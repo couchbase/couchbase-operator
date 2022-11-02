@@ -1075,7 +1075,7 @@ func isTLSSecretRequired(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 
 	return (requestedVersion.Less(minimumVersionNoSecret) ||
 		(requestedVersion.GreaterEqual(minimumVersionNoSecret) &&
-			len(cluster.Spec.Networking.TLS.RootCAs) == 0)), nil
+			(cluster.Spec.Networking.TLS != nil && len(cluster.Spec.Networking.TLS.RootCAs) == 0))), nil
 }
 
 // checkConstraintLDAPConnectionTLS checks that when enabled, the encryption type and
