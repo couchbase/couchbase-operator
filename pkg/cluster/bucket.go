@@ -13,7 +13,7 @@ import (
 )
 
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
-func gatherCouchbaseBuckets(durablitySupported, storageBackendSupported bool, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+func gatherCouchbaseBuckets(durablitySupported, storageBackendSupported, magmaStorageBackendSupported bool, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
 	for _, bucket := range k8sBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
@@ -46,17 +46,36 @@ func gatherCouchbaseBuckets(durablitySupported, storageBackendSupported bool, se
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
+		// cb server version below 7.0.0.
 		if !storageBackendSupported && bucket.Spec.StorageBackend != "" {
 			// warning log for user why spec.StorageBackend is ignored.
-			log.Info("[WARN] spec.storageBackend ignored", "CB image version", "lesser than 7.1.0")
+			log.Info("[WARN] spec.storageBackend cannot be present for server version below 7.0.0", "CB image version", "lesser than 7.0.0")
 		}
 
-		if storageBackendSupported && bucket.Spec.StorageBackend == "" {
-			// default is "couchstore"
+		// cb server version greater or equal to 7.0.0 but less than 7.1.0.
+		// default is "couchstore"
+		if storageBackendSupported && !magmaStorageBackendSupported && bucket.Spec.StorageBackend == "" {
+			log.Info("[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore")
+
 			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
 		}
 
-		if storageBackendSupported && bucket.Spec.StorageBackend != "" {
+		// cb server version greater or equal to 7.0.0 but less than 7.1.0.
+		// magma is not supported.
+		// default is "couchstore"
+		if storageBackendSupported && !magmaStorageBackendSupported && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackend(couchbaseutil.CouchbaseStorageBackendMagma) {
+			log.Info("[WARN] spec.storageBackend cannot be magma for server version below 7.1.0 - default to couchstore")
+
+			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
+		}
+
+		// cb server version greater or equal to 7.1.0 and bucket.Spec.StorageBackend not specified.
+		if magmaStorageBackendSupported && bucket.Spec.StorageBackend == "" {
+			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
+		}
+
+		// cb server version greater or equal to 7.1.0 and bucket.Spec.StorageBackend specified.
+		if magmaStorageBackendSupported && bucket.Spec.StorageBackend != "" {
 			b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(bucket.Spec.StorageBackend)
 		}
 
@@ -138,25 +157,26 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		return nil, err
 	}
 
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	durablitySupported, err := c.IsAtLeastVersion("6.6.0")
 	if err != nil {
 		return nil, err
 	}
 
-	durablitySupported, err := couchbaseutil.VersionAfter(tag, "6.6.0")
+	// storageBackend is only allowed above CB version 7.0.0.
+	storageBackendSupported, err := c.IsAtLeastVersion("7.0.0")
 	if err != nil {
 		return nil, err
 	}
 
-	// storageBackend is only allowed above CB version 7.1.0.
-	storageBackendSupported, err := couchbaseutil.VersionAfter(tag, "7.1.0")
+	// magma storageBackend is only allowed above CB version 7.1.0.
+	magmaStorageBackendSupported, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return nil, err
 	}
 
 	allBuckets := []couchbaseutil.Bucket{}
 
-	allBuckets = gatherCouchbaseBuckets(durablitySupported, storageBackendSupported, selector, c.k8s.CouchbaseBuckets.List(), allBuckets)
+	allBuckets = gatherCouchbaseBuckets(durablitySupported, storageBackendSupported, magmaStorageBackendSupported, selector, c.k8s.CouchbaseBuckets.List(), allBuckets)
 	allBuckets = gatherEphemeralBuckets(durablitySupported, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets)
 
@@ -187,6 +207,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
+				// Since, BucketStorageBackend is non-editable, once created.
+				// This avoids running any update reconcile loop,
+				// if BucketStorageBackend seems to be the only one different.
+				r.BucketStorageBackend = a.BucketStorageBackend
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
 					c.logUpdate(a, r)

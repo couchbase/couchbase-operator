@@ -461,7 +461,7 @@ func TestCouchbaseBucketStorageBackendDefault(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
 
 	// Static configuration
 	clusterSize := constants.Size1

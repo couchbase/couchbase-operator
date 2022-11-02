@@ -46,6 +46,11 @@ func TestCouchbaseVersionAfter(t *testing.T) {
 			"1.0.6",
 			true,
 		},
+		{
+			"7.0.3",
+			"7.0.0",
+			true,
+		},
 	}
 	for _, testcase := range testcases {
 		valid, err := VersionAfter(testcase.actualVersion, testcase.requiredVersion)
@@ -54,7 +59,7 @@ func TestCouchbaseVersionAfter(t *testing.T) {
 		}
 
 		if valid != testcase.valid {
-			t.Errorf("unexpectedly failed version check: %s,%s - %s", testcase.actualVersion, testcase.requiredVersion, strconv.FormatBool(testcase.valid))
+			t.Errorf("unexpectedly failed version check: version: %s,required: %s - %s", testcase.actualVersion, testcase.requiredVersion, strconv.FormatBool(testcase.valid))
 		}
 	}
 }

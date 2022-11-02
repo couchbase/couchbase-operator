@@ -1081,11 +1081,10 @@ type CouchbaseBucketSpec struct {
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Name BucketName `json:"name,omitempty"`
 
-	// StorageBackend to be assigned to and used by the bucket.
+	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
+	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
 	// This cannot be edited after bucket creation.
-	// Two different backend storage mechanisms can be used - "couchstore" or "magma".
-	// The value can be either of those, defaulting to "couchstore"
-	// StorageBackend is only valid for Couchbase Server 7.1.0 onward.
+	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,

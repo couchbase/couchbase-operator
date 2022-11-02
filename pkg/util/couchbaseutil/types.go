@@ -727,8 +727,9 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.BucketType = "couchbase"
 	}
 
-	// For CB Server 7.1.0+
-	if status.StorageBackend != "" {
+	// For CB Server 7.0.0+
+	// check "undefined"! looks crazy right? well, there's javascript somewhere
+	if status.StorageBackend != "" && status.StorageBackend != "undefined" {
 		b.BucketStorageBackend = status.StorageBackend
 	}
 
@@ -754,7 +755,6 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.IoPriority = status.GetIoPriority()
 	b.DurabilityMinLevel = status.DurabilityMinLevel
 	b.MaxTTL = status.MaxTTL
-	b.BucketStorageBackend = status.StorageBackend
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -772,7 +772,7 @@ func (b *Bucket) FormEncode(update bool) []byte {
 	data.Set("bucketType", b.BucketType)
 	data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
 
-	// Adds storageBackend for CB Server 7.1.0 onwards.
+	// Adds storageBackend for CB Server 7.0.0 onwards.
 	if b.BucketStorageBackend != "" {
 		data.Set("storageBackend", string(b.BucketStorageBackend))
 	}

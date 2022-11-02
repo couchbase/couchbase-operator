@@ -2774,8 +2774,14 @@ func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseClu
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
+	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
+		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
+	}
+
 	if prev.Spec.StorageBackend != curr.Spec.StorageBackend {
-		errs = append(errs, fmt.Errorf("spec.storageBackend value in body %s can not be different from previous value %s", curr.Spec.StorageBackend, prev.Spec.StorageBackend))
+		if !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
+			errs = append(errs, fmt.Errorf("spec.storageBackend value in body %s cannot be different from previous value %s", curr.Spec.StorageBackend, prev.Spec.StorageBackend))
+		}
 	}
 
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
@@ -2916,6 +2922,16 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 		return nil
 	}
 
+	srvImgTag, err := k8sutil.CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
+	srvVerAfter712, err := couchbaseutil.VersionAfter(srvImgTag, "7.1.2")
+	if err != nil {
+		return err
+	}
+
 	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
@@ -2938,8 +2954,8 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 	// check if any server class has FTS, Eventing, or Analytics.
 	for _, config := range cluster.Spec.Servers {
 		services := couchbasev2.ServiceList(config.Services)
-		if services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService) {
-			return fmt.Errorf("search, eventing or analytics services cannot be used in magma buckets for CB Server 7.1.0. One or more of those services has been used as server class: %v", services.StringSlice())
+		if !srvVerAfter712 && (services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService)) {
+			return fmt.Errorf("search, eventing or analytics services cannot be used in magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v", services.StringSlice())
 		}
 	}
 
