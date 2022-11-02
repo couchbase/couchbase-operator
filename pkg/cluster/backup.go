@@ -740,6 +740,7 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 				},
 				Spec: corev1.PodSpec{
 					NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
+					Tolerations:        c.cluster.Spec.Backup.Tolerations,
 					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 					InitContainers:     nil,
