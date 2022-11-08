@@ -925,6 +925,8 @@ TimeWindow allows restriction of when compaction can occur.
 
 *Type*: `boolean`
 
+*Default*: `False`
+
 ==== Description
 
 AbortCompactionOutsideWindow stops compaction processes when the process moves outside the window.

@@ -5,6 +5,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -72,6 +73,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintMemoryAllocations,
 		checkConstraintMTLSPaths,
 		checkConstraintAutoCompactionTombstonePurgeInterval,
+		checkConstraintAutoCompactionTimeWindow,
 		checkConstraintLDAPAuthentication,
 		checkConstraintLDAPConnectionTLS,
 		checkConstraintLDAPAuthorization,
@@ -1024,6 +1026,52 @@ func checkConstraintMTLSPaths(v *types.Validator, cluster *couchbasev2.Couchbase
 // checkConstraintAutoCompactionTombstonePurgeInterval checks that the tombstone purge
 // interval is in range.
 func checkConstraintAutoCompactionTombstonePurgeInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
+	if purgeInterval < 1.0 {
+		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
+	}
+
+	if purgeInterval > 60.0*24.0 {
+		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoCompactionTimeWindow checks that the autocompaction time window is valid with
+// start time being before end time.
+func checkConstraintAutoCompactionTimeWindow(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	timeWindow := cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow
+
+	if timeWindow.Start != nil {
+		// both start and end are required for valid time window
+		if timeWindow.End == nil {
+			return errors.Required("spec.cluster.autoCompaction.timeWindow.end", "body", nil)
+		}
+
+		// cluster will not start if start and end times are the same
+		if *timeWindow.Start == *timeWindow.End {
+			return fmt.Errorf("spec.cluster.autoCompaction.timeWindow.start in body cannot be the same as timeWindow.end")
+		}
+
+		// parse out hours and minutes.
+		// the crd already validates the format is HH:MM
+		startWindow := strings.Split(*timeWindow.Start, ":")
+		startHH, _ := strconv.Atoi(startWindow[0])
+		startMM, _ := strconv.Atoi(startWindow[1])
+		endWindow := strings.Split(*timeWindow.End, ":")
+		endHH, _ := strconv.Atoi(endWindow[0])
+		endMM, _ := strconv.Atoi(endWindow[1])
+
+		// start must be before end
+		if startHH*60+startMM > endHH*60+endMM {
+			return fmt.Errorf("spec.cluster.autoCompaction.timeWindow.start in body must be less than timeWindow.end")
+		}
+	} else if timeWindow.End != nil {
+		// cannot have end without start
+		return errors.Required("spec.cluster.autoCompaction.timeWindow.start", "body", nil)
+	}
+
 	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
 	if purgeInterval < 1.0 {
 		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")

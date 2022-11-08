@@ -1056,6 +1056,31 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoCompaction.tombstonePurgeInterval`},
 		},
 		{
+			name:           "TestValidateAutoCompactionInvalidStartEqualsEnd",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "07:30")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.timeWindow.start`},
+		},
+		{
+			name:           "TestValidateAutoCompactionInvalidStartAfterEnd",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "08:00")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.timeWindow.start`},
+		},
+		{
+			name:           "TestValidateAutoCompactionInvalidStartMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction/timeWindow/start")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.timeWindow.start`},
+		},
+		{
+			name:           "TestValidateAutoCompactionInvalidEndMissing",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction/timeWindow/end")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.timeWindow.end`},
+		},
+
+		{
 			name:           "TestValidateDataServiceMemoryQuotaUnderflow",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/dataServiceMemoryQuota", "0Mi")},
 			shouldFail:     true,

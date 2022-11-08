@@ -768,26 +768,6 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 		viewFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.Value()
 	}
 
-	fromHour := 0
-	fromMinute := 0
-
-	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start != "" {
-		// validated by DAC
-		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start, ":")
-		fromHour, _ = strconv.Atoi(parts[0])
-		fromMinute, _ = strconv.Atoi(parts[1])
-	}
-
-	toHour := 0
-	toMinute := 0
-
-	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End != "" {
-		// validated by DAC
-		parts := strings.Split(c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End, ":")
-		toHour, _ = strconv.Atoi(parts[0])
-		toMinute, _ = strconv.Atoi(parts[1])
-	}
-
 	requested := &couchbaseutil.AutoCompactionSettings{
 		AutoCompactionSettings: couchbaseutil.AutoCompactionAutoCompactionSettings{
 			DatabaseFragmentationThreshold: couchbaseutil.AutoCompactionDatabaseFragmentationThreshold{
@@ -800,15 +780,26 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 			},
 			ParallelDBAndViewCompaction: c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
 			IndexCompactionMode:         "circular",
-			AllowedTimePeriod: couchbaseutil.AutoCompactionAllowedTimePeriod{
-				FromHour:     fromHour,
-				FromMinute:   fromMinute,
-				ToHour:       toHour,
-				ToMinute:     toMinute,
-				AbortOutside: c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.AbortCompactionOutsideWindow,
-			},
 		},
 		PurgeInterval: c.cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0,
+	}
+
+	// Time window should only be provided if explicitly specified by user
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start != nil {
+		// Even though the DAC has validated the time window to ensure appropriate end time,
+		// some people don't care about the DAC so some checks are still needed.
+		if c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End != nil {
+			autoCompactionTimePeriod := couchbaseutil.AutoCompactionAllowedTimePeriod{
+				AbortOutside: c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.AbortCompactionOutsideWindow,
+			}
+			parts := strings.Split(*c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.Start, ":")
+			autoCompactionTimePeriod.FromHour, _ = strconv.Atoi(parts[0])
+			autoCompactionTimePeriod.FromMinute, _ = strconv.Atoi(parts[1])
+			parts = strings.Split(*c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End, ":")
+			autoCompactionTimePeriod.ToHour, _ = strconv.Atoi(parts[0])
+			autoCompactionTimePeriod.ToMinute, _ = strconv.Atoi(parts[1])
+			requested.AutoCompactionSettings.AllowedTimePeriod = autoCompactionTimePeriod
+		}
 	}
 
 	// Write

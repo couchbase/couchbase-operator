@@ -2891,14 +2891,15 @@ type ViewFragmentationThreshold struct {
 type TimeWindow struct {
 	// Start is a wallclock time, in the form HH:MM, when a compaction is permitted to start.
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
-	Start string `json:"start,omitempty"`
+	Start *string `json:"start,omitempty"`
 
 	// End is a wallclock time, in the form HH:MM, when a compaction should stop.
 	// +kubebuilder:validation:Pattern="^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$"
-	End string `json:"end,omitempty"`
+	End *string `json:"end,omitempty"`
 
 	// AbortCompactionOutsideWindow stops compaction processes when the
 	// process moves outside the window.
+	// +kubebuilder:default=false
 	AbortCompactionOutsideWindow bool `json:"abortCompactionOutsideWindow,omitempty"`
 }
 
