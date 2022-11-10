@@ -499,7 +499,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 
 	var container corev1.Container
 
-	var affinity *corev1.Affinity
+	affinity := new(corev1.Affinity)
 
 	switch action {
 	case Incremental:
