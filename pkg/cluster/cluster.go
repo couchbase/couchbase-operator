@@ -605,33 +605,16 @@ func (c *Cluster) recoverClusterDown() (bool, error) {
 	return false, nil
 }
 
-// filterClusterPods returns a filtered list of pods that belong to this Couchbase cluster
-// instance.
-func (c *Cluster) filterClusterPods(pods []*v1.Pod) []*v1.Pod {
-	var result []*v1.Pod
+// getClusterPods returns all pods related to the cluster, excluding any anciliary
+// ones such as backup and restore.
+func (c *Cluster) getClusterPods() []*v1.Pod {
+	return c.discardUntrustedPods(c.k8s.Pods.List(constants.LabelServer))
+}
 
+// discardUntrustedPods removes anything we don't "trust" e.g. looks a bit off like
+// a user has tried to inject something into the cluster outside of our control.
+func (c *Cluster) discardUntrustedPods(pods []*v1.Pod) (filtered []*v1.Pod) {
 	for _, pod := range pods {
-		// Avoid polling deleted pods
-		if pod.DeletionTimestamp != nil {
-			continue
-		}
-
-		// Filter out anything we shouldn't be looking at.  Technically we should
-		// just select anything with the "server" label, but that will have to wait
-		// until 2.2 when all clusters are upgraded to using the new scheme.
-		if _, ok := pod.Labels[constants.LabelBackup]; ok {
-			log.V(2).Info("Backup pod ignored", "cluster", c.namespacedName(), "name", pod.Name)
-			continue
-		}
-
-		if _, ok := pod.Labels[constants.LabelBackupRestore]; ok {
-			log.V(2).Info("Restore pod ignored", "cluster", c.namespacedName(), "name", pod.Name)
-			continue
-		}
-
-		// Finally filter out anything we don't "trust" e.g. looks a bit off like
-		// a user has tried to inject something into the cluster outside of our
-		// control.
 		if len(pod.OwnerReferences) < 1 {
 			log.Info("Pod ignored, no owner", "cluster", c.namespacedName(), "name", pod.Name)
 			continue
@@ -642,16 +625,10 @@ func (c *Cluster) filterClusterPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 
-		result = append(result, pod)
+		filtered = append(filtered, pod)
 	}
 
-	return result
-}
-
-// getClusterPods returns all pods related to the cluster, excluding any anciliary
-// ones such as backup and restore.
-func (c *Cluster) getClusterPods() []*v1.Pod {
-	return c.filterClusterPods(c.k8s.Pods.List())
+	return
 }
 
 func (c *Cluster) getClusterPodsByPhase() (running, pending []*v1.Pod) {

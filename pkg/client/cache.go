@@ -113,11 +113,21 @@ func (c *PodCache) Get(name string) (*corev1.Pod, bool) {
 	return obj.(*corev1.Pod), true
 }
 
-// list returns all pods.
-func (c *PodCache) List() (pods []*corev1.Pod) {
+// list returns pods by label matchers.
+func (c *PodCache) List(label string) (pods []*corev1.Pod) {
 	objs := c.resourceCache.informer.GetStore().List()
 	for _, obj := range objs {
-		pods = append(pods, obj.(*corev1.Pod))
+		pod, ok := obj.(*corev1.Pod)
+		if ok {
+			// Avoid polling deleted pods
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
+
+			if _, exists := pod.Labels[label]; exists {
+				pods = append(pods, pod)
+			}
+		}
 	}
 
 	return
