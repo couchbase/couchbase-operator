@@ -2188,6 +2188,12 @@ type Backup struct {
 	// run any backup and restore operations to.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// Labels defines additional labels to appear on the backup/restore pods.
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Annotations defines additional annotations to appear on the backup/restore pods.
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Resources is the resource requirements for the backup and restore
 	// containers.  Will be populated by defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`

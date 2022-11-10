@@ -514,7 +514,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 		affinity.PodAntiAffinity = k8sutil.ApplyPodAntiAffinityForCluster(c.cluster.Name)
 	}
 
-	labels := k8sutil.LabelsForCluster(c.cluster)
+	labels := k8sutil.LabelsForClusterMerged(c.cluster, c.cluster.Spec.Backup.Labels)
 	labels[constants.LabelBackup] = backup.Name
 
 	cronjob := &batchv1.CronJob{
@@ -540,6 +540,7 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 								constants.LabelCluster: c.cluster.Name,
 								constants.LabelBackup:  backup.Name,
 							},
+							Annotations: c.cluster.Spec.Backup.Annotations,
 						},
 						Spec: corev1.PodSpec{
 							Affinity: affinity,
@@ -712,7 +713,7 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 		}
 	}
 
-	labels := k8sutil.LabelsForCluster(c.cluster)
+	labels := k8sutil.LabelsForClusterMerged(c.cluster, c.cluster.Spec.Backup.Labels)
 	labels[constants.LabelBackupRestore] = restore.Name
 
 	restorejob := &batchv1.Job{
@@ -737,6 +738,7 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 						constants.LabelCluster:       c.cluster.Name,
 						constants.LabelBackupRestore: restore.Name,
 					},
+					Annotations: c.cluster.Spec.Backup.Annotations,
 				},
 				Spec: corev1.PodSpec{
 					NodeSelector:       c.cluster.Spec.Backup.NodeSelector,

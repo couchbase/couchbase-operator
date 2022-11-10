@@ -205,6 +205,18 @@ func LabelsForCluster(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	}
 }
 
+// LabelsForClusterMerged returns a basic set of labels which will identiy a couchbase
+// pod within a specific cluster, with optional labels merged in.
+func LabelsForClusterMerged(cluster *couchbasev2.CouchbaseCluster, labels map[string]string) map[string]string {
+	baseLabels := LabelsForCluster(cluster)
+
+	if labels == nil {
+		return baseLabels
+	}
+
+	return mergeLabels(baseLabels, labels)
+}
+
 func IsKubernetesResourceAlreadyExistError(err error) bool {
 	return apierrors.IsAlreadyExists(err)
 }

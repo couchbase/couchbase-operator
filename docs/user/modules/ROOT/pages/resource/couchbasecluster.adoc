@@ -25,9 +25,11 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-autoresourceallocation-overheadpercent,overheadPercent>>: 25
   <<couchbaseclusters-spec-autoscalestabilizationperiod,autoscaleStabilizationPeriod>>: ""
   <<couchbaseclusters-spec-backup,backup>>:
+    <<couchbaseclusters-spec-backup-annotations,annotations>>:
     <<couchbaseclusters-spec-backup-image,image>>: couchbase/operator-backup:1.3.1
     <<couchbaseclusters-spec-backup-imagepullsecrets,imagePullSecrets>>:
     - <<couchbaseclusters-spec-backup-imagepullsecrets-name,name>>: ""
+    <<couchbaseclusters-spec-backup-labels,labels>>:
     <<couchbaseclusters-spec-backup-managed,managed>>: false
     <<couchbaseclusters-spec-backup-nodeselector,nodeSelector>>: {}
     <<couchbaseclusters-spec-backup-objectendpoint,objectEndpoint>>:
@@ -453,6 +455,16 @@ When undefined, the HPA is never put into maintenance mode during rebalance.
 
 Backup defines whether the Operator should manage automated backups, and how to lookup backup resources.
 
+=== couchbaseclusters.spec.backup.annotations
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Annotations defines additional annotations to appear on the backup/restore pods.
+
 === couchbaseclusters.spec.backup.image
 
 ==== Constraints
@@ -488,6 +500,16 @@ ImagePullSecrets allow you to use an image from private repositories and non-doc
 Name of the referent.
 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields.
 apiVersion, kind, uid?.
+
+=== couchbaseclusters.spec.backup.labels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+Labels defines additional labels to appear on the backup/restore pods.
 
 === couchbaseclusters.spec.backup.managed
 
