@@ -621,7 +621,7 @@ func TestServersServerGroupsAddsToPodNodeSelector(t *testing.T) {
 	nodes := e2eutil.MustNodes(t, kubernetes)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-
+	cluster.Spec.AntiAffinity = true
 	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{}
 
 	region := getRegionFromNodeWithFailureDomainRegionLabel(nodes)
@@ -671,6 +671,20 @@ func TestServersServerGroupsAddsToPodNodeSelector(t *testing.T) {
 		}
 
 		e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+	}
+
+	for _, node := range nodes {
+		pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: constants.CouchbaseLabel,
+			FieldSelector: "spec.nodeName=" + node.Name,
+		})
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		if len(pods.Items) > 1 {
+			e2eutil.Die(t, fmt.Errorf("There were more than one pods in a node, despite anti affinity set to true"))
+		}
 	}
 }
 
