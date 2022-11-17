@@ -3320,8 +3320,8 @@ type PassphraseRestConfig struct {
 type StaticTLS struct {
 	// ServerSecret is a secret name containing TLS certs used by each Couchbase member pod
 	// for the communication between Couchbase server and its clients.  The secret must
-	// contain a certificate chain (data key "couchbase-operator.crt") and a private
-	// key (data key "couchbase-operator.key").  The private key must be in the PKCS#1 RSA
+	// contain a certificate chain (data key "chain.pem") and a private
+	// key (data key "pkey.key").  The private key must be in the PKCS#1 RSA
 	// format.  The certificate chain must have a required set of X.509v3 subject alternative
 	// names for all cluster addressing modes.  See the Operator TLS documentation for more
 	// information.
