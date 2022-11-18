@@ -860,8 +860,13 @@ func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serv
 		// populate a new PodAntiAffinity enforcing no two cb pods on same node.
 		podAntiAffinity := ApplyPodAntiAffinityForCluster(cluster.Name)
 
+		if pod.Spec.Affinity == nil {
+			// initialise new Affinity
+			pod.Spec.Affinity = &v1.Affinity{}
+		}
+
 		if pod.Spec.Affinity.PodAntiAffinity == nil {
-			// add new
+			// initialise new PodAntiAffinity
 			pod.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
 		}
 		// append to existing
