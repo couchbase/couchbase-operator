@@ -17,7 +17,7 @@ type AzureCredentials struct {
 	accountKey  string
 }
 type AzureProvider struct {
-	client *azblob.ServiceClient
+	client *azblob.Client
 	creds  *AzureCredentials
 }
 
@@ -36,7 +36,7 @@ func NewAzureProvider(creds ...string) (Provider, error) {
 	}
 
 	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net", accountName)
-	client, err := azblob.NewServiceClientWithSharedKey(serviceURL, cred, nil)
+	client, err := azblob.NewClientWithSharedKeyCredential(serviceURL, cred, nil)
 
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (provider *AzureProvider) CreateBucket(bucketName string) error {
 		return nil
 	}
 
-	_, err = provider.client.CreateContainer(ctx, bucketName, &azblob.ContainerCreateOptions{})
+	_, err = provider.client.CreateContainer(ctx, bucketName, &azblob.CreateContainerOptions{})
 	if err != nil {
 		return err
 	}
@@ -66,15 +66,16 @@ func (provider *AzureProvider) CreateBucket(bucketName string) error {
 }
 
 func (provider *AzureProvider) GetBucket(bucketName string) (bool, error) {
-	pager := provider.client.ListContainers(nil)
-	if pager.Err() != nil {
-		return false, pager.Err()
-	}
-
+	pager := provider.client.NewListContainersPager(nil)
 	ctx := context.Background()
 
-	for pager.NextPage(ctx) {
-		resp := pager.PageResponse()
+	for pager.More() {
+		resp, err := pager.NextPage(ctx)
+
+		if err != nil {
+			return false, err
+		}
+
 		for _, container := range resp.ContainerItems {
 			if *container.Name == bucketName {
 				return true, nil

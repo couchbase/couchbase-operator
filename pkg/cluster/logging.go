@@ -60,7 +60,7 @@ func (c *Cluster) reconcileLogConfig() error {
 			k8sutil.LoggingConfigurationFile: []byte("@include /fluent-bit/etc/fluent-bit.conf\n"),
 
 			// Redaction salt if required using default of cluster name
-			"redaction.salt": []byte(c.cluster.ClusterName),
+			"redaction.salt": []byte(c.cluster.ObjectMeta.Name),
 		},
 	}
 
