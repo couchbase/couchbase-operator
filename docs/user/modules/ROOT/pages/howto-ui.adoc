@@ -44,7 +44,8 @@ You can then connect to \http://localhost:8091 to access the UI.
 ====
 If you must connect over TLS then forward port 18091 and use the address `\https://localhost:18091`.
 Ensure your cluster administrator has provided a CA certificate to be installed into your browser's trust store.
-If certificate based authentication is used, then ensure you have installed your client certificate/key into your browser too.
+If certificate-based authentication is used,
+then ensure you have installed your client certificate/key into your browser too.
 As you are connecting to `localhost` it is also important that your cluster administrator has added the `localhost` subject alternative address name into the cluster TLS certificate.
 ====
 
@@ -61,9 +62,10 @@ Given the DNS domain `my-cluster.acme.org`, to connect to the cluster using TLS 
 == Configuring an Ingress
 
 A https://kubernetes.io/docs/concepts/services-networking/ingress/[Kubernetes ingress^] can be used to expose the Couchbase administrative console to a network external to the Kubernetes cluster.
-Ingresses are not managed by the Operator because the required configuration is not generic, however the configuration for your specific provider can be summarized as:
+Ingresses are not managed by the Operator because the required configuration is not generic.
+However, the configuration for your specific provider can be summarized as:
 
-* Enable cookie based client session affinity.
+* Enable cookie-based client session affinity.
 
 Couchbase administrative console cookies are valid only for the pod you authenticated against.
 Client affinity ensures the ingress routes all requests for a session to the same pod each time.
@@ -79,17 +81,17 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/affinity: cookie # <.>
     nginx.ingress.kubernetes.io/affinity-mode: persistent
-  spec:
-    rules:
-    - http: # <.>
-        paths:
-        - path: / # <.>
-          pathType: Prefix
-          backend:
-            service:
-              name: my-cluster # <.>
-              port:
-                number: 8091 # <.>
+spec:
+rules:
+- http: # <.>
+    paths:
+    - path: / # <.>
+      pathType: Prefix
+      backend:
+        service:
+          name: my-cluster # <.>
+          port:
+            number: 8091 # <.>
 ----
 
 <.> The ingress is annotated with `affinity` -- this enables client affinity -- and `affinity-mode` -- this ensures each client session is routed to the same backend pod.
@@ -99,7 +101,7 @@ metadata:
 The Operator will create a headless service by default for every cluster -- in order to create DNS entries -- and can be used as the backend service for the ingress.
 The service will be named the same as a Couchbase cluster resource.
 <.> The port is the backend port to connect to.
-In this instance the ingress is plain text HTTP, so 8091.
+In this instance, the ingress is plain text HTTP, so 8091.
 
 [TIP]
 ====
