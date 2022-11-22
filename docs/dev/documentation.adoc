@@ -114,7 +114,7 @@ This is because some brand names e.g. Red Hat, should be a certain way for corre
 
 Images are all created with https://diagrams.net[diagrams.net^].
 There's no real style defined for these, but try to keep things consistent with existing images e.g. default font size, Arial face.
-Existing images are on Google Drive, ask Simon if you need access.
+Existing images are on Google Drive:  https://drive.google.com/drive/folders/1Nl1o7VomrJlxuqfxxSV4ds3q5JQJbXz6?usp=sharing
 
 == Reviewing Documentation
 
