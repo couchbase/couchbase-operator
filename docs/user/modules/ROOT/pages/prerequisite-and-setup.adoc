@@ -25,7 +25,7 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 6.6, 7.0
+| 6.6 - 7.1
 |===
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
@@ -44,9 +44,9 @@ This release supports the following container images for xref:concept-backup.ado
 | Backup Utility
 | Backup From and Restore To
 
-a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.0`^]
-a| xref:7.0@server:backup-restore:cbbackupmgr.adoc[`cbbackupmgr 7.0.0`]
-| Couchbase Server 6.6--7.0
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.2`^]
+a| https://docs.couchbase.com/server/7.1/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.1.3`^]
+| Couchbase Server 6.6--7.1
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
@@ -72,6 +72,9 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 
 | 2.3.0
 | 1.0.4, 1.1.0 - 1.1.3, 1.2.0
+
+| 2.4.0
+| 1.1.0 - 1.1.3, 1.2.0, 1.2.2
 |===
 
 .Operator Fluent Bit Compatibility
@@ -98,10 +101,10 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.21, 1.22
+| 1.21 - 1.25
 
 | Red Hat OpenShift Container Platform
-| 4.8, 4.9
+| 4.8 - 4.12
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
@@ -128,15 +131,8 @@ This release supports the following managed Kubernetes services and utilities:
 * Amazon EKS
 * Google GKE
 * Microsoft AKS
-* Rancher
-
-[NOTE]
-====
-With Operator 2.2.0, we added support for Bottlerocket OS.
-Bottlerocket is a Linux-based open-source operating system that is purpose-built by Amazon Web Services for running containers.
-
-To create an EKS cluster with Bottlerocket OS, follow the steps https://github.com/bottlerocket-os/bottlerocket/blob/develop/QUICKSTART-EKS.md[here^].
-====
+* K3s
+* Bottlerocket OS
 
 [#compatibility-pv]
 == Persistent Volume Compatibility
@@ -144,26 +140,14 @@ To create an EKS cluster with Bottlerocket OS, follow the steps https://github.c
 Persistent volumes are mandatory for production deployments.
 Review the Autonomous Operator xref:best-practices.adoc#persistent-volumes-best-practices[best practices] for more information about cluster supportability requirements.
 
-This release supports the following persistent volume provisioners:
+== Hardware Requirements
 
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#aws-ebs[AWS EBS^]
+It is highly recommended that your Couchbase clusters are deployed with some form of compute and memory resource request in order to ensure fair scheduling of workloads and to ensure resources are available to meet basic service levels.
 
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#azure-disk[Azure Disk^]
-
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#ceph-rbd[Ceph RBD^]
-
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#gce-pd[GCE PD^]
-
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#glusterfs[GlusterFS^]
-
-* https://kubernetes.io/docs/concepts/storage/storage-classes/#portworx-volume[Portworx Volume^]
-
-== CPU and Memory Requirements
-
-It is highly recommended that your Couchbase clusters are deployed with some form of memory resource request in order to ensure fair scheduling of workloads and to ensure resources are available to meet basic service levels.
+=== CPU and Memory  Requirements
 
 You can set all resource allocations yourself explicitly, however for new users to the platform we recommend using xref:resource/couchbasecluster.adoc#spec-autoresourceallocation[auto resource allocation].
-Using this feature will require:
+Auto resource allocation will require:
 
 * 2 CPUs per Couchbase pod by default.
 * 512MiB of memory per pod for each of the Data, Index, Search, and Eventing Services that are enabled.
@@ -172,6 +156,14 @@ Using this feature will require:
   For a typical development cluster where all services are enabled, this would equal 3.75GiB.
 
 You can read more about pod scheduling in the xref:best-practices.adoc#pod-scheduling[best practices] documentation.
+
+=== Architecture requirements
+
+The Autonomous Operator supports both ARM and AMD64 Kubernetes clusters.
+The architecture of each node must be uniform across the cluster as the use of mixed architecture nodes is not supported.
+
+NOTE: The official Couchbase docker repository contains multi-arch images which do not require explicit references to architecture tags when being pulled and deployed.
+However, when pulling from a private repository, or performing intermediate processing on a machine with a different architecture than the deployed cluster, the use of explicit tags may be required to ensure the correct images are deployed.
 
 == RBAC and Networking Requirements
 
