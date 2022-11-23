@@ -171,7 +171,7 @@ By default, all data is included.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -211,7 +211,7 @@ FilterValues only restores documents whose values match the provided regular exp
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -245,7 +245,7 @@ Map sources may only be specified once, and may not overlap.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -259,7 +259,7 @@ Source defines the data source of the mapping, this may be either a bucket, scop
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -349,7 +349,7 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(az|s3|gs)://.\{3,}$`
+*Pattern (Regular Expression)*: `^(az|s3|gs)://.{3,}$`
 
 ==== Description
 
@@ -374,7 +374,7 @@ If no repository is specified, the backup container will choose the latest.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]{3,63}$`
 
 ==== Description
 

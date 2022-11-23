@@ -147,7 +147,7 @@ This field defaults to `CouchbaseCollection` if not specified.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250}$`
 
 ==== Description
 
@@ -189,7 +189,7 @@ Only one default scope is permitted to be contained in a bucket.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250}$`
 
 ==== Description
 

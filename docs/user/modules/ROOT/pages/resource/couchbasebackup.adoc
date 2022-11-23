@@ -220,7 +220,7 @@ Modifications to this field will only take effect on the next full backup.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -240,7 +240,7 @@ This field cannot be used at the same time as included items.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -352,7 +352,7 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(az|s3|gs)://.\{3,}$`
+*Pattern (Regular Expression)*: `^(az|s3|gs)://.{3,}$`
 
 ==== Description
 
@@ -366,7 +366,7 @@ i.e s3://bucket, az://bucket or gs://bucket.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]{3,63}$`
 
 ==== Description
 

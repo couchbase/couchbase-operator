@@ -26,6 +26,7 @@ couchbase-operator-certification*.tar.bz2
 /go/
 /bin/
 /venv/
+scripts/venv/
 /node-*/
 
 *terraform.*
