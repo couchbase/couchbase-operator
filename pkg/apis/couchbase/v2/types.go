@@ -2254,8 +2254,10 @@ type CouchbaseClusterLDAPSpec struct {
 	// password of the binding LDAP user.
 	BindSecret string `json:"bindSecret"`
 
-	// TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
-	// The secret must have the key with the name "ca.crt".
+	// TLSSecret is the name of a Kubernetes secret to use explcitly for LDAP ca cert.
+	// If TLSSecret is not provided, certificates found in `couchbaseclusters.spec.networking.tls.rootCAs`
+	// will be used instead.
+	// If provided, the secret must contain the ca to be used under the name "ca.crt".
 	TLSSecret string `json:"tlsSecret,omitempty"`
 
 	// AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
