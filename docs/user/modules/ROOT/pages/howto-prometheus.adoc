@@ -170,6 +170,7 @@ spec:
       enabled: true # <.>
       image: couchbase/exporter:{prometheus-version} # <.>
       authorizationSecret: cb-metrics-token # <.>
+      refreshRate: 60 #<.>
 ----
 
 <.> Setting xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-monitoring-prometheus-enabled[`couchbaseclusters.spec.monitoring.prometheus.enabled`] to `true` enables injection of the sidecar into Couchbase Server pods.
@@ -181,6 +182,8 @@ If pulling directly from the the Red Hat Container Catalog, then the path will b
 If image pull secrets are required to access the image, they are inherited from the Couchbase Server pod and can be set explicitly with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-pod[`couchbaseclusters.spec.servers.pod.spec.imagePullSecrets`] field or implicitly with a service account specified with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-pod[`couchbaseclusters.spec.servers.pod.spec.serviceAccountName`] field.
 
 <.> You can optionally specify a Kubernetes Secret that contains a bearer token value that clients will need to use to gain access to the Prometheus metrics.
+
+<.> `refreshRate` changes how often the exporter polls Couchbase Server for bucket metrics.  In server 7.0+ this can be an expensive operation depending upon the cluster size and number of buckets.
 
 [NOTE]
 ====
