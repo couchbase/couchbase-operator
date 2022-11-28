@@ -207,6 +207,10 @@ type CouchbaseBackupSpec struct {
 	// Used in Full/Incremental and FullOnly backup strategies.
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
 
+	// Amount of time to elapse before a completed job is deleted.
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
 	// Amount of successful jobs to keep.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
@@ -235,8 +239,8 @@ type CouchbaseBackupSpec struct {
 	// Size allows the specification of a backup persistent volume, when using
 	// volume based backup. More info:
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
-	// +kubebuilder:default="20Gi"
 	// +kubebuilder:validation:Type=string
+	// +kubebuilder:default="20Gi"
 	Size *resource.Quantity `json:"size,omitempty"`
 
 	// AutoScaling allows the volume size to be dynamically increased.
@@ -269,6 +273,12 @@ type CouchbaseBackupSpec struct {
 	// backup.  By default, all data is included.  Modifications
 	// to this field will only take effect on the next full backup.
 	Data *CouchbaseBackupDataFilter `json:"data,omitempty"`
+
+	// EphemeralVolume sets backup to use an ephemeral volume instead
+	// of a persistent volume. This is used when backing up to a remote
+	// cloud provider, where a persistent volume is not needed.
+	// +kubebuilder:default=false
+	EphemeralVolume bool `json:"ephemeralVolume"`
 }
 
 // CouchbaseBackupServiceFilter allows backup filtering per-service.
@@ -558,6 +568,29 @@ type CouchbaseBackupRestoreSpec struct {
 	// Forces data in the Couchbase cluster to be overwritten
 	// even if the data in the cluster is newer than the restore
 	ForceUpdates bool `json:"forceUpdates,omitempty"`
+
+	// StagingVolume contains configuration related to the
+	// ephemeral volume used as staging when restoring from a cloud backup.
+	// +kubebuilder:default={size: "20Gi"}
+	StagingVolume *CouchbaseBackupStagingVolume `json:"stagingVolume,omitempty"`
+
+	// Number of seconds to elapse before a completed job is deleted.
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+}
+
+type CouchbaseBackupStagingVolume struct {
+	// Size allows the specification of a staging volume. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// The ephemeral volume will only be used when restoring from a cloud provider,
+	// if the backup job was created using ephemeral storage.
+	// Otherwise the restore job will share a staging volume with the backup job.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:default="20Gi"
+	Size *resource.Quantity `json:"size,omitempty"`
+
+	// Name of StorageClass to use.
+	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 // CouchbaseBackupRestoreDataFilter allows filtering of restore data by bucket, scope or collection.
@@ -2210,7 +2243,7 @@ type Backup struct {
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
 	// Deprecated: by backup.spec.objectStore.secret
-	// S3Secret contains the region and credentials for operating backups in S3.
+	// S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
 	// This field must be popluated when the `spec.s3bucket` field is specified
 	// for a backup or restore resource.
 	S3Secret string `json:"s3Secret,omitempty"`

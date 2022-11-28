@@ -51,10 +51,14 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-services-ftindex,ftIndex>>: True
     <<couchbasebackuprestores-spec-services-gsiindex,gsiIndex>>: True
     <<couchbasebackuprestores-spec-services-views,views>>: True
+  <<couchbasebackuprestores-spec-stagingvolume,stagingVolume>>:
+    <<couchbasebackuprestores-spec-stagingvolume-size,size>>: 20Gi
+    <<couchbasebackuprestores-spec-stagingvolume-storageclassname,storageClassName>>: ""
   <<couchbasebackuprestores-spec-start,start>>:
     <<couchbasebackuprestores-spec-start-int,int>>: 0
     <<couchbasebackuprestores-spec-start-str,str>>: ""
   <<couchbasebackuprestores-spec-threads,threads>>: 1
+  <<couchbasebackuprestores-spec-ttlsecondsafterfinished,ttlSecondsAfterFinished>>: 0
 <<couchbasebackuprestores-status,status>>:
   <<couchbasebackuprestores-status-archive,archive>>: ""
   <<couchbasebackuprestores-status-backups,backups>>:
@@ -538,6 +542,44 @@ This field defaults to true.
 Views restores views from the backup.
 This field defaults to true.
 
+=== couchbasebackuprestores.spec.stagingVolume
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{'size': '20Gi'}`
+
+==== Description
+
+StagingVolume contains configuration related to the ephemeral volume used as staging when restoring from a cloud backup.
+
+=== couchbasebackuprestores.spec.stagingVolume.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `20Gi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size allows the specification of a staging volume.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes The ephemeral volume will only be used when restoring from a cloud provider, if the backup job was created using ephemeral storage.
+Otherwise the restore job will share a staging volume with the backup job.
+
+=== couchbasebackuprestores.spec.stagingVolume.storageClassName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of StorageClass to use.
+
 === couchbasebackuprestores.spec.start
 
 ==== Constraints
@@ -584,6 +626,18 @@ Str references an absolute backup by name.
 ==== Description
 
 How many threads to use during the restore.
+
+=== couchbasebackuprestores.spec.ttlSecondsAfterFinished
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+Number of seconds to elapse before a completed job is deleted.
 
 == couchbasebackuprestores.status
 

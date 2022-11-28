@@ -1170,3 +1170,12 @@ func (l ScopeOrCollectionNameList) StringSlice() []string {
 
 	return out
 }
+
+// HasCloudStore returns if any remote cloud stores are set.
+func (b CouchbaseBackup) HasCloudStore() bool {
+	return b.Spec.S3Bucket != "" || (b.Spec.ObjectStore != nil && b.Spec.ObjectStore.URI != "")
+}
+
+func (r CouchbaseBackupRestore) HasCloudStore() bool {
+	return r.Spec.S3Bucket != "" || (r.Spec.ObjectStore != nil && r.Spec.ObjectStore.URI != "")
+}

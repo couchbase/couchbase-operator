@@ -27,6 +27,7 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbasebackups-spec-data-include,include>>:
     - ""
+  <<couchbasebackups-spec-ephemeralvolume,ephemeralVolume>>: false
   <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-full,full>>:
     <<couchbasebackups-spec-full-schedule,schedule>>: ""
@@ -54,6 +55,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackups-spec-strategy,strategy>>: full_incremental
   <<couchbasebackups-spec-successfuljobshistorylimit,successfulJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-threads,threads>>: 1
+  <<couchbasebackups-spec-ttlsecondsafterfinished,ttlSecondsAfterFinished>>: 0
 <<couchbasebackups-status,status>>:
   <<couchbasebackups-status-archive,archive>>: ""
   <<couchbasebackups-status-backups,backups>>:
@@ -251,6 +253,21 @@ Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-sco
 Included data cannot overlap e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
 This field cannot be used at the same time as excluded items.
+
+=== couchbasebackups.spec.ephemeralVolume
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+EphemeralVolume sets backup to use an ephemeral volume instead of a persistent volume.
+This is used when backing up to a remote cloud provider, where a persistent volume is not needed.
 
 === couchbasebackups.spec.failedJobsHistoryLimit
 
@@ -607,6 +624,18 @@ Amount of successful jobs to keep.
 
 How many threads to use during the backup.
 This field defaults to 1.
+
+=== couchbasebackups.spec.ttlSecondsAfterFinished
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+Amount of time to elapse before a completed job is deleted.
 
 == couchbasebackups.status
 

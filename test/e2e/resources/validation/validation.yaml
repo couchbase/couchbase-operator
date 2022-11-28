@@ -561,6 +561,21 @@ spec:
   size: "30Gi"
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: backup2
+spec:
+  strategy: full_only
+  full:
+    schedule: "*/5 * * * *"
+  failedJobsHistoryLimit: 3
+  backupRetention: 24h
+  logRetention: 24h
+  objectStore:
+    uri: s3://blah
+  ephemeral: true
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseBackupRestore
 metadata:
   name: restore0

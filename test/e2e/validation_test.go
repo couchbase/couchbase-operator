@@ -2180,6 +2180,12 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			expectedErrors: []string{`spec.size`},
 		},
 		{
+			name:           "TestValidateBackupStagingVolueWithoutCloudOrPersistentVolume",
+			mutations:      patchMap{"backup2": jsonpatch.NewPatchSet().Remove("/spec/objectStore/uri").Replace("/spec/ephemeralVolume", true)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.ephemeralVolume`},
+		},
+		{
 			name:           "TestValidateBackupS3Bucket",
 			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "hellobeans")},
 			shouldFail:     true,

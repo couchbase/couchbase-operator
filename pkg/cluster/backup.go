@@ -31,6 +31,8 @@ const (
 	StoreSecretAccessKey    string            = "secret-access-key"
 	StoreSecretRegion       string            = "region"
 	StoreSecretRefreshToken string            = "refresh-token"
+	BackupVolumeName        string            = "couchbase-cluster-backup-volume"
+	CouchbaseAdminVolume    string            = "couchbase-admin"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -190,9 +192,11 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 	// so we won't create a current backup resource for it, and thus
 	// it's possible to delete all cronjobs and end up here, so ensure
 	// the PVC doesn't already exist first.
-	if _, ok := c.k8s.PersistentVolumeClaims.Get(resource.pvc.Name); !ok {
-		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), resource.pvc, metav1.CreateOptions{}); err != nil {
-			return err
+	if resource.pvc != nil {
+		if _, ok := c.k8s.PersistentVolumeClaims.Get(resource.pvc.Name); !ok {
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), resource.pvc, metav1.CreateOptions{}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -318,6 +322,10 @@ func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested,
 // updateBackupPVC recreates the PVC if it has been deleted or does dyanmic expansion if
 // the backup is reporting that space is running low.
 func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchbasev2.CouchbaseBackup, requested, current *corev1.PersistentVolumeClaim) error {
+	if backup.Spec.EphemeralVolume {
+		return nil
+	}
+
 	if current == nil {
 		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
 			return err
@@ -517,6 +525,14 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	labels := k8sutil.LabelsForClusterMerged(c.cluster, c.cluster.Spec.Backup.Labels)
 	labels[constants.LabelBackup] = backup.Name
 
+	var volume corev1.Volume
+
+	if backup.Spec.EphemeralVolume {
+		volume = generateEphemeralBackupVolume(backup.ObjectMeta.Name, backup.Spec.StorageClassName, backup.Spec.Size)
+	} else {
+		volume = generatePersistentBackupVolume(backup.Name)
+	}
+
 	cronjob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   backup.Name + "-" + string(action),
@@ -531,53 +547,14 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 			FailedJobsHistoryLimit:     &backup.Spec.FailedJobsHistoryLimit,
 			ConcurrencyPolicy:          batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
-				Spec: batchv1.JobSpec{
-					BackoffLimit: &backup.Spec.BackoffLimit,
-					Template: corev1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{
-								constants.LabelApp:     constants.App,
-								constants.LabelCluster: c.cluster.Name,
-								constants.LabelBackup:  backup.Name,
-							},
-							Annotations: c.cluster.Spec.Backup.Annotations,
-						},
-						Spec: corev1.PodSpec{
-							Affinity: affinity,
-							Containers: []corev1.Container{
-								container,
-							},
-							NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
-							RestartPolicy:      corev1.RestartPolicyNever,
-							SecurityContext:    c.cluster.Spec.SecurityContext,
-							ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
-							ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
-							Tolerations:        c.cluster.Spec.Backup.Tolerations,
-							Volumes: []corev1.Volume{
-								{
-									Name: "couchbase-cluster-backup-volume",
-									VolumeSource: corev1.VolumeSource{
-										PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-											ClaimName: backup.Name,
-											ReadOnly:  false,
-										},
-									},
-								},
-								{
-									Name: "couchbase-admin",
-									VolumeSource: corev1.VolumeSource{
-										Secret: &corev1.SecretVolumeSource{
-											SecretName: c.cluster.Spec.Security.AdminSecret,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
+				Spec: *c.createBaseJobSpec(&backup.Spec.BackoffLimit, backup.Spec.TTLSecondsAfterFinished, container, volume),
 			},
 		},
 	}
+
+	// add in backup specific templating.
+	cronjob.Spec.JobTemplate.Spec.Template.ObjectMeta.Labels[constants.LabelBackup] = backup.Name
+	cronjob.Spec.JobTemplate.Spec.Template.Spec.Affinity = affinity
 
 	// Mount objectendpoint cert if set.
 	c.applyObjEndpointCertToCronJob(cronjob)
@@ -667,12 +644,12 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		WorkingDir: "/",
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      "couchbase-cluster-backup-volume",
+				Name:      BackupVolumeName,
 				ReadOnly:  false,
 				MountPath: "/data",
 			},
 			{
-				Name:      "couchbase-admin",
+				Name:      CouchbaseAdminVolume,
 				ReadOnly:  true,
 				MountPath: "/var/run/secrets/couchbase",
 			},
@@ -716,6 +693,16 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 	labels := k8sutil.LabelsForClusterMerged(c.cluster, c.cluster.Spec.Backup.Labels)
 	labels[constants.LabelBackupRestore] = restore.Name
 
+	var volume corev1.Volume
+
+	// only use an ephemeral volume if we can't find a persistent one.
+	_, ok := c.k8s.PersistentVolumeClaims.Get(restore.Spec.Backup)
+	if ok {
+		volume = generatePersistentBackupVolume(restore.Spec.Backup)
+	} else {
+		volume = generateEphemeralBackupVolume(restore.ObjectMeta.Name, restore.Spec.StagingVolume.StorageClassName, restore.Spec.StagingVolume.Size)
+	}
+
 	restorejob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   restore.Name,
@@ -729,52 +716,10 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 				},
 			},
 		},
-		Spec: batchv1.JobSpec{
-			BackoffLimit: &restore.Spec.BackoffLimit,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						constants.LabelApp:           constants.App,
-						constants.LabelCluster:       c.cluster.Name,
-						constants.LabelBackupRestore: restore.Name,
-					},
-					Annotations: c.cluster.Spec.Backup.Annotations,
-				},
-				Spec: corev1.PodSpec{
-					NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
-					Tolerations:        c.cluster.Spec.Backup.Tolerations,
-					ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
-					ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
-					InitContainers:     nil,
-					Containers: []corev1.Container{
-						c.generateRestoreContainer(restore, start, end),
-					},
-					RestartPolicy:   corev1.RestartPolicyNever,
-					SecurityContext: c.cluster.Spec.SecurityContext,
-					Volumes: []corev1.Volume{
-						{
-							Name: "couchbase-cluster-backup-volume",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: restore.Spec.Backup,
-									ReadOnly:  false,
-								},
-							},
-						},
-						{
-							Name: "couchbase-admin",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName: c.cluster.Spec.Security.AdminSecret,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+		Spec: *c.createBaseJobSpec(&restore.Spec.BackoffLimit, restore.Spec.TTLSecondsAfterFinished, c.generateRestoreContainer(restore, start, end), volume),
 	}
 
+	restorejob.Spec.Template.ObjectMeta.Labels[constants.LabelBackupRestore] = restore.Name
 	if err := applyTLSConfiguration(c.cluster, &restorejob.Spec); err != nil {
 		return nil, err
 	}
@@ -882,12 +827,12 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		WorkingDir: "/",
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      "couchbase-cluster-backup-volume",
+				Name:      BackupVolumeName,
 				ReadOnly:  false,
 				MountPath: "/data",
 			},
 			{
-				Name:      "couchbase-admin",
+				Name:      CouchbaseAdminVolume,
 				ReadOnly:  true,
 				MountPath: "/var/run/secrets/couchbase",
 			},
@@ -1095,6 +1040,11 @@ func (c *Cluster) applyLegacyS3Configuration(container *corev1.Container, s3Buck
 
 // generateBackupPVC returns the PVC that backups will be stored on.
 func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1.PersistentVolumeClaim {
+	// not using a PVC so not needed.
+	if backup.Spec.EphemeralVolume {
+		return nil
+	}
+
 	return &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   backup.Name,
@@ -1262,4 +1212,83 @@ func (c *Cluster) reconcileBackupRestore() error {
 	}
 
 	return nil
+}
+
+// Creates the base template for backup/restore jobs.
+func (c *Cluster) createBaseJobSpec(backoffLimit, ttlSecondsAfterFinished *int32, container corev1.Container, volume corev1.Volume) *batchv1.JobSpec {
+	return &batchv1.JobSpec{
+		BackoffLimit:            backoffLimit,
+		TTLSecondsAfterFinished: ttlSecondsAfterFinished,
+		Template: corev1.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					constants.LabelApp:     constants.App,
+					constants.LabelCluster: c.cluster.Name,
+				},
+				Annotations: c.cluster.Spec.Backup.Annotations,
+			},
+			Spec: corev1.PodSpec{
+				NodeSelector:       c.cluster.Spec.Backup.NodeSelector,
+				Tolerations:        c.cluster.Spec.Backup.Tolerations,
+				ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
+				ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
+				RestartPolicy:      corev1.RestartPolicyNever,
+				SecurityContext:    c.cluster.Spec.SecurityContext,
+				Containers: []corev1.Container{
+					container,
+				},
+				Volumes: []corev1.Volume{
+					volume,
+					{
+						Name: CouchbaseAdminVolume,
+						VolumeSource: corev1.VolumeSource{
+							Secret: &corev1.SecretVolumeSource{
+								SecretName: c.cluster.Spec.Security.AdminSecret,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func generatePersistentBackupVolume(claimName string) corev1.Volume {
+	return corev1.Volume{
+		Name: BackupVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: claimName,
+				ReadOnly:  false,
+			},
+		},
+	}
+}
+
+func generateEphemeralBackupVolume(volumeName string, storageClass *string, size *resource.Quantity) corev1.Volume {
+	return corev1.Volume{
+		Name: BackupVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Ephemeral: &corev1.EphemeralVolumeSource{
+				VolumeClaimTemplate: &corev1.PersistentVolumeClaimTemplate{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"name": volumeName,
+						},
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						StorageClassName: storageClass,
+						Resources: corev1.ResourceRequirements{
+							Requests: map[corev1.ResourceName]resource.Quantity{
+								"storage": *size,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }

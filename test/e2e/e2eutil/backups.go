@@ -70,6 +70,11 @@ type Backup struct {
 
 	// withoutFTAlias prevents FT alias from being backed up.
 	withoutFTAlias bool
+
+	// configures backup to use an ephemeral volume
+	ephemeral bool
+
+	ttlSeconds *int32
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -177,6 +182,18 @@ func (b *Backup) WithAutoscaling(limit *resource.Quantity, threshold, increment 
 	return b
 }
 
+// WithEphemeralVolume sets backup to use an ephemeral volume.
+func (b *Backup) WithEphemeralVolume() *Backup {
+	b.ephemeral = true
+	return b
+}
+
+// WithTTL sets when backup job should be deleted.
+func (b *Backup) WithJobTTL(time int32) *Backup {
+	b.ttlSeconds = &time
+	return b
+}
+
 // WithStorageClass allows the use of a non-default storage class.
 func (b *Backup) WithStorageClass(storageClass string) *Backup {
 	b.storageClass = storageClass
@@ -246,6 +263,10 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		backup.Spec.AutoScaling = b.autoscaling
 	}
 
+	if b.ephemeral {
+		backup.Spec.EphemeralVolume = true
+	}
+
 	if len(b.include) > 0 || len(b.exclude) > 0 {
 		backup.Spec.Data = &couchbasev2.CouchbaseBackupDataFilter{
 			Include: b.include,
@@ -261,6 +282,8 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		falseRef := false
 		backup.Spec.Services.FTSAliases = &falseRef
 	}
+
+	backup.Spec.TTLSecondsAfterFinished = b.ttlSeconds
 
 	newBackup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackups(kubernetes.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
 	if err != nil {
