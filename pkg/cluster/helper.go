@@ -26,6 +26,11 @@ func (c *Cluster) IsAtLeastVersion(v string) (bool, error) {
 
 // checks all pods in a cluster are above a minimum version requirement.
 func (c *Cluster) RunningVersionIsAtLeast(v string) (bool, error) {
+	// we'll rely on spec version when cluster is not yet initialized.
+	if len(c.members) == 0 {
+		return c.IsAtLeastVersion(v)
+	}
+
 	for name := range c.members {
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
