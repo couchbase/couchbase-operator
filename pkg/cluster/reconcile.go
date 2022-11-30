@@ -798,7 +798,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 			parts = strings.Split(*c.cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow.End, ":")
 			autoCompactionTimePeriod.ToHour, _ = strconv.Atoi(parts[0])
 			autoCompactionTimePeriod.ToMinute, _ = strconv.Atoi(parts[1])
-			requested.AutoCompactionSettings.AllowedTimePeriod = autoCompactionTimePeriod
+			requested.AutoCompactionSettings.AllowedTimePeriod = &autoCompactionTimePeriod
 		}
 	}
 

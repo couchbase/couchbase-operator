@@ -956,7 +956,7 @@ type AutoCompactionAutoCompactionSettings struct {
 	ViewFragmentationThreshold     AutoCompactionViewFragmentationThreshold     `json:"viewFragmentationThreshold" url:""`
 	ParallelDBAndViewCompaction    bool                                         `json:"parallelDBAndViewCompaction" url:"parallelDBAndViewCompaction"`
 	IndexCompactionMode            string                                       `json:"indexCompactionMode" url:"indexCompactionMode"`
-	AllowedTimePeriod              AutoCompactionAllowedTimePeriod              `json:"allowedTimePeriod" url:""`
+	AllowedTimePeriod              *AutoCompactionAllowedTimePeriod             `json:"allowedTimePeriod,omitempty" url:""`
 }
 
 // AutoCompactionSettings is the cluster wide auto-compaction settings for a
