@@ -2714,10 +2714,10 @@ type ClusterConfig struct {
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
 	// AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
-	// will allow before not allowing any more.  This field must be between 1-3, default 3.
+	// will allow before not allowing any more.  This field must be between 1-3 for server versions prior to 7.1.0
+	// default is 3.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=3
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
 	// AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a pod
@@ -2731,6 +2731,7 @@ type ClusterConfig struct {
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
 	// AutoFailoverServerGroup whether to enable failing over a server group.
+	// This field is ignored in server versions 7.1+ as it has been removed from the Couchbase API
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// AutoCompaction allows the configuration of auto-compaction, including on what

@@ -44,6 +44,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAnalyticsServiceMemoryQuota,
 		checkConstraintQueryTemporarySpace,
 		checkConstraintAutoFailoverTimeout,
+		checkConstraintAutoFailoverMaxCount,
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
@@ -200,6 +201,23 @@ func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2
 
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
 		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverTimeout checks the autofailover timeout is within range.
+func checkConstraintAutoFailoverMaxCount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
+		if cluster.Spec.ClusterSettings.AutoFailoverMaxCount > 3 {
+			return fmt.Errorf("spec.cluster.autoFailoverMaxCount should be less than or equal to 3")
+		}
 	}
 
 	return nil

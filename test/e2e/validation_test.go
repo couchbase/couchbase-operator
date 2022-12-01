@@ -1123,6 +1123,18 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoFailoverTimeout`},
 		},
 		{
+			name:           "TestValidateAutoFailoverMaxCountLessThan4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.0.4")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverMaxCount`},
+		},
+		{
+			name:           "TestValidateAutoFailoverMaxCountOver4On71+",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.1.0")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
 			name:           "TestValidateAutoFailoverOnDataDiskIssuesTimePeriodUnderflow",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "0s")},
 			shouldFail:     true,
