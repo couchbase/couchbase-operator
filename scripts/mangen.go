@@ -63,7 +63,7 @@ func generateCollectedResourceDocumentation(file io.StringWriter) {
 	write(file, "")
 	resources := collector.Resources
 
-	sort.Slice(resources, func(i, j int) bool {
+	sort.SliceStable(resources, func(i, j int) bool {
 		if resources[i].LogLevel == resources[j].LogLevel {
 			return resources[i].Scope < resources[j].Scope
 		}

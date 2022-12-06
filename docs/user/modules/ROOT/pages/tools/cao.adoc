@@ -275,10 +275,6 @@ group: All resources limited by resource name
 operator: Only the Operator deployment
 
 ==== Log Level - Required
-CouchbaseCollectionGroup::
-Log Level: Required
-+
-Scope: all
 CouchbaseBucket::
 Log Level: Required
 +
@@ -331,10 +327,10 @@ CouchbaseCollection::
 Log Level: Required
 +
 Scope: all
-Service::
+CouchbaseCollectionGroup::
 Log Level: Required
 +
-Scope: cluster
+Scope: all
 ConfigMap::
 Log Level: Required
 +
@@ -345,34 +341,38 @@ Endpoints::
 Log Level: Required
 +
 Scope: cluster
-PodDisruptionBudget::
-Log Level: Required
-+
-Scope: cluster
-+
-Reason: Used to determine issues with automatic Kubernetes upgrades
-Pod::
-Log Level: Required
-+
-Scope: cluster
-CronJob::
-Log Level: Required
-+
-Scope: cluster
-+
-Reason: Used to determine issues with Cronjobs for scheduled backups
 PersistentVolumeClaim::
 Log Level: Required
 +
 Scope: cluster
 +
 Reason: Used to determine compatibility issues with underlying persistent volume
+Pod::
+Log Level: Required
++
+Scope: cluster
+Service::
+Log Level: Required
++
+Scope: cluster
 Job::
 Log Level: Required
 +
 Scope: cluster
 +
 Reason: Used to determine issues with Jobs created for restoring from backup
+CronJob::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with Cronjobs for scheduled backups
+PodDisruptionBudget::
+Log Level: Required
++
+Scope: cluster
++
+Reason: Used to determine issues with automatic Kubernetes upgrades
 CustomResourceDefinition::
 Log Level: Required
 +
@@ -395,11 +395,35 @@ Scope: operator
 Reason: Used to determine issues with Operator and Dynamic Admission Control deployments
 
 ==== Log Level - Sensitive
+Node::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine issues with orchestration platform and identify potential images problems
+PersistentVolume::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine compatibility issues with underlying persistent volume
+Secret::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine issues with stored cluster passwords, TLS configurations and other private keys stored in secrets
 ServiceAccount::
 Log Level: Sensitive
 +
 Scope: all
 ClusterRole::
+Log Level: Sensitive
++
+Scope: all
++
+Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
+ClusterRoleBinding::
 Log Level: Sensitive
 +
 Scope: all
@@ -412,30 +436,6 @@ Scope: all
 +
 Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
 RoleBinding::
-Log Level: Sensitive
-+
-Scope: all
-+
-Reason: Used to determine whether RBAC Is correctly setup for the running Operator version.
-Secret::
-Log Level: Sensitive
-+
-Scope: all
-+
-Reason: Used to determine issues with stored cluster passwords, TLS configurations and other private keys stored in secrets
-PersistentVolume::
-Log Level: Sensitive
-+
-Scope: all
-+
-Reason: Used to determine compatibility issues with underlying persistent volume
-Node::
-Log Level: Sensitive
-+
-Scope: all
-+
-Reason: Used to determine issues with orchestration platform and identify potential images problems
-ClusterRoleBinding::
 Log Level: Sensitive
 +
 Scope: all
