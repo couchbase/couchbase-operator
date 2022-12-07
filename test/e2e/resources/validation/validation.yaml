@@ -426,6 +426,8 @@ spec:
       memorySnapshotInterval: 200ms
       stableSnapshotInterval: 5s
       storageMode: memory_optimized
+      numReplica: 0
+      redistributeIndexes: false
     query:
       backfillEnabled: true
       temporarySpace: 5Gi
