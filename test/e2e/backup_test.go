@@ -2721,10 +2721,10 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	framework.Requires(t, kubernetes).StaticCluster().HasIAMParameters()
 
 	// Create a normal cluster.
-	clusterSize := constants.Size3
+	clusterSize := constants.Size1
 
 	numOfDocs := f.DocsCount
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).WithS3IAMRole(true).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	aws := e2eutil.AwsHelper(f.IAMAccessKey, f.IAMSecretID, f.S3Region).Create()
 	e2eutil.MustSetupBackupIAM(t, kubernetes, aws, f.AWSAccountID, f.AWSOIDCProvider, s3BucketName)
@@ -2740,7 +2740,7 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithUseIAM(true).WithObjStoreSecret(s3secret).ToObjStore("s3://"+s3BucketName).MustCreate(t, kubernetes)
 
 	// wait for backup to complete
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 12*time.Minute)
@@ -2758,7 +2758,7 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromS3(s3BucketName).UseIAM(true).MustCreate(t, kubernetes)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)

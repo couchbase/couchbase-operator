@@ -74,7 +74,11 @@ type Backup struct {
 	// configures backup to use an ephemeral volume
 	ephemeral bool
 
+	// configures how long before a finished backup job deletes.
 	ttlSeconds *int32
+
+	// whether backup SDK can use IAM for credentials.
+	UseIAM bool
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -207,6 +211,13 @@ func (b *Backup) WithoutFTAlias() *Backup {
 	return b
 }
 
+// WithUseIAM set the cluster to use IAM Role.
+func (b *Backup) WithUseIAM(useIAM bool) *Backup {
+	b.UseIAM = useIAM
+
+	return b
+}
+
 // MustCreate generates the concrete backup resource and creates it in Kubernetes.
 func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackup {
 	generateName := "backup-"
@@ -247,6 +258,10 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 
 	if b.s3Bucket != "" {
 		backup.Spec.S3Bucket = couchbasev2.S3BucketURI(fmt.Sprintf("s3://%s", b.s3Bucket))
+	}
+
+	if b.UseIAM {
+		backup.Spec.ObjectStore.UseIAM = &b.UseIAM
 	}
 
 	if b.retention != 0 {
@@ -336,6 +351,9 @@ type Restore struct {
 
 	// forceUpdates overwrites data in the cluster with restore data
 	forceUpdates bool
+
+	// useIAM
+	useIAM bool
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -432,6 +450,12 @@ func (r *Restore) WithMapping(source, target string) *Restore {
 	return r
 }
 
+// UseIAM allows restore to use IAM role for backup restoration.
+func (r *Restore) UseIAM(useIAM bool) *Restore {
+	r.useIAM = useIAM
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -464,6 +488,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.objStoreSecret != nil {
 		restore.Spec.ObjectStore.Secret = r.objStoreSecret.Name
+	}
+
+	if r.useIAM {
+		restore.Spec.ObjectStore.UseIAM = &r.useIAM
 	}
 
 	if r.withBucketConfig {

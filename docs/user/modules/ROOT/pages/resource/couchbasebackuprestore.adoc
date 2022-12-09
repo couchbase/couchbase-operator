@@ -37,6 +37,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackuprestores-spec-objectstore,objectStore>>:
     <<couchbasebackuprestores-spec-objectstore-secret,secret>>: ""
     <<couchbasebackuprestores-spec-objectstore-uri,uri>>: ""
+    <<couchbasebackuprestores-spec-objectstore-useiam,useIAM>>: false
   <<couchbasebackuprestores-spec-repo,repo>>: ""
   <<couchbasebackuprestores-spec-s3bucket,s3bucket>>: ""
   <<couchbasebackuprestores-spec-services,services>>:
@@ -360,6 +361,17 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 URI is a reference to a remote object store.
 This is the prefix of the object store and the bucket name.
 i.e s3://bucket, az://bucket or gs://bucket.
+
+=== couchbasebackuprestores.spec.objectStore.useIAM
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Whether to allow the backup SDK to attempt to authenticate using the instance metadata api.
+If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 
 === couchbasebackuprestores.spec.repo
 

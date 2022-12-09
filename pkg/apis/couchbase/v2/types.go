@@ -152,6 +152,10 @@ const (
 
 // ObjectStore allows for backing up to a remote cloud storage.
 type ObjectStoreSpec struct {
+	// Whether to allow the backup SDK to attempt to authenticate
+	// using the instance metadata api.
+	// If set, will override `CouchbaseCluster.spec.backup.useIAM`.
+	UseIAM *bool `json:"useIAM,omitempty"`
 	// URI is a reference to a remote object store.
 	// This is the prefix of the object store and the bucket name.
 	// i.e s3://bucket, az://bucket or gs://bucket.
@@ -2242,7 +2246,7 @@ type Backup struct {
 	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// Deprecated: by backup.spec.objectStore.secret
+	// Deprecated: by CouchbaseBackup.spec.objectStore.secret
 	// S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
 	// This field must be popluated when the `spec.s3bucket` field is specified
 	// for a backup or restore resource.
@@ -2251,6 +2255,7 @@ type Backup struct {
 	// ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 	ObjectEndpoint *ObjectEndpoint `json:"objectEndpoint,omitempty"`
 
+	// Deprecated: by CouchbaseBackup.spec.objectStore.useIAM
 	// UseIAMRole enables backup to fetch EC2 instance metadata.
 	// This allows the AWS SDK to use the EC2's IAM Role for S3 access.
 	// UseIAMRole will ignore credentials in s3Secret.

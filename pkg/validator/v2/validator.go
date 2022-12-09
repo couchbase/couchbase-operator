@@ -1525,7 +1525,17 @@ func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectSto
 		return fmt.Errorf("secret %s referenced by objectStore.secret must exist", secretName)
 	}
 
-	// these always have to exist.
+	if store.UseIAM != nil && *store.UseIAM {
+		if strings.HasPrefix(string(store.URI), "s3://") {
+			if _, ok := secret.Data[cbcluster.StoreSecretRegion]; !ok {
+				return fmt.Errorf("object store secret %s must contain key '%s' when using IAM", secretName, cbcluster.StoreSecretRegion)
+			}
+		}
+
+		return nil
+	}
+
+	// these always have to exist unless using IAM.
 	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
 		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
 	}
@@ -1569,24 +1579,9 @@ func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.
 	if backup.Spec.ObjectStore == nil {
 		return nil
 	}
-	// only validate the secret if it exists
-	if len(backup.Spec.ObjectStore.Secret) == 0 {
-		return nil
-	}
 
-	secretName := backup.Spec.ObjectStore.Secret
-
-	_, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
-	if err != nil {
-		return err
-	}
-
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
-	}
-
-	if err = checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
-		return err
+	if err := checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
+		return fmt.Errorf("failure validating backup.spec.objectStore %w", err)
 	}
 
 	return nil
@@ -1606,19 +1601,8 @@ func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couc
 		return nil
 	}
 
-	secretName := restore.Spec.ObjectStore.Secret
-
-	_, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
-	if err != nil {
-		return err
-	}
-
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
-	}
-
-	if err = checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
-		return err
+	if err := checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
+		return fmt.Errorf("failure validating restore.spec.objectStore %w", err)
 	}
 
 	return nil

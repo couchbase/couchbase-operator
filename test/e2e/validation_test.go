@@ -1246,6 +1246,17 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "TestValidateBackupSecretS3Region",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3-region-only",
+					}),
+			},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -2147,6 +2158,17 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 				Replace("/spec/remoteBucket", "bucket0")},
 			shouldFail:     true,
 			expectedErrors: []string{`duplicate rule`},
+		},
+		{
+			name: "TestValidateBackupSecretS3Region",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI: "s3://blah",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"must contain key region when using IAM"},
 		},
 	}
 

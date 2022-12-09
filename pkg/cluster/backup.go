@@ -925,14 +925,23 @@ func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeS
 		return
 	}
 
-	secretName := storeSpec.Secret
-	secret, found := c.k8s.Secrets.Get(secretName)
+	// need to return early and apply region if its required.
+	usingIAM := false
 
-	if !found {
-		if c.cluster.Spec.Backup.UseIAMRole && strings.HasPrefix(string(url), "s3://") {
-			container.Args = append(container.Args, "--obj-auth-by-instance-metadata")
+	if storeSpec.UseIAM == nil {
+		if c.cluster.Spec.Backup.UseIAMRole { //nolint:staticcheck
+			container.Args = append(container.Args, "--obj-auth-by-instance-metadata=true")
+			usingIAM = true
 		}
+	} else if *storeSpec.UseIAM {
+		container.Args = append(container.Args, "--obj-auth-by-instance-metadata=true")
+		usingIAM = true
+	}
 
+	secretName := storeSpec.Secret
+
+	secret, found := c.k8s.Secrets.Get(secretName)
+	if !found {
 		return
 	}
 
@@ -950,6 +959,10 @@ func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeS
 		})
 	}
 
+	if usingIAM {
+		return
+	}
+
 	if _, ok := secret.Data[StoreSecretRefreshToken]; ok {
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name: "CB_OBJSTORE_REFRESH_TOKEN",
@@ -964,6 +977,7 @@ func (c *Cluster) applyObjStoreConfiguration(container *corev1.Container, storeS
 		})
 	}
 
+	// These fields are common.
 	container.Env = append(container.Env, []corev1.EnvVar{
 		{
 			Name: "CB_OBJSTORE_ACCESS_KEY_ID",
@@ -1005,7 +1019,7 @@ func (c *Cluster) applyLegacyS3Configuration(container *corev1.Container, s3Buck
 		},
 	})
 
-	if c.cluster.Spec.Backup.UseIAMRole {
+	if c.cluster.Spec.Backup.UseIAMRole { //nolint:staticcheck
 		container.Env = append(container.Env, corev1.EnvVar{
 			Name:  "CB_AWS_ENABLE_EC2_METADATA",
 			Value: "true",

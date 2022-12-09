@@ -593,7 +593,7 @@ Will be populated by defaults if not specified.
 
 ==== Description
 
-Deprecated: by backup.spec.objectStore.secret S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
+Deprecated: by CouchbaseBackup.spec.objectStore.secret S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
 This field must be popluated when the `spec.s3bucket` field is specified for a backup or restore resource.
 
 === couchbaseclusters.spec.backup.selector
@@ -697,7 +697,7 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 
 ==== Description
 
-UseIAMRole enables backup to fetch EC2 instance metadata.
+Deprecated: by CouchbaseBackup.spec.objectStore.useIAM UseIAMRole enables backup to fetch EC2 instance metadata.
 This allows the AWS SDK to use the EC2's IAM Role for S3 access.
 UseIAMRole will ignore credentials in s3Secret.
 

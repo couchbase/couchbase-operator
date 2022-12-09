@@ -8,6 +8,13 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: test-example-s3-region-only
+data:
+  region: ZXUtd2VzdC0y
+---
+apiVersion: v1
+kind: Secret
+metadata:
   name: test-example-s3
 data:
   access-key-id: YmxhaCBibGFoIGJsYWgK
