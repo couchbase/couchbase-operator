@@ -62,7 +62,7 @@ Create the service resource in the same namespace as the `CouchbaseCluster` you 
 
 [source,console]
 ----
-$ kubectl create -f couchbase-prometheus-service.yaml
+$ kubectl apply -f couchbase-prometheus-service.yaml
 ----
 
 Now create a `ServiceMonitor` resource to direct Prometheus to monitor this metric service.
@@ -130,7 +130,7 @@ Commit the service monitor configuration:
 
 [source,console]
 ----
-$ kubectl create -f couchbase-prometheus-monitor.yaml -n monitoring`
+$ kubectl apply -f couchbase-prometheus-monitor.yaml -n monitoring`
 ----
 
 == Verify

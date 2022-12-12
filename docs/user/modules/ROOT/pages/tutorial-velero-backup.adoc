@@ -66,13 +66,13 @@ Next up, create a Couchbase Server cluster:
 
 [source,console]
 ----
-$ kubectl create -n test -f secret.yaml
+$ kubectl apply -n test -f secret.yaml
 secret/cb-example-auth created
 ----
 
 [source,console]
 ----
-$ kubectl create -n test -f couchbase-cluster.yaml
+$ kubectl apply -n test -f couchbase-cluster.yaml
 couchbasebucket.couchbase.com/default created
 couchbasecluster.couchbase.com/cb-example created
 ----

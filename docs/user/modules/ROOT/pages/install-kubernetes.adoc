@@ -35,7 +35,7 @@ This can be achieved with the following command:
 
 [source,console]
 ----
-$ kubectl create -f crd.yaml
+$ kubectl apply -f crd.yaml
 ----
 
 == Install the Operator

@@ -193,7 +193,7 @@ The {HorizontalPodAutoscaler} resource can be created like any other resource by
 
 [source,console]
 ----
-$ kubectl create -f query-hpa.yaml
+$ kubectl apply -f query-hpa.yaml
 ----
 
 As soon as the {HorizontalPodAutoscaler} resource has been successfully created, the Horizontal Pod Autoscaler will begin to monitor the target metric and the cluster will be subject to auto-scaling if the targeted metric is above or below the configured threshold.

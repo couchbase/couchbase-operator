@@ -75,6 +75,6 @@ Save to a file then submit to Kubernetes:
 
 [source,console]
 ----
-$ kubectl create -f my-storage-class.yaml
+$ kubectl apply -f my-storage-class.yaml
 storageclass.storage.k8s.io/standard-lazy-bound created
 ----

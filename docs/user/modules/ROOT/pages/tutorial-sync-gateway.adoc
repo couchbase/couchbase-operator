@@ -107,7 +107,7 @@ If the configuration file is named `sync-gateway-config.yaml`, the command to de
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway.yaml
+$ kubectl apply -f sync-gateway.yaml
 ----
 
 === Enabling TLS Connectivity to Couchbase Server
@@ -172,7 +172,7 @@ If the configuration file is named `sync-gateway-tls.yaml`, the command to deplo
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway-tls.yaml
+$ kubectl apply -f sync-gateway-tls.yaml
 ----
 
 [#configure-an-rbac-user-for-sync-gateway]
@@ -222,7 +222,7 @@ If the configuration file is named `sync-gateway-rbac-user.yaml`, the command to
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway-rbac-user.yaml
+$ kubectl apply -f sync-gateway-rbac-user.yaml
 ----
 
 This creates a sync gateway user with the specified password.
@@ -283,7 +283,7 @@ If the configuration file is named `sync-gateway-user-rolebinding.yaml`, the com
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway-user-rolebinding.yaml
+$ kubectl apply -f sync-gateway-user-rolebinding.yaml
 ----
 
 ==== Configure Sync Gateway with the RBAC User
@@ -319,7 +319,7 @@ If the configuration file is named `sync-gateway.yaml`, the command to deploy th
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway.yaml
+$ kubectl apply -f sync-gateway.yaml
 ----
 
 [#deploying-sync-gateway]
@@ -402,7 +402,7 @@ If the above configuration is in a file named `sync-gateway.yaml`, the command t
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway.yaml
+$ kubectl apply -f sync-gateway.yaml
 ----
 
 If successful, the equivalent of the following output will be returned:

@@ -181,31 +181,12 @@ We'll be modifying this Secret in order to implement our own custom configuratio
 
 Before we can modify the `fluent-bit-config` secret, we'll first need to modify the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource to allow custom log forwarding configurations.
 
-.Updated xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] Parameters That Enable Custom Log Forwarding
-[source,yaml,subs="attributes,verbatim"]
-----
-apiVersion: couchbase.com/v2
-kind: CouchbaseCluster
-metadata:
-  name: cb-example
-spec:
-  logging:
-    server:
-      manageConfiguration: false # <.>
-----
-
-<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`]: When this field is set to `true`, the Autonomous Operator will always enforce the default log forwarding configuration by overwriting the Secret if it detects a non-default configuration.
-_Therefore, we need to set this field to `false`._
-Setting this field to `false` is vital to ensure that the Autonomous Operator doesn't remove the custom configurations we're going to make in the rest of this tutorial.
-
-Modify your xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] configuration file so that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `false` (do not just use the snippet above), then run the following command to deploy it into Kubernetes:
-
 [source,console]
 ----
-$ kubectl apply -f couchbase-cluster-log-forwarding.yaml
+$ kubectl patch cbc cb-example -p '{"spec":{"logging": {"server": {"manageConfiguration": false}}}}'
 ----
 
-NOTE: Since we used `kubectl apply` to only change the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] field, Couchbase pods will continue to consume the same log forwarding configuration Secret (`fluent-bit-config`) and the Autonomous Operator will not need to re-create the Couchbase cluster.
+Patching your xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource so that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `false`.
 
 Now that we've successfully allowed our Couchbase cluster to use custom log forwarding configurations, let's get to customizing!
 
@@ -263,7 +244,7 @@ Run the following command to deploy it into Kubernetes:
 
 [source,console]
 ----
-$ kubectl replace -f fluent-bit-config.yaml
+$ kubectl apply -f fluent-bit-config.yaml
 ----
 
 Once the Secret is updated in Kubernetes, the configuration changes will be populated into the volume that is mounted in the `logging` sidecar container on each Couchbase pod.

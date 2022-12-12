@@ -40,7 +40,7 @@ The below command creates the password for users "Alice" and "Bob":
 
 [source,console]
 ----
-cat << EOF | kubectl create -f -
+cat << EOF | kubectl apply -f -
 apiVersion: v1
 kind: Secret
 metadata:

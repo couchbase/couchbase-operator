@@ -321,7 +321,7 @@ Finally reviewers should:
 == Debugging
 
 . Create a kind cluster
-. `kubectl create -f example/crd.yaml`
+. `kubectl apply -f example/crd.yaml`
 . `make debug`
    * build all containers
    * load them into kind

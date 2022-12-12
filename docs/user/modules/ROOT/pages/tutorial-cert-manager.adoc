@@ -110,12 +110,12 @@ Run the following commands to create the CA's `Secret` and `Issuer`:
 
 [source,console]
 ----
-$ kubectl create -f ca-secret.yaml
+$ kubectl apply -f ca-secret.yaml
 ----
 
 [source,console]
 ----
-$ kubectl create -f ca-issuer.yaml
+$ kubectl apply -f ca-issuer.yaml
 ----
 
 == Using cert-manager with the DAC
@@ -187,7 +187,7 @@ Run the following command to create the `Certificate` resource:
 
 [source,console]
 ----
-$ kubectl create -f admission-certificate-resource.yaml
+$ kubectl apply -f admission-certificate-resource.yaml
 ----
 
 NOTE: This command will not succeed if the DAC is already installed.
@@ -264,14 +264,14 @@ Run the following command to deploy the DAC:
 
 [source,console]
 ----
-$ kubectl create -f admission.yaml
+$ kubectl apply -f admission.yaml
 ----
 
 If all goes well, you can create Couchbase resources, and the DAC will reject any misconfiguration:
 
 [source,console]
 ----
-$ kubectl create -f example/couchbase-cluster.yaml 
+$ kubectl apply -f example/couchbase-cluster.yaml 
 couchbasebucket.couchbase.com/default created
 Error from server: error when creating "example/couchbase-cluster.yaml": admission webhook "couchbase-operator-admission.default.svc" denied the request: validation failure list:
 secret cb-example-auth referenced by spec.security.adminSecret must exist
@@ -281,7 +281,7 @@ However, if you see something similar to the following, it means that the Kubern
 
 [source,console]
 ----
-$ kubectl create -f example/couchbase-cluster.yaml 
+$ kubectl apply -f example/couchbase-cluster.yaml 
 Error from server (InternalError): error when creating "example/couchbase-cluster.yaml": Internal error occurred: failed calling webhook "couchbase-operator-admission.default.svc": Post "https://couchbase-operator-admission.default.svc:443/couchbaseclusters/validate?timeout=10s": x509: certificate signed by unknown authority
 ----
 
@@ -346,7 +346,7 @@ Run the following command to create the `Certificate` resource:
 
 [source,console]
 ----
-$ kubectl create -f server-certificate-resource.yaml
+$ kubectl apply -f server-certificate-resource.yaml
 ----
 
 You can run the following command to check the status of the resource:
@@ -417,7 +417,7 @@ Run the following command to create the `Certificate` resource:
 
 [source,console]
 ----
-$ kubectl create -f couchbase-cluster.yaml
+$ kubectl apply -f couchbase-cluster.yaml
 ----
 
 You can run the following command to check the status of the deployment:

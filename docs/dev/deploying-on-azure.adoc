@@ -30,7 +30,7 @@ To setup ACI run:
 
  git clone git@github.com:Azure/aci-connector-k8s.git
  cd aci-connector-k8s
- kubectl create -f examples/example-aci-connector.yaml
+ kubectl apply -f examples/example-aci-connector.yaml
 
 It's unclear to me how to point the operator at ACI.
 

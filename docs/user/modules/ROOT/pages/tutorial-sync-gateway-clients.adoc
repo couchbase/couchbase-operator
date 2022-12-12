@@ -56,7 +56,7 @@ Port 4984 is the default public port of Sync Gateway. You can map any incoming `
 +
 [source,console]
 ----
-$ kubectl create -f sync-gateway-nodeport.yaml
+$ kubectl apply -f sync-gateway-nodeport.yaml
 ----
 
 
@@ -131,7 +131,7 @@ spec:
 +
 [source,console]
 ----
-$ kubectl create -f sync-gateway-ingress-tls.yaml
+$ kubectl apply -f sync-gateway-ingress-tls.yaml
 ----
 
 * Verify the status of the deployment using following command
@@ -222,7 +222,7 @@ Create a secret with the updated version of configuration file. Assuming that th
 
 [source,console]
 ----
-$ kubectl create -f sgw-config-tls.yaml
+$ kubectl apply -f sgw-config-tls.yaml
 ----
 
 === Create secret with the Sync Gateway certs
@@ -295,7 +295,7 @@ If the controller definition is in a file named `sync-gateway-tls.yaml`, the com
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway-tls.yaml
+$ kubectl apply -f sync-gateway-tls.yaml
 ----
 
 === Deploying a Load Balancer
@@ -337,7 +337,7 @@ If the Load Balancer service definition file is `sync-gateway-load-balancer.yaml
 
 [source,console]
 ----
-$ kubectl create -f sync-gateway-load-balancer.yaml
+$ kubectl apply -f sync-gateway-load-balancer.yaml
 ----
 
 If successful, you will see the equivalent of the following:

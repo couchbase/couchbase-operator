@@ -300,7 +300,7 @@ Now update the Secrets in Kubernetes with the new ones:
 
 [source,console]
 ----
-kubectl replace -f secrets.yaml
+kubectl apply -f secrets.yaml
 ----
 
 The Autonomous Operator should now pick up the new certificates and proceed through the upgrade process.

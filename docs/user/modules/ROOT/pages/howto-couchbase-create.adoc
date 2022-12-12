@@ -101,7 +101,7 @@ Kubernetes::
 --
 [source,console]
 ----
-$ kubectl create -f couchbase-cluster.yaml
+$ kubectl apply -f couchbase-cluster.yaml
 ----
 --
 
