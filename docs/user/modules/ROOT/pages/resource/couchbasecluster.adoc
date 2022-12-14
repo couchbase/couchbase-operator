@@ -539,7 +539,7 @@ NodeSelector defines which nodes to constrain the pods that run any backup and r
 
 ==== Description
 
-ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
+Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 
 === couchbaseclusters.spec.backup.objectEndpoint.secret
 
@@ -549,9 +549,7 @@ ObjectEndpoint contains the configuration for connecting to a custom S3 complian
 
 ==== Description
 
-The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint (when required, e.g.
-not signed by a public CA).
-The secret must have the key with the name "tls.crt".
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
 
 === couchbaseclusters.spec.backup.objectEndpoint.url
 
@@ -571,8 +569,7 @@ The host/address of the custom object endpoint.
 
 ==== Description
 
-UseVirtualPath will force the AWS SDK to use the new virtual style paths.
-by default alternative path style URLs which are often required by S3 compatible object stores.
+UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
 
 === couchbaseclusters.spec.backup.resources
 

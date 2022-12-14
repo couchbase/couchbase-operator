@@ -165,6 +165,11 @@ type ObjectStoreSpec struct {
 	// These correspond to the fields used by cbbackupmgr
 	// https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2
 	Secret string `json:"secret,omitempty"`
+
+	// Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
+	// If set will override `CouchbaseCluster.spec.backup.objectEndpoint`
+	// See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores
+	Endpoint *ObjectEndpoint `json:"endpoint,omitempty"`
 }
 
 // CouchbaseBackup allows automatic backup of all data from a Couchbase cluster
@@ -2252,6 +2257,7 @@ type Backup struct {
 	// for a backup or restore resource.
 	S3Secret string `json:"s3Secret,omitempty"`
 
+	// Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint
 	// ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 	ObjectEndpoint *ObjectEndpoint `json:"objectEndpoint,omitempty"`
 
@@ -2264,14 +2270,14 @@ type Backup struct {
 
 type ObjectEndpoint struct {
 	// The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint
-	// (when required, e.g. not signed by a public CA). The secret must have the key with the name "tls.crt"
+	// The secret must have the key with the name "tls.crt"
 	CertSecret string `json:"secret,omitempty"`
 
 	// The host/address of the custom object endpoint.
 	URL string `json:"url,omitempty"`
 
-	// UseVirtualPath will force the AWS SDK to use the new virtual style paths.
-	// by default alternative path style URLs which are often required by S3 compatible object stores.
+	// UseVirtualPath will force the AWS SDK to use the new virtual style paths
+	// which are often required by S3 compatible object stores.
 	UseVirtualPath bool `json:"useVirtualPath,omitempty"`
 }
 

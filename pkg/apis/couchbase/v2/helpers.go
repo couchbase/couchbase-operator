@@ -928,6 +928,10 @@ func (c *CouchbaseCluster) DualStack() bool {
 	return c.Spec.Networking.AddressFamily == nil
 }
 
+func (c *CouchbaseCluster) GetBackupStoreEndpoint() *ObjectEndpoint {
+	return c.Spec.Backup.ObjectEndpoint
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {

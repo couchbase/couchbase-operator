@@ -35,6 +35,10 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackuprestores-spec-forceupdates,forceUpdates>>: false
   <<couchbasebackuprestores-spec-logretention,logRetention>>: 168h
   <<couchbasebackuprestores-spec-objectstore,objectStore>>:
+    <<couchbasebackuprestores-spec-objectstore-endpoint,endpoint>>:
+      <<couchbasebackuprestores-spec-objectstore-endpoint-secret,secret>>: ""
+      <<couchbasebackuprestores-spec-objectstore-endpoint-url,url>>: ""
+      <<couchbasebackuprestores-spec-objectstore-endpoint-usevirtualpath,useVirtualPath>>: false
     <<couchbasebackuprestores-spec-objectstore-secret,secret>>: ""
     <<couchbasebackuprestores-spec-objectstore-uri,uri>>: ""
     <<couchbasebackuprestores-spec-objectstore-useiam,useIAM>>: false
@@ -336,6 +340,47 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 ==== Description
 
 The remote destination for backup.
+
+=== couchbasebackuprestores.spec.objectStore.endpoint
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
+If set will override `CouchbaseCluster.spec.backup.objectEndpoint` See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores.
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.url
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The host/address of the custom object endpoint.
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.useVirtualPath
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
 
 === couchbasebackuprestores.spec.objectStore.secret
 

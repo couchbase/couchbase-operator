@@ -224,12 +224,12 @@ func applyObjEndpoint(cluster *couchbasev2.CouchbaseCluster, objEndpoint string,
 		return
 	}
 
-	cluster.Spec.Backup.ObjectEndpoint = &couchbasev2.ObjectEndpoint{
+	cluster.Spec.Backup.ObjectEndpoint = &couchbasev2.ObjectEndpoint{ //nolint:staticcheck
 		URL: objEndpoint,
 	}
 
 	if secret != nil {
-		cluster.Spec.Backup.ObjectEndpoint.CertSecret = secret.Name
+		cluster.Spec.Backup.ObjectEndpoint.CertSecret = secret.Name //nolint:staticcheck
 	}
 }
 

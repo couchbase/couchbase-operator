@@ -1464,7 +1464,7 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = err
 	}
 
-	if err := checkConstaintBackupObjStoreSecret(v, backup); err != nil {
+	if err := checkConstaintBackupObjStore(v, backup); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1571,7 +1571,7 @@ func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectSto
 	return nil
 }
 
-func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+func checkConstaintBackupObjStore(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	if !v.Options.ValidateSecrets {
 		return nil
 	}
@@ -1581,7 +1581,28 @@ func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.
 	}
 
 	if err := checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
-		return fmt.Errorf("failure validating backup.spec.objectStore %w", err)
+		return fmt.Errorf("failure validating spec.objectStore %w", err)
+	}
+
+	if backup.Spec.ObjectStore.Endpoint != nil {
+		secretName := backup.Spec.ObjectStore.Endpoint.CertSecret
+		if len(secretName) == 0 {
+			return nil
+		}
+
+		secret, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
+
+		if err != nil {
+			return err
+		}
+
+		if !found {
+			return fmt.Errorf("secret %s referenced by spec.objectStore.endpoint.secret. must exist", secretName)
+		}
+
+		if _, ok := secret.Data["tls.crt"]; !ok {
+			return fmt.Errorf("custom object endpoint CA secret %s must contain key 'tls.crt'", secretName)
+		}
 	}
 
 	return nil
@@ -1602,7 +1623,28 @@ func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couc
 	}
 
 	if err := checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
-		return fmt.Errorf("failure validating restore.spec.objectStore %w", err)
+		return fmt.Errorf("failure validating spec.objectStore %w", err)
+	}
+
+	if restore.Spec.ObjectStore.Endpoint != nil {
+		secretName := restore.Spec.ObjectStore.Endpoint.CertSecret
+		if len(secretName) == 0 {
+			return nil
+		}
+
+		secret, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
+
+		if err != nil {
+			return err
+		}
+
+		if !found {
+			return fmt.Errorf("secret %s referenced by spec.objectStore.endpoint.secret. must exist", secretName)
+		}
+
+		if _, ok := secret.Data["tls.crt"]; !ok {
+			return fmt.Errorf("custom object endpoint CA secret %s must contain key 'tls.crt'", secretName)
+		}
 	}
 
 	return nil
@@ -1644,11 +1686,16 @@ func checkConstraintBackupObjectEndpointSecret(v *types.Validator, cluster *couc
 		return nil
 	}
 
-	if cluster.Spec.Backup.ObjectEndpoint == nil || len(cluster.Spec.Backup.ObjectEndpoint.CertSecret) == 0 {
+	endpoint := cluster.GetBackupStoreEndpoint()
+	if endpoint == nil {
 		return nil
 	}
 
-	secretName := cluster.Spec.Backup.ObjectEndpoint.CertSecret
+	if len(endpoint.CertSecret) == 0 {
+		return nil
+	}
+
+	secretName := cluster.GetBackupStoreEndpoint().CertSecret
 
 	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {

@@ -2613,17 +2613,25 @@ func TestBackupThenDelete(t *testing.T) {
 }
 
 func TestBackupCustomObjEndpoint(t *testing.T) {
-	testBackupCustomObjectEndpoint(t, false)
+	testBackupCustomObjectEndpoint(t, false, false)
 }
 
 func TestBackupCustomObjEndpointWithCert(t *testing.T) {
-	testBackupCustomObjectEndpoint(t, true)
+	testBackupCustomObjectEndpoint(t, true, false)
+}
+
+func TestBackupLegacyCustomObjEndpointWithCert(t *testing.T) {
+	testBackupCustomObjectEndpoint(t, true, true)
+}
+
+func TestBackupLegacyCustomObjEndpoint(t *testing.T) {
+	testBackupCustomObjectEndpoint(t, false, true)
 }
 
 // testbackupCustomObjectEndpoint tests backup compatibility with
 // AWS compliant object stores and with an optional custom CA
 // cert to verify the endpoint with.
-func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
+func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -2631,7 +2639,7 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 
 	numOfDocs := f.DocsCount
 
-	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.2.1")
+	framework.Requires(t, kubernetes).StaticCluster()
 
 	minio, err := e2eutil.MinioOptions(kubernetes).WithName("minio").WithTLS(withCA).WithCredentials(f.MinioAccessKey, f.MinioSecretID, f.MinioRegion).Create(t)
 	defer minio.CleanUp()
@@ -2650,7 +2658,12 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	s3secret, s3BucketName, s3cleanup := createObjEndpointS3Secret(t, kubernetes, minio.Endpoint, cert)
 	defer s3cleanup()
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).WithObjEndpoint(minio.Endpoint).WithObjEndpointCert(minio.CASecret).MustCreate(t, kubernetes)
+	clusterOptions := clusterOptions().WithEphemeralTopology(clusterSize)
+	if legacy {
+		clusterOptions.WithS3(s3secret).WithObjEndpoint(minio.Endpoint).WithObjEndpointCert(minio.CASecret)
+	}
+
+	cluster := clusterOptions.MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
 
 	// Create bucket.
@@ -2662,7 +2675,14 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backupOptions := e2eutil.NewFullBackup(e2eutil.DefaultSchedule())
+	if legacy {
+		backupOptions.ToS3(s3BucketName)
+	} else {
+		backupOptions.WithObjStoreSecret(s3secret).ToObjStore("s3://" + s3BucketName).WithCustomStoreURL(minio.Endpoint).WithCustomStoreCert(minio.CASecret)
+	}
+
+	backup := backupOptions.MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -2681,7 +2701,11 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA bool) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	if legacy {
+		e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	} else {
+		e2eutil.NewRestore(backup).FromObjStore("s3://"+s3BucketName).WithObjStoreSecret(s3secret).WithCustomStoreURL(minio.Endpoint).WithCustomStoreCert(minio.CASecret).MustCreate(t, kubernetes)
+	}
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)

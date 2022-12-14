@@ -454,8 +454,10 @@ func registerTests() {
 		framework.NewTestDef(TestBackupAndRestoreCollectionS3).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupAndRestoreCollectionAzure).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupAndRestoreCollectionGCP).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup, TagFeatureBackupCloud),
-		framework.NewTestDef(TestBackupCustomObjEndpoint).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup),
-		framework.NewTestDef(TestBackupCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup),
+		framework.NewTestDef(TestBackupCustomObjEndpoint).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupLegacyCustomObjEndpoint).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestBackupLegacyCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),

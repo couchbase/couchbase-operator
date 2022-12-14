@@ -3109,6 +3109,11 @@ func (in *ObjectStoreSpec) DeepCopyInto(out *ObjectStoreSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Endpoint != nil {
+		in, out := &in.Endpoint, &out.Endpoint
+		*out = new(ObjectEndpoint)
+		**out = **in
+	}
 	return
 }
 
