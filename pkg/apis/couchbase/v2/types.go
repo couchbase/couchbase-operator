@@ -3380,8 +3380,9 @@ type TLSSecretSource struct {
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the kubernetes.io/tls secret type.  It may also contain "ca.crt".
-	// Only a single Root CA can be provided to "ca.crt". Refer to
-	// couchbaseclusters.spec.networking.tls.rootcas for multiple Root CA deployments.
+	// Only a single PEM formated x509 certificate can be provided to "ca.crt".
+	// The single certificate may also bundle together multiple root CA certificates.
+	// Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater.
 	ServerSecretName string `json:"serverSecretName"`
 
 	// ClientSecretName specifies the secret name, in the same namespace as the cluster,
