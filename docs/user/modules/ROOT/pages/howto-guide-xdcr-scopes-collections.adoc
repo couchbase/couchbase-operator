@@ -78,17 +78,17 @@ metadata:
   name: replicate-source-to-destination-in-remote-cluster
   labels:
     replication: from-my-cluster-to-remote-cluster 
+explicitMapping:
+  allowRules:
+  - sourceKeyspace:
+      scope: "scope0"
+      collection: "collection0"
+    targetKeyspace:
+      scope: "scope0"
+      collection: "collection1"    
 spec:
   bucket: source
   remoteBucket: destination
-  explicitMapping:
-    allowRules:
-    - sourceKeyspace:
-        scope: "scope0"
-        collection: "collection0"
-      targetKeyspace:
-        scope: "scope0"
-        collection: "collection1"
 ----
 
 The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any ambiguity.
@@ -203,17 +203,17 @@ metadata:
   name: replicate-destination-to-source-in-remote-cluster
   labels:
     replication: from-my-cluster-to-remote-cluster 
+explicitMapping:
+  allowRules:
+  - sourceKeyspace:
+      scope: "scope0"
+      collection: "collection1"
+    targetKeyspace:
+      scope: "scope0"
+      collection: "collection0"    
 spec:
   bucket: destination
   remoteBucket: source
-  explicitMapping:
-    allowRules:
-    - sourceKeyspace:
-        scope: "scope0"
-        collection: "collection1"
-      targetKeyspace:
-        scope: "scope0"
-        collection: "collection0"
 ----
 
 The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any ambiguity because by default the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters.
