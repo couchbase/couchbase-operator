@@ -1212,6 +1212,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 }
 
 func TestValidationCreateCouchbaseBackup(t *testing.T) {
+	useIAM := true
 	testDefs := []testDef{
 		{
 			name: "TestValidateBackupSecretS3",
@@ -1253,6 +1254,7 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
 						URI:    "s3://blah",
 						Secret: "test-example-s3-region-only",
+						UseIAM: &useIAM,
 					}),
 			},
 			shouldFail: false,
@@ -2266,6 +2268,18 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Add("/spec/data/exclude", []string{"anything"})},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.data.include`, `spec.data.exclude`},
+		},
+		{
+			name: "TestValidateBackupInvalidSecret",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3-region-only",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{},
 		},
 	}
 
