@@ -145,6 +145,22 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 	// than one node.
 	status.Balanced = len(info.Nodes) == 1 || info.Balanced
 
+	// While upgrading to server version equal or above 7.1,
+	// there is an apparent anamoly in returning the cluster balanced status.
+	// See issue, https://issues.couchbase.com/browse/MB-45973 for more explanations.
+	// As a temp workaraound, when encountering "balalnced": false during upgrades,
+	// we tend to check "rebalanceStatus": "none" now.
+	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
+		verAbove71, err := c.IsAtLeastVersion("7.1.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if verAbove71 {
+			status.Balanced = status.Balanced || (!info.Balanced && info.RebalanceStatus == couchbaseutil.RebalanceStatusNone)
+		}
+	}
+
 	status.Balancing = info.RebalanceStatus == couchbaseutil.RebalanceStatusRunning
 
 	return status, nil

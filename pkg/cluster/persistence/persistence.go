@@ -60,6 +60,18 @@ const (
 	VolumeExpansion PersistentKind = "volumeExpansion"
 )
 
+// PersistentUpgradeStatus tracks the status of cluster upgrade.
+type PersistentUpgradeStatus string
+
+const (
+	// UpgradeActive is set when cluster is actively upgrading.
+	// Historically, this value has been set to true so this provides backwards compatibility.
+	UpgradeActive PersistentUpgradeStatus = "true"
+
+	// UpgradeInactive is set when cluster is not undergoing an upgrade.
+	UpgradeInactive PersistentUpgradeStatus = "false"
+)
+
 // PersistentKindXDCR is a type for XDCR persistence keys.  These are defined on
 // a per-connection basis.
 type PersistentKindXDCR string

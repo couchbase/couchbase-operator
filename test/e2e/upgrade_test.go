@@ -98,8 +98,12 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 				},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
+			// once member is recovered the Operator will proceed with upgrade
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+			// followed by removal of node that was upgraded pre & post failure
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}
@@ -133,9 +137,15 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 					},
 				},
 			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			// I wonder why this is the only case where a member removed event doesn't happen?
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						// I wonder why this is the only case where a member removed event doesn't happen?
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+					},
+				},
+			},
 		},
 	}
 }
@@ -157,11 +167,27 @@ func upgradeDownRecoverableSequence(victimName string) eventschema.Validatable {
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+						eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+					},
+				},
+			},
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 					},
 				},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+					},
+				},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}
@@ -505,7 +531,9 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeFailedAddRecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		// both the victim pod and upgraded pod occurred in same sequence.
+		// therefore, these 2 do not need to be accounted for here
+		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
@@ -615,7 +643,8 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownRecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
+		eventschema.Optional{Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 

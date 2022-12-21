@@ -189,7 +189,7 @@ func (c *Cluster) reconcile() error {
 	// If the cluster is upgrading, then don't interfere with anything else
 	// as the data returned from Couchbase will vary depending on the version
 	// leading to some very strange and possibly dangerous behaviour.
-	if _, err := c.state.Get(persistence.Upgrading); err == nil {
+	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
 		return nil
 	}
 

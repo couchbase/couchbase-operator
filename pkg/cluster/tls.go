@@ -1690,7 +1690,7 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 	// If the cluster is upgrading, then don't interfere with TLS until the process
 	// is complete.  All topology changes should be considered "atomic" or the logic
 	// for this just gets mind bending.
-	if _, err := c.state.Get(persistence.Upgrading); err == nil {
+	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
 		return nil
 	}
 
@@ -1728,7 +1728,7 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 	// If the cluster is upgrading, then don't interfere with TLS until the process
 	// is complete.  All topology changes should be considered "atomic" or the logic
 	// for this just gets mind bending.
-	if _, err := c.state.Get(persistence.Upgrading); err == nil {
+	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
 		return nil
 	}
 
