@@ -107,3 +107,89 @@ Use TLS to secure your ingresses on the public internet, otherwise your login cr
 Your ingress provider may support backend TLS encryption, providing end-to-end security -- use port 18091 on the backend.
 When using ingresses to access Couchbase, you cannot use client certificate authentication -- use a load balancer service to expose the console instead.
 ====
+
+
+== Configuring an Istio Proxy
+
+Istio ingress gateway can be used to as a proxy to access the Couchbase Server user interface when installing a cluster into an Istio enabled namespace.
+An Istio ingress gateway comes with the additional benefits of the Istio ecosystem such as observability and traffic management.
+Refer to the https://istio.io/latest/docs/reference/config/networking/gateway/[Istio Gateway^] documentation for an overview of the configuration options available during installation.
+
+
+To ensure that your Kubernetes cluster is prepared to configure an ingress gateway, check that the `istio-ingressgateway` service has been assigned a public IP address.
+The `istio-ingressgateway`  service is created by default with the installation of the default Istio profile.
+
+[source,console]
+----
+$ kubectl get svc -n istio-system
+NAME                   TYPE           CLUSTER-IP    EXTERNAL-IP     PORT(S)                                      AGE
+istio-ingressgateway   LoadBalancer   10.0.249.57   20.242.186.24   15021:31049/TCP,80:32273/TCP,443:32358/TCP   22h
+----
+The next step is to set up a DNS A records for the `EXTERNAL-IP` with your DNS registrar service.
+
+Once the external address has been committed to DNS, set up the necessary proxy rules to begin forwarding traffic through Istio into the Couchbase console service.
+[source,console]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: api-gateway
+spec:
+  servers:
+    - port:
+        number: 443
+        name: https-api
+        protocol: HTTPS <.>
+      hosts:
+        - "public.hostname.com" <.>
+----
+
+<.> HTTPS is highly recommended as this is a public facing inteface.
+<.> The DNS name assigned to the ingress gateway load balancer service.
+
+
+The next step is to create a `VirtualService` resource to define routing destination rules for incoming traffic from the external Gateway:
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+ name: "virtual-service-couchbase-ui"
+spec:
+  hosts:
+  - "public.hostname.com"
+  gateways:
+  - api-gateway
+  http:
+  - match:
+    - uri:
+        prefix: / <.>
+    route:
+    - destination:
+        host: "cb-example-ui" <.>
+        port:
+          number: 18091
+----
+<.> Matches traffic targeting `public.hostname.com/`
+<.> The internal destination service used to resolve the request.
+The fully qualified domain name of this service should be used if the `VirtualService` is created in a namespace that is different than the destination service.
+
+Finally create a destination rule to allow for sticky sessions when ensures that client sessions remain open and associated with a single instance of Couchbase Server.
+
+[source,yaml]
+----
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: destination-rule-couchbase-ui
+spec:
+  host: cb-example-ui
+  trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        httpCookie:
+          name: user <.>
+          ttl: 0s
+----
+<.> It is possible to use other session cookies such as source IP if a different policy is desired.
