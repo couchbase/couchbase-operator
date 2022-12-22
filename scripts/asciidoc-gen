@@ -78,7 +78,7 @@ def escape_attributes(attribute):
 
     if isinstance(attribute, str):
         # Escape attributes.
-        attribute = re.sub(r'\{', r'\{', attribute)
+        attribute = re.sub(r'\{(?=[A-Za-z0-9]*})', r'\{', attribute)
 
         # Escape capitalization.
         attribute = re.sub(r'\*', r'\*', attribute)

@@ -1123,6 +1123,18 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoFailoverTimeout`},
 		},
 		{
+			name:           "TestValidateAutoFailoverMaxCountLessThan4",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.0.4")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverMaxCount`},
+		},
+		{
+			name:           "TestValidateAutoFailoverMaxCountOver4On71+",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.1.0")},
+			shouldFail:     false,
+			expectedErrors: []string{},
+		},
+		{
 			name:           "TestValidateAutoFailoverOnDataDiskIssuesTimePeriodUnderflow",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "0s")},
 			shouldFail:     true,
@@ -1230,6 +1242,17 @@ func TestValidationCreateCouchbaseBackup(t *testing.T) {
 					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
 						URI:    "gs://blah",
 						Secret: "test-example-gs",
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateBackupSecretS3Region",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI:    "s3://blah",
+						Secret: "test-example-s3-region-only",
 					}),
 			},
 			shouldFail: false,
@@ -2136,6 +2159,17 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`duplicate rule`},
 		},
+		{
+			name: "TestValidateBackupSecretS3Region",
+			mutations: patchMap{
+				"backup0": jsonpatch.NewPatchSet().
+					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
+						URI: "s3://blah",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"must contain key region when using IAM"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -2166,6 +2200,12 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			mutations:      patchMap{"backup1": jsonpatch.NewPatchSet().Replace("/spec/size", "-2")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.size`},
+		},
+		{
+			name:           "TestValidateBackupStagingVolueWithoutCloudOrPersistentVolume",
+			mutations:      patchMap{"backup2": jsonpatch.NewPatchSet().Remove("/spec/objectStore/uri").Replace("/spec/ephemeralVolume", true)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.ephemeralVolume`},
 		},
 		{
 			name:           "TestValidateBackupS3Bucket",

@@ -539,7 +539,7 @@ NodeSelector defines which nodes to constrain the pods that run any backup and r
 
 ==== Description
 
-ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
+Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 
 === couchbaseclusters.spec.backup.objectEndpoint.secret
 
@@ -549,9 +549,7 @@ ObjectEndpoint contains the configuration for connecting to a custom S3 complian
 
 ==== Description
 
-The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint (when required, e.g.
-not signed by a public CA).
-The secret must have the key with the name "tls.crt".
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
 
 === couchbaseclusters.spec.backup.objectEndpoint.url
 
@@ -571,8 +569,7 @@ The host/address of the custom object endpoint.
 
 ==== Description
 
-UseVirtualPath will force the AWS SDK to use the new virtual style paths.
-by default alternative path style URLs which are often required by S3 compatible object stores.
+UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
 
 === couchbaseclusters.spec.backup.resources
 
@@ -593,7 +590,7 @@ Will be populated by defaults if not specified.
 
 ==== Description
 
-Deprecated: by backup.spec.objectStore.secret S3Secret contains the region and credentials for operating backups in S3.
+Deprecated: by CouchbaseBackup.spec.objectStore.secret S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
 This field must be popluated when the `spec.s3bucket` field is specified for a backup or restore resource.
 
 === couchbaseclusters.spec.backup.selector
@@ -697,7 +694,7 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 
 ==== Description
 
-UseIAMRole enables backup to fetch EC2 instance metadata.
+Deprecated: by CouchbaseBackup.spec.objectStore.useIAM UseIAMRole enables backup to fetch EC2 instance metadata.
 This allows the AWS SDK to use the EC2's IAM Role for S3 access.
 UseIAMRole will ignore credentials in s3Secret.
 
@@ -1021,12 +1018,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 *Minimum*: `1`
 
-*Maximum*: `3`
-
 ==== Description
 
 AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server will allow before not allowing any more.
-This field must be between 1-3, default 3.
+This field must be between 1-3 for server versions prior to 7.1.0 default is 3.
 
 === couchbaseclusters.spec.cluster.autoFailoverOnDataDiskIssues
 
@@ -1061,6 +1056,7 @@ More info:  https://golang.org/pkg/time/#ParseDuration.
 ==== Description
 
 AutoFailoverServerGroup whether to enable failing over a server group.
+This field is ignored in server versions 7.1+ as it has been removed from the Couchbase API.
 
 === couchbaseclusters.spec.cluster.autoFailoverTimeout
 
@@ -2073,7 +2069,7 @@ Each feature may only be included once.
 
 *Type*: `[]string`
 
-*Pattern (Regular Expression)*: `^\d\{1,3}\.\d\{1,3}\.\d\{1,3}\.\d\{1,3}/\d\{1,2}$`
+*Pattern (Regular Expression)*: `^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2}$`
 
 ==== Description
 
@@ -2384,8 +2380,9 @@ The secret is expected to contain "tls.crt" and "tls.key" as per the Kubernetes.
 ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains server TLS data.
 The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
 It may also contain "ca.crt".
-Only a single Root CA can be provided to "ca.crt".
-Refer to couchbaseclusters.spec.networking.tls.rootcas for multiple Root CA deployments.
+Only a single PEM formated x509 certificate can be provided to "ca.crt".
+The single certificate may also bundle together multiple root CA certificates.
+Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater.
 
 === couchbaseclusters.spec.networking.tls.static
 
@@ -2770,8 +2767,9 @@ Whether server certificate validation be enabled.
 
 ==== Description
 
-TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
-The secret must have the key with the name "ca.crt".
+TLSSecret is the name of a Kubernetes secret to use explcitly for LDAP ca cert.
+If TLSSecret is not provided, certificates found in `couchbaseclusters.spec.networking.tls.rootCAs` will be used instead.
+If provided, the secret must contain the ca to be used under the name "ca.crt".
 
 === couchbaseclusters.spec.security.ldap.userDNMapping
 
@@ -3180,7 +3178,7 @@ The secret must contain a username (secret key "username") and password (secret 
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^((couchbase|http)(s)?(://))?((\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$))\{4}\b)|((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]\*[a-zA-Z0-9])\.)\*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]\*[A-Za-z0-9]))|\[(\s\*((([0-9A-Fa-f]\{1,4}:)\{7}([0-9A-Fa-f]\{1,4}|:))|(([0-9A-Fa-f]\{1,4}:)\{6}(:[0-9A-Fa-f]\{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3})|:))|(([0-9A-Fa-f]\{1,4}:)\{5}(((:[0-9A-Fa-f]\{1,4})\{1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3})|:))|(([0-9A-Fa-f]\{1,4}:)\{4}(((:[0-9A-Fa-f]\{1,4})\{1,3})|((:[0-9A-Fa-f]\{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]\{1,4}:)\{3}(((:[0-9A-Fa-f]\{1,4})\{1,4})|((:[0-9A-Fa-f]\{1,4})\{0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]\{1,4}:)\{2}(((:[0-9A-Fa-f]\{1,4})\{1,5})|((:[0-9A-Fa-f]\{1,4})\{0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]\{1,4}:)\{1}(((:[0-9A-Fa-f]\{1,4})\{1,6})|((:[0-9A-Fa-f]\{1,4})\{0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(:(((:[0-9A-Fa-f]\{1,4})\{1,7})|((:[0-9A-Fa-f]\{1,4})\{0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:)))(%.+)?\s\*\]))(:[0-9]\{0,5})?(\\\{0,1}\?network=[^&]+)?$`
+*Pattern (Regular Expression)*: `^((couchbase|http)(s)?(://))?((\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|$))\{4}\b)|((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]\*[a-zA-Z0-9])\.)\*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]\*[A-Za-z0-9]))|\[(\s\*((([0-9A-Fa-f]{1,4}:)\{7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:)\{6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3})|:))|(([0-9A-Fa-f]{1,4}:)\{5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3})|:))|(([0-9A-Fa-f]{1,4}:)\{4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]{1,4}:)\{3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]{1,4}:)\{2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(([0-9A-Fa-f]{1,4}:)\{1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d))\{3}))|:)))(%.+)?\s\*\]))(:[0-9]{0,5})?(\\{0,1}\?network=[^&]+)?$`
 
 ==== Description
 

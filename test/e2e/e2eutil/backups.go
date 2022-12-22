@@ -9,7 +9,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -53,7 +53,7 @@ type Backup struct {
 
 	// objStoreSecret is the secret to be used for authentication to
 	// the objStore
-	objStoreSecret *corev1.Secret
+	objStoreSecret *v1.Secret
 	// objStore indicates the remote destination for backup.
 	objStore string
 	// retention is the length of time to retain backups for.
@@ -70,6 +70,21 @@ type Backup struct {
 
 	// withoutFTAlias prevents FT alias from being backed up.
 	withoutFTAlias bool
+
+	// configures backup to use an ephemeral volume
+	ephemeral bool
+
+	// configures how long before a finished backup job deletes.
+	ttlSeconds *int32
+
+	// whether backup SDK can use IAM for credentials.
+	useIAM bool
+
+	// custom object endpoint to be used with backup.
+	objStoreEndpoint string
+
+	// cert to be used with the custom object endpoint.
+	objStoreEndpointCert *v1.Secret
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -146,7 +161,7 @@ func (b *Backup) ToObjStore(objStore string) *Backup {
 }
 
 // WithObjStoreSecret the secret to use to authenticate against the object store.
-func (b *Backup) WithObjStoreSecret(secret *corev1.Secret) *Backup {
+func (b *Backup) WithObjStoreSecret(secret *v1.Secret) *Backup {
 	if secret != nil {
 		b.objStoreSecret = secret
 	}
@@ -177,6 +192,18 @@ func (b *Backup) WithAutoscaling(limit *resource.Quantity, threshold, increment 
 	return b
 }
 
+// WithEphemeralVolume sets backup to use an ephemeral volume.
+func (b *Backup) WithEphemeralVolume() *Backup {
+	b.ephemeral = true
+	return b
+}
+
+// WithTTL sets when backup job should be deleted.
+func (b *Backup) WithJobTTL(time int32) *Backup {
+	b.ttlSeconds = &time
+	return b
+}
+
 // WithStorageClass allows the use of a non-default storage class.
 func (b *Backup) WithStorageClass(storageClass string) *Backup {
 	b.storageClass = storageClass
@@ -187,6 +214,29 @@ func (b *Backup) WithStorageClass(storageClass string) *Backup {
 // WithServices allows specifying specific services to be backedup.
 func (b *Backup) WithoutFTAlias() *Backup {
 	b.withoutFTAlias = true
+	return b
+}
+
+// WithUseIAM set the cluster to use IAM Role.
+func (b *Backup) WithUseIAM(useIAM bool) *Backup {
+	b.useIAM = useIAM
+
+	return b
+}
+
+// WithCustomStoreURL sets the custom url to use
+// with backup.spec.objectStore.Endpoint.
+func (b *Backup) WithCustomStoreURL(url string) *Backup {
+	b.objStoreEndpoint = url
+
+	return b
+}
+
+// WithCustomStoreCert sets the custom url to use
+// with backup.spec.objectStore.CertSecret.
+func (b *Backup) WithCustomStoreCert(secret *v1.Secret) *Backup {
+	b.objStoreEndpointCert = secret
+
 	return b
 }
 
@@ -232,6 +282,20 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		backup.Spec.S3Bucket = couchbasev2.S3BucketURI(fmt.Sprintf("s3://%s", b.s3Bucket))
 	}
 
+	if b.useIAM {
+		backup.Spec.ObjectStore.UseIAM = &b.useIAM
+	}
+
+	if b.objStoreEndpoint != "" {
+		if backup.Spec.ObjectStore.Endpoint == nil {
+			backup.Spec.ObjectStore.Endpoint = &couchbasev2.ObjectEndpoint{URL: b.objStoreEndpoint}
+		}
+
+		if b.objStoreEndpointCert != nil {
+			backup.Spec.ObjectStore.Endpoint.CertSecret = b.objStoreEndpointCert.Name
+		}
+	}
+
 	if b.retention != 0 {
 		backup.Spec.BackupRetention = &metav1.Duration{
 			Duration: b.retention,
@@ -244,6 +308,10 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 
 	if b.autoscaling != nil {
 		backup.Spec.AutoScaling = b.autoscaling
+	}
+
+	if b.ephemeral {
+		backup.Spec.EphemeralVolume = true
 	}
 
 	if len(b.include) > 0 || len(b.exclude) > 0 {
@@ -261,6 +329,8 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		falseRef := false
 		backup.Spec.Services.FTSAliases = &falseRef
 	}
+
+	backup.Spec.TTLSecondsAfterFinished = b.ttlSeconds
 
 	newBackup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackups(kubernetes.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
 	if err != nil {
@@ -282,7 +352,7 @@ type Restore struct {
 	objStore string
 
 	// objStoreSecret containst the credentials for use when restoring from a cloud store.
-	objStoreSecret *corev1.Secret
+	objStoreSecret *v1.Secret
 
 	// withBucketConfig enables bucket configuration restoration.
 	withBucketConfig bool
@@ -313,6 +383,15 @@ type Restore struct {
 
 	// forceUpdates overwrites data in the cluster with restore data
 	forceUpdates bool
+
+	// useIAM
+	useIAM bool
+
+	// custom object endpoint to be used with backup.
+	objStoreEndpoint string
+
+	// cert to be used with the custom object endpoint.
+	objStoreEndpointCert *v1.Secret
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -340,7 +419,7 @@ func (r *Restore) FromObjStore(objStore string) *Restore {
 	return r
 }
 
-func (r *Restore) WithObjStoreSecret(secret *corev1.Secret) *Restore {
+func (r *Restore) WithObjStoreSecret(secret *v1.Secret) *Restore {
 	r.objStoreSecret = secret
 	return r
 }
@@ -409,6 +488,28 @@ func (r *Restore) WithMapping(source, target string) *Restore {
 	return r
 }
 
+// UseIAM allows restore to use IAM role for backup restoration.
+func (r *Restore) UseIAM(useIAM bool) *Restore {
+	r.useIAM = useIAM
+	return r
+}
+
+// WithCustomStoreURL sets the custom url to use
+// with backup.spec.objectStore.Endpoint.
+func (r *Restore) WithCustomStoreURL(url string) *Restore {
+	r.objStoreEndpoint = url
+
+	return r
+}
+
+// WithCustomStoreCert sets the custom url to use
+// with backup.spec.objectStore.CertSecret.
+func (r *Restore) WithCustomStoreCert(secret *v1.Secret) *Restore {
+	r.objStoreEndpointCert = secret
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -441,6 +542,17 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.objStoreSecret != nil {
 		restore.Spec.ObjectStore.Secret = r.objStoreSecret.Name
+	}
+
+	if r.objStoreEndpoint != "" {
+		restore.Spec.ObjectStore.Endpoint = &couchbasev2.ObjectEndpoint{URL: r.objStoreEndpoint}
+		if r.objStoreEndpointCert != nil {
+			restore.Spec.ObjectStore.Endpoint.CertSecret = r.objStoreEndpointCert.Name
+		}
+	}
+
+	if r.useIAM {
+		restore.Spec.ObjectStore.UseIAM = &r.useIAM
 	}
 
 	if r.withBucketConfig {

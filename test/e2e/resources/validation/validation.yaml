@@ -8,6 +8,13 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: test-example-s3-region-only
+data:
+  region: ZXUtd2VzdC0y
+---
+apiVersion: v1
+kind: Secret
+metadata:
   name: test-example-s3
 data:
   access-key-id: YmxhaCBibGFoIGJsYWgK
@@ -561,6 +568,21 @@ spec:
   backupRetention: 24h
   logRetention: 24h
   size: "30Gi"
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: backup2
+spec:
+  strategy: full_only
+  full:
+    schedule: "*/5 * * * *"
+  failedJobsHistoryLimit: 3
+  backupRetention: 24h
+  logRetention: 24h
+  objectStore:
+    uri: s3://blah
+  ephemeral: true
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackupRestore

@@ -44,6 +44,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAnalyticsServiceMemoryQuota,
 		checkConstraintQueryTemporarySpace,
 		checkConstraintAutoFailoverTimeout,
+		checkConstraintAutoFailoverMaxCount,
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
@@ -200,6 +201,23 @@ func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2
 
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
 		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be less than or equal to 1h")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverTimeout checks the autofailover timeout is within range.
+func checkConstraintAutoFailoverMaxCount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Should be filled in by CRD defaulting.
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
+		if cluster.Spec.ClusterSettings.AutoFailoverMaxCount > 3 {
+			return fmt.Errorf("spec.cluster.autoFailoverMaxCount should be less than or equal to 3")
+		}
 	}
 
 	return nil
@@ -1446,8 +1464,12 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = err
 	}
 
-	if err := checkConstaintBackupObjStoreSecret(v, backup); err != nil {
+	if err := checkConstaintBackupObjStore(v, backup); err != nil {
 		errs = append(errs, err)
+	}
+
+	if !backup.HasCloudStore() && backup.Spec.EphemeralVolume {
+		errs = append(errs, fmt.Errorf("spec.ephemeralVolume is only useable with spec.objectStore.uri or spec.s3Bucket"))
 	}
 
 	if backup.Spec.Size.Value() <= 0 {
@@ -1503,7 +1525,17 @@ func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectSto
 		return fmt.Errorf("secret %s referenced by objectStore.secret must exist", secretName)
 	}
 
-	// these always have to exist.
+	if store.UseIAM != nil && *store.UseIAM {
+		if strings.HasPrefix(string(store.URI), "s3://") {
+			if _, ok := secret.Data[cbcluster.StoreSecretRegion]; !ok {
+				return fmt.Errorf("object store secret %s must contain key '%s' when using IAM", secretName, cbcluster.StoreSecretRegion)
+			}
+		}
+
+		return nil
+	}
+
+	// these always have to exist unless using IAM.
 	if _, ok := secret.Data[cbcluster.StoreSecretAccessID]; !ok {
 		return fmt.Errorf("object store secret %s must contain key '%s'", secretName, cbcluster.StoreSecretAccessID)
 	}
@@ -1539,7 +1571,7 @@ func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectSto
 	return nil
 }
 
-func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+func checkConstaintBackupObjStore(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	if !v.Options.ValidateSecrets {
 		return nil
 	}
@@ -1547,24 +1579,30 @@ func checkConstaintBackupObjStoreSecret(v *types.Validator, backup *couchbasev2.
 	if backup.Spec.ObjectStore == nil {
 		return nil
 	}
-	// only validate the secret if it exists
-	if len(backup.Spec.ObjectStore.Secret) == 0 {
-		return nil
+
+	if err := checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
+		return fmt.Errorf("failure validating spec.objectStore %w", err)
 	}
 
-	secretName := backup.Spec.ObjectStore.Secret
+	if backup.Spec.ObjectStore.Endpoint != nil {
+		secretName := backup.Spec.ObjectStore.Endpoint.CertSecret
+		if len(secretName) == 0 {
+			return nil
+		}
 
-	_, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
-	if err != nil {
-		return err
-	}
+		secret, found, err := v.Abstraction.GetSecret(backup.Namespace, secretName)
 
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
-	}
+		if err != nil {
+			return err
+		}
 
-	if err = checkConstraintStoreSecret(v, backup.Spec.ObjectStore, backup.Namespace); err != nil {
-		return err
+		if !found {
+			return fmt.Errorf("secret %s referenced by spec.objectStore.endpoint.secret. must exist", secretName)
+		}
+
+		if _, ok := secret.Data["tls.crt"]; !ok {
+			return fmt.Errorf("custom object endpoint CA secret %s must contain key 'tls.crt'", secretName)
+		}
 	}
 
 	return nil
@@ -1584,19 +1622,29 @@ func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couc
 		return nil
 	}
 
-	secretName := restore.Spec.ObjectStore.Secret
-
-	_, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
-	if err != nil {
-		return err
+	if err := checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
+		return fmt.Errorf("failure validating spec.objectStore %w", err)
 	}
 
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.backup.storeSecret must exist", secretName)
-	}
+	if restore.Spec.ObjectStore.Endpoint != nil {
+		secretName := restore.Spec.ObjectStore.Endpoint.CertSecret
+		if len(secretName) == 0 {
+			return nil
+		}
 
-	if err = checkConstraintStoreSecret(v, restore.Spec.ObjectStore, restore.Namespace); err != nil {
-		return err
+		secret, found, err := v.Abstraction.GetSecret(restore.Namespace, secretName)
+
+		if err != nil {
+			return err
+		}
+
+		if !found {
+			return fmt.Errorf("secret %s referenced by spec.objectStore.endpoint.secret. must exist", secretName)
+		}
+
+		if _, ok := secret.Data["tls.crt"]; !ok {
+			return fmt.Errorf("custom object endpoint CA secret %s must contain key 'tls.crt'", secretName)
+		}
 	}
 
 	return nil
@@ -1638,11 +1686,16 @@ func checkConstraintBackupObjectEndpointSecret(v *types.Validator, cluster *couc
 		return nil
 	}
 
-	if cluster.Spec.Backup.ObjectEndpoint == nil || len(cluster.Spec.Backup.ObjectEndpoint.CertSecret) == 0 {
+	endpoint := cluster.GetBackupStoreEndpoint()
+	if endpoint == nil {
 		return nil
 	}
 
-	secretName := cluster.Spec.Backup.ObjectEndpoint.CertSecret
+	if len(endpoint.CertSecret) == 0 {
+		return nil
+	}
+
+	secretName := cluster.GetBackupStoreEndpoint().CertSecret
 
 	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {

@@ -594,7 +594,7 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 
 	if o.debug {
 		operatorCommand = "/go/bin/dlv"
-		operatorCommandArgs = []string{"debug", "./cmd/operator", "--listen=:" + debugPort, "--accept-multiclient", "--headless=true", "--api-version=2"}
+		operatorCommandArgs = []string{"debug", "./cmd/couchbase-operator", "--listen=:" + debugPort, "--accept-multiclient", "--continue", "--headless=true", "--api-version=2"}
 	}
 
 	deployment := &appsv1.Deployment{

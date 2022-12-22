@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -161,4 +163,42 @@ func checkPodSpecAnnotationsForNodeSelector(k8s *types.Cluster, couchbase *couch
 	}
 
 	return nil
+}
+
+// Ephemeral Volumes are named deterministically.
+// <pod-name>-<volume-name>
+// pods are suffixed with the backup name, so we can recreate the generated name and fetch it.
+// https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#persistentvolumeclaim-naming
+func FindBackupEphemeralVolume(kubernetes *types.Cluster, backupName string) (*v1.PersistentVolumeClaim, error) {
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	podName := ""
+
+	// scan through looking for the backup prefix.
+	for _, pod := range pods.Items {
+		if strings.HasPrefix(pod.Name, backupName) {
+			podName = pod.Name
+		}
+	}
+
+	if podName == "" {
+		return nil, fmt.Errorf("unable to find pod for backup cronjob %s", backupName)
+	}
+
+	pvcs, err := kubernetes.KubeClient.CoreV1().PersistentVolumeClaims(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	pvcName := fmt.Sprintf("%s-%s", podName, cluster.BackupVolumeName)
+	for _, pvc := range pvcs.Items {
+		if pvc.Name == pvcName { // found an ephemeral volume backup pvc.
+			return &pvc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("unable to find pvc %s", pvcName)
 }

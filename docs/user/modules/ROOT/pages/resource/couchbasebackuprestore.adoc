@@ -35,8 +35,13 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackuprestores-spec-forceupdates,forceUpdates>>: false
   <<couchbasebackuprestores-spec-logretention,logRetention>>: 168h
   <<couchbasebackuprestores-spec-objectstore,objectStore>>:
+    <<couchbasebackuprestores-spec-objectstore-endpoint,endpoint>>:
+      <<couchbasebackuprestores-spec-objectstore-endpoint-secret,secret>>: ""
+      <<couchbasebackuprestores-spec-objectstore-endpoint-url,url>>: ""
+      <<couchbasebackuprestores-spec-objectstore-endpoint-usevirtualpath,useVirtualPath>>: false
     <<couchbasebackuprestores-spec-objectstore-secret,secret>>: ""
     <<couchbasebackuprestores-spec-objectstore-uri,uri>>: ""
+    <<couchbasebackuprestores-spec-objectstore-useiam,useIAM>>: false
   <<couchbasebackuprestores-spec-repo,repo>>: ""
   <<couchbasebackuprestores-spec-s3bucket,s3bucket>>: ""
   <<couchbasebackuprestores-spec-services,services>>:
@@ -51,10 +56,14 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-services-ftindex,ftIndex>>: True
     <<couchbasebackuprestores-spec-services-gsiindex,gsiIndex>>: True
     <<couchbasebackuprestores-spec-services-views,views>>: True
+  <<couchbasebackuprestores-spec-stagingvolume,stagingVolume>>:
+    <<couchbasebackuprestores-spec-stagingvolume-size,size>>: 20Gi
+    <<couchbasebackuprestores-spec-stagingvolume-storageclassname,storageClassName>>: ""
   <<couchbasebackuprestores-spec-start,start>>:
     <<couchbasebackuprestores-spec-start-int,int>>: 0
     <<couchbasebackuprestores-spec-start-str,str>>: ""
   <<couchbasebackuprestores-spec-threads,threads>>: 1
+  <<couchbasebackuprestores-spec-ttlsecondsafterfinished,ttlSecondsAfterFinished>>: 0
 <<couchbasebackuprestores-status,status>>:
   <<couchbasebackuprestores-status-archive,archive>>: ""
   <<couchbasebackuprestores-status-backups,backups>>:
@@ -171,7 +180,7 @@ By default, all data is included.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -211,7 +220,7 @@ FilterValues only restores documents whose values match the provided regular exp
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -245,7 +254,7 @@ Map sources may only be specified once, and may not overlap.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -259,7 +268,7 @@ Source defines the data source of the mapping, this may be either a bucket, scop
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -332,6 +341,47 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 The remote destination for backup.
 
+=== couchbasebackuprestores.spec.objectStore.endpoint
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
+If set will override `CouchbaseCluster.spec.backup.objectEndpoint` See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores.
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.url
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The host/address of the custom object endpoint.
+
+=== couchbasebackuprestores.spec.objectStore.endpoint.useVirtualPath
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
+
 === couchbasebackuprestores.spec.objectStore.secret
 
 ==== Constraints
@@ -349,13 +399,24 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(az|s3|gs)://.\{3,}$`
+*Pattern (Regular Expression)*: `^(az|s3|gs)://.{3,}$`
 
 ==== Description
 
 URI is a reference to a remote object store.
 This is the prefix of the object store and the bucket name.
 i.e s3://bucket, az://bucket or gs://bucket.
+
+=== couchbasebackuprestores.spec.objectStore.useIAM
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Whether to allow the backup SDK to attempt to authenticate using the instance metadata api.
+If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 
 === couchbasebackuprestores.spec.repo
 
@@ -374,7 +435,7 @@ If no repository is specified, the backup container will choose the latest.
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]{3,63}$`
 
 ==== Description
 
@@ -538,6 +599,44 @@ This field defaults to true.
 Views restores views from the backup.
 This field defaults to true.
 
+=== couchbasebackuprestores.spec.stagingVolume
+
+==== Constraints
+
+*Type*: `object`
+
+*Default*: `{'size': '20Gi'}`
+
+==== Description
+
+StagingVolume contains configuration related to the ephemeral volume used as staging when restoring from a cloud backup.
+
+=== couchbasebackuprestores.spec.stagingVolume.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `20Gi`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size allows the specification of a staging volume.
+More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes The ephemeral volume will only be used when restoring from a cloud provider, if the backup job was created using ephemeral storage.
+Otherwise the restore job will share a staging volume with the backup job.
+
+=== couchbasebackuprestores.spec.stagingVolume.storageClassName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of StorageClass to use.
+
 === couchbasebackuprestores.spec.start
 
 ==== Constraints
@@ -584,6 +683,18 @@ Str references an absolute backup by name.
 ==== Description
 
 How many threads to use during the restore.
+
+=== couchbasebackuprestores.spec.ttlSecondsAfterFinished
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+Number of seconds to elapse before a completed job is deleted.
 
 == couchbasebackuprestores.status
 

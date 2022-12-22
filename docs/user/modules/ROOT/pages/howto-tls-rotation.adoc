@@ -20,6 +20,7 @@ Use when:
 Use when:
 +
  ** The root CA has been compromised
+ ** The root CA has expired
 
 The relevant errors will be shown when a certificate is found to be invalid or compromised.
 
@@ -38,9 +39,8 @@ certificate cannot be verified: x509: certificate signed by unknown authority
 [NOTE]
 ====
 Certificate rotation is fully supported when using client certificate authentication.
-Due to technical reasons all TLS reconciliation occurs over plain text.
-This is however still secure as private keys are never exposed by the Operator over the wire.
-Private keys are securely mounted on Couchbase Server pods by Kubernetes.
+All certificate rotation occurs over TLS, however due to technical reasons, the rotation of expired certificates must occur over plain text.
+However when rotating either expired or non-expired certificates, the private keys are never exposed by the Couchbase Operator over the wire since private keys are securely mounted on Couchbase Server pods by Kubernetes.
 ====
 
 == Replacing Server Certificates
@@ -195,6 +195,62 @@ As such, there will be a delay -- in the order of about a minute -- between trig
 ====
 A full PKI rotation must not be interrupted once it has begun.
 Interruption risks severing communication between the Operator and the Couchbase cluster, as some certificates cannot be validated against the active CA.
-
 In the unlikely event something does go wrong, don't restart anything, it may make the problem worse, and seek immediate guidance from Couchbase support.
 ====
+
+== Replacing expired Certificates
+
+In the event of server certificate or root CA expiry, TLS rotation and replacement can be performed according to the previous sections in order to restore secure connectivity to Couchbase Server Pods.
+When the Couchbase Operator has detected the expiration of Couchbase Server certificates or any of the root CAs, the Couchbase cluster resource will raise the `ClientTLSInvalid` event:
+
+[source,console]
+----
+$ kubectl describe couchbasecluster
+...
+Events:
+  Type    Reason              Age   From                Message
+  ----    ------              ----  ----                -------
+  Normal  ClientTLSInvalid    9s (x48 over 8m2s)        Failed to validate TLS certificate chain
+  Normal  ClientTLSUpdated    81s                       Client certificate was updated
+----
+
+The `ClientTLSInvalid` event is raised until valid certificates are provided to replace the expired certificates.
+
+In order to replace expired server or root CA certificates you need to ensure that `allowPlainTextCertReload` is enabled.
+This value can be set within the Couchbase Cluster resource:
+[source,yaml]
+----
+apiVersion: v2
+kind: CouchbaseCluster
+metadata:
+  name: ""
+spec:
+  networking:
+    tls:
+      allowPlainTextCertReload: true
+----
+
+[WARNING]
+====
+Enabling `allowPlainTextCertReload` will cause user credentials to be momentarily exposed while the Operator makes plain text `http` requests to Couchbase Server.
+Plain text requests are required because the Operator needs to request Couchbase Server to reload its certificates without rejecting invalid TLS client requests.
+Due to this behavior it is more effective to proactively monitor and rotate certificates prior to rotation in order to ensure security of your cluster.
+====
+
+The following calls are made in plain text to the Couchbase when recovering a cluster with only expired server certs:
+
+
+- https://docs.couchbase.com/server/current/rest-api/upload-retrieve-node-cert.html#http-method-and-uri[Reload node certificate^]
+
+The following calls are made in plain text to the Couchbase when recovering a cluster with expired root CA certificates:
+
+- https://docs.couchbase.com/server/current/rest-api/load-trusted-cas.html[Load trusted CAs^]
+- https://docs.couchbase.com/server/current/rest-api/upload-retrieve-node-cert.html#http-method-and-uri[Reload node certificate^]
+
+When only the client certificates have expired then the Operator can securely rotate the certificates without the need to perform plain text requests to Couchbase Server.
+
+[IMPORTANT]
+====
+Expired certificates cannot be rotated if Node encryption is enabled due to the secruity risk caused by the amount of insecure traffic that will be generated when disabling this feature.
+====
+

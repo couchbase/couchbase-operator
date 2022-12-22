@@ -2030,6 +2030,8 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	}
 
 	if c.shouldRotateExpiredRootCAs() {
+		// root CA has expired so ensure invalid tls event is raised
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		log.Info(fmt.Sprintf("Rotating expired Root CAs"), "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredRootCAs(); err != nil {
@@ -2038,6 +2040,8 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	}
 
 	if c.shouldRotateExpiredServerCerts() {
+		// server certs have expired so ensure invalid tls event is raised
+		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		log.Info(fmt.Sprintf("Rotating expired server certs"), "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredServerCerts(); err != nil {
@@ -2046,6 +2050,8 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	}
 
 	if c.shouldRotateExpiredClientCerts() {
+		// client certs have expired so ensure invalid client event is raised
+		c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
 		log.Info(fmt.Sprintf("Rotating expired client certs"), "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredClientCerts(); err != nil {

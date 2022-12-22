@@ -152,6 +152,10 @@ const (
 
 // ObjectStore allows for backing up to a remote cloud storage.
 type ObjectStoreSpec struct {
+	// Whether to allow the backup SDK to attempt to authenticate
+	// using the instance metadata api.
+	// If set, will override `CouchbaseCluster.spec.backup.useIAM`.
+	UseIAM *bool `json:"useIAM,omitempty"`
 	// URI is a reference to a remote object store.
 	// This is the prefix of the object store and the bucket name.
 	// i.e s3://bucket, az://bucket or gs://bucket.
@@ -161,6 +165,11 @@ type ObjectStoreSpec struct {
 	// These correspond to the fields used by cbbackupmgr
 	// https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2
 	Secret string `json:"secret,omitempty"`
+
+	// Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
+	// If set will override `CouchbaseCluster.spec.backup.objectEndpoint`
+	// See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores
+	Endpoint *ObjectEndpoint `json:"endpoint,omitempty"`
 }
 
 // CouchbaseBackup allows automatic backup of all data from a Couchbase cluster
@@ -207,6 +216,10 @@ type CouchbaseBackupSpec struct {
 	// Used in Full/Incremental and FullOnly backup strategies.
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
 
+	// Amount of time to elapse before a completed job is deleted.
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
 	// Amount of successful jobs to keep.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=0
@@ -235,8 +248,8 @@ type CouchbaseBackupSpec struct {
 	// Size allows the specification of a backup persistent volume, when using
 	// volume based backup. More info:
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
-	// +kubebuilder:default="20Gi"
 	// +kubebuilder:validation:Type=string
+	// +kubebuilder:default="20Gi"
 	Size *resource.Quantity `json:"size,omitempty"`
 
 	// AutoScaling allows the volume size to be dynamically increased.
@@ -269,6 +282,12 @@ type CouchbaseBackupSpec struct {
 	// backup.  By default, all data is included.  Modifications
 	// to this field will only take effect on the next full backup.
 	Data *CouchbaseBackupDataFilter `json:"data,omitempty"`
+
+	// EphemeralVolume sets backup to use an ephemeral volume instead
+	// of a persistent volume. This is used when backing up to a remote
+	// cloud provider, where a persistent volume is not needed.
+	// +kubebuilder:default=false
+	EphemeralVolume bool `json:"ephemeralVolume"`
 }
 
 // CouchbaseBackupServiceFilter allows backup filtering per-service.
@@ -558,6 +577,29 @@ type CouchbaseBackupRestoreSpec struct {
 	// Forces data in the Couchbase cluster to be overwritten
 	// even if the data in the cluster is newer than the restore
 	ForceUpdates bool `json:"forceUpdates,omitempty"`
+
+	// StagingVolume contains configuration related to the
+	// ephemeral volume used as staging when restoring from a cloud backup.
+	// +kubebuilder:default={size: "20Gi"}
+	StagingVolume *CouchbaseBackupStagingVolume `json:"stagingVolume,omitempty"`
+
+	// Number of seconds to elapse before a completed job is deleted.
+	// +kubebuilder:validation:Minimum=0
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+}
+
+type CouchbaseBackupStagingVolume struct {
+	// Size allows the specification of a staging volume. More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// The ephemeral volume will only be used when restoring from a cloud provider,
+	// if the backup job was created using ephemeral storage.
+	// Otherwise the restore job will share a staging volume with the backup job.
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:default="20Gi"
+	Size *resource.Quantity `json:"size,omitempty"`
+
+	// Name of StorageClass to use.
+	StorageClassName *string `json:"storageClassName,omitempty"`
 }
 
 // CouchbaseBackupRestoreDataFilter allows filtering of restore data by bucket, scope or collection.
@@ -2209,15 +2251,17 @@ type Backup struct {
 	// repositories and non-dockerhub ones.
 	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty"`
 
-	// Deprecated: by backup.spec.objectStore.secret
-	// S3Secret contains the region and credentials for operating backups in S3.
+	// Deprecated: by CouchbaseBackup.spec.objectStore.secret
+	// S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
 	// This field must be popluated when the `spec.s3bucket` field is specified
 	// for a backup or restore resource.
 	S3Secret string `json:"s3Secret,omitempty"`
 
+	// Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint
 	// ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 	ObjectEndpoint *ObjectEndpoint `json:"objectEndpoint,omitempty"`
 
+	// Deprecated: by CouchbaseBackup.spec.objectStore.useIAM
 	// UseIAMRole enables backup to fetch EC2 instance metadata.
 	// This allows the AWS SDK to use the EC2's IAM Role for S3 access.
 	// UseIAMRole will ignore credentials in s3Secret.
@@ -2226,14 +2270,14 @@ type Backup struct {
 
 type ObjectEndpoint struct {
 	// The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint
-	// (when required, e.g. not signed by a public CA). The secret must have the key with the name "tls.crt"
+	// The secret must have the key with the name "tls.crt"
 	CertSecret string `json:"secret,omitempty"`
 
 	// The host/address of the custom object endpoint.
 	URL string `json:"url,omitempty"`
 
-	// UseVirtualPath will force the AWS SDK to use the new virtual style paths.
-	// by default alternative path style URLs which are often required by S3 compatible object stores.
+	// UseVirtualPath will force the AWS SDK to use the new virtual style paths
+	// which are often required by S3 compatible object stores.
 	UseVirtualPath bool `json:"useVirtualPath,omitempty"`
 }
 
@@ -2254,8 +2298,10 @@ type CouchbaseClusterLDAPSpec struct {
 	// password of the binding LDAP user.
 	BindSecret string `json:"bindSecret"`
 
-	// TLSSecret is the name of a Kubernetes secret to use for LDAP ca cert.
-	// The secret must have the key with the name "ca.crt".
+	// TLSSecret is the name of a Kubernetes secret to use explcitly for LDAP ca cert.
+	// If TLSSecret is not provided, certificates found in `couchbaseclusters.spec.networking.tls.rootCAs`
+	// will be used instead.
+	// If provided, the secret must contain the ca to be used under the name "ca.crt".
 	TLSSecret string `json:"tlsSecret,omitempty"`
 
 	// AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
@@ -2714,10 +2760,10 @@ type ClusterConfig struct {
 	AutoFailoverTimeout *metav1.Duration `json:"autoFailoverTimeout,omitempty"`
 
 	// AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
-	// will allow before not allowing any more.  This field must be between 1-3, default 3.
+	// will allow before not allowing any more.  This field must be between 1-3 for server versions prior to 7.1.0
+	// default is 3.
 	// +kubebuilder:default=3
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=3
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
 	// AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a pod
@@ -2731,6 +2777,7 @@ type ClusterConfig struct {
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
 	// AutoFailoverServerGroup whether to enable failing over a server group.
+	// This field is ignored in server versions 7.1+ as it has been removed from the Couchbase API
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// AutoCompaction allows the configuration of auto-compaction, including on what
@@ -3339,8 +3386,9 @@ type TLSSecretSource struct {
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains server TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the kubernetes.io/tls secret type.  It may also contain "ca.crt".
-	// Only a single Root CA can be provided to "ca.crt". Refer to
-	// couchbaseclusters.spec.networking.tls.rootcas for multiple Root CA deployments.
+	// Only a single PEM formated x509 certificate can be provided to "ca.crt".
+	// The single certificate may also bundle together multiple root CA certificates.
+	// Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater.
 	ServerSecretName string `json:"serverSecretName"`
 
 	// ClientSecretName specifies the secret name, in the same namespace as the cluster,

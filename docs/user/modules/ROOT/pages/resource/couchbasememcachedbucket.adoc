@@ -99,7 +99,7 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]\{1,100}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
 
 ==== Description
 

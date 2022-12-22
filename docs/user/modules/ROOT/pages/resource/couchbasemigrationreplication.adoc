@@ -118,7 +118,7 @@ The destination of our migration, must be a scope and collection.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250})$`
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
 
 ==== Description
 
@@ -137,7 +137,7 @@ May be empty to just work at scope level.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250})$`
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
 
 ==== Description
 
@@ -165,7 +165,7 @@ CouchbaseReplicationSpec allows configuration of an XDCR replication.
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]\{1,100}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
 
 ==== Description
 
@@ -221,7 +221,7 @@ Paused allows a replication to be stopped and restarted without having to restar
 
 *Maximum Length*: `100`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]\{1,100}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
 
 ==== Description
 

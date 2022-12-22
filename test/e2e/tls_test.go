@@ -2349,11 +2349,12 @@ func TestMandatoryMutualTLSRotateClientExpiring(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
 
 	// waiting additional time to ensure that the clients have expired
-	time.Sleep(2 * time.Minute)
+	expiryTime := validTo.Add(15 * time.Second)
+	time.Sleep(time.Until(expiryTime))
 
 	// At this point the client is locked out but we should be able to rotate certs and proceed
 	e2eutil.MustRotateClientCertificate(t, ctx)
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 3*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
@@ -2396,21 +2397,26 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/allowPlainTextCertReload", true), time.Minute)
 
 	// waiting additional time to ensure that the clients have expired
-	time.Sleep(2 * time.Minute)
+	expiryTime := validTo.Add(15 * time.Second)
+	time.Sleep(time.Until(expiryTime))
 
 	// At this point the client is locked out but we should be able to rotate certs and proceed
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
 
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 2*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 3*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
+	// * Invalid TLS is raised for both root CA and server cert
+	// * Invalid Client TLS is raised for expired client cert
 	// * Client TLS updated
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),

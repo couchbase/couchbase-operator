@@ -224,18 +224,18 @@ func applyObjEndpoint(cluster *couchbasev2.CouchbaseCluster, objEndpoint string,
 		return
 	}
 
-	cluster.Spec.Backup.ObjectEndpoint = &couchbasev2.ObjectEndpoint{
+	cluster.Spec.Backup.ObjectEndpoint = &couchbasev2.ObjectEndpoint{ //nolint:staticcheck
 		URL: objEndpoint,
 	}
 
 	if secret != nil {
-		cluster.Spec.Backup.ObjectEndpoint.CertSecret = secret.Name
+		cluster.Spec.Backup.ObjectEndpoint.CertSecret = secret.Name //nolint:staticcheck
 	}
 }
 
 // applyIAMRole optionally sets backup to use host EC2 IAM Role.
 func applyS3IAMRole(cluster *couchbasev2.CouchbaseCluster, useIAMRole bool) {
-	cluster.Spec.Backup.UseIAMRole = useIAMRole
+	cluster.Spec.Backup.UseIAMRole = useIAMRole //nolint:staticcheck
 }
 
 // applyGenericNetworking optionally applies generic networking to the cluster, this
@@ -517,13 +517,6 @@ func (o *ClusterOptions) WithObjEndpoint(objEndpoint string) *ClusterOptions {
 
 func (o *ClusterOptions) WithObjEndpointCert(certSecret *v1.Secret) *ClusterOptions {
 	o.ObjEndpointCertSecret = certSecret
-
-	return o
-}
-
-// WithS3IAMRole set the cluster to use host EC2 IAM Role.
-func (o *ClusterOptions) WithS3IAMRole(useIAM bool) *ClusterOptions {
-	o.S3UseIAM = useIAM
 
 	return o
 }

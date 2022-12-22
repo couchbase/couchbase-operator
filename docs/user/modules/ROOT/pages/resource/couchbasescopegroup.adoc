@@ -149,7 +149,7 @@ This field defaults to `CouchbaseCollection` if not specified.
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250}$`
 
 ==== Description
 
@@ -179,7 +179,7 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#
 
 *Maximum Length*: `251`
 
-*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,250}$`
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250}$`
 
 ==== Description
 

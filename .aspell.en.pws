@@ -249,3 +249,8 @@ Couchbase's
 Datacenters
 unmanaged
 cgroup
+CouchbaseCluster
+pre
+sha
+CAs
+cao

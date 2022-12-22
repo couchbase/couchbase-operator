@@ -928,6 +928,10 @@ func (c *CouchbaseCluster) DualStack() bool {
 	return c.Spec.Networking.AddressFamily == nil
 }
 
+func (c *CouchbaseCluster) GetBackupStoreEndpoint() *ObjectEndpoint {
+	return c.Spec.Backup.ObjectEndpoint
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {
@@ -1169,4 +1173,13 @@ func (l ScopeOrCollectionNameList) StringSlice() []string {
 	}
 
 	return out
+}
+
+// HasCloudStore returns if any remote cloud stores are set.
+func (b CouchbaseBackup) HasCloudStore() bool {
+	return b.Spec.S3Bucket != "" || (b.Spec.ObjectStore != nil && b.Spec.ObjectStore.URI != "")
+}
+
+func (r CouchbaseBackupRestore) HasCloudStore() bool {
+	return r.Spec.S3Bucket != "" || (r.Spec.ObjectStore != nil && r.Spec.ObjectStore.URI != "")
 }

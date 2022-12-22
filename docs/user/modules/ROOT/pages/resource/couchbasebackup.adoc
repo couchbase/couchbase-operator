@@ -27,6 +27,7 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbasebackups-spec-data-include,include>>:
     - ""
+  <<couchbasebackups-spec-ephemeralvolume,ephemeralVolume>>: false
   <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-full,full>>:
     <<couchbasebackups-spec-full-schedule,schedule>>: ""
@@ -34,8 +35,13 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackups-spec-incremental-schedule,schedule>>: ""
   <<couchbasebackups-spec-logretention,logRetention>>: 168h
   <<couchbasebackups-spec-objectstore,objectStore>>:
+    <<couchbasebackups-spec-objectstore-endpoint,endpoint>>:
+      <<couchbasebackups-spec-objectstore-endpoint-secret,secret>>: ""
+      <<couchbasebackups-spec-objectstore-endpoint-url,url>>: ""
+      <<couchbasebackups-spec-objectstore-endpoint-usevirtualpath,useVirtualPath>>: false
     <<couchbasebackups-spec-objectstore-secret,secret>>: ""
     <<couchbasebackups-spec-objectstore-uri,uri>>: ""
+    <<couchbasebackups-spec-objectstore-useiam,useIAM>>: false
   <<couchbasebackups-spec-s3bucket,s3bucket>>: ""
   <<couchbasebackups-spec-services,services>>:
     <<couchbasebackups-spec-services-analytics,analytics>>: True
@@ -54,6 +60,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackups-spec-strategy,strategy>>: full_incremental
   <<couchbasebackups-spec-successfuljobshistorylimit,successfulJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-threads,threads>>: 1
+  <<couchbasebackups-spec-ttlsecondsafterfinished,ttlSecondsAfterFinished>>: 0
 <<couchbasebackups-status,status>>:
   <<couchbasebackups-status-archive,archive>>: ""
   <<couchbasebackups-status-backups,backups>>:
@@ -220,7 +227,7 @@ Modifications to this field will only take effect on the next full backup.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -240,7 +247,7 @@ This field cannot be used at the same time as included items.
 
 *Minimum Items*: `1`
 
-*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.)\{1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]\{0,29})?)?$`
+*Pattern (Regular Expression)*: `^(?:[a-zA-Z0-9\-_%]|\\.){1,100}(\._default(\._default)?|\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29}(\.[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,29})?)?$`
 
 ==== Description
 
@@ -251,6 +258,21 @@ Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-sco
 Included data cannot overlap e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
 This field cannot be used at the same time as excluded items.
+
+=== couchbasebackups.spec.ephemeralVolume
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+EphemeralVolume sets backup to use an ephemeral volume instead of a persistent volume.
+This is used when backing up to a remote cloud provider, where a persistent volume is not needed.
 
 === couchbasebackups.spec.failedJobsHistoryLimit
 
@@ -335,6 +357,47 @@ More info: https://golang.org/pkg/time/#ParseDuration.
 
 ObjectStore allows for backing up to a remote cloud storage.
 
+=== couchbasebackups.spec.objectStore.endpoint
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
+If set will override `CouchbaseCluster.spec.backup.objectEndpoint` See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores.
+
+=== couchbasebackups.spec.objectStore.endpoint.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
+
+=== couchbasebackups.spec.objectStore.endpoint.url
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The host/address of the custom object endpoint.
+
+=== couchbasebackups.spec.objectStore.endpoint.useVirtualPath
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
+
 === couchbasebackups.spec.objectStore.secret
 
 ==== Constraints
@@ -352,7 +415,7 @@ These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/se
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^(az|s3|gs)://.\{3,}$`
+*Pattern (Regular Expression)*: `^(az|s3|gs)://.{3,}$`
 
 ==== Description
 
@@ -360,13 +423,24 @@ URI is a reference to a remote object store.
 This is the prefix of the object store and the bucket name.
 i.e s3://bucket, az://bucket or gs://bucket.
 
+=== couchbasebackups.spec.objectStore.useIAM
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Whether to allow the backup SDK to attempt to authenticate using the instance metadata api.
+If set, will override `CouchbaseCluster.spec.backup.useIAM`.
+
 === couchbasebackups.spec.s3bucket
 
 ==== Constraints
 
 *Type*: `string`
 
-*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]\{3,63}$`
+*Pattern (Regular Expression)*: `^s3://[a-z0-9-\.]{3,63}$`
 
 ==== Description
 
@@ -607,6 +681,18 @@ Amount of successful jobs to keep.
 
 How many threads to use during the backup.
 This field defaults to 1.
+
+=== couchbasebackups.spec.ttlSecondsAfterFinished
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+Amount of time to elapse before a completed job is deleted.
 
 == couchbasebackups.status
 
