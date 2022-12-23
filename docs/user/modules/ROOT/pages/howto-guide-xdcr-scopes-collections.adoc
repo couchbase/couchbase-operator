@@ -1,11 +1,11 @@
-= How-to Guide: XDCR with Scopes and Collections 
+= How-to Guide: XDCR with Scopes and Collections
 :description: A how-to guide on configuring cross data center replication (XDCR) using the Autonomous Operator.
 :page-toclevels: 2
 
 [abstract]
 {description}
 
-== Overview 
+== Overview
 
 Couchbase Server allows the use of cross data center replication (XDCR).
 XDCR allows data to be physically migrated to a new cluster, or replicated to a standby system for disaster recovery or physical locality.
@@ -28,7 +28,7 @@ Refer to the xref:concept-scopes-and-collections.adoc[Couchbase Scopes and Colle
 NOTE: This guide uses IP based Addressing to configure XDCR.
 To configure it using a different approach please refer to xref:howto-xdcr.adoc[Configure XDCR].
 
-XDCR can be configured to do `Unidirectional` and `Bidirectional` replication. 
+XDCR can be configured to do `Unidirectional` and `Bidirectional` replication.
 
 === Unidirectional Replication
 
@@ -49,7 +49,7 @@ spec:
     exposeAdminConsole: true <.>
     adminConsoleServiceTemplate: <.>
       spec:
-        type: NodePort 
+        type: NodePort
     exposedFeatures: <.>
     - xdcr
     exposedFeatureServiceTemplate: <.>
@@ -77,7 +77,7 @@ kind: CouchbaseReplication
 metadata:
   name: replicate-source-to-destination-in-remote-cluster
   labels:
-    replication: from-my-cluster-to-remote-cluster 
+    replication: from-my-cluster-to-remote-cluster
 explicitMapping:
   allowRules:
   - sourceKeyspace:
@@ -85,14 +85,14 @@ explicitMapping:
       collection: "collection0"
     targetKeyspace:
       scope: "scope0"
-      collection: "collection1"    
+      collection: "collection1"
 spec:
   bucket: source
   remoteBucket: destination
 ----
 
 The resource is labeled with `replication:from-my-cluster-to-remote-cluster` to avoid any ambiguity.
-This is because the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters by default. 
+This is because the Operator will select all `CouchbaseReplication` resources in the namespace and apply them to all remote clusters by default.
 Thus, the label is specific to the source cluster and target cluster.
 
 Create a secret for authentication of remote Couchbase cluster:
@@ -119,7 +119,7 @@ We define a remote cluster on our local resource:
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
-  name: my-cluster 
+  name: my-cluster
 spec:
   xdcr:
     managed: true
@@ -145,7 +145,7 @@ The hostname is calculated as per the xref:howto-client-sdks#ip-based-addressing
 
 <.> Finally we select replications that match the labels we specify, in this instance the ones that go from this cluster to the remote one.
 
-Upon completion of the above steps, XDCR will be configured on the source cluster to replicate the data of the `source` bucket to the `destination` bucket in the remote cluster. 
+Upon completion of the above steps, XDCR will be configured on the source cluster to replicate the data of the `source` bucket to the `destination` bucket in the remote cluster.
 
 To verify that, login to the Web UI, and go to the XDCR section, you'll see it configured as shown in the image below.
 
@@ -173,7 +173,7 @@ spec:
     exposeAdminConsole: true <.>
     adminConsoleServiceTemplate: <.>
       spec:
-        type: NodePort 
+        type: NodePort
     exposedFeatures: <.>
     - xdcr
     exposedFeatureServiceTemplate: <.>
@@ -202,7 +202,7 @@ kind: CouchbaseReplication
 metadata:
   name: replicate-destination-to-source-in-remote-cluster
   labels:
-    replication: from-my-cluster-to-remote-cluster 
+    replication: from-my-cluster-to-remote-cluster
 explicitMapping:
   allowRules:
   - sourceKeyspace:
@@ -210,7 +210,7 @@ explicitMapping:
       collection: "collection1"
     targetKeyspace:
       scope: "scope0"
-      collection: "collection0"    
+      collection: "collection0"
 spec:
   bucket: destination
   remoteBucket: source
@@ -274,7 +274,7 @@ By combining unidirectional and bidirectional topologies, you have the flexibili
 
 ==== Chain Replication
 
-Chain Replication is a configuration in which transactions occurring at source bucket can be replicated to destination bucket, and the transactions occurring at destination bucket can be replicated to another destination bucket. 
+Chain Replication is a configuration in which transactions occurring at source bucket can be replicated to destination bucket, and the transactions occurring at destination bucket can be replicated to another destination bucket.
 
 Chain replication topology is useful for minimizing data center network bandwidth because the cluster at the head of the chain only replicates to the next cluster along the chain rather than all the clusters.
 
