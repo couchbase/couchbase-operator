@@ -114,7 +114,7 @@ When using ingresses to access Couchbase, you cannot use client certificate auth
 == Configuring an Istio Proxy
 
 Istio ingress gateway can be used to as a proxy to access the Couchbase Server user interface when installing a cluster into an Istio enabled namespace.
-An Istio ingress gateway comes with the additional benefits of the Istio ecosystem such as observability and traffic management.
+An Istio ingress gateway comes with the additional benefits of the Istio ecosystem such as traffic monitoring and tracing.
 Refer to the https://istio.io/latest/docs/reference/config/networking/gateway/[Istio Gateway^] documentation for an overview of the configuration options available during installation.
 
 
@@ -146,7 +146,7 @@ spec:
         - "public.hostname.com" <.>
 ----
 
-<.> HTTPS is highly recommended as this is a public facing inteface.
+<.> HTTPS is highly recommended as this is a public facing interface.
 <.> The DNS name assigned to the ingress gateway load balancer service.
 
 
