@@ -251,6 +251,6 @@ When only the client certificates have expired then the Operator can securely ro
 
 [IMPORTANT]
 ====
-Expired certificates cannot be rotated if Node encryption is enabled due to the secruity risk caused by the amount of insecure traffic that will be generated when disabling this feature.
+Expired certificates cannot be rotated if Node encryption is enabled due to the security risk caused by the amount of insecure traffic that will be generated when disabling this feature.
 ====
 
