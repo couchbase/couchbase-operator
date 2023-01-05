@@ -717,20 +717,21 @@ The affinity and anti-affinity mechanisms are described in xref:concept-scheduli
 
 Backup and restore job affinity can be set, per `CouchbaseCluster`, with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-nodeselector[`couchbaseclusters.spec.backup.nodeSelector`] attribute, and toleration of anti-affinity rules can be set with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-tolerations[`couchbaseclusters.spec.backup.tolerations`] attribute.
 
-== Backup and Restore to S3
+== Backup and Restore to a Cloud Store
 
-If you are running a Couchbase cluster version 6.6.x or higher and using the backup image `operator-backup:1.1.0` or higher, the ability to backup and restore to and from AWS S3 buckets is available.
-This option requires some extra configuration related to your AWS credentials and the name of the S3 bucket to perform operations on.
+If you are running a Couchbase cluster version 6.6.x or higher and using the backup image `operator-backup:1.3.2` or higher, the ability to backup and restore to and from AWS, Azure, and GCP is available.
 
-There are two ways to configure your AWS credentials:
+There are two ways to configure access to a cloud store.
 
-. Manually through providing an access key and secret id.
-. Automatically through an attached IAM Role.
+. Manually through providing credentials via a secret.
+. Automatically by using instance metadata api to grant role access.
 
-=== Configure Explicit Access and Secret Keys
+=== Configure Explicit Credentials
 
-When manually providing an access key and secret id, a separate `Secret` must be created that holds the AWS region name, access key ID, and secret access key.
+When manually providing credentials, a separate `Secret` must be created that holds the credentials required for the cloud store. More information on the individual fields can be found under xref:server:backup-restore:cbbackupmgr-backup.adoc#optional-2[cbbackupmgr].
 
+For AWS S3 three fields are expected in the secret.
+Region name, access key ID, and secret access key under the keys `region`, `access-key-id` and `secret-access-key`.
 [source,yaml]
 ----
 apiVersion: v1
@@ -739,50 +740,85 @@ metadata:
   name: s3-secret
 type: Opaque
 data:
-  region: aGV5IG1h...
-  access-key-id: bXVzaHJvb20ga2l...
-  secret-access-key: cm9zY29lJ3Mgd2V0IHN...
+  region: <aws-region>
+  access-key-id: <access key id>
+  secret-access-key: <secret access key>
 ----
 
-In your `CouchbaseCluster` object, you will need to reference this secret so the Operator knows where to extract the credentials from.
+For Azure Blob Storage the account name and the account key are expected under the keys `access-key-id` and `secret-access-key`.
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gcp-secret
+type: Opaque
+data:
+  access-key-id: <account name>
+  secret-access-key: <account key>
+----
+
+For Google Cloud Cloud Storage a client id, client secret and refresh token are expected under the keys `access-key-id`, `secret-access-key` and `refresh-token`.
+[source,yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-secret
+type: Opaque
+data:
+  access-key-id: <client id>
+  secret-access-key: <client secret>
+  refresh-token: <refresh-token>
+----
+
+In your `CouchbaseBackup` and `CouchbaseBackupRestore` object, you will need to reference this secret so the Operator knows where to extract the credentials from.
 
 [source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: couchbase/v2
-kind: CouchbaseCluster
+kind: CouchbaseBackup
 spec:
-  backup:
-    managed: true
-    image: couchbase/operator-backup:{backup-version}
-    serviceAccountName: couchbase-backup
-    s3Secret: s3-secret
+  ...
+  objectStore:
+    secret: cloud-secret
+    uri: [az|s3|gcp]://example
 ----
 
-=== Configure IAM Roles
+=== Configure Instance Metadata Authentication
 
-To allow backup to automatically use an attached IAM Role, enable the `useIAMRole` parameter.
-A secret with the region key set is still required.
-If you have attached the IAM Role to an EKS node directly then this is sufficient configuration.
-
-If you have link:https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html[setup IAM roles for service accounts], the role `ARN` annotation must be applied to the backup service account either manually or when running `cao` using `bin/cao create backup --iam-role-arn arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>`
+To allow backup to automatically use the instance metadata api for authentication, enable the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-useiam[`couchbasebackup.spec.objectStore.useIAM`] parameter. By default this is disabled.
+When using Azure and GCP this is all that's required, for AWS a secret with the region key set must be provided.
 
 [source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: couchbase/v2
-kind: CouchbaseCluster
+kind: CouchbaseBackup
 spec:
-  backup:
-    managed: true
-    image: couchbase/operator-backup:{backup-version}
-    serviceAccountName: couchbase-backup
-    useIAMRole: true
-    s3Secret: s3-secret
+  ...
+  objectStore:
+    useIAM: true
+    secret: s3-region-secret
+    uri: s3://example-bucket
 ----
 
-=== Configure S3 Backup
+==== AWS
+When using AWS, if you have attached the IAM Role to an EKS node directly then this is sufficient configuration.
+If you have link:https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html[setup IAM roles for service accounts^], the role `ARN` annotation must be applied to the backup service account either manually or when running `cao` using `cao create backup --iam-role-arn arn:aws:iam::<ACCOUNT_ID>:role/<IAM_ROLE_NAME>`
 
-The S3 bucket that we wish to hold backups needs to be specified in the desired `CouchbaseBackup` and `CouchbaseBackupRestore` CRDs.
-Note that the `s3://` prefix is required, otherwise the Admission Controller will not allow the creation of the CRD.
+=== GCP
+Applications running on a GKE cluster will attempt to use the default Compute Engine service account.
+To provide more granular control use Workload Identity. For how to setup Workload Identity with GCP follow link:https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity[Use Workload Identity^]
+
+By default the service account to annotate will be `couchbase-backup`.
+
+=== Azure
+Workload Identity support is not yet available.
+
+=== Configure Cloud Store Backup
+
+The cloud store that we wish to hold backups needs to be specified in the desired `CouchbaseBackup` and `CouchbaseBackupRestore` CRDs.
+Note that the prefix must be either `s3://`, `gs://`, or `az://`, otherwise the Admission Controller will not allow the creation of the CRD.
 
 [source,yaml]
 ----
@@ -797,7 +833,8 @@ spec:
   incremental:
     schedule: "0 3 * * 1-6"
   size: 20Gi
-  s3bucket: s3://my-backup-bucket
+  objectStore:
+    uri: s3://my-backup-bucket
 ----
 
 [source,yaml]
@@ -812,40 +849,46 @@ spec:
     str: oldest
   end:
     str: latest
-  s3bucket: s3://my-backup-bucket
+  objectStore:
+    uri: s3://my-backup-bucket
 ----
 
-Please note that operations involving S3 take more time to complete in comparison to regular backup to PVCs so please bear this in mind when configuring your automated backup schedules.
+Please note that operations involving remote cloud stores take more time to complete in comparison to regular backup to PVCs so please bear this in mind when configuring your automated backup schedules.
 
 [IMPORTANT]
 ====
-Backing up to S3 still requires a local PVC with enough space for xref:server:backup-restore:cbbackupmgr-cloud.adoc#the-staging-directory[a `staging` folder],
-where files will be stored locally first before being uploaded to S3.
-Please note that cleanup schedules will also apply to the local PVC as well as the S3 bucket.
+Backing up to cloud store still requires a local PVC with enough space for xref:server:backup-restore:cbbackupmgr-cloud.adoc#the-staging-directory[a `staging` folder],
+where files will be stored locally first before being uploaded to the remote cloud store.
+Please note that cleanup schedules will also apply to the local PVC as well as the remote cloud store.
 
 The `staging` folder does not need to be created manually by the user.
 ====
 
-== Backup and Restore to Compatible Object Stores
+=== Backup and Restore to Compatible Cloud Object Stores
 
-If you are using Couchbase Operator version 2.3.0 or higher, and Couchbase Operator Backup 1.2.1 version or higher, the ability to backup/restore using a S3 compatible stores is available.
+If you are using Couchbase Operator version 2.4.0 or higher, and Couchbase Operator Backup 1.3.2 version or higher, the ability to backup/restore using a compatible cloud store is available.
 Please see xref:server:backup-restore:cbbackupmgr-cloud.adoc#compatible-object-stores[Compatible Object Stores] for limitations.
 
-Users wishing to use a compatible store should set xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-objectendpoint-url[`couchbaseclusters.spec.backup.objectEndpoint.url`] to the host/address of the object store.
+Users wishing to use a compatible store should set xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-url[`couchbasebackup.spec.objectStore.endpoint.url`] to the host/address of the object store.
 
-Optionally, xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-backup-objectendpoint-secret[`couchbaseclusters.spec.backup.objectEndpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
+Optionally, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-secret[`couchbasebackup.spec.objectStore.endpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
 
+For example: to use Minio, a S3 compatiable api.
 [source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: couchbase/v2
-kind: CouchbaseCluster
+kind: CouchbaseBackup
 spec:
-  backup:
-    managed: true
-    image: couchbase/operator-backup:{backup-version}
-    serviceAccountName: couchbase-backup
-    s3Secret: s3-secret
-    objectEndpoint:
+  strategy: full_incremental
+  full:
+    schedule: "0 3 * * 0"
+  incremental:
+    schedule: "0 3 * * 1-6"
+  size: 20Gi
+  objectStore:
+    secret: s3-secret
+    uri: s3://example-bucket
+    endpoint:
       url: https://minio.minio # <.>
       secret: my-tls-secret # <.>
       useVirtualPath: false # <.>
@@ -865,4 +908,55 @@ metadata:
 type: kubernetes.io/tls
 data:
   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1J...
+----
+
+=== Backup and Restore with Ephemeral Staging
+If you are using Couchbase Operator version 2.4.0 or higher, and Couchbase Operator Backup 1.3.2 version or higher, the ability to backup/restore using a link:https://kubernetes.io/docs/concepts/storage/ephemeral-volumes/#generic-ephemeral-volumes[generic ephemeral volumes^] volume is available.
+This can only be used when backing up or restoring from a remote cloud store and may be useful for high availability setups.
+To enable ephemeral staging volumes for backup set xref:resource/couchbasebackup.adoc#couchbasebackups-spec-ephemeralvolume[`couchbasebackups.spec.ephemeralVolume`] to true, defaults to false.
+Both xref:resource/couchbasebackup.adoc#couchbasebackups-spec-storageclassname[`couchbasebackups.spec.storageClassName`] and xref:resource/couchbasebackup.adoc#couchbasebackups-spec-size[`couchbasebackups.spec.size`] will apply to the ephemeral PVC.
+
+[NOTE]
+====
+When enabled, the backup PVC will share it's lifecycle with the backup/restore pod, and will not be removed until the pod is removed.
+It may be useful to tweak xref:resource/couchbasebackup.adoc#couchbasebackups-spec-failedjobshistorylimit[`couchbasebackups.spec.failedJobsHistoryLimit`] and xref:resource/couchbasebackup.adoc#couchbasebackups-spec-successfuljobshistorylimit[`couchbasebackups.spec.successfulJobsHistoryLimit`] to reduce the number of
+extraneous ephemeral volumes.
+====
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase/v2
+kind: CouchbaseBackup
+spec:
+  strategy: full_incremental
+  full:
+    schedule: "0 3 * * 0"
+  incremental:
+    schedule: "0 3 * * 1-6"
+  size: 20Gi
+  objectStore:
+    secret: s3-secret
+    uri: s3://example-bucket
+  ephemeralVolume: true
+----
+
+When restoring, if a backup PVC is not found, an ephemeral volume will be used instead. To change either the size of this volume or the storage class use xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-stagingvolume-size[`couchbasebackuprestores.spec.stagingVolume.size`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-stagingvolume-storageclassname[`couchbasebackuprestores.spec.stagingVolume.storageClassName`] respectively.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: my-restore
+spec:
+  backup: my-backup
+  start:
+    str: oldest
+  end:
+    str: latest
+  objectStore:
+    uri: s3://my-backup-bucket
+  stagingVolume:
+    size: 20Gi
+    storageClassName: "default"
 ----
