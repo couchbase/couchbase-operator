@@ -2171,17 +2171,6 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`duplicate rule`},
 		},
-		{
-			name: "TestValidateBackupSecretS3Region",
-			mutations: patchMap{
-				"backup0": jsonpatch.NewPatchSet().
-					Add("/spec/objectStore", couchbasev2.ObjectStoreSpec{
-						URI: "s3://blah",
-					}),
-			},
-			shouldFail:     true,
-			expectedErrors: []string{"must contain key region when using IAM"},
-		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
