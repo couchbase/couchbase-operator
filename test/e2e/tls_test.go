@@ -1672,13 +1672,23 @@ func TestTLSEditSettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/security/uiSessionTimeout", 2), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op4)
 
+	op5 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
+	defer op5.Cancel()
+
+	cipherSuites := []string{
+		"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
+		"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/cipherSuites", cipherSuites), time.Minute)
+	e2eutil.MustReceiveErrorValue(t, op5)
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings edited
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times:     4,
+			Times:     5,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdated},
 		},
 	}
