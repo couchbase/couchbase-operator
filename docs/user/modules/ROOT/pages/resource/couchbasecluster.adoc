@@ -2119,8 +2119,6 @@ TLS defines the TLS configuration for the cluster including server and client ce
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
 
 *Default*: `False`
@@ -2839,6 +2837,8 @@ Selector is a label selector used to list RBAC resources in the namespace that a
 ==== Constraints
 
 *Type*: `integer`
+
+*Default*: `0`
 
 *Minimum*: `0`
 

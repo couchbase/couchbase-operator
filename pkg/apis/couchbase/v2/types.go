@@ -2409,7 +2409,7 @@ type CouchbaseClusterSecuritySpec struct {
 	// UISessionTimeout sets how long, in minutes, before a user is declared inactive
 	// and signed out from the Couchbase Server UI.
 	// 0 represents no time out.
-	// +kubebuilder:default:0
+	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16666
 	UISessionTimeoutMinutes uint `json:"uiSessionTimeout,omitempty"`
@@ -3313,7 +3313,7 @@ type TLSPolicy struct {
 	// the Operator only attempts plain text cert reloading when expired certificates
 	// are detected.
 	// +kubebuilder:default=false
-	AllowPlainTextCertReload bool `json:"allowPlainTextCertReload"`
+	AllowPlainTextCertReload bool `json:"allowPlainTextCertReload,omitempty"`
 }
 
 type PassphraseType string
