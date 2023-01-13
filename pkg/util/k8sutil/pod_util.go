@@ -1027,7 +1027,7 @@ func applyPodPassphraseVolumes(cluster *couchbasev2.CouchbaseCluster, pod *v1.Po
 	passphraseSecretName := PassphraseKeySecretName(cluster)
 
 	// ensure group users can execute script as we may be subject to fsGroup
-	var chmod int32 = 0550
+	var chmod int32 = 0555
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes,
 		v1.Volume{
