@@ -787,7 +787,7 @@ spec:
 
 === Configure Instance Metadata Authentication
 
-To allow backup to automatically use the instance metadata api for authentication, enable the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-useiam[`couchbasebackup.spec.objectStore.useIAM`] parameter. By default this is disabled.
+To allow backup to automatically use the instance metadata api for authentication, enable the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-useiam[`couchbasebackups.spec.objectStore.useIAM`] parameter. By default this is disabled.
 When using Azure and GCP this is all that's required, for AWS a secret with the region key set must be provided.
 
 [source,yaml,subs="attributes,verbatim"]
@@ -869,9 +869,9 @@ The `staging` folder does not need to be created manually by the user.
 If you are using Couchbase Operator version 2.4.0 or higher, and Couchbase Operator Backup 1.3.2 version or higher, the ability to backup/restore using a compatible cloud store is available.
 Please see xref:server:backup-restore:cbbackupmgr-cloud.adoc#compatible-object-stores[Compatible Object Stores] for limitations.
 
-Users wishing to use a compatible store should set xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-url[`couchbasebackup.spec.objectStore.endpoint.url`] to the host/address of the object store.
+Users wishing to use a compatible store should set xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-url[`couchbasebackups.spec.objectStore.endpoint.url`] to the host/address of the object store.
 
-Optionally, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-secret[`couchbasebackup.spec.objectStore.endpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
+Optionally, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-secret[`couchbasebackups.spec.objectStore.endpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
 
 For example: to use Minio, a S3 compatiable api.
 [source,yaml,subs="attributes,verbatim"]

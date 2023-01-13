@@ -206,7 +206,7 @@ type CouchbaseBackupSpec struct {
 	// attempt to mount the same backup volume. This field default to `full_incremental`.
 	// Info: https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-strategies.html
 	// +kubebuilder:default="full_incremental"
-	Strategy Strategy `json:"strategy"`
+	Strategy Strategy `json:"strategy,omitempty"`
 
 	// Incremental is the schedule on when to take incremental backups.
 	// Used in Full/Incremental backup strategies.
@@ -287,7 +287,7 @@ type CouchbaseBackupSpec struct {
 	// of a persistent volume. This is used when backing up to a remote
 	// cloud provider, where a persistent volume is not needed.
 	// +kubebuilder:default=false
-	EphemeralVolume bool `json:"ephemeralVolume"`
+	EphemeralVolume bool `json:"ephemeralVolume,omitempty"`
 }
 
 // CouchbaseBackupServiceFilter allows backup filtering per-service.

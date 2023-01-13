@@ -541,7 +541,7 @@ Operator rest port
 --server-image::
 *Type*: string
 +
-*Default*: couchbase/server:6.6.2
+*Default*: couchbase/server:7.1.3
 +
 Couchbase server image
 

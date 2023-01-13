@@ -263,8 +263,6 @@ This field cannot be used at the same time as excluded items.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
 
 *Default*: `False`
@@ -634,8 +632,6 @@ Name of StorageClass to use.
 === couchbasebackups.spec.strategy
 
 ==== Constraints
-
-*Required*
 
 *Type*: `string`
 
