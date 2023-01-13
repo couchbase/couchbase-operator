@@ -20,8 +20,7 @@ Instructions for installing the authenticator can be found in the https://docs.a
 === Best Practices
 
 Storage classes::
-The EBS volume type `io1` is recommended over `gp2` for any Storage Classes due to its performance characteristics.
-The https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html[official AWS user guide^] itself recommends `io1` for “Large database workloads”.
+The EBS volume type `io2` is recommended over `gp3` for any Storage Classes due to its performance characteristics. However, `gp3` at times could be more cost effective and flexible in terms of storage provisioning. Follow the https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html[official AWS user guide^] for more details on recommendations relating “Large database workloads”.
 
 == Google GKE
 
