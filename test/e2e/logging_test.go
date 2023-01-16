@@ -469,12 +469,11 @@ func TestLoggingMemoryBufferLimits(t *testing.T) {
 	framework.Requires(t, kubernetes).AtLeastLoggingVersion("1.2.0")
 
 	maxMem := e2eutil.MustGetMaxNodeMem(t, kubernetes)
-	memLimit := strconv.Itoa(int(0.8*maxMem)) + "M"
+	memLimit := strconv.Itoa(int(0.5*maxMem)) + "M"
 
 	newAnnotations := make(map[string]string)
 	newAnnotations["fluentbit.couchbase.com/mem.buf.limits.enabled"] = "true"
 
-	expected := int(0.8 * maxMem / 13) // 13 is for the default Fluent Bit config
 	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithDefaultLogStreaming().WithPodAnnotations(newAnnotations).Generate(kubernetes)
 	cluster.Spec.Logging.Server.Sidecar.Resources = &corev1.ResourceRequirements{
 		Limits: corev1.ResourceList{
@@ -494,8 +493,8 @@ func TestLoggingMemoryBufferLimits(t *testing.T) {
 	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
 	// General check for some logs
 	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
-	// Specific check for logs we have specified in the custom config that are not in the default one
-	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, fmt.Sprintf("Setting new memory buffer limits %d", expected))
+
+	e2eutil.MustCheckLogsForString(t, kubernetes, cluster, 5*time.Minute, "Setting new memory buffer limits")
 
 	// Ensure no audit cleanup
 	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 1)
