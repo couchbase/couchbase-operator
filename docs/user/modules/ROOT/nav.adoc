@@ -78,6 +78,7 @@
   *** xref:howto-server-groups.adoc[Configure Server Groups]
   *** xref:howto-admin-password-rotation.adoc[Rotate the Administrator Password]
   *** xref:howto-tls.adoc[Configure TLS]
+  *** xref:howto-tls-passphrase.adoc[Configure TLS Passphrase Protection]
   *** xref:howto-tls-client-certificates.adoc[Configure Client Certificate Authentication]
   *** xref:howto-tls-rotation.adoc[Rotate TLS Certificates]
   *** xref:howto-prometheus.adoc[Configure Prometheus Metrics Collection]
