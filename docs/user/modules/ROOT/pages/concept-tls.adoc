@@ -70,7 +70,7 @@ When using Couchbase 7.0 and earlier, only one CA is supported, therefore all se
 Specifying multiple CA certificates with Couchbase Server 7.0 and earlier will result in undefined behavior.
 ====
 
- 
+
 === Cert-Manager TLS
 kbd:[operator 2.2]
 
@@ -158,3 +158,71 @@ The Operator supports all possible rotation types:
 * Replacing the entire PKI
 
 For details on certificate rotation read the xref:howto-tls-rotation.adoc[TLS certificate rotation how-to].
+
+== TLS Passphrase Protection
+
+Couchbase Server 7.1 supports password protected private keys.
+When using password protected keys, the Operator configures Couchbase Server to register a secret passphrase to decrypt Servers private key.
+The passphrase can be registered with Couchbase Server through an internal shell script or an HTTP(S) rest endpoint.
+
+=== Securing Rest Endpoints
+
+It is important that only Couchbase Server is able to retrieve the secret passphrase.
+Therefore, when using a rest endpoint to retrieve the passphrase, the most immediate form of security is to ensure that the provided URL uses HTTPS with `verifyPeer` enabled.
+Also, since mutual TLS is not yet available for the rest endpoint, it is good practice to avoid hosting the rest endpoint on a public network since anyone who is able to monitor external traffic from Couchbase Server will be able to detect the passphrase URL.
+HTTPS Headers may also be used to provide context to the rest endpoint:
+[source,yaml]
+----
+networking:
+   tls:
+      passphrase:
+        rest:
+          url: https://app.default.svc <.>
+          verifyPeer: True
+          headers:
+            "Authorization": "Bearer {token}" <.>
+----
+<.> HTTPS service within the internal Kubernetes network
+<.> HTTP Headers to send along with the request.
+Headers are also sent encrypted when using HTTPS.
+
+The rest endpoint itself should take adequate security measures with policies such as `Content-Security-Policy` and `Cross Origin Resource Sharing`.
+Determining a full proof way to completely obfuscate the passphrase is beyond the scope of this documentation, and in most circumstances, using the script passphrase will be more suitable.
+
+=== Securing Local Scripts
+
+When script passphrase registration is configured, the Autonomous Operator employs additional security measures to ensure that script creation and execution cannot be compromised by any external parties.
+Therefore, the user only needs to provide a passphrase secret while the Operator internally creates the passphrase script and mounts it into each of the Couchbase Server Pods.
+The Operator also mounts another private key into Couchbase Server in order to securely transfer the passphrase to Couchbase for on-demand use rather than statically mounting the passphrase in the Server Pod alongside the encrypted key. The overall design is as follows:
+
+.TLS Passphrase Protection
+image:tls-passphrase-kubernetes.png[]
+
+The passphrase is only sent to Couchbase Server when the Operator performs an HTTPS `POST` to the https://docs.couchbase.com/server/current/rest-api/upload-retrieve-node-cert.html[`/node/controller/reloadCertificate`^] API.
+The request to `reloadCertificate` causes Couchbase Server to call `passphrase-script.sh` in order to retrieve the passphrase required load the node certificate.
+The general requirement for the local script is simply to print out a passphrase string.
+Therefore, the Operator mounts the following script into each Couchbase Server Pod in order to securely fufill this requirement:
+
+[source,yaml]
+----
+kind: ConfigMap
+data:
+  passphrase.sh: |-
+    #!/bin/sh
+    echo1 | base64 -d | \   <.>
+    openssl rsautl -decrypt -inkey \   <.>
+   /var/run/secrets/couchbase.com/couchbase-tls/tls-passphrase-private-key  <.>
+----
+<.> The scripts receives the passphrase as encrypted by a public key from the Operator's own self-generated keypair.
+<.> Server is instructed to decrypt the passphrase argument.
+<.> Server uses the Operator generated private key to decrypt the passphrase.
+
+As a result, the `passphrase.sh` script allows transport of the original TLS passphrase on an as needed basis to Couchbase Server without any network exposure.
+This deployment strategy ensures that eavesdroppers between Couchbase Operator and Couchbase Server cannot capture the passphrase.
+Note that this intermediate encryption is necessary since the Operator cannot yet securely communicate with Server since this setup processes is required to load the initial certificates.
+
+An additional benefit of this design is that it protects the passphrase from being uncovered in the event that Couchbase Server is compromised.
+A malicious actor will not be able to make immediate use of any of the on-disk certs unless the Operator makes a subsequent call to reload the certificates (which only occurs during rotation and topology changes).
+Therefore, this overall design provides optimal security for passphrase script registration as it ensures that the private key and its passphrase are never co-located on disk within Couchbase Server, consumed in memory only, and presented only on an as needed bases.
+
+For details on tls passphrase configuration read the xref:howto-tls-passphrase.adoc[TLS Passphrase How To].
