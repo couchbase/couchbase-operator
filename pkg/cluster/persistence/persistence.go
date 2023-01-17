@@ -164,7 +164,12 @@ func New(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) (Persis
 		return nil, err
 	}
 
-	if _, ok := client.Secrets.Get(couchbase.Name); !ok {
+	callback := func() error {
+		if _, found := client.Secrets.Get(couchbase.Name); found {
+			return fmt.Errorf("persistence secret found for cluster: %w", errors.NewStackTracedError(errors.ErrResourceExists))
+		}
+
+		// the secret doesn't exist anymore or at all, for the cluster.
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   couchbase.Name,
@@ -176,8 +181,15 @@ func New(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) (Persis
 		}
 
 		if _, err := client.KubeClient.CoreV1().Secrets(couchbase.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
-			return nil, errors.NewStackTracedError(err)
+			return errors.NewStackTracedError(err)
 		}
+
+		return nil
+	}
+
+	// retry/wait to be sure that the persistence secret is deleted/doesn't exist anymore.
+	if err := retryutil.RetryFor(persistenceCacheTimeout, callback); err != nil {
+		return nil, err
 	}
 
 	return &persistentStorageImpl{
