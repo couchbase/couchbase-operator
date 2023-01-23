@@ -11,12 +11,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	GenerateCmd = "generate"
+	CreateCmd   = "create"
+	DeleteCmd   = "delete"
+	UpdateCmd   = "update"
+)
+
 // ApplySubCommands attaches the configuration (create/delete/generate) sub commands to
 // an arbitrary root command.
 func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags) {
 	// 'cbopcfg generate' creates YAML for various Operator deployments.
 	generate := &cobra.Command{
-		Use:   "generate",
+		Use:   GenerateCmd,
 		Short: "Generates YAML manifests",
 		Long:  "Generates YAML manifests for various Operator components",
 	}
@@ -27,7 +34,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 
 	// 'cbopcfg create' actually creates resources.
 	create := &cobra.Command{
-		Use:   "create",
+		Use:   CreateCmd,
 		Short: "Creates Couchbase Autonomous Operator components",
 		Long:  "Creates Couchbase Autonomous Operator components",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +48,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 
 	// 'cbopcfg create' actually deletes resources.
 	deleteCmd := &cobra.Command{
-		Use:   "delete",
+		Use:   DeleteCmd,
 		Short: "Deletes Couchbase Autonomous Operator components",
 		Long:  "Deletes Couchbase Autonomous Operator components",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -53,9 +60,21 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 	deleteCmd.AddCommand(getDeleteAdmissionCommand(root.UseLine(), flags))
 	deleteCmd.AddCommand(getDeleteBackupCommand(root.UseLine(), flags))
 
+	updateCmd := &cobra.Command{
+		Use:   UpdateCmd,
+		Short: "Updates Couchbase Autonomous Operator components",
+		Long:  "Updates Couchbase Autonomous Operator components",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return checkAPIVersions(flags)
+		},
+	}
+
+	updateCmd.AddCommand(getUpdateAdmissionCommand(root.UseLine(), flags))
+
 	root.AddCommand(generate)
 	root.AddCommand(create)
 	root.AddCommand(deleteCmd)
+	root.AddCommand(updateCmd)
 }
 
 func GenerateCommand() *cobra.Command {

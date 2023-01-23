@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/spf13/cobra"
 )
@@ -49,6 +51,8 @@ const (
 	// admissionDefaultPullPolicy is the pull policy to use when downloading the image.
 	// By default images are only pulled if not already present.
 	admissionDefaultPullPolicy = string(corev1.PullIfNotPresent)
+
+	defaultExpirationTime = 10 * 365 * 24 * time.Hour
 )
 
 // generateAdmissionOptions defines options for creating the admission controller.
@@ -165,7 +169,7 @@ func getGenerateAdmissionCommand(command string, flags *genericclioptions.Config
                         %[1]s generate admission --log-level debug
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := o.validate(); err != nil {
+			if err := o.validate(GenerateCmd); err != nil {
 				return err
 			}
 
@@ -229,7 +233,7 @@ func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-admission-flags")
 			}
 
-			if err := o.validate(); err != nil {
+			if err := o.validate(CreateCmd); err != nil {
 				return err
 			}
 
@@ -271,7 +275,7 @@ func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
 			}
 
-			if err := o.validate(); err != nil {
+			if err := o.validate(DeleteCmd); err != nil {
 				return err
 			}
 
@@ -293,10 +297,37 @@ func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 	return cmd
 }
 
+func getUpdateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := newGenerateAdmissionOptions()
+
+	cmd := &cobra.Command{
+		Use:   "webhook",
+		Short: "refreshes the self signed certificate used by the validating webhook.",
+		Long:  "refreshes the self signed certificate used by the validating webhook.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if command != caoBinaryName {
+				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
+			}
+
+			if err := o.validate(UpdateCmd); err != nil {
+				return err
+			}
+
+			return refreshWebhook(flags, o)
+		},
+	}
+
+	cmd.Flags().Var(&o.scope, "scope", "Whether to scope the Operator to a 'namespace' or to the 'cluster'.")
+
+	return cmd
+}
+
 // validate performs any validation that cobra doesn't on options.
-func (o *generateAdmissionOptions) validate() error {
+func (o *generateAdmissionOptions) validate(command string) error {
 	if o.scope.value.isNamespaceScope() && o.namespaceSelector.LabelSelector == nil {
-		return fmt.Errorf("dynamic admission controller with namespace scope requires the --namespace-selector flag")
+		if command != UpdateCmd && command != DeleteCmd {
+			return fmt.Errorf("dynamic admission controller with namespace scope requires the --namespace-selector flag")
+		}
 	}
 
 	// When namespaced, we cannot access namespaces or storage classes
@@ -310,16 +341,16 @@ func (o *generateAdmissionOptions) validate() error {
 	return nil
 }
 
-// generate dumps all admission controller resources to standard out.
-func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.Object, error) {
-	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return nil, err
-	}
+type AdmissionCerts struct {
+	key  []byte
+	cert []byte
+	ca   *util_x509.CertificateAuthority
+}
 
+func GenerateAdmissionCerts(namespace string, duration time.Duration) (*AdmissionCerts, error) {
 	// Generate TLS configuration for the dynamic admission controller.
 	validFrom := time.Now()
-	validTo := time.Now().Add(24 * 365 * 10 * time.Hour)
+	validTo := time.Now().Add(duration)
 
 	ca, err := util_x509.NewCertificateAuthority(util_x509.KeyTypeRSA, AdmissionResourceName+" CA", validFrom, validTo, util_x509.CertTypeCA)
 	if err != nil {
@@ -346,14 +377,29 @@ func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags
 		return nil, err
 	}
 
+	return &AdmissionCerts{key: key, cert: cert, ca: ca}, nil
+}
+
+// generate dumps all admission controller resources to standard out.
+func (o *generateAdmissionOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.Object, error) {
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	bundle, err := GenerateAdmissionCerts(namespace, defaultExpirationTime)
+	if err != nil {
+		return nil, err
+	}
+
 	resources := []runtime.Object{
 		o.getAdmissionServiceAccount(),
 		o.getAdmissionRole(),
 		o.getAdmissionRoleBinding(namespace),
-		o.getAdmissionSecret(key, cert),
+		o.getAdmissionSecret(bundle.key, bundle.cert),
 		o.getAdmissionDeployment(),
 		o.getAdmissionService(),
-		o.getAdmissionValidatingWebhook(namespace, ca.Certificate),
+		o.getAdmissionValidatingWebhook(namespace, bundle.ca.Certificate),
 	}
 
 	return resources, nil
@@ -705,4 +751,79 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 	}
 
 	return webhook
+}
+
+func refreshWebhook(flags *genericclioptions.ConfigFlags, o *generateAdmissionOptions) error {
+	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	bundle, err := GenerateAdmissionCerts(namespace, defaultExpirationTime)
+	if err != nil {
+		return err
+	}
+
+	config, err := flags.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	name := AdmissionResourceName
+
+	if !o.scope.value.isClusterScope() {
+		name = AdmissionResourceName + "-" + namespace
+	}
+
+	hook, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Get(ctx, name, metav1.GetOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	oldHook := hook.DeepCopy()
+
+	for i := 0; i < len(hook.Webhooks); i++ {
+		hook.Webhooks[i].ClientConfig.CABundle = bundle.ca.Certificate
+	}
+
+	secret, err := clientset.CoreV1().Secrets(namespace).Get(ctx, AdmissionResourceName, metav1.GetOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	secret.Data["tls.crt"] = bundle.cert
+	secret.Data["tls.key"] = bundle.key
+
+	fmt.Println("updating validation hook with new CA")
+
+	if _, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, hook, metav1.UpdateOptions{}); err != nil {
+		fmt.Println("failed to update validation hook")
+		return err
+	}
+
+	cleanup := func() {
+		if _, err := clientset.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(ctx, oldHook, metav1.UpdateOptions{}); err != nil {
+			fmt.Println("failed to roll back validation hook: %w", err)
+		}
+	}
+
+	fmt.Println("updating TLS secret with new certificate/key pair")
+
+	if _, err := clientset.CoreV1().Secrets(namespace).Update(ctx, secret, metav1.UpdateOptions{}); err != nil {
+		fmt.Println("failed to update TLS secret with new certificate/key pair")
+		cleanup()
+
+		return err
+	}
+
+	return nil
 }
