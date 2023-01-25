@@ -1,7 +1,8 @@
 = Release Notes for Couchbase Autonomous Operator {operator-version-minor}
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} release is primarily focused on adding some key features introduced in Couchbase Server 7.1 to Autonomous Operator such as support for ARM platforms and Encrypted Certificates, as well as other improvements related to TLS Certificate Management, cloud backups, index configuration, and the Prometheus Exporter
+Couchbase Autonomous Operator {operator-version-minor} is a significant release that expands support for
+Couchbase Server 7, providing full support for scope and collections.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
@@ -33,10 +34,6 @@ You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
 ** There are no additional upgrade steps or considerations when upgrading from this version.
 You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
 
-* Version 2.3.x
-** There are no additional upgrade steps or considerations when upgrading from this version.
-You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
-
 [[upgrade-v20x]]
 === Upgrading from Version 2.0.x
 
@@ -63,7 +60,7 @@ You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rolli
 To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
 Refer to xref:howto-operator-upgrade.adoc[] for further details.
 
-=== Upgrading from 2.0, 2.1, 2.2, and 2.3
+=== Upgrading from 2.0, 2.1, and 2.2
 
 ==== Mandatory Couchbase Upgrade Cycle
 
@@ -102,37 +99,71 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
-[#release-v240]
-== Release 2.4.0
+[#release-v231]
+== Release 2.3.1
 
-Couchbase Autonomous Operator 2.4.0 was released in January 2023.
+Couchbase Autonomous Operator 2.3.1 was released in July 2022.
 
-[#changes-in-behavior-v240]
 === New Features and Behavioral Changes
 
-==== ARM Platform Support
+==== Operator Recognizes and Distinguishes Server Containers
 
-The Couchbase Autonomous Operator, and all related container images, can now be deployed on ARM platforms where available on AWS, Azure, and GCP managed Kubernetes services, as well as on open source Kubernetes distributions.
-Support for OpenShift on ARM will be available in a future release.
+Versions of Couchbase Server available in the Red Hat Container Catalog 
+lacked SHA-256 tagging to allow the Operator to distinguish between versions. As of release 2.3.1 
+all versions of Couchbase Server are recognizable and distinguishable by the Operator.
 
-==== TLS Certificate Management
+==== Support for Additional User Roles
 
-* Added support for Encrypted Private Keys
-* LDAP Server configuration can now make use of the main Root CA's array
-* Allow multi-PEM CAs in the Server `secretSource`
-* Allow insecure reload of expired certificates as a last resort
-* Raise events on TLS expiration
+Previously, Couchbase Autonomous Operator did not support the role "external_stats_reader", which
+is supported by Couchbase Server. This led to the Operator being unable to validate users with roles
+that were valid for Couchbase Server. This release adds support for "external_stats_reader" and allows 
+use of this supported role.
 
 === Fixed Issues
 
-[#table-fixed-issues-v240,cols="25,66"]
+[#table-fixed-issues-v231,cols="25,66"]
 |===
 | Issue | Description
-a| https://issues.couchbase.com/browse/K8S-2825[K8S-2825^]
-a| *Summary* Previously the Operator did not correctly propagate the changes when the client certificates were updated.
-a| https://issues.couchbase.com/browse/K8S-2838[K8S-2838^]
-a| *Summary* Previously the CRD was not correctly inheriting the entirety of `v1.PodSpec`, meaning that attributes such as `affinity` were not available.
+a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717^]
+a| *Summary* Previously there was no way to set the storage class used for the artifact logs 
+used during certification. This resulted in the storage class "default" always being used when
+running "cao certify". Setting the storage class only affects the volumes created during the 
+test, but not the volume used to store the results. 
+The workaround is to delete the default storage class and recreate it with the same specification
+as the storage class passed by the "-storage-class" argument.
+a| https://issues.couchbase.com/browse/K8S-2698[K8S-2698^]
+a| *Summary* There was a mismatch between the restore process and the CRD. The repository
+required by the CRD was optional for the restore process, which sometimes resulted in an 
+empty field in the JSON document used by both, causing an error in the CRD.
+This situation is corrected in 2.3.1.
+a| https://issues.couchbase.com/browse/K8S-2676[K8S-2676^]
+a| *Summary* Previously Operator did not support use of a raw IPv6 address for 
+cross datacenter replication (XDCR). Version 2.3.1 allows use of a raw IPv6 address in 
+this context.
 |===
+
+
+
+[#release-v230]
+== Release 2.3.0
+
+Couchbase Autonomous Operator 2.3.0 was released in April 2022.
+
+[#changes-in-behavior-v230]
+=== New Features and Behavioral Changes
+
+==== Data Topology Synchronization
+
+This feature allows manually created buckets, scopes and collections to be synchronized as Kubernetes primitives and then managed.
+
+For more information, see the xref:concept-data-save-restore.adoc[] concepts page.
+
+==== Data Topology Save and Restore
+
+This feature allows manually created buckets, scopes and collections to be saved, then restored to any cluster.
+Unlike synchronization, this feature supports partial save and restore, different merge policies, resource compaction and garbage collection.
+
+For more information, see the xref:concept-data-save-restore.adoc[] concepts page.
 
 === Known Issues
 
@@ -140,63 +171,174 @@ a| *Summary* Previously the CRD was not correctly inheriting the entirety of `v1
 |===
 | Issue | Description
 
-a| https://issues.couchbase.com/browse/K8S-2944[K8S-2944]
+a| https://issues.couchbase.com/browse/K8S-2690[K8S-2690]
 a| *Summary*:
-URL Encoding breaks string lists with `cipherSuites`.
+Kubernetes resource names are based on DNS, and may be up to ~250 characters in length.
+Prior to Couchbase Server `6.6.5` and `7.0.0`, host names were used to generate a key for internal communication, however, long names caused a buffer overflow.
 
-The following fails with "Invalid format. Expecting a list of ciphers.":
+This was fixed in `6.6.5` (though not fully implemented for Eventing) and `7.0.0`.
+When using long namespaces or cluster names, ensure that you use a version of Couchbase Server greater than `6.6.5` or `7.0.0`.
+
+a| https://issues.couchbase.com/browse/K8S-2698[K8S-2698]
+a| *Summary*:
+The restore process can determine what repository to use in a `CouchbaseBackupRestore` resource, and therefore the `repo` field _should_ be entirely optional.
+However, the underlying API erroneously requires this field to be set.
+
+To avoid any errors, we recommend setting the `repo` field to an empty string until the issue is fixed in a future release.
 
 [source,yaml]
 ----
-  tls:
-    cipherSuites:
-    - TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-    - TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
-    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-    tlsMinimumVersion: TLS1.2
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+spec:
+  repo: ""
 ----
 
-As a workaround, escape the ciphers with quotation marks as shown below (the single quotes allow the double quotes to be passed through for further parsing):
-
-[source,yaml]
-----
-  tls:
-      cipherSuites:
-      - '"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"'
-      - '"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"'
-      - '"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384"'
-      - '"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"'
-      tlsMinimumVersion: TLS1.2
-----
-
-a| https://issues.couchbase.com/browse/K8S-2971[K8S-2971]
+a| https://issues.couchbase.com/browse/K8S-2713[K8S-2713] 
 a| *Summary*:
-`storageBackend` warnings occur after Operator upgrade
-
-By default before Operator 2.4.0, Bucket resources do not have `storageBackend` set.
-When Upgrading to 2.4 the Operator will send warnings if server is also < 7.1.0:
+Due to a mismatch between the catalog version of our backup image and the version recommended by the certification tool, you will need to override the default backup used for certification with OpenShift.
+The override can be provided via:
 
 [source,console]
 ----
-{"level":"info","ts":1674524426.697536,"logger":"cluster","msg":"[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore"}
+$  cao certify -- -backup-image registry.connect.redhat.com/couchbase/operator-backup:1.3.0-2
 ----
 
-Under normal upgrade scenarios the workaround for this is to:
+a| https://issues.couchbase.com/browse/K8S-2676[K8S-2676]
+a| *Summary*:
+Currently, it is not possible to specify a raw IPv6 Address for XDCR. +
+This will be fixed in the next Operator release, and will include an update to the CRD.
+As a workaround to support XDCR to an IPv6 endpoint, you will need to remove the XDCR hostname rules from the `CouchbaseCluster` custom resource.
 
-* Edit `couchbaseBucket` with `storageBackend` = `couchstore`
+Run the `kubectl edit` command:
+
+[source,console]
+----
+$ kubectl edit crd couchbaseclusters.couchbase.com
+----
+
+Then, remove `pattern` from the yaml:
+
+[source,yaml]
+----
+xdcr:
+  hostname:
+    description: Hostname is the connection string to use to connect the remote cluster.
+    pattern: ^((couchbase\|couchbases\|http\|https)://)?[0-9a-zA-Z\-\.]+(:\d+)?(\?network=[^&]+)?$
+----
+
+Note that removing `pattern` will disable any validation on this field (i.e. if an invalid hostname is provided it won't be validated).
+Contact the https://support.couchbase.com[Couchbase Support team] for further help on this workaround.
+
+a| https://issues.couchbase.com/browse/K8S-2717[K8S-2717]
+a| *Summary*: 
+At this point in time, you cannot set the storage class used for the artifact logs during certification.
+This means the `default` storage class is always used when running the `cao certify` command. +
+Passing the `-storage-class` flag to the command will only affect volumes created during test, but *not* the volume used to store test results.
+
+If you need to use a specific type of storage class for both artifacts and testing, please contact the https://support.couchbase.com[Couchbase Support team] for advice on a workaround.
+|===
+
+[#release-v230-beta1]
+== Release 2.3.0-beta1
+
+Couchbase Autonomous Operator 2.3.0-beta1 was released in October 2021.
+
+[#changes-in-behavior-v230-beta1]
+=== New Features and Behavioral Changes
+
+=== Logging Defaults
+The new default image for logging is `couchbase/fluent-bit:1.1.1`.
+This image features functional and security updates.
+
+Existing clusters will continue to use the logging version they were provisioned with.
+Should you wish to update existing Couchbase clusters to make use of this new image, then they will undergo a rolling upgrade to facilitate the update.
+You should plan a maintenance window accordingly.
+
+==== Scopes and Collections Management
+
+The Operator now has the ability to fully manage scopes and collections within a bucket.
+Scopes and collections provide fine grained access control and replication, and improved scalability.
+
+For further information consult the xref:concept-scopes-and-collections.adoc[Scopes and Collections Concepts] documentation.
+
+==== Backup and Restore Improvements
+
+Due to interface changes introduced in Couchbase Server 7.0, a new backup image (1.2.0) is the only supported version that will run with Operator 2.3.
+It continues to support operation with all supported Couchbase Server versions.
+
+[IMPORTANT]
+====
+Ensure that any backup jobs are upgraded to use the new image when moving to Operator 2.3.
+====
+
+Backup 1.2.0 fully supports operation with Couchbase scopes and collections.
+Additional improvements include support for filtering of backup source data -- thus minimizing backup size and improving performance, and the addition of new options for filtering restore data -- such as with document key and value regular expressions.
+
+==== Removal of Admission Controller Mutation
+
+Prior to this release, the dynamic admission controller was utilized to provide some defaults to Couchbase custom resources.
+The vast majority of these defaults have already been migrated to native CRD defaulting.
+Mutation has now been fully removed to provide out-of-the-box compatibility with platforms like GKE Autopilot where mutation is prohibited.
+
+Some defaults were not able to be migrated so have been removed entirely:
+
+* Default file system groups for persistent volumes (does not affect Red Hat OCP).
+When using Couchbase with PVCs, the operator tries to reuse data where possible.
+In order for an old volume to be used by a new pod, the data needs to be read and written by the same group across all pods.
+Clusters that use backups are also affected, as these reuse PVCs across backup jobs.
++
+Previously the DAC provided dynamic defaults depending on the platform (Kubernetes/Red Hat OCP).
+While OCP should work without specifying the file system group, Kubernetes users will need to explicitly specify the group when using persistent volumes.
+Follow the existing xref:concept-persistent-volumes.adoc#using-storage-classes[persistent volume concepts] documentation for guidance on configuration.
+* Backup and Prometheus images.
+These were dynamically populated by the DAC for ease of use, depending on platform.
+These fields are now marked as required to be provided by the end user.
+Up to date images can be found on Docker hub and the Red Hat container catalog.
+See the xref:prerequisite-and-setup.adoc[prerequisites] documentation for compatible image versions.
+
+==== Tooling Updates
+
+Previous releases came bundled with `cbopcfg` and `cbopinfo` binaries to aid installation and support requests respectively.
+While these binaries are still part of the distribution, the new xref:tools/cao.adoc[`cao`] binary features all the existing functionality of these tools, and extends the feature set to allow self-service platform certification.
+The existing `cbopcfg` and `cbopinfo` binaries are now deprecated and will be removed in a later release.
+
+You should update any tooling to use `cao`, or you can alias existing commands to use the new binary:
+
+[source,console]
+----
+$ alias cbopcfg='cao'
+$ alias cbopinfo='cao collect-logs'
+----
+
+[#fixed-issues-v230-beta1]
+=== Fixed Issues
+
+[#table-fixed-issues-v230-beta1,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2432[K8S-2432^]
+a| *Summary:* When recovering a pod and using persistent volume storage, there is the possibly of a race condition when running the Couchbase Server pod's initialization container.
+This occurs when the underlying storage provider returns an error, rather than a definitive answer a to whether a file exists.
+The error appears as if the file doesn't exist, and so the container erroneously reinitializes its persistent storage and resets configuration, particularly storage path locations.
+This fix removes the condition check, and replaces with a non-destructive copy instead.
+
+a| https://issues.couchbase.com/browse/K8S-2534[K8S-2534^]
+a| *Summary:* Couchbase Cluster becomes inoperable when its internal replication streams are longer than 200 Characters.
+This occurs when Operator is installed with Couchbase Server version 6.6.3 and below and is caused by runtime validation checks made by Couchbase Server against internal replication streams.
+The fix is made to Couchbase Server 6.6.4 and 7.0.x.
+Also, the Couchbase Helm Chart has been improved to shorten the default cluster name in order to prevent the creation of clusters with long names.
 
 |===
 
 == Feedback
 
-You can have a big impact on future versions of the Operator (and its documentation) by providing Couchbase with your direct feedback and observations.
-Please feel free to post your questions and comments to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].
+You can have a big impact on future versions of the Operator (and its documentation) by providing Couchbase with your direct feedback and observations. Please feel free to post your questions and comments to the https://forums.couchbase.com/c/couchbase-server/Kubernetes[Couchbase Forums].
 
 == Licenses for Third-Party Components
 
-The complete list of licenses for Couchbase products is available on the https://www.couchbase.com/legal/agreements[Legal Agreements] page.
-Couchbase is thankful to all of the individuals that have created these third-party components.
+The complete list of licenses for Couchbase products is available on the https://www.couchbase.com/legal/agreements[Legal Agreements] page. Couchbase is thankful to all of the individuals that have created these third-party components.
 
 == More Information
 
