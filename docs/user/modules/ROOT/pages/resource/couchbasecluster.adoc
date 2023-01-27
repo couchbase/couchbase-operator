@@ -150,6 +150,9 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-disableuioverhttps,disableUIOverHTTPS>>: false
     <<couchbaseclusters-spec-networking-dns,dns>>:
       <<couchbaseclusters-spec-networking-dns-domain,domain>>: ""
+    <<couchbaseclusters-spec-networking-endpointproxy,endpointProxy>>:
+      <<couchbaseclusters-spec-networking-endpointproxy-enabled,enabled>>: false
+      <<couchbaseclusters-spec-networking-endpointproxy-image,image>>: ""
     <<couchbaseclusters-spec-networking-exposeadminconsole,exposeAdminConsole>>: false
     <<couchbaseclusters-spec-networking-exposedfeatureservicetemplate,exposedFeatureServiceTemplate>>: {}
     <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: NodePort
@@ -1824,6 +1827,7 @@ AuthorizationSecret is the name of a Kubernetes secret that contains a bearer to
 ==== Description
 
 Enabled is a boolean that enables/disables the metrics sidecar container.
+This must be set to true, when image is provided.
 
 === couchbaseclusters.spec.monitoring.prometheus.image
 
@@ -1837,6 +1841,7 @@ Enabled is a boolean that enables/disables the metrics sidecar container.
 
 Image is the metrics image to be used to collect metrics.
 No validation is carried out as this can be any arbitrary repo and tag.
+enabled must be set to true, when image is provided.
 
 === couchbaseclusters.spec.monitoring.prometheus.refreshRate
 
@@ -1982,6 +1987,41 @@ DNS defines information required for Dynamic DNS support.
 Domain is the domain to create pods in.
 When populated the Operator will annotate the admin console and per-pod services with the key "external-dns.alpha.kubernetes.io/hostname".
 These annotations can be used directly by a Kubernetes External-DNS controller to replicate load balancer service IP addresses into a public DNS server.
+
+=== couchbaseclusters.spec.networking.endpointProxy
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+EndpointProxy is used to provision a gRPC gateway in front of the Couchbase cluster.
+
+=== couchbaseclusters.spec.networking.endpointProxy.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled is a boolean that enables/disables the grpc gateway sidecar container.
+This must be set to true, when image is provided.
+
+=== couchbaseclusters.spec.networking.endpointProxy.image
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Image is the grpc gateway image to be used to run the sidecar container.
+No validation is carried out as this can be any arbitrary repo and tag.
+enabled must be set to true, when image is provided.
 
 === couchbaseclusters.spec.networking.exposeAdminConsole
 

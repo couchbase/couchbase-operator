@@ -2484,6 +2484,17 @@ const (
 	AFInet6 AddressFamily = "IPv6"
 )
 
+type EndpointProxy struct {
+	// Enabled is a boolean that enables/disables the grpc gateway sidecar container.
+	// This must be set to true, when image is provided.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Image is the grpc gateway image to be used to run the sidecar container.
+	// No validation is carried out as this can be any arbitrary repo and tag.
+	// enabled must be set to true, when image is provided.
+	Image string `json:"image"`
+}
+
 type CouchbaseClusterNetworkingSpec struct {
 	// AddressFamily allows the manual selection of the address family to use.
 	// When this field is not set, Couchbase server will default to using IPv4
@@ -2604,6 +2615,10 @@ type CouchbaseClusterNetworkingSpec struct {
 	// the use of an initial `waitForAddressReachableDelay` to allow propagation.
 	// +kubebuilder:default="10m"
 	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
+
+	// EndpointProxy is used to provision a gRPC gateway in front of the
+	// Couchbase cluster.
+	EndpointProxy *EndpointProxy `json:"endpointProxy,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
@@ -3641,10 +3656,12 @@ type CouchbaseClusterMonitoringSpec struct {
 
 type CouchbaseClusterMonitoringPrometheusSpec struct {
 	// Enabled is a boolean that enables/disables the metrics sidecar container.
+	// This must be set to true, when image is provided.
 	Enabled bool `json:"enabled,omitempty"`
 
 	// Image is the metrics image to be used to collect metrics.
 	// No validation is carried out as this can be any arbitrary repo and tag.
+	// enabled must be set to true, when image is provided.
 	Image string `json:"image"`
 
 	// Resources is the resource requirements for the metrics container.

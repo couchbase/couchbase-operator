@@ -182,6 +182,13 @@ func selectorForDataService(cluster *couchbasev2.CouchbaseCluster) map[string]st
 	return labels
 }
 
+func selectorForEndpointProxyService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+	labels := LabelsForCluster(cluster)
+	labels[constants.LabelEndpointProxy] = constants.EnabledValue
+
+	return labels
+}
+
 func LabelsForNodeResource(cluster *couchbasev2.CouchbaseCluster, name string) map[string]string {
 	labels := LabelsForClusterResource(cluster)
 	labels[constants.LabelNode] = name

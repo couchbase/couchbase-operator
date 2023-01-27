@@ -214,6 +214,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
+		(*Cluster).reconcileEndpointProxyService,
 	}
 
 	if err := postTopologyReconcilers.run(c); err != nil {
@@ -263,7 +264,7 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) (bool, error) {
 	return rm.exec(c)
 }
 
-// reconcile changes to selected pod labels for
+// reconcileAdminService changes to selected pod labels for
 // the nodePort service exposing admin console.
 func (c *Cluster) reconcileAdminService() error {
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
@@ -345,6 +346,12 @@ func (c *Cluster) reconcilePodServices() error {
 	}
 
 	return nil
+}
+
+// reconcileEndpointProxyService looks for changes in endpoint proxy feature enablement
+// and it's subfeatures.
+func (c *Cluster) reconcileEndpointProxyService() error {
+	return k8sutil.ReconcileEndpointProxyService(c.k8s, c.cluster)
 }
 
 func (c *Cluster) reconcileClusterSettings() error {

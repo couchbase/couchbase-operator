@@ -335,6 +335,20 @@ func (cs *ClusterSpec) MetricsImage() string {
 	return image
 }
 
+// EndpointProxyImage represents the image to use for endpoint proxy to access CB cluster.
+// defaults to Spec.Networking.EndpointProxy.Image when provided then falls back to relatedImage env variable.
+func (cs *ClusterSpec) EndpointProxyImage() string {
+	image := cs.Networking.EndpointProxy.Image
+
+	if annotatedImage, ok := os.LookupEnv(constants.EnvEndpointProxyImageName); ok {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
+			image = annotatedImage
+		}
+	}
+
+	return image
+}
+
 // get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}

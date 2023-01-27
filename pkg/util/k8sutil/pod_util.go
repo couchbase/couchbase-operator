@@ -53,6 +53,7 @@ const (
 	LoggingConfigurationFile                  = "fluent-bit.conf"
 	passphraseScriptName                      = "tls-passphrase-script"
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
+	EndpointProxyContainerName                = "endpoint-proxy"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -816,6 +817,12 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		return nil, err
 	}
 
+	// adding endpoint proxy gRPC gateway for the cb cluster.
+	applyEndpointProxy(cluster, pod)
+
+	// adds endpoint proxy label to pods.
+	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelEndpointProxy: constants.EnabledValue})
+
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
 	applyMetadata(cluster, pod)
@@ -918,6 +925,22 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 	}
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
+}
+
+// applyEndpointProxy adds a endpoit proxy for gRPC access to the cb cluster.
+func applyEndpointProxy(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+	// If endpointProxy is enabled add the necessary sidecars.
+	if cluster.Spec.Networking.EndpointProxy == nil {
+		return
+	}
+
+	if !cluster.Spec.Networking.EndpointProxy.Enabled {
+		return
+	}
+
+	epProxyContainer := createEndpointProxyContainer(cluster.Spec)
+
+	pod.Spec.Containers = append(pod.Spec.Containers, epProxyContainer)
 }
 
 // applyPodMonitoring adds any monitoring related hacks required to work.
@@ -1519,6 +1542,28 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	}
 
 	return initContainer
+}
+
+// createEndpointProxyContainer creates a endpoint proxy container based on inputs from manifest.
+// N.B. The endpoint proxy is implemented by stellar-nebula-gateway gRPC service by default.
+func createEndpointProxyContainer(cs couchbasev2.ClusterSpec) v1.Container {
+	return v1.Container{
+		Name:  EndpointProxyContainerName,
+		Image: cs.EndpointProxyImage(),
+		Ports: []v1.ContainerPort{
+			{
+				Name:          "sn-data-port",
+				ContainerPort: int32(snDataPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+			{
+				Name:          "sn-sd-port",
+				ContainerPort: int32(snSdPort),
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+		Args: []string{"--cb-host", "localhost"},
+	}
 }
 
 func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {

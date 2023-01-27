@@ -20,6 +20,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -81,6 +82,10 @@ const (
 	viewServicePortNameTLS = viewService + tlsPortNameSuffix
 	viewServicePort        = 8092
 	viewServicePortTLS     = tlsBasePort + viewServicePort
+
+	// stellar-nebula-gateway related constants.
+	snDataPort = 18098
+	snSdPort   = 18099
 )
 
 var (
@@ -520,6 +525,42 @@ func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 	}
 
 	return updatedJSON, nil
+}
+
+// generateEndpointProxyService returns a service for exposing the endpoint proxy which could be accessed form outside the cluster
+// with the help of an Ingress or Openshift Route.
+func generateEndpointProxyService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
+	service := &v1.Service{}
+
+	service.Name = cluster.Name + "-endpoint-proxy-service"
+	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
+	service.OwnerReferences = []metav1.OwnerReference{
+		cluster.AsOwner(),
+	}
+
+	service.Spec.Selector = selectorForEndpointProxyService(cluster)
+	service.Spec.Ports = []v1.ServicePort{
+		{
+			Name:       "endpoint-proxy-http",
+			Protocol:   v1.ProtocolTCP,
+			Port:       80,
+			TargetPort: intstr.FromInt(snDataPort),
+		},
+	}
+
+	return service
+}
+
+// ReconcileEndpointProxyService creates/updates k8s services for exposing the data and service discovery services
+// on the gRPC gateway proxying to the couchbase cluster.
+func ReconcileEndpointProxyService(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	requested := generateEndpointProxyService(cluster)
+
+	if err := reconcileService(c, cluster, requested); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // reconcileService creates or updates a service.
