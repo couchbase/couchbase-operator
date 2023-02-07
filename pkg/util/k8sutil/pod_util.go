@@ -214,7 +214,7 @@ func (p *PersistentVolumeClaimState) List() []*v1.PersistentVolumeClaim {
 // addVolume takes a requested volume for a pod and interrogates Kubernetes
 // in order to work out how to process it e.g. does it need to be created,
 // updated, resized etc.
-func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *v1.PersistentVolumeClaim, member couchbaseutil.Member, mountMapping volumeMount) error {
+func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *v1.PersistentVolumeClaim, member couchbaseutil.Member, mountMapping volumeMount, expandable bool) error {
 	// BUG: this returns an error we ignore, the PVC may actually exist but
 	// be in a bad state.
 	pvc, _ := findMemberPVC(client, member.Name(), mountMapping.mountPath)
@@ -268,6 +268,13 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 			p.diff += d
 		}
 
+		return nil
+	}
+
+	// When volume expansion is disabled then reconcile is complete.
+	// Otherwise, will assume that a volume expansion is underway if the
+	// volume status is larger than the size being requested.
+	if !expandable {
 		return nil
 	}
 
@@ -404,7 +411,7 @@ func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *
 			return nil, err
 		}
 
-		if err := state.addVolume(client, required, member, mountMapping); err != nil {
+		if err := state.addVolume(client, required, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion); err != nil {
 			return nil, err
 		}
 	}
