@@ -1217,6 +1217,15 @@ type CouchbaseBucketSpec struct {
 	// Scopes defines whether the Operator manages scopes for the bucket or not, and
 	// the set of scopes defined for the bucket.
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
+
+	HistoryRetentionSettings *HistoryRetentionSettings `json:"-" annotation:"historyRetention"`
+}
+
+type HistoryRetentionSettings struct {
+	// history retention in bytes
+	Seconds int `json:"-" annotation:"seconds"`
+	// history retention in seconds
+	Bytes int `json:"-" annotation:"bytes"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

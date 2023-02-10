@@ -1248,6 +1248,20 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
 	}
 
+	cdcAnnotations := map[string]struct{}{
+		"cao.couchbase.com/historyRetention.seconds":                  {},
+		"cao.couchbase.com/historyRetention.bytes":                    {},
+		"cao.couchbase.com/historyRetention.collectionHistoryDefault": {},
+	}
+
+	for k := range bucket.Annotations {
+		if _, ok := cdcAnnotations[k]; ok {
+			if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+				errs = append(errs, fmt.Errorf("annotation '%s' can only be used with magma storage backend", k))
+			}
+		}
+	}
+
 	if bucket.Spec.MaxTTL != nil {
 		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
 			errs = append(errs, err)
@@ -1464,7 +1478,7 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = err
 	}
 
-	if err := checkConstaintBackupObjStore(v, backup); err != nil {
+	if err := checkConstraintBackupObjStore(v, backup); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1571,7 +1585,7 @@ func checkConstraintStoreSecret(v *types.Validator, store *couchbasev2.ObjectSto
 	return nil
 }
 
-func checkConstaintBackupObjStore(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
+func checkConstraintBackupObjStore(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	if !v.Options.ValidateSecrets {
 		return nil
 	}
@@ -1608,7 +1622,7 @@ func checkConstaintBackupObjStore(v *types.Validator, backup *couchbasev2.Couchb
 	return nil
 }
 
-func checkConstaintBackupRestoreObjStoreSecret(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkConstraintBackupRestoreObjStoreSecret(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	if !v.Options.ValidateSecrets {
 		return nil
 	}
@@ -1656,7 +1670,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		checkContraintRestoreEnd,
 		checkContraintRestoreRange,
 		checkContraintRestoreData,
-		checkConstaintBackupRestoreObjStoreSecret,
+		checkConstraintBackupRestoreObjStoreSecret,
 	}
 
 	var errs []error

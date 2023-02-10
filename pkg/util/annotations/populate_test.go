@@ -42,11 +42,34 @@ func TestSimpleEncode(t *testing.T) {
 
 	err := Populate(&simple, annotations)
 	if err != nil {
-		t.Errorf("unexpected error. %v", err)
+		t.Fatalf("unexpected error. %v", err)
 	}
 
 	if !cmp.Equal(simple, expected) {
-		t.Errorf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
+		t.Fatalf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
+	}
+}
+
+func TestSimpleEncodeRollBack(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/foo":  "foo",
+		"cao.couchbase.com/bar":  "bar", // trying to encode string into an int
+		"cao.couchbase.com/buzz": "10s",
+	}
+
+	simple := SimpleStruct{Foo: "not foo", Bar: -1}
+	expected := SimpleStruct{
+		Foo: "not foo",
+		Bar: -1,
+	}
+
+	err := Populate(&simple, annotations)
+	if err == nil {
+		t.Fatalf("expected an error")
+	}
+
+	if !cmp.Equal(simple, expected) {
+		t.Fatalf("Failed to rollback simple struct. found %v, expected %v", simple, expected)
 	}
 }
 
@@ -68,14 +91,35 @@ func TestNestedStruct(t *testing.T) {
 
 	err := Populate(&nested, annotations)
 	if err != nil {
-		t.Errorf("unpexpected error. %v", err)
+		t.Fatalf("unpexpected error. %v", err)
 	}
 
 	if !cmp.Equal(nested, expected) {
-		t.Errorf("Failed to annotate nested struct. found %v expected %v", nested, expected)
+		t.Fatalf("Failed to annotate nested struct. found %v expected %v", nested, expected)
 	}
 }
 
+func TestNestedStructRollback(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/nested.foo":  "foo",
+		"cao.couchbase.com/nested.bar":  "bar",
+		"cao.couchbase.com/nested.buzz": "10s",
+	}
+
+	nested := NestedStruct{}
+	expected := NestedStruct{
+		Nested: SimpleStruct{},
+	}
+
+	err := Populate(&nested, annotations)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	if !cmp.Equal(nested, expected) {
+		t.Fatalf("Failed to rollback nested struct. found %v expected %v", nested, expected)
+	}
+}
 func TestPointerStruct(t *testing.T) {
 	annotations := map[string]string{
 		"cao.couchbase.com/pointed.foo":  "foo",
@@ -94,10 +138,30 @@ func TestPointerStruct(t *testing.T) {
 
 	err := Populate(&pointer, annotations)
 	if err != nil {
-		t.Errorf("unexpected error. %v", err)
+		t.Fatalf("unexpected error. %v", err)
 	}
 
 	if !cmp.Equal(pointer, expected) {
-		t.Errorf("Failed to annotate pointer struct. found %v expected %v", pointer, expected)
+		t.Fatalf("Failed to annotate pointer struct. found %v expected %v", pointer, expected)
+	}
+}
+
+func TestPointerRollbackStruct(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/pointed.foo":  "foo",
+		"cao.couchbase.com/pointed.bar":  "bar",
+		"cao.couchbase.com/pointed.buzz": "10s",
+	}
+
+	pointer := PointerStruct{}
+	expected := PointerStruct{}
+
+	err := Populate(&pointer, annotations)
+	if err == nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(pointer, expected) {
+		t.Fatalf("Failed to rollback pointer struct. found %v expected %v", pointer, expected)
 	}
 }

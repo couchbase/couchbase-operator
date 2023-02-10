@@ -43,6 +43,14 @@ func (e *InvalidPopulateError) Error() string {
 	return "Populate(nil " + e.Type.String() + ")"
 }
 
+type PopulateState struct {
+	rollback [][]reflect.Value // pointer to the original field with the original value
+}
+
+func NewPopulateState() *PopulateState {
+	return &PopulateState{}
+}
+
 /*
 Populate takes a pointer to some value a, and a map[string]string.
 The key of this map represents paths within the struct for which the value should be set.
@@ -60,6 +68,17 @@ func Populate(a interface{}, annotations map[string]string) error {
 		return &InvalidPopulateError{Type: reflect.TypeOf(a)}
 	}
 
+	failed := false
+	state := NewPopulateState()
+
+	defer func() {
+		if failed {
+			for _, v := range state.rollback {
+				v[0].Set(v[1])
+			}
+		}
+	}()
+
 	for k, v := range annotations {
 		if !strings.HasPrefix(k, AnnotationPrefix) {
 			continue
@@ -67,13 +86,15 @@ func Populate(a interface{}, annotations map[string]string) error {
 
 		path := k[len(AnnotationPrefix):]
 
-		if field := FindField(a, strings.Split(path, AnnotationDelim)); field != nil {
+		if field := state.FindField(a, strings.Split(path, AnnotationDelim)); field != nil {
 			if field.IsValid() && field.CanSet() {
-				if err := setField(field, v); err != nil {
+				if err := state.setField(field, v); err != nil {
+					failed = true
 					return err
 				}
 			}
 		} else {
+			failed = true
 			return &FieldNotFoundError{Field: k}
 		}
 	}
@@ -81,7 +102,9 @@ func Populate(a interface{}, annotations map[string]string) error {
 	return nil
 }
 
-func setField(field *reflect.Value, value string) error {
+func (state *PopulateState) setField(field *reflect.Value, value string) error {
+	state.rollback = append(state.rollback, []reflect.Value{*field, reflect.ValueOf(field.Interface())})
+
 	switch field.Kind() {
 	case reflect.Struct:
 		// we can only support metav1.Durations structs
@@ -116,7 +139,7 @@ func setField(field *reflect.Value, value string) error {
 
 // given a path peforms a recursive search until the final field is found.
 // this field can then be used to set values.
-func FindField(a interface{}, path []string) *reflect.Value {
+func (state *PopulateState) FindField(a interface{}, path []string) *reflect.Value {
 	rv := reflect.ValueOf(a)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -144,14 +167,15 @@ func FindField(a interface{}, path []string) *reflect.Value {
 			switch fv.Kind() {
 			case reflect.Struct:
 				// if this is a struct get a pointer to it and follow it
-				return FindField(fv.Addr().Interface(), path[1:])
+				return state.FindField(fv.Addr().Interface(), path[1:])
 			case reflect.Pointer:
 				if st.Type.Elem().Kind() == reflect.Struct {
 					if fv.IsNil() {
+						state.rollback = append(state.rollback, []reflect.Value{fv, reflect.Zero(fv.Type())})
 						fv.Set(reflect.New(st.Type.Elem()))
 					}
 
-					return FindField(fv.Interface(), path[1:])
+					return state.FindField(fv.Interface(), path[1:])
 				}
 
 			default:

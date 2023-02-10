@@ -186,6 +186,30 @@ func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster
 	}
 }
 
+func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, timeout time.Duration) {
+	if err := VerifyBucketHistoryRetentionSettings(t, k8s, cluster, name, seconds, bytes, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, name)
+		if err != nil {
+			return err
+		}
+
+		if info.HistoryRetentionBytes != bytes {
+			return fmt.Errorf("history retention expected %d bytes but found %d", bytes, info.HistoryRetentionBytes)
+		}
+		if info.HistoryRetentionSeconds != seconds {
+			return fmt.Errorf("history retention expected %d seconds but found %d", seconds, info.HistoryRetentionSeconds)
+		}
+		fmt.Println("retention history found")
+		return nil
+	})
+}
+
 // VerifyReplicaCount polls the Couchbase API for the named bucket and checks whether the
 // Replica number matches the expected replicaNumber.
 func VerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {

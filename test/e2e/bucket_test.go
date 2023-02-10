@@ -33,6 +33,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		"bucket2",
 		"bucket3",
 		"bucket4",
+		"bucket5",
 	}
 
 	buckets := []metav1.Object{
@@ -51,6 +52,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
+
 		&couchbasev2.CouchbaseMemcachedBucket{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: names[1],
@@ -88,10 +90,30 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
+		&couchbasev2.CouchbaseBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[4],
+				Annotations: map[string]string{
+					"cao.couchbase.com/historyRetention.seconds": "100",
+					"cao.couchbase.com/historyRetention.bytes":   "50",
+				},
+			},
+			Spec: couchbasev2.CouchbaseBucketSpec{
+				MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				EnableFlush:        true,
+				EnableIndexReplica: true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+				StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			},
+		},
 	}
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for _, bucket := range buckets {
@@ -99,6 +121,9 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	}
+
+	// check if mutation setting exists
+	e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, buckets[4].GetName(), 100, 50, 2*time.Minute)
 
 	for _, bucket := range buckets {
 		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
