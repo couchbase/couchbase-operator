@@ -48,6 +48,7 @@ pipeline {
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
     GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
     GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
     AWS_CREDENTIALS = credentials('aws-alex')
     AZURE_CREDENTIALS = credentials('azure-alex')
@@ -182,7 +183,7 @@ pipeline {
             -bucket-type \${bucket_type} \
             -compression-mode \${compression_mode} \
             -registry https://index.docker.io/v1/,\${DOCKER_CREDENTIALS_USR},\${DOCKER_CREDENTIALS_PSW} \
-            -registry registry.gitlab.com,\${GITLAB_CREDENTIALS_USR},\${GITLAB_CREDENTIALS_PSW} \
+            -registry=https://ghcr.io/,\${GHCR_CREDENTIALS_USR},\${GHCR_CREDENTIALS_PSW} \
             -collect-logs \
             -collect-server-logs=false \
             -s3-access-key \${AWS_CREDENTIALS_USR} \
