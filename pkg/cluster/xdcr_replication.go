@@ -27,7 +27,8 @@ var (
 )
 
 const (
-	defaultMigrationFilter = couchbasev2.DefaultScopeOrCollection + "." + couchbasev2.DefaultScopeOrCollection
+	defaultMigrationFilter                    = couchbasev2.DefaultScopeOrCollection + "." + couchbasev2.DefaultScopeOrCollection
+	RemoteClusterOperatorManagedSuffix string = "-operator-managed"
 )
 
 // replicationKey returns a unique identifier per replication.
@@ -252,15 +253,15 @@ func (c *Cluster) isScopesAndCollectionsSupported() (bool, error) {
 
 // generateXDCRReplications uses the remote's label selector to pick all the replications
 // to create for this remote cluster connection.
-func (c *Cluster) generateXDCRReplications(cluster couchbasev2.RemoteCluster) ([]couchbaseutil.Replication, error) {
+func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteCluster) ([]couchbaseutil.Replication, error) {
 	var replications []couchbaseutil.Replication
 
 	selector := labels.Everything()
 
-	if cluster.Replications.Selector != nil {
+	if remoteCluster.Replications.Selector != nil {
 		var err error
 
-		if selector, err = metav1.LabelSelectorAsSelector(cluster.Replications.Selector); err != nil {
+		if selector, err = metav1.LabelSelectorAsSelector(remoteCluster.Replications.Selector); err != nil {
 			return nil, err
 		}
 	}
@@ -282,7 +283,7 @@ func (c *Cluster) generateXDCRReplications(cluster couchbasev2.RemoteCluster) ([
 
 			newMigration := couchbaseutil.Replication{
 				FromBucket:       string(migration.Spec.Bucket),
-				ToCluster:        cluster.Name,
+				ToCluster:        remoteCluster.Name,
 				ToBucket:         string(migration.Spec.RemoteBucket),
 				Type:             couchbaseutil.ReplicationTypeXMEM,
 				ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
@@ -319,7 +320,7 @@ func (c *Cluster) generateXDCRReplications(cluster couchbasev2.RemoteCluster) ([
 
 		newReplication := couchbaseutil.Replication{
 			FromBucket:       string(replication.Spec.Bucket),
-			ToCluster:        cluster.Name,
+			ToCluster:        remoteCluster.Name,
 			ToBucket:         string(replication.Spec.RemoteBucket),
 			Type:             couchbaseutil.ReplicationTypeXMEM,
 			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
@@ -363,34 +364,38 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 
 	var replications []couchbaseutil.Replication
 
-	for _, cluster := range c.cluster.Spec.XDCR.RemoteClusters {
-		hostname, network, err := getXDCRHostnameAndNetwork(cluster)
+	for _, remoteCluster := range c.cluster.Spec.XDCR.RemoteClusters {
+		hostname, network, err := getXDCRHostnameAndNetwork(remoteCluster)
 		if err != nil {
 			return nil, nil, err
 		}
 
+		// renaming c.cluster.spec.xdcr.remoteClusters.name
+		// any remoteCluster created/added via Operator must have this unique suffix
+		remoteCluster.Name += RemoteClusterOperatorManagedSuffix
+
 		requested := couchbaseutil.RemoteCluster{
-			Name:       cluster.Name,
-			UUID:       cluster.UUID,
+			Name:       remoteCluster.Name,
+			UUID:       remoteCluster.UUID,
 			Hostname:   hostname,
 			Network:    network,
 			SecureType: couchbaseutil.RemoteClusterSecurityNone,
 		}
 
-		if cluster.AuthenticationSecret != nil {
-			secret, found := c.k8s.Secrets.Get(*cluster.AuthenticationSecret)
+		if remoteCluster.AuthenticationSecret != nil {
+			secret, found := c.k8s.Secrets.Get(*remoteCluster.AuthenticationSecret)
 			if !found {
-				return nil, nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.AuthenticationSecret)
+				return nil, nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.AuthenticationSecret)
 			}
 
 			requested.Username = string(secret.Data["username"])
 			requested.Password = string(secret.Data["password"])
 		}
 
-		if cluster.TLS != nil && cluster.TLS.Secret != nil {
-			secret, found := c.k8s.Secrets.Get(*cluster.TLS.Secret)
+		if remoteCluster.TLS != nil && remoteCluster.TLS.Secret != nil {
+			secret, found := c.k8s.Secrets.Get(*remoteCluster.TLS.Secret)
 			if !found {
-				return nil, nil, fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *cluster.TLS.Secret)
+				return nil, nil, fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.TLS.Secret)
 			}
 
 			if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
@@ -416,7 +421,7 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 
 		clusters = append(clusters, requested)
 
-		clusterReplications, err := c.generateXDCRReplications(cluster)
+		clusterReplications, err := c.generateXDCRReplications(remoteCluster)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -469,14 +474,31 @@ func (c *Cluster) setOptionalPersistentXDCRData(cluster *couchbaseutil.RemoteClu
 // credentials.  We, however, do need RMW, so we need to get what the API provides and then
 // fill in the blanks with persistent data.
 func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
-	var clusters couchbaseutil.RemoteClusters
+	var remoteClusters couchbaseutil.RemoteClusters
 
-	if err := couchbaseutil.ListRemoteClusters(&clusters).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.ListRemoteClusters(&remoteClusters).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
 	}
 
-	for i := range clusters {
-		cluster := &clusters[i]
+	// check for the unique suffix "-operator-managed" to discard the rest
+	// this is necessary to rule out all remoteClusters for this cluster
+	// which were not created/added via operator
+	if len(remoteClusters) > 0 {
+		for i, remoteCluster := range remoteClusters {
+			// probably added to this cluster as remoteCluster via UI/API (not managed by operator)
+			if !strings.HasSuffix(remoteCluster.Name, RemoteClusterOperatorManagedSuffix) {
+				// delete those remote clusters via API
+				if err := couchbaseutil.DeleteRemoteCluster(&remoteCluster).On(c.api, c.readyMembers()); err != nil {
+					return nil, err
+				}
+				// remove them from the list
+				remoteClusters = append(remoteClusters[:i], remoteClusters[i+1:]...)
+			}
+		}
+	}
+
+	for i := range remoteClusters {
+		cluster := &remoteClusters[i]
 
 		// Load up the configuration that changes... OMG!!
 		if err := c.getPersistentXDCRData(cluster, persistence.XDCRHostname, &cluster.Hostname); err != nil {
@@ -497,7 +519,7 @@ func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
 		}
 	}
 
-	return clusters, nil
+	return remoteClusters, nil
 }
 
 // updateXDCRPersistentState flushes any existing XDCR persistent data out, so if the

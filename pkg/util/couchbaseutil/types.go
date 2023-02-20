@@ -728,7 +728,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	}
 
 	// For CB Server 7.0.0+
-	// check "undefined"! looks crazy right? well, there's javascript somewhere
+	// check "undefined"! looks crazy right? well, it's fixed now but may just leave it for now.
 	if status.StorageBackend != "" && status.StorageBackend != "undefined" {
 		b.BucketStorageBackend = status.StorageBackend
 	}

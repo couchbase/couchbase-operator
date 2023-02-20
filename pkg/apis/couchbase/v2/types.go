@@ -3024,6 +3024,8 @@ type RemoteClusterTLS struct {
 // RemoteCluster is a reference to a remote cluster for XDCR.
 type RemoteCluster struct {
 	// Name of the remote cluster.
+	// Note that, -operator-managed is added as suffix by operator automatically
+	// to the name in order to diffrentiate from non operator managed remote clusters.
 	Name string `json:"name"`
 
 	// UUID of the remote cluster.  The UUID of a CouchbaseCluster resource
