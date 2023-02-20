@@ -3196,6 +3196,7 @@ To use IPv6, place brackets (`[`, `]`) around the IPv6 value.
 ==== Description
 
 Name of the remote cluster.
+Note that, -operator-managed is added as suffix by operator automatically to the name in order to diffrentiate from non operator managed remote clusters.
 
 === couchbaseclusters.spec.xdcr.remoteClusters.replications
 
