@@ -161,28 +161,66 @@ func (state *PopulateState) FindField(a interface{}, path []string) *reflect.Val
 			continue
 		}
 
-		if path[0] == tag {
+		parts := strings.Split(tag, ",")
+		name, options := parts[0], parts[1:]
+		isInline := Contains(options, "inline")
+
+		if path[0] != name && !isInline {
+			continue
+		}
+
+		fv := rv.FieldByName(st.Name)
+
+		if path[0] == name {
 			// found it check if its requires following or the final field
-			fv := rv.FieldByName(st.Name)
-			switch fv.Kind() {
-			case reflect.Struct:
-				// if this is a struct get a pointer to it and follow it
-				return state.FindField(fv.Addr().Interface(), path[1:])
-			case reflect.Pointer:
-				if st.Type.Elem().Kind() == reflect.Struct {
-					if fv.IsNil() {
-						state.rollback = append(state.rollback, []reflect.Value{fv, reflect.Zero(fv.Type())})
-						fv.Set(reflect.New(st.Type.Elem()))
-					}
-
-					return state.FindField(fv.Interface(), path[1:])
-				}
-
-			default:
-				return &fv
+			if foundField := state.getFieldFromStructField(st, fv, path); foundField != nil {
+				return foundField
+			}
+		} else if fv.Kind() == reflect.Struct { // inline struct, check nested struct without updating path.
+			if foundField := state.FindField(fv.Addr().Interface(), path); foundField != nil {
+				return foundField
 			}
 		}
 	}
 
 	return nil
+}
+
+func (state *PopulateState) getFieldFromStructField(st reflect.StructField, fv reflect.Value, path []string) *reflect.Value {
+	switch fv.Kind() {
+	case reflect.Struct:
+		// if this is a struct get a pointer to it and follow it
+		return state.FindField(fv.Addr().Interface(), path[1:])
+	case reflect.Pointer:
+		if st.Type.Elem().Kind() == reflect.Struct {
+			if fv.IsNil() {
+				state.rollback = append(state.rollback, []reflect.Value{fv, reflect.Zero(fv.Type())})
+				fv.Set(reflect.New(st.Type.Elem()))
+			}
+
+			return state.FindField(fv.Interface(), path[1:])
+		}
+
+		if fv.IsNil() {
+			state.rollback = append(state.rollback, []reflect.Value{fv, reflect.Zero(fv.Type())})
+			fv.Set(reflect.New(st.Type.Elem()))
+		}
+
+		fv = fv.Elem()
+
+		return &fv
+
+	default:
+		return &fv
+	}
+}
+
+func Contains[T comparable](elements []T, element T) bool {
+	for _, x := range elements {
+		if x == element {
+			return true
+		}
+	}
+
+	return false
 }

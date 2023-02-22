@@ -186,13 +186,13 @@ func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster
 	}
 }
 
-func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, timeout time.Duration) {
-	if err := VerifyBucketHistoryRetentionSettings(t, k8s, cluster, name, seconds, bytes, timeout); err != nil {
+func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, collectionDefault bool, timeout time.Duration) {
+	if err := VerifyBucketHistoryRetentionSettings(t, k8s, cluster, name, seconds, bytes, collectionDefault, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, timeout time.Duration) error {
+func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, collectionDefault bool, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		info, err := getBucketInfo(t, k8s, cluster, name)
 		if err != nil {
@@ -205,7 +205,10 @@ func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, clus
 		if info.HistoryRetentionSeconds != seconds {
 			return fmt.Errorf("history retention expected %d seconds but found %d", seconds, info.HistoryRetentionSeconds)
 		}
-		fmt.Println("retention history found")
+
+		if *info.HistoryRetentionCollectionDefault != collectionDefault {
+			return fmt.Errorf("history retention expected %t collection default but found %t", collectionDefault, *info.HistoryRetentionCollectionDefault)
+		}
 		return nil
 	})
 }

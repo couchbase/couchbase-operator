@@ -323,7 +323,7 @@ func addDocs(d *DocumentSet) error {
 
 	bucket := c.Bucket(d.bucket)
 
-	if err := bucket.WaitUntilReady(time.Minute, &gocb.WaitUntilReadyOptions{}); err != nil {
+	if err := bucket.WaitUntilReady(time.Minute*2, &gocb.WaitUntilReadyOptions{}); err != nil {
 		return err
 	}
 

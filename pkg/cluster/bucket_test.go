@@ -14,8 +14,9 @@ func TestHistoryRetention(t *testing.T) {
 	k8sBucket = append(k8sBucket, &couchbasev2.CouchbaseBucket{
 		ObjectMeta: v1.ObjectMeta{
 			Annotations: map[string]string{
-				"cao.couchbase.com/historyRetention.seconds": "100",
-				"cao.couchbase.com/historyRetention.bytes":   "50",
+				"cao.couchbase.com/historyRetention.seconds":                  "100",
+				"cao.couchbase.com/historyRetention.bytes":                    "50",
+				"cao.couchbase.com/historyRetention.collectionHistoryDefault": "true",
 			},
 		},
 
@@ -40,5 +41,9 @@ func TestHistoryRetention(t *testing.T) {
 
 	if newBuckets[0].HistoryRetentionSeconds != 100 {
 		t.Fatalf("expected HistoryRetentionSeconds=100, found %d", newBuckets[0].HistoryRetentionSeconds)
+	}
+
+	if !*(newBuckets[0].HistoryRetentionCollectionDefault) {
+		t.Fatalf("expected HistoryRetentionCollectionDefault=true, found %t", *(newBuckets[0].HistoryRetentionCollectionDefault))
 	}
 }

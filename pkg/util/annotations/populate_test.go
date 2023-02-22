@@ -8,10 +8,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type InlineStruct struct {
+	SimpleStruct `annotation:",inline"`
+	Field        string `annotation:"field"`
+}
+
 type PointerStruct struct {
 	Name    string
 	Pointed *SimpleStruct `annotation:"pointed"`
 }
+
 type NestedStruct struct {
 	Name   string
 	Nested SimpleStruct `annotation:"nested"`
@@ -120,6 +126,7 @@ func TestNestedStructRollback(t *testing.T) {
 		t.Fatalf("Failed to rollback nested struct. found %v expected %v", nested, expected)
 	}
 }
+
 func TestPointerStruct(t *testing.T) {
 	annotations := map[string]string{
 		"cao.couchbase.com/pointed.foo":  "foo",
@@ -163,5 +170,32 @@ func TestPointerRollbackStruct(t *testing.T) {
 
 	if !cmp.Equal(pointer, expected) {
 		t.Fatalf("Failed to rollback pointer struct. found %v expected %v", pointer, expected)
+	}
+}
+
+func TestInlineEncode(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/foo":   "foo",
+		"cao.couchbase.com/bar":   "5",
+		"cao.couchbase.com/buzz":  "10s",
+		"cao.couchbase.com/field": "field",
+	}
+
+	simple := InlineStruct{Field: "100"}
+	expected := InlineStruct{
+		Field: "field", SimpleStruct: SimpleStruct{
+			Foo:  "foo",
+			Bar:  5,
+			Buzz: aboutTen,
+		},
+	}
+
+	err := Populate(&simple, annotations)
+	if err != nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(simple, expected) {
+		t.Fatalf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
 	}
 }

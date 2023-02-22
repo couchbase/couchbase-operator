@@ -37,7 +37,11 @@ func TestScopeCreateExplicit(t *testing.T) {
 	scopeGroupNames := []string{"buttons", "mindy"}
 
 	// Create a scope and scope group.
-	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
+	scope := e2eutil.NewScope(scopeName).Generate()
+	scope.Annotations["cao.couchbase.com/history"] = "false"
+
+	scope = e2eutil.MustCreateScope(t, kubernetes, scope)
+
 	scopeGroup := e2eutil.NewScopeGroup(scopeGroupName, scopeGroupNames...).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
@@ -270,6 +274,66 @@ func TestCollectionCreateExplicit(t *testing.T) {
 	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
+	// Expect there to be a scopes & collections updated event.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestCollectionCreateImplicit tests collection selectors in scopes can
+// select collections and collection groups with labels.
+func TestCollectionCreateImplicitWithAnnotations(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.0").CouchbaseBucket()
+
+	clusterSize := 1
+	scopeName := "pinky"
+	collectionName := "brain"
+	collectionGroupName := "group1"
+	collectionGroupNames := []string{"buttons", "mindy"}
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).WithLabels(defaultLabelSelector).Generate()
+	if collection.Annotations == nil {
+		collection.Annotations = make(map[string]string)
+	}
+
+	collection.Annotations["cao.couchbase.com/history"] = "false"
+
+	e2eutil.MustCreateCollection(t, kubernetes, collection)
+
+	e2eutil.NewCollectionGroup(collectionGroupName, collectionGroupNames...).WithLabels(defaultLabelSelector).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithLabelSelector(defaultLabelSelector).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2espec.DefaultMagmaBucket()
+
+	// bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+
+	_ = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	e2eutil.CheckCollectionSettings(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, false)
 	// Expect there to be a scopes & collections updated event.
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},

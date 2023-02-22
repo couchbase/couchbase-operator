@@ -2,6 +2,7 @@ package cluster
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -329,12 +330,28 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
 
+		err := annotations.Populate(&collection.Spec, collection.Annotations)
+		if err != nil {
+			log.Error(err, "failed to parse collection annotations")
+		}
+
 		apiCollection := couchbaseutil.Collection{
 			Name: collection.CouchbaseName(),
 		}
 
 		if collection.Spec.MaxTTL != nil {
 			apiCollection.MaxTTL = int(collection.Spec.MaxTTL.Duration.Seconds())
+		}
+
+		cdcEnabled, err := c.IsAtLeastVersion("7.2.0")
+		if err != nil {
+			return err
+		}
+
+		// check if couchbase bucket
+		cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
+		if ok && cdcEnabled && cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+			apiCollection.History = collection.Spec.History
 		}
 
 		if err := couchbaseutil.CreateCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {

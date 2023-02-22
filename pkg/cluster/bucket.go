@@ -73,6 +73,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		// CDC is only supported on Magma
 		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
+			b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
 			b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
 			b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
 		}

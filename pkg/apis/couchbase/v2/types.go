@@ -828,10 +828,14 @@ type CouchbaseCollectionSpecCommon struct {
 	// defaulting to 0.  More info:
 	// https://golang.org/pkg/time/#ParseDuration
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
+
+	// History controls whether history retention is enabled for a collection.
+	// pointer bool because if it hasn't been set it should default to true server side
+	History *bool `json:"-" annotation:"history"`
 }
 
 type CouchbaseCollectionSpec struct {
-	CouchbaseCollectionSpecCommon `json:",inline"`
+	CouchbaseCollectionSpecCommon `json:",inline" annotation:",inline"`
 
 	// Name specifies the name of the collection.  By default, the metadata.name is
 	// used to define the collection name, however, due to the limited character set,
@@ -1226,6 +1230,8 @@ type HistoryRetentionSettings struct {
 	Seconds int `json:"-" annotation:"seconds"`
 	// history retention in seconds
 	Bytes int `json:"-" annotation:"bytes"`
+	// whether collections have history enabled by default
+	CollectionDefault *bool `json:"-" annotation:"collectionHistoryDefault"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
