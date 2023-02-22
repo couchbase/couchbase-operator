@@ -3595,7 +3595,7 @@ type BucketStatus struct {
 	BucketType string `json:"type"`
 
 	// BucketStorageBackend is the storage backend of the bucket.
-	BucketStorageBackend string `json:"storageBackend"`
+	BucketStorageBackend string `json:"storageBackend,omitempty"`
 
 	// BucketMemoryQuota is the bucket memory quota in megabytes.
 	BucketMemoryQuota int64 `json:"memoryQuota"`
