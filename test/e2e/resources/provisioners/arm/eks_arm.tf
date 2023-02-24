@@ -104,3 +104,17 @@ data "aws_ami" "arm-ami" {
     values = ["amzn2*arm64-gp2"]
   }
 }
+
+# Required for Kubernetes 1.23 and above:
+# https://aws.amazon.com/blogs/containers/amazon-ebs-csi-driver-is-now-generally-available-in-amazon-eks-add-ons/
+module "kubernetes_addons" {
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons"
+  eks_cluster_id = module.cluster.cluster_id
+  enable_amazon_eks_aws_ebs_csi_driver = true
+  amazon_eks_aws_ebs_csi_driver_config = {
+    addon_name               = "aws-ebs-csi-driver"
+    addon_version            = "v1.5.2-eksbuild.1"
+  }
+ }
+
+
