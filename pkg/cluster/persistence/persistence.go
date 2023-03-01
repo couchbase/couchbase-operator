@@ -164,12 +164,7 @@ func New(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) (Persis
 		return nil, err
 	}
 
-	callback := func() error {
-		if _, found := client.Secrets.Get(couchbase.Name); found {
-			return fmt.Errorf("persistence secret found for cluster: %w", errors.NewStackTracedError(errors.ErrResourceExists))
-		}
-
-		// the secret doesn't exist anymore or at all, for the cluster.
+	createSecret := func() error {
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   couchbase.Name,
@@ -187,6 +182,43 @@ func New(client *client.Client, couchbase *couchbasev2.CouchbaseCluster) (Persis
 		return nil
 	}
 
+	cluster, err := client.CouchbaseClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	// if cluster exists, this can just be an operator upgrade,
+	// then, secret must also exists.
+	if cluster != nil {
+		if _, found := client.Secrets.Get(couchbase.Name); found {
+			return &persistentStorageImpl{
+				client:    client,
+				couchbase: couchbase,
+			}, nil
+		}
+
+		// cluster exists but secret doesn't might be rare
+		// so just in case.
+		if err := createSecret(); err != nil {
+			return nil, errors.NewStackTracedError(err)
+		}
+	}
+
+	callback := func() error {
+		if _, found := client.Secrets.Get(couchbase.Name); found {
+			return fmt.Errorf("persistence secret found for cluster: %w", errors.NewStackTracedError(errors.ErrResourceExists))
+		}
+
+		// the secret doesn't exist anymore or at all, for the cluster.
+		if err := createSecret(); err != nil {
+			return errors.NewStackTracedError(err)
+		}
+
+		return nil
+	}
+
+	// this is a new cluster creation so we muct create a new secret,
+	// so, we have to be sure that the old persistence secret doesn't exist at all to avoid reuse;
 	// retry/wait to be sure that the persistence secret is deleted/doesn't exist anymore.
 	if err := retryutil.RetryFor(persistenceCacheTimeout, callback); err != nil {
 		return nil, err
