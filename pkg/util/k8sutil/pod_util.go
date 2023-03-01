@@ -113,7 +113,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
 		// the init command is idempotent.
 		for _, pvc := range pvcState.pvcs {
-			if pvc.Annotations[constants.AnnotationVolumeMountPath] == couchbaseVolumeDefaultConfigDir {
+			if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
 				initContainer := couchbaseInitContainer(cluster, pvc.Name, config, image)
 				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 			}
@@ -199,6 +199,17 @@ func (p *PersistentVolumeClaimState) lookup(name string, pvcs []*v1.PersistentVo
 	}
 
 	return nil
+}
+
+// volumeExists checks if volume has been added to the list which is already known.
+func (p *PersistentVolumeClaimState) volumeExists(name string) bool {
+	for _, v := range p.volumes {
+		if v.Name == name {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Diff returns a diff of changes when PVCs are created or updated.
@@ -308,7 +319,11 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 // to generate the required set of volume mounts to apply to the containers.
 func (p *PersistentVolumeClaimState) addVolumeMounts(mountMappings volumeMountList) {
 	for _, mountMapping := range mountMappings {
-		p.volumes = append(p.volumes, podVolumeSpecForClaim(mountMapping.persistentVolumeClaimName))
+		// When reusing volumeMounts, a single volume name will associate the Pod with a list of mounts,
+		// therefore we need to avoid having duplicate volume names (which is also invalid).
+		if !p.volumeExists(mountMapping.persistentVolumeClaimName) {
+			p.volumes = append(p.volumes, podVolumeSpecForClaim(mountMapping.persistentVolumeClaimName))
+		}
 
 		// Mount point for Pod Container spec to reference volume by name.
 		if mountMapping.name == defaultVolumeMount {
@@ -318,6 +333,7 @@ func (p *PersistentVolumeClaimState) addVolumeMounts(mountMappings volumeMountLi
 				MountPath: mountMapping.mountPath,
 				SubPath:   defaultSubPathName,
 			}
+
 			etcMount := v1.VolumeMount{
 				Name:      mountMapping.persistentVolumeClaimName,
 				MountPath: couchbaseVolumeDefaultEtcDir,
@@ -333,6 +349,7 @@ func (p *PersistentVolumeClaimState) addVolumeMounts(mountMappings volumeMountLi
 		p.volumeMounts = append(p.volumeMounts, v1.VolumeMount{
 			Name:      mountMapping.persistentVolumeClaimName,
 			MountPath: mountMapping.mountPath,
+			SubPath:   mountMapping.subPath,
 		})
 	}
 }
@@ -405,18 +422,59 @@ func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *
 		return nil, err
 	}
 
+	// reusableClaimMapping allows for association of a single pvc to multiple volumes
+	// by tracking  when a pvc has already been defined for a specific path.
+	reusableClaimMapping := map[string]*v1.PersistentVolumeClaim{}
+
+	// requested mount mapping can differ from actual mount mapping as it factors in reusable volumes
+	requestedMountMappings := volumeMountList{}
+
 	for _, mountMapping := range mountMappings {
-		required, err := generatePVC(cluster, member, mountMapping, config)
+		// get template associated with this mount
+		templateName := mountMapping.persistentVolumeClaimTemplateName
+		claimTemplate := cluster.Spec.GetVolumeClaimTemplate(templateName)
+
+		if claimTemplate == nil {
+			return nil, fmt.Errorf("%w: claim (%s) does not map to any claimTemplates", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), mountMapping.persistentVolumeClaimTemplateName)
+		}
+
+		pvc, err := generatePVC(cluster, member, mountMapping, config)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := state.addVolume(client, required, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion); err != nil {
+		// reusable templates are not added to the list of volumes to create
+		if _, ok := claimTemplate.Annotations[constants.LocalStorageAnnotation]; ok {
+			// local volumes always use subpath
+			mountMapping.subPath = string(mountMapping.name)
+
+			if matchingPvc, exists := reusableClaimMapping[templateName]; exists {
+				// add subPath annotations in order to determine later which paths are represented by this claim
+				subpaths := matchingPvc.Annotations[constants.AnnotationVolumeMountSubPaths]
+				matchingPvc.Annotations[constants.AnnotationVolumeMountSubPaths] = fmt.Sprintf("%s,%s", subpaths, mountMapping.mountPath)
+
+				// associate the mount for this service with previously matching pvc
+				mountMapping.persistentVolumeClaimName = matchingPvc.Name
+				requestedMountMappings = append(requestedMountMappings, mountMapping)
+
+				continue
+			}
+
+			// denote which pvc will represent this template for future volume mounts
+			reusableClaimMapping[templateName] = pvc
+			pvc.Annotations[constants.AnnotationVolumeMountSubPaths] = mountMapping.mountPath
+		}
+
+		if err := state.addVolume(client, pvc, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion); err != nil {
 			return nil, err
 		}
+
+		requestedMountMappings = append(requestedMountMappings, mountMapping)
 	}
 
-	state.addVolumeMounts(mountMappings)
+	// keep volume mounts sorted to avoid unexpected upgrades
+	sort.Stable(requestedMountMappings)
+	state.addVolumeMounts(requestedMountMappings)
 
 	return state, nil
 }
@@ -450,6 +508,9 @@ type volumeMount struct {
 
 	// persistentVolumeClaimName is the name of the PVC for this mount.
 	persistentVolumeClaimName string
+
+	// subPath is the location within the mounted volume to persist data.
+	subPath string
 }
 
 func newVolumeMount(member couchbaseutil.Member, name volumeMountName, persistentVolumeClaimTemplateName string) volumeMount {
@@ -478,7 +539,7 @@ func (l volumeMountList) Swap(i, j int) {
 	l[i], l[j] = l[j], l[i]
 }
 
-// Get all paths to that should be persisted within pod.
+// Get all paths that should be persisted within pod.
 func getPathsToPersist(member couchbaseutil.Member, mounts *couchbasev2.VolumeMounts) (volumeMountList, error) {
 	mountPaths := volumeMountList{}
 
@@ -1742,20 +1803,38 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 // It's not considered an error in the case that PVC cannot be found.
 func findMemberPVC(client *client.Client, memberName, path string) (*v1.PersistentVolumeClaim, error) {
 	for _, pvc := range listMemberPVCS(client, memberName) {
-		if pvcPath, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
-			if pvcPath == path {
-				phase := pvc.Status.Phase
-				switch phase {
-				case v1.ClaimBound:
-					return pvc, nil
-				default:
-					return nil, fmt.Errorf("%w: volume %s for %s is %s, expected Bound", errors.NewStackTracedError(errors.ErrKubernetesError), path, memberName, phase)
-				}
+		if isPathPersisted(pvc, path) {
+			phase := pvc.Status.Phase
+			switch phase {
+			case v1.ClaimBound:
+				return pvc, nil
+			default:
+				return nil, fmt.Errorf("%w: volume %s for %s is %s, expected Bound", errors.NewStackTracedError(errors.ErrKubernetesError), path, memberName, phase)
 			}
 		}
 	}
 
 	return nil, fmt.Errorf("%w: volume %s for %s missing", errors.NewStackTracedError(errors.ErrResourceRequired), path, memberName)
+}
+
+// isPathPersisted checks if PersistentVolumeClaim is associated with the provided path,
+// either directly or as a subpath.
+func isPathPersisted(pvc *v1.PersistentVolumeClaim, path string) bool {
+	if annotationPath, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; ok {
+		if annotationPath == path {
+			return true
+		}
+	}
+
+	if annotationSubPaths, ok := pvc.Annotations[constants.AnnotationVolumeMountSubPaths]; ok {
+		for _, subpath := range strings.Split(annotationSubPaths, ",") {
+			if subpath == path {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // Recreate list of members from persistent volumes.

@@ -43,6 +43,10 @@ var (
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 
+	// Local storage annotation is used to identify a storage class
+	// that does not offer dynamic provisioning.
+	LocalStorageAnnotation = "storage.couchbase.com/local"
+
 	// AddNodeInsecureAnnotation is an experimental and insecure annotation
 	// that enforces the use of HTTP use when clustering Couchbase Nodes.
 	// This will only work for Server versions 6.5 - 7.0 since 7.1 will
@@ -97,11 +101,12 @@ const (
 	LabelBackupRestore = "couchbase_restore"
 	LabelServicePrefix = "couchbase_service_"
 
-	AnnotationVolumeNodeConf   = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
-	AnnotationVolumeMountPath  = "path"
-	AnnotationPrometheusScrape = "prometheus.io/scrape"
-	AnnotationPrometheusPath   = "prometheus.io/path"
-	AnnotationPrometheusPort   = "prometheus.io/port"
+	AnnotationVolumeNodeConf      = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
+	AnnotationVolumeMountPath     = "path"
+	AnnotationVolumeMountSubPaths = "subpaths" // Additional paths associated with mount (internal use by only)
+	AnnotationPrometheusScrape    = "prometheus.io/scrape"
+	AnnotationPrometheusPath      = "prometheus.io/path"
+	AnnotationPrometheusPort      = "prometheus.io/port"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion
