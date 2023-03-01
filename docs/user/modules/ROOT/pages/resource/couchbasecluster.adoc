@@ -3557,8 +3557,6 @@ BucketReplicas is the number of data replicas.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description
