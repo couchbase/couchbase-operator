@@ -107,7 +107,7 @@ If the configuration file is named `sync-gateway-config.yaml`, the command to de
 
 [source,console]
 ----
-$ kubectl apply -f sync-gateway.yaml
+$ kubectl create -f sync-gateway-config.yaml
 ----
 
 === Enabling TLS Connectivity to Couchbase Server

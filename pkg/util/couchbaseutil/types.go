@@ -421,20 +421,23 @@ const (
 
 // Bucket is a canonical representation of the parameters used for creating/editing buckets with the REST API.
 type Bucket struct {
-	BucketName           string                  `json:"name"`
-	BucketType           string                  `json:"type"`
-	BucketStorageBackend CouchbaseStorageBackend `json:"storageBackend"`
-	BucketMemoryQuota    int64                   `json:"memoryQuota"`
-	BucketReplicas       int                     `json:"replicas"`
-	IoPriority           IoPriorityType          `json:"ioPriority"`
-	EvictionPolicy       string                  `json:"evictionPolicy"`
-	ConflictResolution   string                  `json:"conflictResolution"`
-	EnableFlush          bool                    `json:"enableFlush"`
-	EnableIndexReplica   bool                    `json:"enableIndexReplica"`
-	BucketPassword       string                  `json:"password"`
-	CompressionMode      CompressionMode         `json:"compressionMode"`
-	DurabilityMinLevel   Durability              `json:"durabilityMinLevel"`
-	MaxTTL               int                     `json:"maxTTL"`
+	BucketName                        string                  `json:"name"`
+	BucketType                        string                  `json:"type"`
+	BucketStorageBackend              CouchbaseStorageBackend `json:"storageBackend"`
+	BucketMemoryQuota                 int64                   `json:"memoryQuota"`
+	BucketReplicas                    int                     `json:"replicas"`
+	IoPriority                        IoPriorityType          `json:"ioPriority"`
+	EvictionPolicy                    string                  `json:"evictionPolicy"`
+	ConflictResolution                string                  `json:"conflictResolution"`
+	EnableFlush                       bool                    `json:"enableFlush"`
+	EnableIndexReplica                bool                    `json:"enableIndexReplica"`
+	BucketPassword                    string                  `json:"password"`
+	CompressionMode                   CompressionMode         `json:"compressionMode"`
+	DurabilityMinLevel                Durability              `json:"durabilityMinLevel"`
+	MaxTTL                            int                     `json:"maxTTL"`
+	HistoryRetentionSeconds           int                     `json:"historyRetentionSeconds"`
+	HistoryRetentionBytes             int                     `json:"historyRetentionBytes"`
+	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault"`
 }
 
 type BucketList []Bucket
@@ -464,24 +467,27 @@ type BucketBasicStats struct {
 // SM: THIS IS SO M****RF***KING ANNOYING.  HAVE A SINGLE SOURCE OF TRUTH!!!!!
 // THIS IS UTTERLY POINTLESS OVERENGINEERING.  (Fix me essentially).
 type BucketStatus struct {
-	Nodes                  []NodeInfo              `json:"nodes"`
-	BucketName             string                  `json:"name"`
-	BucketType             string                  `json:"bucketType"`
-	StorageBackend         CouchbaseStorageBackend `json:"storageBackend"`
-	EvictionPolicy         string                  `json:"evictionPolicy"`
-	ConflictResolution     string                  `json:"conflictResolutionType"`
-	EnableIndexReplica     bool                    `json:"replicaIndex"`
-	AutoCompactionSettings interface{}             `json:"autoCompactionSettings"`
-	ReplicaNumber          int                     `json:"replicaNumber"`
-	ThreadsNumber          IoPriorityThreadCount   `json:"threadsNumber"`
-	Controllers            map[string]string       `json:"controllers"`
-	Quota                  map[string]int64        `json:"quota"`
-	Stats                  map[string]string       `json:"stats"`
-	VBServerMap            VBucketServerMap        `json:"vBucketServerMap"`
-	CompressionMode        CompressionMode         `json:"compressionMode"`
-	DurabilityMinLevel     Durability              `json:"durabilityMinLevel"`
-	MaxTTL                 int                     `json:"maxTTL"`
-	BasicStats             BucketBasicStats        `json:"basicStats"`
+	Nodes                             []NodeInfo              `json:"nodes"`
+	BucketName                        string                  `json:"name"`
+	BucketType                        string                  `json:"bucketType"`
+	StorageBackend                    CouchbaseStorageBackend `json:"storageBackend"`
+	EvictionPolicy                    string                  `json:"evictionPolicy"`
+	ConflictResolution                string                  `json:"conflictResolutionType"`
+	EnableIndexReplica                bool                    `json:"replicaIndex"`
+	AutoCompactionSettings            interface{}             `json:"autoCompactionSettings"`
+	ReplicaNumber                     int                     `json:"replicaNumber"`
+	ThreadsNumber                     IoPriorityThreadCount   `json:"threadsNumber"`
+	Controllers                       map[string]string       `json:"controllers"`
+	Quota                             map[string]int64        `json:"quota"`
+	Stats                             map[string]string       `json:"stats"`
+	VBServerMap                       VBucketServerMap        `json:"vBucketServerMap"`
+	CompressionMode                   CompressionMode         `json:"compressionMode"`
+	DurabilityMinLevel                Durability              `json:"durabilityMinLevel"`
+	MaxTTL                            int                     `json:"maxTTL"`
+	BasicStats                        BucketBasicStats        `json:"basicStats"`
+	HistoryRetentionSeconds           int                     `json:"historyRetentionSeconds,omitempty"`
+	HistoryRetentionBytes             int                     `json:"historyRetentionBytes,omitempty"`
+	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault,omitempty"`
 }
 
 type VBucketServerMap struct {
@@ -733,6 +739,12 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.BucketStorageBackend = status.StorageBackend
 	}
 
+	if b.BucketStorageBackend == CouchbaseStorageBackendMagma {
+		b.HistoryRetentionBytes = status.HistoryRetentionBytes
+		b.HistoryRetentionSeconds = status.HistoryRetentionSeconds
+		b.HistoryRetentionCollectionDefault = status.HistoryRetentionCollectionDefault
+	}
+
 	if ramQuotaBytes, ok := status.Quota["rawRAM"]; ok {
 		b.BucketMemoryQuota = ramQuotaBytes >> 20
 	}
@@ -808,6 +820,15 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.DurabilityMinLevel != "" {
 		data.Set("durabilityMinLevel", string(b.DurabilityMinLevel))
+	}
+
+	if b.BucketStorageBackend == CouchbaseStorageBackendMagma {
+		if b.HistoryRetentionCollectionDefault != nil {
+			data.Set("historyRetentionCollectionDefault", strconv.FormatBool(*b.HistoryRetentionCollectionDefault))
+		}
+
+		data.Set("historyRetentionBytes", strconv.Itoa(b.HistoryRetentionBytes))
+		data.Set("historyRetentionSeconds", strconv.Itoa(b.HistoryRetentionSeconds))
 	}
 
 	return []byte(data.Encode())
@@ -1396,8 +1417,9 @@ type Scope struct {
 }
 
 type Collection struct {
-	Name   string `json:"name" url:"name"`
-	MaxTTL int    `json:"maxTTL" url:"maxTTL"`
+	Name    string `json:"name" url:"name"`
+	MaxTTL  int    `json:"maxTTL" url:"maxTTL"`
+	History *bool  `json:"history" url:"history,omitempty"`
 }
 
 // HasScope determines whether the named scope exists in the list.
@@ -1432,6 +1454,17 @@ func (s Scope) HasCollection(name string) bool {
 	}
 
 	return false
+}
+
+// GetCollection returns the collection if found.
+func (s Scope) GetCollection(name string) Collection {
+	for _, collection := range s.Collections {
+		if collection.Name == name {
+			return collection
+		}
+	}
+
+	return Collection{}
 }
 
 // MetricsResponse (and it's derivatives) are the format of the JSON returned from the prometheus endpoints provided by CB Server 7.0.

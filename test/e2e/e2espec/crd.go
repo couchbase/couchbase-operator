@@ -273,7 +273,23 @@ var (
 			MemoryQuota: NewResourceQuantityMi(256),
 		},
 	}
+
+	defaultMagmaBucket = &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.DefaultBucket,
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    NewResourceQuantityMi(1025),
+			Replicas:       1,
+			EvictionPolicy: couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+		},
+	}
 )
+
+func DefaultMagmaBucket() *couchbasev2.CouchbaseBucket {
+	return defaultMagmaBucket.DeepCopy()
+}
 
 func DefaultBucket() *couchbasev2.CouchbaseBucket {
 	return defaultBucket.DeepCopy()

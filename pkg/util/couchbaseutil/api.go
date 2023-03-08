@@ -753,6 +753,14 @@ func GetSecuritySettings(s *SecuritySettings) *Request {
 
 // SetSecuritySettings sets the cluster security settings.
 func SetSecuritySettings(s *SecuritySettings) *Request {
+	// Because, this API accepts cipherSuites in the form ["suite_1", "suite_2"], with "".
+	cipherSuites := []string{}
+	for _, cs := range s.CipherSuites {
+		cipherSuites = append(cipherSuites, fmt.Sprintf(`"%s"`, cs))
+	}
+
+	s.CipherSuites = cipherSuites
+
 	data, err := urlencoding.Marshal(s)
 	if err != nil {
 		return NewRequestError(err)

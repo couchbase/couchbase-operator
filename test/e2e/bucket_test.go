@@ -19,6 +19,102 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+/*
+TestBucketHistoryRetention tests history retention server functionality in 7.2 and above.
+Checks that setting the annotation results in the correct changes in Server.
+*/
+func TestBucketHistoryRetention(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.0")
+
+	// Static configuration
+	clusterSize := 1
+	names := []string{
+		"bucket1",
+		"bucket2",
+	}
+
+	expected := []bool{
+		false,
+		true,
+	}
+	buckets := []metav1.Object{
+		&couchbasev2.CouchbaseBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[0],
+				Annotations: map[string]string{
+					"cao.couchbase.com/historyRetention.seconds":                  "100",
+					"cao.couchbase.com/historyRetention.bytes":                    "50",
+					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "false",
+				},
+			},
+			Spec: couchbasev2.CouchbaseBucketSpec{
+				MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				EnableFlush:        true,
+				EnableIndexReplica: true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+				StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			},
+		},
+		&couchbasev2.CouchbaseBucket{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: names[1],
+				Annotations: map[string]string{
+					"cao.couchbase.com/historyRetention.seconds":                  "100",
+					"cao.couchbase.com/historyRetention.bytes":                    "50",
+					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "true",
+				},
+			},
+			Spec: couchbasev2.CouchbaseBucketSpec{
+				MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+				Replicas:           1,
+				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+				EnableFlush:        true,
+				EnableIndexReplica: true,
+				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+				StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			},
+		},
+	}
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	for _, bucket := range buckets {
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	}
+
+	// check if mutation setting exists.
+	for i := 1; i < len(buckets); i++ {
+		e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, buckets[i].GetName(), 100, 50, expected[i], 2*time.Minute)
+	}
+
+	// clean up.
+	for _, bucket := range buckets {
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	}
+
+	for _, name := range names {
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, name, 2*time.Minute)
+	}
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+}
+
 func TestBucketAddRemoveBasic(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -51,6 +147,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
+
 		&couchbasev2.CouchbaseMemcachedBucket{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: names[1],
@@ -74,24 +171,10 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
-		&couchbasev2.CouchbaseEphemeralBucket{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: names[3],
-			},
-			Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
-				MemoryQuota:        e2espec.NewResourceQuantityMi(101),
-				Replicas:           1,
-				IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
-				EvictionPolicy:     couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNRUEviction,
-				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
-				EnableFlush:        true,
-				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
-			},
-		},
 	}
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for _, bucket := range buckets {

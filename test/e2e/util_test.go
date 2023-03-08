@@ -134,6 +134,7 @@ func registerTests() {
 		framework.NewTestDef(TestSyncGatewayCreateLocal).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureSyncGateway),
 
 		// High priority tests.
+		framework.NewTestDef(TestBucketHistoryRetention).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestResizeClusterWithBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestBasicMDSScaling).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDenyCommunityEdition).WithTags(TagSuiteP0),
@@ -425,6 +426,7 @@ func registerTests() {
 		framework.NewTestDef(TestScopeUnmanaged).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateExplicit).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateImplicit).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionCreateImplicitWithAnnotations).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateMixed).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionDelete).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionUnmanaged).WithTags(TagSuiteP0, TagFeatureCollections),

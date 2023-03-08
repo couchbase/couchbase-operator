@@ -43,6 +43,19 @@ Specified values represent the defaults for their respective fields unless other
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 spec:
+  servers:
+  - size: 3
+    name: all_services
+    volumeMounts:
+      default: couchbase
+  volumeClaimTemplates:
+      - metadata:
+          name: couchbase
+        spec:
+          storageClassName: "standard"
+          resources:
+            requests:
+              storage: 1Gi
   logging:
     server:
       enabled: true # <.>

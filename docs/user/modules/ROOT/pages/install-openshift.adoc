@@ -43,6 +43,12 @@ $ oc create -f crd.yaml
 The operator is composed of two components; a per-cluster dynamic admission controller (DAC) and a per-namespace Operator.
 Refer to the xref:concept-operator.adoc[operator architecture document] for additional information on what is required and security considerations.
 
+[IMPORTANT]
+====
+If you use the Openshift Marketplace UI to deploy the Couchbase Autonomous Operator, the dynamic admission controller (DAC) will not be deployed.
+It is recommended that you use the `cao create admission` command to deploy the DAC after installing the Operator.
+====
+
 The DAC and Operator will be installed into the current project/namespace selected by the `oc` command.
 Ensure you have created and selected the correct namespace to install into.
 

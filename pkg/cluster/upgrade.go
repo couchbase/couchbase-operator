@@ -101,16 +101,15 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 // condition, makes condition updates and raises events.
 func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 	// Look for an existing upgrading condition in the persistent storage.
-	upgrading := true
-
-	if _, err := c.state.Get(persistence.Upgrading); err != nil {
-		upgrading = false
+	upgrading, err := c.isUpgrading()
+	if err != nil {
+		return err
 	}
 
 	// No existing condition, we are guaranteed to be upgrading, as opposed to rolling back.
 	// Set the persistent flag and raise an event.
 	if !upgrading {
-		if err := c.state.Insert(persistence.Upgrading, "true"); err != nil {
+		if err := c.state.Update(persistence.Upgrading, string(persistence.UpgradeActive)); err != nil {
 			return err
 		}
 
@@ -131,9 +130,9 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
-	// There is no condition, we weren't upgrading, do nothing
-	if _, err := c.state.Get(persistence.Upgrading); err != nil {
-		return nil
+	if upgrading, err := c.isUpgrading(); err != nil || !upgrading {
+		// There is no condition, we weren't upgrading, do nothing
+		return err
 	}
 
 	// Check to see if there are any more upgrade candidates.
@@ -159,7 +158,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	if err := c.state.Delete(persistence.Upgrading); err != nil {
+	if err := c.state.Update(persistence.Upgrading, string(persistence.UpgradeInactive)); err != nil {
 		return err
 	}
 
@@ -172,4 +171,19 @@ func (c *Cluster) reportUpgradeComplete() error {
 	}
 
 	return nil
+}
+
+// isUpgrading checks for upgrade status in state which may return inactive
+// status or by some impossible means an empty string, in either case
+// the upgrade is not running when we do not get 'UpgradeActive'.
+func (c *Cluster) isUpgrading() (bool, error) {
+	upgradeStatus, err := c.state.Get(persistence.Upgrading)
+
+	// we'll get an error if somehow the upgrading state was unset or cleared
+	if err != nil {
+		return false, c.state.Insert(persistence.Upgrading, string(persistence.UpgradeInactive))
+	}
+
+	// explicitly check for active status
+	return upgradeStatus == string(persistence.UpgradeActive), nil
 }

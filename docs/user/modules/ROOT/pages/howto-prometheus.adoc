@@ -107,7 +107,7 @@ spec:
       username:
         name: cb-example-auth
         key: username
-  tlsConfig: {} <.>
+    tlsConfig: {} <.>
   namespaceSelector: # <.>
     matchNames:
     - default
@@ -120,7 +120,7 @@ spec:
 <.> The `ServiceMonitor` must be installed in the same namespace as the Prometheus Operator.
 <.> Prometheus Operator can authenticate to Couchbase using the same username and password as the Couchbase Operator as long as the authentication Secret also exists in the same namespace as the `ServiceMonitor` resource.
 <.> The `tlsConfig` is required when the metric target is exposed over TLS.
-Refer to the https://prometheus-operator.dev/docs/operator/api/#tlsconfig[TLS Configuration Reference] documentation for supported attributes.
+Refer to the https://prometheus-operator.dev/docs/operator/api/#monitoring.coreos.com/v1.TLSConfig[TLS Configuration Reference] documentation for supported attributes.
 In production you should ensure that your client certificates are signed by the same root CA that is installed within the Couchbase Server.
 <.> You need to explicitly state what namespaces to poll for services.
 <.> Selects the metric services to monitor.
@@ -130,7 +130,7 @@ Commit the service monitor configuration:
 
 [source,console]
 ----
-$ kubectl apply -f couchbase-prometheus-monitor.yaml -n monitoring`
+$ kubectl create -f couchbase-prometheus-monitor.yaml -n monitoring
 ----
 
 == Verify

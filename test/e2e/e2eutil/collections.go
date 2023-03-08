@@ -634,6 +634,33 @@ func MustWaitForScopesAndCollections(t *testing.T, kubernetes *types.Cluster, cl
 	}
 }
 
+func CheckCollectionSettings(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName, scopeName, collectionName string, history bool) {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	var scopes couchbaseutil.ScopeList
+
+	if err := couchbaseutil.ListScopes(bucketName, &scopes).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	foundScope := scopes.GetScope(scopeName)
+	if foundScope.Name != scopeName {
+		Die(t, fmt.Errorf("failed to find scope %s", scopeName))
+	}
+
+	collection := foundScope.GetCollection(collectionName)
+	if collection.Name != collectionName {
+		Die(t, fmt.Errorf("failed to find collection %s in scope %s", collectionName, scopeName))
+	}
+
+	if *collection.History != history {
+		Die(t, fmt.Errorf("history setting %t on collection %s in scope %s did not match expected %t", *collection.History, collectionName, scopeName, history))
+	}
+}
+
 // MustAssertScopesAndCollectionsFor checks that the scopes and collections state is as expected
 // for a period of time (e.g. the Operator is not doing something it shouldn't).
 func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket interface{}, expected *ExpectedScopesAndCollections, timeout time.Duration) {
