@@ -1,0 +1,455 @@
+/**
+ * Pipeline script to test LPV
+ */
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    timestamps()
+
+    // Don't use all the disk, these servers aren't monitored with Nagios or anything.
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
+      )
+    )
+
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'server_image', defaultValue: 'ghcr.io/cb-vanilla/server:7.2.0')
+    string(name: 'server_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/server:6.6.6')
+    string(name: 'backup_image', defaultValue: 'ghcr.io/cb-vanilla/operator-backup:1.3.1')
+    string(name: 'exporter_image', defaultValue: 'ghcr.io/cb-vanilla/exporter:latest')
+    string(name: 'exporter_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/exporter:1.0.5')
+    string(name: 'logging_image', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.2.2-114')
+    string(name: 'logging_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.1.0')
+    string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
+    string(name: 'kubernetes_version', defaultValue: '1.24')
+    string(name: 'storage_class', defaultValue: 'standard-rwo')
+    string(name: 'bucket_type', defaultValue: 'couchbase')
+    string(name: 'compression_mode', defaultValue: 'passive')
+    string(name: 'kubectl_version', defaultValue: '1.20.9')
+    string(name: 'gcloud_sdk_version', defaultValue: '341')
+    choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
+    string(name: 's3_region', defaultValue: 'us-west-2')
+    string(name: 'docs', defaultValue: '100')
+    string(name: 'terraform_version', defaultValue: '1.0.5')
+    booleanParam(name: 'enable_istio', defaultValue: false)
+    string(name: 'istio_version', defaultValue: '1.11.3')
+    string(name: 'istio_mode', defaultValue: 'strict')
+    booleanParam(name: 'Validation', defaultValue: true)
+    booleanParam(name: 'New Tests', defaultValue: true)
+    string(name: 'tests', defaultValue: 'type tests here (no need for -Test)')
+    booleanParam(name: 'GKE', defaultValue: true)
+    booleanParam(name: 'AKS', defaultValue: true)
+    booleanParam(name: 'EKS', defaultValue: true)
+  }
+
+  environment {
+    GOVERSION = '1.19.4'
+    GOROOT = "${env.WORKSPACE}/go"
+    KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
+    PATH = "${env.WORKSPACE}/kubectl:${env.WORKSPACE}/bin:${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}/go/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
+    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
+    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
+    GCLOUD_AUTH_JSON = credentials('couchbaseqe-gcp')
+    GCLOUD_AUTH_ACCOUNT = "couchbase-operator@couchbase-qe.iam.gserviceaccount.com"
+    GCLOUD_AUTH_PROJECT = "couchbase-qe"
+    AWS_ACCESS_KEY_ID=credentials('couchbaseqe-aws-access-id')
+    AWS_SECRET_ACCESS_KEY=credentials('couchbaseqe-aws-access-secret')
+    AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
+    AZURE_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+    AZURE_TENANT_ID = credentials('azure-tenant-id')
+    LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+    TF_IN_AUTOMATION = "TRUE"
+  }
+
+  stages {
+    stage('Prerequisite Installs') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+
+        sh "wget -q https://dl.k8s.io/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
+        sh "chmod +x kubectl"
+        sh "mv kubectl ${env.WORKSPACE}/bin/"
+
+        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+        sh 'chmod +x jq-linux64'
+        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
+
+        sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "unzip terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "mv terraform ${env.WORKSPACE}/bin"
+
+        sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
+        sh "tar xfv istioctl-${params.istio_version}-linux-amd64.tar.gz"
+        sh "chmod +x istioctl"
+        sh "mv istioctl ${env.WORKSPACE}/bin/"
+      }
+    }
+
+    stage('GKE Provisioning') {
+      when {
+          expression {
+            params.GKE
+          }
+      }
+      steps {
+        script {
+          sh "wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${params.gcloud_sdk_version}.0.0-linux-x86_64.tar.gz | tar xzf -"
+          sh "gcloud auth activate-service-account ${GCLOUD_AUTH_ACCOUNT} --key-file ${GCLOUD_AUTH_JSON} --project ${GCLOUD_AUTH_PROJECT}"
+          sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel} --cluster-version ${params.kubernetes_version} --machine n2-standard-4"
+	        sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-central1"
+        }
+      }
+    }
+
+    stage('Build') {
+      steps {
+        // build tools
+        sh 'make touch-generated tools'
+
+        // build container images + upload them
+        sh 'docker login -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
+        sh 'make images-public -e DOCKER_USER=couchbaseqe DOCKER_TAG=qetest'
+      }
+      post {
+        always {
+          // Remove old docker images now, this stops disk from filling up and minimises risk
+          // of this not being called due to a job cancellation.
+          sh 'make images-clean -e DOCKER_USER=couchbaseqe DOCKER_TAG=qetest'
+        }
+      }
+    }
+
+    stage('Install Istio') {
+      when {
+        expression {
+          params.enable_istio
+        }
+      }
+      steps {
+        script {
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+        }
+      }
+    }
+
+    // Make sure passes Validation Suite and LPV tests
+
+    stage('Test Validation') {
+      when {
+        expression {
+          params.validation
+        }
+      }
+      steps {
+
+        script {
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+            --clean \
+            --parallel 6 \
+            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image couchbaseqe/couchbase-operator-certification:qetest \
+            --archive-name validation \
+            -- \
+            -suite validation \
+            -platform-type kubernetes \
+            -operator-image couchbaseqe/couchbase-operator:qetest \
+            -admission-image couchbaseqe/couchbase-admission-controller:qetest \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false \
+            -ignore-errors=true"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+          sh 'tar xf validation.tar.bz2'
+          sh 'tar xf results.tar.bz'
+        }
+      }
+
+      post {
+        always {
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf validation.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
+        }
+      }
+
+    }
+
+    stage('Test GKE') {
+      when {
+          expression {
+            params.GKE
+          }
+      }
+      steps {
+        script {
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+            --clean \
+            --parallel 6 \
+            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image couchbaseqe/couchbase-operator-certification:qetest \
+            --archive-name qetest-GKE \
+            -- \
+            ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+            -platform-type kubernetes \
+            -operator-image couchbaseqe/couchbase-operator:qetest \
+            -admission-image couchbaseqe/couchbase-admission-controller:qetest \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -storage-class ${params.storage_class} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false \
+            -ignore-errors=true"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+          sh 'tar xf qetest-GKE.tar.bz2'
+          sh 'tar xf results.tar.bz'
+        }
+      }
+      post {
+        always {
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf qetest-GKE.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'qetest-GKE.tar.gz', fingerprint: true
+
+          // Decomission kubernetes clusters
+          sh "./test/e2e/resources/provisioners/gke/gcloud_provision stop --name ${env.NAME}"
+        }
+      }
+    }
+  
+
+    stage('Azure Provision') {
+        when {
+            expression {
+              params.AKS
+            }
+        }
+        steps {
+          script {
+            dir("./test/e2e/resources/provisioners/aks") {
+              sh 'terraform init -no-color -input=false'
+              sh "terraform apply -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+              sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
+              sh "kubectl create -f cao-azurefile.yaml --kubeconfig ${env.WORKSPACE}/config1"
+            }
+          }
+        }
+    }
+
+    stage('Test AKS') {
+        when {
+            expression {
+              params.AKS
+            }
+        }
+        steps {
+          script {
+            try {
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+              --clean \
+              --parallel 6 \
+              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --image couchbaseqe/couchbase-operator-certification:qetest \
+              --archive-name qetest \
+              -- \
+              ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+              -platform-type kubernetes \
+              -operator-image couchbaseqe/couchbase-operator:qetest \
+              -admission-image couchbaseqe/couchbase-admission-controller:qetest \
+              -mobile-image ${params.mobile_image} \
+              -server-image ${params.server_image} \
+              -server-image-upgrade ${params.server_image_upgrade} \
+              -exporter-image ${params.exporter_image} \
+              -exporter-image-upgrade ${params.exporter_image_upgrade} \
+              -backup-image ${params.backup_image} \
+              -logging-image ${params.logging_image} \
+              -logging-image-upgrade ${params.logging_image_upgrade} \
+              -storage-class ${params.storage_class} \
+              -bucket-type ${params.bucket_type} \
+              -compression-mode ${params.compression_mode} \
+              -s3-region ${params.s3_region} \
+              -s3-access-key ${env.S3_ACCESS_KEY} \
+              -s3-secret-id ${env.S3_SECRET_ID} \
+              -istio=${params.enable_istio} \
+              -collect-logs \
+              -color=false \
+              -ignore-errors=true"
+            }
+            catch (e) {
+              currentBuild.result = 'UNSTABLE'
+            }
+            sh 'tar xf qetest-AKS.tar.bz2'
+            sh 'tar xf results.tar.bz'
+          }
+        }
+        post {
+          always {
+            // Save JUnit results, this is what we will review.
+            junit 'artifacts/*.xml'
+
+            // Archive any logs as an artifact, these may be needed to debug an issue.
+            sh 'tar czf qetest-AKS.tar.gz artifacts/logs'
+            archiveArtifacts artifacts: 'qetest-AKS.tar.gz', fingerprint: true
+
+            // Decomission kubernetes clusters
+            dir("./test/e2e/resources/provisioners/aks") {
+              sh "terraform destroy -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+            }
+          }
+        }
+      }
+
+  stage('EKS Provisioning') {
+      when {
+          expression {
+            params.EKS
+          }
+      }
+      steps {
+        script {
+	        tfdir = "./test/e2e/resources/provisioners/eks"
+          if (params.machine == "arm") {
+            tfdir = "./test/e2e/resources/provisioners/arm"
+          }
+          sh "aws configure set default.region us-east-2"
+          sh "aws configure set default.output json"
+          dir(tfdir) {
+            sh 'terraform init -no-color -input=false'
+            sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+            sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
+          }
+       }
+    }
+  }
+
+  stage('Test EKS') {
+    when {
+        expression {
+          params.EKS
+        }
+    }
+    steps {
+      script {
+        try {
+          sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+          --clean \
+          --parallel 6 \
+          --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+          --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+          --image couchbaseqe/couchbase-operator-certification:qetest \
+          --archive-name qetest-EKS \
+          -- \
+          ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+          -platform-type kubernetes \
+          -operator-image couchbaseqe/couchbase-operator:qetest \
+          -admission-image couchbaseqe/couchbase-admission-controller:qetest \
+          -mobile-image ${params.mobile_image} \
+          -server-image ${params.server_image} \
+          -server-image-upgrade ${params.server_image_upgrade} \
+          -exporter-image ${params.exporter_image} \
+          -exporter-image-upgrade ${params.exporter_image_upgrade} \
+          -backup-image ${params.backup_image} \
+          -logging-image ${params.logging_image} \
+          -logging-image-upgrade ${params.logging_image_upgrade} \
+          -storage-class ${params.storage_class} \
+          -bucket-type ${params.bucket_type} \
+          -compression-mode ${params.compression_mode} \
+          -s3-region ${params.s3_region} \
+          -s3-access-key ${env.S3_ACCESS_KEY} \
+          -s3-secret-id ${env.S3_SECRET_ID} \
+          -istio=${params.enable_istio} \
+          -collect-logs \
+          -color=false \
+          -ignore-errors=true"
+        }
+        catch (e) {
+          currentBuild.result = 'UNSTABLE'
+        }
+        sh 'tar xf qetest-EKS.tar.bz2'
+        sh 'tar xf results.tar.bz'
+      }
+    }
+    post {
+      always {
+        // Save JUnit results, this is what we will review.
+        junit 'artifacts/*.xml'
+
+        // Archive any logs as an artifact, these may be needed to debug an issue.
+        sh 'tar czf qetest-EKS.tar.gz artifacts/logs'
+        archiveArtifacts artifacts: 'qetest-EKS.tar.gz', fingerprint: true
+
+        // Decomission kubernetes clusters
+        dir("./test/e2e/resources/provisioners/eks") {
+          sh "terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+        }
+      }
+    }
+  }
+  }
+
+  post {
+    always {
+        sh 'docker system prune --force' // Clean up docker - optimise disk usage
+        cleanWs()
+    }
+  }
+  
+} 
