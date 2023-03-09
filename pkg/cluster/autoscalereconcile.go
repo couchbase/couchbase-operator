@@ -34,7 +34,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 	// Ensure that none of the autoscalers are in maintenance
 	// mode at this point since autoscaling is ready.
 	if err = c.endAutoscalingMaintenanceMode(); err != nil {
-		return nil
+		return err
 	}
 
 	for _, autoscalerName := range autoscalers {
