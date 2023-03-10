@@ -11,10 +11,13 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	cfg "github.com/couchbase/couchbase-operator/pkg/config"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/version"
 )
 
 // HPAManager creates a Couchbase Cluster and associates it with
@@ -23,17 +26,12 @@ import (
 type HPAManager struct {
 	CouchbaseCluster *couchbasev2.CouchbaseCluster
 
-	HorizontalPodAutoscalers []*autoscalingv2beta2.HorizontalPodAutoscaler
-
 	Cleanup func()
 }
 
 func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2espec.ClusterOptions, istioEnabled bool, hpaConfigs ...*e2espec.HPAConfig) *HPAManager {
 	// Begin with basic autoscale enabled cluster
 	clusterSpec := MustNewAutoscaleCluster(t, k8s, couchbaseOptions)
-
-	// Create HPA to target specified metric
-	autoscalers := []*autoscalingv2beta2.HorizontalPodAutoscaler{}
 
 	for i, serverConfig := range clusterSpec.Spec.Servers {
 		// HPA references CouchbaseAutoscaler reference which must exist
@@ -46,17 +44,15 @@ func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2esp
 			config = hpaConfigs[i]
 		}
 
-		hpa := MustCreateAverageValueHPA(t, k8s, clusterSpec.Namespace, autoscalerName, config)
-		autoscalers = append(autoscalers, hpa)
+		MustCreateAverageValueHPA(t, k8s, clusterSpec.Namespace, autoscalerName, config)
 	}
 
 	// Create the metric server for metric generation
 	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name, istioEnabled)
 
 	return &HPAManager{
-		CouchbaseCluster:         clusterSpec,
-		HorizontalPodAutoscalers: autoscalers,
-		Cleanup:                  cleanup,
+		CouchbaseCluster: clusterSpec,
+		Cleanup:          cleanup,
 	}
 }
 
@@ -126,15 +122,149 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 }
 
 // MustCreateAverageValueHPA uses Averaging algorithm on target metrics to determine resize activity.
-func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
+// Returns a v2 HPA if K8S server v1.23 or newer.
+// Returns a v2beta2 HPA if otherwise.
+func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) interface{} {
 	hpa := e2espec.NewAverageValueHPA(name, config)
 
-	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
+	serverVersion, err := k8s.KubeClient.Discovery().ServerVersion()
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	if v2supported, err := cfg.VersionGreaterThan(&version.Info{Major: "1", Minor: "22", GitVersion: "v1.22.0"}, serverVersion); err != nil {
+		Die(t, err)
+	} else if !v2supported {
+		v2beta2hpa := v2HPAtoV2Beta2(hpa)
+
+		v2beta2hpa, err = k8s.V2Beta2AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), v2beta2hpa, metav1.CreateOptions{})
+		if err != nil {
+			Die(t, err)
+		}
+
+		return v2beta2hpa
+	}
+
+	hpa, err = k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
+
 	if err != nil {
 		Die(t, err)
 	}
 
 	return hpa
+}
+
+// This does a conversion of the spec of the HPA.
+// NOTE: This does NOT convert the status of the the resource.
+func v2HPAtoV2Beta2(in *autoscalingv2.HorizontalPodAutoscaler) *autoscalingv2beta2.HorizontalPodAutoscaler {
+	convertMetricTarget := func(in autoscalingv2.MetricTarget) autoscalingv2beta2.MetricTarget {
+		return autoscalingv2beta2.MetricTarget{
+			Type:               autoscalingv2beta2.MetricTargetType(in.Type),
+			Value:              in.Value,
+			AverageValue:       in.AverageValue,
+			AverageUtilization: in.AverageUtilization,
+		}
+	}
+
+	convertMetrics := func(in []autoscalingv2.MetricSpec) []autoscalingv2beta2.MetricSpec {
+		rv := make([]autoscalingv2beta2.MetricSpec, 0, len(in))
+
+		for _, m := range in {
+			ms := autoscalingv2beta2.MetricSpec{
+				Type: autoscalingv2beta2.MetricSourceType(m.Type),
+			}
+
+			if m.Object != nil {
+				ms.Object = &autoscalingv2beta2.ObjectMetricSource{
+					DescribedObject: autoscalingv2beta2.CrossVersionObjectReference(m.Object.DescribedObject),
+					Target:          convertMetricTarget(m.Object.Target),
+					Metric:          autoscalingv2beta2.MetricIdentifier(m.Object.Metric),
+				}
+			}
+
+			if m.Pods != nil {
+				ms.Pods = &autoscalingv2beta2.PodsMetricSource{
+					Metric: autoscalingv2beta2.MetricIdentifier(m.Pods.Metric),
+					Target: convertMetricTarget(m.Pods.Target),
+				}
+			}
+
+			if m.Resource != nil {
+				ms.Resource = &autoscalingv2beta2.ResourceMetricSource{
+					Name:   m.Resource.Name,
+					Target: convertMetricTarget(m.Resource.Target),
+				}
+			}
+
+			if m.ContainerResource != nil {
+				ms.ContainerResource = &autoscalingv2beta2.ContainerResourceMetricSource{
+					Name:      m.ContainerResource.Name,
+					Target:    convertMetricTarget(m.ContainerResource.Target),
+					Container: m.ContainerResource.Container,
+				}
+			}
+
+			if m.External != nil {
+				ms.External = &autoscalingv2beta2.ExternalMetricSource{
+					Metric: autoscalingv2beta2.MetricIdentifier(m.External.Metric),
+					Target: convertMetricTarget(m.External.Target),
+				}
+			}
+
+			rv = append(rv, ms)
+		}
+
+		return rv
+	}
+
+	convertScalingPolicies := func(in []autoscalingv2.HPAScalingPolicy) []autoscalingv2beta2.HPAScalingPolicy {
+		rv := make([]autoscalingv2beta2.HPAScalingPolicy, 0, len(in))
+		for _, p := range in {
+			rv = append(rv, autoscalingv2beta2.HPAScalingPolicy{
+				Type:          autoscalingv2beta2.HPAScalingPolicyType(p.Type),
+				Value:         p.Value,
+				PeriodSeconds: p.PeriodSeconds,
+			})
+		}
+
+		return rv
+	}
+
+	convertScalingRules := func(in *autoscalingv2.HPAScalingRules) *autoscalingv2beta2.HPAScalingRules {
+		if in == nil {
+			return nil
+		}
+
+		return &autoscalingv2beta2.HPAScalingRules{
+			StabilizationWindowSeconds: in.StabilizationWindowSeconds,
+			SelectPolicy:               (*autoscalingv2beta2.ScalingPolicySelect)(in.SelectPolicy),
+			Policies:                   convertScalingPolicies(in.Policies),
+		}
+	}
+
+	convertBehavior := func(in *autoscalingv2.HorizontalPodAutoscalerBehavior) *autoscalingv2beta2.HorizontalPodAutoscalerBehavior {
+		if in == nil {
+			return nil
+		}
+
+		return &autoscalingv2beta2.HorizontalPodAutoscalerBehavior{
+			ScaleUp:   convertScalingRules(in.ScaleUp),
+			ScaleDown: convertScalingRules(in.ScaleDown),
+		}
+	}
+
+	return &autoscalingv2beta2.HorizontalPodAutoscaler{
+		// TypeMeta:   in.TypeMeta,
+		ObjectMeta: *in.ObjectMeta.DeepCopy(),
+		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference(in.Spec.ScaleTargetRef),
+			MinReplicas:    in.Spec.MinReplicas,
+			MaxReplicas:    in.Spec.MaxReplicas,
+			Metrics:        convertMetrics(in.Spec.Metrics),
+			Behavior:       convertBehavior(in.Spec.Behavior),
+		},
+	}
 }
 
 // CreateCustomMetricServer creates custom metric api service and deployment.

@@ -2,7 +2,7 @@ package e2espec
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -16,7 +16,7 @@ import (
 const (
 	apiServerApp      = "custom-metrics-apiserver"
 	apiRBACRoleName   = "custom-metrics-resource-reader"
-	apiServerAppImage = "aemerycb/k8s-test-metrics-adapter:v2"
+	apiServerAppImage = "couchbaseqe/k8s-test-metrics-adapter-amd64:v2"
 )
 
 const (
@@ -74,7 +74,7 @@ type HPAConfig struct {
 	TargetMetricValue int64
 
 	// Scale up and down behaviors for tuning the rate of autoscaling operations
-	Behavior *autoscalingv2beta2.HorizontalPodAutoscalerBehavior
+	Behavior *autoscalingv2.HorizontalPodAutoscalerBehavior
 }
 
 func newHPAConfig(min int32, max int32, targetValue int64, targetName string) *HPAConfig {
@@ -83,9 +83,9 @@ func newHPAConfig(min int32, max int32, targetValue int64, targetName string) *H
 		MaxSize:           max,
 		TargetMetricName:  targetName,
 		TargetMetricValue: targetValue,
-		Behavior: &autoscalingv2beta2.HorizontalPodAutoscalerBehavior{
-			ScaleUp:   &autoscalingv2beta2.HPAScalingRules{},
-			ScaleDown: &autoscalingv2beta2.HPAScalingRules{},
+		Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+			ScaleUp:   &autoscalingv2.HPAScalingRules{},
+			ScaleDown: &autoscalingv2.HPAScalingRules{},
 		},
 	}
 }
@@ -114,25 +114,25 @@ func (h *HPAConfig) WithScaleUpStabilizationWindow(period int32) *HPAConfig {
 
 // Sets scaling in any direction to at most 1 pod.
 func (h *HPAConfig) WithSinglePodScalingPolicy() *HPAConfig {
-	policy := autoscalingv2beta2.HPAScalingPolicy{
-		Type:          autoscalingv2beta2.PodsScalingPolicy,
+	policy := autoscalingv2.HPAScalingPolicy{
+		Type:          autoscalingv2.PodsScalingPolicy,
 		Value:         1,
 		PeriodSeconds: defaultPeriodSeconds,
 	}
-	h.Behavior.ScaleUp.Policies = []autoscalingv2beta2.HPAScalingPolicy{policy}
-	h.Behavior.ScaleDown.Policies = []autoscalingv2beta2.HPAScalingPolicy{policy}
+	h.Behavior.ScaleUp.Policies = []autoscalingv2.HPAScalingPolicy{policy}
+	h.Behavior.ScaleDown.Policies = []autoscalingv2.HPAScalingPolicy{policy}
 
 	return h
 }
 
 // NewHorizontalPodAutoscaler returns spec of an HPA resource.
-func NewHorizontalPodAutoscaler(name string, config *HPAConfig, metrics []autoscalingv2beta2.MetricSpec) *autoscalingv2beta2.HorizontalPodAutoscaler {
-	return &autoscalingv2beta2.HorizontalPodAutoscaler{
+func NewHorizontalPodAutoscaler(name string, config *HPAConfig, metrics []autoscalingv2.MetricSpec) *autoscalingv2.HorizontalPodAutoscaler {
+	return &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
 				Name:       name,
 				Kind:       "CouchbaseAutoscaler",
 				APIVersion: "couchbase.com/v2",
@@ -147,20 +147,20 @@ func NewHorizontalPodAutoscaler(name string, config *HPAConfig, metrics []autosc
 
 // NewAverageValueHPA is a HPA with a single metric
 // targeting an average value among Pods.
-func NewAverageValueHPA(name string, config *HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
-	metrics := autoscalingv2beta2.MetricSpec{
-		Type: autoscalingv2beta2.PodsMetricSourceType,
-		Pods: &autoscalingv2beta2.PodsMetricSource{
-			Metric: autoscalingv2beta2.MetricIdentifier{
+func NewAverageValueHPA(name string, config *HPAConfig) *autoscalingv2.HorizontalPodAutoscaler {
+	metrics := autoscalingv2.MetricSpec{
+		Type: autoscalingv2.PodsMetricSourceType,
+		Pods: &autoscalingv2.PodsMetricSource{
+			Metric: autoscalingv2.MetricIdentifier{
 				Name: config.TargetMetricName,
 			},
-			Target: autoscalingv2beta2.MetricTarget{
-				Type:         autoscalingv2beta2.AverageValueMetricType,
+			Target: autoscalingv2.MetricTarget{
+				Type:         autoscalingv2.AverageValueMetricType,
 				AverageValue: resource.NewQuantity(config.TargetMetricValue, resource.DecimalSI),
 			},
 		},
 	}
-	hpa := NewHorizontalPodAutoscaler(name, config, []autoscalingv2beta2.MetricSpec{metrics})
+	hpa := NewHorizontalPodAutoscaler(name, config, []autoscalingv2.MetricSpec{metrics})
 
 	return hpa
 }

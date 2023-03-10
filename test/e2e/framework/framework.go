@@ -45,7 +45,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
+	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
+	autoscalev2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
@@ -591,17 +593,18 @@ func createKubeClusterObject() (*types.Cluster, error) {
 	restMapper := restmapper.NewDiscoveryRESTMapper(groupresources)
 
 	cluster := &types.Cluster{
-		Config:          config,
-		CRClient:        client.MustNew(config),
-		KubeClient:      kubernetes.NewForConfigOrDie(config),
-		DynamicClient:   dynamic.NewForConfigOrDie(config),
-		AutoscaleClient: autoscalev2.NewForConfigOrDie(config),
-		APIRegClient:    apiregistrationv1.NewForConfigOrDie(config),
-		RESTMapper:      restMapper,
-		Platform:        string(Global.Platform),
-		PlatformType:    Global.KubeType,
-		IPv6:            Global.SharedTestFlags.IPv6,
-		DynamicPlatform: Global.DynamicPlatform,
+		Config:                 config,
+		CRClient:               client.MustNew(config),
+		KubeClient:             kubernetes.NewForConfigOrDie(config),
+		DynamicClient:          dynamic.NewForConfigOrDie(config),
+		AutoscaleClient:        autoscalev2.NewForConfigOrDie(config),
+		V2Beta2AutoscaleClient: autoscalev2beta2.NewForConfigOrDie(config),
+		APIRegClient:           apiregistrationv1.NewForConfigOrDie(config),
+		RESTMapper:             restMapper,
+		Platform:               string(Global.Platform),
+		PlatformType:           Global.KubeType,
+		IPv6:                   Global.SharedTestFlags.IPv6,
+		DynamicPlatform:        Global.DynamicPlatform,
 	}
 
 	return cluster, nil

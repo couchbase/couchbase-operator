@@ -11,7 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	autoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
+	autoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 	"k8s.io/client-go/rest"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 )
@@ -49,7 +50,9 @@ type Cluster struct {
 	// CRClient is a Kubernetes client for CouchbaseCluster resources.
 	CRClient versioned.Interface
 	// AutoscaleClient is a Kubernetes client for Autoscaling resources.
-	AutoscaleClient autoscalingv2.AutoscalingV2beta2Interface
+	AutoscaleClient autoscalingv2.AutoscalingV2Interface
+	// AutoscaleClient is a Kubernetes client for V2Beta2 Autoscaling resources.
+	V2Beta2AutoscaleClient autoscalingv2beta2.AutoscalingV2beta2Interface
 	// APIRegClient is a Kubernetes client to work with APIService resources.
 	APIRegClient *apiregistrationv1.ApiregistrationV1Client
 	// Config is the REST configuration to use to directly access the Kubernetes API.
