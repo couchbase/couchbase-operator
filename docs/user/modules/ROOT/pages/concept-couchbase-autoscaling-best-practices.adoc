@@ -1,5 +1,5 @@
 = Couchbase Cluster Auto-scaling Best Practices
-:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscaler-v2beta2-autoscaling[`HorizontalPodAutoscaler`^]]
+:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscaler-v2-autoscaling[`HorizontalPodAutoscaler`^]]
 
 [abstract]
 Recommended best practices, derived from tested performance metrics, for configuring Couchbase cluster auto-scaling using the Couchbase Autonomous Operator.
@@ -73,7 +73,7 @@ spec:
 .Example `HorizontalPodAutoscaler` Recommended Settings
 [source,yaml]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -250,7 +250,7 @@ spec:
 .Example `HorizontalPodAutoscaler` Recommended Settings
 [source,yaml]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: data-hpa
@@ -380,7 +380,7 @@ spec:
 .Example `HorizontalPodAutoscaler` Recommended Settings
 [source,yaml]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -515,7 +515,7 @@ spec:
 .Example `HorizontalPodAutoscaler` Recommended Settings
 [source,yaml]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: index-hpa

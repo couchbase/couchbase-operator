@@ -1,6 +1,6 @@
 = Configure Couchbase Cluster Auto-scaling
 include::partial$constants.adoc[]
-:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscaler-v2beta2-autoscaling[`HorizontalPodAutoscaler`^]]
+:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscaler-v2-autoscaling[`HorizontalPodAutoscaler`^]]
 
 [abstract]
 Configure Couchbase clusters to automatically scale based on observed usage metrics.
@@ -118,7 +118,7 @@ The following configuration represents an example to scale the server class from
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -228,7 +228,7 @@ This can be accomplished by modifying the {HorizontalPodAutoscaler} resource as 
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: example-hpa

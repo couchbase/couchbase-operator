@@ -274,7 +274,7 @@ Run the following command to create a `HorizontalPodAutoscaler` resource that wi
 $ cat << EOF | kubectl apply -f -
 ---
 kind: HorizontalPodAutoscaler
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 metadata:
   name: query-cpu-hpa
 spec:
@@ -520,7 +520,7 @@ We can accomplish this by configuring a policy that scales in smaller xref:conce
 $ cat << EOF | kubectl apply -f -
 ---
 kind: HorizontalPodAutoscaler
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 metadata:
   name: query-cpu-hpa
 spec:
@@ -568,7 +568,7 @@ If you want to try disabling down-scaling completely, you can instead set policy
 $ cat << EOF | kubectl apply -f -
 ---
 kind: HorizontalPodAutoscaler
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 metadata:
   name: query-cpu-hpa
 spec:

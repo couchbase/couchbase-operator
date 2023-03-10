@@ -12,7 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -23,7 +23,7 @@ import (
 type HPAManager struct {
 	CouchbaseCluster *couchbasev2.CouchbaseCluster
 
-	HorizontalPodAutoscalers []*autoscalingv2beta2.HorizontalPodAutoscaler
+	HorizontalPodAutoscalers []*autoscalingv2.HorizontalPodAutoscaler
 
 	Cleanup func()
 }
@@ -33,7 +33,7 @@ func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2esp
 	clusterSpec := MustNewAutoscaleCluster(t, k8s, couchbaseOptions)
 
 	// Create HPA to target specified metric
-	autoscalers := []*autoscalingv2beta2.HorizontalPodAutoscaler{}
+	autoscalers := []*autoscalingv2.HorizontalPodAutoscaler{}
 
 	for i, serverConfig := range clusterSpec.Spec.Servers {
 		// HPA references CouchbaseAutoscaler reference which must exist
@@ -126,7 +126,7 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 }
 
 // MustCreateAverageValueHPA uses Averaging algorithm on target metrics to determine resize activity.
-func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2beta2.HorizontalPodAutoscaler {
+func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := e2espec.NewAverageValueHPA(name, config)
 
 	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})

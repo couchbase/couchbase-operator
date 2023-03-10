@@ -45,7 +45,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
+	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"

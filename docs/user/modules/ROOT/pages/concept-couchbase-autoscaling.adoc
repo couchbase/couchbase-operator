@@ -1,5 +1,5 @@
 = Couchbase Cluster Auto-scaling
-:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscaler-v2beta2-autoscaling[`HorizontalPodAutoscaler`^]]
+:HorizontalPodAutoscaler: pass:q[https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscaler-v2-autoscaling[`HorizontalPodAutoscaler`^]]
 
 [abstract]
 The Autonomous Operator can be configured to enable automatic scaling for Couchbase clusters.
@@ -162,11 +162,11 @@ Deleting a xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource does
 === Referencing the Couchbase Autoscaler
 
 A {HorizontalPodAutoscaler} resource needs to reference an existing xref:resource/couchbaseautoscaler.adoc[`CouchbaseAutoscaler`] resource in order for auto-scaling operations to occur for the associated server class.
-This is accomplished by defining the `scaleTargetRef` settings within https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscalerspec-v2beta2-autoscaling[`HorizontalPodAutoscalerSpec`^]:
+This is accomplished by defining the `scaleTargetRef` settings within https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscalerspec-v2-autoscaling[`HorizontalPodAutoscalerSpec`^]:
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -199,7 +199,7 @@ The following example shows how Couchbase metrics are targeted in the {Horizonta
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -218,12 +218,12 @@ spec:
         averageValue: 7 # <.>
 ----
 
-<.> When targeting Couchbase metrics, https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metrictarget-v2beta2-autoscaling[`MetricSpec`^] must be set to `type: Pods`.
+<.> When targeting Couchbase metrics, https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metrictarget-v2-autoscaling[`MetricSpec`^] must be set to `type: Pods`.
 
-<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metricidentifier-v2beta2-autoscaling[`MetricIdentifier`^] must include the name of the Couchbase metric to target for monitoring.
+<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metricidentifier-v2-autoscaling[`MetricIdentifier`^] must include the name of the Couchbase metric to target for monitoring.
 In this example, `cbquery_requests_1000ms` is specified, which is a metric that measures the number of requests that are exceeding 1000ms.
 
-<.> When targeting Couchbase metrics, the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metrictarget-v2beta2-autoscaling[`MetricTarget`^] should be set to `type: AverageValue` so that the metric is averaged across all of the pods in the relevant server class.
+<.> When targeting Couchbase metrics, the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metrictarget-v2-autoscaling[`MetricTarget`^] should be set to `type: AverageValue` so that the metric is averaged across all of the pods in the relevant server class.
 
 <.> `averageValue` is the value of the average of the metric across all pods in the relevant server class (as a quantity).
 This is the _threshold_ value that, when crossed, will trigger the Horizontal Pod Autoscaler to consider scaling the server class.
@@ -235,7 +235,7 @@ If the resulting value ever crosses above or below `7`, then the Horizontal Pod 
 ===== Label Selectors
 
 Some Couchbase metrics may require the use of https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#autoscaling-on-more-specific-metrics[_label selectors_^].
-A label selector is defined in the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metricidentifier-v2beta2-autoscaling[`MetricIdentifier`^] and gets passed as an additional parameter to the metrics server so that metrics can be individually scoped.
+A label selector is defined in the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metricidentifier-v2-autoscaling[`MetricIdentifier`^] and gets passed as an additional parameter to the metrics server so that metrics can be individually scoped.
 
 To better understand the need for label selectors, and how to use them, consider the scenario of auto-scaling the Data Service based on memory utilization.
 Since each individual bucket reserves its own memory quota, it is almost never a good idea to scale the cluster based on the overall memory utilization of the Data Service.
@@ -248,7 +248,7 @@ Therefore, label selectors are required for this metric to be scoped to individu
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: data-hpa
@@ -282,7 +282,7 @@ spec:
 
 <.> The name of the metric is defined in the same way as the <<targeting-couchbase-metrics,previous example>>.
 
-<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metricidentifier-v2beta2-autoscaling[`MetricIdentifier`^] is now defined with a label selector.
+<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metricidentifier-v2-autoscaling[`MetricIdentifier`^] is now defined with a label selector.
 
 <.> The label for the `travel-sample` bucket is specified, thus instructing the Horizontal Pod Autoscaler to monitor the value of `cbbucketinfo_basic_quota_user_percent` specifically for the `travel-sample` bucket.
 
@@ -296,7 +296,7 @@ The following example shows how Kubernetes resource metrics are targeted in the 
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -314,12 +314,12 @@ spec:
         averageUtilization: 70 # <.>
 ----
 
-<.> When targeting Kubernetes resource metrics, https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metrictarget-v2beta2-autoscaling[`MetricSpec`^] must be set to `type: Resource`.
+<.> When targeting Kubernetes resource metrics, https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metrictarget-v2-autoscaling[`MetricSpec`^] must be set to `type: Resource`.
 
-<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#resourcemetricsource-v2beta2-autoscaling[`ResourceMetricSource`^] must include the name of the Kubernetes resource metric (e.g. `cpu` and `memory`) to target for monitoring.
+<.> The https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcemetricsource-v2-autoscaling[`ResourceMetricSource`^] must include the name of the Kubernetes resource metric (e.g. `cpu` and `memory`) to target for monitoring.
 In this example, `cpu` is specified, which is a metric that measures the pod CPU usage as a percentage.
 
-<.> When targeting Kubernetes resource metrics, the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#metrictarget-v2beta2-autoscaling[`MetricTarget`^] should be set to `type: Utilization` so that the metric is averaged across all of the pods in the relevant server class.
+<.> When targeting Kubernetes resource metrics, the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#metrictarget-v2-autoscaling[`MetricTarget`^] should be set to `type: Utilization` so that the metric is averaged across all of the pods in the relevant server class.
 
 <.> `averageUtilization` the value of the average of the resource metric across all pods in the relevant server class, represented as a percentage of the requested value of the resource for the pods.
 This is the _threshold_ value that, when crossed, will trigger the Horizontal Pod Autoscaler to consider scaling the server class.
@@ -331,11 +331,11 @@ If resulting value ever crosses above or below `70`, then the Horizontal Pod Aut
 === Sizing Constraints
 
 The Horizontal Pod Autoscaler applies constraints to the sizing values that are allowed to be propagated to the xref:resource/couchbaseautoscaler.adoc[`CouchbaseAutoscaler`] resource.
-Specifically, defining `minReplicas` and `maxReplicas` within the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscalerspec-v2beta2-autoscaling[`HorizontalPodAutoscalerSpec`^] sets lower and upper boundaries for the size of the server class.
+Specifically, defining `minReplicas` and `maxReplicas` within the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscalerspec-v2-autoscaling[`HorizontalPodAutoscalerSpec`^] sets lower and upper boundaries for the size of the server class.
 
 [source,yaml,subs="attributes,verbatim"]
 ----
-apiVersion: autoscaling/v2beta2
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: query-hpa
@@ -363,7 +363,7 @@ Refer to the  https://kubernetes.io/docs/tasks/run-application/horizontal-pod-au
 === Scaling Behavior
 
 The Horizontal Pod Autoscaler provides fine-grained controls for configuring behaviors for scaling up and down.
-These behaviors are configured via _policies_ specified in the `behavior` field in the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#horizontalpodautoscalerspec-v2beta2-autoscaling[`HorizontalPodAutoscalerSpec`^].
+These behaviors are configured via _policies_ specified in the `behavior` field in the https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#horizontalpodautoscalerspec-v2-autoscaling[`HorizontalPodAutoscalerSpec`^].
 
 The following subsections describe some of the more relevant details related to configuring scaling behavior.
 For additional information and examples, refer to the Kubernetes documentation related to https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#scaling-policies[scaling policies^].
