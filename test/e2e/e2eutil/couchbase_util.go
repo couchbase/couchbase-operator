@@ -422,7 +422,7 @@ func AddNode(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, servic
 			return err
 		}
 
-		if err := couchbaseutil.AddNode(member.GetHostURLPlaintext(), username, password, svcs).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.AddNode(member.GetDNSName(), username, password, svcs).On(client.client, client.host); err != nil {
 			return err
 		}
 
