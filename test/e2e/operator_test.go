@@ -298,7 +298,7 @@ func TestPodDeleteDelayRespected(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	_, err := e2eutil.ResizeCluster(t, 0, constants.Size1, kubernetes, cluster, 1*time.Minute)
-	if err == nil {
+	if err != nil {
 		t.Errorf("TestPodDeleteDelayRespected failed: " + err.Error())
 	}
 }
