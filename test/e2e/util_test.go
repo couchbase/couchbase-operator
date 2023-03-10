@@ -488,6 +488,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketAddRemoveExtended).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestRevertExternalBucketUpdates).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestPauseOperator).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestServicesRunningAfterFailover).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestNegPodResourcesBasic).WithTags(TagSuiteP1, TagFeatureScheduling),
 		framework.NewTestDef(TestTLSRemoveOperatorCertificateAndAddBack).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestTLSRemoveClusterCertificateAndAddBack).WithTags(TagSuiteP1, TagFeatureTLS),
