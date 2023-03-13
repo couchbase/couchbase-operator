@@ -151,22 +151,22 @@ func TestServicesRunningAfterFailover(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 4
-	victims := []int{0, 1}
+	victims := []int{0}
 	autoFailoverTimeout := 10 * time.Second
 
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
-	bucket1 := e2espec.DefaultBucket()
+	bucket1 := e2espec.DefaultBucketThreeReplicas()
 	bucket1.SetName("bucket1")
 	bucket1.Spec.CompressionMode = couchbasev2.CouchbaseBucketCompressionModePassive
 	bucket1.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(100)
 
-	bucket2 := e2espec.DefaultBucket()
+	bucket2 := e2espec.DefaultBucketThreeReplicas()
 	bucket2.SetName("bucket2")
 	bucket2.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(100)
 	bucket2.Spec.CompressionMode = couchbasev2.CouchbaseBucketCompressionModePassive
 
-	bucket3 := e2espec.DefaultBucket()
+	bucket3 := e2espec.DefaultBucketThreeReplicas()
 	bucket3.SetName("bucket3")
 	bucket3.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(100)
 	bucket2.Spec.CompressionMode = couchbasev2.CouchbaseBucketCompressionModePassive
@@ -179,6 +179,8 @@ func TestServicesRunningAfterFailover(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.EventingService, couchbasev2.SearchService, couchbasev2.AnalyticsService)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = &metav1.Duration{Duration: autoFailoverTimeout}
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket1, time.Minute)
