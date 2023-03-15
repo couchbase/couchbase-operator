@@ -15,6 +15,7 @@ const (
 	ipv6Flag            = "ipv6"
 	storageClassFlag    = "storage-class"
 	collectLogLevelFlag = "collected-log-level"
+	localPVFlag         = "lpv"
 )
 
 // certifyOptions defines all options for a certification task.
@@ -94,6 +95,9 @@ type SharedTestFlags struct {
 	// along with provisioning test persistent volumes.
 	StorageClassName string
 
+	// LocalPV boolean to enable LPV for testing. True for using LPV, False (default)
+	LocalPV bool
+
 	// CollectedLogLevel is passed to the certification container for controlling the
 	// sensitivity of collected information by cbopinfo
 	CollectedLogLevel int
@@ -109,6 +113,7 @@ func (s *SharedTestFlags) BindSharedFlags(flagSet *pflag.FlagSet) {
 		"",
 		"Storage class to use for result artifacts and test volumes. The default storage class of the platform is used if not specified.")
 	flag.IntVar(&s.CollectedLogLevel, collectLogLevelFlag, 0, "Log level to be collected by cbopinfo")
+	flag.BoolVar(&s.LocalPV, localPVFlag, false, "Use LPV when testing")
 
 	// add flag to cli flagset if provided
 	if flagSet != nil {

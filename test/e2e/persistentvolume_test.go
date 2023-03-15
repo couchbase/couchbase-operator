@@ -26,8 +26,9 @@ import (
 
 // This will create a Persistent volume claim data
 // for adding into the cluster CRD.
-func createPersistentVolumeClaimSpec(storageClass string, pvcName string, resourceQtyVal int64) couchbasev2.PersistentVolumeClaimTemplate {
+func createPersistentVolumeClaimSpec(storageClass string, pvcName string, lpv bool, resourceQtyVal int64) couchbasev2.PersistentVolumeClaimTemplate {
 	resourceQuantity := apiresource.NewQuantity(resourceQtyVal*1024*1024*1024, apiresource.BinarySI)
+	localStorageName := "local-path"
 
 	pvc := couchbasev2.PersistentVolumeClaimTemplate{
 		ObjectMeta: couchbasev2.NamedObjectMeta{
@@ -42,6 +43,12 @@ func createPersistentVolumeClaimSpec(storageClass string, pvcName string, resour
 		},
 	}
 
+	if lpv {
+		pvc.ObjectMeta.Annotations = make(map[string]string)
+		pvc.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+		pvc.Spec.StorageClassName = &localStorageName
+	}
+
 	if storageClass != "" {
 		pvc.Spec.StorageClassName = &storageClass
 	}
@@ -51,8 +58,14 @@ func createPersistentVolumeClaimSpec(storageClass string, pvcName string, resour
 
 // Verifies actual PVC wrt to server pods matches the expected PVC mapping given by user.
 func verifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMap map[string]int) (errToReturn error) {
+	f := framework.Global
+
 	pvcMappingVerify := func() error {
 		for memberName, pvcCount := range expectedPvcMap {
+			if f.LocalPV {
+				return nil
+			}
+
 			pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
 			if err != nil {
 				return err
@@ -86,7 +99,9 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 	victim := 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -98,7 +113,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
@@ -134,7 +149,9 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	clusterSize := 6
 	victim1 := 1
 	victim2 := 5
-	pvcName := "couchbase"
+
+	// PV Configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -146,7 +163,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -233,7 +250,9 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	pvcName := "couchbase"
+
+	// PV Configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -246,7 +265,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -282,7 +301,9 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
@@ -303,7 +324,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -340,7 +361,9 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 	// Static configuration.
 	clusterSize := 4
 	victim := 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -353,7 +376,7 @@ func TestPersistentVolumeKillPodAndOperator(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -388,7 +411,9 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -401,7 +426,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -442,7 +467,9 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := len(availableServerGroups) * 2
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -457,7 +484,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -515,7 +542,9 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := len(availableServerGroups) + 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -530,7 +559,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -579,7 +608,8 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 
 	framework.Requires(t, kubernetes).StaticCluster().ServerGroups(2)
 
-	pvcName := "couchbase"
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create cluster spec for RZA feature
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
@@ -599,7 +629,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -651,7 +681,8 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
-	pvcName := "couchbase"
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -663,7 +694,7 @@ func TestPersistentVolumeResizeCluster(t *testing.T) {
 		IndexClaim:   pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -723,7 +754,9 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create cluster with Online Resizing Enabled
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -734,7 +767,7 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -783,7 +816,7 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 		DataClaim:    pvcDataName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, f.LocalPV, 2),
 	}
 
 	// Add standalone index service as separate config with separate claim templates
@@ -797,7 +830,7 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 		DefaultClaim: pvcIndexName,
 		IndexClaim:   pvcIndexName,
 	}
-	pvcIndexClaimTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2)
+	pvcIndexClaimTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, f.LocalPV, 2)
 	cluster.Spec.VolumeClaimTemplates = append(cluster.Spec.VolumeClaimTemplates, pvcIndexClaimTemplate)
 
 	// Create cluster
@@ -853,8 +886,8 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 		IndexClaim:   pvcIndexName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, f.LocalPV, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, f.LocalPV, 2),
 	}
 
 	// Create cluster
@@ -906,8 +939,8 @@ func TestOnlinePersistentVolumeResizeNop(t *testing.T) {
 		IndexClaim:   pvcIndexName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, 2),
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, f.LocalPV, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, f.LocalPV, 2),
 	}
 
 	// Create cluster
@@ -939,8 +972,10 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	pvcName := "couchbase"
 	numOfDocs := f.DocsCount
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create cluster with Online Resizing Enabled
 	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -951,7 +986,7 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -993,7 +1028,9 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create cluster with Online Resizing Enabled
 	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -1004,7 +1041,7 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 		DataClaim:    pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -1048,21 +1085,21 @@ func TestLocalVolumeMountReuse(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 3
-	localClaim := "local"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
-		DefaultClaim: localClaim,
-		DataClaim:    localClaim,
-		IndexClaim:   localClaim,
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+		IndexClaim:   pvcName,
 	}
 
 	// set local storage annotation
-	template := createPersistentVolumeClaimSpec(f.StorageClassName, localClaim, 2)
-	template.ObjectMeta.Annotations = make(map[string]string)
-	template.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+	template := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2)
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{template}
 
 	// ensure cluster is created and bucket warmup completes
@@ -1113,10 +1150,8 @@ func TestMixedVolumeMountReuse(t *testing.T) {
 	}
 
 	// create storage templates
-	localTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, localClaim, 2)
-	localTemplate.ObjectMeta.Annotations = make(map[string]string)
-	localTemplate.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
-	dynamicTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, dynamicClaim, 2)
+	localTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, localClaim, f.LocalPV, 2)
+	dynamicTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, dynamicClaim, f.LocalPV, 2)
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{localTemplate, dynamicTemplate}
 
 	// ensure cluster is created and bucket warmup completes
@@ -1154,7 +1189,9 @@ func TestLocalVolumeAutoFailover(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 	victim := 1
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
@@ -1167,9 +1204,7 @@ func TestLocalVolumeAutoFailover(t *testing.T) {
 	}
 
 	// set local storage annotation
-	template := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
-	template.ObjectMeta.Annotations = make(map[string]string)
-	template.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+	template := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2)
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{template}
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)

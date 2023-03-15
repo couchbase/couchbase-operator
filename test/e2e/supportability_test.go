@@ -1847,7 +1847,9 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	}
 
 	clusterSize := constants.Size3
-	pvcName := "couchbase"
+
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 
@@ -1863,7 +1865,7 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 		},
 	}
 	cbCluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cbCluster)
 

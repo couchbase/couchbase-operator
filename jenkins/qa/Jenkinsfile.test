@@ -33,6 +33,7 @@ pipeline {
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
     string(name: 'kubernetes_version', defaultValue: '1.24')
     string(name: 'storage_class', defaultValue: 'standard-rwo')
+    booleanParam(name: 'lpv', defaultValue: false)
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.20.9')
@@ -44,8 +45,9 @@ pipeline {
     booleanParam(name: 'enable_istio', defaultValue: false)
     string(name: 'istio_version', defaultValue: '1.11.3')
     string(name: 'istio_mode', defaultValue: 'strict')
-    booleanParam(name: 'Validation', defaultValue: true)
-    booleanParam(name: 'New Tests', defaultValue: true)
+    booleanParam(name: 'validation', defaultValue: true)
+    booleanParam(name: 'build_images', defaultValue: true)
+    booleanParam(name: 'new_tests', defaultValue: true)
     string(name: 'tests', defaultValue: 'type tests here (no need for -Test)')
     booleanParam(name: 'GKE', defaultValue: true)
     booleanParam(name: 'AKS', defaultValue: true)
@@ -117,11 +119,20 @@ pipeline {
       }
     }
 
-    stage('Build') {
+    stage('Build Tools') {
       steps {
         // build tools
         sh 'make touch-generated tools'
+      }
+    }
 
+    stage('Build Images') {
+      when {
+        expression {
+          params.build_images
+        }
+      }
+      steps {
         // build container images + upload them
         sh 'docker login -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
         sh 'make images-public -e DOCKER_USER=couchbaseqe DOCKER_TAG=qetest'
@@ -130,7 +141,7 @@ pipeline {
         always {
           // Remove old docker images now, this stops disk from filling up and minimises risk
           // of this not being called due to a job cancellation.
-          sh 'make images-clean -e DOCKER_USER=couchbaseqe DOCKER_TAG=qetest'
+          sh 'make images-clean -e IMAGE_TARGET=kubernetes-linux-amd64 -e TARGET_ARCH=amd64 -e DOCKER_USER=couchbaseqe -e DOCKER_TAG=qetest'
         }
       }
     }
@@ -146,6 +157,19 @@ pipeline {
           sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
         }
       }
+    }
+
+    stage('Intall Rancher') {
+          when {
+            expression {
+              params.storage_class == 'local-path'
+            }
+          }
+          steps {
+            script {
+              sh "kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
+            }
+          }
     }
 
     // Make sure passes Validation Suite and LPV tests
@@ -181,6 +205,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -215,7 +240,7 @@ pipeline {
     stage('Test GKE') {
       when {
           expression {
-            params.GKE
+            params.GKE && params.new_tests
           }
       }
       steps {
@@ -227,7 +252,7 @@ pipeline {
             --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
             --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
             --image couchbaseqe/couchbase-operator-certification:qetest \
-            --archive-name qetest-GKE \
+            --archive-name GKE \
             -- \
             ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
             -platform-type kubernetes \
@@ -242,6 +267,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -255,7 +281,7 @@ pipeline {
           catch (e) {
             currentBuild.result = 'UNSTABLE'
           }
-          sh 'tar xf qetest-GKE.tar.bz2'
+          sh 'tar xf GKE.tar.bz2'
           sh 'tar xf results.tar.bz'
         }
       }
@@ -265,8 +291,8 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf qetest-GKE.tar.gz artifacts/logs'
-          archiveArtifacts artifacts: 'qetest-GKE.tar.gz', fingerprint: true
+          sh 'tar czf GKE.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'GKE.tar.gz', fingerprint: true
 
           // Decomission kubernetes clusters
           sh "./test/e2e/resources/provisioners/gke/gcloud_provision stop --name ${env.NAME}"
@@ -278,7 +304,7 @@ pipeline {
     stage('Azure Provision') {
         when {
             expression {
-              params.AKS
+              params.AKS 
             }
         }
         steps {
@@ -296,7 +322,7 @@ pipeline {
     stage('Test AKS') {
         when {
             expression {
-              params.AKS
+              params.AKS && params.new_tests
             }
         }
         steps {
@@ -308,7 +334,7 @@ pipeline {
               --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
               --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
               --image couchbaseqe/couchbase-operator-certification:qetest \
-              --archive-name qetest \
+              --archive-name AKS \
               -- \
               ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
               -platform-type kubernetes \
@@ -323,6 +349,7 @@ pipeline {
               -logging-image ${params.logging_image} \
               -logging-image-upgrade ${params.logging_image_upgrade} \
               -storage-class ${params.storage_class} \
+              -lpv=${params.lpv} \
               -bucket-type ${params.bucket_type} \
               -compression-mode ${params.compression_mode} \
               -s3-region ${params.s3_region} \
@@ -336,7 +363,8 @@ pipeline {
             catch (e) {
               currentBuild.result = 'UNSTABLE'
             }
-            sh 'tar xf qetest-AKS.tar.bz2'
+
+            sh 'tar xf AKS.tar.bz2'
             sh 'tar xf results.tar.bz'
           }
         }
@@ -346,8 +374,8 @@ pipeline {
             junit 'artifacts/*.xml'
 
             // Archive any logs as an artifact, these may be needed to debug an issue.
-            sh 'tar czf qetest-AKS.tar.gz artifacts/logs'
-            archiveArtifacts artifacts: 'qetest-AKS.tar.gz', fingerprint: true
+            sh 'tar czf AKS.tar.gz artifacts/logs'
+            archiveArtifacts artifacts: 'AKS.tar.gz', fingerprint: true
 
             // Decomission kubernetes clusters
             dir("./test/e2e/resources/provisioners/aks") {
@@ -360,7 +388,7 @@ pipeline {
   stage('EKS Provisioning') {
       when {
           expression {
-            params.EKS
+            params.EKS 
           }
       }
       steps {
@@ -383,7 +411,7 @@ pipeline {
   stage('Test EKS') {
     when {
         expression {
-          params.EKS
+          params.EKS && params.new_tests
         }
     }
     steps {
@@ -395,7 +423,7 @@ pipeline {
           --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
           --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
           --image couchbaseqe/couchbase-operator-certification:qetest \
-          --archive-name qetest-EKS \
+          --archive-name EKS \
           -- \
           ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
           -platform-type kubernetes \
@@ -410,6 +438,7 @@ pipeline {
           -logging-image ${params.logging_image} \
           -logging-image-upgrade ${params.logging_image_upgrade} \
           -storage-class ${params.storage_class} \
+          -lpv=${params.lpv} \
           -bucket-type ${params.bucket_type} \
           -compression-mode ${params.compression_mode} \
           -s3-region ${params.s3_region} \
@@ -423,7 +452,7 @@ pipeline {
         catch (e) {
           currentBuild.result = 'UNSTABLE'
         }
-        sh 'tar xf qetest-EKS.tar.bz2'
+        sh 'tar xf EKS.tar.bz2'
         sh 'tar xf results.tar.bz'
       }
     }
@@ -433,8 +462,8 @@ pipeline {
         junit 'artifacts/*.xml'
 
         // Archive any logs as an artifact, these may be needed to debug an issue.
-        sh 'tar czf qetest-EKS.tar.gz artifacts/logs'
-        archiveArtifacts artifacts: 'qetest-EKS.tar.gz', fingerprint: true
+        sh 'tar czf EKS.tar.gz artifacts/logs'
+        archiveArtifacts artifacts: 'EKS.tar.gz', fingerprint: true
 
         // Decomission kubernetes clusters
         dir("./test/e2e/resources/provisioners/eks") {

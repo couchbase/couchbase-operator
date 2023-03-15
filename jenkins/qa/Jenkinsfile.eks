@@ -42,6 +42,7 @@ pipeline {
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
     string(name: 'kubernetes_version', defaultValue: '1.21')
     string(name: 'storage_class', defaultValue: 'gp2')
+    booleanParam(name: 'lpv', defaultValue: false)
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.20.9')
@@ -103,7 +104,7 @@ pipeline {
     stage('EKS Provisioning') {
       steps {
         script {
-	  tfdir = "./test/e2e/resources/provisioners/eks"
+          tfdir = "./test/e2e/resources/provisioners/eks"
           if (params.machine == "arm") {
             tfdir = "./test/e2e/resources/provisioners/arm"
           }
@@ -114,9 +115,9 @@ pipeline {
             sh "terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
             sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
           }
-       }
+        }
+      }
     }
-}
 
     stage('Build') {
       steps {
@@ -136,6 +137,19 @@ pipeline {
       steps {
         script {
           sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+        }
+      }
+    }
+
+    stage('Intall Rancher') {
+      when {
+        expression {
+          params.lpv
+        }
+      }
+      steps {
+        script {
+          sh "kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
         }
       }
     }
@@ -174,6 +188,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -232,6 +247,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -290,6 +306,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -348,6 +365,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -406,6 +424,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -464,6 +483,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \

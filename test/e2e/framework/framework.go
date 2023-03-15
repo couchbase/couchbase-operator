@@ -534,6 +534,7 @@ func setup() error {
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
 	logrus.Info(" →  storage class: " + Global.SharedTestFlags.StorageClassName)
+	logrus.Info(" →  LPV enabled: " + strconv.FormatBool(Global.SharedTestFlags.LocalPV))
 
 	logrus.Info(util.PrettyHeading("Logs"))
 	logrus.Info(" →  directory: " + Global.LogDir)

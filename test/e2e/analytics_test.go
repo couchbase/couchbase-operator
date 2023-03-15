@@ -280,7 +280,9 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		"CREATE DATASET " + analyticsDataset3 + " ON `default` WHERE meta(default).id NOT LIKE '%1%'",
 		"CONNECT LINK Local",
 	}
-	pvcName := "test"
+
+	// PV Configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
 	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
@@ -294,7 +296,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 		DefaultClaim: pvcName,
 	}
 	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
-		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2),
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
