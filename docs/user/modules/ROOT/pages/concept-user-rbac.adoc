@@ -70,8 +70,9 @@ spec:
   - name: data_reader
   - name: data_writer
     buckets:
-      name: default
-      kind: CouchbaseBucket
+      resources:
+      - name: default
+        kind: CouchbaseBucket
 ----
 
 In versions Couchbase Server greater than 7.0.0, bucket roles can be specified for buckets, scopes and collections.  In Couchbase Server versions before 7.0.0, these settings will be ignored.
@@ -87,18 +88,22 @@ spec:
   roles:
   - name: data_reader
     buckets:
-      name: default
-      kind: CouchbaseBucket
+      resources:
+      - name: default
+        kind: CouchbaseBucket
   - name: data_writer
     buckets:
-      name: default
-      kind: CouchbaseBucket
+      resources:
+      - name: default
+        kind: CouchbaseBucket
     scopes:
-      name: default
-      kind: CouchbaseScope
+      resources:
+      - name: default
+        kind: CouchbaseScope
     collections:
-      name: default
-      kind: CouchbaseCollection
+      resources:
+      - name: default
+        kind: CouchbaseCollection
 ----
 
 Multiple Buckets, Scopes and Collections can be specified.  However, `CouchbaseScopeGroup` and `CouchbaseCollectionGroup` can also be utilized to create roles for many scope and collection combinations.
