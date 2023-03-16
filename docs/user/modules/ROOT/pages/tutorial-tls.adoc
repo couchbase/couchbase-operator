@@ -146,7 +146,7 @@ This is in the form `_<service>_._<namespace>_.svc`, so if our service is called
 
 [source,console]
 ----
-$ ./easyrsa --subject-alt-name=couchbase-operator-admission.operator-admission.svc build-server-full couchbase-admission-controller nopass`
+$ ./easyrsa --subject-alt-name='DNS:couchbase-operator-admission.operator-admission.svc' build-server-full couchbase-admission-controller nopass`
 ----
 
 == Creating a Client Certificate
