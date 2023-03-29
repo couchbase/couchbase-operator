@@ -351,6 +351,10 @@ func (c *Cluster) reconcilePodServices() error {
 // reconcileEndpointProxyService looks for changes in endpoint proxy feature enablement
 // and it's subfeatures.
 func (c *Cluster) reconcileEndpointProxyService() error {
+	if c.cluster.Spec.Networking.EndpointProxy == nil {
+		return nil
+	}
+
 	return k8sutil.ReconcileEndpointProxyService(c.k8s, c.cluster)
 }
 

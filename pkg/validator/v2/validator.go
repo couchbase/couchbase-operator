@@ -68,6 +68,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintVolumeTemplateStorageClass,
 		checkConstraintServerMinimumVersion,
 		checkConstraintTLS,
+		checkConstraintEndpointProxyTLS,
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
 		checkConstraintBucketNames,
@@ -985,6 +986,24 @@ func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluste
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintEndpointProxyTLS checks the validity of the endpoint proxy TLS configs passed.
+func checkConstraintEndpointProxyTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Networking.EndpointProxy == nil {
+		return nil
+	}
+
+	if cluster.Spec.Networking.EndpointProxy.TLS == nil {
+		return nil
+	}
+
+	err := validateEndpointProxyServerTLS(v, cluster)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -3101,6 +3120,40 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 		if !srvVerAfter712 && (services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService)) {
 			return fmt.Errorf("search, eventing or analytics services cannot be used in magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v", services.StringSlice())
 		}
+	}
+
+	return nil
+}
+
+func validateEndpointProxyServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	serverSecretName := cluster.Spec.Networking.EndpointProxy.TLS.ServerSecretName
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, serverSecretName)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.networking.endpointProxy.tls.serverSecretName must exist", serverSecretName)
+	}
+
+	_, ok := secret.Data[v1.TLSPrivateKeyKey]
+	if !ok {
+		return fmt.Errorf("tls secret %s must contain key %s", secret, v1.TLSPrivateKeyKey)
+	}
+
+	certData, ok := secret.Data[v1.TLSCertKey]
+	if !ok {
+		return fmt.Errorf("tls secret %s must contain cert %s", secret, v1.TLSCertKey)
+	}
+
+	cert, err := util_x509.ParseCertificate(certData)
+	if err != nil {
+		return fmt.Errorf("unable to parse server cert: %w", err)
+	}
+
+	if len(cert.DNSNames) == 0 {
+		return fmt.Errorf("must provide the DNS name in Subject Alternate Name values in server cert needed for K8s Ingress or OC Routes")
 	}
 
 	return nil

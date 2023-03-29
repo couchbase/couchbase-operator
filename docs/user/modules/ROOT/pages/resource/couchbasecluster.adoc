@@ -153,8 +153,9 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-dns,dns>>:
       <<couchbaseclusters-spec-networking-dns-domain,domain>>: ""
     <<couchbaseclusters-spec-networking-endpointproxy,endpointProxy>>:
-      <<couchbaseclusters-spec-networking-endpointproxy-enabled,enabled>>: false
       <<couchbaseclusters-spec-networking-endpointproxy-image,image>>: ""
+      <<couchbaseclusters-spec-networking-endpointproxy-tls,tls>>:
+        <<couchbaseclusters-spec-networking-endpointproxy-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-exposeadminconsole,exposeAdminConsole>>: false
     <<couchbaseclusters-spec-networking-exposedfeatureservicetemplate,exposedFeatureServiceTemplate>>: {}
     <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: NodePort
@@ -2034,17 +2035,6 @@ These annotations can be used directly by a Kubernetes External-DNS controller t
 
 EndpointProxy is used to provision a gRPC gateway in front of the Couchbase cluster.
 
-=== couchbaseclusters.spec.networking.endpointProxy.enabled
-
-==== Constraints
-
-*Type*: `boolean`
-
-==== Description
-
-Enabled is a boolean that enables/disables the grpc gateway sidecar container.
-This must be set to true, when image is provided.
-
 === couchbaseclusters.spec.networking.endpointProxy.image
 
 ==== Constraints
@@ -2055,9 +2045,30 @@ This must be set to true, when image is provided.
 
 ==== Description
 
-Image is the grpc gateway image to be used to run the sidecar container.
+Image is the endpoint proxy image to be used to run the sidecar container.
 No validation is carried out as this can be any arbitrary repo and tag.
-enabled must be set to true, when image is provided.
+TODO: provide a default kubebuilder default image tag as field is mandatory.
+
+=== couchbaseclusters.spec.networking.endpointProxy.tls
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+TLS defines the TLS configuration for the endpoint proxy server including server and client certificate configuration, and TLS security policies.
+
+=== couchbaseclusters.spec.networking.endpointProxy.tls.serverSecretName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains endpoint proxy (gateway) gRPC server TLS data.
+The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
 
 === couchbaseclusters.spec.networking.exposeAdminConsole
 

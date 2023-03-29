@@ -538,15 +538,25 @@ func generateEndpointProxyService(cluster *couchbasev2.CouchbaseCluster) *v1.Ser
 		cluster.AsOwner(),
 	}
 
-	service.Spec.Selector = selectorForEndpointProxyService(cluster)
-	service.Spec.Ports = []v1.ServicePort{
-		{
-			Name:       "endpoint-proxy-http",
-			Protocol:   v1.ProtocolTCP,
-			Port:       80,
-			TargetPort: intstr.FromInt(snDataPort),
-		},
+	svcPort := v1.ServicePort{
+		Name:       "endpoint-proxy-http",
+		Protocol:   v1.ProtocolTCP,
+		Port:       80,
+		TargetPort: intstr.FromInt(snDataPort),
 	}
+
+	// When Enpoint Proxy TLS enabled
+	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
+		svcPort = v1.ServicePort{
+			Name:       "endpoint-proxy-https",
+			Protocol:   v1.ProtocolTCP,
+			Port:       443,
+			TargetPort: intstr.FromInt(snDataPort),
+		}
+	}
+
+	service.Spec.Selector = selectorForEndpointProxyService(cluster)
+	service.Spec.Ports = []v1.ServicePort{svcPort}
 
 	return service
 }

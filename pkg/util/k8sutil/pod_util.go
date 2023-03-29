@@ -54,6 +54,7 @@ const (
 	passphraseScriptName                      = "tls-passphrase-script"
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
 	EndpointProxyContainerName                = "endpoint-proxy"
+	EpTLSSecretMountPath                      = "/var/run/secrets/couchbase.com/couchbase-ep-tls"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -995,20 +996,49 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 	pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
 }
 
-// applyEndpointProxy adds a endpoit proxy for gRPC access to the cb cluster.
+// applyEndpointProxy adds a endpoint proxy for gRPC access to the cb cluster.
 func applyEndpointProxy(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	// If endpointProxy is enabled add the necessary sidecars.
 	if cluster.Spec.Networking.EndpointProxy == nil {
 		return
 	}
 
-	if !cluster.Spec.Networking.EndpointProxy.Enabled {
-		return
-	}
-
 	epProxyContainer := createEndpointProxyContainer(cluster.Spec)
 
+	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
+		applyEndpointProxyPodTLS(cluster, &epProxyContainer, pod)
+	}
+
 	pod.Spec.Containers = append(pod.Spec.Containers, epProxyContainer)
+}
+
+// applyEndpointProxyPodTLS adds endpoint proxy server TLS certs and keys from secret to volumes and mounted.
+func applyEndpointProxyPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
+	// Add the endpoint proxy server secret volume to the pod
+	volumeName := "couchbase-endpoint-proxy-volume"
+	secretName := cluster.Spec.Networking.EndpointProxy.TLS.ServerSecretName
+	volume := v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+	// Mount the secret volume
+	volumeMount := v1.VolumeMount{
+		Name:      volumeName,
+		ReadOnly:  true,
+		MountPath: EpTLSSecretMountPath,
+	}
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	container.Args = append(container.Args,
+		"-secure=true",
+		fmt.Sprintf("-cert=%s/tls.crt", EpTLSSecretMountPath),
+		fmt.Sprintf("-key=%s/tls.key", EpTLSSecretMountPath),
+	)
 }
 
 // applyPodMonitoring adds any monitoring related hacks required to work.
@@ -1615,7 +1645,7 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 // createEndpointProxyContainer creates a endpoint proxy container based on inputs from manifest.
 // N.B. The endpoint proxy is implemented by stellar-nebula-gateway gRPC service by default.
 func createEndpointProxyContainer(cs couchbasev2.ClusterSpec) v1.Container {
-	return v1.Container{
+	container := v1.Container{
 		Name:  EndpointProxyContainerName,
 		Image: cs.EndpointProxyImage(),
 		Ports: []v1.ContainerPort{
@@ -1630,8 +1660,12 @@ func createEndpointProxyContainer(cs couchbasev2.ClusterSpec) v1.Container {
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		Args: []string{"--cb-host", "localhost"},
 	}
+
+	// add cb host 127.0.0.1 and run on daemon mode
+	container.Args = append(container.Args, "-daemon=true", "-cb-host=127.0.0.1")
+
+	return container
 }
 
 func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {

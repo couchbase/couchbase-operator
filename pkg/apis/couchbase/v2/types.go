@@ -2499,15 +2499,23 @@ const (
 	AFInet6 AddressFamily = "IPv6"
 )
 
-type EndpointProxy struct {
-	// Enabled is a boolean that enables/disables the grpc gateway sidecar container.
-	// This must be set to true, when image is provided.
-	Enabled bool `json:"enabled,omitempty"`
+type EndpointProxyTLS struct {
+	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
+	// that contains endpoint proxy (gateway) gRPC server TLS data.
+	// The secret is expected to contain "tls.crt" and
+	// "tls.key" as per the kubernetes.io/tls secret type.
+	ServerSecretName string `json:"serverSecretName,omitempty"`
+}
 
-	// Image is the grpc gateway image to be used to run the sidecar container.
+type EndpointProxy struct {
+	// Image is the endpoint proxy image to be used to run the sidecar container.
 	// No validation is carried out as this can be any arbitrary repo and tag.
-	// enabled must be set to true, when image is provided.
+	// TODO: provide a default kubebuilder default image tag as field is mandatory.
 	Image string `json:"image"`
+
+	// TLS defines the TLS configuration for the endpoint proxy server including
+	// server and client certificate configuration, and TLS security policies.
+	TLS *EndpointProxyTLS `json:"tls,omitempty"`
 }
 
 type CouchbaseClusterNetworkingSpec struct {
