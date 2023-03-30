@@ -38,6 +38,7 @@ const (
 func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintDataServiceMemoryQuota,
+		checkConstraintDataServiceMemcachedThreadCounts,
 		checkConstraintIndexServiceMemoryQuota,
 		checkConstraintSearchServiceMemoryQuota,
 		checkConstraintEventingServiceMemoryQuota,
@@ -114,6 +115,34 @@ func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbas
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota.Cmp(*k8sutil.NewResourceQuantityMi(256)) < 0 {
 		return fmt.Errorf("spec.cluster.dataServiceMemoryQuota in body should be greater than or equal to 256Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintDataServiceMemcachedThreadCounts checks the reader/writer thread count for specific server version.
+func checkConstraintDataServiceMemcachedThreadCounts(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
+		serverVerErrStr := "for couchbase server version 7.1.0 or greater"
+
+		if cluster.Spec.ClusterSettings.Data.ReaderThreads < 4 {
+			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.readerThreads %d must be greater than or equal to 4 %s", cluster.Spec.ClusterSettings.Data.ReaderThreads, serverVerErrStr))
+		}
+
+		if cluster.Spec.ClusterSettings.Data.WriterThreads < 4 {
+			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.writerThreads %d must be greater than or equal to 4 %s", cluster.Spec.ClusterSettings.Data.WriterThreads, serverVerErrStr))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil

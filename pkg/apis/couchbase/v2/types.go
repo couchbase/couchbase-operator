@@ -2916,20 +2916,42 @@ type CouchbaseClusterDataSettings struct {
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use.  If not specified, this defaults to the
 	// default value set by Couchbase Server.
-	// +kubebuilder:validation:Minimum=4
+	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
 	ReaderThreads int `json:"readerThreads,omitempty"`
 
-	// ReaderThreads allows the number of threads used by the data service,
+	// WriterThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This setting is especially relevant when
 	// using "durable writes", increasing this field will have a large
 	// impact on performance.  This value must be between 4 and 64 threads,
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
-	// +kubebuilder:validation:Minimum=4
+	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
 	WriterThreads int `json:"writerThreads,omitempty"`
+
+	// NonIOThreads allows the number of threads used by the data service,
+	// per pod, to be altered.  This indicates the number of threads that are
+	// to be used in the NonIO thread pool to run in memory tasks.
+	// This value must be between 4 and 64 threads,
+	// and should only be increased where there are sufficient CPU resources
+	// allocated for their use. If not specified, this defaults to the
+	// default value set by Couchbase Server.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=64
+	NonIOThreads int `json:"nonIOThreads,omitempty"`
+
+	// AuxIOThreads allows the number of threads used by the data service,
+	// per pod, to be altered.  This indicates the number of threads that are
+	// to be used in the AuxIO thread pool to run auxiliary I/O tasks.
+	// This value must be between 4 and 64 threads,
+	// and should only be increased where there are sufficient CPU resources
+	// allocated for their use. If not specified, this defaults to the
+	// default value set by Couchbase Server.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=64
+	AuxIOThreads int `json:"auxIOThreads,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

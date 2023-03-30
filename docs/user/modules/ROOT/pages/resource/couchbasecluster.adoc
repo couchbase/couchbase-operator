@@ -79,6 +79,8 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-autofailovertimeout,autoFailoverTimeout>>: 120s
     <<couchbaseclusters-spec-cluster-clustername,clusterName>>: ""
     <<couchbaseclusters-spec-cluster-data,data>>:
+      <<couchbaseclusters-spec-cluster-data-auxiothreads,auxIOThreads>>: 0
+      <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: 0
     <<couchbaseclusters-spec-cluster-dataservicememoryquota,dataServiceMemoryQuota>>: 256Mi
@@ -1097,13 +1099,47 @@ By default, the cluster name is that specified in the CouchbaseCluster resource'
 
 Data allows the data service to be configured.
 
+=== couchbaseclusters.spec.cluster.data.auxIOThreads
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `64`
+
+==== Description
+
+AuxIOThreads allows the number of threads used by the data service, per pod, to be altered.
+This indicates the number of threads that are to be used in the AuxIO thread pool to run auxiliary I/O tasks.
+This value must be between 4 and 64 threads, and should only be increased where there are sufficient CPU resources allocated for their use.
+If not specified, this defaults to the default value set by Couchbase Server.
+
+=== couchbaseclusters.spec.cluster.data.nonIOThreads
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `64`
+
+==== Description
+
+NonIOThreads allows the number of threads used by the data service, per pod, to be altered.
+This indicates the number of threads that are to be used in the NonIO thread pool to run in memory tasks.
+This value must be between 4 and 64 threads, and should only be increased where there are sufficient CPU resources allocated for their use.
+If not specified, this defaults to the default value set by Couchbase Server.
+
 === couchbaseclusters.spec.cluster.data.readerThreads
 
 ==== Constraints
 
 *Type*: `integer`
 
-*Minimum*: `4`
+*Minimum*: `1`
 
 *Maximum*: `64`
 
@@ -1119,13 +1155,13 @@ If not specified, this defaults to the default value set by Couchbase Server.
 
 *Type*: `integer`
 
-*Minimum*: `4`
+*Minimum*: `1`
 
 *Maximum*: `64`
 
 ==== Description
 
-ReaderThreads allows the number of threads used by the data service, per pod, to be altered.
+WriterThreads allows the number of threads used by the data service, per pod, to be altered.
 This setting is especially relevant when using "durable writes", increasing this field will have a large impact on performance.
 This value must be between 4 and 64 threads, and should only be increased where there are sufficient CPU resources allocated for their use.
 If not specified, this defaults to the default value set by Couchbase Server.

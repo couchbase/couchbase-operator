@@ -547,6 +547,16 @@ func (c *Cluster) reconcileDataSettings() error {
 		requested.NumWriterThreads = c.cluster.Spec.ClusterSettings.Data.WriterThreads
 	}
 
+	if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
+		if c.cluster.Spec.ClusterSettings.Data.NonIOThreads != 0 {
+			requested.NumNonIOThreads = c.cluster.Spec.ClusterSettings.Data.NonIOThreads
+		}
+
+		if c.cluster.Spec.ClusterSettings.Data.AuxIOThreads != 0 {
+			requested.NumAuxIOThreads = c.cluster.Spec.ClusterSettings.Data.AuxIOThreads
+		}
+	}
+
 	if reflect.DeepEqual(current, requested) {
 		return nil
 	}

@@ -1450,9 +1450,9 @@ func MustGetCouchbaseVersion(t *testing.T, image string) string {
 	return version
 }
 
-// MustVerifyReaderWriterThreads checks memcached's reader and writer thread counts.
+// MustVerifyDataServerSettingsMemcachedThreadCounts checks memcached's reader, writer, auxIo, nonIo thread counts.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
-func MustVerifyReaderWriterThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads int, timeout time.Duration) {
+func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads, nonIOThreads, auxIOThreads int, timeout time.Duration) {
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
@@ -1470,6 +1470,14 @@ func MustVerifyReaderWriterThreads(t *testing.T, k8s *types.Cluster, cluster *co
 
 		if current.NumWriterThreads != writerThreads {
 			return fmt.Errorf("expected %d writers, got %d", writerThreads, current.NumWriterThreads)
+		}
+
+		if current.NumNonIOThreads != nonIOThreads {
+			return fmt.Errorf("expected %d non IO threads, got %d", nonIOThreads, current.NumNonIOThreads)
+		}
+
+		if current.NumAuxIOThreads != auxIOThreads {
+			return fmt.Errorf("expected %d aux IO threads, got %d", auxIOThreads, current.NumAuxIOThreads)
 		}
 
 		return nil

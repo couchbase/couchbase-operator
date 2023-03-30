@@ -1404,6 +1404,8 @@ type AuditUser struct {
 type MemcachedGlobals struct {
 	NumReaderThreads int `json:"num_reader_threads" url:"num_reader_threads,omitempty"`
 	NumWriterThreads int `json:"num_writer_threads" url:"num_writer_threads,omitempty"`
+	NumNonIOThreads  int `json:"num_nonio_threads" url:"num_nonio_threads,omitempty"`
+	NumAuxIOThreads  int `json:"num_auxio_threads" url:"num_auxio_threads,omitempty"`
 }
 
 // ScopeList defines all scopes for a bucket, and all nested collections.
