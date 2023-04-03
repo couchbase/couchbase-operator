@@ -75,6 +75,13 @@ var (
 	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
 )
 
+// Backup Errors.
+var (
+	// ErrBackupInvalidConfiguration is raised when fields are missing or misconfigured
+	// for backup/restore.
+	ErrBackupInvalidConfiguration = errors.New("invalid backup configuration")
+)
+
 // Operator specific errors.
 var (
 	// ErrInternalError is something that should never get raised.
