@@ -83,6 +83,12 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 	for i := range backups {
 		backup := &backups[i]
 
+		// it's possible we don't have a full backup schedule,
+		// if the DAC is disabled AE.
+		if backup.Spec.Full == nil || len(backup.Spec.Full.Schedule) == 0 {
+			return nil, fmt.Errorf("%w: no valid full backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
+		}
+
 		fullCronJob, err := c.generateBackupCronjob(backup, Full)
 		if err != nil {
 			return nil, err
