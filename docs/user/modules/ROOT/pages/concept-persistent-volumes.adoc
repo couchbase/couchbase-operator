@@ -86,3 +86,106 @@ The xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-securitycontext[`
 
 On Kubernetes the file system group can be any non-zero value (we use `1000` internally for testing).
 On Red Hat OpenShift you do not need to populate this field.
+
+== Local Persistent Volumes
+
+The Couchbase Operator and `CouchbaseCluster` resources can be configured to utilize local persistent volumes (LPV).  
+Using LPV comes with risks and should be fully understood before attempting to run this configuration in a production cluster.  
+
+The first consideration is that upgrade is more resource intensive than using standard persistent volumes.  
+The reason is that the Operator is unable to rely on an LPV Provisioner to clean up unused volumes. 
+Since volumes are typically solely bound to a pod, this means that you will need N additional volumes (where N is the number of pods) as we create the replacement pods. 
+
+The second consideration is that most management of LPV is a manual task performed at the K8S Node level.  
+*It is up to the K8S Administrator to maintain these LPV for usage with the Couchbase Cluster.*
+
+Lastly, High Availability is impacted if a K8S node goes offline.  
+If the node (and pod) disappears, likely the PV will as well.  
+This will cause issues, as the operator will attempt to replace the pod and reuse the PVC.  
+Obviously this will not work and will require human intervention to correct. 
+The administrator will need to restore the K8S node and PV, or pause the operator and remove the afflicted pod from the cluster (and delete associated persistent volumes and persistent volume claims) and then unpause the operator. 
+
+To utilize Local Persistent Volumes, you must first install a provisioner for your platform and create a storage class for the Local Volumes.  
+
+* https://github.com/rancher/local-path-provisioner[Rancher Local Path Provisioner]
+* https://github.com/Azure/kubernetes-volume-drivers/tree/master/local[Azure NVME Provisioner]
+* https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd#example_local_pvs[GKE Local PVS]
+* https://github.com/kubernetes-sigs/sig-storage-local-static-provisioner[Kubernetes Storage Local Static Provisioner]
+
+Once you have your created Persistent Volumes and a Storage class that references these Persistent Volumes, you can create a volume mount template to reference this storage class.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: my-cluster
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: local
+        annotations:
+            "storage.couchbase.com/local": true
+      spec:
+      storageClassName: "local-disk"
+      resources:
+        requests:
+          storage: 50Gi
+    - metadata:
+        name: logging
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 5Gi
+----
+
+By adding the `storage.couchbase.com/local` annotation, this informs Operator that references to this template on a single pod should all be mounted inside a single PV.  This simplifies setting up your LPV by allowing you to allocate an entire disk for a PV.
+
+This would allow you to specify the volumes for a server group as such:
+
+[source,yaml]
+----
+spec:
+  image: couchbase/server:7.1.4
+  security:
+    adminSecret: cb-example-auth
+  buckets:
+    managed: true
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+      volumeMounts:
+        logging: logging
+        data:  local
+        index: local
+        analytics:
+          - local
+          - local
+  volumeClaimTemplates:
+    - metadata:
+        name: local
+        annotations:
+            "storage.couchbase.com/local": true
+      spec:
+      storageClassName: "local-disk"
+      resources:
+        requests:
+          storage: 50Gi
+    - metadata:
+        name: logging
+      spec:
+        storageClassName: "standard"
+        resources:
+          requests:
+            storage: 5Gi          
+----
+
+This would place all "local" volumes onto a single persistent volume claim (PVC) mounted under sub-directories, while the logging would be placed in its own PVC.
