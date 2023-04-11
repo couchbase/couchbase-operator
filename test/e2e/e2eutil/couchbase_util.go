@@ -1516,6 +1516,13 @@ func MustCreateSecondaryIndex(t *testing.T, queryManager *gocb.QueryIndexManager
 	}
 }
 
+// MustCreateSecondaryIndex creates Secondary Index against default collection.
+func MustDropSecondaryIndex(t *testing.T, queryManager *gocb.QueryIndexManager, bucketName string) {
+	if err := queryManager.DropIndex(bucketName, "cnd_gsi", &gocb.DropQueryIndexOptions{Timeout: 3 * time.Minute}); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustExecuteN1qlQuery runs the specified query against default collection.
 func MustExecuteN1qlQuery(t *testing.T, host *gocb.Cluster, query string) *gocb.QueryResult {
 	queryResult, err := host.Query(query, &gocb.QueryOptions{Timeout: 3 * time.Minute})

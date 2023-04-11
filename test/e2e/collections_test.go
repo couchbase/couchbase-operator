@@ -37,10 +37,7 @@ func TestScopeCreateExplicit(t *testing.T) {
 	scopeGroupNames := []string{"buttons", "mindy"}
 
 	// Create a scope and scope group.
-	scope := e2eutil.NewScope(scopeName).Generate()
-	scope.Annotations["cao.couchbase.com/history"] = "false"
-
-	scope = e2eutil.MustCreateScope(t, kubernetes, scope)
+	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
 
 	scopeGroup := e2eutil.NewScopeGroup(scopeGroupName, scopeGroupNames...).MustCreate(t, kubernetes)
 

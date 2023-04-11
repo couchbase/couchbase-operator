@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -1032,6 +1033,162 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestLocalVolumeMountReuse tests that use of local storage annotation causes underlying
+// volumes(default/data/index) to be reused from the generated PersistentVolumeClaim.
+func TestLocalVolumeMountReuse(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+	localClaim := "local"
+
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: localClaim,
+		DataClaim:    localClaim,
+		IndexClaim:   localClaim,
+	}
+
+	// set local storage annotation
+	template := createPersistentVolumeClaimSpec(f.StorageClassName, localClaim, 2)
+	template.ObjectMeta.Annotations = make(map[string]string)
+	template.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{template}
+
+	// ensure cluster is created and bucket warmup completes
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+
+	// validate cluster creation events
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Only a single Claim should be assocated with Pod
+	// Check number of persistent vol claims matches the defined spec
+	expectedPvcMap := map[string]int{
+		couchbaseutil.CreateMemberName(cluster.Name, 0): 1,
+		couchbaseutil.CreateMemberName(cluster.Name, 1): 1,
+		couchbaseutil.CreateMemberName(cluster.Name, 2): 1,
+	}
+
+	// To cross check number of persistent vol claims matches the defined spec
+	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
+}
+
+// TestMixedVolumeMountReuse tests that use of local storage annotation causes underlying
+// volumes(default/data/index) to be reused from the generated PersistentVolumeClaim.
+func TestMixedVolumeMountReuse(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+	localClaim := "local"
+	dynamicClaim := "dynamic"
+
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: dynamicClaim,
+		DataClaim:    localClaim,
+		IndexClaim:   localClaim,
+	}
+
+	// create storage templates
+	localTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, localClaim, 2)
+	localTemplate.ObjectMeta.Annotations = make(map[string]string)
+	localTemplate.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+	dynamicTemplate := createPersistentVolumeClaimSpec(f.StorageClassName, dynamicClaim, 2)
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{localTemplate, dynamicTemplate}
+
+	// ensure cluster is created and bucket warmup completes
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+
+	// validate cluster creation events
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Pod should consist of default claim with data and index on a shared local claim
+	expectedPvcMap := map[string]int{
+		couchbaseutil.CreateMemberName(cluster.Name, 0): 2,
+		couchbaseutil.CreateMemberName(cluster.Name, 1): 2,
+		couchbaseutil.CreateMemberName(cluster.Name, 2): 2,
+	}
+
+	// To cross check number of persistent vol claims matches the defined spec
+	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
+}
+
+// TestLocalVolumeAutoFailover tests couchbase server can failover a node
+// with Local PV style backing and the operator can reconcile.
+func TestLocalVolumeAutoFailover(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+	victim := 1
+	pvcName := "couchbase"
+
+	// Create the cluster.
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+	}
+
+	// set local storage annotation
+	template := createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 2)
+	template.ObjectMeta.Annotations = make(map[string]string)
+	template.ObjectMeta.Annotations[pkgconstants.LocalStorageAnnotation] = "ok"
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{template}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+	time.Sleep(30 * time.Second) // Allow bucket to warm up before killing anything
+
+	// When ready terminate a node, expect Server to auto failover and the operator
+	// to replace the node.
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Check the events are as expected:
+	// * Cluster created
+	// * Node goes down, fails over and is replaced
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		e2eutil.PodDownFailedWithPVCRecoverySequence(1),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

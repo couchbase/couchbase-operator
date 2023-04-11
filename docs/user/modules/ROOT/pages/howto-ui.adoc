@@ -74,7 +74,7 @@ An illustrative example for NGINX would look like:
 
 [source,console]
 ----
-apiVersion: networking.k8s.io
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: my-ingress
@@ -82,16 +82,16 @@ metadata:
     nginx.ingress.kubernetes.io/affinity: cookie # <.>
     nginx.ingress.kubernetes.io/affinity-mode: persistent
 spec:
-rules:
-- http: # <.>
-    paths:
-    - path: / # <.>
-      pathType: Prefix
-      backend:
-        service:
-          name: my-cluster # <.>
-          port:
-            number: 8091 # <.>
+  rules:
+  - http: # <.>
+      paths:
+      - path: / # <.>
+        pathType: Prefix
+        backend:
+          service:
+            name: my-cluster # <.>
+            port:
+              number: 8091 # <.>
 ----
 
 <.> The ingress is annotated with `affinity` -- this enables client affinity -- and `affinity-mode` -- this ensures each client session is routed to the same backend pod.
