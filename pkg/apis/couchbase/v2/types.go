@@ -1227,9 +1227,9 @@ type CouchbaseBucketSpec struct {
 
 type HistoryRetentionSettings struct {
 	// history retention in bytes
-	Seconds int `json:"-" annotation:"seconds"`
+	Seconds uint64 `json:"-" annotation:"seconds"`
 	// history retention in seconds
-	Bytes int `json:"-" annotation:"bytes"`
+	Bytes uint64 `json:"-" annotation:"bytes"`
 	// whether collections have history enabled by default
 	CollectionDefault *bool `json:"-" annotation:"collectionHistoryDefault"`
 }

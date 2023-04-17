@@ -118,6 +118,13 @@ func (state *PopulateState) setField(field *reflect.Value, value string) error {
 		}
 	case reflect.String:
 		field.SetString(value)
+	case reflect.Uint64:
+		val, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return err
+		}
+
+		field.SetUint(val)
 	case reflect.Int:
 		intVal, err := strconv.Atoi(value)
 		if err != nil {

@@ -1227,6 +1227,56 @@ func checkConstraintAutoscalingStabilizationPeriod(v *types.Validator, cluster *
 	return nil
 }
 
+func checkStringToUint(val string) error {
+	_, err := strconv.ParseUint(val, 10, 64)
+	return err
+}
+
+func checkStringToBool(val string) error {
+	_, err := strconv.ParseBool(val)
+	return err
+}
+
+func checkHistoryRetentionBytes(val string) error {
+	bytes, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	minExpected := uint64(2 * 1024 * 1024 * 1024)
+	if bytes < minExpected {
+		return fmt.Errorf("value %d is less than %d", bytes, minExpected)
+	}
+
+	return nil
+}
+
+func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
+	cdcAnnotations := map[string]func(string) error{
+		"cao.couchbase.com/historyRetention.seconds":                  checkStringToUint,
+		"cao.couchbase.com/historyRetention.bytes":                    checkHistoryRetentionBytes,
+		"cao.couchbase.com/historyRetention.collectionHistoryDefault": checkStringToBool,
+	}
+
+	var errs []error
+
+	for k, v := range bucket.Annotations {
+		if testFunc, ok := cdcAnnotations[k]; ok {
+			if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+				errs = append(errs, fmt.Errorf("annotation '%s' can only be used with magma storage backend", k))
+				continue
+			}
+
+			if err := testFunc(v); err != nil {
+				errs = append(errs, fmt.Errorf("annotation '%s' failed to parse with error %w", k, err))
+				continue
+			}
+		}
+	}
+
+	return errs
+}
+
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
@@ -1248,20 +1298,6 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
 	}
 
-	cdcAnnotations := map[string]struct{}{
-		"cao.couchbase.com/historyRetention.seconds":                  {},
-		"cao.couchbase.com/historyRetention.bytes":                    {},
-		"cao.couchbase.com/historyRetention.collectionHistoryDefault": {},
-	}
-
-	for k := range bucket.Annotations {
-		if _, ok := cdcAnnotations[k]; ok {
-			if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
-				errs = append(errs, fmt.Errorf("annotation '%s' can only be used with magma storage backend", k))
-			}
-		}
-	}
-
 	if bucket.Spec.MaxTTL != nil {
 		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
 			errs = append(errs, err)
@@ -1279,6 +1315,8 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.BucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
 	}
+
+	errs = append(errs, checkBucketAnnotations(bucket)...)
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)

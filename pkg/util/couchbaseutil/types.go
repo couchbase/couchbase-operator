@@ -435,8 +435,8 @@ type Bucket struct {
 	CompressionMode                   CompressionMode         `json:"compressionMode"`
 	DurabilityMinLevel                Durability              `json:"durabilityMinLevel"`
 	MaxTTL                            int                     `json:"maxTTL"`
-	HistoryRetentionSeconds           int                     `json:"historyRetentionSeconds"`
-	HistoryRetentionBytes             int                     `json:"historyRetentionBytes"`
+	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds"`
+	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault"`
 }
 
@@ -485,8 +485,8 @@ type BucketStatus struct {
 	DurabilityMinLevel                Durability              `json:"durabilityMinLevel"`
 	MaxTTL                            int                     `json:"maxTTL"`
 	BasicStats                        BucketBasicStats        `json:"basicStats"`
-	HistoryRetentionSeconds           int                     `json:"historyRetentionSeconds,omitempty"`
-	HistoryRetentionBytes             int                     `json:"historyRetentionBytes,omitempty"`
+	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds,omitempty"`
+	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes,omitempty"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault,omitempty"`
 }
 
@@ -827,8 +827,8 @@ func (b *Bucket) FormEncode(update bool) []byte {
 			data.Set("historyRetentionCollectionDefault", strconv.FormatBool(*b.HistoryRetentionCollectionDefault))
 		}
 
-		data.Set("historyRetentionBytes", strconv.Itoa(b.HistoryRetentionBytes))
-		data.Set("historyRetentionSeconds", strconv.Itoa(b.HistoryRetentionSeconds))
+		data.Set("historyRetentionBytes", strconv.FormatUint(b.HistoryRetentionBytes, 10))
+		data.Set("historyRetentionSeconds", strconv.FormatUint(b.HistoryRetentionSeconds, 10))
 	}
 
 	return []byte(data.Encode())
