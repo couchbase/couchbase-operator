@@ -29,7 +29,7 @@ With support for multiple Root CA's in Server 7.1, certificates no longer need t
 It is now possible to include multi-PEM CAs in the Server `secretSource`.
 See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[serverSecretName]
 
-Cetificate Rotation has been expanded to allow plain text reload as a last resort in case of already-expired certificates.
+Certificate Rotation has been expanded to allow plain text reload as a last resort in case of already-expired certificates.
 See xref:howto-tls-rotation.adoc#replacing-expired-certificates[Replacing expired Certificates]
 
 Relatedly, the Operator now raises Kubernetes Events when it detects TLS expiration.

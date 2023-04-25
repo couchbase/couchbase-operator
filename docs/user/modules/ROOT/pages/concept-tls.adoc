@@ -201,7 +201,7 @@ image:tls-passphrase-kubernetes.png[]
 The passphrase is only sent to Couchbase Server when the Operator performs an HTTPS `POST` to the https://docs.couchbase.com/server/current/rest-api/upload-retrieve-node-cert.html[`/node/controller/reloadCertificate`^] API.
 The request to `reloadCertificate` causes Couchbase Server to call `passphrase-script.sh` in order to retrieve the passphrase required load the node certificate.
 The general requirement for the local script is simply to print out a passphrase string.
-Therefore, the Operator mounts the following script into each Couchbase Server Pod in order to securely fufill this requirement:
+Therefore, the Operator mounts the following script into each Couchbase Server Pod in order to securely fulfill this requirement:
 
 [source,yaml]
 ----
@@ -225,4 +225,4 @@ An additional benefit of this design is that it protects the passphrase from bei
 A malicious actor will not be able to make immediate use of any of the on-disk certs unless the Operator makes a subsequent call to reload the certificates (which only occurs during rotation and topology changes).
 Therefore, this overall design provides optimal security for passphrase script registration as it ensures that the private key and its passphrase are never co-located on disk within Couchbase Server, consumed in memory only, and presented only on an as needed bases.
 
-For details on tls passphrase configuration read the xref:howto-tls-passphrase.adoc[TLS Passphrase How To].
+For details on TLS passphrase configuration read the xref:howto-tls-passphrase.adoc[TLS Passphrase How To].
