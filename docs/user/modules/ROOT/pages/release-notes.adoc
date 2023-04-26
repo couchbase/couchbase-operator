@@ -102,6 +102,95 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
+[#release-v241]
+== Release 2.4.1
+
+Couchbase Autonomous Operator 2.4.1 was released in May 2023.
+
+[#changes-in-behavior-v241]
+=== New Features and Behavioral Changes
+
+==== Support for New Features in Couchbase Server 7.2.0
+
+Per Collection Change-History. Maintain a change history for all collections in a bucket.
+Changes to documents in collections are included in the change history for the bucket.
+A maximum size for the change history can be specified in bytes or seconds.
+See xref:server:learn:data:change-history.adoc[Change History].
+
+You can now configure block size for Magma storage when you create a bucket.
+See xref:server:rest-api:rest-bucket-create.adoc#magmaseqtreedatablocksize[Creating and Editing Buckets].
+
+==== Local Persistent Volumes
+
+The ability to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume when deploying Couchbase Server resources.
+
+=== Fixed Issues
+
+[#table-fixed-issues-v241,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2843[K8S-2843^]
+a| *Summary:* Previously the Operator was not able to rotate an expired, self-signed Admission Controller certificate on the Mutating/Validating Webhook.
+
+a| https://issues.couchbase.com/browse/K8S-2885[K8S-2885^]
+a| *Summary:* Fixed extraneous Rebalance messages under certain Couchbase Server upgrade conditions.
+
+a| https://issues.couchbase.com/browse/K8S-2934[K8S-2934^]
+a| *Summary:* Check for existence of old persistence secret before creating a new one, and avoid reusing an existing one.
+
+a| https://issues.couchbase.com/browse/K8S-2944[K8S-2944^]
+a| *Summary:* Fixed issue where URL Encoding breaks string lists with `cipherSuites`.
+
+a| https://issues.couchbase.com/browse/K8S-2971[K8S-2971^]
+a| *Summary:* Fixed issue where `storageBackend` warnings occur after Operator upgrade.
+
+|===
+
+=== Known Issues
+
+[#table-known-issues-v241,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2997[K8S-2997]
+a| *Summary:*
+`TestUpgradeSupportableKillStatefulPodOnCreate` results are inconsistent.
+
+This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
+
+a| https://issues.couchbase.com/browse/K8S-3061[K8S-3061]
+a| *Summary:*
+`TestPersistentVolumeRzaNodesKilledUnbalanced` results are inconsistent.
+
+This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
+
+a| https://issues.couchbase.com/browse/K8S-3062[K8S-3062]
+a| *Summary:*
+`TestMandatoryMutualTLSRotateCAExpiring` results are inconsistent.
+
+This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
+
+a| https://issues.couchbase.com/browse/K8S-2891[K8S-2891]
+a| *Summary:*
+`cao certify` is not supported on Openshift ARM clusters.
+
+Full support for OpenShift on ARM will be available in a future release.
+
+a| https://issues.couchbase.com/browse/K8S-3033[K8S-3033]
+a| *Summary:*
+`autoFailoverMaxCount` defaults to 3, which is inconsistent with the Couchbase Server default of 1.
+
+The workaround is to set the appropriate value for the cluster.
+
+a| https://issues.couchbase.com/browse/K8S-3066[K8S-3066]
+a| *Summary:*
+It is not yet possible to mutate an existing Collection using the Operator.
+
+See the linked issue for details of a workaround.
+
+|===
+
 [#release-v240]
 == Release 2.4.0
 
@@ -128,20 +217,23 @@ Support for OpenShift on ARM will be available in a future release.
 [#table-fixed-issues-v240,cols="25,66"]
 |===
 | Issue | Description
+
 a| https://issues.couchbase.com/browse/K8S-2825[K8S-2825^]
-a| *Summary* Previously the Operator did not correctly propagate the changes when the client certificates were updated.
+a| *Summary:* Previously the Operator did not correctly propagate the changes when the client certificates were updated.
+
 a| https://issues.couchbase.com/browse/K8S-2838[K8S-2838^]
-a| *Summary* Previously the CRD was not correctly inheriting the entirety of `v1.PodSpec`, meaning that attributes such as `affinity` were not available.
+a| *Summary:* Previously the CRD was not correctly inheriting the entirety of `v1.PodSpec`, meaning that attributes such as `affinity` were not available.
+
 |===
 
 === Known Issues
 
-[#table_known_issues,cols="25,66"]
+[#table-known-issues-v240,cols="25,66"]
 |===
 | Issue | Description
 
 a| https://issues.couchbase.com/browse/K8S-2944[K8S-2944]
-a| *Summary*:
+a| *Summary:*
 URL Encoding breaks string lists with `cipherSuites`.
 
 The following fails with "Invalid format. Expecting a list of ciphers.":
@@ -171,7 +263,7 @@ As a workaround, escape the ciphers with quotation marks as shown below (the sin
 ----
 
 a| https://issues.couchbase.com/browse/K8S-2971[K8S-2971]
-a| *Summary*:
+a| *Summary:*
 `storageBackend` warnings occur after Operator upgrade
 
 By default before Operator 2.4.0, Bucket resources do not have `storageBackend` set.

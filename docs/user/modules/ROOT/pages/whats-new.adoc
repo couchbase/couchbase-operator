@@ -60,3 +60,9 @@ Although the Exporter is no longer required when using Couchbase Server 7.x, whi
 
 This release adds performance improvements and tuning options, see xref:howto-prometheus.adoc[] for details.
 
+== Local Persistent Volumes (from Couchbase Autonomous Operator 2.4.1)
+
+In Kubernetes it is possible to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume (see https://kubernetes.io/docs/concepts/storage/volumes/#local[local]).
+
+From Couchbase Autonomous Operator 2.4.1, it is now possible to use these Local Volumes when deploying Couchbase Server resources.
+See xref:concept-persistent-volumes.adoc#local-persistent-volumes[Local Persistent Volumes] for full details.
