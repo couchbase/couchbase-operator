@@ -17,7 +17,7 @@ ARG TARGETARCH
 ARG GO_VERSION=1.19.4
 RUN curl -s https://dl.google.com/go/go$GO_VERSION.linux-${TARGETARCH}.tar.gz | tar xz
 
-ARG TARGET=openshift-linux-amd64
+ARG TARGET=openshift-linux-${TARGETARCH}
 
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 COPY ${TARGET}/cao /
