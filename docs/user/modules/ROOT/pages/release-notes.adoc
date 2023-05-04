@@ -124,6 +124,7 @@ See xref:server:rest-api:rest-bucket-create.adoc#magmaseqtreedatablocksize[Creat
 
 The ability to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume when deploying Couchbase Server resources.
 
+[#fixed-issues-v241]
 === Fixed Issues
 
 [#table-fixed-issues-v241,cols="25,66"]
@@ -147,6 +148,7 @@ a| *Summary:* Fixed issue where `storageBackend` warnings occur after Operator u
 
 |===
 
+[#known-issues-v241]
 === Known Issues
 
 [#table-known-issues-v241,cols="25,66"]
@@ -212,6 +214,7 @@ Support for OpenShift on ARM will be available in a future release.
 * Allow insecure reload of expired certificates as a last resort
 * Raise events on TLS expiration
 
+[#fixed-issues-v240]
 === Fixed Issues
 
 [#table-fixed-issues-v240,cols="25,66"]
@@ -226,6 +229,7 @@ a| *Summary:* Previously the CRD was not correctly inheriting the entirety of `v
 
 |===
 
+[#known-issues-v240]
 === Known Issues
 
 [#table-known-issues-v240,cols="25,66"]
