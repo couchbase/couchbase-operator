@@ -1003,12 +1003,7 @@ func applyEndpointProxy(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		return
 	}
 
-	epProxyContainer := createEndpointProxyContainer(cluster.Spec)
-
-	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
-		applyEndpointProxyPodTLS(cluster, &epProxyContainer, pod)
-	}
-
+	epProxyContainer := createEndpointProxyContainer(cluster, pod)
 	pod.Spec.Containers = append(pod.Spec.Containers, epProxyContainer)
 }
 
@@ -1035,9 +1030,9 @@ func applyEndpointProxyPodTLS(cluster *couchbasev2.CouchbaseCluster, container *
 	}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	container.Args = append(container.Args,
-		"-secure=true",
-		fmt.Sprintf("-cert=%s/tls.crt", EpTLSSecretMountPath),
-		fmt.Sprintf("-key=%s/tls.key", EpTLSSecretMountPath),
+		"--self-sign", "false",
+		"--cert", fmt.Sprintf("%s/tls.crt", EpTLSSecretMountPath),
+		"--key", fmt.Sprintf("%s/tls.key", EpTLSSecretMountPath),
 	)
 }
 
@@ -1642,12 +1637,12 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	return initContainer
 }
 
-// createEndpointProxyContainer creates a endpoint proxy container based on inputs from manifest.
+// createEndpointProxyContainer creates a new endpoint proxy container based on inputs from manifest.
 // N.B. The endpoint proxy is implemented by stellar-nebula-gateway gRPC service by default.
-func createEndpointProxyContainer(cs couchbasev2.ClusterSpec) v1.Container {
+func createEndpointProxyContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {
 	container := v1.Container{
 		Name:  EndpointProxyContainerName,
-		Image: cs.EndpointProxyImage(),
+		Image: cluster.Spec.EndpointProxyImage(),
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "sn-data-port",
@@ -1662,8 +1657,17 @@ func createEndpointProxyContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		},
 	}
 
-	// add cb host 127.0.0.1 and run on daemon mode
-	container.Args = append(container.Args, "-daemon=true", "-cb-host=127.0.0.1")
+	// add cb host 127.0.0.1 and run on daemon mode for all
+	container.Args = append(container.Args,
+		"--daemon", "true",
+		"--cb-host", "127.0.0.1")
+
+	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
+		applyEndpointProxyPodTLS(cluster, &container, pod)
+	} else {
+		container.Args = append(container.Args,
+			"--self-sign", "true")
+	}
 
 	return container
 }
