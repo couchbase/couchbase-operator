@@ -429,7 +429,7 @@ func registerTests() {
 		framework.NewTestDef(TestScopeUnmanaged).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateExplicit).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateImplicit).WithTags(TagSuiteP0, TagFeatureCollections),
-		framework.NewTestDef(TestCollectionCreateImplicitWithAnnotations).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestCollectionWithAnnotations).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionCreateMixed).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionDelete).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestCollectionUnmanaged).WithTags(TagSuiteP0, TagFeatureCollections),

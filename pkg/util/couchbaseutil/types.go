@@ -1422,6 +1422,13 @@ type Collection struct {
 	History *bool  `json:"history" url:"history,omitempty"`
 }
 
+// 09/05/2023: collections are now mutateable.
+// Uses a separate struct because only one field is mutable.
+// Creating a separate struct for now.
+type CollectionPatchRequest struct {
+	History *bool `json:"history" url:"history,omitempty"`
+}
+
 // HasScope determines whether the named scope exists in the list.
 func (l ScopeList) HasScope(name string) bool {
 	for _, scope := range l.Scopes {

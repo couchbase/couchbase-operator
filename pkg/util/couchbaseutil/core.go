@@ -236,6 +236,19 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	return nil
 }
 
+func (c *Client) Patch(r *Request, host string) error {
+	req, err := http.NewRequest("PATCH", host+r.Path, bytes.NewReader(r.Body))
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	c.setDefaultHeaders(r, req)
+
+	req.Header.Set(HeaderContentType, ContentTypeURLEncoded)
+
+	return c.doRequest(req, r.Body, r.Result)
+}
+
 func (c *Client) Get(r *Request, host string) error {
 	req, err := http.NewRequest("GET", host+r.Path, nil)
 	if err != nil {

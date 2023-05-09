@@ -283,7 +283,7 @@ func TestCollectionCreateExplicit(t *testing.T) {
 
 // TestCollectionCreateImplicit tests collection selectors in scopes can
 // select collections and collection groups with labels.
-func TestCollectionCreateImplicitWithAnnotations(t *testing.T) {
+func TestCollectionWithAnnotations(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -294,8 +294,6 @@ func TestCollectionCreateImplicitWithAnnotations(t *testing.T) {
 	clusterSize := 1
 	scopeName := "pinky"
 	collectionName := "brain"
-	collectionGroupName := "group1"
-	collectionGroupNames := []string{"buttons", "mindy"}
 
 	// Create a collection and collection group.
 	collection := e2eutil.NewCollection(collectionName).WithLabels(defaultLabelSelector).Generate()
@@ -305,9 +303,7 @@ func TestCollectionCreateImplicitWithAnnotations(t *testing.T) {
 
 	collection.Annotations["cao.couchbase.com/history"] = "false"
 
-	e2eutil.MustCreateCollection(t, kubernetes, collection)
-
-	e2eutil.NewCollectionGroup(collectionGroupName, collectionGroupNames...).WithLabels(defaultLabelSelector).MustCreate(t, kubernetes)
+	collection = e2eutil.MustCreateCollection(t, kubernetes, collection)
 
 	// Create a scope.
 	scope := e2eutil.NewScope(scopeName).WithLabelSelector(defaultLabelSelector).MustCreate(t, kubernetes)
@@ -327,18 +323,15 @@ func TestCollectionCreateImplicitWithAnnotations(t *testing.T) {
 
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
-	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
+	expected.WithScope(scopeName).WithCollections(collectionName)
+
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForCollectionSettings(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, false, 1*time.Minute)
 
-	e2eutil.CheckCollectionSettings(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, false)
-	// Expect there to be a scopes & collections updated event.
-	expectedEvents := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
-	}
+	collection.Annotations["cao.couchbase.com/history"] = "true"
 
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	e2eutil.MustUpdateCollection(t, kubernetes, collection)
+	e2eutil.MustWaitForCollectionSettings(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, true, 1*time.Minute)
 }
 
 // TestCollectionCreateImplicit tests collection selectors in scopes can
