@@ -1030,7 +1030,6 @@ func applyEndpointProxyPodTLS(cluster *couchbasev2.CouchbaseCluster, container *
 	}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	container.Args = append(container.Args,
-		"--self-sign", "false",
 		"--cert", fmt.Sprintf("%s/tls.crt", EpTLSSecretMountPath),
 		"--key", fmt.Sprintf("%s/tls.key", EpTLSSecretMountPath),
 	)
@@ -1665,8 +1664,7 @@ func createEndpointProxyContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1
 	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
 		applyEndpointProxyPodTLS(cluster, &container, pod)
 	} else {
-		container.Args = append(container.Args,
-			"--self-sign", "true")
+		container.Args = append(container.Args, "--self-sign")
 	}
 
 	return container
