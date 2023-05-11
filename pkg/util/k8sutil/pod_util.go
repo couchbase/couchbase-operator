@@ -1654,12 +1654,26 @@ func createEndpointProxyContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
+		LivenessProbe: &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{
+				HTTPGet: &v1.HTTPGetAction{
+					Path: metricsEndpointPath,
+					Port: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: prometheusPort,
+					},
+					Scheme: v1.URISchemeHTTP,
+				},
+			},
+			InitialDelaySeconds: 10,
+			TimeoutSeconds:      5,
+			PeriodSeconds:       10,
+			FailureThreshold:    3,
+		},
 	}
 
-	// add cb host 127.0.0.1 and run on daemon mode for all
-	container.Args = append(container.Args,
-		"--daemon", "true",
-		"--cb-host", "127.0.0.1")
+	// add cb host 127.0.0.1 and run on daemon mode.
+	container.Args = append(container.Args, "--daemon", "--cb-host", "127.0.0.1")
 
 	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
 		applyEndpointProxyPodTLS(cluster, &container, pod)
