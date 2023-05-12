@@ -1092,7 +1092,8 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 
 // MustRotateServerCertificateClientCertificateAndCA generates a new CA and client and server certificates and updates the existing secrets.
 func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSContext) {
-	validFrom := time.Now().In(time.UTC)
+	// valid from an hour ago
+	validFrom := time.Now().Add(time.Duration(-60) * time.Minute).In(time.UTC)
 	validTo := validFrom.AddDate(10, 0, 0)
 
 	// Create a new CA
