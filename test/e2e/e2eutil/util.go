@@ -75,16 +75,16 @@ func RandomString(length int) string {
 	return suffix
 }
 
-// MustNewClusterFromSpec creates a cluster and waits for various ready conditions.
+// CreateNewClusterFromSpec creates a cluster and waits for various ready conditions.
 // Performs retries and garbage collection in the event of transient failure.
-func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+func CreateNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster, timeout int) *couchbasev2.CouchbaseCluster {
 	// Create the cluster.
 	cluster, err := CreateCluster(t, k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
 
-	MustWaitClusterStatusHealthy(t, k8s, cluster, 15*time.Minute)
+	MustWaitClusterStatusHealthy(t, k8s, cluster, time.Duration(timeout*int(time.Minute)))
 
 	// Update the cluster status, this is important for the test, especially if the cluster
 	// name is auto-generated.
@@ -94,6 +94,12 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couch
 	}
 
 	return updatedCluster
+}
+
+// MustNewClusterFromSpec calls the CreateNewClusterFromSpec function with a default
+// timeout of 15 minutes.
+func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
+	return CreateNewClusterFromSpec(t, k8s, clusterSpec, 15)
 }
 
 func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
@@ -294,6 +300,14 @@ func applyAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[str
 	}
 }
 
+func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.EndpointProxy) {
+	if config == nil {
+		return
+	}
+
+	cluster.Spec.Networking.EndpointProxy = config
+}
+
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
 // The key observation is all clusters are ostensibly the same, with features layered on
 // top.  We use the builder pattern to declare those features, so they are only defined
@@ -328,6 +342,8 @@ type ClusterOptions struct {
 
 	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
 
+	CloudNativeGateway *couchbasev2.EndpointProxy
+
 	S3UseIAM bool
 
 	Annotations map[string]string
@@ -336,6 +352,15 @@ type ClusterOptions struct {
 // WithPodAnnotations defines a cluster with annotations set on all pods.
 func (o *ClusterOptions) WithPodAnnotations(annotations map[string]string) *ClusterOptions {
 	o.Annotations = annotations
+
+	return o
+}
+
+func (o *ClusterOptions) WithCloudNativeGateway(image string) *ClusterOptions {
+	o.CloudNativeGateway = &couchbasev2.EndpointProxy{
+		Image: image,
+		TLS:   nil,
+	}
 
 	return o
 }
@@ -558,6 +583,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyAuditing(cluster, o.AuditConfiguration)
 	applyMonitoring(cluster, o.MonitoringConfiguration)
 	applyAnnotations(cluster, o.Annotations)
+	applyCloudNativeGateway(cluster, o.CloudNativeGateway)
 
 	return cluster
 }

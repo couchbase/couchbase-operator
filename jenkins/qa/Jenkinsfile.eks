@@ -40,6 +40,7 @@ pipeline {
     string(name: 'logging_image', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.2.2-114')
     string(name: 'logging_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.1.0')
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-125')
     string(name: 'kubernetes_version', defaultValue: '1.21')
     string(name: 'storage_class', defaultValue: 'gp2')
     string(name: 'bucket_type', defaultValue: 'couchbase')
@@ -173,6 +174,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -231,6 +233,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -289,6 +292,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -347,6 +351,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -405,6 +410,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -463,6 +469,7 @@ pipeline {
             -backup-image ${params.backup_image} \
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \

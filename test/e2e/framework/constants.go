@@ -18,4 +18,5 @@ var (
 	backupImageDefault              = "couchbase/operator-backup:1.3.0"
 	loggingImageDefault             = "couchbase/fluent-bit:1.2.0"
 	loggingImageUpgradeFromDefault  = "couchbase/fluent-bit:1.1.1"
+	endpointProxyImageDefault       = "ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-125"
 )

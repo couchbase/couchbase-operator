@@ -986,43 +986,8 @@ func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, backup *couchba
 	}
 }
 
-func WaitForPrometheusReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	return retryutil.RetryFor(timeout, func() error {
-		listOptions := metav1.ListOptions{
-			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
-		}
-
-		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
-		if err != nil {
-			return err
-		}
-
-		for _, pod := range pods.Items {
-			found := false
-
-			for _, status := range pod.Status.ContainerStatuses {
-				if status.Name != k8sutil.MetricsContainerName {
-					continue
-				}
-
-				if !status.Ready {
-					return fmt.Errorf("prometheus not ready on pod %s", pod.Name)
-				}
-
-				found = true
-			}
-
-			if !found {
-				return fmt.Errorf("unable to find prometheus container status in pod %s", pod.Name)
-			}
-		}
-
-		return nil
-	})
-}
-
 func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	err := WaitForPrometheusReady(k8s, couchbase, timeout)
+	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.MetricsContainerName)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1080,7 +1045,8 @@ func MustWaitForStableResourceVersion(t *testing.T, k8s *types.Cluster, resource
 	}
 }
 
-func waitForLoggingSidecarReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+// WaitForContainerReady waits for the specified container to enter a ready state.
+func WaitForContainerReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, containerName string) error {
 	return retryutil.RetryFor(timeout, func() error {
 		listOptions := metav1.ListOptions{
 			LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
@@ -1095,19 +1061,19 @@ func waitForLoggingSidecarReady(k8s *types.Cluster, couchbase *couchbasev2.Couch
 			found := false
 
 			for _, status := range pod.Status.ContainerStatuses {
-				if status.Name != k8sutil.CouchbaseLogSidecarContainerName {
+				if status.Name != containerName {
 					continue
 				}
 
 				if !status.Ready {
-					return fmt.Errorf("logging sidecar not ready on pod %s", pod.Name)
+					return fmt.Errorf(containerName+" not ready on pod %s", pod.Name)
 				}
 
 				found = true
 			}
 
 			if !found {
-				return fmt.Errorf("unable to find logging sidecar container status in pod %s", pod.Name)
+				return fmt.Errorf("unable to find "+containerName+" container status in pod %s", pod.Name)
 			}
 		}
 
@@ -1145,9 +1111,16 @@ func waitForPodVolumeSize(k8s *types.Cluster, memberName string, claimName strin
 	})
 }
 
+func MustWaitForCloudNativeGatewaySidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.EndpointProxyContainerName)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
 // MustWaitForLoggingSidecarReady waits for the duration to confirm that the sidecar is running.
 func MustWaitForLoggingSidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	err := waitForLoggingSidecarReady(k8s, couchbase, timeout)
+	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.CouchbaseLogSidecarContainerName)
 	if err != nil {
 		Die(t, err)
 	}

@@ -35,6 +35,7 @@ type Framework struct {
 	CouchbaseBackupImage          string
 	CouchbaseLoggingImage         string
 	CouchbaseLoggingImageUpgrade  string
+	EndpointProxyImage            string
 	BucketType                    e2eutil.BucketType
 	CompressionMode               couchbasev2.CouchbaseBucketCompressionMode
 	EnableIstio                   bool

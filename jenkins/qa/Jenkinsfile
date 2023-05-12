@@ -33,6 +33,7 @@ pipeline {
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.4', description: 'Version of the Prometheus exporter to upgrade from')
     string(name: 'logging_image', defaultValue: 'aemerycb/fluent-bit:b66da5a59dc4ac89abc019ecbd1d9e2ab31c80b4', description: 'Version of the log shipping sidecar to test')
     string(name: 'logging_image_upgrade', defaultValue: 'couchbase/fluent-bit:1.0.4', description: 'Version of the log shipping sidecar to upgrade from')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-125', description: 'Image to use for the cloud native gateway deployment')
     string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.3-enterprise', description: 'Version of Sync-Gateway to test')
     choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
     choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')
@@ -179,6 +180,7 @@ pipeline {
             -backup-image \${backup_image} \
             -logging-image \${logging_image} \
             -logging-image-upgrade \${logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class standard-rwo \
             -bucket-type \${bucket_type} \
             -compression-mode \${compression_mode} \

@@ -98,6 +98,7 @@ func registerTests() {
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
+		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateBucketCluster).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestResizeCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
