@@ -327,6 +327,14 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 				Times:     victims,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 			},
+			eventschema.Optional{
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+					},
+				},
+			},
 			// This may or may not happen on 6.5.0... :/
 			eventschema.Optional{
 				Validator: eventschema.Sequence{
