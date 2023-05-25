@@ -5,15 +5,15 @@ import (
 )
 
 const (
-	EnvOperatorPodName        = "MY_POD_NAME"
-	EnvOperatorPodNamespace   = "MY_POD_NAMESPACE"
-	EnvCouchbaseImageName     = "RELATED_IMAGE_COUCHBASE_SERVER"
-	EnvBackupImageName        = "RELATED_IMAGE_COUCHBASE_BACKUP"
-	EnvMetricsImageName       = "RELATED_IMAGE_COUCHBASE_METRICS"
-	EnvEndpointProxyImageName = "RELATED_IMAGE_COUCHBASE_ENDPOINT_PROXY"
-	EnvDigestsConfigMap       = "IMAGE_DIGESTS_CONFIG_MAP"
-	AuthSecretUsernameKey     = "username"
-	AuthSecretPasswordKey     = "password"
+	EnvOperatorPodName             = "MY_POD_NAME"
+	EnvOperatorPodNamespace        = "MY_POD_NAMESPACE"
+	EnvCouchbaseImageName          = "RELATED_IMAGE_COUCHBASE_SERVER"
+	EnvBackupImageName             = "RELATED_IMAGE_COUCHBASE_BACKUP"
+	EnvMetricsImageName            = "RELATED_IMAGE_COUCHBASE_METRICS"
+	EnvCloudNativeGatewayImageName = "RELATED_IMAGE_COUCHBASE_CLOUD_NATIVE_GATEWAY"
+	EnvDigestsConfigMap            = "IMAGE_DIGESTS_CONFIG_MAP"
+	AuthSecretUsernameKey          = "username"
+	AuthSecretPasswordKey          = "password"
 )
 
 const (
@@ -92,16 +92,16 @@ var (
 const (
 	App = "couchbase"
 
-	LabelApp           = "app"
-	LabelCluster       = "couchbase_cluster"
-	LabelNode          = "couchbase_node"
-	LabelNodeConf      = "couchbase_node_conf"
-	LabelVolumeName    = "couchbase_volume"
-	LabelServer        = "couchbase_server"
-	LabelBackup        = "couchbase_backup"
-	LabelBackupRestore = "couchbase_restore"
-	LabelServicePrefix = "couchbase_service_"
-	LabelEndpointProxy = "couchbase_endpoint_proxy"
+	LabelApp                = "app"
+	LabelCluster            = "couchbase_cluster"
+	LabelNode               = "couchbase_node"
+	LabelNodeConf           = "couchbase_node_conf"
+	LabelVolumeName         = "couchbase_volume"
+	LabelServer             = "couchbase_server"
+	LabelBackup             = "couchbase_backup"
+	LabelBackupRestore      = "couchbase_restore"
+	LabelServicePrefix      = "couchbase_service_"
+	LabelCloudNativeGateway = "couchbase_cloud_native_gateway"
 
 	AnnotationVolumeNodeConf      = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
 	AnnotationVolumeMountPath     = "path"

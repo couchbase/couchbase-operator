@@ -68,7 +68,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintVolumeTemplateStorageClass,
 		checkConstraintServerMinimumVersion,
 		checkConstraintTLS,
-		checkConstraintEndpointProxyTLS,
+		checkConstraintCloudNativeGatewayTLS,
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
 		checkConstraintBucketNames,
@@ -991,17 +991,17 @@ func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluste
 	return nil
 }
 
-// checkConstraintEndpointProxyTLS checks the validity of the endpoint proxy TLS configs passed.
-func checkConstraintEndpointProxyTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.Networking.EndpointProxy == nil {
+// checkConstraintCloudNativeGatewayTLS checks the validity of the Cloud Native Gateway TLS configs passed.
+func checkConstraintCloudNativeGatewayTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return nil
 	}
 
-	if cluster.Spec.Networking.EndpointProxy.TLS == nil {
+	if cluster.Spec.Networking.CloudNativeGateway.TLS == nil {
 		return nil
 	}
 
-	err := validateEndpointProxyServerTLS(v, cluster)
+	err := validateCloudNativeGatewayServerTLS(v, cluster)
 	if err != nil {
 		return err
 	}
@@ -3125,8 +3125,8 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 	return nil
 }
 
-func validateEndpointProxyServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	serverSecretName := cluster.Spec.Networking.EndpointProxy.TLS.ServerSecretName
+func validateCloudNativeGatewayServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	serverSecretName := cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName
 
 	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, serverSecretName)
 	if err != nil {
@@ -3134,7 +3134,7 @@ func validateEndpointProxyServerTLS(v *types.Validator, cluster *couchbasev2.Cou
 	}
 
 	if !found {
-		return fmt.Errorf("secret %s referenced by spec.networking.endpointProxy.tls.serverSecretName must exist", serverSecretName)
+		return fmt.Errorf("secret %s referenced by spec.networking.cloudNativeGateway.tls.serverSecretName must exist", serverSecretName)
 	}
 
 	_, ok := secret.Data[v1.TLSPrivateKeyKey]

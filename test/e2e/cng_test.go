@@ -20,7 +20,7 @@ func TestCreateCNG(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.EndpointProxyImage).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetes)
 
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, cluster, 2)

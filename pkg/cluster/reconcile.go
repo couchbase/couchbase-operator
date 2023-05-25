@@ -214,7 +214,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
-		(*Cluster).reconcileEndpointProxyService,
+		(*Cluster).reconcileCloudNativeGatewayService,
 	}
 
 	if err := postTopologyReconcilers.run(c); err != nil {
@@ -348,14 +348,14 @@ func (c *Cluster) reconcilePodServices() error {
 	return nil
 }
 
-// reconcileEndpointProxyService looks for changes in endpoint proxy feature enablement
+// reconcileCloudNativeGatewayService looks for changes in Cloud Native Gateway feature enablement
 // and it's subfeatures.
-func (c *Cluster) reconcileEndpointProxyService() error {
-	if c.cluster.Spec.Networking.EndpointProxy == nil {
+func (c *Cluster) reconcileCloudNativeGatewayService() error {
+	if c.cluster.Spec.Networking.CloudNativeGateway == nil {
 		return nil
 	}
 
-	return k8sutil.ReconcileEndpointProxyService(c.k8s, c.cluster)
+	return k8sutil.ReconcileCloudNativeGatewayService(c.k8s, c.cluster)
 }
 
 func (c *Cluster) reconcileClusterSettings() error {

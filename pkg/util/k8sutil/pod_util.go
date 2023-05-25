@@ -53,8 +53,8 @@ const (
 	LoggingConfigurationFile                  = "fluent-bit.conf"
 	passphraseScriptName                      = "tls-passphrase-script"
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
-	EndpointProxyContainerName                = "endpoint-proxy"
-	EpTLSSecretMountPath                      = "/var/run/secrets/couchbase.com/couchbase-ep-tls"
+	CloudNativeGatewayContainerName           = "cloud-native-gateway"
+	CngTLSSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-cng-tls"
 )
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
@@ -886,11 +886,11 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 		return nil, err
 	}
 
-	// adding endpoint proxy gRPC gateway for the cb cluster.
-	applyEndpointProxy(cluster, pod)
+	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
+	applyCloudNativeGateway(cluster, pod)
 
-	// adds endpoint proxy label to pods.
-	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelEndpointProxy: constants.EnabledValue})
+	// adds Cloud Native Gateway label to pods.
+	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
@@ -996,22 +996,22 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 	pod.Spec.Volumes = append(pod.Spec.Volumes, pvcState.volumes...)
 }
 
-// applyEndpointProxy adds a endpoint proxy for gRPC access to the cb cluster.
-func applyEndpointProxy(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
-	// If endpointProxy is enabled add the necessary sidecars.
-	if cluster.Spec.Networking.EndpointProxy == nil {
+// applyCloudNativeGateway adds a Cloud Native Gateway for gRPC access to the cb cluster.
+func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+	// If cloudNativeGateway is enabled add the necessary sidecars.
+	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return
 	}
 
-	epProxyContainer := createEndpointProxyContainer(cluster, pod)
-	pod.Spec.Containers = append(pod.Spec.Containers, epProxyContainer)
+	cngContainer := createCloudNativeGatewayImageContainer(cluster, pod)
+	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
 }
 
-// applyEndpointProxyPodTLS adds endpoint proxy server TLS certs and keys from secret to volumes and mounted.
-func applyEndpointProxyPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
-	// Add the endpoint proxy server secret volume to the pod
-	volumeName := "couchbase-endpoint-proxy-volume"
-	secretName := cluster.Spec.Networking.EndpointProxy.TLS.ServerSecretName
+// applyCloudNativeGatewayPodTLS adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
+func applyCloudNativeGatewayPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
+	// Add the Cloud Native Gateway server secret volume to the pod
+	volumeName := "couchbase-cloud-native-gateway-volume"
+	secretName := cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName
 	volume := v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -1026,12 +1026,12 @@ func applyEndpointProxyPodTLS(cluster *couchbasev2.CouchbaseCluster, container *
 	volumeMount := v1.VolumeMount{
 		Name:      volumeName,
 		ReadOnly:  true,
-		MountPath: EpTLSSecretMountPath,
+		MountPath: CngTLSSecretMountPath,
 	}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	container.Args = append(container.Args,
-		"--cert", fmt.Sprintf("%s/tls.crt", EpTLSSecretMountPath),
-		"--key", fmt.Sprintf("%s/tls.key", EpTLSSecretMountPath),
+		"--cert", fmt.Sprintf("%s/tls.crt", CngTLSSecretMountPath),
+		"--key", fmt.Sprintf("%s/tls.key", CngTLSSecretMountPath),
 	)
 }
 
@@ -1636,12 +1636,11 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	return initContainer
 }
 
-// createEndpointProxyContainer creates a new endpoint proxy container based on inputs from manifest.
-// N.B. The endpoint proxy is implemented by stellar-nebula-gateway gRPC service by default.
-func createEndpointProxyContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {
+// createCloudNativeGatewayImageContainer creates a new Cloud Native Gateway container based on inputs from manifest.
+func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {
 	container := v1.Container{
-		Name:  EndpointProxyContainerName,
-		Image: cluster.Spec.EndpointProxyImage(),
+		Name:  CloudNativeGatewayContainerName,
+		Image: cluster.Spec.CloudNativeGatewayImage(),
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "sn-data-port",
@@ -1675,8 +1674,8 @@ func createEndpointProxyContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1
 	// add cb host 127.0.0.1 and run on daemon mode.
 	container.Args = append(container.Args, "--daemon", "--cb-host", "127.0.0.1")
 
-	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
-		applyEndpointProxyPodTLS(cluster, &container, pod)
+	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
+		applyCloudNativeGatewayPodTLS(cluster, &container, pod)
 	} else {
 		container.Args = append(container.Args, "--self-sign")
 	}

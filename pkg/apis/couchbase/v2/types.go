@@ -2499,23 +2499,23 @@ const (
 	AFInet6 AddressFamily = "IPv6"
 )
 
-type EndpointProxyTLS struct {
+type CloudNativeGatewayTLS struct {
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
-	// that contains endpoint proxy (gateway) gRPC server TLS data.
+	// that contains Cloud Native Gateway gRPC server TLS data.
 	// The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the kubernetes.io/tls secret type.
 	ServerSecretName string `json:"serverSecretName,omitempty"`
 }
 
-type EndpointProxy struct {
-	// Image is the endpoint proxy image to be used to run the sidecar container.
+type CloudNativeGateway struct {
+	// Image is the Cloud Native Gateway image to be used to run the sidecar container.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// TODO: provide a default kubebuilder default image tag as field is mandatory.
 	Image string `json:"image"`
 
-	// TLS defines the TLS configuration for the endpoint proxy server including
+	// TLS defines the TLS configuration for the Cloud Native Gateway server including
 	// server and client certificate configuration, and TLS security policies.
-	TLS *EndpointProxyTLS `json:"tls,omitempty"`
+	TLS *CloudNativeGatewayTLS `json:"tls,omitempty"`
 }
 
 type CouchbaseClusterNetworkingSpec struct {
@@ -2639,9 +2639,9 @@ type CouchbaseClusterNetworkingSpec struct {
 	// +kubebuilder:default="10m"
 	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
 
-	// EndpointProxy is used to provision a gRPC gateway in front of the
-	// Couchbase cluster.
-	EndpointProxy *EndpointProxy `json:"endpointProxy,omitempty"`
+	// CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
+	// cluster.
+	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {

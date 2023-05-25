@@ -300,12 +300,12 @@ func applyAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[str
 	}
 }
 
-func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.EndpointProxy) {
+func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CloudNativeGateway) {
 	if config == nil {
 		return
 	}
 
-	cluster.Spec.Networking.EndpointProxy = config
+	cluster.Spec.Networking.CloudNativeGateway = config
 }
 
 // ClusterOptions is used to generate or create all Couchbase clusters by the framework.
@@ -342,7 +342,7 @@ type ClusterOptions struct {
 
 	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
 
-	CloudNativeGateway *couchbasev2.EndpointProxy
+	CloudNativeGateway *couchbasev2.CloudNativeGateway
 
 	S3UseIAM bool
 
@@ -357,7 +357,7 @@ func (o *ClusterOptions) WithPodAnnotations(annotations map[string]string) *Clus
 }
 
 func (o *ClusterOptions) WithCloudNativeGateway(image string) *ClusterOptions {
-	o.CloudNativeGateway = &couchbasev2.EndpointProxy{
+	o.CloudNativeGateway = &couchbasev2.CloudNativeGateway{
 		Image: image,
 		TLS:   nil,
 	}

@@ -335,12 +335,12 @@ func (cs *ClusterSpec) MetricsImage() string {
 	return image
 }
 
-// EndpointProxyImage represents the image to use for endpoint proxy to access CB cluster.
-// defaults to Spec.Networking.EndpointProxy.Image when provided then falls back to relatedImage env variable.
-func (cs *ClusterSpec) EndpointProxyImage() string {
-	image := cs.Networking.EndpointProxy.Image
+// CloudNativeGatewayImage represents the image to use for Cloud Native Gateway to access CB cluster.
+// defaults to Spec.Networking.CloudNativeGateway.Image when provided then falls back to relatedImage env variable.
+func (cs *ClusterSpec) CloudNativeGatewayImage() string {
+	image := cs.Networking.CloudNativeGateway.Image
 
-	if annotatedImage, ok := os.LookupEnv(constants.EnvEndpointProxyImageName); ok {
+	if annotatedImage, ok := os.LookupEnv(constants.EnvCloudNativeGatewayImageName); ok {
 		if cs.EnvImagePrecedence && annotatedImage != "" {
 			image = annotatedImage
 		}

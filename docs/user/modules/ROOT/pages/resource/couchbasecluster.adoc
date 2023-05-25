@@ -148,14 +148,14 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: NodePort
     <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
     - ""
+    <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
+      <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
+      <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
+        <<couchbaseclusters-spec-networking-cloudnativegateway-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-disableuioverhttp,disableUIOverHTTP>>: false
     <<couchbaseclusters-spec-networking-disableuioverhttps,disableUIOverHTTPS>>: false
     <<couchbaseclusters-spec-networking-dns,dns>>:
       <<couchbaseclusters-spec-networking-dns-domain,domain>>: ""
-    <<couchbaseclusters-spec-networking-endpointproxy,endpointProxy>>:
-      <<couchbaseclusters-spec-networking-endpointproxy-image,image>>: ""
-      <<couchbaseclusters-spec-networking-endpointproxy-tls,tls>>:
-        <<couchbaseclusters-spec-networking-endpointproxy-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-exposeadminconsole,exposeAdminConsole>>: false
     <<couchbaseclusters-spec-networking-exposedfeatureservicetemplate,exposedFeatureServiceTemplate>>: {}
     <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: NodePort
@@ -1981,6 +1981,51 @@ AdminConsoleServices is a selector to choose specific services to expose via the
 This field may contain any of "data", "index", "query", "search", "eventing" and "analytics".
 Each service may only be included once.
 
+=== couchbaseclusters.spec.networking.cloudNativeGateway
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase cluster.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.image
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Image is the Cloud Native Gateway image to be used to run the sidecar container.
+No validation is carried out as this can be any arbitrary repo and tag.
+TODO: provide a default kubebuilder default image tag as field is mandatory.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.tls
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+TLS defines the TLS configuration for the Cloud Native Gateway server including server and client certificate configuration, and TLS security policies.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.tls.serverSecretName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains Cloud Native Gateway gRPC server TLS data.
+The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
+
 === couchbaseclusters.spec.networking.disableUIOverHTTP
 
 ==== Constraints
@@ -2024,51 +2069,6 @@ DNS defines information required for Dynamic DNS support.
 Domain is the domain to create pods in.
 When populated the Operator will annotate the admin console and per-pod services with the key "external-dns.alpha.kubernetes.io/hostname".
 These annotations can be used directly by a Kubernetes External-DNS controller to replicate load balancer service IP addresses into a public DNS server.
-
-=== couchbaseclusters.spec.networking.endpointProxy
-
-==== Constraints
-
-*Type*: `object`
-
-==== Description
-
-EndpointProxy is used to provision a gRPC gateway in front of the Couchbase cluster.
-
-=== couchbaseclusters.spec.networking.endpointProxy.image
-
-==== Constraints
-
-*Required*
-
-*Type*: `string`
-
-==== Description
-
-Image is the endpoint proxy image to be used to run the sidecar container.
-No validation is carried out as this can be any arbitrary repo and tag.
-TODO: provide a default kubebuilder default image tag as field is mandatory.
-
-=== couchbaseclusters.spec.networking.endpointProxy.tls
-
-==== Constraints
-
-*Type*: `object`
-
-==== Description
-
-TLS defines the TLS configuration for the endpoint proxy server including server and client certificate configuration, and TLS security policies.
-
-=== couchbaseclusters.spec.networking.endpointProxy.tls.serverSecretName
-
-==== Constraints
-
-*Type*: `string`
-
-==== Description
-
-ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains endpoint proxy (gateway) gRPC server TLS data.
-The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
 
 === couchbaseclusters.spec.networking.exposeAdminConsole
 

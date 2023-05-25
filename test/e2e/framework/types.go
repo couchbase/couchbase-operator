@@ -18,28 +18,28 @@ type Framework struct {
 	certification.SharedTestFlags
 
 	// CbopinfoPath is the absolute path to the cbopinfo binary
-	CbopinfoPath                  string
-	OpImage                       string
-	AdmissionControllerImage      string
-	SyncGatewayImage              string
-	KubeType                      string
-	KubeVersion                   string
-	ClusterSpec                   []*types.Cluster
-	LogDir                        string
-	SkipTeardown                  bool
-	ClusterConfFile               string
-	CollectLogs                   bool
-	CollectServerLogsOnFailure    bool
-	CouchbaseExporterImage        string
-	CouchbaseExporterImageUpgrade string
-	CouchbaseBackupImage          string
-	CouchbaseLoggingImage         string
-	CouchbaseLoggingImageUpgrade  string
-	EndpointProxyImage            string
-	BucketType                    e2eutil.BucketType
-	CompressionMode               couchbasev2.CouchbaseBucketCompressionMode
-	EnableIstio                   bool
-	IstioTLSMode                  string
+	CbopinfoPath                     string
+	OpImage                          string
+	AdmissionControllerImage         string
+	SyncGatewayImage                 string
+	KubeType                         string
+	KubeVersion                      string
+	ClusterSpec                      []*types.Cluster
+	LogDir                           string
+	SkipTeardown                     bool
+	ClusterConfFile                  string
+	CollectLogs                      bool
+	CollectServerLogsOnFailure       bool
+	CouchbaseExporterImage           string
+	CouchbaseExporterImageUpgrade    string
+	CouchbaseBackupImage             string
+	CouchbaseLoggingImage            string
+	CouchbaseLoggingImageUpgrade     string
+	CouchbaseCloudNativeGatewayImage string
+	BucketType                       e2eutil.BucketType
+	CompressionMode                  couchbasev2.CouchbaseBucketCompressionMode
+	EnableIstio                      bool
+	IstioTLSMode                     string
 	// AWS Access
 	AWSAccountID    string
 	AWSOIDCProvider string

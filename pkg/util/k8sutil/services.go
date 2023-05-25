@@ -527,44 +527,45 @@ func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 	return updatedJSON, nil
 }
 
-// generateEndpointProxyService returns a service for exposing the endpoint proxy which could be accessed form outside the cluster
-// with the help of an Ingress or Openshift Route.
-func generateEndpointProxyService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
+// generateCloudNativeGatewayService returns a service for
+// exposing the Cloud Native Gateway which could be accessed form
+// outside the cluster with the help of an Ingress or Openshift Route.
+func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	service := &v1.Service{}
 
-	service.Name = cluster.Name + "-endpoint-proxy-service"
+	service.Name = cluster.Name + "-cloud-native-gateway-service"
 	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
 	service.OwnerReferences = []metav1.OwnerReference{
 		cluster.AsOwner(),
 	}
 
 	svcPort := v1.ServicePort{
-		Name:       "endpoint-proxy-http",
+		Name:       "cloud-native-gateway-http",
 		Protocol:   v1.ProtocolTCP,
 		Port:       80,
 		TargetPort: intstr.FromInt(snDataPort),
 	}
 
 	// When Enpoint Proxy TLS enabled
-	if cluster.Spec.Networking.EndpointProxy.TLS != nil {
+	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
 		svcPort = v1.ServicePort{
-			Name:       "endpoint-proxy-https",
+			Name:       "cloud-native-gateway-https",
 			Protocol:   v1.ProtocolTCP,
 			Port:       443,
 			TargetPort: intstr.FromInt(snDataPort),
 		}
 	}
 
-	service.Spec.Selector = selectorForEndpointProxyService(cluster)
+	service.Spec.Selector = selectorForCloudNativeGatewayService(cluster)
 	service.Spec.Ports = []v1.ServicePort{svcPort}
 
 	return service
 }
 
-// ReconcileEndpointProxyService creates/updates k8s services for exposing the data and service discovery services
-// on the gRPC gateway proxying to the couchbase cluster.
-func ReconcileEndpointProxyService(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
-	requested := generateEndpointProxyService(cluster)
+// ReconcileCloudNativeGatewayService creates/updates k8s services for exposing the data and service discovery services
+// on the gRPC based Cloud Native Gateway proxying to the couchbase cluster.
+func ReconcileCloudNativeGatewayService(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	requested := generateCloudNativeGatewayService(cluster)
 
 	if err := reconcileService(c, cluster, requested); err != nil {
 		return err

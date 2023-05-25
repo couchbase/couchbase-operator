@@ -182,9 +182,9 @@ func selectorForDataService(cluster *couchbasev2.CouchbaseCluster) map[string]st
 	return labels
 }
 
-func selectorForEndpointProxyService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
+func selectorForCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster)
-	labels[constants.LabelEndpointProxy] = constants.EnabledValue
+	labels[constants.LabelCloudNativeGateway] = constants.EnabledValue
 
 	return labels
 }

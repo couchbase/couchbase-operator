@@ -367,8 +367,8 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseLoggingImageUpgrade, "logging-image-upgrade",
 		loggingImageUpgradeFromDefault,
 		"Docker image to use for couchbase log shipping upgrades to upgrade from.")
-	flag.StringVar(&params.EndpointProxyImage, "cloud-native-gateway-image",
-		endpointProxyImageDefault,
+	flag.StringVar(&params.CouchbaseCloudNativeGatewayImage, "cloud-native-gateway-image",
+		cloudNativeGatewayImageDefault,
 		"Docker image to use for the cloud native gateway deployment")
 	flag.Var(&bucket, "bucket-type",
 		"Bucket type to use.  Either 'couchbase', 'ephemeral' or 'memcached'.")
@@ -528,7 +528,7 @@ func setup() error {
 	logrus.Info(" →  couchbase backup: " + Global.CouchbaseBackupImage)
 	logrus.Info(" →  couchbase logging: " + Global.CouchbaseLoggingImage)
 	logrus.Info(" →  couchbase logging upgrade: " + Global.CouchbaseLoggingImageUpgrade)
-	logrus.Info(" →  couchbase endpoint proxy image: " + Global.EndpointProxyImage)
+	logrus.Info(" →  couchbase cloud native gateway image: " + Global.CouchbaseCloudNativeGatewayImage)
 
 	logrus.Info(util.PrettyHeading("Framework Configuration"))
 	logrus.Info(" →  Bucket Type: " + Global.BucketType)

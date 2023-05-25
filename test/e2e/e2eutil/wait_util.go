@@ -986,6 +986,7 @@ func MustWaitForBackupDeletion(t *testing.T, k8s *types.Cluster, backup *couchba
 	}
 }
 
+// MustWaitForPrometheusReady waits for the duration to confirm that the Prometheus Exporter sidecar is running.
 func MustWaitForPrometheusReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.MetricsContainerName)
 	if err != nil {
@@ -1111,14 +1112,15 @@ func waitForPodVolumeSize(k8s *types.Cluster, memberName string, claimName strin
 	})
 }
 
+// MustWaitForCloudNativeGatewaySidecarReady waits for the duration to confirm that the Cloud Native Gateway sidecar is running.
 func MustWaitForCloudNativeGatewaySidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.EndpointProxyContainerName)
+	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.CloudNativeGatewayContainerName)
 	if err != nil {
 		Die(t, err)
 	}
 }
 
-// MustWaitForLoggingSidecarReady waits for the duration to confirm that the sidecar is running.
+// MustWaitForLoggingSidecarReady waits for the duration to confirm that the Logging sidecar is running.
 func MustWaitForLoggingSidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.CouchbaseLogSidecarContainerName)
 	if err != nil {
