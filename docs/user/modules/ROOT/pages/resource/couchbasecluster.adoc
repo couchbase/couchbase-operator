@@ -72,7 +72,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold,viewFragmentationThreshold>>:
         <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold-percent,percent>>: 30
         <<couchbaseclusters-spec-cluster-autocompaction-viewfragmentationthreshold-size,size>>: ""
-    <<couchbaseclusters-spec-cluster-autofailovermaxcount,autoFailoverMaxCount>>: 3
+    <<couchbaseclusters-spec-cluster-autofailovermaxcount,autoFailoverMaxCount>>: 1
     <<couchbaseclusters-spec-cluster-autofailoverondatadiskissues,autoFailoverOnDataDiskIssues>>: false
     <<couchbaseclusters-spec-cluster-autofailoverondatadiskissuestimeperiod,autoFailoverOnDataDiskIssuesTimePeriod>>: 120s
     <<couchbaseclusters-spec-cluster-autofailoverservergroup,autoFailoverServerGroup>>: false
@@ -1020,14 +1020,14 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 *Type*: `integer`
 
-*Default*: `3`
+*Default*: `1`
 
 *Minimum*: `1`
 
 ==== Description
 
 AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server will allow before not allowing any more.
-This field must be between 1-3 for server versions prior to 7.1.0 default is 3.
+This field must be between 1-3 for server versions prior to 7.1.0 default is 1.
 
 === couchbaseclusters.spec.cluster.autoFailoverOnDataDiskIssues
 

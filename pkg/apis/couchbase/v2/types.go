@@ -2799,8 +2799,8 @@ type ClusterConfig struct {
 
 	// AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
 	// will allow before not allowing any more.  This field must be between 1-3 for server versions prior to 7.1.0
-	// default is 3.
-	// +kubebuilder:default=3
+	// default is 1.
+	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	AutoFailoverMaxCount uint64 `json:"autoFailoverMaxCount,omitempty"`
 
