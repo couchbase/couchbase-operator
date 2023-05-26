@@ -538,7 +538,7 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 func (c *Cluster) logUpdate(old, new interface{}) {
 	d, err := diff.Diff(old, new)
 	if err != nil {
-		log.Error(err, "cluster", c.namespacedName())
+		log.Error(err, "failed to create diff", "cluster", c.namespacedName())
 		return
 	}
 
@@ -905,6 +905,27 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 	}
 }
 
+// getAvailableIndexs will return an array of indexs available to be used for
+// pod names.
+func (c *Cluster) getAvailableIndexes(num int) ([]int, error) {
+	start, err := c.getPodIndex()
+	if err != nil {
+		return nil, err
+	}
+
+	indexes := make([]int, 0, num)
+	for i := 0; i < num; i++ {
+		indexes = append(indexes, start+i)
+	}
+
+	err = c.setPodIndex(indexes[len(indexes)-1] + 1)
+	if err != nil {
+		return nil, err
+	}
+
+	return indexes, nil
+}
+
 // getPodIndex returns the current pod naming index.
 func (c *Cluster) getPodIndex() (int, error) {
 	podIndexStr, err := c.state.Get(persistence.PodIndex)
@@ -923,26 +944,6 @@ func (c *Cluster) getPodIndex() (int, error) {
 // setPodIndex updates the current pod naming index and commits to etcd.
 func (c *Cluster) setPodIndex(index int) error {
 	return c.state.Update(persistence.PodIndex, strconv.Itoa(index))
-}
-
-// incPodIndex gets the current pod naming index and increments it.
-func (c *Cluster) incPodIndex() error {
-	podIndex, err := c.getPodIndex()
-	if err != nil {
-		return err
-	}
-
-	return c.setPodIndex(podIndex + 1)
-}
-
-// decPodIndex gets the current pod naming index and decrements it.
-func (c *Cluster) decPodIndex() error {
-	podIndex, err := c.getPodIndex()
-	if err != nil {
-		return err
-	}
-
-	return c.setPodIndex(podIndex - 1)
 }
 
 // setVolumeExpansionState sets volume expansion state

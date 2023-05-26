@@ -63,3 +63,16 @@ func TestCouchbaseVersionAfter(t *testing.T) {
 		}
 	}
 }
+
+func TestGetIndexFromMemberName(t *testing.T) {
+	name := "test-couchbase-xkjg4-9999"
+
+	index, err := GetIndexFromMemberName(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if index != 9999 {
+		t.Fatal("expected index 0 found", index)
+	}
+}

@@ -3,6 +3,7 @@ package couchbaseutil
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -350,4 +351,45 @@ func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 // cluster and numerical index.
 func CreateMemberName(cluster string, member int) string {
 	return fmt.Sprintf("%s-%04d", cluster, member)
+}
+
+func GetIndexFromMemberName(name string) (int, error) {
+	// its just the last 4 digits...
+	return strconv.Atoi(name[len(name)-4:])
+}
+
+// this exists to allow testing.
+func GetAvailableIndexes(names []string, num int) ([]int, error) {
+	sort.Slice(names, func(i, j int) bool {
+		return names[i] < names[j]
+	})
+
+	// since pods are in order, we basically expect the first one to be 0.
+	// so count up until we hit the limit
+	index := 0
+	availableIndex := 0
+	availableIndexes := []int{}
+
+	for len(availableIndexes) < num && index < len(names) {
+		usedIndex, err := GetIndexFromMemberName(names[index])
+		if err != nil {
+			return nil, err
+		}
+
+		if availableIndex < usedIndex {
+			availableIndexes = append(availableIndexes, availableIndex)
+			availableIndex++
+		} else {
+			availableIndex = usedIndex + 1
+			index++
+		}
+	}
+
+	// every number from here on is available
+	for len(availableIndexes) < num {
+		availableIndexes = append(availableIndexes, availableIndex)
+		availableIndex++
+	}
+
+	return availableIndexes, nil
 }

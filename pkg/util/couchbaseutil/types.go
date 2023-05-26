@@ -1574,3 +1574,8 @@ type PrivateKeyPassphrase struct {
 	// Timeout is  the number of milliseconds that must elapse before the call is timed out.
 	Timeout uint64 `json:"timeout,omitempty"`
 }
+
+type PodCreationResult struct {
+	Err    error
+	Member Member
+}

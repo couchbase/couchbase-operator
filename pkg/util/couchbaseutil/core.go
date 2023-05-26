@@ -126,9 +126,10 @@ func (c *Client) makeClient() {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			DialContext:  dialContext,
-			DialTLS:      dialTLS,
-			MaxIdleConns: 100,
+			DialContext:           dialContext,
+			DialTLS:               dialTLS,
+			MaxIdleConns:          100,
+			ResponseHeaderTimeout: time.Second * 30, // server timesout when creating pods without this.
 		},
 	}
 

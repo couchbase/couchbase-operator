@@ -4,6 +4,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"sync"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -124,8 +125,10 @@ func (c *Cluster) logFailedMember(message, name string) {
 	log.Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
-// Create a new Couchbase cluster member.
-func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbaseutil.Member, err error) {
+// Creates new Couchbase cluster members.
+// returns PodCreationResult which contains a member and a potential error.
+// also can return an error...
+func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) { //
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
 	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
 	if err != nil {
@@ -138,45 +141,86 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	// Allocate an index to be used in the name.  Get the current index then increment
 	// and commit back to etcd.  That way we are guaranteed to never have conflicting
 	// names
-	index, err := c.getPodIndex()
+	availableIndexes, err := c.getAvailableIndexes(len(serverSpecs))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := c.incPodIndex(); err != nil {
-		return nil, err
-	}
-
+	log.V(1).Info("creating pods with indexes", "indexes", availableIndexes)
 	// Create a new member
-	newMember, err := c.newMember(index, serverSpec.Name, c.cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return nil, err
-	}
+	memberSpecs := make([]couchbaseutil.Member, len(serverSpecs))
 
-	// Decrement the member number on error (probably don't need to actually do this
-	// any more, or even generate names for that matter, let Kubernetes do it, that said
-	// it makes event coalesing actually possible, perhaps we could generate a name from
-	// a member hash or something?)
-	defer func() {
+	usedPodIndex := 0
+	for index, serverSpec := range serverSpecs {
+		newMember, err := c.newMember(availableIndexes[usedPodIndex], serverSpec.Name, c.cluster.Spec.CouchbaseImage())
 		if err != nil {
-			_ = c.decPodIndex()
+			return nil, err // since we've not managed to create anything lets just error out
 		}
-	}()
 
-	// Delete volumes on error here, they contain no data, and restarting from scratch
-	// *may* lead to success.
-	if err := c.createPod(ctx, newMember, serverSpec, true); err != nil {
-		return nil, fmt.Errorf("fail to create member's pod (%s): %w", newMember.Name(), err)
+		usedPodIndex++
+
+		memberSpecs[index] = newMember
 	}
 
+	wg := sync.WaitGroup{}
+
+	// we want to track members and if they fail
+	results := make([]*couchbaseutil.PodCreationResult, len(memberSpecs))
+
+	log.V(1).Info("starting pod creation")
+
+	for index, newMember := range memberSpecs {
+		results[index] = &couchbaseutil.PodCreationResult{
+			Member: newMember,
+		}
+
+		wg.Add(1)
+
+		go func(index int, newMember couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) {
+			// Delete volumes on error here, they contain no data, and restarting from scratch
+			// *may* lead to success.
+			err = c.createPod(ctx, newMember, serverSpec, true)
+			if err != nil {
+				results[index].Err = err
+			}
+
+			wg.Done()
+		}(index, newMember, serverSpecs[index])
+	}
+
+	wg.Wait()
+	log.V(1).Info("finished pod creation")
+
+	var allErr = true
+	//
+	for index, result := range results {
+		if results[index].Err == nil {
+			err = c.initMember(ctx, result.Member, serverSpecs[index])
+			results[index].Err = err
+			allErr = false
+		}
+	}
+
+	if allErr {
+		err = c.setPodIndex(availableIndexes[0])
+		log.Error(err, "failed to rollback index", "index", availableIndexes[0])
+	}
+
+	return results, nil
+}
+
+func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+	log.V(1).Info("initialising pod", "pod", newMember.Name(), "cluster", c.namespacedName())
 	// From this point on, if something goes wrong, we blow the pod (and any volumes)
 	// away, as they are uninitialized and not clustered, hoping it will fix itself
 	// next time around.
+	var err error
 	defer func() {
 		if err == nil {
 			return
 		}
 
+		log.V(1).Info("failed to initialise pod", "pod", newMember.Name(), "cluster", c.namespacedName(), "error", err)
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 
 		if rerr := c.removePod(newMember.Name(), true); rerr != nil {
@@ -185,89 +229,100 @@ func (c *Cluster) createMember(serverSpec couchbasev2.ServerConfig) (m couchbase
 	}()
 
 	// Setup networking.
-	if err := c.initMemberNetworking(newMember); err != nil {
-		return nil, err
+	if err = c.initMemberNetworking(newMember); err != nil {
+		return err
 	}
 
 	// Check the pod is EE.  DNS should be working (as checked by the wait above), but
 	// it has been observed that this may still need a retry.
 	info := &couchbaseutil.PoolsInfo{}
-	if err := couchbaseutil.GetPools(info).InPlaintext().RetryFor(time.Minute).On(c.api, newMember); err != nil {
-		return nil, err
+	if err = couchbaseutil.GetPools(info).InPlaintext().RetryFor(time.Minute).On(c.api, newMember); err != nil {
+		return err
 	}
 
 	if !info.Enterprise {
-		return nil, fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+		err = fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+		return err
 	}
 
 	// Enable TLS if requested.
-	if err := c.initMemberTLS(ctx, newMember); err != nil {
-		return nil, err
+	if err = c.initMemberTLS(ctx, newMember); err != nil {
+		return err
 	}
 
 	// Set the hostname.  Sometimes this returns a 500 so needs a retry, I'm guessing
 	// although the server is running and returns cluster information it's not configured
 	// enough to allow host name changes.
-	if err := couchbaseutil.SetHostname(newMember.GetDNSName()).RetryFor(time.Minute).On(c.api, newMember); err != nil {
-		return nil, err
+	if err = couchbaseutil.SetHostname(newMember.GetDNSName()).RetryFor(time.Minute).On(c.api, newMember); err != nil {
+		return err
 	}
 
 	// Initialize storage paths.
 	dataPath, indexPath, analyticsPaths := getServiceDataPaths(serverSpec.GetVolumeMounts())
-	if err := couchbaseutil.SetStoragePaths(dataPath, indexPath, analyticsPaths).RetryFor(time.Minute).On(c.api, newMember); err != nil {
-		return nil, err
+	if err = couchbaseutil.SetStoragePaths(dataPath, indexPath, analyticsPaths).RetryFor(time.Minute).On(c.api, newMember); err != nil {
+		return err
 	}
 
 	// Notify that we have created a new member
-	if err := c.clusterCreateMember(newMember); err != nil {
-		return nil, err
+	if err = c.clusterCreateMember(newMember); err != nil {
+		return err
 	}
 
-	if err := c.updateCRStatus(); err != nil {
-		return nil, err
+	if err = c.updateCRStatus(); err != nil {
+		return err
 	}
 
-	return newMember, nil
+	return nil
 }
 
 // Creates and adds a new Couchbase cluster member.
-func (c *Cluster) addMember(serverSpec couchbasev2.ServerConfig) (couchbaseutil.Member, error) {
+func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) {
 	// Create the new member
-	newMember, err := c.createMember(serverSpec)
+	memberResults, err := c.createMembers(serverSpecs...)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add to the cluster. Note we have to use the plain text url as
-	// /controller/addNode will not work with a https reference
-	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
-	if err != nil {
-		return newMember, err
+	for index, memberResult := range memberResults {
+		serverSpec := serverSpecs[index]
+
+		if memberResult.Err != nil {
+			log.V(1).Info("skipping clustering pod due to error", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", memberResult.Err)
+			continue
+		}
+		// Add to the cluster. Note we have to use the plain text url as
+		// /controller/addNode will not work with a https reference
+		services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
+		if err != nil {
+			memberResult.Err = err
+		}
+		// Get dns name of member being added but reduce to plain text http if insecure annotation exists.
+		url := memberResult.Member.GetDNSName()
+
+		if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
+			log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+			url = memberResult.Member.GetHostURLPlaintext()
+		}
+
+		log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+
+		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil { // we're hitting this too hard i think so its erroring.
+			log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
+			memberResult.Err = err
+		}
+
+		// Notify that we have added a new member, this makes it callable.
+		c.clusterAddMember(memberResult.Member)
+
+		log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+		c.raiseEvent(k8sutil.MemberAddEvent(memberResult.Member.Name(), c.cluster))
+
+		if err := k8sutil.SetPodInitialized(c.k8s, memberResult.Member.Name()); err != nil {
+			memberResult.Err = err
+		}
 	}
 
-	// Get dns name of member being added but reduce to plain text http if insecure annotation exists.
-	url := newMember.GetDNSName()
-
-	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
-		log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", newMember.Name())
-		url = newMember.GetHostURLPlaintext()
-	}
-
-	if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
-		return newMember, err
-	}
-
-	// Notify that we have added a new member, this makes it callable.
-	c.clusterAddMember(newMember)
-
-	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", newMember.Name())
-	c.raiseEvent(k8sutil.MemberAddEvent(newMember.Name(), c.cluster))
-
-	if err := k8sutil.SetPodInitialized(c.k8s, newMember.Name()); err != nil {
-		return newMember, err
-	}
-
-	return newMember, nil
+	return memberResults, nil
 }
 
 // Destroys a Couchbase cluster member.
@@ -314,21 +369,29 @@ func (c *Cluster) createInitialMember() (couchbaseutil.Member, *couchbasev2.Serv
 
 	class := c.cluster.Spec.Servers[index]
 
-	member, err := c.createMember(class)
+	member, err := c.createMembers(class)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Notify that we have added a new member, this makes it callable.
-	c.clusterAddMember(member)
+	if len(member) == 0 {
+		return nil, nil, errors.NewStackTracedError(errors.ErrInternalError) // this is basically impossible
+	}
 
-	return member, &class, nil
+	if member[0].Err != nil {
+		return nil, nil, member[0].Err
+	}
+
+	// Notify that we have added a new member, this makes it callable.
+	c.clusterAddMember(member[0].Member)
+
+	return member[0].Member, &class, nil
 }
 
 // configureInitialMember sets up passwords, defaults, that kind of stuff.  It's unlikely
 // that this can go wrong, you've probably bypassed the admission controller (naughty)...
 func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *couchbasev2.ServerConfig) error {
-	if err := c.initMember(member, class); err != nil {
+	if err := c.initInitialMember(member, class); err != nil {
 		// ... if we fail to initialize the cluster, then chances are we won't be
 		// able to contact it and get stuck.  Like all pod creation/recreation code
 		// we should clean up and let retries potentially work, either as transient
@@ -353,7 +416,7 @@ func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *cou
 }
 
 // initializes the first member in the cluster.
-func (c *Cluster) initMember(m couchbaseutil.Member, serverSpec *couchbasev2.ServerConfig) error {
+func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbasev2.ServerConfig) error {
 	log.Info("Initial pod creating", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 

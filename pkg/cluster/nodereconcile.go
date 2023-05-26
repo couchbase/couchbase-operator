@@ -740,17 +740,36 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
 	}
 
-	for _, serverSpec := range additions {
-		m, err := c.addMember(serverSpec)
-		if err != nil {
-			log.Error(err, "Pod addition to cluster failed", "cluster", c.namespacedName())
-			return err
-		}
-
-		r.addMember(m)
+	memberResults, err := c.addMembers(additions...)
+	if err != nil {
+		log.Error(err, "Pod addition to cluster failed", "cluster", c.namespacedName())
 	}
 
-	return nil
+	// count how many errors we actually have
+	numErrors := 0
+
+	for _, result := range memberResults {
+		if result.Err != nil {
+			numErrors++
+		}
+	}
+
+	errs := make([]error, 0, numErrors)
+
+	for _, result := range memberResults {
+		if result.Err != nil {
+			errs = append(errs, fmt.Errorf("failed to create new node for cluster: %w", result.Err))
+			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+		} else {
+			r.addMember(result.Member)
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
 }
 
 // handleVolumeExpansion attempts to perform online expansion of Persistent Volumes.
@@ -956,6 +975,9 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
+	candidatesSlice := make([]couchbaseutil.Member, 0, len(candidates))
+	toCreate := make([]couchbasev2.ServerConfig, 0, len(candidates))
+
 	for _, candidate := range candidates {
 		log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion)
 
@@ -970,18 +992,41 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		// Add the new member.
-		member, err := c.addMember(*class)
-		if err != nil {
-			return fmt.Errorf("upgrade failed to add new node to cluster: %w", err)
-		}
-
-		// Update book keeping
-		r.addMember(member)
-		r.removeMemberUser(candidate)
+		toCreate = append(toCreate, *class)
+		candidatesSlice = append(candidatesSlice, candidate)
 	}
 
-	return nil
+	// Add the new members.
+	memberResults, err := c.addMembers(toCreate...)
+	if err != nil {
+		return fmt.Errorf("upgrade failed to add new nodes to cluster: %w", err)
+	}
+
+	numErrors := 0
+
+	for _, result := range memberResults {
+		if result.Err != nil {
+			numErrors++
+		}
+	}
+
+	errs := make([]error, 0, numErrors)
+
+	for index, result := range memberResults {
+		if result.Err != nil {
+			errs = append(errs, fmt.Errorf("upgrade failed to add new node to cluster: %w", result.Err))
+			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+		} else { // Update book keeping
+			r.addMember(result.Member)
+			r.removeMemberUser(candidatesSlice[index])
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
 }
 
 // handleServerGroups moves nodes from their current server group into the one
