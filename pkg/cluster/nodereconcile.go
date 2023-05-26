@@ -1103,7 +1103,7 @@ func (r *ReconcileMachine) handleDeadMembers(c *Cluster) error {
 }
 
 func (r *ReconcileMachine) handleNotifyFinished(c *Cluster) error {
-	log.Info("Reconcile completed", "cluster", c.namespacedName())
+	log.V(1).Info("Reconcile completed", "cluster", c.namespacedName())
 
 	return nil
 }
