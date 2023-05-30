@@ -133,6 +133,10 @@ func checkConstraintDataServiceMemcachedThreadCounts(v *types.Validator, cluster
 	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
 		serverVerErrStr := "for couchbase server version 7.1.0 or greater"
 
+		if cluster.Spec.ClusterSettings.Data == nil {
+			return nil
+		}
+
 		if cluster.Spec.ClusterSettings.Data.ReaderThreads < 4 {
 			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.readerThreads %d must be greater than or equal to 4 %s", cluster.Spec.ClusterSettings.Data.ReaderThreads, serverVerErrStr))
 		}
