@@ -3,6 +3,12 @@ terraform {
     kubernetes = {
       version = "~> 2.11"
     }
+    aws = {
+    source = "hashicorp/aws"
+    version = "<= 4.67.0" # In place because of the following terraform failure in version 5.0.1:
+                            # An argument named "enable_classiclink_dns_support" is not expected here.
+                            # It should be changed once it is fixed.
+    }
   }
 }
 
