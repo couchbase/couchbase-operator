@@ -54,7 +54,7 @@ pipeline {
     AZURE_CREDENTIALS = credentials('azure-alex')
     GCP_CREDENTIALS = credentials('gcp-operator')
     GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
-    KIND_VERSION = "0.14.0"
+    KIND_VERSION = "0.18.0"
   }
 
   stages {
@@ -74,7 +74,7 @@ pipeline {
 
     stage('Install Google Cloud SDK') {
       steps {
-        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-315.0.0-linux-x86_64.tar.gz | tar xz'
+        sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-432.0.0-linux-x86_64.tar.gz | tar xz'
         sh 'gcloud components install kubectl'
         sh 'gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${GCLOUD_SERVICE_TOKEN}'
         sh 'KUBECONFIG=config gcloud container clusters get-credentials couchbase-operator-ci-certification --region us-east1'
@@ -123,6 +123,9 @@ pipeline {
           stage('Validation Test') {
             steps {
               sh 'kind create cluster --name ${version} --image kindest/node:${version} --kubeconfig kubeconfig.${version}'
+              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} kubectl get nodes'
+              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} kubectl wait --for=condition=Ready nodes --all --timeout=10m'
+              sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} kubectl describe nodes'
               // This test is kinda special in that it can be run with huge parallelism
               // and consumes no actual resources, so -ignore-errors is a bit of a fudge.
               sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${version} ./build/bin/kubernetes-linux-amd64/cao \
