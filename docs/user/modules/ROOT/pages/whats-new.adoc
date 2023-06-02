@@ -10,7 +10,7 @@ In Couchbase Server 7.1.0 we added support for AWS Graviton-based instances, and
 
 Now, with Autonomous Operator {operator-version-minor}, all tools and container images for Open Source Kubernetes platforms are available for both architectures, allowing deployments on either `amd64` or `arm64` as well as migrations between the two.
 
-NOTE: Support for ARM on the OpenShift Container Platform will be added in a future release.
+NOTE: Support for ARM on the OpenShift Container Platform was added in Operator 2.4.2.
 
 == Encrypted Certificates
 

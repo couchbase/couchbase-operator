@@ -102,6 +102,58 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
+[#release-v242]
+== Release 2.4.2
+
+Couchbase Autonomous Operator 2.4.2 was released in June 2023.
+
+[#changes-in-behavior-v242]
+=== New Features and Behavioral Changes
+
+==== Support for New Features in Couchbase Server 7.2.0
+
+With the addition of the Change History feature in Couchbase Server 7.2.0, Collections can now be modified (to enable/disable History Retention).
+
+Operator 2.4.2 now allows Collection objects to be mutated.
+
+==== ARM Platform Support
+
+Operator 2.4.0 added support for deploying on ARM platforms where available on AWS, Azure, and GCP managed Kubernetes services, as well as on open source Kubernetes distributions.
+
+With Operator 2.4.2 this now includes deploying on OpenShift on ARM platforms.
+
+[#fixed-issues-v242]
+=== Fixed Issues
+
+[#table-fixed-issues-v242,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-2997[K8S-2997]
+a| *Summary:* Fixed issue where `TestUpgradeSupportableKillStatefulPodOnCreate` results were inconsistent.
+
+a| https://issues.couchbase.com/browse/K8S-3061[K8S-3061]
+a| *Summary:* Fixed issue where `TestPersistentVolumeRzaNodesKilledUnbalanced` results were inconsistent.
+
+a| https://issues.couchbase.com/browse/K8S-3062[K8S-3062]
+a| *Summary:* Fixed issues where `TestMandatoryMutualTLSRotateCAExpiring` results were inconsistent.
+
+|===
+
+[#known-issues-v242]
+=== Known Issues
+
+[#table-known-issues-v242,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3063[K8S-3063]
+a| *Summary:* `TestClusterUpdateUsingRest` and `TestTLSScriptCreateRestRotate` may cause "schema overflowed" messages.
+
+This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
+
+|===
+
 [#release-v241]
 == Release 2.4.1
 
