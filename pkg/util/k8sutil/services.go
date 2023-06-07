@@ -529,7 +529,7 @@ func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 
 // generateCloudNativeGatewayService returns a service for
 // exposing the Cloud Native Gateway which could be accessed form
-// outside the cluster with the help of an Ingress or Openshift Route.
+// outside the cluster with the help of an K8s Ingress or Openshift Route.
 func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	service := &v1.Service{}
 
@@ -539,21 +539,12 @@ func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v
 		cluster.AsOwner(),
 	}
 
+	// Always https(443)
 	svcPort := v1.ServicePort{
-		Name:       "cloud-native-gateway-http",
+		Name:       "cloud-native-gateway-https",
 		Protocol:   v1.ProtocolTCP,
-		Port:       80,
+		Port:       443,
 		TargetPort: intstr.FromInt(snDataPort),
-	}
-
-	// When Enpoint Proxy TLS enabled
-	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
-		svcPort = v1.ServicePort{
-			Name:       "cloud-native-gateway-https",
-			Protocol:   v1.ProtocolTCP,
-			Port:       443,
-			TargetPort: intstr.FromInt(snDataPort),
-		}
 	}
 
 	service.Spec.Selector = selectorForCloudNativeGatewayService(cluster)
@@ -853,7 +844,7 @@ func GetSRVName(cluster *couchbasev2.CouchbaseCluster) string {
 }
 
 // filterInsecurePorts takes a set of ports and removes any that are not allowed
-// because they inscure.
+// because they insecure.
 func filterInsecurePorts(ports []v1.ServicePort, secure bool) []v1.ServicePort {
 	p := []v1.ServicePort{}
 
