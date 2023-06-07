@@ -3131,3 +3131,29 @@ func TestRzaNegCreateCluster(t *testing.T) {
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
+
+func TestSecurityContextValidationCreateCluster(t *testing.T) {
+	fsGrp1 := int64(1234)
+	fsGrp2 := int64(2345)
+
+	testDefs := []testDef{
+		{
+			name: "TestValidateDifferentSecurityContexts",
+			mutations: patchMap{
+				"sc0": jsonpatch.NewPatchSet().
+					Add("/spec/securityContext", &couchbasev2.ClusterSpec{
+						SecurityContext: &corev1.PodSecurityContext{
+							FSGroup: &fsGrp1,
+						},
+					}).
+					Add("/spec/security/podSecurityContext", &couchbasev2.CouchbaseClusterSecuritySpec{
+						PodSecurityContext: &corev1.PodSecurityContext{
+							FSGroup: &fsGrp2,
+						},
+					}),
+			},
+			shouldFail: true,
+		},
+	}
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}

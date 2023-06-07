@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	goerrors "errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -83,6 +84,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAutoscalingStabilizationPeriod,
 		checkConstraintBackupObjectEndpointSecret,
 		checkConstraintBucketStorageBackend,
+		checkConstraintK8sSecurityContext,
 	}
 
 	var errs []error
@@ -3196,6 +3198,18 @@ func validateCloudNativeGatewayServerTLS(v *types.Validator, cluster *couchbasev
 
 	if len(cert.DNSNames) == 0 {
 		return fmt.Errorf("must provide the DNS name in Subject Alternate Name values in server cert needed for K8s Ingress or OC Routes")
+	}
+
+	return nil
+}
+
+// checkConstraintK8sSecurityContext validates the different combination of K8s SecurityContext options (pods and containers)
+// being applied.
+func checkConstraintK8sSecurityContext(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Security.PodSecurityContext != nil && cluster.Spec.SecurityContext != nil {
+		if !reflect.DeepEqual(cluster.Spec.Security.PodSecurityContext, cluster.Spec.SecurityContext) {
+			return fmt.Errorf("spec.Security.PodSecurityContext must be equal to spec.SecurityContext, if both present")
+		}
 	}
 
 	return nil

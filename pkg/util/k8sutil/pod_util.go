@@ -851,7 +851,15 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.Spec.Hostname = m.Name()
 	pod.Spec.Subdomain = cluster.Name
-	pod.Spec.SecurityContext = cluster.Spec.SecurityContext
+
+	if cluster.Spec.Security.PodSecurityContext != nil {
+		// both cluster.Spec.SecurityContext (if present) and cluster.Spec.Security.PodSecurityContext
+		// are equal.
+		pod.Spec.SecurityContext = cluster.Spec.Security.PodSecurityContext
+	} else {
+		pod.Spec.SecurityContext = cluster.Spec.SecurityContext
+	}
+
 	pod.Spec.ReadinessGates = []v1.PodReadinessGate{
 		{
 			ConditionType: podReadinessCondition,
@@ -1212,7 +1220,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	}
 
 	// Create a side car container to retrieve the logs.
-	logging := v1.Container{
+	loggingContainer := v1.Container{
 		Name:  CouchbaseLogSidecarContainerName,
 		Image: sidecarConfig.Image,
 		VolumeMounts: []v1.VolumeMount{
@@ -1290,6 +1298,10 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		},
 	}
 
+	if cluster.Spec.Security.SecurityContext != nil {
+		loggingContainer.SecurityContext = cluster.Spec.Security.SecurityContext
+	}
+
 	pod.Spec.Volumes = append(pod.Spec.Volumes,
 		// Make sure we include the volume for the Secret as well
 		v1.Volume{
@@ -1324,7 +1336,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		},
 	)
 
-	pod.Spec.Containers = append(pod.Spec.Containers, logging)
+	pod.Spec.Containers = append(pod.Spec.Containers, loggingContainer)
 
 	// Deal with audit log cleanup if both auditing is enabled and then GC is also enabled.
 	// Disgusting solution to remove all rotated audit logs after configurable amount of timeand output those deleted to stdout for reference.
@@ -1369,7 +1381,7 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		auditMount.SubPath = defaultSubPathName + "/logs"
 	}
 
-	auditcleaner := v1.Container{
+	auditcleanerContainer := v1.Container{
 		Name:  CouchbaseAuditCleanupSidecarContainerName,
 		Image: gc.Image,
 		VolumeMounts: []v1.VolumeMount{
@@ -1401,7 +1413,11 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		Resources: auditResources,
 	}
 
-	pod.Spec.Containers = append(pod.Spec.Containers, auditcleaner)
+	if cluster.Spec.Security.SecurityContext != nil {
+		auditcleanerContainer.SecurityContext = cluster.Spec.Security.SecurityContext
+	}
+
+	pod.Spec.Containers = append(pod.Spec.Containers, auditcleanerContainer)
 }
 
 func applyMetricsPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
@@ -1551,6 +1567,10 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 	c.EnvFrom = config.EnvFrom
 	c.Resources = config.Resources
 
+	if cluster.Spec.Security.SecurityContext != nil {
+		c.SecurityContext = cluster.Spec.Security.SecurityContext
+	}
+
 	// Automatically configure resource memory requests, mainly for lazy users,
 	// but also to prevent memory starvation and random OOM killings.  It must
 	// be manually enabled to maintain current behaviour...
@@ -1671,6 +1691,10 @@ func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluste
 		},
 	}
 
+	if cluster.Spec.Security.SecurityContext != nil {
+		container.SecurityContext = cluster.Spec.Security.SecurityContext
+	}
+
 	// add cb host 127.0.0.1 and run on daemon mode.
 	container.Args = append(container.Args, "--daemon", "--cb-host", "127.0.0.1")
 
@@ -1708,7 +1732,7 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		readinessCheckURL = readinessProbeEndpointPath
 	}
 
-	return v1.Container{
+	container := v1.Container{
 		Name:  MetricsContainerName,
 		Image: cs.MetricsImage(),
 		Env: []v1.EnvVar{
@@ -1761,6 +1785,12 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		Resources: resources,
 		Args:      []string{"--per-node-refresh", fmt.Sprintf("%d", cs.Monitoring.Prometheus.RefreshRate)},
 	}
+
+	if cs.Security.SecurityContext != nil {
+		container.SecurityContext = cs.Security.SecurityContext
+	}
+
+	return container
 }
 
 // Given a pod, return a pointer to the couchbase container.

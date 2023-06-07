@@ -2139,6 +2139,7 @@ type ClusterSpec struct {
 	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
+	// DEPRECATED - by spec.security.securityContext
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set
 	// the fsGroup field in order to write to the volume.  For non-root clusters
@@ -2428,6 +2429,20 @@ type CouchbaseClusterSecuritySpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16666
 	UISessionTimeoutMinutes uint `json:"uiSessionTimeout,omitempty"`
+
+	// PodSecurityContext allows the configuration of the security context for all
+	// Couchbase server pods.  When using persistent volumes you may need to set
+	// the fsGroup field in order to write to the volume.  For non-root clusters
+	// you must also set runAsUser to 1000, corresponding to the Couchbase user
+	// in official container images.  More info:
+	// https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	PodSecurityContext *v1.PodSecurityContext `json:"podSecurityContext,omitempty"`
+
+	// SecurityContext defines the security options the container should be run with.
+	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+	// Use securityContext.allowPrivilegeEscalation field to grant more privileges than its parent process.
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
 }
 
 // +kubebuilder:validation:Pattern="^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"

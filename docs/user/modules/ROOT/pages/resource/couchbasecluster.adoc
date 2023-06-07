@@ -223,9 +223,59 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-security-ldap-userdnmapping,userDNMapping>>:
         <<couchbaseclusters-spec-security-ldap-userdnmapping-query,query>>: ""
         <<couchbaseclusters-spec-security-ldap-userdnmapping-template,template>>: ""
+    <<couchbaseclusters-spec-security-podsecuritycontext,podSecurityContext>>:
+      <<couchbaseclusters-spec-security-podsecuritycontext-fsgroup,fsGroup>>: 0
+      <<couchbaseclusters-spec-security-podsecuritycontext-fsgroupchangepolicy,fsGroupChangePolicy>>: ""
+      <<couchbaseclusters-spec-security-podsecuritycontext-runasgroup,runAsGroup>>: 0
+      <<couchbaseclusters-spec-security-podsecuritycontext-runasnonroot,runAsNonRoot>>: false
+      <<couchbaseclusters-spec-security-podsecuritycontext-runasuser,runAsUser>>: 0
+      <<couchbaseclusters-spec-security-podsecuritycontext-selinuxoptions,seLinuxOptions>>:
+        <<couchbaseclusters-spec-security-podsecuritycontext-selinuxoptions-level,level>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-selinuxoptions-role,role>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-selinuxoptions-type,type>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-selinuxoptions-user,user>>: ""
+      <<couchbaseclusters-spec-security-podsecuritycontext-seccompprofile,seccompProfile>>:
+        <<couchbaseclusters-spec-security-podsecuritycontext-seccompprofile-localhostprofile,localhostProfile>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-seccompprofile-type,type>>: ""
+      <<couchbaseclusters-spec-security-podsecuritycontext-supplementalgroups,supplementalGroups>>:
+      - 0
+      <<couchbaseclusters-spec-security-podsecuritycontext-sysctls,sysctls>>:
+      - <<couchbaseclusters-spec-security-podsecuritycontext-sysctls-name,name>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-sysctls-value,value>>: ""
+      <<couchbaseclusters-spec-security-podsecuritycontext-windowsoptions,windowsOptions>>:
+        <<couchbaseclusters-spec-security-podsecuritycontext-windowsoptions-gmsacredentialspec,gmsaCredentialSpec>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-windowsoptions-gmsacredentialspecname,gmsaCredentialSpecName>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-windowsoptions-hostprocess,hostProcess>>: false
+        <<couchbaseclusters-spec-security-podsecuritycontext-windowsoptions-runasusername,runAsUserName>>: ""
     <<couchbaseclusters-spec-security-rbac,rbac>>:
       <<couchbaseclusters-spec-security-rbac-managed,managed>>: false
       <<couchbaseclusters-spec-security-rbac-selector,selector>>: {}
+    <<couchbaseclusters-spec-security-securitycontext,securityContext>>:
+      <<couchbaseclusters-spec-security-securitycontext-allowprivilegeescalation,allowPrivilegeEscalation>>: false
+      <<couchbaseclusters-spec-security-securitycontext-capabilities,capabilities>>:
+        <<couchbaseclusters-spec-security-securitycontext-capabilities-add,add>>:
+        - ""
+        <<couchbaseclusters-spec-security-securitycontext-capabilities-drop,drop>>:
+        - ""
+      <<couchbaseclusters-spec-security-securitycontext-privileged,privileged>>: false
+      <<couchbaseclusters-spec-security-securitycontext-procmount,procMount>>: ""
+      <<couchbaseclusters-spec-security-securitycontext-readonlyrootfilesystem,readOnlyRootFilesystem>>: false
+      <<couchbaseclusters-spec-security-securitycontext-runasgroup,runAsGroup>>: 0
+      <<couchbaseclusters-spec-security-securitycontext-runasnonroot,runAsNonRoot>>: false
+      <<couchbaseclusters-spec-security-securitycontext-runasuser,runAsUser>>: 0
+      <<couchbaseclusters-spec-security-securitycontext-selinuxoptions,seLinuxOptions>>:
+        <<couchbaseclusters-spec-security-securitycontext-selinuxoptions-level,level>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-selinuxoptions-role,role>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-selinuxoptions-type,type>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-selinuxoptions-user,user>>: ""
+      <<couchbaseclusters-spec-security-securitycontext-seccompprofile,seccompProfile>>:
+        <<couchbaseclusters-spec-security-securitycontext-seccompprofile-localhostprofile,localhostProfile>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-seccompprofile-type,type>>: ""
+      <<couchbaseclusters-spec-security-securitycontext-windowsoptions,windowsOptions>>:
+        <<couchbaseclusters-spec-security-securitycontext-windowsoptions-gmsacredentialspec,gmsaCredentialSpec>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-windowsoptions-gmsacredentialspecname,gmsaCredentialSpecName>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-windowsoptions-hostprocess,hostProcess>>: false
+        <<couchbaseclusters-spec-security-securitycontext-windowsoptions-runasusername,runAsUserName>>: ""
     <<couchbaseclusters-spec-security-uisessiontimeout,uiSessionTimeout>>: 0
   <<couchbaseclusters-spec-securitycontext,securityContext>>: {}
   <<couchbaseclusters-spec-servergroups,serverGroups>>:
@@ -2889,6 +2939,295 @@ Query is the LDAP query to run to map from Couchbase user to LDAP distinguished 
 This field specifies list of templates to use for providing username to DN mapping.
 The template may contain a placeholder specified as `%u` to represent the Couchbase user who is attempting to gain access.
 
+=== couchbaseclusters.spec.security.podSecurityContext
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+PodSecurityContext allows the configuration of the security context for all Couchbase server pods.
+When using persistent volumes you may need to set the fsGroup field in order to write to the volume.
+For non-root clusters you must also set runAsUser to 1000, corresponding to the Couchbase user in official container images.
+More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
+
+=== couchbaseclusters.spec.security.podSecurityContext.fsGroup
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+A special supplemental group that applies to all containers in a pod.
+Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
+ 1.
+The owning GID will be the FSGroup 2.
+The setgid bit is set (new files created in the volume will be owned by FSGroup) 3.
+The permission bits are OR'd with rw-rw---- 
+ If unset, the Kubelet will not modify the ownership and permissions of any volume.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.fsGroupChangePolicy
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod.
+This field will only apply to volume types which support fsGroup based ownership(and permissions).
+It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir.
+Valid values are "OnRootMismatch" and "Always".
+If not specified, "Always" is used.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.runAsGroup
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+The GID to run the entrypoint of the container process.
+Uses runtime default if unset.
+May also be set in SecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.runAsNonRoot
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Indicates that the container must run as a non-root user.
+If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does.
+If unset or false, no such validation will be performed.
+May also be set in SecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+
+=== couchbaseclusters.spec.security.podSecurityContext.runAsUser
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+The UID to run the entrypoint of the container process.
+Defaults to user specified in image metadata if unspecified.
+May also be set in SecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The SELinux context to be applied to all containers.
+If unspecified, the container runtime will allocate a random SELinux context for each container.
+May also be set in SecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions.level
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Level is SELinux level label that applies to the container.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions.role
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Role is a SELinux role label that applies to the container.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions.type
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Type is a SELinux type label that applies to the container.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions.user
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+User is a SELinux user label that applies to the container.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seccompProfile
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The seccomp options to use by the containers in this pod.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.seccompProfile.localhostProfile
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+localhostProfile indicates a profile defined in a file on the node should be used.
+The profile must be preconfigured on the node to work.
+Must be a descending path, relative to the kubelet's configured seccomp profile location.
+Must only be set if type is "Localhost".
+
+=== couchbaseclusters.spec.security.podSecurityContext.seccompProfile.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+type indicates which kind of seccomp profile will be applied.
+Valid options are: 
+ Localhost - a profile defined in a file on the node should be used.
+RuntimeDefault - the container runtime default profile should be used.
+Unconfined - no profile should be applied.
+
+=== couchbaseclusters.spec.security.podSecurityContext.supplementalGroups
+
+==== Constraints
+
+*Type*: `[]integer`
+
+==== Description
+
+A list of groups applied to the first process run in each container, in addition to the container's primary GID.
+If unspecified, no groups will be added to any container.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.sysctls
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Sysctls hold a list of namespaced sysctls used for the pod.
+Pods with unsupported sysctls (by the container runtime) might fail to launch.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.sysctls.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of a property to set.
+
+=== couchbaseclusters.spec.security.podSecurityContext.sysctls.value
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Value of a property to set.
+
+=== couchbaseclusters.spec.security.podSecurityContext.windowsOptions
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The Windows specific settings applied to all containers.
+If unspecified, the options within a container's SecurityContext will be used.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is linux.
+
+=== couchbaseclusters.spec.security.podSecurityContext.windowsOptions.gmsaCredentialSpec
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.
+
+=== couchbaseclusters.spec.security.podSecurityContext.windowsOptions.gmsaCredentialSpecName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GMSACredentialSpecName is the name of the GMSA credential spec to use.
+
+=== couchbaseclusters.spec.security.podSecurityContext.windowsOptions.hostProcess
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+HostProcess determines if a container should be run as a 'Host Process' container.
+This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag.
+Setting this field without the feature flag will result in errors when validating the Pod.
+All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+In addition, if HostProcess is true then HostNetwork must also be set to true.
+
+=== couchbaseclusters.spec.security.podSecurityContext.windowsOptions.runAsUserName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The UserName in Windows to run the entrypoint of the container process.
+Defaults to the user specified in image metadata if unspecified.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+
 === couchbaseclusters.spec.security.rbac
 
 ==== Constraints
@@ -2919,6 +3258,298 @@ Managed defines whether RBAC is managed by us or the clients.
 
 Selector is a label selector used to list RBAC resources in the namespace that are managed by the Operator.
 
+=== couchbaseclusters.spec.security.securityContext
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+SecurityContext defines the security options the container should be run with.
+If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
+Use securityContext.allowPrivilegeEscalation field to grant more privileges than its parent process.
+More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
+
+=== couchbaseclusters.spec.security.securityContext.allowPrivilegeEscalation
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process.
+This bool directly controls if the no_new_privs flag will be set on the container process.
+AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.capabilities
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The capabilities to add/drop when running containers.
+Defaults to the default set of capabilities granted by the container runtime.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.capabilities.add
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Added capabilities.
+
+=== couchbaseclusters.spec.security.securityContext.capabilities.drop
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Removed capabilities.
+
+=== couchbaseclusters.spec.security.securityContext.privileged
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Run container in privileged mode.
+Processes in privileged containers are essentially equivalent to root on the host.
+Defaults to false.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.procMount
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+procMount denotes the type of proc mount to use for the containers.
+The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths.
+This requires the ProcMountType feature flag to be enabled.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.readOnlyRootFilesystem
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Whether this container has a read-only root filesystem.
+Default is false.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.runAsGroup
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+The GID to run the entrypoint of the container process.
+Uses runtime default if unset.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.runAsNonRoot
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Indicates that the container must run as a non-root user.
+If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does.
+If unset or false, no such validation will be performed.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+
+=== couchbaseclusters.spec.security.securityContext.runAsUser
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+The UID to run the entrypoint of the container process.
+Defaults to user specified in image metadata if unspecified.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.seLinuxOptions
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The SELinux context to be applied to the container.
+If unspecified, the container runtime will allocate a random SELinux context for each container.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.seLinuxOptions.level
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Level is SELinux level label that applies to the container.
+
+=== couchbaseclusters.spec.security.securityContext.seLinuxOptions.role
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Role is a SELinux role label that applies to the container.
+
+=== couchbaseclusters.spec.security.securityContext.seLinuxOptions.type
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Type is a SELinux type label that applies to the container.
+
+=== couchbaseclusters.spec.security.securityContext.seLinuxOptions.user
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+User is a SELinux user label that applies to the container.
+
+=== couchbaseclusters.spec.security.securityContext.seccompProfile
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The seccomp options to use by this container.
+If seccomp options are provided at both the pod & container level, the container options override the pod options.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.seccompProfile.localhostProfile
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+localhostProfile indicates a profile defined in a file on the node should be used.
+The profile must be preconfigured on the node to work.
+Must be a descending path, relative to the kubelet's configured seccomp profile location.
+Must only be set if type is "Localhost".
+
+=== couchbaseclusters.spec.security.securityContext.seccompProfile.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+type indicates which kind of seccomp profile will be applied.
+Valid options are: 
+ Localhost - a profile defined in a file on the node should be used.
+RuntimeDefault - the container runtime default profile should be used.
+Unconfined - no profile should be applied.
+
+=== couchbaseclusters.spec.security.securityContext.windowsOptions
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+The Windows specific settings applied to all containers.
+If unspecified, the options from the PodSecurityContext will be used.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+Note that this field cannot be set when spec.os.name is linux.
+
+=== couchbaseclusters.spec.security.securityContext.windowsOptions.gmsaCredentialSpec
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.
+
+=== couchbaseclusters.spec.security.securityContext.windowsOptions.gmsaCredentialSpecName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GMSACredentialSpecName is the name of the GMSA credential spec to use.
+
+=== couchbaseclusters.spec.security.securityContext.windowsOptions.hostProcess
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+HostProcess determines if a container should be run as a 'Host Process' container.
+This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag.
+Setting this field without the feature flag will result in errors when validating the Pod.
+All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+In addition, if HostProcess is true then HostNetwork must also be set to true.
+
+=== couchbaseclusters.spec.security.securityContext.windowsOptions.runAsUserName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+The UserName in Windows to run the entrypoint of the container process.
+Defaults to the user specified in image metadata if unspecified.
+May also be set in PodSecurityContext.
+If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+
 === couchbaseclusters.spec.security.uiSessionTimeout
 
 ==== Constraints
@@ -2944,7 +3575,8 @@ UISessionTimeout sets how long, in minutes, before a user is declared inactive a
 
 ==== Description
 
-SecurityContext allows the configuration of the security context for all Couchbase server pods.
+*DEPRECATED* - by spec.security.securityContext SecurityContext allows the configuration of the security context for all Couchbase server pods.
+
 When using persistent volumes you may need to set the fsGroup field in order to write to the volume.
 For non-root clusters you must also set runAsUser to 1000, corresponding to the Couchbase user in official container images.
 More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
