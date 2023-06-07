@@ -48,7 +48,6 @@ pipeline {
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
-    string(name: 'terraform_version', defaultValue: '1.0.5')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -87,10 +86,6 @@ pipeline {
 
         sh "wget -q https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${params.openshift_version}/openshift-install-linux.tar.gz"
         sh 'tar xfv openshift-install-linux.tar.gz'
-
-        sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
-        sh "unzip terraform_${params.terraform_version}_linux_amd64.zip"
-        sh "mv terraform ${env.WORKSPACE}/bin"
       }
     }
 

@@ -51,7 +51,7 @@ pipeline {
     booleanParam(name: 'enable_istio', defaultValue: false)
     string(name: 'istio_version', defaultValue: '1.15.7')
     string(name: 'istio_mode', defaultValue: 'strict')
-    string(name: 'terraform_version', defaultValue: '1.0.5')
+    string(name: 'terraform_version', defaultValue: '1.4.6')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
     booleanParam(name: 'p0', defaultValue: true)
@@ -107,9 +107,9 @@ pipeline {
     stage('Azure Provision') {
       steps {
         dir("./test/e2e/resources/provisioners/aks") {
-          sh 'terraform init -no-color -input=false'
-          sh "terraform apply -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
-          sh "terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
+          sh "${env.WORKSPACE}/bin/terraform init -no-color -input=false"
+          sh "${env.WORKSPACE}/bin/terraform apply -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+          sh "${env.WORKSPACE}/bin/terraform output -raw kubeconfig1 > ${env.WORKSPACE}/config1"
           sh "kubectl create -f cao-azurefile.yaml --kubeconfig ${env.WORKSPACE}/config1"
         }
       }
@@ -502,7 +502,7 @@ pipeline {
   post {
     always {
       dir("./test/e2e/resources/provisioners/aks") {
-        sh "terraform destroy -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+        sh "${env.WORKSPACE}/bin/terraform destroy -var service-principal-id=${env.AZURE_CREDENTIALS_USR} -var service-principal-secret=${env.AZURE_CREDENTIALS_PSW} -var subscription-id=${env.AZURE_SUBSCRIPTION_ID} -var tenant-id=${env.AZURE_TENANT_ID} -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
       }
       sh 'docker system prune --force' // Clean up docker - optimise disk usage
       cleanWs()
