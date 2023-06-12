@@ -24,7 +24,7 @@ func ReconcilePDB(client *client.Client, cluster *couchbasev2.CouchbaseCluster) 
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: LabelsForCluster(cluster),
+				MatchLabels: SelectorForClusterResource(cluster),
 			},
 			MinAvailable: &intstr.IntOrString{
 				IntVal: int32(cluster.Spec.TotalSize() - 1),
