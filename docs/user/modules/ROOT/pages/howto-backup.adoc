@@ -724,7 +724,7 @@ If you are running a Couchbase cluster version 6.6.x or higher and using the bac
 There are two ways to configure access to a cloud store.
 
 . Manually through providing credentials via a secret.
-. Automatically by using instance metadata api to grant role access.
+. Automatically by using instance metadata API to grant role access.
 
 === Configure Explicit Credentials
 
@@ -787,7 +787,7 @@ spec:
 
 === Configure Instance Metadata Authentication
 
-To allow backup to automatically use the instance metadata api for authentication, enable the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-useiam[`couchbasebackups.spec.objectStore.useIAM`] parameter. By default this is disabled.
+To allow backup to automatically use the instance metadata API for authentication, enable the xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-useiam[`couchbasebackups.spec.objectStore.useIAM`] parameter. By default this is disabled.
 When using Azure and GCP this is all that's required, for AWS a secret with the region key set must be provided.
 
 [source,yaml,subs="attributes,verbatim"]
@@ -873,7 +873,7 @@ Users wishing to use a compatible store should set xref:resource/couchbasebackup
 
 Optionally, xref:resource/couchbasebackup.adoc#couchbasebackups-spec-objectstore-endpoint-secret[`couchbasebackups.spec.objectStore.endpoint.secret`] can be set to the name of the secret containing the CA certificate the compatible object endpoint is using.
 
-For example: to use Minio, a S3 compatiable api.
+For example: to use Minio, a S3 compatible API.
 [source,yaml,subs="attributes,verbatim"]
 ----
 apiVersion: couchbase/v2

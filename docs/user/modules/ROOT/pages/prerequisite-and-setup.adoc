@@ -25,8 +25,10 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 6.6 - 7.1
+| 6.6 - 7.2^*^
 |===
+
+*: Couchbase Server 7.2 is supported with Operator 2.4, however new features in 7.2 are only supported on Operator 2.4.1
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
 

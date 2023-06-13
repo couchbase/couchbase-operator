@@ -43,6 +43,7 @@ pipeline {
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
     string(name: 'kubernetes_version', defaultValue: '1.22')
     string(name: 'storage_class', defaultValue: 'standard-rwo')
+    booleanParam(name: 'lpv', defaultValue: false)
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
     string(name: 'kubectl_version', defaultValue: '1.20.9')
@@ -136,6 +137,19 @@ pipeline {
       }
     }
 
+    stage('Intall Rancher') {
+      when {
+        expression {
+          params.lpv
+        }
+      }
+      steps {
+        script {
+          sh "kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
+        }
+      }
+    }
+
     // All of these test stages are exactly the same.  With a matrix build
     // iterating over a list of suites, you only need to define it once.
     // Appears to need the declarative pipeline plugin version >= 1.5.
@@ -176,6 +190,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -236,6 +251,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -296,6 +312,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -356,6 +373,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -416,6 +434,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \
@@ -476,6 +495,7 @@ pipeline {
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
             -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
             -s3-region ${params.s3_region} \

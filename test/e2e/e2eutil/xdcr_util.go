@@ -186,13 +186,13 @@ func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster
 	}
 }
 
-func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, collectionDefault bool, timeout time.Duration) {
+func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes uint64, collectionDefault bool, timeout time.Duration) {
 	if err := VerifyBucketHistoryRetentionSettings(t, k8s, cluster, name, seconds, bytes, collectionDefault, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes int, collectionDefault bool, timeout time.Duration) error {
+func VerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes uint64, collectionDefault bool, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		info, err := getBucketInfo(t, k8s, cluster, name)
 		if err != nil {

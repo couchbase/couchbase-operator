@@ -49,7 +49,7 @@ func TestBucketHistoryRetention(t *testing.T) {
 				Name: names[0],
 				Annotations: map[string]string{
 					"cao.couchbase.com/historyRetention.seconds":                  "100",
-					"cao.couchbase.com/historyRetention.bytes":                    "50",
+					"cao.couchbase.com/historyRetention.bytes":                    "2147483648",
 					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "false",
 				},
 			},
@@ -70,7 +70,7 @@ func TestBucketHistoryRetention(t *testing.T) {
 				Name: names[1],
 				Annotations: map[string]string{
 					"cao.couchbase.com/historyRetention.seconds":                  "100",
-					"cao.couchbase.com/historyRetention.bytes":                    "50",
+					"cao.couchbase.com/historyRetention.bytes":                    "2147483648",
 					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "true",
 				},
 			},
@@ -100,7 +100,7 @@ func TestBucketHistoryRetention(t *testing.T) {
 
 	// check if mutation setting exists.
 	for i := 1; i < len(buckets); i++ {
-		e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, buckets[i].GetName(), 100, 50, expected[i], 2*time.Minute)
+		e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, buckets[i].GetName(), 100, 2147483648, expected[i], 2*time.Minute)
 	}
 
 	// clean up.

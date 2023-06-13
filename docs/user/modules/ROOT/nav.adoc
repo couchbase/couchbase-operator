@@ -97,6 +97,7 @@
 .Reference
 * Resource Types
  ** xref:reference-resources.adoc[Resource Documentation]
+ ** xref:reference-annotations.adoc[Annotation Documentation]
 include::partial$autogen-reference.adoc[]
 * Operator
  ** xref:reference-admission-cli.adoc[Dynamic Admission Controller Deployment Settings]

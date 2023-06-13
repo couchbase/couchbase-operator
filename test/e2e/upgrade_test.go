@@ -813,32 +813,17 @@ func TestUpgradeToSupportable(t *testing.T) {
 	// Static configuration.
 	clusterSize := 3
 
+	// PV configuration
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
+
 	// Create the cluster without PVs.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Once up and running add in PV support.
-	templates := []couchbasev2.PersistentVolumeClaimTemplate{
-		{
-			ObjectMeta: couchbasev2.NamedObjectMeta{
-				Name:        "couchbase",
-				Annotations: map[string]string{},
-			},
-			Spec: v1.PersistentVolumeClaimSpec{
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceStorage: *e2espec.NewResourceQuantityMi(1024),
-					},
-				},
-			},
-		},
-	}
-
-	if f.StorageClassName != "" {
-		templates[0].Spec.StorageClassName = &f.StorageClassName
-	}
+	templates := []couchbasev2.PersistentVolumeClaimTemplate{createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2)}
 
 	mounts := &couchbasev2.VolumeMounts{
-		DefaultClaim: "couchbase",
+		DefaultClaim: pvcName,
 	}
 	patchset := jsonpatch.NewPatchSet().
 		Add("/spec/volumeClaimTemplates", templates).

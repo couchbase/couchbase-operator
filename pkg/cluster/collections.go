@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"reflect"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -292,6 +294,45 @@ func (c *Cluster) gatherScopesImplicit(bucket couchbasev2.AbstractBucket, scopes
 	return nil
 }
 
+func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, collection *couchbasev2.CouchbaseCollection) error {
+	ok, err := c.IsAtLeastVersion("7.2.0")
+	if err != nil {
+		return err
+	}
+
+	if !ok {
+		// mutatating collections not supported.
+		return nil
+	}
+
+	cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
+	if !ok {
+		return nil
+	}
+
+	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+		return nil
+	}
+
+	existingCollection := current.GetScope(scope.CouchbaseName()).GetCollection(collection.CouchbaseName())
+
+	if !reflect.DeepEqual(existingCollection.History, collection.Spec.History) {
+		// only history field is mutatable
+		apiCollection := couchbaseutil.Collection{
+			Name:    collection.CouchbaseName(),
+			History: collection.Spec.History,
+		}
+
+		log.Info("Patching collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
+
+		if err := couchbaseutil.PatchCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // reconcileCollections magaes collection state for a specific scope within
 // a specific bucket.
 func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, raiseEvent *bool) error {
@@ -324,16 +365,21 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 	// Create collections using an exhaustive search.
 	for _, collection := range collections {
-		if current.GetScope(scope.CouchbaseName()).HasCollection(collection.CouchbaseName()) {
-			continue
-		}
-
-		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
-
 		err := annotations.Populate(&collection.Spec, collection.Annotations)
 		if err != nil {
 			log.Error(err, "failed to parse collection annotations")
 		}
+
+		if current.GetScope(scope.CouchbaseName()).HasCollection(collection.CouchbaseName()) {
+			// scope already exists, check if it's different.
+			if err := c.reconcileCollectionSettings(bucket, scope, current, collection); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
 
 		apiCollection := couchbaseutil.Collection{
 			Name: collection.CouchbaseName(),
@@ -392,7 +438,7 @@ func (c *Cluster) gatherCollections(scope *couchbasev2.CouchbaseScope) ([]*couch
 
 // gatherCollectionsExplicit collects all collections that are explicitly referenced by
 // the scope, and appends then to the list.  Collection groups are expanded into individual
-// collections for data consistency.
+// collections for data cons istency.
 func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, collections *[]*couchbasev2.CouchbaseCollection) {
 	if scope.Spec.Collections == nil {
 		return

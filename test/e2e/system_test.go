@@ -243,7 +243,7 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	kubernetes := f.ClusterSpec[0]
 	clusterSize := 4
-	pvcName := "couchbase"
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
 	leaveJobsRunning := false
 
 	// cluster configuration, 4 nodes, all services
@@ -293,9 +293,9 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 				},
 			},
 			VolumeClaimTemplates: []couchbasev2.PersistentVolumeClaimTemplate{
-				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, 1),
-				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-data", 4),
-				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-index", 4),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 1),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-data", f.LocalPV, 4),
+				createPersistentVolumeClaimSpec(f.StorageClassName, pvcName+"-index", f.LocalPV, 4),
 			},
 		},
 	}

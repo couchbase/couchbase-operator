@@ -1800,3 +1800,11 @@ func MustRetrieveMemcachedBucketByLabel(t *testing.T, kubernetes *types.Cluster,
 
 	return &buckets.Items[0]
 }
+
+func GetPvcName(lpv bool) string {
+	if lpv {
+		return "local"
+	}
+
+	return "couchbase"
+}

@@ -880,6 +880,16 @@ func CreateCollection(bucket, scope string, collection Collection) *Request {
 	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections", bucket, scope), data, nil)
 }
 
+func PatchCollection(bucket, scope string, collection Collection) *Request {
+	// only mutation field is mutable
+	data, err := urlencoding.Marshal(CollectionPatchRequest{History: collection.History})
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Patch, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections/%s", bucket, scope, collection.Name), data, nil)
+}
+
 func DeleteCollection(bucket, scope, collection string) *Request {
 	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections/%s", bucket, scope, collection), nil, nil)
 }

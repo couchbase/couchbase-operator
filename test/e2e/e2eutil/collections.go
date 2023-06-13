@@ -549,6 +549,16 @@ func MustCreateCollection(t *testing.T, kubernetes *types.Cluster, collection *c
 	return newCollection
 }
 
+// MustUpateCollection updates the specified collection and returns the updated version.
+func MustUpdateCollection(t *testing.T, kubernetes *types.Cluster, collection *couchbasev2.CouchbaseCollection) *couchbasev2.CouchbaseCollection {
+	newCollection, err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollections(kubernetes.Namespace).Update(context.Background(), collection, metav1.UpdateOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return newCollection
+}
+
 // MustDeleteCollection deletes the specified collection.
 func MustDeleteCollection(t *testing.T, kubernetes *types.Cluster, name string) {
 	if err := kubernetes.CRClient.CouchbaseV2().CouchbaseCollections(kubernetes.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
@@ -634,30 +644,42 @@ func MustWaitForScopesAndCollections(t *testing.T, kubernetes *types.Cluster, cl
 	}
 }
 
-func CheckCollectionSettings(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName, scopeName, collectionName string, history bool) {
+func CheckCollectionSettings(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName, scopeName, collectionName string, history bool) error {
 	client, err := CreateAdminConsoleClient(kubernetes, cluster)
 	if err != nil {
-		Die(t, err)
+		return err
 	}
 
 	var scopes couchbaseutil.ScopeList
 
 	if err := couchbaseutil.ListScopes(bucketName, &scopes).On(client.client, client.host); err != nil {
-		Die(t, err)
+		return err
 	}
 
 	foundScope := scopes.GetScope(scopeName)
 	if foundScope.Name != scopeName {
-		Die(t, fmt.Errorf("failed to find scope %s", scopeName))
+		return fmt.Errorf("failed to find scope %s", scopeName)
 	}
 
 	collection := foundScope.GetCollection(collectionName)
 	if collection.Name != collectionName {
-		Die(t, fmt.Errorf("failed to find collection %s in scope %s", collectionName, scopeName))
+		return fmt.Errorf("failed to find collection %s in scope %s", collectionName, scopeName)
 	}
 
 	if *collection.History != history {
-		Die(t, fmt.Errorf("history setting %t on collection %s in scope %s did not match expected %t", *collection.History, collectionName, scopeName, history))
+		return fmt.Errorf("history setting %t on collection %s in scope %s did not match expected %t", *collection.History, collectionName, scopeName, history)
+	}
+
+	return nil
+}
+
+func MustWaitForCollectionSettings(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName, scopeName, collectionName string, history bool, timeout time.Duration) {
+	callback := func() error {
+		return CheckCollectionSettings(kubernetes, cluster, bucketName, scopeName, collectionName, history)
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
 	}
 }
 

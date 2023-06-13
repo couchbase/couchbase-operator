@@ -108,6 +108,13 @@ Pull Policy to use when downloading the Certification container
 +
 Force the use of IPv6 with Couchbase Server.
 
+--lpv::
+*Type*: bool
++
+*Default*: false
++
+Use LPV when testing
+
 --parallel::
 *Type*: int
 +

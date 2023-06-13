@@ -10,7 +10,7 @@ In Couchbase Server 7.1.0 we added support for AWS Graviton-based instances, and
 
 Now, with Autonomous Operator {operator-version-minor}, all tools and container images for Open Source Kubernetes platforms are available for both architectures, allowing deployments on either `amd64` or `arm64` as well as migrations between the two.
 
-NOTE: Support for ARM on the OpenShift Container Platform will be added in a future release.
+NOTE: Support for ARM on the OpenShift Container Platform was added in Operator 2.4.2.
 
 == Encrypted Certificates
 
@@ -29,7 +29,7 @@ With support for multiple Root CA's in Server 7.1, certificates no longer need t
 It is now possible to include multi-PEM CAs in the Server `secretSource`.
 See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[serverSecretName]
 
-Cetificate Rotation has been expanded to allow plain text reload as a last resort in case of already-expired certificates.
+Certificate Rotation has been expanded to allow plain text reload as a last resort in case of already-expired certificates.
 See xref:howto-tls-rotation.adoc#replacing-expired-certificates[Replacing expired Certificates]
 
 Relatedly, the Operator now raises Kubernetes Events when it detects TLS expiration.
@@ -60,3 +60,9 @@ Although the Exporter is no longer required when using Couchbase Server 7.x, whi
 
 This release adds performance improvements and tuning options, see xref:howto-prometheus.adoc[] for details.
 
+== Local Persistent Volumes (from Couchbase Autonomous Operator 2.4.1)
+
+In Kubernetes it is possible to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume (see https://kubernetes.io/docs/concepts/storage/volumes/#local[local]).
+
+From Couchbase Autonomous Operator 2.4.1, it is now possible to use these Local Volumes when deploying Couchbase Server resources.
+See xref:concept-persistent-volumes.adoc#local-persistent-volumes[Local Persistent Volumes] for full details.
