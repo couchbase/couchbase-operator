@@ -252,11 +252,11 @@ func getScopeList(bucket *couchbasev2.CouchbaseBucket, scopes []*couchbasev2.Cou
 func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbasev2.CouchbaseBucket, scopes []*couchbasev2.CouchbaseScope, collections []*couchbasev2.CouchbaseCollection) ([]couchbaseutil.UserRole, error) {
 	roles := []couchbaseutil.UserRole{}
 
-	log.Info("role being created", "role", role)
+	log.V(2).Info("Generated role being created", "role", role)
 
 	for _, bucket := range buckets {
 		if !c.bucketExists(bucket.GetName()) {
-			log.Info("skipping role due to non-existent bucket", "bucket", bucket)
+			log.V(2).Info("skipping role due to non-existent bucket", "bucket", bucket)
 			continue
 		}
 
@@ -268,7 +268,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 		for _, scope := range scopes {
 			// Check to ensure that scope belongs to bucket
 			if !scopeList.HasScope(scope.CouchbaseName()) {
-				log.Info("skipping role due to non-existent scope", "bucket", bucket.GetName(), "scope", scope.GetName())
+				log.V(2).Info("skipping role due to non-existent scope", "bucket", bucket.GetName(), "scope", scope.GetName())
 				continue
 			}
 
@@ -277,7 +277,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 			for _, collection := range collections {
 				// Check to ensure that collection belongs to the scope
 				if !cbScope.HasCollection(collection.CouchbaseName()) {
-					log.Info("skipping role due to non-existent collection", "bucket", bucket.GetName(), "scope", scope.GetName(), "collection", collection.GetName())
+					log.V(2).Info("skipping role due to non-existent collection", "bucket", bucket.GetName(), "scope", scope.GetName(), "collection", collection.GetName())
 					continue
 				}
 
@@ -288,7 +288,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 					CollectionName: collection.CouchbaseName(),
 				}
 
-				log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+				log.V(2).Info("Adding generated role to generated group", "role", couchbaseutil.RoleToStr(r))
 
 				roles = append(roles, r)
 			}
@@ -305,7 +305,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 					CollectionName: "",
 				}
 
-				log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+				log.V(2).Info("Adding generated role to generated group", "role", couchbaseutil.RoleToStr(r))
 
 				roles = append(roles, r)
 			}
@@ -323,7 +323,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 				CollectionName: "",
 			}
 
-			log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+			log.V(2).Info("Adding generated role to generated group", "role", couchbaseutil.RoleToStr(r))
 
 			roles = append(roles, r)
 		}
