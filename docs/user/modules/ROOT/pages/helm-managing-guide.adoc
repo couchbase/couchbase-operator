@@ -147,3 +147,31 @@ To delete a Helm deployment, run `helm uninstall` on each of the releases that m
 ----
 helm delete <release-name>
 ----
+
+[#rotate-webhook-certificates]
+== Rotate Webhook Certificates
+By default, the certificate created for use with the validating webhook is valid for 365 days.
+If the certificate is allowed to expire, the Operator will be unable to perform any tasks, and manual intervention is required.
+
+To resolve this issue, both the validating webhook and the secret containing the certificate must be replaced.
+
+. Delete the existing resources.
++
+[source,console]
+----
+kubectl delete validatingwebhookconfigurations.admissionregistration.k8s.io <deployment-name>-couchbase-admission-controller
+kubectl delete mutatingwebhookconfigurations.admissionregistration.k8s.io <deployment-name>-couchbase-admission-controller # only required pre 2.3.0
+kubectl delete secrets <deployment-name>-couchbase-admission-controller
+----
+
+. Create new resources.
++
+[source,console]
+----
+helm upgrade <deployment-name> couchbase/couchbase-operator -f <override-values.yaml> --version <version>
+----
++
+[IMPORTANT]
+====
+To prevent accidental upgrades, it is important to use the the chart version and overriding values corresponding to the current deployment.
+====
