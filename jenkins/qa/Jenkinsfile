@@ -26,7 +26,7 @@ pipeline {
 
   parameters {
     string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
-    string(name: 'server_image', defaultValue: 'couchbase/server:7.0.4', , description: 'Version of Couchbase to test')
+    string(name: 'server_image', defaultValue: 'couchbase/server:7.2.0', , description: 'Version of Couchbase to test')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.4', description: 'Version of Couchbase to upgrade from')
     string(name: 'backup_image', defaultValue: 'aemerycb/couchbase-operator-backup:0e73896ed9cd273dfdaed804160d00a944fb31a7', description: 'Version of the Couchbase backup image to test')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.5', description: 'Version of the Prometheus exporter to test')
@@ -55,7 +55,7 @@ pipeline {
     AZURE_CREDENTIALS = credentials('azure-alex')
     GCP_CREDENTIALS = credentials('gcp-operator')
     GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
-    KIND_VERSION = "0.18.0"
+    KIND_VERSION = "0.19.0"
   }
 
   stages {
