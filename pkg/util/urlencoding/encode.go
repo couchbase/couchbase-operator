@@ -63,8 +63,11 @@ func encode(v reflect.Value) (string, error) {
 	case reflect.Ptr:
 		nv := v.Elem()
 
-		if nv.Kind() == reflect.Bool {
+		switch nv.Kind() {
+		case reflect.Bool:
 			return strconv.FormatBool(nv.Bool()), nil
+		case reflect.Int:
+			return strconv.FormatInt(nv.Int(), 10), nil
 		}
 	}
 

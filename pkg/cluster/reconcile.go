@@ -543,21 +543,21 @@ func (c *Cluster) reconcileDataSettings() error {
 
 	requested := current
 
-	if c.cluster.Spec.ClusterSettings.Data.ReaderThreads != 0 {
-		requested.NumReaderThreads = c.cluster.Spec.ClusterSettings.Data.ReaderThreads
+	if threads := c.cluster.Spec.ClusterSettings.Data.ReaderThreads; threads != nil && *threads != 0 {
+		requested.NumReaderThreads = threads
 	}
 
-	if c.cluster.Spec.ClusterSettings.Data.WriterThreads != 0 {
-		requested.NumWriterThreads = c.cluster.Spec.ClusterSettings.Data.WriterThreads
+	if threads := c.cluster.Spec.ClusterSettings.Data.WriterThreads; threads != nil && *threads != 0 {
+		requested.NumWriterThreads = threads
 	}
 
 	if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
-		if c.cluster.Spec.ClusterSettings.Data.NonIOThreads != 0 {
-			requested.NumNonIOThreads = c.cluster.Spec.ClusterSettings.Data.NonIOThreads
+		if threads := c.cluster.Spec.ClusterSettings.Data.NonIOThreads; threads != nil && *threads != 0 {
+			requested.NumNonIOThreads = threads
 		}
 
-		if c.cluster.Spec.ClusterSettings.Data.AuxIOThreads != 0 {
-			requested.NumAuxIOThreads = c.cluster.Spec.ClusterSettings.Data.AuxIOThreads
+		if threads := c.cluster.Spec.ClusterSettings.Data.AuxIOThreads; threads != nil && *threads != 0 {
+			requested.NumAuxIOThreads = threads
 		}
 	}
 

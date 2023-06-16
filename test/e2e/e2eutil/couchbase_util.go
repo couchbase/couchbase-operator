@@ -1452,7 +1452,7 @@ func MustGetCouchbaseVersion(t *testing.T, image string) string {
 
 // MustVerifyDataServerSettingsMemcachedThreadCounts checks memcached's reader, writer, auxIo, nonIo thread counts.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
-func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads, nonIOThreads, auxIOThreads int, timeout time.Duration) {
+func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads, nonIOThreads, auxIOThreads *int, timeout time.Duration) {
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
@@ -1464,20 +1464,20 @@ func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.
 			return err
 		}
 
-		if current.NumReaderThreads != readerThreads {
-			return fmt.Errorf("expected %d readers, got %d", readerThreads, current.NumReaderThreads)
+		if !reflect.DeepEqual(current.NumReaderThreads, readerThreads) {
+			return fmt.Errorf("expected %s readers, got %s", IntPointerToString(readerThreads), IntPointerToString(current.NumReaderThreads))
 		}
 
-		if current.NumWriterThreads != writerThreads {
-			return fmt.Errorf("expected %d writers, got %d", writerThreads, current.NumWriterThreads)
+		if !reflect.DeepEqual(current.NumWriterThreads, writerThreads) {
+			return fmt.Errorf("expected %s writers, got %s", IntPointerToString(writerThreads), IntPointerToString(current.NumWriterThreads))
 		}
 
-		if current.NumNonIOThreads != nonIOThreads {
-			return fmt.Errorf("expected %d non IO threads, got %d", nonIOThreads, current.NumNonIOThreads)
+		if !reflect.DeepEqual(current.NumNonIOThreads, nonIOThreads) {
+			return fmt.Errorf("expected %s non IO threads, got %s", IntPointerToString(nonIOThreads), IntPointerToString(current.NumNonIOThreads))
 		}
 
-		if current.NumAuxIOThreads != auxIOThreads {
-			return fmt.Errorf("expected %d aux IO threads, got %d", auxIOThreads, current.NumAuxIOThreads)
+		if !reflect.DeepEqual(current.NumAuxIOThreads, auxIOThreads) {
+			return fmt.Errorf("expected %s aux IO threads, got %s", IntPointerToString(auxIOThreads), IntPointerToString(current.NumAuxIOThreads))
 		}
 
 		return nil
@@ -1486,6 +1486,14 @@ func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.
 	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
+}
+
+func IntPointerToString(a *int) string {
+	if a == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%d", *a)
 }
 
 // GetCouchbaseMetric gets the specified metric from Couchbase Server, using the specified labels, and returns them in a MetricsResponse.

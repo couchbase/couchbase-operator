@@ -2941,7 +2941,7 @@ type CouchbaseClusterDataSettings struct {
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
-	ReaderThreads int `json:"readerThreads,omitempty"`
+	ReaderThreads *int `json:"readerThreads,omitempty"`
 
 	// WriterThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This setting is especially relevant when
@@ -2952,7 +2952,7 @@ type CouchbaseClusterDataSettings struct {
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
-	WriterThreads int `json:"writerThreads,omitempty"`
+	WriterThreads *int `json:"writerThreads,omitempty"`
 
 	// NonIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
@@ -2963,7 +2963,7 @@ type CouchbaseClusterDataSettings struct {
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
-	NonIOThreads int `json:"nonIOThreads,omitempty"`
+	NonIOThreads *int `json:"nonIOThreads,omitempty"`
 
 	// AuxIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
@@ -2974,7 +2974,7 @@ type CouchbaseClusterDataSettings struct {
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
-	AuxIOThreads int `json:"auxIOThreads,omitempty"`
+	AuxIOThreads *int `json:"auxIOThreads,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

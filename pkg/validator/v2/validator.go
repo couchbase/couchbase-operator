@@ -139,12 +139,12 @@ func checkConstraintDataServiceMemcachedThreadCounts(v *types.Validator, cluster
 			return nil
 		}
 
-		if cluster.Spec.ClusterSettings.Data.ReaderThreads < 4 {
-			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.readerThreads %d must be greater than or equal to 4 %s", cluster.Spec.ClusterSettings.Data.ReaderThreads, serverVerErrStr))
+		if threads := cluster.Spec.ClusterSettings.Data.ReaderThreads; threads != nil && *threads < 4 {
+			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.readerThreads %d must be greater than or equal to 4 %s", *threads, serverVerErrStr))
 		}
 
-		if cluster.Spec.ClusterSettings.Data.WriterThreads < 4 {
-			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.writerThreads %d must be greater than or equal to 4 %s", cluster.Spec.ClusterSettings.Data.WriterThreads, serverVerErrStr))
+		if threads := cluster.Spec.ClusterSettings.Data.WriterThreads; threads != nil && *threads < 4 {
+			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.writerThreads %d must be greater than or equal to 4 %s", threads, serverVerErrStr))
 		}
 	}
 
