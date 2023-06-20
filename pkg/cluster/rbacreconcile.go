@@ -252,11 +252,11 @@ func getScopeList(bucket *couchbasev2.CouchbaseBucket, scopes []*couchbasev2.Cou
 func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbasev2.CouchbaseBucket, scopes []*couchbasev2.CouchbaseScope, collections []*couchbasev2.CouchbaseCollection) ([]couchbaseutil.UserRole, error) {
 	roles := []couchbaseutil.UserRole{}
 
-	log.Info("role being created", "role", role)
+	log.V(2).Info("Generated role being created", "cluster", c.cluster.NamespacedName(), "role", role)
 
 	for _, bucket := range buckets {
 		if !c.bucketExists(bucket.GetName()) {
-			log.Info("skipping role due to non-existent bucket", "bucket", bucket)
+			log.V(2).Info("skipping role due to non-existent bucket", "cluster", c.cluster.NamespacedName(), "bucket", bucket)
 			continue
 		}
 
@@ -268,7 +268,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 		for _, scope := range scopes {
 			// Check to ensure that scope belongs to bucket
 			if !scopeList.HasScope(scope.CouchbaseName()) {
-				log.Info("skipping role due to non-existent scope", "bucket", bucket.GetName(), "scope", scope.GetName())
+				log.V(2).Info("skipping role due to non-existent scope", "cluster", c.cluster.NamespacedName(), "bucket", bucket.GetName(), "scope", scope.GetName())
 				continue
 			}
 
@@ -277,7 +277,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 			for _, collection := range collections {
 				// Check to ensure that collection belongs to the scope
 				if !cbScope.HasCollection(collection.CouchbaseName()) {
-					log.Info("skipping role due to non-existent collection", "bucket", bucket.GetName(), "scope", scope.GetName(), "collection", collection.GetName())
+					log.V(2).Info("skipping role due to non-existent collection", "cluster", c.cluster.NamespacedName(), "bucket", bucket.GetName(), "scope", scope.GetName(), "collection", collection.GetName())
 					continue
 				}
 
@@ -288,7 +288,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 					CollectionName: collection.CouchbaseName(),
 				}
 
-				log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+				log.V(2).Info("Adding generated role to generated group", "cluster", c.cluster.NamespacedName(), "role", couchbaseutil.RoleToStr(r))
 
 				roles = append(roles, r)
 			}
@@ -305,7 +305,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 					CollectionName: "",
 				}
 
-				log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+				log.V(2).Info("Adding generated role to generated group", "cluster", c.cluster.NamespacedName(), "role", couchbaseutil.RoleToStr(r))
 
 				roles = append(roles, r)
 			}
@@ -323,7 +323,7 @@ func (c *Cluster) getRoleCombinations(role couchbasev2.Role, buckets []*couchbas
 				CollectionName: "",
 			}
 
-			log.Info("Adding role to group", "role", couchbaseutil.RoleToStr(r))
+			log.V(2).Info("Adding generated role to generated group", "cluster", c.cluster.NamespacedName(), "role", couchbaseutil.RoleToStr(r))
 
 			roles = append(roles, r)
 		}
@@ -337,13 +337,13 @@ func (c *Cluster) bucketExists(bucket string) bool {
 
 	err := couchbaseutil.ListBuckets(bucketList).On(c.api, c.readyMembers())
 	if err != nil {
-		log.Info("error retrieving bucket list")
+		log.Info("error retrieving bucket list", "cluster", c.cluster.NamespacedName())
 		return false
 	}
 
 	b, err := bucketList.Get(bucket)
 	if err != nil {
-		log.Info("Error retrieving bucket", "bucket", bucket)
+		log.Info("Error retrieving bucket", "cluster", c.cluster.NamespacedName(), "bucket", bucket)
 		return false
 	}
 
@@ -480,7 +480,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 				}
 
 				c.raiseEvent(k8sutil.GroupEditEvent(e.ID, c.cluster))
-				log.Info("edit CouchbaseGroup", "name", e.ID)
+				log.Info("edit CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
 		} else {
 			// delete unrequested group
@@ -489,7 +489,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			}
 
 			c.raiseEvent(k8sutil.GroupDeleteEvent(e.ID, c.cluster))
-			log.Info("delete CouchbaseGroup", "name", e.ID)
+			log.Info("delete CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 		}
 
 		existingGroupNames = append(existingGroupNames, e.ID)
@@ -503,7 +503,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			}
 
 			c.raiseEvent(k8sutil.GroupCreateEvent(group.ID, c.cluster))
-			log.Info("create CouchbaseGroup", "name", group.ID)
+			log.Info("create CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", group.ID)
 		}
 	}
 
@@ -627,7 +627,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 				}
 
 				c.raiseEvent(k8sutil.UserEditEvent(e.ID, c.cluster))
-				log.Info("edit CouchbaseUser", "name", e.ID)
+				log.Info("edit CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
 		} else {
 			// delete unrequested user
@@ -636,7 +636,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			}
 
 			c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
-			log.Info("delete CouchbaseUser", "name", e.ID)
+			log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 		}
 
 		existingUserNames = append(existingUserNames, e.ID)
@@ -652,7 +652,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			}
 
 			c.raiseEvent(k8sutil.UserCreateEvent(r.ID, c.cluster))
-			log.Info("create CouchbaseUser", "name", r.ID)
+			log.Info("create CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", r.ID)
 		}
 	}
 

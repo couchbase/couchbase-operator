@@ -216,7 +216,7 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		}
 	}
 
-	log.Info("Backup created", "cbbackup", resource.name)
+	log.Info("Backup created", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupCreateEvent(resource.name, c.cluster))
 
@@ -240,7 +240,7 @@ func (n *backupUpdateNotifier) notify() {
 		return
 	}
 
-	log.Info("Backup updated", "cbbackup", n.name)
+	log.Info("Backup updated", "cluster", n.c.cluster.NamespacedName(), "cbbackup", n.name)
 
 	n.c.raiseEvent(k8sutil.BackupUpdateEvent(n.name, n.c.cluster))
 
@@ -405,7 +405,7 @@ func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchb
 		return err
 	}
 
-	log.Info("Backup PVC resize pending", "cbbackup", pvc.Name, "new size", *size)
+	log.Info("Backup PVC resize pending", "cluster", c.cluster.NamespacedName(), "cbbackup", pvc.Name, "new size", *size)
 
 	notifier.notify()
 
@@ -431,7 +431,7 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 		}
 	}
 
-	log.Info("Backup deleted", "cbbackup", resource.name)
+	log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
 
@@ -1207,7 +1207,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 		// less likely, been deleted and needs recreating.
 		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
 		if !ok {
-			log.Info("Restore created", "cbrestore", currentRestore.Name)
+			log.Info("Restore created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name)
 
 			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
 
@@ -1216,7 +1216,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 				return err
 			}
 
-			log.Info("restore job created", "cbrestore", currentRestore.Name, "created job", createdJob.Name)
+			log.Info("restore job created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name, "created job", createdJob.Name)
 
 			continue
 		}

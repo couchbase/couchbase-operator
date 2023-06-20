@@ -354,7 +354,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Deleting collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.Name)
+		log.Info("Deleting collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.Name)
 
 		if err := couchbaseutil.DeleteCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), collection.Name).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -379,7 +379,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
+		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
 
 		apiCollection := couchbaseutil.Collection{
 			Name: collection.CouchbaseName(),
