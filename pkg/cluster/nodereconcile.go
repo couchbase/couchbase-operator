@@ -1113,7 +1113,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			}
 
 			if len(deltaNodes) != 0 {
-				log.Info("Pod add-back failed, forcing full recovery")
+				log.Info("Pod add-back failed, forcing full recovery", "cluster", c.cluster.NamespacedName())
 
 				for name, m := range deltaNodes {
 					if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
