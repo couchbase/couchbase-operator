@@ -43,6 +43,13 @@ NATIVE_TYPES = [
     'couchbaseephemeralbuckets.spec.scopes.selector',
 ]
 
+EXCLUDES = [
+    'couchbaseclusters.spec.networking.cloudNativeGateway',
+    'couchbaseclusters.spec.networking.cloudNativeGateway.image',
+    'couchbaseclusters.spec.networking.cloudNativeGateway.tls',
+    'couchbaseclusters.spec.networking.cloudNativeGateway.tls.serverSecretName',
+]
+
 # Output constants.
 CONSTRAINTS_HEADING = 'Constraints'
 DESCRIPTION_HEADING = 'Description'
@@ -193,7 +200,6 @@ class AsciidocVisitor:
         self.content.append(f':resource-name-plural: {self.resource.plural}')
         self.content.append(f':resource-name-kind: {self.resource.kind}')
         self.content.append('')
-
         self._generate_description(context)
 
         self.content.append('The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):')
@@ -340,7 +346,6 @@ class AsciidocVisitor:
             self.content.append(line)
             if line_break:
                 self.content.append('')
-
         self.content.append('')
 
     def _format_type(self, context):
@@ -348,7 +353,6 @@ class AsciidocVisitor:
         Generic type formatter, called for all scalars, objects and arrays to
         get consistent formatting.
         """
-
         depth = min(3, len(context.path) + 1)
 
         self._generate_heading(depth, context.full_path)
@@ -464,7 +468,6 @@ class YAMLVisitor:
         fields within the current document.
         """
         # pylint: disable=no-self-use
-
         return '<<' + re.sub(r'\.', r'-', context.full_path.lower()) + f',{context.path.base}>>'
 
     def _implicit_default(self, t):
@@ -629,60 +632,61 @@ def walk(visitor, context):
     in the provided visitor as we progress.
     """
 
-    # Handle native types and stop processing down the tree.
-    if context.full_path in NATIVE_TYPES:
-        if hasattr(visitor, 'native_type_handler'):
-            visitor.native_type_handler(context)
-        return
-
-    if context.type == 'object':
-        if context.full_path.endswith(".metadata"):
-            if hasattr(visitor, 'metadata_handler'):
-                visitor.metadata_handler(context)
+    if context.full_path not in EXCLUDES:
+        # Handle native types and stop processing down the tree.
+        if context.full_path in NATIVE_TYPES:
+            if hasattr(visitor, 'native_type_handler'):
+                visitor.native_type_handler(context)
             return
 
-        if hasattr(visitor, 'object_type_handler'):
-            visitor.object_type_handler(context)
+        if context.type == 'object':
+            if context.full_path.endswith(".metadata"):
+                if hasattr(visitor, 'metadata_handler'):
+                    visitor.metadata_handler(context)
+                return
 
-        if 'properties' not in context.schema:
-            return
+            if hasattr(visitor, 'object_type_handler'):
+                visitor.object_type_handler(context)
 
-        for name, property_schema in context.schema['properties'].items():
-            property_required = False
-            if 'required' in context.schema and name in context.schema['required']:
-                property_required = True
+            if 'properties' not in context.schema:
+                return
 
-            child_path = JSONPath(*context.path.path)
-            child_path.append(name)
-
-            walk(visitor, WalkContext(context.resource, child_path, property_schema, property_required))
-
-    elif context.type == 'array':
-        if 'items' not in context.schema:
-            logging.error('schema array has no items at %s', context.path)
-            sys.exit(1)
-
-        if 'type' not in context.schema['items']:
-            logging.error('schema array items have no type at %s', context.path)
-            sys.exit(1)
-
-        if hasattr(visitor, 'array_type_handler'):
-            visitor.array_type_handler(context)
-
-        if context.schema['items']['type'] == 'object':
-            for name, item_schema in context.schema['items']['properties'].items():
+            for name, property_schema in context.schema['properties'].items():
                 property_required = False
-                if 'required' in context.schema['items'] and name in context.schema['items']['required']:
+                if 'required' in context.schema and name in context.schema['required']:
                     property_required = True
 
                 child_path = JSONPath(*context.path.path)
                 child_path.append(name)
 
-                walk(visitor, WalkContext(context.resource, child_path, item_schema, property_required))
+                walk(visitor, WalkContext(context.resource, child_path, property_schema, property_required))
 
-    else:
-        if hasattr(visitor, 'scalar_type_handler'):
-            visitor.scalar_type_handler(context)
+        elif context.type == 'array':
+            if 'items' not in context.schema:
+                logging.error('schema array has no items at %s', context.path)
+                sys.exit(1)
+
+            if 'type' not in context.schema['items']:
+                logging.error('schema array items have no type at %s', context.path)
+                sys.exit(1)
+
+            if hasattr(visitor, 'array_type_handler'):
+                visitor.array_type_handler(context)
+
+            if context.schema['items']['type'] == 'object':
+                for name, item_schema in context.schema['items']['properties'].items():
+                    property_required = False
+                    if 'required' in context.schema['items'] and name in context.schema['items']['required']:
+                        property_required = True
+
+                    child_path = JSONPath(*context.path.path)
+                    child_path.append(name)
+
+                    walk(visitor, WalkContext(context.resource, child_path, item_schema, property_required))
+
+        else:
+            if hasattr(visitor, 'scalar_type_handler'):
+                visitor.scalar_type_handler(context)
 
 
 class ResourceContext:
@@ -784,7 +788,6 @@ def main():
 
     for crd in crds:
         resource, content = generate(args, crd)
-
         if args.dry_run:
             continue
 

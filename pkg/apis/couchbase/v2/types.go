@@ -2529,6 +2529,7 @@ const (
 )
 
 type CloudNativeGatewayTLS struct {
+	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// ServerSecretName specifies the secret name, in the same namespace as the cluster,
 	// that contains Cloud Native Gateway gRPC server TLS data.
 	// The secret is expected to contain "tls.crt" and
@@ -2537,11 +2538,13 @@ type CloudNativeGatewayTLS struct {
 }
 
 type CloudNativeGateway struct {
+	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// Image is the Cloud Native Gateway image to be used to run the sidecar container.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// TODO: provide a default kubebuilder default image tag as field is mandatory.
 	Image string `json:"image"`
 
+	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// TLS defines the TLS configuration for the Cloud Native Gateway server including
 	// server and client certificate configuration, and TLS security policies.
 	TLS *CloudNativeGatewayTLS `json:"tls,omitempty"`
@@ -2550,6 +2553,7 @@ type CloudNativeGateway struct {
 }
 
 type CloudNativeGatewayOTLP struct {
+	// DEVELOPER PREVIEW - This feature is in developer preview.
 	Endpoint string `json:"-" annotation:"endpoint"`
 }
 
@@ -2674,6 +2678,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// +kubebuilder:default="10m"
 	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
 
+	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
 	// cluster.
 	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty" annotation:"cloudNativeGateway"`
