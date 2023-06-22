@@ -25,7 +25,6 @@ const (
 	TagSuiteP1         = "p1"
 	TagSuiteSystem     = "system"
 	TagSuitePlatform   = "platform"
-	TagSuiteCNG        = "cng"
 
 	// Functional test areas.  These allow you to do targeted runs without invoking
 	// a broad test suite.
@@ -99,11 +98,7 @@ func registerTests() {
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
-		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestCreateCNGBucket).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestGetCNGBucket).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestDeleteCNGBucket).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestUpdateCNGBucket).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
+		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateBucketCluster).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestResizeCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
