@@ -116,9 +116,10 @@ const (
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 
-	CouchbaseContainerName   = "couchbase-server"
-	CouchbaseTLSVolumeName   = "couchbase-server-tls"
-	CouchbaseTLSCAVolumeName = "couchbase-server-tls-ca"
+	CouchbaseContainerName          = "couchbase-server"
+	CouchbaseTLSVolumeName          = "couchbase-server-tls"
+	CouchbaseTLSCAVolumeName        = "couchbase-server-tls-ca"
+	CloudNativeGatewayServiceAppend = "-cloud-native-gateway-service"
 
 	// Name of private key mounted within server used to decrypt incoming passphrase.
 	CouchbaseTLSPassphraseKey = "tls-passphrase-key"
