@@ -288,7 +288,21 @@ type CouchbaseBackupSpec struct {
 	// cloud provider, where a persistent volume is not needed.
 	// +kubebuilder:default=false
 	EphemeralVolume bool `json:"ephemeralVolume,omitempty"`
+
+	// DefaultRecoveryMethod specifies how cbbackupmgr should
+	// recover from broken backup/restore attempts.
+	// +kubebuilder:default="none"
+	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryType"`
 }
+
+// +kubebuilder:validation:Enum=none;resume;purge
+type DefaultRecoveryType string
+
+const (
+	DefaultRecoveryTypeNone   DefaultRecoveryType = "none"
+	DefaultRecoveryTypePurge  DefaultRecoveryType = "purge"
+	DefaultRecoveryTypeResume DefaultRecoveryType = "resume"
+)
 
 // CouchbaseBackupServiceFilter allows backup filtering per-service.
 // It may look the same as the restore one, implying aggregation of a common struct,

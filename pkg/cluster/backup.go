@@ -614,6 +614,10 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		args = append(args, "--incremental")
 	}
 
+	if backup.Spec.DefaultRecoveryMethod != couchbasev2.DefaultRecoveryTypeNone {
+		args = append(args, "--default-recovery", string(backup.Spec.DefaultRecoveryMethod))
+	}
+
 	// Old resources won't have this set until written.
 	if backup.Spec.Threads != 0 {
 		args = append(args, "--threads", strconv.Itoa(backup.Spec.Threads))

@@ -253,6 +253,7 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 			Full: &couchbasev2.CouchbaseBackupSchedule{
 				Schedule: b.fullSchedule,
 			},
+			DefaultRecoveryMethod: couchbasev2.DefaultRecoveryTypeNone,
 		},
 	}
 

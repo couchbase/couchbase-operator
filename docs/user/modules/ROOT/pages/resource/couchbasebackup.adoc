@@ -27,6 +27,7 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbasebackups-spec-data-include,include>>:
     - ""
+  <<couchbasebackups-spec-defaultrecoverytype,defaultRecoveryType>>: none
   <<couchbasebackups-spec-ephemeralvolume,ephemeralVolume>>: false
   <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-full,full>>:
@@ -258,6 +259,22 @@ Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-sco
 Included data cannot overlap e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
 This field cannot be used at the same time as excluded items.
+
+=== couchbasebackups.spec.defaultRecoveryType
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Default*: `none`
+
+*Enumerations*: `none, resume, purge`
+
+==== Description
+
+DefaultRecoveryMethod specifies how cbbackupmgr should recover from broken backup/restore attempts.
 
 === couchbasebackups.spec.ephemeralVolume
 
