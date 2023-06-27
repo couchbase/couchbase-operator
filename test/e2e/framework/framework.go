@@ -661,7 +661,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 		return err
 	}
 
-	crdYAMLs := strings.Split(string(crdsRaw), "---\n")
+	crdYAMLs := strings.Split(string(crdsRaw), "\n---\n")
 
 	for _, crdYAML := range crdYAMLs {
 		if strings.TrimSpace(crdYAML) == "" {
