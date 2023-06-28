@@ -1698,6 +1698,10 @@ func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluste
 	// add cb host 127.0.0.1 and run on daemon mode.
 	container.Args = append(container.Args, "--daemon", "--cb-host", "127.0.0.1")
 
+	if otlp := cluster.Spec.Networking.CloudNativeGateway.OTLP; otlp != nil && otlp.Endpoint != "" {
+		container.Args = append(container.Args, "--otlp-endpoint", otlp.Endpoint)
+	}
+
 	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
 		applyCloudNativeGatewayPodTLS(cluster, &container, pod)
 	} else {

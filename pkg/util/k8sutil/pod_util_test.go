@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
@@ -133,5 +134,22 @@ func TestCreateMetricsContainer(t *testing.T) {
 		if !reflect.DeepEqual(tc.containerArgs, c.Args) {
 			t.Errorf("metrics cpntainer args: expected: %v, got: %v", tc.containerArgs, c.Args)
 		}
+	}
+}
+
+func TestPopulateCNG(t *testing.T) {
+	cluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{}}
+
+	annotation := map[string]string{
+		"cao.couchbase.com/networking.cloudNativeGateway.otlp.endpoint": "foo.bar",
+	}
+
+	err := annotations.Populate(&cluster.Spec, annotation)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cluster.Spec.Networking.CloudNativeGateway.OTLP.Endpoint != "foo.bar" {
+		t.Fatal("expected foo.bar but not found")
 	}
 }

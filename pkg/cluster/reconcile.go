@@ -13,6 +13,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -98,6 +99,10 @@ func (c *Cluster) reconcile() error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
 
+	err = annotations.Populate(&c.cluster.Spec, c.cluster.Annotations)
+	if err != nil {
+		return err
+	}
 	// Run pre-creation reconcilers.  These are all the things we need to correctly
 	// provision a Couchbase pod such as requisite services or any secrets/configmaps
 	// that may be mounted in the container.

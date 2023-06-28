@@ -2172,7 +2172,7 @@ type ClusterSpec struct {
 
 	// Networking defines Couchbase cluster networking options such as network
 	// topology, TLS and DDNS settings.
-	Networking CouchbaseClusterNetworkingSpec `json:"networking,omitempty"`
+	Networking CouchbaseClusterNetworkingSpec `json:"networking,omitempty" annotation:"networking"`
 
 	// Logging defines Operator logging options.
 	Logging CouchbaseClusterLoggingSpec `json:"logging,omitempty"`
@@ -2545,6 +2545,12 @@ type CloudNativeGateway struct {
 	// TLS defines the TLS configuration for the Cloud Native Gateway server including
 	// server and client certificate configuration, and TLS security policies.
 	TLS *CloudNativeGatewayTLS `json:"tls,omitempty"`
+
+	OTLP *CloudNativeGatewayOTLP `json:"-" annotation:"otlp"`
+}
+
+type CloudNativeGatewayOTLP struct {
+	Endpoint string `json:"-" annotation:"endpoint"`
 }
 
 type CouchbaseClusterNetworkingSpec struct {
@@ -2670,7 +2676,7 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
 	// cluster.
-	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty"`
+	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty" annotation:"cloudNativeGateway"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
