@@ -1011,6 +1011,14 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod)
 		return
 	}
 
+	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	if err == nil {
+		if srvVerAfter72, err := couchbaseutil.VersionAfter(tag, "7.2.0"); !srvVerAfter72 && err == nil {
+			log.Info("[WARN] server version must be 7.2 or later for cloud native gateway support. Check server version.")
+			return
+		}
+	}
+
 	cngContainer := createCloudNativeGatewayImageContainer(cluster, pod)
 	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
 }
@@ -1078,7 +1086,7 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	serverVersionPrometheus := false
 
 	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
-	if err != nil {
+	if err == nil {
 		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
 	}
 

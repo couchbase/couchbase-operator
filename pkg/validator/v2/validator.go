@@ -69,6 +69,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintVolumeTemplateStorageClass,
 		checkConstraintServerMinimumVersion,
 		checkConstraintTLS,
+		checkConstraintCloudNativeGatewayProvisioning,
 		checkConstraintCloudNativeGatewayTLS,
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
@@ -1008,6 +1009,28 @@ func checkConstraintCloudNativeGatewayTLS(v *types.Validator, cluster *couchbase
 	}
 
 	err := validateCloudNativeGatewayServerTLS(v, cluster)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkConstraintCloudNativeGatewayProvisioning validates whether Cloud Native Gateway could be provisioned.
+func checkConstraintCloudNativeGatewayProvisioning(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Networking.CloudNativeGateway == nil {
+		return nil
+	}
+
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if srvVerAfter72, err := couchbaseutil.VersionAfter(tag, "7.2.0"); !srvVerAfter72 && err == nil {
+		return fmt.Errorf("server version must be 7.2 or later for cloud native gateway support")
+	}
+
 	if err != nil {
 		return err
 	}

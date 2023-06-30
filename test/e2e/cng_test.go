@@ -59,14 +59,11 @@ func TestCreateCNG(t *testing.T) {
 func TestCNGBucketOps(t *testing.T) {
 	ctx := context.Background()
 
-	f := framework.Global
-
-	kubernetesCluster, cleanup := f.SetupTest(t)
+	kubernetesCluster, cleanup := framework.Global.SetupTest(t)
 
 	framework.Requires(t, kubernetesCluster).AtLeastVersion("7.2.0")
 
 	client, err := setupCNGTests(ctx, t, kubernetesCluster)
-
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -75,7 +72,6 @@ func TestCNGBucketOps(t *testing.T) {
 
 	defer func(t *testing.T, client *gocbcoreps.RoutingClient) {
 		err := client.Close()
-
 		if err != nil {
 			e2eutil.Die(t, err)
 		}
@@ -84,17 +80,22 @@ func TestCNGBucketOps(t *testing.T) {
 	}(t, client)
 
 	t.Run("TestCreateCNGBucket", func(t *testing.T) {
-		// Attempt to create a bucket
-		output, err := client.BucketV1().CreateBucket(ctx, &admin_bucket_v1.CreateBucketRequest{
-			BucketName:    bucketName,
-			BucketType:    admin_bucket_v1.BucketType(0),
-			RamQuotaBytes: 100,
-			NumReplicas:   1,
-		})
+		cleanup := framework.Global.SetupSubTest(t)
+		defer cleanup()
 
+		// create bucket
+		var createRAMQuota uint64 = 100
+		var createNumReplica uint32 = 1
+
+		// Attempt to create a bucket
+		_, err := client.BucketV1().CreateBucket(ctx, &admin_bucket_v1.CreateBucketRequest{
+			BucketName:  bucketName,
+			BucketType:  admin_bucket_v1.BucketType(0),
+			RamQuotaMb:  &createRAMQuota,
+			NumReplicas: &createNumReplica,
+		})
 		if err != nil {
-			t.Log(output)
-			t.Log(err)
+			e2eutil.Die(t, err)
 		}
 
 		response, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
@@ -110,55 +111,56 @@ func TestCNGBucketOps(t *testing.T) {
 	})
 
 	t.Run("TestUpdateCNGBucket", func(t *testing.T) {
-		// Default bucket RAM quota
-		var ramQuota int64 = 104857600
+		cleanup := framework.Global.SetupSubTest(t)
+		defer cleanup()
+
+		// upadate bucket
+		var updatedRAMQuota uint64 = 150
+		var updatedNumReplica uint32 = 1
+		flushEnabled := true
+		replicaIndexes := false
+		var maxExpirySecs uint32 = 10
 
 		// Attempt to update the bucket.
-		updateResponse, err := client.BucketV1().UpdateBucket(ctx, &admin_bucket_v1.UpdateBucketRequest{
+		_, err := client.BucketV1().UpdateBucket(ctx, &admin_bucket_v1.UpdateBucketRequest{
 			BucketName:             bucketName,
-			RamQuotaBytes:          func() *uint64 { var b uint64 = 104857700; return &b }(),
-			NumReplicas:            func() *uint32 { var b uint32 = 1; return &b }(),
-			FlushEnabled:           func() *bool { b := true; return &b }(),
-			ReplicaIndexes:         func() *bool { b := false; return &b }(),
+			RamQuotaMb:             &updatedRAMQuota,
+			NumReplicas:            &updatedNumReplica,
+			FlushEnabled:           &flushEnabled,
+			ReplicaIndexes:         &replicaIndexes,
 			EvictionMode:           admin_bucket_v1.EvictionMode_EVICTION_MODE_FULL.Enum(),
-			MaxExpirySecs:          func() *uint32 { var b uint32 = 10; return &b }(),
+			MaxExpirySecs:          &maxExpirySecs,
 			CompressionMode:        admin_bucket_v1.CompressionMode_COMPRESSION_MODE_ACTIVE.Enum(),
 			MinimumDurabilityLevel: kv_v1.DurabilityLevel_DURABILITY_LEVEL_MAJORITY.Enum(),
 		})
 
 		if err != nil {
-			t.Log(updateResponse)
-			t.Log(err)
+			e2eutil.Die(t, err)
 		}
 
-		newTest, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
-
+		lb, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
 		if err != nil {
-			t.Log(newTest)
 			e2eutil.Die(t, err)
 		}
 
 		// Check if the bucket RAM quota has been updated.
-		for _, bucket := range newTest.Buckets {
-			if ramQuota == int64(bucket.RamQuotaBytes) {
-				if bucket.RamQuotaBytes == uint64(ramQuota) {
-					e2eutil.Die(t, fmt.Errorf("bucket did not update"))
-				}
+		for _, bucket := range lb.Buckets {
+			if bucket.RamQuotaMb != updatedRAMQuota {
+				e2eutil.Die(t, fmt.Errorf("bucket did not update"))
 			}
 		}
 	})
 
 	t.Run("TestDeleteCNGBucket", func(t *testing.T) {
-		deleteResponse, err := client.BucketV1().DeleteBucket(ctx, &admin_bucket_v1.DeleteBucketRequest{BucketName: bucketName})
+		cleanup := framework.Global.SetupSubTest(t)
+		defer cleanup()
 
+		_, err := client.BucketV1().DeleteBucket(ctx, &admin_bucket_v1.DeleteBucketRequest{BucketName: bucketName})
 		if err != nil {
-			t.Log(deleteResponse)
-			t.Log(err)
 			e2eutil.Die(t, err)
 		}
 
 		listResponse, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
-
 		if err != nil {
 			e2eutil.Die(t, err)
 		}
@@ -206,18 +208,10 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 		PoolSize:           1,
 	}
 
-	ip, port, err := k8sutil.GetClusterCNGService(kubernetesCluster, cluster, v1.ServiceTypeClusterIP, 2*time.Minute)
+	cngSvcName := clusterName + "-cloud-native-gateway-service"
+	connStr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", cngSvcName, cluster.Namespace, 443)
 
-	if err != nil {
-		return nil, err
-	}
-
-	if len(port) == 0 {
-		return nil, fmt.Errorf("unable to retrieve CNG service details")
-	}
-
-	client, err := gocbcoreps.DialContext(ctx, ip+":443", &dialopts)
-
+	client, err := gocbcoreps.DialContext(ctx, connStr, &dialopts)
 	if err != nil {
 		return nil, err
 	}

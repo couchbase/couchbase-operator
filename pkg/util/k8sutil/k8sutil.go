@@ -21,7 +21,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
-	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	"github.com/ghodss/yaml"
 
@@ -117,18 +116,6 @@ func GetPodNames(pods []*v1.Pod) []string {
 
 func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 	o.SetOwnerReferences(append(o.GetOwnerReferences(), r))
-}
-
-func GetClusterCNGService(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serviceType v1.ServiceType, timeout time.Duration) (string, []v1.ServicePort, error) {
-	service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), couchbase.Name+constants.CloudNativeGatewayServiceAppend, metav1.GetOptions{})
-	if err != nil {
-		return "", nil, err
-	}
-
-	ip := service.Spec.ClusterIP
-	ports := service.Spec.Ports
-
-	return ip, ports, err
 }
 
 func GetHostIP(client *client.Client, name string) (string, error) {
