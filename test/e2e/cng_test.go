@@ -19,6 +19,9 @@ import (
 	"github.com/couchbase/goprotostellar/genproto/admin_bucket_v1"
 	"github.com/couchbase/goprotostellar/genproto/kv_v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	podconsts "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 var cluster *v2.CouchbaseCluster
@@ -231,4 +234,63 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 	}
 
 	return client, nil
+}
+
+func TestCngOtlp(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster spec
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetes)
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+
+	otelURL := "https://otel:1234"
+	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.otlp.endpoint"] = otelURL
+	// Create the cluster
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, cluster, -1)
+
+	// get the pod and check the args
+	var container v1.Container
+
+	err := retryutil.RetryFor(5*time.Minute, func() error {
+		listOptions := metav1.ListOptions{
+			LabelSelector: constants.CouchbaseServerClusterKey + "=" + cluster.Name,
+		}
+		pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range pods.Items {
+			for _, container = range pod.Spec.Containers {
+				if container.Name == k8sutil.CloudNativeGatewayContainerName {
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("%s container not found", k8sutil.CloudNativeGatewayContainerName)
+	})
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for index, arg := range container.Args {
+		if arg == podconsts.CloudNativeGatewayOtlpFlag && container.Args[index+1] == "https://otel:1234" {
+			return
+		}
+	}
+
+	e2eutil.Die(t, fmt.Errorf("%s flag not set", podconsts.CloudNativeGatewayOtlpFlag))
 }

@@ -16,6 +16,11 @@ const (
 	AuthSecretPasswordKey          = "password"
 )
 
+// Cloud Native Gateway Constants.
+const (
+	CloudNativeGatewayOtlpFlag = "--otlp-endpoint"
+)
+
 const (
 	IntMax = int(^uint(0) >> 1)
 )

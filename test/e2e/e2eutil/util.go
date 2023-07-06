@@ -84,7 +84,9 @@ func CreateNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *cou
 		Die(t, err)
 	}
 
-	MustWaitClusterStatusHealthy(t, k8s, cluster, time.Duration(timeout*int(time.Minute)))
+	if timeout != -1 {
+		MustWaitClusterStatusHealthy(t, k8s, cluster, time.Duration(timeout*int(time.Minute)))
+	}
 
 	// Update the cluster status, this is important for the test, especially if the cluster
 	// name is auto-generated.
