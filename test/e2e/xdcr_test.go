@@ -22,7 +22,7 @@ import (
 // mustCreateXDCRBuckets creates default buckets in the source and target clusters, ensuring
 // we don't redefine if the same cluster is used for source and target couchbase instances.
 func mustCreateXDCRBucketsWithScopes(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, scopes ...*couchbasev2.CouchbaseScope) metav1.Object {
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 
 	for _, scope := range scopes {
 		e2eutil.LinkBucketToScopesExplicit(bucket, scope)
@@ -728,7 +728,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 
 	// Now we delete the replication, add some documents in the source bucket and
 	// verify that the doc count of destination bucket is same as its old value
-	e2eutil.MustDeleteXDCRReplication(t, kubernetes1, sourceCluster, replication, time.Minute)
+	e2eutil.MustDeleteXDCRReplication(t, kubernetes1, replication, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, e2eutil.ReplicationRemovedEvent(sourceCluster, targetCluster.Name, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
 
@@ -887,7 +887,7 @@ func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster,
 
 	e2eutil.MustRotateClientCertificate(t, tls)
 	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, k8sutil.ClientTLSUpdatedEvent(targetCluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
-	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, kubernetes2, targetCluster, tls)
+	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, targetCluster, tls)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
@@ -952,7 +952,7 @@ func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns
 
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, tls)
 	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, k8sutil.ClientTLSUpdatedEvent(targetCluster, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
-	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, kubernetes2, targetCluster, tls)
+	e2eutil.MustRotateXDCRReplicationTLS(t, kubernetes1, targetCluster, tls)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)

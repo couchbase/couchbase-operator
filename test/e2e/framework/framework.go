@@ -73,18 +73,14 @@ func Init() error {
 		return err
 	}
 
-	if err := setup(); err != nil {
-		return err
-	}
-
-	return nil
+	return setup()
 }
 
 const (
 	// Not defined by the library, usually due to ordering mismatches across
 	// architectures. This is the number of processes/PIDs/TIDs that are allowed
 	// within the container.
-	RLIMIT_NPROC = 6 // nolint:golint,stylecheck,revive
+	RLIMIT_NPROC = 6 //nolint:golint,stylecheck,revive
 )
 
 // rlimitCheck defines an rlimit check.
@@ -753,11 +749,9 @@ func (f *Framework) SetupFramework(k8s *types.Cluster) error {
 	// creating DAC
 	logrus.Infof("Creating admission controller")
 
-	if err := createAdmissionController(k8s, secrets); err != nil {
-		return err
-	}
+	err = createAdmissionController(k8s, secrets)
 
-	return nil
+	return err
 }
 
 func (f *Framework) GetOperatorRestartCount(k8s *types.Cluster) (int32, error) {
@@ -1062,7 +1056,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		logDir := filepath.Join(f.LogDir, t.Name(), cluster.Namespace)
 
 		// Collect operator and logging sidecar logs
-		if err := e2eutil.WriteLogs(cluster, logDir, ""); err != nil {
+		if err := e2eutil.WriteLogs(cluster, logDir); err != nil {
 			t.Logf("Error: %v", err)
 		}
 
@@ -1142,18 +1136,18 @@ func (r *TestRequirement) IstioDisabled() *TestRequirement {
 func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	for _, version := range v {
 		v2, err := couchbaseutil.NewVersion(version)
 		if err != nil {
-			r.t.Skip(fmt.Sprintf("malformed version: %s: %v", version, err))
+			r.t.Skipf("malformed version: %s: %v", version, err)
 		}
 
 		if v1.Equal(v2) {
@@ -1212,17 +1206,17 @@ func (r *TestRequirement) HasIAMParameters() *TestRequirement {
 func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v1.Less(v2) {
@@ -1235,17 +1229,17 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseServerImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v2.Less(v1) {
@@ -1264,22 +1258,22 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 
 	parts1 := strings.Split(Global.CouchbaseServerImage, ":")
 	if len(parts1) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
 	parts2 := strings.Split(Global.CouchbaseServerImageUpgrade, ":")
 	if len(parts2) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseServerImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
 	version, err := couchbaseutil.NewVersion(parts1[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts1[1], err)
 	}
 
 	upgrade, err := couchbaseutil.NewVersion(parts2[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts2[1], err)
 	}
 
 	if upgrade.GreaterEqual(version) {
@@ -1300,12 +1294,12 @@ func (r *TestRequirement) LoggingUpgradable() *TestRequirement {
 
 	parts1 := strings.Split(Global.CouchbaseLoggingImage, ":")
 	if len(parts1) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseLoggingImage)
 	}
 
 	parts2 := strings.Split(Global.CouchbaseLoggingImageUpgrade, ":")
 	if len(parts2) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImageUpgrade))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseLoggingImageUpgrade)
 	}
 
 	if parts1[1] == parts2[1] {
@@ -1318,16 +1312,16 @@ func (r *TestRequirement) LoggingUpgradable() *TestRequirement {
 
 	version, err := couchbaseutil.NewVersion(parts1[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts1[1], err)
 	}
 
 	upgrade, err := couchbaseutil.NewVersion(parts2[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts2[1], err)
 	}
 
 	if upgrade.GreaterEqual(version) {
-		r.t.Skip(fmt.Sprintf("Logging image upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1]))
+		r.t.Skipf("Logging image upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1])
 	}
 
 	return r
@@ -1344,12 +1338,12 @@ func (r *TestRequirement) ExporterUpgradable() *TestRequirement {
 
 	parts1 := strings.Split(Global.CouchbaseExporterImage, ":")
 	if len(parts1) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseExporterImage)
 	}
 
 	parts2 := strings.Split(Global.CouchbaseExporterImageUpgrade, ":")
 	if len(parts2) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImageUpgrade))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseExporterImageUpgrade)
 	}
 
 	if parts1[1] == parts2[1] {
@@ -1362,16 +1356,16 @@ func (r *TestRequirement) ExporterUpgradable() *TestRequirement {
 
 	version, err := couchbaseutil.NewVersion(parts1[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts1[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts1[1], err)
 	}
 
 	upgrade, err := couchbaseutil.NewVersion(parts2[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts2[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts2[1], err)
 	}
 
 	if upgrade.GreaterEqual(version) {
-		r.t.Skip(fmt.Sprintf("Exporter upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1]))
+		r.t.Skipf("Exporter upgrade version %s greater than or equal to base version %s", parts2[1], parts1[1])
 	}
 
 	return r
@@ -1381,17 +1375,17 @@ func (r *TestRequirement) ExporterUpgradable() *TestRequirement {
 func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseBackupImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseBackupImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseBackupImage)
 	}
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v1.Less(v2) {
@@ -1405,7 +1399,7 @@ func (r *TestRequirement) AtLeastBackupVersion(v string) *TestRequirement {
 func (r *TestRequirement) AtLeastLoggingVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseLoggingImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseLoggingImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseLoggingImage)
 	}
 
 	if parts[1] == "latest" {
@@ -1414,12 +1408,12 @@ func (r *TestRequirement) AtLeastLoggingVersion(v string) *TestRequirement {
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v1.Less(v2) {
@@ -1437,17 +1431,17 @@ func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 
 	parts := strings.Split(Global.SyncGatewayImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.SyncGatewayImage))
+		r.t.Skipf("malformed image: %v", Global.SyncGatewayImage)
 	}
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v2.Less(v1) {
@@ -1461,7 +1455,7 @@ func (r *TestRequirement) AtMostSyncGatewayVersion(v string) *TestRequirement {
 func (r *TestRequirement) AtLeastExporterVersion(v string) *TestRequirement {
 	parts := strings.Split(Global.CouchbaseExporterImage, ":")
 	if len(parts) != 2 {
-		r.t.Skip(fmt.Sprintf("malformed image: %v", Global.CouchbaseExporterImage))
+		r.t.Skipf("malformed image: %v", Global.CouchbaseExporterImage)
 	}
 
 	if parts[1] == "latest" {
@@ -1470,12 +1464,12 @@ func (r *TestRequirement) AtLeastExporterVersion(v string) *TestRequirement {
 
 	v1, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", parts[1], err))
+		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
 	if err != nil {
-		r.t.Skip(fmt.Sprintf("malformed version: %s: %v", v, err))
+		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
 	if v1.Less(v2) {
@@ -1569,7 +1563,7 @@ func (r *TestRequirement) ServerFixing() *TestRequirement {
 // PlatformIs skips the test if the vendor platform is incorrect.
 func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestRequirement {
 	if Global.Platform != platform {
-		r.t.Skip(fmt.Sprintf("Platform requires %s", platform))
+		r.t.Skipf("Platform requires %s", platform)
 	}
 
 	return r

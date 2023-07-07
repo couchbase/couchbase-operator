@@ -268,11 +268,7 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 		return err
 	}
 
-	if err = c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateCRStatus()
 }
 
 // Creates and adds a new Couchbase cluster member.
@@ -335,11 +331,7 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 		return err
 	}
 
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateCRStatus()
 }
 
 // Cancel a node addition.
@@ -408,11 +400,7 @@ func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *cou
 		return err
 	}
 
-	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
-		return err
-	}
-
-	return nil
+	return k8sutil.SetPodInitialized(c.k8s, member.Name())
 }
 
 // initializes the first member in the cluster.
@@ -496,11 +484,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 
 	// This needs a retry, server doesn't gracefully shutdown and give us a response,
 	// it may just slam the door shut and give us an EOF.
-	if err := couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
-
-	return nil
+	return couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.readyMembers())
 }
 
 // Initialize a member with TLS certificates.
@@ -537,11 +521,7 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) 
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA); err != nil {
-		return err
-	}
-
-	return nil
+	return netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA)
 }
 
 // initMemberTLSLegacy handles TLS initialization on CBS versions <=7.0.
@@ -561,11 +541,7 @@ func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Membe
 	}
 
 	// Wait for the port to come backup with the correct certificate chain
-	if err := netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA); err != nil {
-		return err
-	}
-
-	return nil
+	return netutil.WaitForHostPortTLS(ctx, m.GetHostPort(), c.tlsCache.serverCA)
 }
 
 func (c *Cluster) updateMemberStatus(firstMember bool) error {

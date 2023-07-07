@@ -178,11 +178,7 @@ func getGenerateAdmissionCommand(command string, flags *genericclioptions.Config
 				return err
 			}
 
-			if err := dumpResources(resources); err != nil {
-				return err
-			}
-
-			return nil
+			return dumpResources(resources)
 		},
 	}
 
@@ -242,11 +238,7 @@ func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 				return err
 			}
 
-			if err := createResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return createResources(flags, resources)
 		},
 	}
 
@@ -284,11 +276,7 @@ func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 				return err
 			}
 
-			if err := deleteResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return deleteResources(flags, resources)
 		},
 	}
 

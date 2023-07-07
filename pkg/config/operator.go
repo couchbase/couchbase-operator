@@ -168,11 +168,7 @@ func getGenerateOperatorCommand(command string, flags *genericclioptions.ConfigF
 				return err
 			}
 
-			if err := dumpResources(resources); err != nil {
-				return err
-			}
-
-			return nil
+			return dumpResources(resources)
 		},
 	}
 
@@ -222,11 +218,7 @@ func getCreateOperatorCommand(command string, flags *genericclioptions.ConfigFla
 				return err
 			}
 
-			if err := createResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return createResources(flags, resources)
 		},
 	}
 
@@ -260,11 +252,7 @@ func getDeleteOperatorCommand(command string, flags *genericclioptions.ConfigFla
 				return err
 			}
 
-			if err := deleteResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return deleteResources(flags, resources)
 		},
 	}
 

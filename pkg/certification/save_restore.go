@@ -1203,11 +1203,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	log.V(cli.Debug).Info("Cleaning up old resources...")
 
-	if err := cleanup(clients, resources); err != nil {
-		return err
-	}
-
-	return nil
+	return cleanup(clients, resources)
 }
 
 // promptOkay creates a barrier until the user explcitly agrees to something.
@@ -1274,7 +1270,7 @@ func diffResources(a, b interface{}) (bool, []byte, error) {
 }
 
 // TreeNode forms an abstraction layer for all resource types.
-type TreeNode interface {
+type TreeNode interface { //nolint:interfacebloat
 	// Name is the Couchbase resource name.
 	Name() string
 
@@ -2954,7 +2950,8 @@ func gatherDataTopologyResources(clients *clients, cluster *couchbasev2.Couchbas
 
 // gatherScopeResources collects scope resources under the control of a scope selector, then
 // recursively gathers descendants.
-// nolint:gocognit
+//
+//nolint:gocognit
 func gatherScopeResources(clients *clients, scopeSelector *couchbasev2.ScopeSelector) ([]runtime.Object, error) {
 	if scopeSelector == nil || !scopeSelector.Managed {
 		return nil, nil

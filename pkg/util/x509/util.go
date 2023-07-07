@@ -7,7 +7,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1" // nolint:gosec
+	"crypto/sha1" //nolint:gosec
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -357,7 +357,7 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 		return nil, errors.NewStackTracedError(err)
 	}
 
-	sum := sha1.Sum(subjectPublicKey) // nolint:gosec
+	sum := sha1.Sum(subjectPublicKey) //nolint:gosec
 
 	return sum[:], nil
 }

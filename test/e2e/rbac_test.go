@@ -414,7 +414,7 @@ func TestRBACWithBucketScopedRolePost7(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -447,7 +447,7 @@ func TestRBACWithBucketScopedRolePre7(t *testing.T) {
 	clusterSize := 1
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	group := bindGroup(t, kubernetes, e2espec.NewGroup(couchbasev2.RoleDataReader).WithBuckets(bucket).Create())
@@ -484,7 +484,7 @@ func TestRBACWithScopeScopedRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -529,7 +529,7 @@ func TestRBACWithScopeScopedRoleNoPermissionWhenNoScopeCreated(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	group := bindGroup(t, kubernetes, e2espec.NewGroup(couchbasev2.RoleDataReader).WithBuckets(bucket).WithScopes(scope).WithCollections(collection).WithCollectionGroups(collectionGroup).Create())
@@ -565,7 +565,7 @@ func TestRBACWithMultipleScopedRolesViaScopeGroup(t *testing.T) {
 	// Create a scope.
 	scopes := e2eutil.NewScopeGroup(scopeGroupName, scope1, scope2, scope3).MustCreate(t, kubernetes)
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scopes)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -612,7 +612,7 @@ func TestRBACWithCollectionScopedRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -658,7 +658,7 @@ func TestRBACWithCollectionScopedRoleDoesNotAddPermissionDuetoNoCollection(t *te
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	group := bindGroup(t, kubernetes, e2espec.NewGroup(couchbasev2.RoleDataReader).WithBuckets(bucket).WithScopes(scope).WithCollections(collection).Create())
@@ -697,7 +697,7 @@ func TestRBACWithMultipleCollectionScopedRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -744,7 +744,7 @@ func TestRBACWithMultipleCollectionAndMultipleScopesScopedRole(t *testing.T) {
 	scopeGroup := e2eutil.NewScopeGroup(scopeGroupName, scopeName1, scopeName2).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scopeGroup)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -792,7 +792,7 @@ func TestRBACWithCollectionScopedRoleBySelector(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithLabels(label).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -842,7 +842,7 @@ func TestRBACWithCollectionScopedRoleBySelectorForGroups(t *testing.T) {
 	scope := e2eutil.NewScopeGroup(scopeGroupName, scopeName, scopeName2).WithLabels(label).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -896,7 +896,7 @@ func TestRBACWithCollectionScopedRoleBySelectorForMultipleScopesAndCollections(t
 	scope := e2eutil.NewScope(scopeName).WithLabels(label).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	scope2 := e2eutil.NewScope(scopeName2).WithLabels(label).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope2)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -950,7 +950,7 @@ func TestRBACWithWillNotGetPermissionSetWithInvalidSelector(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithLabels(label).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	scope2 := e2eutil.NewScope(scopeName2).WithLabels(label).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope2)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -994,12 +994,12 @@ func TestRBACWithMultipleBucketRole(t *testing.T) {
 	clusterSize := 1
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	bucket2 = e2eutil.MustNewBucket(t, kubernetes, bucket2)
 	bucket2 = e2eutil.MustPatchBucket(t, kubernetes, bucket2, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
@@ -1030,14 +1030,14 @@ func TestRBACWithMultipleBucketSingleScopeRole(t *testing.T) {
 	// create scope
 	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
 	// Create first bucket
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	// bind scope to bucket 1
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	// bind scope to bucket 2
 	e2eutil.LinkBucketToScopesExplicit(bucket2, scope)
@@ -1071,7 +1071,7 @@ func TestRBACWithMultipleBucketMultiScopeRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
 	scope2 := e2eutil.NewScope(scope2Name).MustCreate(t, kubernetes)
 	// Create first bucket
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	// bind scope to bucket 1
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope2)
@@ -1079,7 +1079,7 @@ func TestRBACWithMultipleBucketMultiScopeRole(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	// bind scope to bucket 2
 	e2eutil.LinkBucketToScopesExplicit(bucket2, scope)
@@ -1120,7 +1120,7 @@ func TestRBACWithMultipleBucketMultiScopeSingleCollectionRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 	scope2 := e2eutil.NewScope(scope2Name).WithCollections(collection).MustCreate(t, kubernetes)
 	// Create first bucket
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	// bind scope to bucket 1
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope2)
@@ -1128,7 +1128,7 @@ func TestRBACWithMultipleBucketMultiScopeSingleCollectionRole(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	// bind scope to bucket 2
 	e2eutil.LinkBucketToScopesExplicit(bucket2, scope)
@@ -1171,7 +1171,7 @@ func TestRBACWithMultipleBucketMultiScopeMultiCollectionRole(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	scope2 := e2eutil.NewScope(scope2Name).WithCollections(collection, collection2).MustCreate(t, kubernetes)
 	// Create first bucket
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	// bind scope to bucket 1
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope2)
@@ -1179,7 +1179,7 @@ func TestRBACWithMultipleBucketMultiScopeMultiCollectionRole(t *testing.T) {
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	// bind scope to bucket 2
 	e2eutil.LinkBucketToScopesExplicit(bucket2, scope)
@@ -1218,13 +1218,13 @@ func TestRBACWithBucketSelector(t *testing.T) {
 		"security": "rbac",
 	}
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket.SetLabels(label)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", e2espec.NewResourceQuantityMi(128)), time.Minute)
 
 	// Second bucket
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName("mickey")
 	bucket2.SetLabels(label)
 	bucket2 = e2eutil.MustNewBucket(t, kubernetes, bucket2)

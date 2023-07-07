@@ -156,7 +156,7 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 
 // ClusterCreateSequenceWithExposedFeatures is a common function for generating cluster
 // creation events, with specific featuresets.
-func ClusterCreateSequenceWithExposedFeatures(size int, features ...couchbasev2.ExposedFeature) eventschema.Validatable {
+func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.ExposedFeature) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Repeat{

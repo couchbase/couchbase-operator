@@ -247,11 +247,7 @@ func createSyncGateway(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster
 		return err
 	}
 
-	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, deployment, string(appsv1.DeploymentAvailable), string(corev1.ConditionTrue))); err != nil {
-		return err
-	}
-
-	return nil
+	return retryutil.RetryFor(timeout, ResourceCondition(k8s, deployment, string(appsv1.DeploymentAvailable), string(corev1.ConditionTrue)))
 }
 
 func MustCreateSyncGateway(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, image, bucket string, auth *corev1.Secret, dns *corev1.Service, serverTLS *TLSContext, timeout time.Duration) {

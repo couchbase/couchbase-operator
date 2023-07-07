@@ -269,3 +269,10 @@ webserver
 cbbackupmgr
 Minio
 keypair
+LPV
+PV
+PVS
+provisioner
+Provisioner
+unpause
+vbucket

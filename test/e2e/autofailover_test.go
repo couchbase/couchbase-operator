@@ -36,7 +36,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	clusterSize := len(availableServerGroupList) * 2
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -219,7 +219,7 @@ func TestServicesRunningAfterFailover(t *testing.T) {
 	// documents appear in the destination.
 	docsToCreate := 3
 
-	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", bucket1.Name, bucket3.Name, bucket2.Name, eventFunction, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, cluster, "test", bucket1.Name, bucket3.Name, bucket2.Name, eventFunction, time.Minute)
 	e2eutil.NewDocumentSet(bucket1.GetName(), docsToCreate).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket2.Name, docsToCreate, time.Minute)
 

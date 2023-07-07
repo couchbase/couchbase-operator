@@ -55,11 +55,8 @@ func (provider *GCPProvider) CreateBucket(bucketName string) error {
 	ctx := context.Background()
 
 	bkt := provider.client.Bucket(bucketName)
-	if err := bkt.Create(ctx, "couchbase-engineering", nil); err != nil {
-		return err
-	}
 
-	return nil
+	return bkt.Create(ctx, "couchbase-engineering", nil)
 }
 
 func (provider *GCPProvider) GetBucket(bucketName string) (bool, error) {

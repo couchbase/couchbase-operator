@@ -129,7 +129,7 @@ func MustDisableCouchbaseAutoscaling(t *testing.T, k8s *types.Cluster, cluster *
 func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace string, name string, config *e2espec.HPAConfig) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := e2espec.NewAverageValueHPA(name, config)
 
-	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(k8s.Namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
+	hpa, err := k8s.AutoscaleClient.HorizontalPodAutoscalers(namespace).Create(context.Background(), hpa, metav1.CreateOptions{})
 	if err != nil {
 		Die(t, err)
 	}
@@ -141,7 +141,7 @@ func MustCreateAverageValueHPA(t *testing.T, k8s *types.Cluster, namespace strin
 // These collection of resources are used by HPA for reacting to target values.
 // Specifically, the custom metric service exposes test metrics with various behaviors,
 // such as incrementing, decrementing, average, and random value metrics.
-func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string, istioEnabled bool) (func(), error) {
+func CreateCustomMetricServer(k8s *types.Cluster, namespace string, clusterName string, istioEnabled bool) (func(), error) {
 	// generate resources
 	serviceAccount := e2espec.GenerateCustomMetricServiceAccount(namespace)
 	deploymentRole := e2espec.GenerateCustomMetricDeploymentRole(namespace)
@@ -205,7 +205,7 @@ func CreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string
 
 // MustCreateCustomMetricServer requires creation of metric server or fails.
 func MustCreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace string, clusterName string, istioEnabled bool) func() {
-	cleanup, err := CreateCustomMetricServer(t, k8s, namespace, clusterName, istioEnabled)
+	cleanup, err := CreateCustomMetricServer(k8s, namespace, clusterName, istioEnabled)
 	if err != nil {
 		cleanup()
 		Die(t, err)
@@ -215,7 +215,7 @@ func MustCreateCustomMetricServer(t *testing.T, k8s *types.Cluster, namespace st
 }
 
 // UpdateScale changes scale of CouchbaseAutoscaler resource to requested size.
-func UpdateScale(t *testing.T, k8s *types.Cluster, namespace string, name string, size int32) (*autoscalingv1.Scale, error) {
+func UpdateScale(k8s *types.Cluster, namespace string, name string, size int32) (*autoscalingv1.Scale, error) {
 	scale, err := k8s.CRClient.CouchbaseV2().CouchbaseAutoscalers(namespace).GetScale(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -228,7 +228,7 @@ func UpdateScale(t *testing.T, k8s *types.Cluster, namespace string, name string
 
 // MustUpdateScale requires successful scale update.
 func MustUpdateScale(t *testing.T, k8s *types.Cluster, namespace string, name string, size int32) *autoscalingv1.Scale {
-	scale, err := UpdateScale(t, k8s, namespace, name, size)
+	scale, err := UpdateScale(k8s, namespace, name, size)
 	if err != nil {
 		Die(t, err)
 	}

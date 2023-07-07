@@ -97,7 +97,7 @@ func (j *janitorAbstractionInterfaceTestImpl) LogPVCDelete(name string) error {
 // Exists returns a configurable boolean to indicate whether a pod has been seen.
 // It is assumed podExists will be called once for each PVC returned by the List
 // method of the logPVCInterface.
-func (j *janitorAbstractionInterfaceTestImpl) PodExists(name string) (bool, error) {
+func (j *janitorAbstractionInterfaceTestImpl) PodExists(_ string) (bool, error) {
 	if j.podExistsIndex >= len(j.podExists) {
 		j.t.Fatalf("Exists() overflow")
 	}

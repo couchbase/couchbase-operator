@@ -37,11 +37,7 @@ func getGenerateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 				return err
 			}
 
-			if err := dumpResources(resources); err != nil {
-				return err
-			}
-
-			return nil
+			return dumpResources(resources)
 		},
 	}
 
@@ -68,11 +64,7 @@ func getCreateBackupCommand(command string, flags *genericclioptions.ConfigFlags
 				return err
 			}
 
-			if err := createResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return createResources(flags, resources)
 		},
 	}
 
@@ -99,11 +91,7 @@ func getDeleteBackupCommand(command string, flags *genericclioptions.ConfigFlags
 				return err
 			}
 
-			if err := deleteResources(flags, resources); err != nil {
-				return err
-			}
-
-			return nil
+			return deleteResources(flags, resources)
 		},
 	}
 

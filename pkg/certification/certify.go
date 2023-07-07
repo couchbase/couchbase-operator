@@ -709,11 +709,7 @@ func (o *certifyOptions) waitCertificationPodReady() error {
 		return util.PodReady(o.client, o.namespace, certificationName)
 	}
 
-	if err := util.WaitFor(callback, 5*time.Minute); err != nil {
-		return err
-	}
-
-	return nil
+	return util.WaitFor(callback, 5*time.Minute)
 }
 
 // streamLogs provides "live" streaming of logs from the certification container.
@@ -923,11 +919,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 		return err
 	}
 
-	if err := os.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(o.archiveName.archiveName(), stdout.Bytes(), 0644)
 }
 
 // startProfiling begins periodic profiling of the certification container

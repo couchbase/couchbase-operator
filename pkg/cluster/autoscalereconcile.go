@@ -159,7 +159,7 @@ func (c *Cluster) autoscalingReady() bool {
 	case v1.ConditionUnknown:
 		// Should never be in unknown condition, log and clear
 		err := fmt.Errorf("autoscaler condition %w", errors.NewStackTracedError(errors.ErrUnknownCondition))
-		log.Error(err, "cluster", c.namespacedName())
+		log.Error(err, "cluster", "cluster should not be in unknown condition", c.namespacedName())
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionAutoscaleReady)
 	}
 

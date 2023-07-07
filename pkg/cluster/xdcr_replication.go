@@ -542,11 +542,7 @@ func (c *Cluster) updateXDCRPersistentState(cluster *couchbaseutil.RemoteCluster
 		return err
 	}
 
-	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, cluster.Certificate); err != nil {
-		return err
-	}
-
-	return nil
+	return c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, cluster.Certificate)
 }
 
 // remoteClusterCreations is a generator that returns clusters that need to be created.
@@ -727,7 +723,7 @@ func (c *Cluster) reconcileXDCRReplications(requestedReplications couchbaseutil.
 			return err
 		}
 
-		if err := couchbaseutil.DeleteReplication(&replication, cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.DeleteReplication(cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 

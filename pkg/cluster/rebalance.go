@@ -265,11 +265,7 @@ func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPN
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
 
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateCRStatus()
 }
 
 func (c *Cluster) verifyRebalance(members couchbaseutil.MemberSet) error {

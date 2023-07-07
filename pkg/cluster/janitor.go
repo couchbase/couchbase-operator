@@ -53,20 +53,14 @@ func (j *janitorAbstractionInterfaceImpl) LogPVCList() ([]*corev1.PersistentVolu
 
 // LogPVCUpdate updates the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCUpdate(pvc *corev1.PersistentVolumeClaim) error {
-	if _, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
-		return err
-	}
+	_, err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{})
 
-	return nil
+	return err
 }
 
 // LogPVCDelete deleted the specified PVC.
 func (j *janitorAbstractionInterfaceImpl) LogPVCDelete(name string) error {
-	if err := j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	return j.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(j.cluster.cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
 // PodExists returns whether a pod exists or not.
@@ -162,11 +156,7 @@ func (j *janitor) updateDetachedAnnotation(pvc *corev1.PersistentVolumeClaim) er
 	}
 
 	// Update the resource, may fail due to conflicts but we'll fix it up in a minute...
-	if err := j.abstraction.LogPVCUpdate(pvc); err != nil {
-		return err
-	}
-
-	return nil
+	return j.abstraction.LogPVCUpdate(pvc)
 }
 
 // updateDetachedAnnotations performs the updateDetachedAnnotation for each log volume defined
@@ -281,11 +271,7 @@ func (j *janitor) cleanPeriodic() error {
 	}
 
 	// Third pass check for too many PVCs.
-	if err := j.deleteOverCapacityVolumes(); err != nil {
-		return err
-	}
-
-	return nil
+	return j.deleteOverCapacityVolumes()
 }
 
 // run monitors the namespace for resources related to the named cluster.

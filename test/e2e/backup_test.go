@@ -46,7 +46,7 @@ func testFullIncremental(t *testing.T, providerType cloud.ProviderType) {
 
 	// Create a normal cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -113,7 +113,7 @@ func testFullOnly(t *testing.T, providerType cloud.ProviderType) {
 
 	// Create a normal cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -182,7 +182,7 @@ func testFailedBackupBehaviour(t *testing.T, providerType cloud.ProviderType) {
 	cluster.Spec.Backup.Image = f.CouchbaseBackupImage
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -274,7 +274,7 @@ func testBackupPVCReconcile(t *testing.T, providerType cloud.ProviderType) {
 	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -362,7 +362,7 @@ func testReplaceFullOnlyBackup(t *testing.T, providerType cloud.ProviderType) {
 	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -455,7 +455,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, providerType cloud.ProviderT
 	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -538,7 +538,7 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
 
 	numOfDocs := f.DocsCount
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -562,7 +562,7 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
@@ -630,7 +630,7 @@ func testUpdateBackupStatus(t *testing.T, providerType cloud.ProviderType) {
 	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -704,7 +704,7 @@ func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
 	numOfDocs := f.DocsCount
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -784,7 +784,7 @@ func testFullIncrementalOverTLS(t *testing.T, providerType cloud.ProviderType) {
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -859,7 +859,7 @@ func testFullOnlyOverTLS(t *testing.T, providerType cloud.ProviderType, tls *e2e
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tls)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, policy).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -966,7 +966,7 @@ func testBackupRetention(t *testing.T, providerType cloud.ProviderType) {
 	clusterSize := 3
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -1024,7 +1024,7 @@ func testBackupPVCResize(t *testing.T, providerType cloud.ProviderType) {
 	numOfDocs := 100
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -1184,7 +1184,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 3; i++ {
-		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+		bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
 		e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1192,7 +1192,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 	}
 
 	// create eventing function and verify
-	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", buckets[0].GetName(), buckets[1].GetName(), buckets[2].GetName(), function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, cluster, "test", buckets[0].GetName(), buckets[1].GetName(), buckets[2].GetName(), function, time.Minute)
 	e2eutil.NewDocumentSet(buckets[0].GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[2].GetName(), f.DocsCount, 5*time.Minute)
 
@@ -1214,7 +1214,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 	}
 
 	// delete the eventing function
-	e2eutil.MustDeleteEventingFunction(t, kubernetes, cluster, time.Minute)
+	e2eutil.MustDeleteEventingFunction(t, cluster, time.Minute)
 	time.Sleep(30 * time.Second)
 
 	for _, bucket := range buckets {
@@ -1227,7 +1227,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// if eventing function is restored raise error.
-	if err := e2eutil.MustGetEventingFunction(t, kubernetes, cluster, time.Minute); err == nil {
+	if err := e2eutil.MustGetEventingFunction(t, cluster, time.Minute); err == nil {
 		e2eutil.Die(t, err)
 	}
 
@@ -1288,7 +1288,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderTyp
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -1396,7 +1396,7 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, providerType cloud.Provi
 	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, v2.AnalyticsService)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -1510,7 +1510,7 @@ func testBackupAndRestoreDisableData(t *testing.T, providerType cloud.ProviderTy
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -1600,7 +1600,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -1697,7 +1697,7 @@ func testBackupAndRestoreMapBuckets(t *testing.T, providerType cloud.ProviderTyp
 	clusterSize := constants.Size3
 	numOfDocs := f.DocsCount
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -1787,7 +1787,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, providerType cloud.Provide
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 2; i++ {
-		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+		bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
 		e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1882,7 +1882,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, providerType cloud.Provide
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	for i := 0; i < 2; i++ {
-		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+		bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 		bucket.SetName(fmt.Sprintf("%s-%d", bucket.GetName(), i))
 		buckets = append(buckets, bucket)
 
@@ -1994,7 +1994,7 @@ func testBackupAndRestoreNodeSelector(t *testing.T, providerType cloud.ProviderT
 	cluster.Spec.Backup.NodeSelector = nodeSelector
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2173,7 +2173,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -2197,7 +2197,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
@@ -2273,7 +2273,7 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -2305,7 +2305,7 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scopeNew)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -2381,7 +2381,7 @@ func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -2409,7 +2409,7 @@ func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
@@ -2488,7 +2488,7 @@ func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderTyp
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection1, collection2).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -2516,7 +2516,7 @@ func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderTyp
 
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
@@ -2579,7 +2579,7 @@ func TestBackupThenDelete(t *testing.T) {
 
 	// Create a normal cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2641,7 +2641,7 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
-	minio, err := e2eutil.MinioOptions(kubernetes).WithName("minio").WithTLS(withCA).WithCredentials(f.MinioAccessKey, f.MinioSecretID, f.MinioRegion).Create(t)
+	minio, err := e2eutil.MinioOptions(kubernetes).WithName("minio").WithTLS(withCA).WithCredentials(f.MinioAccessKey, f.MinioSecretID, f.MinioRegion).Create()
 	defer minio.CleanUp()
 
 	if err != nil {
@@ -2664,7 +2664,7 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 	}
 
 	cluster := clusterOptions.MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	// Create bucket.
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -2755,7 +2755,7 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 
 	defer aws.Cleanup()
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2776,7 +2776,7 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
@@ -2821,7 +2821,7 @@ func TestBackupAndForcedRestore(t *testing.T) {
 
 	numOfDocs := f.DocsCount
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2887,7 +2887,7 @@ func TestBackupAndRestoreServices(t *testing.T) {
 
 	// Create a normal cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2937,7 +2937,7 @@ func TestBackupAndRestoreToSubPath(t *testing.T) {
 
 	numOfDocs := f.DocsCount
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -2961,7 +2961,7 @@ func TestBackupAndRestoreToSubPath(t *testing.T) {
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
@@ -3010,7 +3010,7 @@ func TestBackupAndRestoreEphemeralVolume(t *testing.T) {
 
 	numOfDocs := f.DocsCount
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -3053,7 +3053,7 @@ func TestBackupAndRestoreEphemeralVolume(t *testing.T) {
 	// wait for new bucket to be created and create new bucket
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	bucket = e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)

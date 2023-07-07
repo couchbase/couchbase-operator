@@ -63,7 +63,7 @@ func TestAnalyticsCreateDataSet(t *testing.T) {
 	}
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -122,7 +122,7 @@ func TestAnalyticsResizeCluster(t *testing.T) {
 	}
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -202,7 +202,7 @@ func TestAnalyticsKillPods(t *testing.T) {
 	}
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -285,7 +285,7 @@ func TestAnalyticsKillPodsWithPVC(t *testing.T) {
 	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -381,7 +381,7 @@ func TestAnalyticsCreateDataSetWithCollections(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 

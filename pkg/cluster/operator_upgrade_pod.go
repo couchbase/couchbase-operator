@@ -81,25 +81,20 @@ func (r *podUpgradableResource) perform(item, action int) error {
 	pod := r.pods[item]
 
 	upgrade := r.actions[action].action
-	if err := upgrade(r.cluster, pod); err != nil {
-		return err
-	}
 
-	return nil
+	return upgrade(r.cluster, pod)
 }
 
 func (r *podUpgradableResource) commit(item int) error {
 	pod := r.pods[item]
-	if _, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
-		return err
-	}
+	_, err := r.cluster.k8s.KubeClient.CoreV1().Pods(r.cluster.cluster.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{})
 
-	return nil
+	return err
 }
 
 // upgradePodFrom020000To020100 performs pod upgrades to 2.1.0 from 2.0.0.
 // * The couchbase_server label was added and needs to be present on upgrade for the peer service.
-func upgradePodFrom020000To020100(cluster *Cluster, pod *corev1.Pod) error {
+func upgradePodFrom020000To020100(_ *Cluster, pod *corev1.Pod) error {
 	// Don't bother with updating the version, it will all be upgraded as it is...
 	pod.Labels[constants.LabelServer] = "true"
 

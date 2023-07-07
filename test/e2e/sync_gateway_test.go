@@ -21,7 +21,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	clusterSize := 3
 
 	// Create the cluster in the target cluster.
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes2, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, policy).MustCreate(t, kubernetes2)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, cluster, bucket, time.Minute)
@@ -152,7 +152,7 @@ func TestSyncGatewayCreateRemoteMandatoryMutualTLSWithMultipleCAs(t *testing.T) 
 	clientTLS := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 
 	// Create the cluster in the target cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(serverTLS, &mtlsPolicy).WithClientTLS(clientTLS).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -239,7 +239,7 @@ func TestSyncGatewayRBAC(t *testing.T) {
 	e2eutil.MustNewGroup(t, k8s1, group)
 	e2eutil.MustNewRoleBinding(t, k8s1, binding)
 
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, k8s1, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, nil).MustCreate(t, k8s1)

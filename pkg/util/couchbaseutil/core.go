@@ -238,7 +238,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 }
 
 func (c *Client) Patch(r *Request, host string) error {
-	req, err := http.NewRequest("PATCH", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPatch, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -251,7 +251,7 @@ func (c *Client) Patch(r *Request, host string) error {
 }
 
 func (c *Client) Get(r *Request, host string) error {
-	req, err := http.NewRequest("GET", host+r.Path, nil)
+	req, err := http.NewRequest(http.MethodGet, host+r.Path, nil)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -262,7 +262,7 @@ func (c *Client) Get(r *Request, host string) error {
 }
 
 func (c *Client) Post(r *Request, host string) error {
-	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPost, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -275,7 +275,7 @@ func (c *Client) Post(r *Request, host string) error {
 }
 
 func (c *Client) PostJSON(r *Request, host string) error {
-	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPost, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -288,7 +288,7 @@ func (c *Client) PostJSON(r *Request, host string) error {
 }
 
 func (c *Client) PostNoContentType(r *Request, host string) error {
-	req, err := http.NewRequest("POST", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPost, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -299,7 +299,7 @@ func (c *Client) PostNoContentType(r *Request, host string) error {
 }
 
 func (c *Client) Put(r *Request, host string) error {
-	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPut, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -312,7 +312,7 @@ func (c *Client) Put(r *Request, host string) error {
 }
 
 func (c *Client) PutJSON(r *Request, host string) error {
-	req, err := http.NewRequest("PUT", host+r.Path, bytes.NewReader(r.Body))
+	req, err := http.NewRequest(http.MethodPut, host+r.Path, bytes.NewReader(r.Body))
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
@@ -325,7 +325,7 @@ func (c *Client) PutJSON(r *Request, host string) error {
 }
 
 func (c *Client) Delete(r *Request, host string) error {
-	req, err := http.NewRequest("DELETE", host+r.Path, nil)
+	req, err := http.NewRequest(http.MethodDelete, host+r.Path, nil)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}

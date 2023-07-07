@@ -111,7 +111,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 }
 
 // checkConstraintDataServiceMemoryQuota checks the service memory resource lower limit.
-func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintDataServiceMemoryQuota(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota == nil {
 		return errors.Required("spec.cluster.dataServiceMemoryQuota", "body", nil)
@@ -125,7 +125,7 @@ func checkConstraintDataServiceMemoryQuota(v *types.Validator, cluster *couchbas
 }
 
 // checkConstraintDataServiceMemcachedThreadCounts checks the reader/writer thread count for specific server version.
-func checkConstraintDataServiceMemcachedThreadCounts(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintDataServiceMemcachedThreadCounts(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
@@ -157,7 +157,7 @@ func checkConstraintDataServiceMemcachedThreadCounts(v *types.Validator, cluster
 }
 
 // checkConstraintIndexServiceMemoryQuota checks the service memory resource lower limit.
-func checkConstraintIndexServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintIndexServiceMemoryQuota(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.IndexServiceMemQuota == nil {
 		return errors.Required("spec.cluster.indexServiceMemoryQuota", "body", nil)
@@ -171,7 +171,7 @@ func checkConstraintIndexServiceMemoryQuota(v *types.Validator, cluster *couchba
 }
 
 // checkConstraintSearchServiceMemoryQuota checks the service memory resource lower limit.
-func checkConstraintSearchServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintSearchServiceMemoryQuota(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.SearchServiceMemQuota == nil {
 		return errors.Required("spec.cluster.searchServiceMemoryQuota", "body", nil)
@@ -185,7 +185,7 @@ func checkConstraintSearchServiceMemoryQuota(v *types.Validator, cluster *couchb
 }
 
 // checkConstraintEventingServiceMemoryQuota checks the service memory resource lower limit.
-func checkConstraintEventingServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintEventingServiceMemoryQuota(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.EventingServiceMemQuota == nil {
 		return errors.Required("spec.cluster.eventingServiceMemoryQuota", "body", nil)
@@ -199,7 +199,7 @@ func checkConstraintEventingServiceMemoryQuota(v *types.Validator, cluster *couc
 }
 
 // checkConstraintAnalyticsServiceMemoryQuota checks the service memory resource lower limit.
-func checkConstraintAnalyticsServiceMemoryQuota(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAnalyticsServiceMemoryQuota(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota == nil {
 		return errors.Required("spec.cluster.anayticsServiceMemoryQuota", "body", nil)
@@ -213,7 +213,7 @@ func checkConstraintAnalyticsServiceMemoryQuota(v *types.Validator, cluster *cou
 }
 
 // checkConstraintQueryTemporarySpace checks the query temporary space is higher than the lower limit.
-func checkConstraintQueryTemporarySpace(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintQueryTemporarySpace(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.ClusterSettings.Query == nil {
 		return nil
 	}
@@ -226,7 +226,7 @@ func checkConstraintQueryTemporarySpace(v *types.Validator, cluster *couchbasev2
 }
 
 // checkConstraintAutoFailoverTimeout checks the autofailover timeout is within range.
-func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoFailoverTimeout(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout == nil {
 		return errors.Required("spec.cluster.autoFailoverTimeout", "body", nil)
@@ -244,7 +244,7 @@ func checkConstraintAutoFailoverTimeout(v *types.Validator, cluster *couchbasev2
 }
 
 // checkConstraintAutoFailoverTimeout checks the autofailover timeout is within range.
-func checkConstraintAutoFailoverMaxCount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoFailoverMaxCount(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 	if err != nil {
@@ -261,7 +261,7 @@ func checkConstraintAutoFailoverMaxCount(v *types.Validator, cluster *couchbasev
 }
 
 // checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod checks the auto failover timeout is within range.
-func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Should be filled in by CRD defaulting.
 	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod == nil {
 		return errors.Required("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod", "body", nil)
@@ -279,7 +279,7 @@ func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(v *types.Validator, c
 }
 
 // checkConstraintIndexerMemorySnapshotInterval checks the indexer snapshot interval is within range.
-func checkConstraintIndexerMemorySnapshotInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintIndexerMemorySnapshotInterval(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.ClusterSettings.Indexer == nil {
 		return nil
 	}
@@ -292,7 +292,7 @@ func checkConstraintIndexerMemorySnapshotInterval(v *types.Validator, cluster *c
 }
 
 // checkConstraintIndexerStableSnapshotInterval checks the indexer snapshot interval is within range.
-func checkConstraintIndexerStableSnapshotInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintIndexerStableSnapshotInterval(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.ClusterSettings.Indexer == nil {
 		return nil
 	}
@@ -379,7 +379,7 @@ func checkConstraintPrometheusAuthorizationSecret(v *types.Validator, cluster *c
 }
 
 // checkConstraintLoggingPermissible checks persistent volumes are being used.
-func checkConstraintLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsServerLoggingEnabled() {
 		return nil
 	}
@@ -393,7 +393,7 @@ func checkConstraintLoggingPermissible(v *types.Validator, cluster *couchbasev2.
 
 // checkConstraintAuditLoggingPermissible checks that when using the audit log
 // garbage collector, shared volumes are enabled and audit logging is also enabled.
-func checkConstraintAuditLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsAuditGarbageCollectionSidecarEnabled() {
 		return nil
 	}
@@ -727,7 +727,7 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 }
 
 // checkConstraintServerClassContainsDataService checks are least one class has the data service enabled.
-func checkConstraintServerClassContainsDataService(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintServerClassContainsDataService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	for _, config := range cluster.Spec.Servers {
 		if couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
 			return nil
@@ -738,7 +738,7 @@ func checkConstraintServerClassContainsDataService(v *types.Validator, cluster *
 }
 
 // checkConstraintClusterSupportable checks that if you have one supportable class, they all are.
-func checkConstraintClusterSupportable(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintClusterSupportable(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.AnySupportable() && !cluster.IsSupportable() {
 		return fmt.Errorf("all server classes must have volumes defined, all classes with stateful services must have the 'default' mount defined")
 	}
@@ -747,7 +747,7 @@ func checkConstraintClusterSupportable(v *types.Validator, cluster *couchbasev2.
 }
 
 // checkConstraintServiceEnabledForVolumeMount checks that volume mounts are only used with the correct services.
-func checkConstraintServiceEnabledForVolumeMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintServiceEnabledForVolumeMount(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	for index, config := range cluster.Spec.Servers {
@@ -779,7 +779,7 @@ func checkConstraintServiceEnabledForVolumeMount(v *types.Validator, cluster *co
 
 // checkConstraintDefaultAndLogVolumesMututallyExclusive checks either logs or default mounts
 // are specified, but never both at the same time.
-func checkConstraintDefaultAndLogVolumesMututallyExclusive(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintDefaultAndLogVolumesMututallyExclusive(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	for index, config := range cluster.Spec.Servers {
@@ -801,7 +801,7 @@ func checkConstraintDefaultAndLogVolumesMututallyExclusive(v *types.Validator, c
 
 // checkConstraintServiceMountsUsedWithDefaultMount checks that service specific mounts are
 // only used when the default mount is i.e. persisting data and not /etc just doesn't work!
-func checkConstraintServiceMountsUsedWithDefaultMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintServiceMountsUsedWithDefaultMount(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	for index, config := range cluster.Spec.Servers {
@@ -823,7 +823,7 @@ func checkConstraintServiceMountsUsedWithDefaultMount(v *types.Validator, cluste
 
 // checkConstraintTemplateExistsForMount checks that volume mounts are only specified when the
 // corresponding service is enabled.
-func checkConstraintTemplateExistsForMount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintTemplateExistsForMount(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	templateNamesEnum := []interface{}{}
@@ -865,7 +865,7 @@ func checkConstraintTemplateExistsForMount(v *types.Validator, cluster *couchbas
 
 // checkConstraintVolumeTemplateNameUnique checks that volume claim templates have unique
 // names and therefore selection is unambiguous.
-func checkConstraintVolumeTemplateNameUnique(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintVolumeTemplateNameUnique(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	names := map[string]interface{}{}
 
 	for _, template := range cluster.Spec.VolumeClaimTemplates {
@@ -881,7 +881,7 @@ func checkConstraintVolumeTemplateNameUnique(v *types.Validator, cluster *couchb
 
 // checkConstraintVolumeTemplateSize checks that volume claim templates have a resource
 // request (aka size) specified, and it's greater than zero.
-func checkConstraintVolumeTemplateSize(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintVolumeTemplateSize(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	for _, template := range cluster.Spec.VolumeClaimTemplates {
@@ -955,7 +955,7 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 }
 
 // checkConstraintServerMinimumVersion checks that the Couchbase version is supported.
-func checkConstraintServerMinimumVersion(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintServerMinimumVersion(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// version check
 	currentVersionString, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 	if err != nil {
@@ -1008,16 +1008,11 @@ func checkConstraintCloudNativeGatewayTLS(v *types.Validator, cluster *couchbase
 		return nil
 	}
 
-	err := validateCloudNativeGatewayServerTLS(v, cluster)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return validateCloudNativeGatewayServerTLS(v, cluster)
 }
 
 // checkConstraintCloudNativeGatewayProvisioning validates whether Cloud Native Gateway could be provisioned.
-func checkConstraintCloudNativeGatewayProvisioning(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintCloudNativeGatewayProvisioning(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return nil
 	}
@@ -1052,7 +1047,7 @@ func checkConstraintXDCRConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 
 // checkConstraintPublicNetworking checks that when the intention (this is implicit, thus
 // probably bad) is to use public networking, then both TLS and DNS are configured.
-func checkConstraintPublicNetworking(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintPublicNetworking(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.Spec.IsExposedFeatureServiceTypePublic() && !cluster.Spec.IsAdminConsoleServiceTypePublic() {
 		return nil
 	}
@@ -1082,7 +1077,7 @@ func checkConstraintBucketNames(v *types.Validator, cluster *couchbasev2.Couchba
 
 // checkConstraintBucketSynchronization checks that when synchronization is enabled,
 // that a label selector has been provided by the user.
-func checkConstraintBucketSynchronization(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintBucketSynchronization(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.Buckets.Managed {
 		return nil
 	}
@@ -1106,7 +1101,7 @@ func checkConstraintMemoryAllocations(v *types.Validator, cluster *couchbasev2.C
 
 // checkConstraintMTLSPaths checks that when mTLS is enabled, then paths are specified
 // in order to extract user identinty from the X.509 client certificate.
-func checkConstraintMTLSPaths(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintMTLSPaths(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsMutualTLSEnabled() {
 		return nil
 	}
@@ -1120,7 +1115,7 @@ func checkConstraintMTLSPaths(v *types.Validator, cluster *couchbasev2.Couchbase
 
 // checkConstraintAutoCompactionTombstonePurgeInterval checks that the tombstone purge
 // interval is in range.
-func checkConstraintAutoCompactionTombstonePurgeInterval(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoCompactionTombstonePurgeInterval(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
 	if purgeInterval < 1.0 {
 		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
@@ -1135,7 +1130,7 @@ func checkConstraintAutoCompactionTombstonePurgeInterval(v *types.Validator, clu
 
 // checkConstraintAutoCompactionTimeWindow checks that the autocompaction time window is valid with
 // start time being before end time.
-func checkConstraintAutoCompactionTimeWindow(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoCompactionTimeWindow(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	timeWindow := cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow
 
 	if timeWindow.Start != nil {
@@ -1181,7 +1176,7 @@ func checkConstraintAutoCompactionTimeWindow(v *types.Validator, cluster *couchb
 
 // checkConstraintLDAPAuthentication checks that when enabled, either a template or
 // query are provided for LDAP authentication.
-func checkConstraintLDAPAuthentication(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintLDAPAuthentication(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	ldap := cluster.Spec.Security.LDAP
 
 	if ldap == nil {
@@ -1270,7 +1265,7 @@ func checkConstraintLDAPConnectionTLS(v *types.Validator, cluster *couchbasev2.C
 
 // checkConstraintLDAPAuthorization checks that when enabled, a query is provided
 // for LDAP authorization.
-func checkConstraintLDAPAuthorization(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintLDAPAuthorization(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	ldap := cluster.Spec.Security.LDAP
 
 	if ldap == nil {
@@ -1290,7 +1285,7 @@ func checkConstraintLDAPAuthorization(v *types.Validator, cluster *couchbasev2.C
 }
 
 // checkConstraintAutoscalingStabilizationPeriod checks the autoscaling stablization period is greater than the lower limit.
-func checkConstraintAutoscalingStabilizationPeriod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintAutoscalingStabilizationPeriod(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	stabilizationPeriod := cluster.Spec.AutoscaleStabilizationPeriod
 
 	if stabilizationPeriod == nil {
@@ -1460,7 +1455,7 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return nil
 }
 
-func CheckConstraintsReplication(v *types.Validator, replication *couchbasev2.CouchbaseReplication) error {
+func CheckConstraintsReplication(_ *types.Validator, _ *couchbasev2.CouchbaseReplication) error {
 	return nil
 }
 
@@ -1842,7 +1837,7 @@ func checkConstraintBackupObjectEndpointSecret(v *types.Validator, cluster *couc
 	return nil
 }
 
-func checkContraintRestoreStart(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkContraintRestoreStart(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	start := restore.Spec.Start
 
 	if start == nil {
@@ -1856,7 +1851,7 @@ func checkContraintRestoreStart(v *types.Validator, restore *couchbasev2.Couchba
 	return nil
 }
 
-func checkContraintRestoreEnd(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkContraintRestoreEnd(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	end := restore.Spec.End
 
 	if end == nil {
@@ -1871,7 +1866,7 @@ func checkContraintRestoreEnd(v *types.Validator, restore *couchbasev2.Couchbase
 	return nil
 }
 
-func checkContraintRestoreRange(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkContraintRestoreRange(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	start := restore.Spec.Start
 	end := restore.Spec.End
 
@@ -1889,7 +1884,7 @@ func checkContraintRestoreRange(v *types.Validator, restore *couchbasev2.Couchba
 	return nil
 }
 
-func checkContraintRestoreData(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+func checkContraintRestoreData(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	var errs []error
 
 	if restore.Spec.Data == nil {
@@ -1933,7 +1928,7 @@ func checkContraintRestoreData(v *types.Validator, restore *couchbasev2.Couchbas
 	return nil
 }
 
-func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.CouchbaseGroup) error {
+func CheckConstraintsCouchbaseGroup(_ *types.Validator, group *couchbasev2.CouchbaseGroup) error {
 	var errs []error
 
 	for index, role := range group.Spec.Roles {
@@ -2577,11 +2572,7 @@ func checkScopeCollectionsUnique(v *types.Validator, namespace, kind, resourceNa
 		return err
 	}
 
-	if err := checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector, names); err != nil {
-		return err
-	}
-
-	return nil
+	return checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector, names)
 }
 
 // checkScopeCollectionsUniqueExplicit checks collections included in a scope by reference have
@@ -2719,11 +2710,7 @@ func checkBucketScopesUnique(v *types.Validator, namespace, kind, resourceName s
 		return err
 	}
 
-	if err := checkBucketScopesUniqueImplicit(v, namespace, kind, resourceName, selector, names); err != nil {
-		return err
-	}
-
-	return nil
+	return checkBucketScopesUniqueImplicit(v, namespace, kind, resourceName, selector, names)
 }
 
 // checkBucketScopesUniqueExplicit checks scopes included in a bucket by reference have
@@ -3039,7 +3026,7 @@ func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEpheme
 	return nil
 }
 
-func CheckImmutableFieldsMemcachedBucket(prev, curr *couchbasev2.CouchbaseMemcachedBucket) error {
+func CheckImmutableFieldsMemcachedBucket(_, _ *couchbasev2.CouchbaseMemcachedBucket) error {
 	return nil
 }
 
@@ -3228,7 +3215,7 @@ func validateCloudNativeGatewayServerTLS(v *types.Validator, cluster *couchbasev
 
 // checkConstraintK8sSecurityContext validates the different combination of K8s SecurityContext options (pods and containers)
 // being applied.
-func checkConstraintK8sSecurityContext(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.Security.PodSecurityContext != nil && cluster.Spec.SecurityContext != nil {
 		if !reflect.DeepEqual(cluster.Spec.Security.PodSecurityContext, cluster.Spec.SecurityContext) {
 			return fmt.Errorf("spec.Security.PodSecurityContext must be equal to spec.SecurityContext, if both present")

@@ -118,7 +118,7 @@ func TestRzaCreateClusterWithStaticConfig(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -160,7 +160,7 @@ func TestRzaCreateClusterWithClassBasedConfig(t *testing.T) {
 	clusterSize := 7
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().Generate(kubernetes)
@@ -225,7 +225,7 @@ func TestRzaResizeCluster(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -562,7 +562,7 @@ func TestGlobalServerGroupsAddsToPodNodeSelector(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	nodes := e2eutil.MustNodes(t, kubernetes)
@@ -615,7 +615,7 @@ func TestServersServerGroupsAddsToPodNodeSelector(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	nodes := e2eutil.MustNodes(t, kubernetes)

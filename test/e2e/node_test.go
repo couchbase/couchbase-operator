@@ -87,7 +87,7 @@ func TestNodeManualFailover(t *testing.T) {
 	clusterSize := constants.Size2
 
 	// create 2 node cluster with admin console
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -129,7 +129,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -187,7 +187,7 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 	victimIndex := 2
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -245,7 +245,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 	victim2Index := scaledClusterSize
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -318,7 +318,7 @@ func TestRemoveForeignNode(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -455,7 +455,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	victimIndex := 1
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -505,7 +505,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	victimIndex2 := 1
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -650,7 +650,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -715,7 +715,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	recoveryPolicy := couchbasev2.PrioritizeUptime
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)

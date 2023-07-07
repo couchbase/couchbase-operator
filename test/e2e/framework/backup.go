@@ -18,9 +18,7 @@ func CreateBackupStuff(k8s *types.Cluster) error {
 		args = append(args, "--context="+k8s.Context)
 	}
 
-	if _, err := exec.Command("/cao", args...).CombinedOutput(); err != nil {
-		return err
-	}
+	_, err := exec.Command("/cao", args...).CombinedOutput()
 
-	return nil
+	return err
 }

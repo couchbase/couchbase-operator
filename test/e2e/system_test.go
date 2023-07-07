@@ -366,11 +366,11 @@ func runSysTest(t *testing.T, f *framework.Framework, testDef sysTestDef) {
 
 	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster2)
 
-	if err := e2eutil.TLSCheckForCluster(t, kubernetes, cluster1, ctx1, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(kubernetes, cluster1, ctx1, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 
-	if err := e2eutil.TLSCheckForCluster(t, kubernetes, cluster2, ctx2, time.Minute); err != nil {
+	if err := e2eutil.TLSCheckForCluster(kubernetes, cluster2, ctx2, time.Minute); err != nil {
 		t.Fatal("TLS check for cluster failed: ", err)
 	}
 

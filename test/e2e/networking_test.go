@@ -51,7 +51,7 @@ func TestExposedFeatureIP(t *testing.T) {
 
 	for _, options := range testCases {
 		// Create the cluster.
-		bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+		bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 		e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 		cluster := options.Generate(kubernetes)
@@ -93,7 +93,7 @@ func TestExposedFeatureDNS(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -152,7 +152,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -213,7 +213,7 @@ func TestExposedFeatureServiceTypeModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -264,7 +264,7 @@ func TestConsoleServiceDNS(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -317,7 +317,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -376,7 +376,7 @@ func TestConsoleServiceTypeModify(t *testing.T) {
 
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOptions)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -506,7 +506,7 @@ func TestConsoleServiceBootstrapingClient(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	clusterSize := constants.Size1
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create cluster
@@ -536,7 +536,7 @@ func TestConsoleServiceBootstrapingXDCR(t *testing.T) {
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	clusterSize := constants.Size1
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create cluster

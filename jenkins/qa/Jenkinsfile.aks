@@ -63,7 +63,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = '1.19.4'
+    GOVERSION = '1.20'
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')

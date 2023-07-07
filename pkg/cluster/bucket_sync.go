@@ -263,11 +263,7 @@ func (c *Cluster) synchronizeBuckets() error {
 	}
 
 	// Next up create the resources in Kubernetes.
-	if err := c.applyDataTopologyResources(resources); err != nil {
-		return err
-	}
-
-	return nil
+	return c.applyDataTopologyResources(resources)
 }
 
 // reconcileSynchronizeBuckets is a top level wrapper around synchronization, it handles UX.

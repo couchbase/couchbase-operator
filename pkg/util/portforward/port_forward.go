@@ -91,7 +91,7 @@ func Silent() func() {
 
 	if instances == 0 {
 		handlers = runtime.ErrorHandlers
-		runtime.ErrorHandlers = []func(error){}
+		runtime.ErrorHandlers = []func(error){} //nolint:reassign
 	}
 
 	instances++
@@ -104,7 +104,7 @@ func Silent() func() {
 
 		instances--
 		if instances == 0 {
-			runtime.ErrorHandlers = handlers
+			runtime.ErrorHandlers = handlers //nolint:reassign
 		}
 
 		mutex.Unlock()

@@ -262,11 +262,9 @@ func (c *Cluster) updateBackupResource(requested backupResources, current *backu
 		return err
 	}
 
-	if err := c.updateBackupPVC(notifier, requested.backup, requested.pvc, current.pvc); err != nil {
-		return err
-	}
+	err := c.updateBackupPVC(notifier, requested.backup, requested.pvc, current.pvc)
 
-	return nil
+	return err
 }
 
 // updateBackupCronJob recreates jobs if they have been deleted, deletes them if they need

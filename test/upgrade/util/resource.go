@@ -212,18 +212,10 @@ func DeleteResource(c *Clients, resource *unstructured.Unstructured) error {
 	}
 
 	if mapping.Scope.Name() == meta.RESTScopeNameRoot {
-		if err := c.dynamic.Resource(mapping.Resource).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-
-		return nil
+		return c.dynamic.Resource(mapping.Resource).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0))
 	}
 
-	if err := c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
-		return err
-	}
-
-	return nil
+	return c.dynamic.Resource(mapping.Resource).Namespace(resource.GetNamespace()).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0))
 }
 
 // DeleteResources deletes resources, in order, from a list of raw YAMl data.

@@ -30,7 +30,7 @@ var retryInterval = 10 * time.Second
 type resourceCheckFunc func(*unstructured.Unstructured, error) error
 
 // resourceExists checks that a resource exists.
-func resourceExists(resource *unstructured.Unstructured, lookupError error) error {
+func resourceExists(_ *unstructured.Unstructured, lookupError error) error {
 	if lookupError != nil {
 		return fmt.Errorf("resource must exist: %w", lookupError)
 	}
@@ -39,7 +39,7 @@ func resourceExists(resource *unstructured.Unstructured, lookupError error) erro
 }
 
 // resourceNotExists checks that a resource does not exist.
-func resourceNotExists(resource *unstructured.Unstructured, lookupError error) error {
+func resourceNotExists(_ *unstructured.Unstructured, lookupError error) error {
 	if lookupError == nil {
 		return fmt.Errorf("resource must not exist")
 	}
@@ -115,7 +115,7 @@ func resourceConditionNotExists(conditionType string) resourceCheckFunc {
 }
 
 // couchbaseClusterScaled checks that the requested cluster size matched the reported size.
-func couchbaseClusterScaled(resource *unstructured.Unstructured, lookupError error) error {
+func couchbaseClusterScaled(resource *unstructured.Unstructured, _ error) error {
 	classes, ok, _ := unstructured.NestedSlice(resource.Object, "spec", "servers")
 	if !ok {
 		return fmt.Errorf("resource has no server classes")
@@ -478,11 +478,8 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 		return nil
 	}
-	if err := retryutil.Retry(ctx, retryInterval, callback); err != nil {
-		return err
-	}
 
-	return nil
+	return retryutil.Retry(ctx, retryInterval, callback)
 }
 
 func MustWaitUntilBucketsExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) {
@@ -567,7 +564,7 @@ func MustWaitUntilBucketNotExists(t *testing.T, k8s *types.Cluster, couchbase *c
 	}
 }
 
-func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+func WaitClusterStatusHealthy(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
 	// Bit complex, probably a strong sign that our conditions are wrong!
 	// Cluster needs to be available, balanced, not scaling and not upgrading.
 	constraints := []resourceCheckFunc{
@@ -584,7 +581,7 @@ func WaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchba
 }
 
 func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
+	if err := WaitClusterStatusHealthy(k8s, cluster, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -708,7 +705,7 @@ func MustDeletePVC(t *testing.T, k8s *types.Cluster, pvc *v1.PersistentVolumeCla
 // WaitForRebalanceProgress waits until a rebalance is running and the progress is greater
 // than or eual to the defined threshold.  This allows us to kill pods during a rebalance
 // with greater confidence that some vbuckets have migrated to the new master.
-func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, threshold float64, timeout time.Duration) error {
+func WaitForRebalanceProgress(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, threshold float64, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -751,7 +748,7 @@ func WaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couch
 }
 
 func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, threshold float64, timeout time.Duration) {
-	if err := WaitForRebalanceProgress(t, k8s, couchbase, threshold, timeout); err != nil {
+	if err := WaitForRebalanceProgress(k8s, couchbase, threshold, timeout); err != nil {
 		Die(t, err)
 	}
 }

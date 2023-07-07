@@ -361,11 +361,7 @@ func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseClust
 
 	requested = generateDiscoveryService(cluster)
 
-	if err := reconcileService(c, cluster, requested); err != nil {
-		return err
-	}
-
-	return nil
+	return reconcileService(c, cluster, requested)
 }
 
 // adminConsoleSelector generates a selector matching pods running all the requested services.
@@ -559,11 +555,7 @@ func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v
 func ReconcileCloudNativeGatewayService(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
 	requested := generateCloudNativeGatewayService(cluster)
 
-	if err := reconcileService(c, cluster, requested); err != nil {
-		return err
-	}
-
-	return nil
+	return reconcileService(c, cluster, requested)
 }
 
 // reconcileService creates or updates a service.
@@ -757,7 +749,7 @@ func exposedFeatureSetToServiceList(featureSet couchbasev2.ExposedFeatureList) (
 	serviceList := couchbasev2.ServiceList{}
 	serviceSet := map[couchbasev2.Service]interface{}{}
 
-	if featureSet == nil || len(featureSet) == 0 {
+	if len(featureSet) == 0 {
 		return serviceList, nil
 	}
 
@@ -985,7 +977,7 @@ func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster
 // GetAlternateAddressExternalPorts polls the pod service for any alternate ports
 // that may have been set and returns a structure ready for submission to the
 // Couchbase API.
-func GetAlternateAddressExternalPorts(c *client.Client, namespace, name string) (*couchbaseutil.AlternateAddressesExternalPorts, error) {
+func GetAlternateAddressExternalPorts(c *client.Client, name string) (*couchbaseutil.AlternateAddressesExternalPorts, error) {
 	svc, found := c.Services.Get(name)
 
 	// Not created yet.

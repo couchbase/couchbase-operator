@@ -51,7 +51,7 @@ func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster)
 }
 
 // Create does nothing.
-func (sched *nullSchedulerImpl) Create(class, name, group string) (string, error) {
+func (sched *nullSchedulerImpl) Create(class, name, _ string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
 		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
@@ -95,5 +95,5 @@ func (sched *nullSchedulerImpl) Reschedule() ([]Move, error) {
 }
 
 // LogStatus returns nothing.
-func (sched *nullSchedulerImpl) LogStatus(cluster string) {
+func (sched *nullSchedulerImpl) LogStatus(_ string) {
 }

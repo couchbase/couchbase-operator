@@ -90,11 +90,7 @@ func (c *Cluster) reconcile() error {
 
 	// Hibernation trumps all.
 	if c.cluster.Spec.Hibernate {
-		if err := c.hibernate(); err != nil {
-			return err
-		}
-
-		return nil
+		return c.hibernate()
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)
@@ -881,7 +877,7 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 	// so the output is deterministic.
 	d, err := diff.Diff(current, requested)
 	if err != nil {
-		log.Error(err, "cluster", c.namespacedName())
+		log.Error(err, "failed to diff cluster", "cluster", c.namespacedName())
 		return true, ""
 	}
 

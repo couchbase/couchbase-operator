@@ -43,11 +43,9 @@ func (b *tgzBackend) WriteFile(path, data string) error {
 		return err
 	}
 
-	if _, err := b.writer.Write([]byte(data)); err != nil {
-		return err
-	}
+	_, err := b.writer.Write([]byte(data))
 
-	return nil
+	return err
 }
 
 // Close closes TGZ resources, compresses the output and writes it

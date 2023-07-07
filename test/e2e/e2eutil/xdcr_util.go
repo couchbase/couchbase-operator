@@ -574,7 +574,7 @@ func MustRotateXDCRReplicationPassword(t *testing.T, src *types.Cluster, dst *ty
 	}
 }
 
-func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, dst *types.Cluster, target *couchbasev2.CouchbaseCluster, tls *TLSContext) {
+func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, target *couchbasev2.CouchbaseCluster, tls *TLSContext) {
 	xdcrSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
 
 	srcSecret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), xdcrSecret, metav1.GetOptions{})
@@ -591,7 +591,7 @@ func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, dst *types.C
 	}
 }
 
-func DeleteXDCRReplication(k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) error {
+func DeleteXDCRReplication(k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		if err := k8s.CRClient.CouchbaseV2().CouchbaseReplications(replication.Namespace).Delete(context.Background(), replication.Name, metav1.DeleteOptions{}); err != nil {
 			return err
@@ -634,8 +634,8 @@ func MustEstblistXDCRReplicationWithMultipleCAs(t *testing.T, srcK8s, dstK8s *ty
 	}
 }
 
-func MustDeleteXDCRReplication(t *testing.T, k8s *types.Cluster, source *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) {
-	err := DeleteXDCRReplication(k8s, source, replication, timeout)
+func MustDeleteXDCRReplication(t *testing.T, k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, timeout time.Duration) {
+	err := DeleteXDCRReplication(k8s, replication, timeout)
 	if err != nil {
 		Die(t, err)
 	}

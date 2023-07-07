@@ -52,14 +52,14 @@ func RandomSuffix() string {
 // 0-9a-z as that is compatible with DNS names and Couchbase Server passwords.
 func RandomString(length int) string {
 	// Seed the PRNG so we get vagely random suffixes across runs
-	rand.Seed(time.Now().UnixNano())
+	ranGen := rand.New(rand.New(rand.NewSource(time.Now().UnixNano())))
 
 	// Generate a random 5 character suffix for the cluster name
 	suffix := ""
 
 	for i := 0; i < length; i++ {
 		// Our alphabet is 0-9 a-z, so 36 characters
-		ordinal := rand.Intn(36)
+		ordinal := ranGen.Intn(36)
 		// Less than 10 places it in the 0-9 range, otherwise in
 		// the a-z range
 		if ordinal < 10 {
@@ -79,7 +79,7 @@ func RandomString(length int) string {
 // Performs retries and garbage collection in the event of transient failure.
 func CreateNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster, timeout int) *couchbasev2.CouchbaseCluster {
 	// Create the cluster.
-	cluster, err := CreateCluster(t, k8s, clusterSpec)
+	cluster, err := CreateCluster(k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -105,7 +105,7 @@ func MustNewClusterFromSpec(t *testing.T, k8s *types.Cluster, clusterSpec *couch
 }
 
 func MustNewClusterFromSpecAsync(t *testing.T, k8s *types.Cluster, clusterSpec *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := CreateCluster(t, k8s, clusterSpec)
+	cluster, err := CreateCluster(k8s, clusterSpec)
 	if err != nil {
 		Die(t, err)
 	}
@@ -599,7 +599,7 @@ func (o *ClusterOptions) MustCreate(t *testing.T, k8s *types.Cluster) *couchbase
 // MustNotCreate calls Generate then creates the cluster in Kubernetes, dying
 // on success.
 func (o *ClusterOptions) MustNotCreate(t *testing.T, k8s *types.Cluster) {
-	if _, err := CreateCluster(t, k8s, o.Generate(k8s)); err == nil {
+	if _, err := CreateCluster(k8s, o.Generate(k8s)); err == nil {
 		Die(t, fmt.Errorf("cluster created unexpectedly"))
 	}
 }
@@ -662,7 +662,7 @@ func GetDurableBucket(bucketType BucketType, compressionMode couchbasev2.Couchba
 	return generateBucket(bucketType, compressionMode, durability)
 }
 
-func MustGetBucket(t *testing.T, bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode) metav1.Object {
+func MustGetBucket(bucketType BucketType, compressionMode couchbasev2.CouchbaseBucketCompressionMode) metav1.Object {
 	bucket := GetBucket(bucketType, compressionMode)
 
 	return bucket
@@ -707,13 +707,13 @@ func MustDeleteBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object) {
 	}
 }
 
-func AddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+func AddServices(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	settings := append(cl.Spec.Servers, newService)
 	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace("/spec/servers", settings), timeout)
 }
 
 func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, newService couchbasev2.ServerConfig, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	couchbase, err := AddServices(t, k8s, cl, newService, timeout)
+	couchbase, err := AddServices(k8s, cl, newService, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -721,7 +721,7 @@ func MustAddServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchbase
 	return couchbase
 }
 
-func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+func RemoveServices(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
 
 	for _, service := range cl.Spec.Servers {
@@ -734,7 +734,7 @@ func RemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseC
 }
 
 func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, removeServiceName string, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	couchbase, err := RemoveServices(t, k8s, cl, removeServiceName, timeout)
+	couchbase, err := RemoveServices(k8s, cl, removeServiceName, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -742,7 +742,7 @@ func MustRemoveServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.Couchb
 	return couchbase
 }
 
-func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+func ScaleServices(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	newServiceConfig := []couchbasev2.ServerConfig{}
 
 	for _, service := range cl.Spec.Servers {
@@ -759,7 +759,7 @@ func ScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCl
 }
 
 func MustScaleServices(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, servicesMap map[string]int, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	couchbase, err := ScaleServices(t, k8s, cl, servicesMap, timeout)
+	couchbase, err := ScaleServices(k8s, cl, servicesMap, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -942,7 +942,7 @@ func KillMember(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseClus
 	return nil
 }
 
-func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
+func WriteLogs(k8s *types.Cluster, logDir string) error {
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		return err
 	}
@@ -977,12 +977,12 @@ func WriteLogs(k8s *types.Cluster, logDir, testName string) error {
 	return nil
 }
 
-func ResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func ResizeClusterNoWait(service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	return patchCluster(k8s, cl, jsonpatch.NewPatchSet().Replace(fmt.Sprintf("/spec/servers/%d/size", service), clusterSize), 30*time.Second)
 }
 
 func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) *couchbasev2.CouchbaseCluster {
-	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
+	cluster, err := ResizeClusterNoWait(service, clusterSize, k8s, cl)
 	if err != nil {
 		Die(t, err)
 	}
@@ -992,13 +992,13 @@ func MustResizeClusterNoWait(t *testing.T, service int, clusterSize int, k8s *ty
 
 // ResizeCluster resizes the MDS service to the desired size and waits until the cluster is
 // healthy.
-func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
-	cluster, err := ResizeClusterNoWait(t, service, clusterSize, k8s, cl)
+func ResizeCluster(service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
+	cluster, err := ResizeClusterNoWait(service, clusterSize, k8s, cl)
 	if err != nil {
 		return cl, err
 	}
 
-	if err := WaitClusterStatusHealthy(t, k8s, cluster, timeout); err != nil {
+	if err := WaitClusterStatusHealthy(k8s, cluster, timeout); err != nil {
 		return cluster, err
 	}
 
@@ -1006,7 +1006,7 @@ func ResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluste
 }
 
 func MustResizeCluster(t *testing.T, service int, clusterSize int, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) *couchbasev2.CouchbaseCluster {
-	cluster, err := ResizeCluster(t, service, clusterSize, k8s, cl, timeout)
+	cluster, err := ResizeCluster(service, clusterSize, k8s, cl, timeout)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1382,7 +1382,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	return result
 }
 
-func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, timeout time.Duration) error {
+func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, timeout time.Duration) error {
 	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 	if err != nil {
 		return fmt.Errorf("unable to get couchbase pods: %w", err)
@@ -1412,18 +1412,14 @@ func TLSCheckForCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.C
 }
 
 func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
-	if err := TLSCheckForCluster(t, k8s, cluster, ctx, timeout); err != nil {
+	if err := TLSCheckForCluster(k8s, cluster, ctx, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 func deletePod(k8s *types.Cluster, podName string) error {
 	err := retryutil.RetryFor(time.Minute, func() error {
-		if err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0)); err != nil {
-			return err
-		}
-
-		return nil
+		return k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Delete(context.Background(), podName, *metav1.NewDeleteOptions(0))
 	})
 
 	return err
@@ -1615,7 +1611,7 @@ func GetUUID(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeou
 		return nil
 	}
 
-	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		return "", err
 	}
 
@@ -1764,8 +1760,8 @@ func MustSetBucketTTL(t *testing.T, bucket metav1.Object, duration time.Duration
 	}
 }
 
-func MustRetrieveCouchbaseBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseBucket {
-	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+func MustRetrieveCouchbaseBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector string) *couchbasev2.CouchbaseBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
 	}
@@ -1777,8 +1773,8 @@ func MustRetrieveCouchbaseBucketByLabel(t *testing.T, kubernetes *types.Cluster,
 	return &buckets.Items[0]
 }
 
-func MustRetrieveEphemeralBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseEphemeralBucket {
-	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+func MustRetrieveEphemeralBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector string) *couchbasev2.CouchbaseEphemeralBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseEphemeralBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
 	}
@@ -1790,8 +1786,8 @@ func MustRetrieveEphemeralBucketByLabel(t *testing.T, kubernetes *types.Cluster,
 	return &buckets.Items[0]
 }
 
-func MustRetrieveMemcachedBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector *metav1.LabelSelector) *couchbasev2.CouchbaseMemcachedBucket {
-	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "foo=bar"})
+func MustRetrieveMemcachedBucketByLabel(t *testing.T, kubernetes *types.Cluster, labelSelector string) *couchbasev2.CouchbaseMemcachedBucket {
+	buckets, err := kubernetes.CRClient.CouchbaseV2().CouchbaseMemcachedBuckets(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		Die(t, fmt.Errorf("cannot get bucket from kubernetes"))
 	}

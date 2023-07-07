@@ -236,11 +236,9 @@ func (c *Cluster) newCluster() error {
 	}
 
 	// Perform any necessary upgrades to the cluster and kubernetes resources.
-	if err := c.operatorUpgrade(); err != nil {
-		return err
-	}
+	err = c.operatorUpgrade()
 
-	return nil
+	return err
 }
 
 func (c *Cluster) Delete() {
@@ -660,11 +658,7 @@ func (c *Cluster) initClients() error {
 		return err
 	}
 
-	if err := c.initCouchbaseClient(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.initCouchbaseClient()
 }
 
 // Use username and password from secret store.

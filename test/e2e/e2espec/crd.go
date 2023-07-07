@@ -56,9 +56,7 @@ func (t ClusterTopology) DeepCopy() ClusterTopology {
 	for i, class := range t {
 		services := make([]couchbasev2.Service, len(class.Services))
 
-		for j, service := range class.Services {
-			services[j] = service
-		}
+		copy(services, class.Services)
 
 		o[i] = ServerClass{
 			Name:        class.Name,

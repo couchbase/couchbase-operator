@@ -14,7 +14,7 @@ RUN microdnf update \
  && microdnf clean all
 
 ARG TARGETARCH
-ARG GO_VERSION=1.19.4
+ARG GO_VERSION=1.20
 RUN curl -s https://dl.google.com/go/go$GO_VERSION.linux-${TARGETARCH}.tar.gz | tar xz
 
 ARG TARGET=openshift-linux-${TARGETARCH}

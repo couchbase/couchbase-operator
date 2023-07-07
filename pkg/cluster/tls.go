@@ -282,8 +282,6 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 		if !ok {
 			return fmt.Errorf("%w: encrypted private key requires server version 7.1.0", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
 		}
-
-		break
 	case "PRIVATE KEY":
 		// PKCS#8, way more modern and widely used, but needs conversion
 		// if server version is lower than 7.1.
@@ -330,7 +328,7 @@ func (c *Cluster) reconcileTLSSecrets(requestedSecret *corev1.Secret) error {
 	// Look the secret, if it exists update it, otherwise create it.
 	currentSecret, ok := c.k8s.Secrets.Get(requestedSecret.Name)
 	if !ok {
-		log.Info(fmt.Sprintf("Creating TLS secret `%s`", requestedSecret.Name), "cluster", c.namespacedName())
+		log.Info("Creating TLS secret", "secretName", requestedSecret.Name, "cluster", c.namespacedName())
 
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedSecret, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
@@ -348,7 +346,7 @@ func (c *Cluster) reconcileTLSSecrets(requestedSecret *corev1.Secret) error {
 		return nil
 	}
 
-	log.Info(fmt.Sprintf("Updating TLS secret `%s`", requestedSecret.Name), "cluster", c.namespacedName())
+	log.Info("Updating TLS secret", "secretName", requestedSecret.Name, "cluster", c.namespacedName())
 
 	updatedSecret := currentSecret.DeepCopy()
 	updatedSecret.Data = requestedSecret.Data
@@ -389,11 +387,7 @@ func (c *Cluster) refreshTLSPassphraseResources() error {
 	}
 
 	// update configmap script
-	if err := c.refreshPassphraseConfigMap(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.refreshPassphraseConfigMap()
 }
 
 // refreshPassphrasePublicKey updates the cached public key used by Operator
@@ -468,7 +462,7 @@ func (c *Cluster) refreshPassphraseConfigMap() error {
 			},
 		}
 
-		log.Info(fmt.Sprintf("Creating TLS configmap `%s`", configMap.Name), "cluster", c.namespacedName())
+		log.Info("Creating TLS configmap", "configMapName", configMap.Name, "cluster", c.namespacedName())
 		if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(context.Background(), configMap, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
@@ -503,13 +497,13 @@ func (c *Cluster) updateInternalPassphraseSecret() (*corev1.Secret, error) {
 	// create internal secret, otherwise update as it may have been rotated
 	_, ok := c.k8s.Secrets.Get(secret.Name)
 	if !ok {
-		log.Info(fmt.Sprintf("Creating TLS secret `%s`", secret.Name), "cluster", c.namespacedName())
+		log.Info("Creating TLS secret", "secretName", secret.Name, "cluster", c.namespacedName())
 
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
 			return nil, errors.NewStackTracedError(err)
 		}
 	} else {
-		log.Info(fmt.Sprintf("Updating TLS secret `%s`", secret.Name), "cluster", c.namespacedName())
+		log.Info("Updating TLS secret", "secretName", secret.Name, "cluster", c.namespacedName())
 
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
 			return nil, errors.NewStackTracedError(err)
@@ -671,11 +665,7 @@ func (c *Cluster) reloadMemberCAsNew(member couchbaseutil.Member) error {
 		return nil
 	}
 
-	if err := retryutil.RetryFor(secretSyncTimePeriod, callback); err != nil {
-		return err
-	}
-
-	return nil
+	return retryutil.RetryFor(secretSyncTimePeriod, callback)
 }
 
 // reloadMemberCALegacy reloads the cluster CA certificate for pre-7.1 versions.
@@ -702,11 +692,7 @@ func (c *Cluster) reloadMemberCALegacy(member couchbaseutil.Member) error {
 		return err
 	}
 
-	if err := couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).On(c.api, member); err != nil {
-		return err
-	}
-
-	return nil
+	return couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).On(c.api, member)
 }
 
 // updateCAs adds CAs if they don't exist only.  This must be called before
@@ -806,11 +792,7 @@ func (c *Cluster) reloadChainAndVerify(member couchbaseutil.Member, cert *x509.C
 		return nil
 	}
 
-	if err := retryutil.RetryFor(secretSyncTimePeriod, callback); err != nil {
-		return err
-	}
-
-	return nil
+	return retryutil.RetryFor(secretSyncTimePeriod, callback)
 }
 
 // getExplcitCAStandard gets the optional (i.e. the result can be nil) CA certificate
@@ -1299,11 +1281,7 @@ func (c *Cluster) enableMutualTLS() error {
 		settings.Prefixes = append(settings.Prefixes, prefix)
 	}
 
-	if err := c.updateClientCertAuthSettings(settings); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateClientCertAuthSettings(settings)
 }
 
 // updateMutualTLS ensures that client certificates are correctly installed before updating
@@ -1712,11 +1690,7 @@ func (c *Cluster) reconcileTLSPreTopologyChange() error {
 
 	// When enabling TLS ensure the client is updated with the CA before adding in,
 	// and communicating with, any new nodes.
-	if err := c.enableTLS(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.enableTLS()
 }
 
 // reconcileTLS performs any certificate rotations that are necessary.
@@ -1774,11 +1748,7 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 
 	// Remove any unused CAs after everything else is successful, we risk locking
 	// ourselves out otherwise.
-	if err := c.cleanCAs(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.cleanCAs()
 }
 
 // nodeToNodeEnabled tells us whether N2N encyption is enabled.
@@ -2032,7 +2002,7 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	if c.shouldRotateExpiredRootCAs() {
 		// root CA has expired so ensure invalid tls event is raised
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
-		log.Info(fmt.Sprintf("Rotating expired Root CAs"), "cluster", c.namespacedName())
+		log.Info("Rotating expired Root CAs", "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredRootCAs(); err != nil {
 			return err
@@ -2042,7 +2012,7 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	if c.shouldRotateExpiredServerCerts() {
 		// server certs have expired so ensure invalid tls event is raised
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
-		log.Info(fmt.Sprintf("Rotating expired server certs"), "cluster", c.namespacedName())
+		log.Info("Rotating expired server certs", "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredServerCerts(); err != nil {
 			return err
@@ -2052,7 +2022,7 @@ func (c *Cluster) rotateExpiredCertificates() error {
 	if c.shouldRotateExpiredClientCerts() {
 		// client certs have expired so ensure invalid client event is raised
 		c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
-		log.Info(fmt.Sprintf("Rotating expired client certs"), "cluster", c.namespacedName())
+		log.Info("Rotating expired client certs", "cluster", c.namespacedName())
 
 		if err := c.rotateExpiredClientCerts(); err != nil {
 			return err

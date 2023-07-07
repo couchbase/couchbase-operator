@@ -214,7 +214,7 @@ func TestPersistentVolumeCreateCluster(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create a basic supportable cluster with 2 stateful and 2 stateless nodes
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
@@ -472,7 +472,7 @@ func TestPersistentVolumeRzaNodesKilled(t *testing.T) {
 	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -547,7 +547,7 @@ func TestPersistentVolumeRzaNodesKilledUnbalanced(t *testing.T) {
 	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -615,7 +615,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	availableServerGroups := getAvailabilityZones(t, kubernetes)
 	clusterSize := len(availableServerGroups) * 2
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)

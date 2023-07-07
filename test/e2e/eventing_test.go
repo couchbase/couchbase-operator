@@ -108,7 +108,7 @@ func TestEventingCreateEventingCluster(t *testing.T) {
 	// When ready, deploy an eventing function to create documents in a destination
 	// bucket based on source bucket documents. Populate the source and ensure the
 	// documents appear in the destination.
-	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 	e2eutil.NewDocumentSet(sourceBucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, destinationBucket.Name, numOfDocs, time.Minute)
 
@@ -149,7 +149,7 @@ func TestEventingResizeCluster(t *testing.T) {
 	// When ready deploy the eventing function and generate workload.  Scale the cluster
 	// up and down then stop the workload.  Expect the number of documents in the destination
 	// bucket to equal those in the source.
-	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 
 	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()
@@ -208,7 +208,7 @@ func TestEventingKillEventingPods(t *testing.T) {
 	// When ready deploy the eventing function and generate workload.  Kill pods in sequence
 	// then stop the workload.  Expect the number of documents in the destination bucket to
 	// equal those in the source.
-	e2eutil.MustDeployEventingFunction(t, kubernetes, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
+	e2eutil.MustDeployEventingFunction(t, cluster, "test", sourceBucket.Name, metadataBucket.Name, destinationBucket.Name, function, time.Minute)
 
 	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()

@@ -59,7 +59,7 @@ func (otpNodes OTPNodeList) StringSlice() []string {
 	return out
 }
 
-type Member interface {
+type Member interface { //nolint: interfacebloat
 	Name() string
 	Config() string
 	UseTLS() bool

@@ -702,11 +702,8 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 		out.Reset()
 
 		v := &eventschema.Validator{Events: clusterEvents, Schema: eventSeq}
-		if err := v.Validate(out); err != nil {
-			return err
-		}
 
-		return nil
+		return v.Validate(out)
 	}
 
 	if err := retryutil.RetryFor(time.Minute, callback); err != nil {

@@ -69,11 +69,7 @@ func createAdmissionController(k8s *types.Cluster, pullSecrets []string) error {
 		},
 	}
 
-	if err := waitAdmissionController(k8s, deployment); err != nil {
-		return err
-	}
-
-	return nil
+	return waitAdmissionController(k8s, deployment)
 }
 
 // deleteAdmissionController removes any existing admission controller resources.  Just does
@@ -137,9 +133,5 @@ func waitAdmissionController(k8s *types.Cluster, deployment *appsv1.Deployment) 
 		return nil
 	}
 
-	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
-		return err
-	}
-
-	return nil
+	return retryutil.RetryFor(time.Minute, callback)
 }

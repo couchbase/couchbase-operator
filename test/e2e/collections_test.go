@@ -42,7 +42,7 @@ func TestScopeCreateExplicit(t *testing.T) {
 	scopeGroup := e2eutil.NewScopeGroup(scopeGroupName, scopeGroupNames...).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope, scopeGroup)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -84,7 +84,7 @@ func TestScopeCreateImplicit(t *testing.T) {
 	e2eutil.NewScopeGroup(scopeGroupName, scopeGroupNames...).WithLabels(defaultLabelSelector).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesImplicit(bucket, defaultLabelSelector)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -126,7 +126,7 @@ func TestScopeCreateMixed(t *testing.T) {
 	e2eutil.NewScopeGroup(scopeGroupName, scopeGroupNames...).WithLabels(defaultLabelSelector).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	e2eutil.LinkBucketToScopesImplicit(bucket, defaultLabelSelector)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -167,7 +167,7 @@ func TestScopeDelete(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -212,7 +212,7 @@ func TestScopeUnmanaged(t *testing.T) {
 	scopeName := "pinky"
 
 	// Create an unmanaged bucket.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create the cluster.
@@ -259,7 +259,7 @@ func TestCollectionCreateExplicit(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -311,7 +311,7 @@ func TestCollectionWithAnnotations(t *testing.T) {
 	// Link to a bucket and create that.
 	bucket := e2espec.DefaultMagmaBucket()
 
-	// bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	// bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 
 	_ = e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -358,7 +358,7 @@ func TestCollectionCreateImplicit(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithLabelSelector(defaultLabelSelector).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -404,7 +404,7 @@ func TestCollectionCreateMixed(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).WithLabelSelector(defaultLabelSelector).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -448,7 +448,7 @@ func TestCollectionDelete(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -497,7 +497,7 @@ func TestCollectionUnmanaged(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -544,7 +544,7 @@ func TestDefaultCollectionDeletion(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).IsDefault().WithManagedCollections().MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -589,12 +589,12 @@ func TestScopesAndCollectionsSharedScopeTopology(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to two buckets and create them.
-	bucket1 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket1 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket1.SetName(bucketName1)
 	e2eutil.LinkBucketToScopesExplicit(bucket1, scope)
 	bucket1 = e2eutil.MustNewBucket(t, kubernetes, bucket1)
 
-	bucket2 := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket2 := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket2.SetName(bucketName2)
 	e2eutil.LinkBucketToScopesExplicit(bucket2, scope)
 	bucket2 = e2eutil.MustNewBucket(t, kubernetes, bucket2)
@@ -654,7 +654,7 @@ func TestScopesAndCollectionsSharedCollectionTopology(t *testing.T) {
 	scope2 := e2eutil.NewScope(scopeName2).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope1, scope2)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -697,7 +697,7 @@ func TestScopesAndCollectionsCascadingScopeDeletion(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -747,7 +747,7 @@ func TestScopeOverflow(t *testing.T) {
 	scopeGroup := e2eutil.NewScopeGroupN(scopeGroupName, "pinky-", scopeClusterLimit).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scopeGroup)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -791,7 +791,7 @@ func TestCollectionOverflow(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collectionGroup).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
@@ -823,7 +823,7 @@ func TestGSIWithCollections(t *testing.T) {
 	numOfDocs := f.DocsCount
 
 	// Create a bucket.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create the cluster.

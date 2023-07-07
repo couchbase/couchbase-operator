@@ -263,7 +263,7 @@ func TestEditBucket(t *testing.T) {
 	disabled := false
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -328,7 +328,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -368,7 +368,7 @@ func TestBucketUnmanaged(t *testing.T) {
 	clusterSize := 3
 
 	// Create a bucket.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create a cluster with buckets unmanaged.

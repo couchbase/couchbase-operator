@@ -30,7 +30,7 @@ func testSDK(t *testing.T, local, remote *types.Cluster, config sdkConfig) {
 	// Create a TLS enabled cluster with a bucket.
 	tls := e2eutil.MustInitClusterTLS(t, remote, &e2eutil.TLSOpts{})
 
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, remote, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(tls).MustCreate(t, remote)

@@ -129,11 +129,7 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 	// Static configuration.
 	clusterSize := 3
 	bucketName := "pale"
-	labelSelector := &metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"foo": "bar",
-		},
-	}
+	labelSelector := "foo=bar"
 
 	// Create a cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)

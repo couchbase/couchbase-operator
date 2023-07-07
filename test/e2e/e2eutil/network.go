@@ -71,7 +71,7 @@ func (nodeServices *NodeServices) validateAlternateAddresses(couchbase *couchbas
 
 // getNodeServices polls the Couchbase API, gets and decodes external addressability configuration.
 func getNodeServices(couchbase *couchbasev2.CouchbaseCluster) (*NodeServices, error) {
-	request, err := http.NewRequest("GET", fmt.Sprintf("http://%s.%s.svc:8091/pools/default/nodeServices", couchbase.Name, couchbase.Namespace), nil)
+	request, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s.%s.svc:8091/pools/default/nodeServices", couchbase.Name, couchbase.Namespace), nil)
 	if err != nil {
 		return nil, err
 	}

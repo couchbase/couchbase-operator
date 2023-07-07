@@ -58,11 +58,8 @@ func (provider *AzureProvider) CreateBucket(bucketName string) error {
 	}
 
 	_, err = provider.client.CreateContainer(ctx, bucketName, &azblob.CreateContainerOptions{})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (provider *AzureProvider) GetBucket(bucketName string) (bool, error) {

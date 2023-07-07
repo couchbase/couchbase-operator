@@ -38,11 +38,7 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 		return err
 	}
 
-	if err := c.waitForCreatePod(ctx, m); err != nil {
-		return err
-	}
-
-	return nil
+	return c.waitForCreatePod(ctx, m)
 }
 
 // Remove Pod and any volumes associated with pod if requested
@@ -91,31 +87,19 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 
 	// To get here the pod would need to be initialized and clustered, so this is
 	// safe.
-	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
-		return err
-	}
-
-	return nil
+	return k8sutil.SetPodInitialized(c.k8s, m.Name())
 }
 
 // wait with context.
 func (c *Cluster) waitForCreatePod(ctx context.Context, member couchbaseutil.Member) error {
-	if err := k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name(), member.GetHostPort()); err != nil {
-		return err
-	}
-
-	return nil
+	return k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name(), member.GetHostPort())
 }
 
 func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	ctx, cancel := context.WithTimeout(c.ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	if err := k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName); err != nil {
-		return err
-	}
-
-	return nil
+	return k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName)
 }
 
 func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {

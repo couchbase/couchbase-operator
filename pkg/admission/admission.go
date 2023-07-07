@@ -46,11 +46,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	if err := apis.AddToScheme(scheme); err != nil {
-		return err
-	}
-
-	return nil
+	return apis.AddToScheme(scheme)
 }
 
 // getClient returns a new Kubernetes client.
@@ -255,7 +251,7 @@ func serve(config *Config, w http.ResponseWriter, r *http.Request, admit admitFu
 	// Ensure the content is JSON before docoding it
 	contentType := r.Header.Get("Content-Type")
 	if contentType != "application/json" {
-		log.Error(fmt.Errorf("media error"), "content-type", contentType)
+		log.Error(fmt.Errorf("media error"), "unsupported Content-Type", "content-type", contentType)
 		w.WriteHeader(http.StatusUnsupportedMediaType)
 
 		return
@@ -306,7 +302,7 @@ func serveDefault(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveReadiness reports that the server is running.
-func serveReadiness(w http.ResponseWriter, r *http.Request) {
+func serveReadiness(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 

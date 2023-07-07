@@ -76,7 +76,7 @@ func TestResizeClusterWithBucket(t *testing.T) {
 	serviceID := 0
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -367,7 +367,7 @@ func TestNodeServiceDownRecovery(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -411,7 +411,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 	victimIndex := 0
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -467,7 +467,7 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	clusterSize := 2
 
 	// create 2 node cluster with admin console
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -918,7 +918,7 @@ func TestManageMultipleClusters(t *testing.T) {
 		clusters = append(clusters, clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes))
 	}
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	for _, cluster := range clusters {

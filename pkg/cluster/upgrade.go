@@ -119,11 +119,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 	// All reports update the condition to reflect the current progress.
 	c.cluster.Status.SetUpgradingCondition(status)
 
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateCRStatus()
 }
 
 // reportUpgradeComplete is called unconditionally when the reconcile is complete.
@@ -166,11 +162,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.updateCRStatus()
 }
 
 // isUpgrading checks for upgrade status in state which may return inactive

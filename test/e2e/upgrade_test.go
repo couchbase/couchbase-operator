@@ -456,7 +456,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	clusterSize := mdsGroupSize * 2
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -502,7 +502,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -558,7 +558,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -613,7 +613,7 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -669,7 +669,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -723,7 +723,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)

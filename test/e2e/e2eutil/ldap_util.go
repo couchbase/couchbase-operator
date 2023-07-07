@@ -43,6 +43,7 @@ func MustNewLDAPService(t *testing.T, k8s *types.Cluster, service *v1.Service) *
 
 // MustCheckLDAPServer ensures the LDAP server is up and running before letting
 // Couchbase loose with it.
-func MustCheckLDAPServer(t *testing.T, k8s *types.Cluster, pod string, tls *TLSContext, timeout time.Duration) {
+func MustCheckLDAPServer(_ *testing.T, _ *types.Cluster, _ string, _ *TLSContext, _ time.Duration) {
 	// Check port 389 and 636
+	//TODO: actually implement this?!
 }

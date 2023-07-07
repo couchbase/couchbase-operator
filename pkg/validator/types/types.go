@@ -17,7 +17,7 @@ import (
 // the discovery of objects that already exist or not in K8s, so
 // we can validate our cbc YAML file against secrets or storage classes
 // that may or may not exist before being accepted by K8s itself.
-type KubeAbstraction interface {
+type KubeAbstraction interface { //nolint: interfacebloat
 	// GetSecret checks whether the named secret exists in the specified namespace.
 	GetSecret(string, string) (*corev1.Secret, bool, error)
 	// GetStorageClass checks whether the named stoage class exists.

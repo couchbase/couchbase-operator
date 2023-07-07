@@ -21,17 +21,17 @@ import (
 )
 
 type policyDocument struct {
-	Version   string
-	Statement []statementEntry
+	Version   string           `json:"version"`
+	Statement []statementEntry `json:"statement"`
 }
 type statementEntry struct {
-	Effect   string
-	Action   []string
-	Resource []string
+	Effect   string   `json:"effect"`
+	Action   []string `json:"action"`
+	Resource []string `json:"resource"`
 }
 type roleDocument struct {
-	Version   string
-	Statement []roleStatementEntry
+	Version   string               `json:"version"`
+	Statement []roleStatementEntry `json:"statement"`
 }
 
 type roleStatementEntry struct {
@@ -117,11 +117,7 @@ func (helper *AWSUtil) SetupBackupIAM(namespace, accountid, oidcProvider, s3Buck
 		return err
 	}
 
-	if err := helper.attachPolicyToRole(); err != nil {
-		return err
-	}
-
-	return nil
+	return helper.attachPolicyToRole()
 }
 
 func MustSetupBackupIAM(t *testing.T, kubernetes *types.Cluster, aws *AWSUtil, accountid, oidcprovider, s3Bucket string) {

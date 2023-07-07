@@ -34,7 +34,7 @@ func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) 
 		}
 	}
 
-	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name())
+	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, member.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -315,11 +315,7 @@ func (c *Cluster) initMemberNetworking(member couchbaseutil.Member) error {
 		return err
 	}
 
-	if err := couchbaseutil.SetNodeNetworkConfiguration(c.generateNetworkConfiguration()).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
-		return err
-	}
-
-	return nil
+	return couchbaseutil.SetNodeNetworkConfiguration(c.generateNetworkConfiguration()).InPlaintext().RetryFor(10*time.Second).On(c.api, member)
 }
 
 // reconcileClusterNetworking allows a read/modify/write version of the above.

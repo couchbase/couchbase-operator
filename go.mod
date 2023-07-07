@@ -1,6 +1,6 @@
 module github.com/couchbase/couchbase-operator
 
-go 1.18
+go 1.20
 
 require (
 	cloud.google.com/go/storage v1.28.1
@@ -56,7 +56,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/couchbase/gocbcore/v10 v10.2.6-0.20230628110847-18d54cfbcf56 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

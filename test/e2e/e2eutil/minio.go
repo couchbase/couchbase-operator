@@ -59,7 +59,7 @@ func MinioOptions(kubernetes *types.Cluster) *Minio {
 	return minio
 }
 
-func (minio *Minio) Create(t *testing.T) (*Minio, error) {
+func (minio *Minio) Create() (*Minio, error) {
 	if len(minio.name) == 0 {
 		minio.name = "minio"
 	}
@@ -106,11 +106,7 @@ func (minio *Minio) WaitUntilReady(waitTime time.Duration) error {
 		return nil
 	}
 
-	if err := util.WaitFor(callback, waitTime); err != nil {
-		return err
-	}
-
-	return nil
+	return util.WaitFor(callback, waitTime)
 }
 
 func (minio *Minio) MustWaitUntilReady(t *testing.T, waitTime time.Duration) {

@@ -1279,7 +1279,7 @@ func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, p
 	}
 
 	// Fall back to legacy 6.5/6.6/7.0
-	requestLegacy, err := http.NewRequest("GET", "https://"+host+"/pools/default/certificate", nil)
+	requestLegacy, err := http.NewRequest(http.MethodGet, "https://"+host+"/pools/default/certificate", nil)
 	if err != nil {
 		return err
 	}

@@ -179,17 +179,17 @@ func mustVerifyArchiveMetadata(t *testing.T, archive string, withOperator bool, 
 			}
 		}
 
-		// nolint:staticcheck
+		//nolint:staticcheck
 		if clusterMetadata == nil {
 			e2eutil.Die(t, fmt.Errorf("unable to locate cluster metadata for %s", cluster.Name))
 		}
 
-		// nolint:staticcheck
+		//nolint:staticcheck
 		if !hasPath(clusterMetadata.ResourcePath, paths) {
 			e2eutil.Die(t, fmt.Errorf("cluster resource path mssing for %s", cluster.Name))
 		}
 
-		// nolint:staticcheck
+		//nolint:staticcheck
 		if !hasPath(clusterMetadata.EventsPath, paths) {
 			e2eutil.Die(t, fmt.Errorf("cluster events path mssing for %s", cluster.Name))
 		}
@@ -986,7 +986,7 @@ func TestLogCollect(t *testing.T) {
 	cluster2Size := constants.Size1
 	cluster3Size := constants.Size1
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster1 := clusterOptions().WithEphemeralTopology(cluster1Size).MustCreate(t, kubernetes)
 	cluster2 := clusterOptions().WithEphemeralTopology(cluster2Size).MustCreate(t, kubernetes)
@@ -1261,11 +1261,7 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 		return err
 	}
 
-	if err := e2eutil.WaitUntilOperatorReady(k8s, 5*time.Minute); err != nil {
-		return err
-	}
-
-	return nil
+	return e2eutil.WaitUntilOperatorReady(k8s, 5*time.Minute)
 }
 
 /***********************************
@@ -1698,7 +1694,7 @@ func TestLogCollectWithDefaultRetentionAndSize(t *testing.T) {
 	victims := 6
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
@@ -1754,7 +1750,7 @@ func TestLogCollectWithCustomRetentionAndSize(t *testing.T) {
 	maxLogCount := 2
 
 	// Create the cluster
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).Generate(kubernetes)

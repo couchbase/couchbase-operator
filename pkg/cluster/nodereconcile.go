@@ -326,7 +326,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 // where we let this through in the hope that pod recovery will save the day.
 // Q: do we need a way to stop further reconcile, as this is likely to fail given
 // the unstable nature of the cluster and litter the logs with stuff.
-func (r *ReconcileMachine) handleWarmupNodes(c *Cluster) error {
+func (r *ReconcileMachine) handleWarmupNodes(_ *Cluster) error {
 	if r.couchbase.WarmupNodes.Size() > 0 && r.couchbase.DownNodes.Empty() {
 		// SM: So, this and a lot of others causes silent skipping of topology changes and
 		// then we do other things... I'm of a mind that only allowing said things
@@ -1051,11 +1051,9 @@ func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 		return err
 	}
 
-	if err := c.reconcileMemberAlternateAddresses(); err != nil {
-		return err
-	}
+	err := c.reconcileMemberAlternateAddresses()
 
-	return nil
+	return err
 }
 
 // When cluster is under topology changes that are outside of

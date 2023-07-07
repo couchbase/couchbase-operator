@@ -285,11 +285,7 @@ func (p *persistentStorageImpl) apply(f func(*corev1.Secret) error) error {
 		return nil
 	}
 
-	if err := retryutil.RetryFor(persistenceCacheTimeout, callback); err != nil {
-		return err
-	}
-
-	return nil
+	return retryutil.RetryFor(persistenceCacheTimeout, callback)
 }
 
 // Insert a value only if it doesn't exist.

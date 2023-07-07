@@ -41,7 +41,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = "1.19.4"
+    GOVERSION = "1.20"
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
@@ -100,7 +100,7 @@ pipeline {
         axes {
           axis {
             name 'version'
-            values 'v1.17.11', 'v1.18.8', 'v1.19.1', 'v1.20.0'
+            values 'v1.17.11', 'v1.18.8', 'v1.20', 'v1.20.0'
           }
         }
 

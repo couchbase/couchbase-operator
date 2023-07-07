@@ -85,20 +85,15 @@ func (r *pvcUpgradableResource) perform(item, action int) error {
 	pvc := r.pvcs[item]
 
 	upgrade := r.actions[action].action
-	if err := upgrade(r.cluster, pvc); err != nil {
-		return err
-	}
 
-	return nil
+	return upgrade(r.cluster, pvc)
 }
 
 func (r *pvcUpgradableResource) commit(item int) error {
 	pvc := r.pvcs[item]
-	if _, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
-		return err
-	}
+	_, err := r.cluster.k8s.KubeClient.CoreV1().PersistentVolumeClaims(r.cluster.cluster.Namespace).Update(context.Background(), pvc, metav1.UpdateOptions{})
 
-	return nil
+	return err
 }
 
 // upgradePersistentVolumeClaimFrom000000To020300 performs pvc upgrades to 2.3.0 from any version.

@@ -53,7 +53,7 @@ func testPrometheusMetrics(t *testing.T, kubernetes *types.Cluster, tls *e2eutil
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	bucket := e2eutil.MustGetBucket(t, framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
@@ -252,7 +252,7 @@ func TestPrometheusMetricsPerformOps(t *testing.T) {
 	e2eutil.MustWaitForPrometheusReady(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckPrometheus(t, kubernetes, cluster, nil)
 
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
@@ -303,7 +303,7 @@ func TestPrometheusMetricsBearerTokenAuth(t *testing.T) {
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -405,7 +405,7 @@ func TestPrometheusMetricsOperator(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -525,7 +525,7 @@ func TestCouchbaseMetricsDocumentCount(t *testing.T) {
 	// Create scope & collection in a bucket.
 	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(t, f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 

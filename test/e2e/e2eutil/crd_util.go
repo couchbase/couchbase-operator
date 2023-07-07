@@ -2,7 +2,6 @@ package e2eutil
 
 import (
 	"context"
-	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
@@ -13,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func CreateCluster(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
+func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couchbasev2.CouchbaseCluster, error) {
 	// This is the only place where all cluster creations converge due to code sprawl.
 	// So regardless of whether the CRD was hand crafted, or a cookie cutter we are
 	// guaranteed to apply the correct pod policy mutations here before every creation.

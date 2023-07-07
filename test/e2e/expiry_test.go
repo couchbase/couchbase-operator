@@ -43,7 +43,7 @@ func TestBucketTTL(t *testing.T) {
 	// In order to expire a document it must be read, compacted, or expired.  It's easiest to
 	// just compact the bucket manually.
 	time.Sleep(2 * time.Minute)
-	e2eutil.MustCompactBucket(t, kubernetes, cluster, bucket)
+	e2eutil.MustCompactBucket(t, cluster, bucket)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, time.Minute)
 }
 

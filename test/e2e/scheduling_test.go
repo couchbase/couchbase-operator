@@ -21,7 +21,7 @@ import (
 // that zone and do bad things to it, while allowing the operator to keep functioning,
 // and thus we can observe its behaviour.
 
-// nolint:unused,nolintlint
+//nolint:unused,nolintlint
 func mustGetNonMasterAvailabilityZone(t *testing.T, kubernetes *types.Cluster) string {
 	caps := clustercapabilities.MustNewCapabilities(t, kubernetes.KubeClient)
 
