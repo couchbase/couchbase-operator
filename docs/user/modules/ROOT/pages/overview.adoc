@@ -14,9 +14,9 @@ The Operator is certified on the following platforms:
 
 * xref:install-kubernetes.adoc[Kubernetes]
 * xref:install-openshift.adoc[Red Hat OpenShift]
-* xref:tutorial-eks.adoc[Amazon EKS]
-* xref:tutorial-gke.adoc[Google GKE]
-* xref:tutorial-aks.adoc[Microsoft AKS]
+* Amazon EKS
+* Google GKE
+* Microsoft AKS
 
 [NOTE]
 ====

@@ -125,10 +125,6 @@ include::partial$autogen-reference.adoc[]
  ** xref:tutorial-autoscale-query.adoc[Autoscaling Couchbase Query Service]
 * Backup
  ** xref:tutorial-velero-backup.adoc[Backup with VMware Velero]
-* Cloud Platforms
- ** xref:tutorial-aks.adoc[Installing AKS]
- ** xref:tutorial-eks.adoc[Installing EKS]
- ** xref:tutorial-gke.adoc[Installing GKE]
 * Logging
  ** xref:tutorial-couchbase-log-forwarding.adoc[]
 * Monitoring
