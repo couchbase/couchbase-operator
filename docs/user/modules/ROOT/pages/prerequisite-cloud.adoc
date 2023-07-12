@@ -195,7 +195,7 @@ This is so that nodes on one network can talk to nodes on the other, which are i
 As such, these must be non-overlapping.
 If we use the default setting, the first cluster would get the prefix 10.0.0.0/8, as would the second.
 
-=== Install kubectl
+=== Install `kubectl`
 
 If you do not already have `kubectl` installed in your CLI, run the following command:
 
@@ -206,7 +206,10 @@ $ az aks install-cli
 
 Get the credentials for your cluster:
 
+[source, console]
+----
 $ az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+----
 
 [source,console]
 ----

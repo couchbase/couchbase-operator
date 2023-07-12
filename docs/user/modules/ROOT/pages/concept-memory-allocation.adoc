@@ -184,6 +184,15 @@ This has no affect on Couchbase Server -- as it cannot constrain the query servi
 
 Modification of memory allocation will cause an upgrade of the affected pods.
 
+[IMPORTANT]
+====
+It is dangerous to change both a memory quota and the resource request at the same time.
+Changing both parameters, the resource request and a quota to take advantage of the new request, at the same time could potentially lead to the Couchbase Autonomous Operator performing a swap/rebalance of all nodes in the cluster.
+This is due to the order in which these changes may be applied.
+If the quota modification gets applied before the new resource request, the memory will not be available for the pod, precipitating operator to create a new pod.
+To prevent this, change the resource request first, then apply the quota modification.
+====
+
 == Interactive Memory Allocation kbd:[operator 2.1]
 
 The Operator provides memory allocation status information in your `CouchbaseCluster` resources with the xref:resource/couchbasecluster.adoc#couchbaseclusters-status-allocations[`couchbaseclusters.status.allocations`] attribute.
