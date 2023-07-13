@@ -905,7 +905,8 @@ func (f *Framework) SetupTestExclusive(t *testing.T, o ...TestOption) (*types.Cl
 }
 
 // SetupTestRemote is called by parallelizable tests that require a local and a
-// remote cluster to run in.
+// remote cluster to run in. Here, remote cluster means in a different k8s namespace.
+// Hence, two instances of operators running on two different namespaces.
 func (f *Framework) SetupTestRemote(t *testing.T, o ...TestOption) (*types.Cluster, *types.Cluster, func()) {
 	// This will stop execution of the test here, it will allow the underlying
 	// go testing framework to release jobs based on the requested parallelism.

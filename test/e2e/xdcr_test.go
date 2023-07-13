@@ -111,7 +111,7 @@ const (
 	xdcrOperationScaleDown xdcrOperation = iota
 )
 
-func XDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object, *couchbasev2.CouchbaseReplication) {
+func createXDCRClusters(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object) {
 	// Create the clusters.
 	// The kubernetes1 cluster optionally uses a custom DNS service to address the kubernetes2 cluster.
 	// The kubernetes2 cluster optionally has TLS set.
@@ -124,9 +124,9 @@ func XDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dn
 	// When ready, establish the XDCR connection.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
-	e2eutil.MustEstablishXDCRReplication(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
+	e2eutil.MustEstablishXDCRReplicationWithTLS(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
 
-	return sourceCluster, targetCluster, bucket, replication
+	return sourceCluster, targetCluster, bucket
 }
 
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
@@ -213,13 +213,13 @@ func xdcrClusterRemoveNode(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
-// testXDCRCreateCluster tests cluster creation using any combination of DNS/TLS.
-func testXDCRCreateCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
+// testCreateXDCRCluster tests clusters creation using any combination of DNS/TLS.
+func testCreateXDCRCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	// Static configuration.
 	clusterSize := constants.Size3
 	numOfDocs := framework.Global.DocsCount
 
-	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
@@ -252,7 +252,7 @@ func TestXDCRCreateClusterLocal(t *testing.T) {
 
 	framework.Requires(t, kubernetes1).CouchbaseBucket()
 
-	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, nil, nil)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes1, nil, nil, nil)
 }
 
 // TestXDCRCreateClusterLocalTLS tests establishing a TLS XDCR connection within the same cluster.
@@ -264,7 +264,7 @@ func TestXDCRCreateClusterLocalTLS(t *testing.T) {
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
-	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, nil)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes1, nil, tls, nil)
 }
 
 // TestXDCRCreateClusterLocalMutualTLS tests establishing an mTLS XDCR connection within the same cluster.
@@ -277,7 +277,7 @@ func TestXDCRCreateClusterLocalMutualTLS(t *testing.T) {
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
 }
 
 // TestXDCRCreateClusterLocalMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection within the same cluster.
@@ -290,7 +290,7 @@ func TestXDCRCreateClusterLocalMandatoryMutualTLS(t *testing.T) {
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes1, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes1, nil, tls, &policy)
 }
 
 // TestXDCRCreateClusterRemote tests establishing an XDCR connection to a kubernetes2 cluster.
@@ -302,7 +302,7 @@ func TestXDCRCreateClusterRemote(t *testing.T) {
 
 	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
 
-	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, nil, nil)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes2, dns, nil, nil)
 }
 
 // TestXDCRCreateClusterRemoteTLS tests establishing a TLS XDCR connection to a kubernetes2 cluster.
@@ -316,7 +316,7 @@ func TestXDCRCreateClusterRemoteTLS(t *testing.T) {
 
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
-	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, nil)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes2, dns, tls, nil)
 }
 
 // TestXDCRCreateClusterRemoteMutualTLS tests establishing an mTLS XDCR connection to a kubernetes2 cluster.
@@ -331,7 +331,7 @@ func TestXDCRCreateClusterRemoteMutualTLS(t *testing.T) {
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyEnable
-	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 // TestXDCRCreateClusterRemoteMandatoryMutualTLS tests establishing a mandatory mTLS TLS XDCR connection to a kubernetes2 cluster.
@@ -346,7 +346,7 @@ func TestXDCRCreateClusterRemoteMandatoryMutualTLS(t *testing.T) {
 	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
 
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	testXDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
+	testCreateXDCRCluster(t, kubernetes1, kubernetes2, dns, tls, &policy)
 }
 
 // TestXDCRCreateCluster tests establishing an XDCR connection.
@@ -728,8 +728,7 @@ func TestXDCRDeleteReplication(t *testing.T) {
 
 	// Now we delete the replication, add some documents in the source bucket and
 	// verify that the doc count of destination bucket is same as its old value
-	e2eutil.MustDeleteXDCRReplication(t, kubernetes1, sourceCluster, replication, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, e2eutil.ReplicationRemovedEvent(sourceCluster, targetCluster.Name, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)), 5*time.Minute)
+	e2eutil.MustDeleteXDCRReplication(t, kubernetes1, sourceCluster, targetCluster, replication, time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
@@ -878,7 +877,7 @@ func TestXDCRRotatePassword(t *testing.T) {
 func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
@@ -943,7 +942,7 @@ func TestXDCRRotateClientMandatoryMutualTLS(t *testing.T) {
 func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	sourceCluster, targetCluster, bucket, _ := XDCRCreateCluster(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
@@ -1864,7 +1863,7 @@ func TestXDCRWithMandatoryTLSAndMultipleCAs(t *testing.T) {
 	// Establish the XDCR connection.  Use the server PKI to validate against the endpoint,
 	// and the client PKI to provide authentication.
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-	e2eutil.MustEstblistXDCRReplicationWithMultipleCAs(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication, serverTLS, clientTLS)
+	e2eutil.MustEstablishXDCRReplicationWithMultipleCAs(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication, serverTLS, clientTLS)
 
 	// Inject some documents into the source, and expect them to appear in the target.
 	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, sourceCluster)

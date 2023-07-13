@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -790,6 +791,102 @@ func MustDeleteCollectionManually(t *testing.T, kubernetes *types.Cluster, clust
 	}
 
 	if err := couchbaseutil.DeleteCollection(bucket, scope, collection).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+}
+
+// verifyDocCountInCollection uses Server 7.0's metrics to check that the current number of items in a collection is equal to a given number.
+func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Labels are passed to specify which collection we're looking at.
+		labels := make(map[string]string)
+		labels["bucket"] = bucket
+		labels["scope"] = scope
+		labels["collection"] = collection
+
+		// Metric name of doc count in bucket. See: https://docs.couchbase.com/server/current/metrics-reference/metrics-reference.html
+		metricName := "kv_collection_item_count"
+
+		metrics, err := GetCouchbaseMetric(t, k8s, cluster, metricName, labels, time.Minute)
+		if err != nil {
+			return err
+		}
+
+		// We're only getting a single metric, so we can just get the first 'Data'.
+		if len(metrics.Data) == 0 {
+			return fmt.Errorf("metrics response had no data")
+		}
+		values := metrics.Data[0].Values
+		// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+		if len(values) == 0 {
+			return fmt.Errorf("metrics response had no values")
+		}
+
+		itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
+		if err != nil {
+			return err
+		}
+
+		if itemCount != items {
+			return fmt.Errorf("document count %d, expected %d", itemCount, items)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
+	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func verifyDocCountInScope(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		// Labels are passed to specify which collection we're looking at.
+		labels := make(map[string]string)
+		labels["bucket"] = bucket
+		labels["scope"] = scope
+
+		// Metric name of doc count in bucket. See: https://docs.couchbase.com/server/current/metrics-reference/metrics-reference.html
+		metricName := "kv_collection_item_count"
+
+		metrics, err := GetCouchbaseMetric(t, k8s, cluster, metricName, labels, time.Minute)
+		if err != nil {
+			return err
+		}
+
+		// We're only getting a single type of metric (doc count), so we can just get the first 'Data'.
+		if len(metrics.Data) == 0 {
+			return fmt.Errorf("metrics response had no data")
+		}
+		totalCount := 0
+
+		// The doc count is returned per collection, so we need to add them all up to get the count in the scope.
+		for _, d := range metrics.Data {
+			// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+			if len(d.Values) == 0 {
+				return fmt.Errorf("metrics response had no values")
+			}
+
+			itemCount, err := getLatestMetric(d.Values)
+			if err != nil {
+				return err
+			}
+
+			totalCount += itemCount
+		}
+
+		if totalCount != items {
+			return fmt.Errorf("document count %d, expected %d", totalCount, items)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInScope(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, items int, timeout time.Duration) {
+	if err := verifyDocCountInScope(t, k8s, cluster, bucket, scope, items, timeout); err != nil {
 		Die(t, err)
 	}
 }
