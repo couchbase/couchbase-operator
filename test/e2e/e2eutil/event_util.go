@@ -97,8 +97,17 @@ func TLSInvalidEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.TLSInvalidEvent(cl)
 }
 
-func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remote, source, destination string) *v1.Event {
-	name := fmt.Sprintf("%s/%s/%s", remote, source, destination)
+func ReplicationAddedEvent(c *couchbasev2.CouchbaseCluster, remoteClusterName, srcBucketName, dstBucketName string) *v1.Event {
+	remoteClusterName = applyXDCRRemoteClusterName(remoteClusterName)
+	name := fmt.Sprintf("%s/%s/%s", remoteClusterName, srcBucketName, dstBucketName)
+
+	return k8sutil.ReplicationAddedEvent(c, name)
+}
+
+func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remoteClusterName, srcBucketName, dstBucketName string) *v1.Event {
+	remoteClusterName = applyXDCRRemoteClusterName(remoteClusterName)
+	name := fmt.Sprintf("%s/%s/%s", remoteClusterName, srcBucketName, dstBucketName)
+
 	return k8sutil.ReplicationRemovedEvent(c, name)
 }
 

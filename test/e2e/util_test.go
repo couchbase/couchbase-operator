@@ -25,7 +25,6 @@ const (
 	TagSuiteP1         = "p1"
 	TagSuiteSystem     = "system"
 	TagSuitePlatform   = "platform"
-	TagSuiteCNG        = "cng"
 
 	// Functional test areas.  These allow you to do targeted runs without invoking
 	// a broad test suite.
@@ -50,6 +49,7 @@ const (
 	TagFeatureCollections       = "collections"
 	TagFeatureSynchronization   = "synchronization"
 	TagFeatureDeleteDelay       = "deletedelay"
+	TagFeatureCNG               = "cng"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -100,9 +100,9 @@ func registerTests() {
 		framework.NewTestDef(TestSecurityContextValidationCreateCluster).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
-		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestCNGBucketOps).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
-		framework.NewTestDef(TestCngOtlp).WithTags(TagSuiteSanity, TagSuitePlatform, TagSuiteCNG),
+		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
+		framework.NewTestDef(TestCNGBucketOps).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
+		framework.NewTestDef(TestCngOtlp).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateBucketCluster).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestResizeCluster).WithTags(TagSuiteSanity, TagSuitePlatform),

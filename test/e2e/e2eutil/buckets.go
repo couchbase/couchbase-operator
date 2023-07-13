@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
@@ -573,6 +574,124 @@ func MustAssertBucketStorageBackend(t *testing.T, k8s *types.Cluster, cluster *c
 	}
 
 	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+// getBucketInfo returns information of the bucket.
+func getBucketInfo(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string) (*couchbaseutil.BucketStatus, error) {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	info := &couchbaseutil.BucketStatus{}
+
+	request := newRequest("/pools/default/buckets/"+bucket, nil, info)
+
+	if err := client.client.Get(request, client.host); err != nil {
+		return info, err
+	}
+
+	return info, nil
+}
+
+// verifyDocCountInBucket polls the Couchbase API for the named bucket and checks whether the
+// document count matches the expected number of items.
+func verifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.BasicStats.ItemCount != items {
+			return fmt.Errorf("document count %d, expected %d", info.BasicStats.ItemCount, items)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) {
+	if err := verifyDocCountInBucket(t, k8s, cluster, bucket, items, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// getLatestMetric takes the 2D array that server returns - an array of [timestamp, value] - and gets the last/most recent one.
+// Naturally, the returned value is a string, so we convert it to an int, then return it as the value we're looking for.
+// Sorry.
+func getLatestMetric(values [][]interface{}) (int, error) {
+	return strconv.Atoi(values[len(values)-1][1].(string))
+}
+
+// verifyDocCountInBucketNonZero polls the Couchbase API for the named bucket and checks whether the
+// document count is non-zero.
+func verifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.BasicStats.ItemCount == 0 {
+			return fmt.Errorf("document count zero")
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyDocCountInBucketNonZero(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := verifyDocCountInBucketNonZero(t, k8s, cluster, bucket, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func verifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes uint64, collectionDefault bool, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, name)
+		if err != nil {
+			return err
+		}
+
+		if info.HistoryRetentionBytes != bytes {
+			return fmt.Errorf("history retention expected %d bytes but found %d", bytes, info.HistoryRetentionBytes)
+		}
+		if info.HistoryRetentionSeconds != seconds {
+			return fmt.Errorf("history retention expected %d seconds but found %d", seconds, info.HistoryRetentionSeconds)
+		}
+
+		if *info.HistoryRetentionCollectionDefault != collectionDefault {
+			return fmt.Errorf("history retention expected %t collection default but found %t", collectionDefault, *info.HistoryRetentionCollectionDefault)
+		}
+		return nil
+	})
+}
+
+func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, seconds, bytes uint64, collectionDefault bool, timeout time.Duration) {
+	if err := verifyBucketHistoryRetentionSettings(t, k8s, cluster, name, seconds, bytes, collectionDefault, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// verifyReplicaCount polls the Couchbase API for the named bucket and checks whether the
+// Replica number matches the expected replicaNumber.
+func verifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.ReplicaNumber != 1 {
+			return fmt.Errorf("replica Number %d, expected %d", info.ReplicaNumber, 1)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
+	if err := verifyReplicaCount(t, k8s, cluster, bucket, timeout); err != nil {
 		Die(t, err)
 	}
 }
