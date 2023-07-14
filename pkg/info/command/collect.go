@@ -4,6 +4,7 @@ import (
 	ctx "context"
 	"fmt"
 	"os"
+	"regexp"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/info/backend"
@@ -147,7 +148,49 @@ func collect(c config.Configuration) {
 		os.Exit(1)
 	}
 
-	defer backend.Close()
+	defer func() {
+		backend.Close()
+		// If log upload is specified, attempt to upload the collected logs
+		if context.Config.Upload {
+			if len(context.Config.Customer) > 50 {
+				fmt.Println("Customer name invalid")
+				os.Exit(1)
+			}
+
+			matched, err := regexp.Match("[A-Za-z0-9_.-]", []byte(context.Config.Customer))
+			if err != nil {
+				fmt.Println("Error parsing customer name: ", err)
+				os.Exit(1)
+			}
+
+			if !matched {
+				fmt.Print("Customer name invalid.")
+				os.Exit(1)
+			}
+
+			if len(context.Config.Ticket) > 7 {
+				fmt.Println("Ticket number invalid")
+				os.Exit(1)
+			}
+
+			matched, err = regexp.Match("^[0-9]*$", []byte(context.Config.Ticket))
+
+			if err != nil {
+				fmt.Println("Error parsing ticket number ", err)
+				os.Exit(1)
+			}
+
+			if !matched {
+				fmt.Print("Ticket number invalid")
+				os.Exit(1)
+			}
+
+			address := context.Config.UploadHost + "/" + context.Config.Customer + "/" + context.Config.Ticket + "/"
+			proxy := context.Config.UploadProxy
+			payload := util.ArchiveName() + ".tar.gz"
+			upload(address, payload, proxy)
+		}
+	}()
 
 	references := resource.Collect(context, backend, collector.Resources)
 	harvestSub(context, backend, references)

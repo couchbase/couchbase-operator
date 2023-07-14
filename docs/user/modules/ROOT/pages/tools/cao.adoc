@@ -512,6 +512,13 @@ Redact couchbase server logs, requires the -collectinfo flag to be set
 +
 Collect only resource for the named CouchbaseCluster, may be used multiple times
 
+--customer::
+*Type*: string
++
+*Default*: default
++
+Specifies the customer name for log uploading. This value must be a string whose maximum length is 50 characters. Only the following characters can be used: [A-Za-z0-9_.-].
+
 --directory::
 *Type*: string
 +
@@ -558,6 +565,30 @@ Couchbase server image
 *Default*: false
 +
 Collect kube-system resources and logs
+
+--ticket::
+*Type*: string
++
+Specifies the Couchbase Support ticket-number. The value must be a string with a maximum length of 7 characters, containing only digits in the range of 0-9.
+
+--upload-host::
+*Type*: string
++
+*Default*: https://uploads.couchbase.com
++
+Specifies the fully-qualified domain name of the host you want the logs uploaded to. The protocol prefix of the domain name
+
+--upload-logs::
+*Type*: bool
++
+*Default*: false
++
+Upload logs to support portal
+
+--upload-proxy::
+*Type*: string
++
+Specifies a proxy for log uploading
 
 === Inherited Flags
 

@@ -132,6 +132,13 @@ The name of the kubeconfig context to use
 +
 Collect only resource for the named CouchbaseCluster, may be used multiple times
 
+--customer::
+*Type*: string
++
+*Default*: default
++
+Specifies the customer name for log uploading. This value must be a string whose maximum length is 50 characters. Only the following characters can be used: [A-Za-z0-9_.-].
+
 --directory::
 *Type*: string
 +
@@ -208,6 +215,11 @@ Couchbase server image
 +
 Collect kube-system resources and logs
 
+--ticket::
+*Type*: string
++
+Specifies the Couchbase Support ticket-number. The value must be a string with a maximum length of 7 characters, containing only digits in the range of 0-9.
+
 --tls-server-name::
 *Type*: string
 +
@@ -217,6 +229,25 @@ Server name to use for server certificate validation. If it is not provided, the
 *Type*: string
 +
 Bearer token for authentication to the API server
+
+--upload-host::
+*Type*: string
++
+*Default*: https://uploads.couchbase.com
++
+Specifies the fully-qualified domain name of the host you want the logs uploaded to. The protocol prefix of the domain name
+
+--upload-logs::
+*Type*: bool
++
+*Default*: false
++
+Upload logs to support portal
+
+--upload-proxy::
+*Type*: string
++
+Specifies a proxy for log uploading
 
 --user::
 *Type*: string

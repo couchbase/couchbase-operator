@@ -40,6 +40,16 @@ type Configuration struct {
 	Directory string
 	// LogLevel tells us what to collect.
 	LogLevel int
+	// Upload specifies whether to attempt to upload logs
+	Upload bool
+	// UploadHost defines where to upload logs to
+	UploadHost string
+	// Customer specifies which customer to associate log uploads with
+	Customer string
+	// UploadProxy specifies a proxy for log upload
+	UploadProxy string
+	// Ticket specifies a Couchbase Support ticket number for log uploads
+	Ticket string
 }
 
 const (
@@ -56,6 +66,11 @@ const (
 	directoryFlag           = "directory"
 	clusterFlag             = "couchbase-cluster"
 	logLevelFlag            = "log-level"
+	uploadFlag              = "upload-logs"
+	uploadHostFlag          = "upload-host"
+	customerFlag            = "customer"
+	uploadProxyFlag         = "upload-proxy"
+	ticketFlag              = "ticket"
 )
 
 type AppendStringVar struct {
@@ -91,4 +106,9 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&c.CollectInfoList, collectInfoListFlag, false, "List all log sources in json and exit, requires the -"+collectInfoFlag+" flag to be set")
 	flags.Var(&c.Clusters, clusterFlag, "Collect only resource for the named CouchbaseCluster, may be used multiple times")
 	flags.IntVar(&c.LogLevel, logLevelFlag, 0, "Control the verbosity of collection, 0 will collect couchbase resources and those scoped to the cluster, 1 will collect more sensitive things that may be required for support such as secrets, roles etc.")
+	flags.BoolVar(&c.Upload, uploadFlag, false, "Upload logs to support portal")
+	flags.StringVar(&c.UploadHost, uploadHostFlag, "https://uploads.couchbase.com", "Specifies the fully-qualified domain name of the host you want the logs uploaded to. The protocol prefix of the domain name")
+	flags.StringVar(&c.Customer, customerFlag, "default", "Specifies the customer name for log uploading. This value must be a string whose maximum length is 50 characters. Only the following characters can be used: [A-Za-z0-9_.-].")
+	flags.StringVar(&c.UploadProxy, uploadProxyFlag, "", "Specifies a proxy for log uploading")
+	flags.StringVar(&c.Ticket, ticketFlag, "", "Specifies the Couchbase Support ticket-number. The value must be a string with a maximum length of 7 characters, containing only digits in the range of 0-9.")
 }
