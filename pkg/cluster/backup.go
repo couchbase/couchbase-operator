@@ -52,6 +52,9 @@ type backupResources struct {
 
 	// pvc deals with persisting the backup data.
 	pvc *corev1.PersistentVolumeClaim
+
+	// immediate backup jobs
+	immediateBackupJob *batchv1.Job
 }
 
 type backupResourcesList []backupResources
@@ -83,23 +86,54 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 	for i := range backups {
 		backup := &backups[i]
 
+		resource := backupResources{
+			name:   backup.Name,
+			backup: backup,
+			pvc:    c.generateBackupPVC(backup),
+		}
+
+		// if the backup is immediate we skip everything else
+		// we don't validate, if you're willing to run immediate backups we assume you know what you're doing.
+		// and don't want to get in your way.
+		if backup.Spec.Strategy == couchbasev2.ImmediateFull {
+			immediateFull, err := c.generateBackupJob(backup, Full)
+			if err != nil {
+				return nil, err
+			}
+
+			resource.immediateBackupJob = immediateFull
+		} else if backup.Spec.Strategy == couchbasev2.ImmediateIncremental {
+			immediateIncremental, err := c.generateBackupJob(backup, Incremental)
+			if err != nil {
+				return nil, err
+			}
+
+			resource.immediateBackupJob = immediateIncremental
+		}
+
+		// this is gross.
+		// if we did an immediate backup there's nothing else to do.
+		if resource.immediateBackupJob != nil {
+			log.V(2).Info("Generated immediate backup job")
+
+			resources = append(resources, resource)
+
+			continue
+		}
+
 		// it's possible we don't have a full backup schedule,
-		// if the DAC is disabled AE.
+		// if the DAC is disabled.
 		if backup.Spec.Full == nil || len(backup.Spec.Full.Schedule) == 0 {
 			return nil, fmt.Errorf("%w: no valid full backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
 		}
 
+		// at a minimum we need a full backup, we can't do incremental without one.
 		fullCronJob, err := c.generateBackupCronjob(backup, Full)
 		if err != nil {
 			return nil, err
 		}
 
-		resource := backupResources{
-			name:        backup.Name,
-			backup:      backup,
-			fullCronJob: fullCronJob,
-			pvc:         c.generateBackupPVC(backup),
-		}
+		resource.fullCronJob = fullCronJob
 
 		if backup.Spec.Strategy == couchbasev2.FullIncremental {
 			incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
@@ -116,8 +150,63 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 	return resources, nil
 }
 
-// listBackupResources searches Kubernetes for any backup resources and returns them.
 func (c Cluster) listBackupResources() (backupResourcesList, error) {
+	var resources backupResourcesList
+
+	jobs := c.listBackupJobResources()
+
+	resources = append(resources, jobs...)
+
+	crons, err := c.listBackupCronjobResources()
+	if err != nil {
+		return nil, err
+	}
+
+	resources = append(resources, crons...)
+
+	return resources, nil
+}
+
+func (c Cluster) listBackupJobResources() backupResourcesList {
+	var resources backupResourcesList
+
+	for _, job := range c.k8s.Jobs.List() {
+		if job.Labels == nil {
+			log.Info("job missing labels", "cluster", c.namespacedName(), "job", job.Name)
+			continue
+		}
+
+		// check if it's ours
+		name, ok := job.Labels[constants.LabelBackup]
+		if !ok {
+			log.Info("job missing backup label", "cluster", c.namespacedName(), "job", job.Name)
+		}
+
+		resource := &backupResources{
+			name:               name,
+			immediateBackupJob: job,
+		}
+
+		backup, ok := c.k8s.CouchbaseBackups.Get(name)
+		if ok {
+			resource.backup = backup
+		}
+
+		pvc, ok := c.k8s.PersistentVolumeClaims.Get(name)
+		if ok {
+			resource.pvc = pvc
+		}
+
+		resources = append(resources, *resource)
+	}
+
+	return resources
+
+}
+
+// listBackupResources searches Kubernetes for any backup resources and returns them.
+// TODO: support new backup jobs
+func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 	var resources backupResourcesList
 
 	for _, cronjob := range c.k8s.CronJobs.List() {
@@ -206,8 +295,16 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		}
 	}
 
-	if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
-		return err
+	if resource.immediateBackupJob != nil {
+		if _, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), resource.immediateBackupJob, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+
+	if resource.fullCronJob != nil {
+		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
+			return err
+		}
 	}
 
 	if resource.incrementalCronJob != nil {
@@ -503,6 +600,77 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 	job.Template.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
 
 	return nil
+}
+
+// TODO: This is just a dupe of generate backup cron job
+// common elements should be... made common
+func (c *Cluster) generateBackupJob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction) (*batchv1.Job, error) {
+	var container corev1.Container
+
+	affinity := new(corev1.Affinity)
+
+	switch action {
+	case Incremental:
+		container = c.generateBackupContainer("cbbackupmgr-incremental", backup, false)
+	case Full:
+		container = c.generateBackupContainer("cbbackupmgr-full", backup, true)
+	}
+
+	if c.cluster.Spec.AntiAffinity {
+		affinity.PodAntiAffinity = k8sutil.ApplyPodAntiAffinityForCluster(c.cluster.Name)
+	}
+
+	labels := k8sutil.LabelsForClusterMerged(c.cluster, c.cluster.Spec.Backup.Labels)
+	labels[constants.LabelBackup] = backup.Name
+
+	var volume corev1.Volume
+
+	if backup.Spec.EphemeralVolume {
+		volume = generateEphemeralBackupVolume(backup.ObjectMeta.Name, backup.Spec.StorageClassName, backup.Spec.Size)
+	} else {
+		volume = generatePersistentBackupVolume(backup.Name)
+	}
+
+	backupJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   backup.Name + "-" + string(action),
+			Labels: labels,
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
+			},
+		},
+		Spec: *c.createBaseJobSpec(&backup.Spec.BackoffLimit, backup.Spec.TTLSecondsAfterFinished, container, volume),
+	}
+
+	// add in backup specific templating.
+	backupJob.Spec.Template.ObjectMeta.Labels[constants.LabelBackup] = backup.Name
+	backupJob.Spec.Template.Spec.Affinity = affinity
+
+	// Mount objectendpoint cert if set.
+	var endpoint *couchbasev2.ObjectEndpoint
+	if backup.Spec.ObjectStore != nil && backup.Spec.ObjectStore.Endpoint != nil {
+		endpoint = backup.Spec.ObjectStore.Endpoint
+	} else if c.cluster.GetBackupStoreEndpoint() != nil {
+		endpoint = c.cluster.GetBackupStoreEndpoint()
+	}
+
+	c.applyObjEndpointCertToJob(&backupJob.Spec, endpoint)
+
+	k8sutil.ApplyBaseAnnotations(backupJob)
+
+	// if TLS enabled apply TLS config to cronjobs
+	if err := applyTLSConfiguration(c.cluster, &backupJob.Spec); err != nil {
+		return nil, err
+	}
+
+	specJSON, err := json.Marshal(backupJob.Spec)
+	if err != nil {
+		return nil, errors.NewStackTracedError(err)
+	}
+
+	backupJob.Annotations[constants.JobSpecAnnotation] = string(specJSON)
+
+	return backupJob, nil
 }
 
 // generateBackupCronjob generates a backup cronjob taking into account the backup strategy and the cbbackupmgr action.
@@ -1088,6 +1256,7 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 
 // gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
 func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
+	log.V(2).Info("gathering backups")
 	selector := labels.Everything()
 
 	if c.cluster.Spec.Backup.Selector != nil {

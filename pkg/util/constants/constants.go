@@ -67,6 +67,7 @@ var (
 
 	CronjobSpecAnnotation = "cronjob.couchbase.com/spec"
 
+	JobSpecAnnotation = "job.couchbase.com/spec"
 	// PodInitializedAnnotationMinVersion is the version pod.couchbase.com/initialized
 	// first appeared in, so we shouldn't do anything with resources created on earlier
 	// versions.

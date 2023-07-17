@@ -203,7 +203,9 @@ type CouchbaseBackupSpec struct {
 	// define full and incremental schedules in the `spec.full` and `spec.incremental` fields
 	// respectively.  Care should be taken to ensure full and incremental schedules do not
 	// overlap, taking into account the backup time, as this will cause failures as the jobs
-	// attempt to mount the same backup volume. This field default to `full_incremental`.
+	// attempt to mount the same backup volume. To cause a backup to occur immediately use `immediate_incremental`
+	// or `immediate_full` for incremental or full backups respectively.
+	// This field default to `full_incremental`.
 	// Info: https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-strategies.html
 	// +kubebuilder:default="full_incremental"
 	Strategy Strategy `json:"strategy,omitempty"`
@@ -475,7 +477,7 @@ type CouchbaseBackupStatus struct {
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=full_incremental;full_only
+// +kubebuilder:validation:Enum=full_incremental;full_only;immediate_incremental;immediate_full
 type Strategy string
 
 const (
@@ -484,6 +486,12 @@ const (
 
 	// Expensive Full Backup only recommended for small clusters.
 	FullOnly Strategy = "full_only"
+
+	// Full only but now
+	ImmediateFull Strategy = "immediate_full"
+
+	// Incremental but now
+	ImmediateIncremental Strategy = "immediate_incremental"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
