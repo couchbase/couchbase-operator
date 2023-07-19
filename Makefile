@@ -130,6 +130,9 @@ HOST_ARCH := $(shell go env GOHOSTARCH)
 TOOLS_TARGET := $(PLATFORM)-$(shell go env GOHOSTOS)-$(HOST_ARCH)
 IMAGE_TARGET := $(PLATFORM)-linux-$(HOST_ARCH)
 
+# Antora log level. Defaults to fatal to fix xref error issue.
+ANTORA_LOG_LEVEL=fatal
+
 ################################################################################
 # Static/Generated Variables
 ################################################################################
@@ -503,12 +506,13 @@ test-unit:
 docs: $(CRD_FILE)
 	scripts/asciidoc-gen --version v2
 	scripts/asciidoc-link
+	go run scripts/metricsgen/metrics-gen.go
 	go run scripts/mangen.go
 
 # Check the docs are spelled correctly and compile etc.
 .PHONY: docs-lint
 docs-lint:
-	scripts/asciidoc-lint
+	scripts/asciidoc-lint -l $(ANTORA_LOG_LEVEL)
 
 ################################################################################
 # Private Goals

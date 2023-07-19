@@ -12,6 +12,14 @@ const (
 )
 
 var (
+	// ReconcileTotalMetric
+	// name: reconcile_total
+	// type: counter
+	// help: Total reconcile operations performed on a specific cluster
+	// unit:
+	// added: 2.3.0
+	// stability: committed
+	// labels: namespace, name, result
 	ReconcileTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "reconcile_total",
 		Help:      "Total reconcile operations performed on a specific cluster",
@@ -19,6 +27,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"namespace", "name", "result"})
 
+	// ReconcileFailureMetric
+	// name: reconcile_failures
+	// type: counter
+	// help: Total failed reconcile operations performed on a specific cluster
+	// unit:
+	// added: 2.3.0
+	// stability: committed
+	// labels: namespace, name
 	ReconcileFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "reconcile_failures",
 		Help:      "Total failed reconcile operations performed on a specific cluster",
@@ -26,6 +42,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"namespace", "name"})
 
+	// ReconcileDurationMetric
+	// name: reconcile_time_seconds
+	// type: histogram
+	// help: Length of time per reconcile for a specific cluster
+	// unit: seconds
+	// added: 2.3.0
+	// stability: committed
+	// labels: namespace, name
 	ReconcileDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:      "reconcile_time_seconds",
 		Help:      "Length of time per reconcile for a specific cluster",
@@ -33,6 +57,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"namespace", "name"})
 
+	// HTTPRequestTotalMetric
+	// name: server_http_requests_total
+	// type: counter
+	// help: Total HTTP requests to Couchbase Server for a specific cluster
+	// unit:
+	// added: 2.3.0
+	// stability: committed
+	// labels: name, method, service, host
 	HTTPRequestTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "server_http_requests_total",
 		Help:      "Total HTTP requests to Couchbase Server for a specific cluster.",
@@ -40,6 +72,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "method", "service", "host"})
 
+	// HTTPRequestTotalCodeMetric
+	// name: server_http_request_codes_total
+	// type: counter
+	// help: Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned
+	// unit:
+	// added: 2.3.0
+	// stability: committed
+	// labels: name, method, code, service, host
 	HTTPRequestTotalCodeMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "server_http_request_codes_total",
 		Help:      "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
@@ -47,6 +87,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "method", "code", "service", "host"})
 
+	// HTTPRequestFailureMetric
+	// name: server_http_request_failures
+	// type: counter
+	// help: Total failed HTTP requests to Couchbase Server for a specific cluster
+	// unit:
+	// added: 2.3.0
+	// stability: committed
+	// labels: name, method, service, host
 	HTTPRequestFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "server_http_request_failures",
 		Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
@@ -54,6 +102,14 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "method", "service", "host"})
 
+	// HTTPRequestDurationMSMetric
+	// name: server_http_requests_time_milliseconds
+	// type: histogram
+	// help: Length of time per request for a specific cluster
+	// unit: milliseconds
+	// added: 2.3.0
+	// stability: committed
+	// labels: name, method, service, host
 	HTTPRequestDurationMSMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:      "server_http_requests_time_milliseconds",
 		Help:      "Length of time per request for a specific cluster",

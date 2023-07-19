@@ -31,6 +31,16 @@ FILTER="${FILTER} -e s/^\[.*$//g"
 # Ignore inline ui-macros.
 FILTER="${FILTER} -e s/btn:\[[^\]*\]//g"
 FILTER="${FILTER} -e s/kbd:\[[^\]*\]//g"
+# Log level for antora
+LOG_LEVEL="fatal"
+
+while getopts l: flag
+do
+  case "${flag}" in
+    l) LOG_LEVEL=${OPTARG};;
+    *) exit 1;;
+  esac
+done
 
 # CHECK_ARGS is the spell checking command to run.
 CHECK_ARGS="-l en_US --home-dir=."
@@ -70,18 +80,11 @@ if [[ ${FAIL} != "" ]]; then
 fi
 
 # Now that your general spelling has been corrected, let's look at syntax...
+# This step will also check for any xrefs you got wrong...
 npm install
-WARNINGS=$(node_modules/@antora/cli/bin/antora generate scripts/playbook.yaml 2>&1 | sed -e /^.*tabs.*$/d)
+WARNINGS=$(node_modules/@antora/cli/bin/antora generate --log-level="$LOG_LEVEL" scripts/playbook.yaml 2>&1 | sed -e /^.*tabs.*$/d)
 if [[ "${WARNINGS}" != "" ]]; then
   echo "Asciidoc markup contains errors"
   echo "${WARNINGS}" | sed 's/^/    /g'
-  exit 1
-fi
-
-# ... and finally any xrefs you've messed up.
-BROKEN_XREFS=$(node_modules/@antora/cli/bin/antora --generator @antora/xref-validator scripts/playbook.yaml 2>&1 | grep -v 'xref: [^:]\+:' | grep path:)
-if [[ "${BROKEN_XREFS}" != "" ]]; then
-  echo "Asciidoc xrefs broken"
-  echo "${BROKEN_XREFS}"
   exit 1
 fi

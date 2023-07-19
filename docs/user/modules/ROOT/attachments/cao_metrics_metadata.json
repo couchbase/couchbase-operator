@@ -1,0 +1,84 @@
+{
+    "reconcile_failures": {
+        "type": "counter",
+        "help": "Total failed reconcile operations performed on a specific cluster",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "namespace",
+            "name"
+        ]
+    },
+    "reconcile_time_seconds": {
+        "type": "histogram",
+        "help": "Length of time per reconcile for a specific cluster",
+        "unit": "seconds",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "namespace",
+            "name"
+        ]
+    },
+    "reconcile_total": {
+        "type": "counter",
+        "help": "Total reconcile operations performed on a specific cluster",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "namespace",
+            "name",
+            "result"
+        ]
+    },
+    "server_http_request_codes_total": {
+        "type": "counter",
+        "help": "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "method",
+            "code",
+            "service",
+            "host"
+        ]
+    },
+    "server_http_request_failures": {
+        "type": "counter",
+        "help": "Total failed HTTP requests to Couchbase Server for a specific cluster",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "method",
+            "service",
+            "host"
+        ]
+    },
+    "server_http_requests_time_milliseconds": {
+        "type": "histogram",
+        "help": "Length of time per request for a specific cluster",
+        "unit": "milliseconds",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "method",
+            "service",
+            "host"
+        ]
+    },
+    "server_http_requests_total": {
+        "type": "counter",
+        "help": "Total HTTP requests to Couchbase Server for a specific cluster",
+        "added": "2.3.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "method",
+            "service",
+            "host"
+        ]
+    }
+}

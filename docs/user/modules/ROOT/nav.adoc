@@ -105,6 +105,7 @@ include::partial$autogen-reference.adoc[]
  ** xref:reference-operator-configuration.adoc[Operator Deployment Settings]
  ** xref:reference-operator-rbac.adoc[Operator RBAC Settings]
  ** xref:reference-operator-logging.adoc[Operator Logging]
+ ** xref:reference-prometheus-metrics.adoc[Operator Prometheus Metrics]
 * Couchbase Cluster
  ** xref:reference-reference-architecture.adoc[`CouchbaseCluster` Reference Architecture]
  ** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
