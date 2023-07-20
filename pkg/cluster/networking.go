@@ -210,14 +210,14 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 
 		// Wait for a period of time before allowing polling to happen in order to
 		// avoid negative caching of DNS values.
-		log.Info("Waiting for DNS propagation", "cluster", c.namespacedName())
+		log.Info("Waiting for DNS propagation", "cluster", c.namespacedName(), "hostname", addresses.Hostname)
 
 		<-ctx.Done()
 
 		// Next check to see if the DNS entry is actually live (and visible by the Operator),
 		// before installing it into Couchbase server, which will then propagate to clients
 		// and potentially break them.
-		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name())
+		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
 
 		timeout := 10 * time.Minute
 
@@ -229,7 +229,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			return err
 		}
 
-		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name())
+		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
 
 		// Perform the update
 		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {
