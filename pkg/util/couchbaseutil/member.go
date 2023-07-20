@@ -122,7 +122,7 @@ func NewPartialMember(namespace, cluster, name string) Member {
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
 // associated with a cluster-wide headless service.
 func (m *memberImpl) GetDNSName() string {
-	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", m.name, m.cluster, m.namespace)
+	return fmt.Sprintf("%s.%s.%s.svc", m.name, m.cluster, m.namespace)
 }
 
 // GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
