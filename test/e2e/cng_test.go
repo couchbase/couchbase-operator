@@ -209,7 +209,7 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 	}
 
 	cngSvcName := clusterName + "-cloud-native-gateway-service"
-	connStr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", cngSvcName, cluster.Namespace, 443)
+	connStr := fmt.Sprintf("%s.%s.svc:%d", cngSvcName, cluster.Namespace, 443)
 
 	client, err := gocbcoreps.DialContext(ctx, connStr, &dialopts)
 	if err != nil {
