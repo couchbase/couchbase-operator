@@ -342,7 +342,7 @@ spec:
   image: couchbase/server:7.0.0
   antiAffinity: false
   paused: false
-  upgradePolicy: RollingUpgrade
+  upgradeStrategy: RollingUpgrade
   rollingUpgrade:
     maxUpgradable: 5
     maxUpgradablePercent: 75%
@@ -360,7 +360,7 @@ spec:
       - ldap-0000.cb-ldap.default.svc
       port: 389
       encryption: StartTLSExtension
-      query_dn: "cn=admin,dc=cb-ldap,dc=default,dc=svc"
+      bindDN: "cn=admin,dc=cb-ldap,dc=default,dc=svc"
       authenticationEnabled: true
       userDNMapping:
         template: "uid=%u,ou=People,dc=example,dc=com"
@@ -385,8 +385,7 @@ spec:
       domain: "example.com"
     tls:
       # Empty objects to be filled in by the dynamic runtime
-      static:
-        member: {}
+      static: {}
       clientCertificatePolicy: "enable"
       clientCertificatePaths:
         - path: subject.cn
@@ -582,7 +581,7 @@ spec:
   logRetention: 24h
   objectStore:
     uri: s3://blah
-  ephemeral: true
+  ephemeralVolume: true
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackupRestore
@@ -628,5 +627,4 @@ spec:
   size: 3
 status:
   labelSelector:  "couchbase_cluster = test-couchbase-cluster"
-  phase: Ready
   size: 3

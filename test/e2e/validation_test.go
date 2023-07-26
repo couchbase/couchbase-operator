@@ -563,22 +563,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			name: "TestValidateDifferentSecurityContexts",
 			mutations: patchMap{
 				"cluster": jsonpatch.NewPatchSet().
-					Replace("/spec/securityContext", &couchbasev2.ClusterSpec{
-						SecurityContext: &corev1.PodSecurityContext{
+					Replace("/spec/securityContext",
+						&corev1.PodSecurityContext{
 							FSGroup: func(fsGrp int) *int64 {
 								fsGrpInt64 := int64(fsGrp)
 								return &fsGrpInt64
 							}(133),
-						},
-					}).
-					Replace("/spec/security/podSecurityContext", &couchbasev2.CouchbaseClusterSecuritySpec{
-						PodSecurityContext: &corev1.PodSecurityContext{
+						}).
+					Replace("/spec/security/podSecurityContext",
+						&corev1.PodSecurityContext{
 							FSGroup: func(fsGrp int) *int64 {
 								fsGrpInt64 := int64(fsGrp)
 								return &fsGrpInt64
 							}(123),
-						},
-					}),
+						}),
 			},
 			shouldFail: true,
 		},
@@ -2536,7 +2534,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 					Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
 					Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
 					Test("/spec/cluster/autoFailoverTimeout", "120s").
-					Test("/spec/cluster/autoFailoverMaxCount", 3).
+					Test("/spec/cluster/autoFailoverMaxCount", 1).
 					Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
 			},
 		},
