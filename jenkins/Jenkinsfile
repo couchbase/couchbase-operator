@@ -5,8 +5,9 @@ pipeline {
 
   environment {
     GOBIN = "${env.WORKSPACE}/bin"
-    GOVERSION = '1.20'
+    GOVERSION = '1.20.6'
     NODEVERSION = '16.0.0'
+    GOPATH = "${env.WORKSPACE}/gopath"
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
   }
 
@@ -14,6 +15,7 @@ pipeline {
     stage('Go Install') {
       steps {
         sh 'wget -q -O- https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz | tar xz'
+        sh 'touch go/go.mod'
       }
     }
     stage('Node.js Install') {
@@ -28,7 +30,7 @@ pipeline {
     }
     stage('Go Lint') {
       steps {
-        sh 'make dockerized-lint'
+        sh 'make lint'
       }
     }
     stage('Python Lint') {

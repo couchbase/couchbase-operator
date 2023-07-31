@@ -23,6 +23,8 @@ couchbase-operator-certification*.tar.bz2
 /artifacts/
 
 # These are for CI/CD shizzle.
+go
+gopath
 /go/
 /bin/
 /venv/
@@ -32,3 +34,4 @@ scripts/venv/
 *terraform.*
 package-lock.json
 /.vscode/
+
