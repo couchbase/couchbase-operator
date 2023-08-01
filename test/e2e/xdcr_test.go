@@ -111,7 +111,7 @@ const (
 	xdcrOperationScaleDown xdcrOperation = iota
 )
 
-func createXDCRClusters(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object, *couchbasev2.CouchbaseReplication) {
+func createXDCRClusters(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy, clusterSize int) (*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster, metav1.Object) {
 	// Create the clusters.
 	// The kubernetes1 cluster optionally uses a custom DNS service to address the kubernetes2 cluster.
 	// The kubernetes2 cluster optionally has TLS set.
@@ -126,7 +126,7 @@ func createXDCRClusters(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, d
 
 	e2eutil.MustEstablishXDCRReplicationWithTLS(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
 
-	return sourceCluster, targetCluster, bucket, replication
+	return sourceCluster, targetCluster, bucket
 }
 
 // xdcrClusterRemoveNode removes nodes from the selected cluster in numerous
@@ -219,7 +219,7 @@ func testCreateXDCRCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	clusterSize := constants.Size3
 	numOfDocs := framework.Global.DocsCount
 
-	sourceCluster, targetCluster, bucket, _ := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
@@ -877,7 +877,7 @@ func TestXDCRRotatePassword(t *testing.T) {
 func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	sourceCluster, targetCluster, bucket, _ := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
@@ -942,7 +942,7 @@ func TestXDCRRotateClientMandatoryMutualTLS(t *testing.T) {
 func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 
-	sourceCluster, targetCluster, bucket, _ := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
+	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
 	numOfDocs := framework.Global.DocsCount
 
