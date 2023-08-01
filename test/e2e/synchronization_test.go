@@ -129,7 +129,11 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 	// Static configuration.
 	clusterSize := 3
 	bucketName := "pale"
-	labelSelector := "foo=bar"
+	labelSelectorString := "foo=bar"
+	labelSelector := metav1.LabelSelector{
+		MatchLabels:      map[string]string{"foo": "bar"},
+		MatchExpressions: nil,
+	}
 
 	// Create a cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -153,11 +157,11 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 
 	switch bucket.GetBucketType() {
 	case e2eutil.BucketTypeCouchbase:
-		actualBucket = e2eutil.MustRetrieveCouchbaseBucketByLabel(t, kubernetes, labelSelector)
+		actualBucket = e2eutil.MustRetrieveCouchbaseBucketByLabel(t, kubernetes, labelSelectorString)
 	case e2eutil.BucketTypeEphemeral:
-		actualBucket = e2eutil.MustRetrieveEphemeralBucketByLabel(t, kubernetes, labelSelector)
+		actualBucket = e2eutil.MustRetrieveEphemeralBucketByLabel(t, kubernetes, labelSelectorString)
 	case e2eutil.BucketTypeMemcached:
-		actualBucket = e2eutil.MustRetrieveMemcachedBucketByLabel(t, kubernetes, labelSelector)
+		actualBucket = e2eutil.MustRetrieveMemcachedBucketByLabel(t, kubernetes, labelSelectorString)
 	}
 
 	e2eutil.MustAssertBucket(t, actualBucket, expectedBucket)
