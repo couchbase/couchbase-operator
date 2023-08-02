@@ -149,7 +149,7 @@ pipeline {
       }
       steps {
         script {
-          sh "kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
+          sh "KUBECONFIG=${env.WORKSPACE}/config1 kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
         }
       }
     }
