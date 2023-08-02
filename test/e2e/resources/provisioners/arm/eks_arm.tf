@@ -86,7 +86,7 @@ module "cluster" {
 
   eks_managed_node_groups = {
     default_node_group = {
-      name                   = "cao-24x-pipeline"
+      name                   = "cao-25x-pipeline"
       ami_type               = "AL2_ARM_64"
       id                     = data.aws_ami.arm-ami.id
       instance_types         = ["m6g.xlarge"]
@@ -114,13 +114,14 @@ data "aws_ami" "arm-ami" {
 # Required for Kubernetes 1.23 and above:
 # https://aws.amazon.com/blogs/containers/amazon-ebs-csi-driver-is-now-generally-available-in-amazon-eks-add-ons/
 module "kubernetes_addons" {
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.24.0"
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.32.1"
   eks_cluster_id = module.cluster.cluster_id
   enable_amazon_eks_aws_ebs_csi_driver = true
   amazon_eks_aws_ebs_csi_driver_config = {
     addon_name               = "aws-ebs-csi-driver"
-    addon_version            = "v1.5.2-eksbuild.1"
+    addon_version            = "v1.17.0-eksbuild.1"
   }
  }
+
 
 
