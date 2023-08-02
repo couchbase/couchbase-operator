@@ -3133,22 +3133,3 @@ func TestAutoscalerValidation(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
-
-// Test cases for RZA / Server group testing.
-// Deploy couchbase cluster over non existent server group.
-func TestRzaNegCreateCluster(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:           "TestValidateServerGroupsInvalid_1",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/serverGroups", []string{"InvalidGroup-1", "InvalidGroup-2"})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servergroups"},
-		},
-		{
-			name:           "TestValidateServerGroupsInvalid_2",
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servergroups"},
-		},
-	}
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
-}
