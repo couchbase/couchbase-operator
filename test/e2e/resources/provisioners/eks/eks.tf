@@ -86,7 +86,7 @@ module "cluster" {
 
   eks_managed_node_groups = {
     default_node_group = {
-      name                   = "cao-23x-pipeline"
+      name                   = "cao-25x-pipeline"
       instance_types         = ["m5.xlarge"]
       min_size               = 11
       desired_size           = 12
@@ -98,7 +98,7 @@ module "cluster" {
 # Required for Kubernetes 1.23 and above:
 # https://aws.amazon.com/blogs/containers/amazon-ebs-csi-driver-is-now-generally-available-in-amazon-eks-add-ons/
 module "kubernetes_addons" {
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.24.0"
+  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.32.1"
   eks_cluster_id = module.cluster.cluster_id
   enable_amazon_eks_aws_ebs_csi_driver = true
   amazon_eks_aws_ebs_csi_driver_config = {
