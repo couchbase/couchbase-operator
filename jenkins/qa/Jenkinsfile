@@ -116,7 +116,7 @@ pipeline {
         axes {
           axis {
             name 'version'
-            values 'v1.20.15', 'v1.21.12', 'v1.22.9', 'v1.23.6', 'v1.24.2'
+            values 'v1.22.9', 'v1.23.6', 'v1.24.2'
           }
         }
 
