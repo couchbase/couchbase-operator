@@ -68,14 +68,17 @@ spec:
     bucket: default <.>
   - name: data_writer
     buckets: <.>
-      kind: CouchbaseBucket
-      name: default
+      resources:
+      - kind: CouchbaseBucket
+        name: default
     scopes: <.>
-      kind: CouchbaseScope
-      name: seasia
+      resources:
+      - kind: CouchbaseScope
+        name: seasia
     collections: <.>
-      kind: CouchbaseCollection
-      name: templates
+      resources:
+      - kind: CouchbaseCollection
+        name: templates
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseRoleBinding
@@ -199,6 +202,13 @@ To seed the service with users and groups, a value override file needs to be cre
 $ echo "
 customLdifFiles:
   01-default-users.ldif: |-
+    dn: dc=example,dc=org
+    objectClass: top
+    objectClass: dcObject
+    objectClass: organization
+    o: Example Org
+    dc: example
+
     dn: ou=People,dc=example,dc=org
     objectClass: organizationalUnit
     ou: People
@@ -218,8 +228,8 @@ Now run the OpenLDAP server with the custom values in `ldap-values.yaml`:
 
 [source,console]
 ----
-# helm 3.1
-$ helm install my-release --set adminPassword=ldappassword -f ldap-values.yaml stable/openldap
+$ helm repo add helm-openldap https://jp-gouin.github.io/helm-openldap/
+$ helm install openldap --set global.adminPassword=ldappassword -f ldap-values.yaml helm-openldap/openldap-stack-ha
 ----
 
 Couchbase will communicate with the OpenLDAP server using the service created by the Helm Chart.
@@ -228,12 +238,44 @@ Run `helm status` to see the service endpoint:
 
 [source,console]
 ----
-$ helm status my-release
-
+$ helm status
+NAME: openldap
+LAST DEPLOYED: Mon Aug  7 15:48:51 2023
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
 NOTES:
-OpenLDAP has been installed. You can access the server from within the k8s cluster using:
+** Please be patient while the chart is being deployed **
 
-  my-release-openldap.default.svc.cluster.local:389
+OpenLDAP-Stack-HA has been installed. You can access the server from within the k8s cluster using:
+
+  openldap.default.svc.cluster.local:
+
+  Or
+
+  openldap.default.svc.cluster.local:
+
+
+You can access the LDAP adminPassword and configPassword using:
+
+  kubectl get secret --namespace default openldap -o jsonpath="{.data.LDAP_ADMIN_PASSWORD}" | base64 --decode; echo
+  kubectl get secret --namespace default openldap -o jsonpath="{.data.LDAP_CONFIG_ADMIN_PASSWORD}" | base64 --decode; echo
+
+
+You can access the LDAP service, from within the cluster (or with kubectl port-forward) with a command like (replace password and domain):
+  ldapsearch -x -H ldap://openldap.default.svc.cluster.local: -b dc=example,dc=org -D "cn=admin,dc=example,dc=org" -w $LDAP_ADMIN_PASSWORD
+
+You can access PHPLdapAdmin, using
+     - http://phpldapadmin.example
+
+You can access Self Service Password, using
+     - http://ssl-ldap2.example
+
+Test server health using Helm test:
+  helm test openldap
+
+Enjoy :)
 ----
 
 The Couchbase service will also need to authenticate with OpenLDAP in order to query for user records and groups.
@@ -250,6 +292,7 @@ kind: Secret
 metadata:
   name: ldap-secret
 type: Opaque
+EOF
 ----
 
 === Edit the `CouchbaseCluster` Resource
@@ -270,7 +313,7 @@ spec:
       managed: true
     ldap:
       hosts:
-      - my-release-openldap.default.svc.cluster.local
+      - openldap.default.svc.cluster.local
       port: 389
       encryption: None
       bindDN: "cn=admin,dc=example,dc=org"
