@@ -118,9 +118,11 @@ def apply_certification_peer_authentication(args):
 def istioctl(*cmd):
     """Runs a istioctl command raising an exception on error"""
     try:
-        return subprocess.check_output(['istioctl'] + list(cmd)).decode().strip()
+        return subprocess.check_output(['istioctl'] + list(cmd), stderr=subprocess.STDOUT).decode().strip()
     except subprocess.CalledProcessError as err:
-        raise RuntimeError(f"command '{err.cmd}' failed") from err
+        print("*******************************************************")
+        print(err.output)
+        raise RuntimeError(f"command '{err.cmd}'") from err
 
 def start(args):
     """
@@ -128,7 +130,7 @@ def start(args):
     """
     istioctl('install', '-y', '--kubeconfig' , args.kubeconfig)
     # Mark default namespace with istio-injection.
-    kubectl('label', 'namespace', 'default', 'istio-injection=enabled', '--overwrite')
+    kubectl('label', 'namespace', 'default', 'istio-injection=enabled', '--overwrite', '--kubeconfig' , args.kubeconfig)
     istioctl('verify-install', '--kubeconfig' , args.kubeconfig)
     if args.mode == 'strict':
         apply_dac_peer_authentication(args)
