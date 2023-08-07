@@ -40,18 +40,18 @@ pipeline {
     string(name: 'logging_image', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.2.2-114')
     string(name: 'logging_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.1.0')
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
-    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-132')
-    string(name: 'kubernetes_version', defaultValue: '1.21')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-133')
+    string(name: 'kubernetes_version', defaultValue: '1.26')
     string(name: 'storage_class', defaultValue: 'gp2')
     booleanParam(name: 'lpv', defaultValue: false)
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
-    string(name: 'kubectl_version', defaultValue: '1.20.9')
+    string(name: 'kubectl_version', defaultValue: '1.26.7')
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
     string(name: 'terraform_version', defaultValue: '1.4.6')
     booleanParam(name: 'enable_istio', defaultValue: false)
-    string(name: 'istio_version', defaultValue: '1.15.7')
+    string(name: 'istio_version', defaultValue: '1.18.2')
     string(name: 'istio_mode', defaultValue: 'strict')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
@@ -198,7 +198,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -258,7 +259,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -318,7 +320,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -378,7 +381,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -438,7 +442,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -498,7 +503,8 @@ pipeline {
             -s3-secret-id ${env.S3_SECRET_ID} \
             -istio=${params.enable_istio} \
             -collect-logs \
-            -color=false"
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'

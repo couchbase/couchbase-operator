@@ -39,20 +39,20 @@ pipeline {
     string(name: 'exporter_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/exporter:1.0.5')
     string(name: 'logging_image', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.2.2-114')
     string(name: 'logging_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.1.0')
-    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-132')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-133')
     string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
-    string(name: 'kubernetes_version', defaultValue: '1.22')
+    string(name: 'kubernetes_version', defaultValue: '1.26')
     string(name: 'storage_class', defaultValue: 'standard-rwo')
     booleanParam(name: 'lpv', defaultValue: false)
     string(name: 'bucket_type', defaultValue: 'couchbase')
     string(name: 'compression_mode', defaultValue: 'passive')
-    string(name: 'kubectl_version', defaultValue: '1.20.9')
-    string(name: 'gcloud_sdk_version', defaultValue: '341')
+    string(name: 'kubectl_version', defaultValue: '1.26.7')
+    string(name: 'gcloud_sdk_version', defaultValue: '413')
     choice(name: 'release_channel', choices: "None\nrapid\nregular\nstable")
     string(name: 's3_region', defaultValue: 'us-west-2')
     string(name: 'docs', defaultValue: '100')
     booleanParam(name: 'enable_istio', defaultValue: false)
-    string(name: 'istio_version', defaultValue: '1.15.7')
+    string(name: 'istio_version', defaultValue: '1.18.2')
     string(name: 'istio_mode', defaultValue: 'strict')
     booleanParam(name: 'validation', defaultValue: true)
     booleanParam(name: 'sanity', defaultValue: true)
@@ -106,6 +106,7 @@ pipeline {
     stage('GKE Provisioning') {
       steps {
         sh "wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${params.gcloud_sdk_version}.0.0-linux-x86_64.tar.gz | tar xzf -"
+        sh "gcloud components install gke-gcloud-auth-plugin"
         sh "gcloud auth activate-service-account ${GCLOUD_AUTH_ACCOUNT} --key-file ${GCLOUD_AUTH_JSON} --project ${GCLOUD_AUTH_PROJECT}"
         sh "./test/e2e/resources/provisioners/gke/gcloud_provision start --name ${env.NAME} --release-channel ${params.release_channel} --cluster-version ${params.kubernetes_version} --machine n2-standard-4"
 	      sh "KUBECONFIG=${env.WORKSPACE}/config1 gcloud container clusters get-credentials ${env.NAME} --region us-central1"
@@ -199,7 +200,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -260,7 +261,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -321,7 +322,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -382,7 +383,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -443,7 +444,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
@@ -504,7 +505,7 @@ pipeline {
             -istio=${params.enable_istio} \
             -collect-logs \
             -color=false \
-            -ignore-errors=true"
+            -ignore-errors=${params.enable_istio}"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
