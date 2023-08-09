@@ -33,8 +33,9 @@ CNG_TAG="$DEFAULT_TAG"
 OPERATOR_TAG="$DEFAULT_TAG"
 EXPIRES="86400"
 HELP=0
+GA=0
 
-while getopts r:o:e:f:b:g:t:x:h flag
+while getopts r:o:e:f:b:g:t:x:hn flag
 do
     case "${flag}" in
         r) REPOSITORY=${OPTARG};;
@@ -46,6 +47,7 @@ do
         t) OPERATOR_TAG=${OPTARG};;
         x) EXPIRES=${OPTARG};;
         h) HELP=1;;
+        n) GA=1;;
         *) exit 1;;
     esac
 done
@@ -83,7 +85,8 @@ EXAMPLE:
     -e 1.0.10-101 \ # Exporter container tag to use - Default is 'latest'
     -f 1.2.6-100 \ # Fluent Bit container tag to use - Default is 'latest'
     -g 0.1.0-132 \ # Cloud Native Gateway tag to use - Default is 'latest'
-    -x 86400 # Creates pre-signed URLS for the files for download that expire in N seconds - Default is '86400' (24hr)
+    -x 86400 \ # Creates pre-signed URLS for the files for download that expire in N seconds - Default is '86400' (24hr)
+    -n # drops the build number from the version.  Use this for 'release' binaries to give to the customer early.
 
 To load the resulting image file simply use 'docker load -i couchbase-autonomous-operator_TAG-images.tar.gz'
 "
@@ -106,6 +109,8 @@ if [[ -z "$BUCKET" ]]; then
 fi
 
 WORK_DIR=$(mktemp -d)
+
+echo "$WORK_DIR"
 
 if [[ ! "$WORK_DIR" || ! -d "$WORK_DIR" ]]; then
     echo "Could not create temp dir."
@@ -146,18 +151,23 @@ for image in "${IMAGES[@]}"; do
 done
 
 wait # waiting on all the docker pull commands to finish
-
+SPLIT_TAG=${OPERATOR_TAG/-/"/"}
+VERSION=${OPERATOR_TAG%%-*}
 OUTPUT="couchbase-autonomous-operator_${OPERATOR_TAG}-images.tar.gz"
+
+if [[ "$GA" == "1" ]]; then
+    OUTPUT="couchbase-autonomous-operator_${VERSION}-images.tar.gz"
+    FOLDER="${FOLDER}${VERSION}"
+else 
+    FOLDER="${FOLDER}${OPERATOR_TAG}"
+fi
+
 PULLED_IMAGES=$(echo "$PULLED_IMAGES" | xargs)
 CMD="docker save ${PULLED_IMAGES} | gzip > \"${WORK_DIR}/${OUTPUT}\""
 echo "Saving docker images."
 eval "${CMD}" &
 echo "Docker images will be saved to $OUTPUT."
 
-TAG=$OPERATOR_TAG
-FOLDER="${FOLDER}${TAG}"
-
-SPLIT_TAG=${TAG/-/"/"}
 MAC_WIN_SUFFIX=".zip"
 LINUX_SUFFIX=".tar.gz"
 
@@ -168,9 +178,13 @@ for platform in "${PLATFORMS[@]}"; do
             SUFFIX="$MAC_WIN_SUFFIX"
         fi
         for arch in "${ARCH[@]}"; do
-            URL="https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-operator/${SPLIT_TAG}/couchbase-autonomous-operator_${TAG}-${platform}-${os}-${arch}${SUFFIX}"
+            URL="https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-operator/${SPLIT_TAG}/couchbase-autonomous-operator_${OPERATOR_TAG}-${platform}-${os}-${arch}${SUFFIX}"
             echo "Downloading tools - $URL"
-            curl -O -s --output-dir "$WORK_DIR/" "$URL" &
+            if [[ "$GA" = "1" ]]; then
+                curl -s --output "$WORK_DIR/couchbase-autonomous-operator_${VERSION}-${platform}-${os}-${arch}${SUFFIX}" "$URL" &
+            else
+                curl -O -s --output-dir "$WORK_DIR/" "$URL" &
+            fi
         done
     done
 done
@@ -191,7 +205,7 @@ done
 touch "$WORK_DIR/links.txt"
 links=("$links")
 for l in "${links[@]}"; do
-    printf "%s\r\n" "$l" >> "$WORK_DIR/links.txt" 
+    printf "%s\r\n" "$(basename $l)" >> "$WORK_DIR/links.txt" 
 done
 
 aws s3 cp "$WORK_DIR/links.txt" "s3://${BUCKET}/${FOLDER}/links.txt"
