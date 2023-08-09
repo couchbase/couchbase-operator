@@ -128,6 +128,7 @@ func checkPrometheusAnnotations(annotations map[string]string) error {
 		constants.AnnotationPrometheusScrape,
 		constants.AnnotationPrometheusPath,
 		constants.AnnotationPrometheusPort,
+		constants.AnnotationPrometheusScheme,
 	}
 
 	for _, expected := range expectedAnnotations {
@@ -135,6 +136,16 @@ func checkPrometheusAnnotations(annotations map[string]string) error {
 		if !exists {
 			return fmt.Errorf("missing annotation %q", expected)
 		}
+	}
+
+	return nil
+}
+
+func checkPrometheusScheme(expectedValue string, annotations map[string]string) error {
+	// check that value of pod annotation prometheus scheme == expected value (either http or https)
+	annoValue := annotations[constants.AnnotationPrometheusScheme]
+	if annoValue != expectedValue {
+		return fmt.Errorf("prometheus Scheme value incorrect. Got %q, Wanted %q", expectedValue, annoValue)
 	}
 
 	return nil
@@ -164,6 +175,16 @@ func checkAllPodMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 		}
 
 		err := checkPrometheusAnnotations(pod.Annotations)
+		if err != nil {
+			return responseDataStr, err
+		}
+
+		val := "http"
+		if ctx != nil {
+			val = "https"
+		}
+
+		err = checkPrometheusScheme(val, pod.Annotations)
 		if err != nil {
 			return responseDataStr, err
 		}

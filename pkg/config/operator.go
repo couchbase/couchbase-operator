@@ -602,6 +602,7 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 						constants.AnnotationPrometheusScrape: "true",
 						constants.AnnotationPrometheusPath:   "/metrics",
 						constants.AnnotationPrometheusPort:   "8383",
+						constants.AnnotationPrometheusScheme: "http",
 					},
 					Labels: map[string]string{
 						"app": OperatorResourceName,

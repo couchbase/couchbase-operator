@@ -115,6 +115,7 @@ const (
 	AnnotationPrometheusScrape    = "prometheus.io/scrape"
 	AnnotationPrometheusPath      = "prometheus.io/path"
 	AnnotationPrometheusPort      = "prometheus.io/port"
+	AnnotationPrometheusScheme    = "prometheus.io/scheme"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion

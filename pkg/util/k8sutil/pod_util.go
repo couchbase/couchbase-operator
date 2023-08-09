@@ -1108,12 +1108,19 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 		metricsPort = strconv.Itoa(loggingPort)
 	}
 
+	// Check for TLS to determine scheme, http or https
+	metricsScheme := "http"
+	if cluster.IsTLSEnabled() {
+		metricsScheme = "https"
+	}
+
 	// Set up the annotations to apply by default
 	annotations := map[string]string{
 		// If we have at least one then we want to scrape, if not we want to make sure we disable scraping
 		constants.AnnotationPrometheusScrape: strconv.FormatBool(serverVersionPrometheus || exporterEnabled || loggingEnabled),
 		constants.AnnotationPrometheusPath:   metricsPath,
 		constants.AnnotationPrometheusPort:   metricsPort,
+		constants.AnnotationPrometheusScheme: metricsScheme,
 	}
 
 	if loggingEnabled {
