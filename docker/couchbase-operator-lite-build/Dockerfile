@@ -1,4 +1,4 @@
-FROM golang:1.19.4-bullseye
+FROM golang:1.20-bullseye
 
 WORKDIR /src/app
 ADD go.mod go.sum ./
