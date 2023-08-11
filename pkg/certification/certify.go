@@ -756,7 +756,7 @@ func (o *certifyOptions) retryStreamLogs() {
 	var since *metav1.Time
 
 	for {
-		if err := util.PodCompleted(o.client, o.namespace, certificationName, nil, o.debug); err == nil {
+		if err := util.ContainerCompleted(o.client, o.namespace, certificationName, o.debug); err == nil {
 			break
 		}
 
@@ -773,7 +773,7 @@ func (o *certifyOptions) retryStreamLogs() {
 }
 
 // waitCertificationPodCompletion is triggered when the log streaming is terminated,
-// implying the container has also finished.  As an extra safetly measure this ensures
+// implying the container has also finished.  As an extra safety measure this ensures
 // it actually has completed before continuing.
 func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
 	util.PrintLine("Waiting for certification pod to complete ...")
@@ -781,7 +781,7 @@ func (o *certifyOptions) waitCertificationPodCompletion() (int32, error) {
 	var exitCode int32
 
 	callback := func() error {
-		return util.PodCompleted(o.client, o.namespace, certificationName, &exitCode, o.debug)
+		return util.ContainerCompleted(o.client, o.namespace, certificationName, o.debug)
 	}
 
 	if err := util.WaitFor(callback, 5*time.Minute); err != nil {

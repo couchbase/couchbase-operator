@@ -201,11 +201,9 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 	}
 
 	return resources
-
 }
 
 // listBackupResources searches Kubernetes for any backup resources and returns them.
-// TODO: support new backup jobs
 func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 	var resources backupResourcesList
 
@@ -603,7 +601,7 @@ func applyTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, job *batchv1.J
 }
 
 // TODO: This is just a dupe of generate backup cron job
-// common elements should be... made common
+// common elements should be... made common.
 func (c *Cluster) generateBackupJob(backup *couchbasev2.CouchbaseBackup, action CBBackupmgrAction) (*batchv1.Job, error) {
 	var container corev1.Container
 
@@ -1257,6 +1255,7 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 // gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
 func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	log.V(2).Info("gathering backups")
+
 	selector := labels.Everything()
 
 	if c.cluster.Spec.Backup.Selector != nil {

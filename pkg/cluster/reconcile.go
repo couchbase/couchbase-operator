@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -698,6 +699,9 @@ func (c *Cluster) reconcileAuditSettings() error {
 	} else {
 		requested.DisabledEvents = []int{}
 	}
+
+	sort.Ints(requested.DisabledEvents)
+	sort.Ints(current.DisabledEvents)
 
 	// Deal with the conversion between two quite different arrays: JSON array of structs and CSV string
 	requested.DisabledUsers = []couchbaseutil.AuditUser{}

@@ -686,22 +686,10 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestRecoveryAfterOneNodeUnreachableBucketOneReplica(t *testing.T) {
-	t.Skip("test not fully implemented...")
-}
-
-func TestRecoveryNodeTmpUnreachableBucketOneReplica(t *testing.T) {
-	t.Skip("test not fully implemented...")
-}
-
-func TestTaintK8SNodeAndRemoveTaint(t *testing.T) {
-	t.Skip("test not fully implemented...")
-}
-
-// TestAutoRecoveryEpehemeralWithNoAutofailover tests that a single replica with
+// TestAutoRecoveryEphemeralWithNoAutofailover tests that a single replica with
 // two nodes down (data loss), ignores server when we tell it to and just nukes the
-// pods in preference of hanving something working and not broken.
-func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
+// pods in preference of having something working and not broken.
+func TestAutoRecoveryEphemeralWithNoAutofailover(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -714,10 +702,11 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	victimIndex2 := 1
 	recoveryPolicy := couchbasev2.PrioritizeUptime
 
-	// Create the cluster.
+	// Single replica bucket.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
+	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.RecoveryPolicy = &recoveryPolicy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -731,6 +720,7 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -741,7 +731,14 @@ func TestAutoRecoveryEpehemeralWithNoAutofailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		e2eutil.PodDownEphemeralWithForcedFailover(t, 2, f.CouchbaseServerImage),
+		eventschema.Optional{
+			Validator: eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

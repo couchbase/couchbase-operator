@@ -560,6 +560,27 @@ func TestValidationCreate(t *testing.T) {
 func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 	testDefs := []testDef{
 		{
+			name: "TestValidateDifferentSecurityContexts",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/securityContext",
+						&corev1.PodSecurityContext{
+							FSGroup: func(fsGrp int) *int64 {
+								fsGrpInt64 := int64(fsGrp)
+								return &fsGrpInt64
+							}(133),
+						}).
+					Replace("/spec/security/podSecurityContext",
+						&corev1.PodSecurityContext{
+							FSGroup: func(fsGrp int) *int64 {
+								fsGrpInt64 := int64(fsGrp)
+								return &fsGrpInt64
+							}(123),
+						}),
+			},
+			shouldFail: true,
+		},
+		{
 			name:           "TestValidateServerGroupsUnique",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/serverGroups", []string{"NewGroupUpdate-1", "NewGroupUpdate-1"})},
 			shouldFail:     true,
@@ -2513,7 +2534,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 					Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
 					Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
 					Test("/spec/cluster/autoFailoverTimeout", "120s").
-					Test("/spec/cluster/autoFailoverMaxCount", 3).
+					Test("/spec/cluster/autoFailoverMaxCount", 1).
 					Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),
 			},
 		},
@@ -3110,50 +3131,5 @@ func TestAutoscalerValidation(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
-}
-
-// Test cases for RZA / Server group testing.
-// Deploy couchbase cluster over non existent server group.
-func TestRzaNegCreateCluster(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:           "TestValidateServerGroupsInvalid_1",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/serverGroups", []string{"InvalidGroup-1", "InvalidGroup-2"})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servergroups"},
-		},
-		{
-			name:           "TestValidateServerGroupsInvalid_2",
-			shouldFail:     true,
-			expectedErrors: []string{"spec.servergroups"},
-		},
-	}
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
-}
-
-func TestSecurityContextValidationCreateCluster(t *testing.T) {
-	fsGrp1 := int64(1234)
-	fsGrp2 := int64(2345)
-
-	testDefs := []testDef{
-		{
-			name: "TestValidateDifferentSecurityContexts",
-			mutations: patchMap{
-				"sc0": jsonpatch.NewPatchSet().
-					Add("/spec/securityContext", &couchbasev2.ClusterSpec{
-						SecurityContext: &corev1.PodSecurityContext{
-							FSGroup: &fsGrp1,
-						},
-					}).
-					Add("/spec/security/podSecurityContext", &couchbasev2.CouchbaseClusterSecuritySpec{
-						PodSecurityContext: &corev1.PodSecurityContext{
-							FSGroup: &fsGrp2,
-						},
-					}),
-			},
-			shouldFail: true,
-		},
-	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }

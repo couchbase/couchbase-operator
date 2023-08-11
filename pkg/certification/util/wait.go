@@ -101,6 +101,29 @@ func PodCompleted(client kubernetes.Interface, namespace, name string, exitCode 
 	return ErrConditionMissing
 }
 
+func ContainerCompleted(client kubernetes.Interface, namespace, name string, debug bool) error {
+	pod, err := client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if debug {
+		PrintLine("Checking container status in pod: " + pod.Name)
+	}
+
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == name {
+			if containerStatus.Ready || *containerStatus.Started {
+				return ErrConditionRunning
+			}
+
+			return nil
+		}
+	}
+
+	return ErrConditionMissing
+}
+
 func VolumeDeleted(client kubernetes.Interface, namespace, name string) error {
 	_, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 
