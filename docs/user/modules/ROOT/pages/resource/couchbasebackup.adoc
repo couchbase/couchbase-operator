@@ -27,7 +27,7 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbasebackups-spec-data-include,include>>:
     - ""
-  <<couchbasebackups-spec-defaultrecoverytype,defaultRecoveryType>>: none
+  <<couchbasebackups-spec-defaultrecoverymethod,defaultRecoveryMethod>>: none
   <<couchbasebackups-spec-ephemeralvolume,ephemeralVolume>>: false
   <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-full,full>>:
@@ -260,11 +260,9 @@ Included data cannot overlap e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
 This field cannot be used at the same time as excluded items.
 
-=== couchbasebackups.spec.defaultRecoveryType
+=== couchbasebackups.spec.defaultRecoveryMethod
 
 ==== Constraints
-
-*Required*
 
 *Type*: `string`
 
