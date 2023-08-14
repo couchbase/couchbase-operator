@@ -292,7 +292,7 @@ type CouchbaseBackupSpec struct {
 	// DefaultRecoveryMethod specifies how cbbackupmgr should
 	// recover from broken backup/restore attempts.
 	// +kubebuilder:default="none"
-	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryType"`
+	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryMethod,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=none;resume;purge
