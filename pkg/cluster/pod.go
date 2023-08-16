@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -211,4 +212,107 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 	}
 
 	return requested, nil
+}
+
+// Allows patching a members version AFTER creation.
+// This involves not only updating the member, but the Pod
+// and PVC as well.
+func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version string) error {
+	if version == "" { // won't upgrade to empty version
+		return nil
+	}
+
+	if member.Version() == version {
+		return nil
+	}
+
+	member.SetVersion(version)
+
+	pod, found := c.k8s.Pods.Get(member.Name())
+	if !found {
+		return fmt.Errorf("failed to find pod by name %s %w", member.Name(), errors.ErrResourceRequired)
+	}
+
+	if pod.Annotations[constants.CouchbaseVersionAnnotationKey] == version {
+		return nil
+	}
+
+	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
+
+	if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == member.Name() {
+			// update the annotation
+			if pvc.Annotations[constants.CouchbaseVersionAnnotationKey] == version {
+				continue
+			}
+
+			pvc.Annotations[constants.CouchbaseVersionAnnotationKey] = version
+
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(),
+				pvc, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// Updates the internal digest map, based on running pods.
+// This is mostly used for when operator is recovering from a restart
+// and has lost it's internal map.
+// We update the image digest map early in reconciliation because it's
+// used in c.IsAtLeastVersion().
+func (c *Cluster) reconcilePodServerVersions() error {
+	version := couchbaseutil.GetVersionTag(c.cluster.Spec.CouchbaseImage())
+
+	// check if we know about this image.
+	if _, ok := constants.ImageDigests[version]; ok {
+		return nil
+	}
+
+	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.cluster.Name)
+
+	for _, member := range c.callableMembers {
+		info := &couchbaseutil.PoolsInfo{}
+
+		if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, member); err != nil {
+			return err
+		}
+
+		pod, found := c.k8s.Pods.Get(member.Name())
+		if !found {
+			continue
+		}
+
+		for _, container := range pod.Spec.Containers {
+			if container.Image == c.cluster.Spec.CouchbaseImage() {
+				if newVersion, updated := couchbaseutil.UpdateImageDigestMap(c.cluster.Spec.CouchbaseImage(), info.Version); newVersion != "" && updated {
+					log.V(2).Info("found server version", "version", info.Version, "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.cluster.Name)
+
+					return c.updatePersistenceVersion(newVersion)
+				}
+
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+// Only update persistence version if
+// we aren't upgrading, since the status is used
+// for rollback recovery.
+func (c *Cluster) updatePersistenceVersion(version string) error {
+	upgrading, _ := c.isUpgrading()
+	if upgrading {
+		return nil
+	}
+
+	return c.state.Update(persistence.Version, version)
 }

@@ -2921,6 +2921,16 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	// Condition is not set, therefore we are starting an upgrade.
 	if upgradeCondition == nil {
+		if currentVersion == "9.9.9" && current.Status.CurrentVersion != "" { // 9.9.9 means the SHA256 image digest map look up failed.
+			// since we aren't upgrading the status should be what is actually running.
+			currentVersion = current.Status.CurrentVersion
+		}
+
+		if updatedVersion == "9.9.9" {
+			// we have no idea what this is so we trust the user
+			return nil
+		}
+
 		src, err := couchbaseutil.NewVersion(currentVersion)
 		if err != nil {
 			return err

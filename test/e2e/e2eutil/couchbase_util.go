@@ -1405,7 +1405,11 @@ func MustCheckStatusVersionFor(t *testing.T, k8s *types.Cluster, cluster *couchb
 }
 
 // MustGetCouchbaseVersion extracts the semantic version from the image tag.
-func MustGetCouchbaseVersion(t *testing.T, image string) string {
+func MustGetCouchbaseVersion(t *testing.T, image string, overrideVersion string) string {
+	if overrideVersion != "" {
+		return overrideVersion
+	}
+
 	version, err := k8sutil.CouchbaseVersion(image)
 	if err != nil {
 		Die(t, err)

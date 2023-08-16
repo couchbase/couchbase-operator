@@ -345,9 +345,15 @@ func configure() (err error) {
 	flag.StringVar(&params.CouchbaseServerImage, "server-image",
 		serverImageDefault,
 		"Docker image to use for couchbase server.")
+	flag.StringVar(&params.CouchbaseServerImageVersion, "server-image-version",
+		"",
+		"Override version for Server image")
 	flag.StringVar(&params.CouchbaseServerImageUpgrade, "server-image-upgrade",
 		serverImageUpgradeFromDefault,
 		"Docker image to use for couchbase server upgrades to upgrade from.")
+	flag.StringVar(&params.CouchbaseServerImageUpgradeVersion, "server-image-upgrade-version",
+		"",
+		"Override version for Server upgrade image")
 	flag.StringVar(&params.CouchbaseExporterImage, "exporter-image",
 		exporterImageDefault,
 		"Docker image to use for the couchbase exporter.")
@@ -1267,14 +1273,33 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
-	version, err := couchbaseutil.NewVersion(parts1[1])
-	if err != nil {
-		r.t.Skipf("malformed version: %s: %v", parts1[1], err)
+	var version *couchbaseutil.Version
+
+	var err error
+
+	if Global.CouchbaseServerImageVersion == "" {
+		version, err = couchbaseutil.NewVersion(parts1[1])
+		if err != nil {
+			r.t.Skipf("malformed version: %s: %v", parts1[1], err)
+		}
+	} else {
+		version, err = couchbaseutil.NewVersion(Global.CouchbaseServerImageVersion)
+		if err != nil {
+			r.t.Skipf("malformed override version: %s: %v", Global.CouchbaseServerImageVersion, err)
+		}
 	}
 
-	upgrade, err := couchbaseutil.NewVersion(parts2[1])
-	if err != nil {
-		r.t.Skipf("malformed version: %s: %v", parts2[1], err)
+	var upgrade *couchbaseutil.Version
+	if Global.CouchbaseServerImageUpgradeVersion == "" {
+		upgrade, err = couchbaseutil.NewVersion(parts2[1])
+		if err != nil {
+			r.t.Skipf("malformed version: %s: %v", parts2[1], err)
+		}
+	} else {
+		upgrade, err = couchbaseutil.NewVersion(Global.CouchbaseServerImageUpgradeVersion)
+		if err != nil {
+			r.t.Skipf("malformed override version: %s: %v", Global.CouchbaseServerImageUpgradeVersion, err)
+		}
 	}
 
 	if upgrade.GreaterEqual(version) {

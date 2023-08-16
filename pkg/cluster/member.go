@@ -125,7 +125,7 @@ func (c *Cluster) logFailedMember(message, name string) {
 	log.Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
-// Creates new Couchbase cluster members.
+// Creates new Couchbase cluster members (pods).
 // returns PodCreationResult which contains a member and a potential error.
 // also can return an error...
 func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) { //
@@ -167,7 +167,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	// we want to track members and if they fail
 	results := make([]*couchbaseutil.PodCreationResult, len(memberSpecs))
 
-	log.V(1).Info("starting pod creation")
+	log.V(1).Info("starting pod creation", "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
 
 	for index, newMember := range memberSpecs {
 		results[index] = &couchbaseutil.PodCreationResult{
@@ -189,10 +189,10 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	}
 
 	wg.Wait()
-	log.V(1).Info("finished pod creation")
+	log.V(1).Info("finished pod creation", "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
 
 	var allErr = true
-	//
+
 	for index, result := range results {
 		if results[index].Err == nil {
 			err = c.initMember(ctx, result.Member, serverSpecs[index])
@@ -203,7 +203,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 
 	if allErr {
 		err = c.setPodIndex(availableIndexes[0])
-		log.Error(err, "failed to rollback index", "index", availableIndexes[0])
+		log.Error(err, "failed to rollback index", "index", availableIndexes[0], "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
 	}
 
 	return results, nil
@@ -243,6 +243,30 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	if !info.Enterprise {
 		err = fmt.Errorf("%w: couchbase server reports community edition", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 		return err
+	}
+
+	// check if we already know about this SHA256
+	// update the digest map
+	newVersion, updated := couchbaseutil.UpdateImageDigestMap(c.cluster.Spec.CouchbaseImage(), info.Version)
+	// check the member version, if it's different then update EVERYTHING.
+	if newVersion != "" {
+		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
+			log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.cluster.Name)
+			return err
+		}
+	}
+
+	// update state with the actual version IF we aren't upgrading.
+	// i.e this is a new cluster. We don't want to change versions until we're finished
+	// upgrading.
+	if updated {
+		log.V(2).Info("discovered new SHA256 ", "image", c.cluster.Spec.CouchbaseImage(), "version", info.Version, "cluster", c.cluster.Name)
+
+		if err := c.updatePersistenceVersion(newVersion); err != nil {
+			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.cluster.Name)
+
+			return err
+		}
 	}
 
 	// Enable TLS if requested.
@@ -405,7 +429,7 @@ func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *cou
 
 // initializes the first member in the cluster.
 func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbasev2.ServerConfig) error {
-	log.Info("Initial pod creating", "cluster", c.namespacedName())
+	log.Info("Initialiasing first cluster member", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 
 	defaults := &couchbaseutil.PoolsDefaults{

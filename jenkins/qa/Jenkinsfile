@@ -27,7 +27,9 @@ pipeline {
   parameters {
     string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
     string(name: 'server_image', defaultValue: 'couchbase/server:7.2.0', , description: 'Version of Couchbase to test')
+    string(name: 'server_image_version', defaultValue: '7.2.0', , description: 'Override the version of Couchbase to test')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.4', description: 'Version of Couchbase to upgrade from')
+    string(name: 'server_image_upgrade_version', defaultValue: '6.6.4', description: 'Override the version of Couchbase to upgrade from')
     string(name: 'backup_image', defaultValue: 'aemerycb/couchbase-operator-backup:0e73896ed9cd273dfdaed804160d00a944fb31a7', description: 'Version of the Couchbase backup image to test')
     string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.5', description: 'Version of the Prometheus exporter to test')
     string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.4', description: 'Version of the Prometheus exporter to upgrade from')
@@ -177,7 +179,9 @@ pipeline {
             -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-admission-controller:\${GIT_COMMIT} \
             -mobile-image \${mobile_image} \
             -server-image \${server_image} \
+            -server-image-version \${server_image_version} \
             -server-image-upgrade \${server_image_upgrade} \
+            -server-image-upgrade-version \${server_image_upgrade_version} \
             -exporter-image \${exporter_image} \
             -exporter-image-upgrade \${exporter_image_upgrade} \
             -backup-image \${backup_image} \

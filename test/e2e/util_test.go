@@ -243,6 +243,7 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradeInvalidDowngrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeInvalidUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgrade).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureUpgrade),
+		framework.NewTestDef(TestUpgradePersistent).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeSupportableKillStatefulPodOnCreate).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeSupportableKillStatefulPodOnRebalance).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeSupportableKillExistingStatefulPodOnRebalance).WithTags(TagSuiteP0, TagFeatureUpgrade),

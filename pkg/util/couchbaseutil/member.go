@@ -63,6 +63,7 @@ type Member interface { //nolint: interfacebloat
 	Name() string
 	Config() string
 	UseTLS() bool
+	SetVersion(string)
 	Version() string
 	GetDNSName() string
 	GetHostPort() string
@@ -117,6 +118,14 @@ func NewPartialMember(namespace, cluster, name string) Member {
 		cluster:   cluster,
 		name:      name,
 	}
+}
+
+// SetVersion is used when a member has been created,
+// but it's version has not yet been realised.
+// i.e unknown SHA256 but we've queried the pod
+// after launch to work out a version.
+func (m *memberImpl) SetVersion(version string) {
+	m.version = version
 }
 
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint

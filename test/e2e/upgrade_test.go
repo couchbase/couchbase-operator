@@ -239,8 +239,16 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 	}
 }
 
-// TestUpgrade upgrades a three node cluster.
 func TestUpgrade(t *testing.T) {
+	testUpgrade(t, false)
+}
+
+func TestUpgradePersistent(t *testing.T) {
+	testUpgrade(t, true)
+}
+
+// testUpgrade upgrades a three node cluster.
+func testUpgrade(t *testing.T, persistent bool) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -251,10 +259,15 @@ func TestUpgrade(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	var cluster *couchbasev2.CouchbaseCluster
+	if persistent {
+		cluster = clusterOptionsUpgrade().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
+	} else {
+		cluster = clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	}
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -1030,7 +1043,7 @@ func TestUpgradeImmediate(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	upgradeStrategy := couchbasev2.ImmediateUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
@@ -1075,7 +1088,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	clusterSize := 3
 	upgradablePercent := "67%"
 	upgradeChunkSize := 2
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	upgradeStrategy := couchbasev2.RollingUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
@@ -1120,7 +1133,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	// Static Config
 	clusterSize := 3
 	numOfDocs := f.DocsCount
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -1166,7 +1179,7 @@ func TestUpgradeWithTLS(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage) // Static configuration.
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion) // Static configuration.
 	clusterSize := constants.Size3
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})

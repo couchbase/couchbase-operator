@@ -72,9 +72,12 @@ type Framework struct {
 	// CouchbaseServerImage is the image of Couchbase server we are running with
 	CouchbaseServerImage string
 
+	CouchbaseServerImageVersion string
+
 	// CouchbaseServerImageUpgrade is the image of Couchbase server we are upgrading to
-	CouchbaseServerImageUpgrade string
-	ServiceAccountName          string
+	CouchbaseServerImageUpgrade        string
+	CouchbaseServerImageUpgradeVersion string
+	ServiceAccountName                 string
 	// PodCreateTimeout is the time we expect to wait when pods are failing to be
 	// created.
 	PodCreateTimeout time.Duration

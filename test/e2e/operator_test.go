@@ -180,7 +180,7 @@ func TestImageVersionDefaultPrecedence(t *testing.T) {
 
 	// Verify that the version displayed in cluster.status matches cluster.spec
 	// as this indicates we did not give precedence to the environment variable.
-	expectedServerVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage)
+	expectedServerVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	// (assuming that no one is providing redhat style server versions to begin with)
 	if expectedServerVersion == defaultOlmServerVersion {
 		e2eutil.Die(t, fmt.Errorf("initial server version %s already matches version provided to EnvVar", expectedServerVersion))
