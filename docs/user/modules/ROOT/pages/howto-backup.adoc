@@ -124,14 +124,11 @@ $ oc logs deployments/couchbase-operator
 --
 ====
 
-You should observe that a Persistent Volume Claim and the correct number of cron jobs have been created along with the `CouchbaseBackup` itself. The output should be similar to:
+You should observe that the expected `CouchbaseBackup` is created. The output should be similar to:
 
 [source,console]
 ----
-{"level":"info","ts":1587134718.3592374,"logger":"cluster","msg":"Backup Cronjob created","cbbackup":"my-backup","cronjob":"my-backup-incremental"}
-{"level":"info","ts":1587134718.3727212,"logger":"cluster","msg":"Backup Cronjob created","cbbackup":"my-backup","cronjob":"my-backup-full"}
-{"level":"info","ts":1587134718.3722592,"logger":"cluster","msg":"Backup PVC created","cbbackup":"my-backup"}
-{"level":"info","ts":1587134718.3727608,"logger":"cluster","msg":"Backup created","cbbackup":"my-backup"}
+{"level":"info","ts":1587134718.3727608,"logger":"cluster","msg":"Backup created","cluster":"default/cb-example","cbbackup":"my-backup"}
 ----
 
 You can then validate for yourself that these resources exist and check that their details match up with what was defined in the `CouchbaseBackup` configuration.
