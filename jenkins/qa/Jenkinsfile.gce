@@ -1,0 +1,236 @@
+pipeline {
+  agent any
+
+  options {
+    timestamps()
+
+    // Don't use all the disk, these servers aren't monitored with Nagios or anything.
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
+      )
+    )
+
+    // We only have a single cluster for now.
+    disableConcurrentBuilds()
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'operator_image', defaultValue: 'ghcr.io/cb-vanilla/operator:latest')
+    string(name: 'admission_image', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
+    string(name: 'certification_image', defaultValue: 'ghcr.io/cb-vanilla/operator-certification:latest')
+    string(name: 'server_image', defaultValue: 'ghcr.io/cb-vanilla/server:7.2.0')
+    string(name: 'server_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/server:6.6.6')
+    string(name: 'backup_image', defaultValue: 'ghcr.io/cb-vanilla/operator-backup:1.3.1')
+    string(name: 'exporter_image', defaultValue: 'ghcr.io/cb-vanilla/exporter:latest')
+    string(name: 'exporter_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/exporter:1.0.5')
+    string(name: 'logging_image', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.2.2-114')
+    string(name: 'logging_image_upgrade', defaultValue: 'ghcr.io/cb-vanilla/fluent-bit:1.1.0')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-132')
+    string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
+    string(name: 'storage_class', defaultValue: 'standard-rwo')
+    booleanParam(name: 'lpv', defaultValue: false)
+    string(name: 'bucket_type', defaultValue: 'couchbase')
+    string(name: 'compression_mode', defaultValue: 'passive')
+    string(name: 'kubectl_version', defaultValue: '1.20.9')
+    string(name: 's3_region', defaultValue: 'us-west-2')
+    booleanParam(name: 'enable_istio', defaultValue: false)
+    string(name: 'istio_version', defaultValue: '1.15.7')
+    string(name: 'kubernetes_version', defaultValue: '1.27.4')
+    booleanParam(name: 'validation', defaultValue: true)
+    booleanParam(name: 'custom', defaultValue: false)
+    choice(name: 'suites', choices: ['', 'p0', 'p0 p1'], description: 'Any additional suites to run (validation and sanity are mandarory)')
+    string(name: 'features', defaultValue: '', description: 'Much like a suite, these feature sets allow functional area testing e.g. "backup"')
+    string(name: 'tests', defaultValue: '', description: 'Any custom tests to run, this is a space delimited list of tests names e.g. "TestCreateCluster TestCreateBucketCluster"')
+  }
+
+  environment {
+    GOVERSION = "1.20"
+    GOBIN = "${env.WORKSPACE}/bin"
+    GOROOT = "${env.WORKSPACE}/go"
+    PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}/clusterctl:/var/lib/jenkins/.local/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('dockerhub-couchbaseqe')
+    GITLAB_CREDENTIALS = credentials('gitlab-couchbaseqe')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    GCLOUD_SERVICE_TOKEN = credentials('google-cloud-couchbase-operator')
+    AWS_CREDENTIALS = credentials('aws-alex')
+    AZURE_CREDENTIALS = credentials('azure-alex')
+    GCP_CREDENTIALS = credentials('gcp-operator')
+    GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
+    KIND_VERSION = "v0.19.0"
+
+    GCP_REGION="us-west1"
+    GCP_PROJECT="couchbase-engineering"
+    KUBERNETES_VERSION="${params.kubernetes_version}"
+    IMAGE_ID="projects/$GCP_PROJECT/global/images/cluster-api-ubuntu-2204-v1-25-10-1692779907"
+    GCP_B64ENCODED_CREDENTIALS=sh(script: 'cat "$GCLOUD_SERVICE_TOKEN" | base64 | tr -d "\n"', returnStdout: true)
+    GCP_CONTROL_PLANE_MACHINE_TYPE="n1-standard-8"
+    GCP_NODE_MACHINE_TYPE="n1-standard-8"
+    GCP_NETWORK_NAME="default"
+    CLUSTER_NAME="test-cluster"
+  }
+
+  stages {
+      stage('Prerequisite Installs') {
+        steps {
+          sh "mkdir -p ${env.WORKSPACE}/bin"
+
+          sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+
+          sh "wget -q https://dl.k8s.io/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
+          sh "chmod +x kubectl"
+          sh "mv kubectl ${env.WORKSPACE}/bin/"
+
+          sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+          sh 'chmod +x jq-linux64'
+          sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
+
+          sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
+          sh "tar xfv istioctl-${params.istio_version}-linux-amd64.tar.gz"
+          sh "chmod +x istioctl"
+          sh "mv istioctl ${env.WORKSPACE}/bin/"
+        }
+      }
+
+      stage('Install Google Cloud SDK') {
+            steps {
+              sh 'wget -q -O- https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-432.0.0-linux-x86_64.tar.gz | tar xz'
+              sh 'gcloud auth activate-service-account couchbase-operator@couchbase-engineering.iam.gserviceaccount.com --project couchbase-engineering --key-file ${GCLOUD_SERVICE_TOKEN}'
+            }
+          }
+
+      stage('Build') {
+            steps {
+              sh 'make touch-generated tools'
+            }
+          }
+
+      stage('Install Kind and clusterctl') {
+            steps {
+              sh 'mkdir -p kind/bin'
+              sh 'mkdir -p clusterctl'
+              sh 'curl -Lo kind/bin/kind https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64'
+              sh 'curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.5.0/clusterctl-linux-amd64 -o clusterctl/clusterctl'
+              sh 'chmod +x kind/bin/kind'
+              sh 'chmod +x clusterctl/clusterctl'
+              
+            }
+          }
+
+      stage('Install management cluster') {
+            steps {
+                sh 'kind create cluster --name ${KIND_VERSION} --kubeconfig kubeconfig.${KIND_VERSION}'
+                sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${KIND_VERSION} kubectl get nodes'
+                sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${KIND_VERSION} kubectl wait --for=condition=Ready nodes --all --timeout=10m'
+                sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${KIND_VERSION} kubectl describe nodes'
+                sh 'clusterctl init --infrastructure gcp --kubeconfig=kubeconfig.${KIND_VERSION}'
+                sleep(time:2, unit:"MINUTES")
+                sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${KIND_VERSION} kubectl get pods -A'
+            }
+        }
+
+      stage('Install workload cluster') {
+            steps {
+                sh 'clusterctl generate cluster test-cluster --kubeconfig=kubeconfig.${KIND_VERSION} --kubernetes-version 1.27.4 --control-plane-machine-count=3 --worker-machine-count=3 > test-cluster.yaml'
+                sh 'kubectl --kubeconfig=kubeconfig.${KIND_VERSION} apply -f test-cluster.yaml'
+                sleep(time:10, unit:"MINUTES")
+            }
+        }
+
+      stage('Post creation steps') {
+          steps {
+            sh 'clusterctl get kubeconfig test-cluster --kubeconfig=kubeconfig.${KIND_VERSION} > test-cluster.kubeconfig'
+            sh 'kubectl --kubeconfig=./test-cluster.kubeconfig \
+                  apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/calico.yaml'
+            sh 'kubectl --kubeconfig=./test-cluster.kubeconfig apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml'
+            sh 'kubectl --kubeconfig=./test-cluster.kubeconfig apply -f example/sc.yaml'
+            sh 'kubectl --kubeconfig=./test-cluster.kubeconfig patch storageclass standard -p \'{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}\''
+          }
+      }
+
+      stage('Run validation') {
+       steps {
+        warnError('Suite failed') {
+            sh "KUBECONFIG=./test-cluster.kubeconfig ./build/bin/kubernetes-linux-amd64/cao \
+            certify \
+            --image ${params.certification_image} \
+            --timeout 10m \
+            --parallel 8 \
+            --archive-name validation \
+            --parallel 8 \
+            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+            -- \
+            -suite validation \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -ignore-errors"
+          }
+          sh 'tar xf validation.tar.bz2'
+          sleep(time:1, unit:"MINUTES")
+        }
+      }
+
+    stage('Run certification') {
+      steps {
+          sh "KUBECONFIG=./test-cluster.kubeconfig ./build/bin/kubernetes-linux-amd64/cao \
+            certify \
+            --clean \
+            --parallel 4 \
+            --image ${params.certification_image} \
+            --archive-name logs \
+            --profile \
+            --profile-dir profile \
+            --registry=https://ghcr.io/,\${GHCR_CREDENTIALS_USR},\${GHCR_CREDENTIALS_PSW} \
+            -- \
+            ${params.suites.split().collect{s -> '-suite ' + s}.join(' ')} \
+            ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} \
+            ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+            -suite sanity \
+            -platform-type kubernetes \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${mobile_image} \
+            -server-image ${server_image} \
+            -server-image-upgrade ${server_image_upgrade} \
+            -exporter-image ${exporter_image} \
+            -exporter-image-upgrade ${exporter_image_upgrade} \
+            -backup-image ${backup_image} \
+            -logging-image ${logging_image} \
+            -logging-image-upgrade ${logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+            -storage-class standard-rwo \
+            -bucket-type ${bucket_type} \
+            -compression-mode \${compression_mode} \
+            -collect-logs \
+            -collect-server-logs=false "
+          sh 'tar xf logs.tar.bz2'
+          sh 'tar xf results.tar.bz'
+          }
+      }
+    }
+    post {
+        always {
+          sh 'KUBECONFIG=${WORKSPACE}/kubeconfig.${KIND_VERSION} kubectl delete cluster test-cluster'
+          sh 'kind delete cluster --name ${KIND_VERSION}'
+
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf logs.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'logs.tar.gz', fingerprint: true
+
+          // Archive profiling data so we can debug the certification image.
+          sh 'tar czf profile.tar.gz profile'
+          archiveArtifacts artifacts: 'profile.tar.gz', fingerprint: true
+        }
+        cleanup {
+          // Clean up the workspace to free disk space.
+          cleanWs()
+        }
+    }
+}
