@@ -72,6 +72,8 @@ spec:
   image: couchbase/server:{couchbase-version}
   security:
     adminSecret: cb-example-auth
+    podSecurityContext:
+      fsGroup: 1000
   buckets:
     managed: true
   servers:
@@ -183,7 +185,7 @@ Before we can modify the `fluent-bit-config` secret, we'll first need to modify 
 
 [source,console]
 ----
-$ kubectl patch cbc cb-example -p '{"spec":{"logging": {"server": {"manageConfiguration": false}}}}'
+$ kubectl patch cbc cb-example --type merge -p '{"spec":{"logging": {"server": {"manageConfiguration": false}}}}'
 ----
 
 Patching your xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource so that xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-manageconfiguration[`couchbaseclusters.spec.logging.server.manageConfiguration`] is set to `false`.
