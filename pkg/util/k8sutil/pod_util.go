@@ -897,9 +897,6 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
 	applyCloudNativeGateway(cluster, pod)
 
-	// adds Cloud Native Gateway label to pods.
-	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
-
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
 	applyMetadata(cluster, pod)
@@ -1021,6 +1018,7 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod)
 
 	cngContainer := createCloudNativeGatewayImageContainer(cluster, pod)
 	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
+	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 }
 
 // applyCloudNativeGatewayPodTLS adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
