@@ -535,44 +535,31 @@ func (c *Cluster) reconcileDataSettings() error {
 	// This is yet another quality API.  The values don't exist until you set them,
 	// then remain for the rest of existence.  So if nothing is set, then leave it
 	// alone.
-	if c.cluster.Spec.ClusterSettings.Data == nil {
-		return nil
-	}
-
 	current := couchbaseutil.MemcachedGlobals{}
 	if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
 	requested := current
-
-	if threads := c.cluster.Spec.ClusterSettings.Data.ReaderThreads; threads != nil && *threads != 0 {
-		requested.NumReaderThreads = threads
-	}
-
-	if threads := c.cluster.Spec.ClusterSettings.Data.WriterThreads; threads != nil && *threads != 0 {
-		requested.NumWriterThreads = threads
-	}
-
-	if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
-		if threads := c.cluster.Spec.ClusterSettings.Data.NonIOThreads; threads != nil && *threads != 0 {
-			requested.NumNonIOThreads = threads
+	if c.cluster.Spec.ClusterSettings.Data == nil {
+		requested.NumReaderThreads = nil
+		requested.NumWriterThreads = nil
+		requested.NumNonIOThreads = nil
+		requested.NumAuxIOThreads = nil
+	} else {
+		requested.NumReaderThreads = c.cluster.Spec.ClusterSettings.Data.ReaderThreads
+		requested.NumWriterThreads = c.cluster.Spec.ClusterSettings.Data.WriterThreads
+		if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
+			requested.NumNonIOThreads = c.cluster.Spec.ClusterSettings.Data.NonIOThreads
+			requested.NumAuxIOThreads = c.cluster.Spec.ClusterSettings.Data.AuxIOThreads
 		}
-
-		if threads := c.cluster.Spec.ClusterSettings.Data.AuxIOThreads; threads != nil && *threads != 0 {
-			requested.NumAuxIOThreads = threads
-		}
-	}
-
-	if reflect.DeepEqual(current, requested) {
-		return nil
 	}
 
 	if err := couchbaseutil.SetMemcachedGlobalSettings(&requested).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
-	log.Info("Memcached settings updated", "cluster", c.namespacedName())
+	log.V(2).Info("Memcached settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("data service", c.cluster))
 
 	return nil

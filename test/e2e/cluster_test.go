@@ -976,13 +976,16 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/auxIOThreads", auxIOThreads), time.Minute)
 	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, &readerThreads, &writerThreads, &nonIOThreads, &auxIOThreads, time.Minute)
 
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: nil, WriterThreads: nil, NonIOThreads: nil, AuxIOThreads: nil}), time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times:     4,
+			Times:     9,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}

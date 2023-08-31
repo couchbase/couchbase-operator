@@ -167,13 +167,11 @@ func marshal(m interface{}, data *url.Values) error {
 			continue
 		}
 
-		// Ignore empty values
-		if options.contains("omitempty") && isEmptyValue(fv) {
+		dataValue := checkEmptyValues(options, fv)
+		if strings.Contains(dataValue, "nil") {
 			continue
-		}
-
-		if options.contains("emptyisnull") && isEmptyValue(fv) {
-			data.Set(name, "")
+		} else if !strings.Contains(dataValue, "empty") {
+			data.Set(name, dataValue)
 			continue
 		}
 		// Finally encode the struct value
@@ -186,4 +184,38 @@ func marshal(m interface{}, data *url.Values) error {
 	}
 
 	return nil
+}
+
+func checkEmptyValues(options tagOptions, fv reflect.Value) string {
+	// Ignore empty values
+	if options.contains("omitempty") && isEmptyValue(fv) {
+		return "nil"
+	}
+
+	if options.contains("emptyisnull") && isEmptyValue(fv) {
+		return ""
+	}
+
+	// Pass custom option
+	if isEmptyValue(fv) {
+		var optionPosition int
+
+		optionFound := false
+
+		for p, v := range options {
+			if strings.Contains(v, "empty=") {
+				optionPosition = p
+				optionFound = true
+
+				break
+			}
+		}
+
+		if len(options) != 0 && optionFound {
+			dataValue := strings.Split(options[optionPosition], "=")
+			return dataValue[1]
+		}
+	}
+
+	return "empty"
 }

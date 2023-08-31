@@ -795,6 +795,7 @@ func patchResource(k8s *types.Cluster, resource runtime.Object, patches jsonpatc
 	}
 
 	patch, err := other_jsonpatch.DecodePatch(patchSet)
+
 	if err != nil {
 		return nil, err
 	}
@@ -868,6 +869,7 @@ func patchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, pat
 
 func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseCluster {
 	cluster, err := patchCluster(k8s, cluster, patches, timeout)
+
 	if err != nil {
 		Die(t, err)
 	}

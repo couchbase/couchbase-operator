@@ -1428,6 +1428,7 @@ func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.
 		}
 
 		current := couchbaseutil.MemcachedGlobals{}
+
 		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {
 			return err
 		}

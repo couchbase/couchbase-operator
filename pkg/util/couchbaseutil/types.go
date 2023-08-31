@@ -1402,10 +1402,69 @@ type AuditUser struct {
 // Classic API design... these return nothing when unset, and remain set once set
 // so we have no idea what the defaults are!
 type MemcachedGlobals struct {
-	NumReaderThreads *int `json:"num_reader_threads" url:"num_reader_threads,omitempty"`
-	NumWriterThreads *int `json:"num_writer_threads" url:"num_writer_threads,omitempty"`
-	NumNonIOThreads  *int `json:"num_nonio_threads" url:"num_nonio_threads,omitempty"`
-	NumAuxIOThreads  *int `json:"num_auxio_threads" url:"num_auxio_threads,omitempty"`
+	NumReaderThreads *int `json:"num_reader_threads,omitempty" url:"num_reader_threads,empty=default"`
+	NumWriterThreads *int `json:"num_writer_threads,omitempty" url:"num_writer_threads,empty=default"`
+	NumNonIOThreads  *int `json:"num_nonio_threads,omitempty" url:"num_nonio_threads,empty=default"`
+	NumAuxIOThreads  *int `json:"num_auxio_threads,omitempty" url:"num_auxio_threads,empty=default"`
+}
+
+func (m *MemcachedGlobals) UnmarshalJSON(data []byte) error {
+	var jsonData map[string]interface{}
+
+	if err := json.Unmarshal(data, &jsonData); err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	float64ToInt := func(v float64) *int {
+		val := int(v)
+		return &val
+	}
+
+	switch v := jsonData["num_reader_threads"].(type) {
+	case float64:
+		m.NumReaderThreads = float64ToInt(v)
+	case string:
+		if strings.Contains(v, "default") {
+			m.NumReaderThreads = nil
+		}
+	default:
+		m.NumReaderThreads = nil
+	}
+
+	switch v := jsonData["num_writer_threads"].(type) {
+	case float64:
+		m.NumWriterThreads = float64ToInt(v)
+	case string:
+		if strings.Contains(v, "default") {
+			m.NumWriterThreads = nil
+		}
+	default:
+		m.NumWriterThreads = nil
+	}
+
+	switch v := jsonData["num_nonio_threads"].(type) {
+	case float64:
+		m.NumNonIOThreads = float64ToInt(v)
+	case string:
+		if strings.Contains(v, "default") {
+			m.NumNonIOThreads = nil
+		}
+	default:
+		m.NumNonIOThreads = nil
+	}
+
+	switch v := jsonData["num_auxio_threads"].(type) {
+	case float64:
+		m.NumAuxIOThreads = float64ToInt(v)
+	case string:
+		if strings.Contains(v, "default") {
+			m.NumAuxIOThreads = nil
+		}
+	default:
+		m.NumAuxIOThreads = nil
+	}
+
+	return nil
 }
 
 // ScopeList defines all scopes for a bucket, and all nested collections.

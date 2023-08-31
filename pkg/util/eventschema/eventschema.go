@@ -36,6 +36,7 @@ type Validator struct {
 // Validate checks the Events stream against the specified schema.
 func (c *Validator) Validate(out io.Writer) error {
 	err := c.Schema.Validate(c)
+
 	if err == nil && c.index < len(c.Events) {
 		err = ErrUnderflow
 	}
