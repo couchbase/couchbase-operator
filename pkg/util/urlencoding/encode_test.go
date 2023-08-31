@@ -1,20 +1,24 @@
 package urlencoding
 
 import (
-	"log"
 	"testing"
 )
 
 type Boo struct {
 	a *int `url:"a,omitempty"`
+	b *int `url:"b,empty=default"`
 }
 
-func TestEncoding(_ *testing.T) {
+func TestEncoding(t *testing.T) {
 	zero := 0
-	b := Boo{a: &zero}
+	b := Boo{a: &zero, b: nil}
 
-	_, err := Marshal(b)
+	byteB, err := Marshal(b)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatalf("Error marshalling args: %v", err)
+	}
+
+	if string(byteB) != "a=0&b=default" {
+		t.Errorf("expected %s, but got %s", "a=0&b=default", string(byteB))
 	}
 }

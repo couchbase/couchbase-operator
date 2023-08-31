@@ -2960,7 +2960,8 @@ type CouchbaseClusterQuerySettings struct {
 // CouchbaseClusterDataSettings allows data service tweaks.
 type CouchbaseClusterDataSettings struct {
 	// ReaderThreads allows the number of threads used by the data service,
-	// per pod, to be altered.  This value must be between 4 and 64 threads,
+	// per pod, to be altered.  This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
+	// or 1 and 64 for CB versions 7.1.0+.
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use.  If not specified, this defaults to the
 	// default value set by Couchbase Server.
@@ -2971,7 +2972,8 @@ type CouchbaseClusterDataSettings struct {
 	// WriterThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This setting is especially relevant when
 	// using "durable writes", increasing this field will have a large
-	// impact on performance.  This value must be between 4 and 64 threads,
+	// impact on performance.  This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
+	//	// or 1 and 64 for CB versions 7.1.0+.
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
@@ -2982,7 +2984,7 @@ type CouchbaseClusterDataSettings struct {
 	// NonIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
 	// to be used in the NonIO thread pool to run in memory tasks.
-	// This value must be between 4 and 64 threads,
+	// This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
@@ -2993,7 +2995,7 @@ type CouchbaseClusterDataSettings struct {
 	// AuxIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
 	// to be used in the AuxIO thread pool to run auxiliary I/O tasks.
-	// This value must be between 4 and 64 threads,
+	// This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
