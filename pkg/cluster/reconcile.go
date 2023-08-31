@@ -555,6 +555,10 @@ func (c *Cluster) reconcileDataSettings() error {
 		}
 	}
 
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
 	if err := couchbaseutil.SetMemcachedGlobalSettings(&requested).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
