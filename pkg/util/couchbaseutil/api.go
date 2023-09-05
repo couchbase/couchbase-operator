@@ -893,3 +893,19 @@ func PatchCollection(bucket, scope string, collection Collection) *Request {
 func DeleteCollection(bucket, scope, collection string) *Request {
 	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/buckets/%s/scopes/%s/collections/%s", bucket, scope, collection), nil, nil)
 }
+
+// GetStatsRangeAvgMetrics returns stats range metrics for couchbase services.
+func GetStatsRangeAvgMetrics(service string, metrics *StatsRangeMetrics) *Request {
+	metricName := ""
+
+	switch service {
+	case "index":
+		metricName = "/index_total_disk_size"
+	case "data":
+		metricName = "/couch_docs_actual_disk_size"
+	case "views":
+		metricName = "/couch_views_actual_disk_size"
+	}
+
+	return NewRequest((*Client).Get, "/pools/default/stats/range"+metricName+"/avg?start=-10&step=10", nil, metrics)
+}

@@ -44,6 +44,10 @@ type Scheduler interface {
 
 	// LogStatus writes out the status to a writer.
 	LogStatus(cluster string)
+
+	// EnQueueRemovals enqueues the group of servers(cb nodes/pods) for prioritised
+	// removal ready for Delete() action
+	EnQueueRemovals(class string, servers []string)
 }
 
 // New is a factory method to return the correct scheduler type for

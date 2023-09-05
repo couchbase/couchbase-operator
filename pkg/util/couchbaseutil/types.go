@@ -1638,3 +1638,19 @@ type PodCreationResult struct {
 	Err    error
 	Member Member
 }
+
+type Metric struct {
+	Nodes []string `json:"nodes"`
+}
+
+type StatsRangeMetricsData struct {
+	Metric Metric          `json:"metric"`
+	Values [][]interface{} `json:"values"`
+}
+
+type StatsRangeMetrics struct {
+	Data           []StatsRangeMetricsData `json:"data"`
+	Errors         []interface{}           `json:"errors"`
+	StartTimestamp int                     `json:"startTimestamp"`
+	EndTimestamp   int                     `json:"endTimestamp"`
+}

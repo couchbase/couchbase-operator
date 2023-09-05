@@ -44,7 +44,7 @@ func (s *serverList) del(name string) error {
 		}
 	}
 
-	return fmt.Errorf("%w: del of non-existent server from server list", errors.NewStackTracedError(errors.ErrInternalError))
+	return fmt.Errorf("%w: server name doesn't exist in server list", errors.NewStackTracedError(errors.ErrInternalError))
 }
 
 // serverGroups maps server group names to a list of servers.
@@ -149,3 +149,29 @@ func (s serverGroups) largestGroup() string {
 
 // serverClassGroupMap maps server classes to their server groups of pods.
 type serverClassGroupMap map[string]serverGroups
+
+// serverRemovalQueue represents a FIFO queue for removing pods(servers) in a FIFO way.
+type serverRemovalQueue struct {
+	servers []string
+}
+
+// enqueueAll adds all servers(pods) to the end of the queue.
+func (q *serverRemovalQueue) enqueueAll(servers []string) {
+	q.servers = append(q.servers, servers...)
+}
+
+// dequeue removes and returns the server(pod) from the front of the queue.
+func (q *serverRemovalQueue) dequeue() string {
+	if len(q.servers) == 0 {
+		return ""
+	}
+
+	server := q.servers[0]
+	q.servers = q.servers[1:]
+
+	return server
+}
+
+// serverClassServerRemovalMap maps server classes to the serverDeletionQueue FIFO queue.
+// N.B. Don't care about serverGroup.
+type serverClassServerRemovalMap map[string]*serverRemovalQueue

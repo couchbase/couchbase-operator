@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -664,6 +665,133 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 	return nil
 }
 
+type allMetrics struct {
+	idx, data, view couchbaseutil.StatsRangeMetrics
+}
+
+// getMetrics retrives metrics for data, index and views services.
+func getMetrics(c *Cluster) (allMetrics, error) {
+	idxMetrics := couchbaseutil.StatsRangeMetrics{}
+	if err := couchbaseutil.GetStatsRangeAvgMetrics("index", &idxMetrics).On(c.api, c.readyMembers()); err != nil {
+		return allMetrics{}, fmt.Errorf("%w: error getting index metrics", err)
+	}
+
+	dataMetrics := couchbaseutil.StatsRangeMetrics{}
+	if err := couchbaseutil.GetStatsRangeAvgMetrics("data", &dataMetrics).On(c.api, c.readyMembers()); err != nil {
+		return allMetrics{}, fmt.Errorf("%w: error getting data metrics", err)
+	}
+
+	viewsMetrics := couchbaseutil.StatsRangeMetrics{}
+	if err := couchbaseutil.GetStatsRangeAvgMetrics("views", &viewsMetrics).On(c.api, c.readyMembers()); err != nil {
+		return allMetrics{}, fmt.Errorf("%w: error getting views metrics", err)
+	}
+
+	return allMetrics{idx: idxMetrics, data: dataMetrics, view: viewsMetrics}, nil
+}
+
+func parseSizePerMember(memberName string, allmetrices allMetrics) (int64, error) {
+	sizeByService := func(sm couchbaseutil.StatsRangeMetrics) (int64, error) {
+		var size int64
+
+		for _, data := range sm.Data {
+			if len(data.Metric.Nodes) > 0 {
+				if !strings.Contains(data.Metric.Nodes[0], memberName) {
+					continue
+				}
+			}
+
+			// there will be two values and we are just interested in one of thems.
+			if len(data.Values) > 0 {
+				value := data.Values[0]
+
+				s, ok := value[1].(string)
+				if ok {
+					i, err := strconv.ParseInt(s, 10, 64)
+					if err != nil {
+						return 0, fmt.Errorf("%w: error converting %s to int64 format", err, s)
+					}
+
+					size += i
+				}
+			}
+		}
+
+		return size, nil
+	}
+
+	idxSize, err := sizeByService(allmetrices.idx)
+	if err != nil {
+		return 0, err
+	}
+
+	dataSize, err := sizeByService(allmetrices.data)
+	if err != nil {
+		return 0, err
+	}
+
+	viewSize, err := sizeByService(allmetrices.view)
+	if err != nil {
+		return 0, err
+	}
+
+	return idxSize + dataSize + viewSize, nil
+}
+
+// populateRemovalQueuePerServerClass enqueus pod(server) names which are version 7.0+.
+func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers couchbaseutil.MemberSet, c *Cluster) error {
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
+	var queueMembers []string
+
+	// appending the member names which are NOT already on target version.
+	membersNamesNotOnTargetVersion := clusteredMembers.GroupBy(
+		func(m couchbaseutil.Member) bool {
+			return m.Version() != targetVersion && m.Config() == serverClass
+		}).Names()
+
+	// added as the first members to get culled.
+	queueMembers = append(queueMembers, membersNamesNotOnTargetVersion...)
+
+	membersOnTargetVersion := clusteredMembers.GroupBy(
+		func(m couchbaseutil.Member) bool {
+			return m.Version() == targetVersion
+		})
+
+	// map used to avoid any chance of duplicate member names.
+	memberToSize := map[string]int64{}
+	memNames := make([]string, 0, len(memberToSize))
+
+	allm, err := getMetrics(c)
+	if err != nil {
+		return err
+	}
+
+	for name := range membersOnTargetVersion {
+		size, err := parseSizePerMember(name, allm)
+		if err != nil {
+			return fmt.Errorf("%w: error calculating member disk size", err)
+		}
+
+		memberToSize[name] = size
+
+		memNames = append(memNames, name)
+	}
+
+	// sort the slice of member names based on the size.
+	sort.Slice(memNames, func(i, j int) bool {
+		return memberToSize[memNames[i]] < memberToSize[memNames[j]]
+	})
+
+	queueMembers = append(queueMembers, memNames...)
+
+	c.scheduler.EnQueueRemovals(serverClass, queueMembers)
+
+	return nil
+}
+
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 	var deletions []couchbasev2.ServerConfig
 
@@ -671,7 +799,17 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 
 	for _, serverSpec := range c.cluster.Spec.Servers {
 		// Check to see if we need to remove anything
-		existingNodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		members := r.clusteredMembers.GroupByServerConfig(serverSpec.Name)
+
+		// falls back to the old way of removing node, if version is below 7.0.
+		if cbVersionOver7, err := c.IsAtLeastVersion("7.0.0"); cbVersionOver7 && err == nil {
+			err := populateRemovalQueuePerServerClass(serverSpec.Name, members, c)
+			if err != nil {
+				return fmt.Errorf("failed to populate removal queue for server class '%s': %w", serverSpec.Name, err)
+			}
+		}
+
+		existingNodes := members.Size()
 		nodesToRemove := existingNodes - serverSpec.Size
 
 		if nodesToRemove <= 0 {
@@ -712,7 +850,10 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	var scheduledScaling couchbasev2.ScalingMessageList
 
 	for _, serverSpec := range c.cluster.Spec.Servers {
-		existingNodes := r.clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		whereEqualsServerConfig := func(m couchbaseutil.Member) bool {
+			return m.Config() == serverSpec.Name
+		}
+		existingNodes := r.clusteredMembers.GroupBy(whereEqualsServerConfig).Size()
 
 		nodesToCreate := serverSpec.Size - existingNodes
 		if nodesToCreate <= 0 {

@@ -27,6 +27,10 @@ type stripeSchedulerImpl struct {
 	// scheduled for some reason, either we're enabling schduling or the server
 	// group is no longer valid.
 	unschedulableServerClasses serverClassGroupMap
+
+	// removableServerClasses is for tracking our internal state of ordered removal
+	// of pods by server classes
+	removableServerClasses serverClassServerRemovalMap
 }
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
@@ -152,6 +156,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 	sched := &stripeSchedulerImpl{
 		serverClasses:              serverClassGroupMap{},
 		unschedulableServerClasses: serverClassGroupMap{},
+		removableServerClasses:     serverClassServerRemovalMap{},
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {
@@ -193,13 +198,29 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 	serverGroup := sched.serverClasses[class].largestGroup()
 
-	// Select the victim server deterministically based on alphabetical order
-	server, err := sched.serverClasses[class][serverGroup].pop()
-	if err != nil {
-		return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	var podName string
+
+	// Victims are selected based on priority order of the backing serverRemovalQueue.
+	rq, ok := sched.removableServerClasses[class]
+	if !ok {
+		// Select the victim server deterministically based on alphabetical order
+		server, err := sched.serverClasses[class][serverGroup].pop()
+		if err != nil {
+			return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		podName = server
+	} else {
+		// if present, dequeue and delete
+		podName = rq.dequeue()
+
+		err := sched.serverClasses[class][serverGroup].del(podName)
+		if err != nil {
+			return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
 	}
 
-	return server, nil
+	return podName, nil
 }
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
@@ -217,6 +238,18 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 	}
 
 	return fmt.Errorf("%s: server '%s' does not exist in class '%s': %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+}
+
+// EnQueueRemovals sets the list server names per serve class name for in-order removal.
+func (sched *stripeSchedulerImpl) EnQueueRemovals(class string, servers []string) {
+	if _, ok := sched.removableServerClasses[class]; !ok {
+		sched.removableServerClasses[class] = &serverRemovalQueue{
+			servers: []string{},
+		}
+		sched.removableServerClasses[class].enqueueAll(servers)
+	} else {
+		sched.removableServerClasses[class].enqueueAll(servers)
+	}
 }
 
 // Member records information about a cluster member.

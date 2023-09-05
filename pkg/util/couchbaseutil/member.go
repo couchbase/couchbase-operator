@@ -343,6 +343,20 @@ func (ms MemberSet) OTPNodes() OTPNodeList {
 	return otpNodes
 }
 
+type FilterFunc func(Member) bool
+
+func (ms MemberSet) GroupBy(f FilterFunc) MemberSet {
+	rv := NewMemberSet()
+
+	for _, m := range ms {
+		if f(m) {
+			rv.Add(m)
+		}
+	}
+
+	return rv
+}
+
 // GroupByServerConfig filters members based on their server class.
 func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	rv := NewMemberSet()

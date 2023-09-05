@@ -375,3 +375,21 @@ func TestStripeAddGlobalSingleOnPodFailure(t *testing.T) {
 
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, podName4, ""), serverGroup3)
 }
+
+func TestEnqueueRemovals(t *testing.T) {
+	c := fixtureCluster
+
+	s, err := NewStripeScheduler(fixturePodsDelete, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.EnQueueRemovals(serverClass1, []string{podName3, podName1})
+
+	server1, err := s.Delete(serverClass1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkDeleteScheduling(t, server1, podName3)
+}

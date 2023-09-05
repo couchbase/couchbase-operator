@@ -19,6 +19,10 @@ const (
 type nullSchedulerImpl struct {
 	// A plain list of servers per server class
 	serverClasses serverGroups
+
+	// removableServerClasses is for tracking our internal state of ordered removal
+	// of pods by server classes
+	removableServerClasses serverClassServerRemovalMap
 }
 
 // NewNullScheduler returns a new null scheduler.
@@ -26,7 +30,8 @@ func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster)
 	// Add existing servers to the server list, we need this for scheduling
 	// pod removal
 	sched := &nullSchedulerImpl{
-		serverClasses: map[string]*serverList{},
+		serverClasses:          map[string]*serverList{},
+		removableServerClasses: map[string]*serverRemovalQueue{},
 	}
 
 	for _, class := range cluster.Spec.Servers {
@@ -36,7 +41,7 @@ func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster)
 	for _, pod := range pods {
 		class, ok := pod.Labels[constants.LabelNodeConf]
 		if !ok {
-			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", stripeErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			return nil, fmt.Errorf("%s: pod %s does not have server class label: %w", nullErrorHeader, pod.Name, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		// Class deleted, ignore the pod
@@ -53,7 +58,7 @@ func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster)
 // Create does nothing.
 func (sched *nullSchedulerImpl) Create(class, name, _ string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", nullErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	sched.serverClasses[class].push(name)
@@ -61,21 +66,37 @@ func (sched *nullSchedulerImpl) Create(class, name, _ string) (string, error) {
 	return "", nil
 }
 
-// Delete removes the largest server name from the sorted list of servers.
+// Delete removes the server(pod) depending on the serverRemovalQueue in a scale down scenario.
 func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return "", fmt.Errorf("%s: no server list present for server class '%s': %w", nullErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	sched.serverClasses[class].sort()
+	var podName string
 
-	server, err := sched.serverClasses[class].pop()
-	if err != nil {
-		return "", fmt.Errorf("%s: %w", nullErrorHeader, err)
+	srq, ok := sched.removableServerClasses[class]
+	if !ok {
+		// Select the victim server deterministically based on alphabetical order
+		sched.serverClasses[class].sort()
+
+		server, err := sched.serverClasses[class].pop()
+		if err != nil {
+			return "", fmt.Errorf("%s: no server list found for server class '%s': %w", nullErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		podName = server
+	} else {
+		// if present, dequeue and delete
+		podName = srq.dequeue()
+
+		err := sched.serverClasses[class].del(podName)
+		if err != nil {
+			return "", fmt.Errorf("%s: no server named %s present for server class %s: %w", nullErrorHeader, podName, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
 	}
 
-	return server, nil
+	return podName, nil
 }
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
@@ -96,4 +117,16 @@ func (sched *nullSchedulerImpl) Reschedule() ([]Move, error) {
 
 // LogStatus returns nothing.
 func (sched *nullSchedulerImpl) LogStatus(_ string) {
+}
+
+// EnQueueRemovals sets the list server names per serve class name for in-order removal.
+func (sched *nullSchedulerImpl) EnQueueRemovals(class string, servers []string) {
+	if _, ok := sched.removableServerClasses[class]; !ok {
+		sched.removableServerClasses[class] = &serverRemovalQueue{
+			servers: []string{},
+		}
+		sched.removableServerClasses[class].enqueueAll(servers)
+	} else {
+		sched.removableServerClasses[class].enqueueAll(servers)
+	}
 }
