@@ -73,6 +73,26 @@ func (l backupResourcesList) contains(resource backupResources) bool {
 	return l.find(resource.name) != nil
 }
 
+// returns the unique elements of both l and l2.
+// with l taking precedence.
+func (l backupResourcesList) unique(l2 backupResourcesList) backupResourcesList {
+	uniqueResources := make(map[string]backupResources)
+	for _, resource := range l2 {
+		uniqueResources[resource.name] = resource
+	}
+
+	for _, resource := range l {
+		uniqueResources[resource.name] = resource
+	}
+
+	resources := make(backupResourcesList, 0, len(uniqueResources))
+	for _, resource := range uniqueResources {
+		resources = append(resources, resource)
+	}
+
+	return resources
+}
+
 // generateBackupResources evaluates the specification and determines the resources
 // required to implement the intended function.
 func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
@@ -151,18 +171,16 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 }
 
 func (c Cluster) listBackupResources() (backupResourcesList, error) {
-	var resources backupResourcesList
-
+	// cronjobs take priority
+	// since a job may exist with the same backup name.
 	jobs := c.listBackupJobResources()
-
-	resources = append(resources, jobs...)
 
 	crons, err := c.listBackupCronjobResources()
 	if err != nil {
 		return nil, err
 	}
 
-	resources = append(resources, crons...)
+	resources := crons.unique(jobs)
 
 	return resources, nil
 }
@@ -180,6 +198,10 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 		name, ok := job.Labels[constants.LabelBackup]
 		if !ok {
 			log.Info("job missing backup label", "cluster", c.namespacedName(), "job", job.Name)
+		}
+
+		if _, ok := job.Labels[constants.LabelBackupRestore]; ok {
+			continue
 		}
 
 		resource := &backupResources{
