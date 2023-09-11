@@ -143,8 +143,8 @@ type PersistentVolumeClaimState struct {
 	// PVCs that are currently expanding.
 	expanding []*v1.PersistentVolumeClaim
 
-	// PVCs that are currently in failed resize state.
-	resizeFailed []*v1.PersistentVolumeClaim
+	// PVC names that are currently in failed resize state, along with error for failure.
+	resizeFailed map[string]error
 
 	// volumes is an ordered list of volumes to attach to the pod.
 	volumes []v1.Volume
@@ -181,7 +181,23 @@ func (p *PersistentVolumeClaimState) IsExpanding(name string) bool {
 
 // IsResizeFailed indicates whether PVC failed to resize.
 func (p *PersistentVolumeClaimState) IsResizeFailed(name string) bool {
-	return p.lookup(name, p.resizeFailed) != nil
+	for pvcName := range p.resizeFailed {
+		if pvcName == name {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetReasonForResizeFailed returns the error reason for the resize failure.
+func (p *PersistentVolumeClaimState) GetReasonForResizeFailed(name string) error {
+	err, ok := p.resizeFailed[name]
+	if !ok {
+		return nil
+	}
+
+	return err
 }
 
 // Update fetches updated version of PVC and applies change.
@@ -227,7 +243,7 @@ func (p *PersistentVolumeClaimState) List() []*v1.PersistentVolumeClaim {
 // addVolume takes a requested volume for a pod and interrogates Kubernetes
 // in order to work out how to process it e.g. does it need to be created,
 // updated, resized etc.
-func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *v1.PersistentVolumeClaim, member couchbaseutil.Member, mountMapping volumeMount, expandable bool) error {
+func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *v1.PersistentVolumeClaim, member couchbaseutil.Member, mountMapping volumeMount, expandable bool, expansionTimeout *int) error {
 	// BUG: this returns an error we ignore, the PVC may actually exist but
 	// be in a bad state.
 	pvc, _ := findMemberPVC(client, member.Name(), mountMapping.mountPath)
@@ -301,12 +317,12 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		return nil
 	}
 
-	if err := checkVolumeResizeFailure(client, pvc); err != nil {
+	if err := checkVolumeResizeFailure(client, pvc, expansionTimeout); err != nil {
 		if !goerrors.Is(err, errors.ErrVolumeResizeError) {
 			return err
 		}
 
-		p.resizeFailed = append(p.resizeFailed, pvc)
+		p.resizeFailed[pvc.Name] = err
 
 		return nil
 	}
@@ -408,7 +424,7 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 	return pvc, nil
 }
 
-// Add a persistent volume to the pod spec for each volumeMount.
+// Add a persistent volume to the pod spec for each spec.servers.volumeMounts.
 // The volumes are first created via persistentVolumeClaims
 // Volumes that already exist are reused.
 func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, config couchbasev2.ServerConfig) (*PersistentVolumeClaimState, error) {
@@ -467,7 +483,7 @@ func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *
 			pvc.Annotations[constants.AnnotationVolumeMountSubPaths] = mountMapping.mountPath
 		}
 
-		if err := state.addVolume(client, pvc, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion); err != nil {
+		if err := state.addVolume(client, pvc, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion, cluster.Spec.OnlineVolumeExpansionTimeout); err != nil {
 			return nil, err
 		}
 
@@ -2072,7 +2088,7 @@ func IsLogPVC(pvc *v1.PersistentVolumeClaim) bool {
 
 // CheckVolumeExpansionEvents checks PVC events for successful resize
 // event to determine status when an expansion has occurred.
-func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeClaim) error {
+func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeClaim, expansionTimeout *int) error {
 	// Check if Volume Claim to has "Resize" condition set
 	var expansionTimestamp metav1.Time
 
@@ -2090,21 +2106,33 @@ func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeC
 		return nil
 	}
 
-	events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
-	if err != nil {
-		return err
-	}
+	// retries until there is VolumeResizeSuccessful.
+	callback := func() error {
+		events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
+		if err != nil {
+			return err
+		}
 
-	for _, event := range events {
-		// Only consider events which occur after the resize condition is presented
-		if expansionTimestamp.Before(&event.LastTimestamp) {
-			if event.Reason == "VolumeResizeFailed" {
-				return errors.ErrVolumeResizeError
+		for _, event := range events {
+			// Only consider events which occur after the resize condition is presented
+			if expansionTimestamp.Before(&event.LastTimestamp) {
+				if event.Reason == "VolumeResizeSuccessful" || event.Reason == "FileSystemResizeSuccessful" {
+					return nil
+				}
 			}
 		}
+		// Since, no VolumeResizeSuccessful has been raised for 10 mins,
+		// it could be assumed there is a VolumeResizeError...
+		// In actual, it could be any event but none of the above two.
+		return errors.ErrVolumeResizeError
 	}
 
-	return nil
+	timeout := 10
+	if expansionTimeout != nil {
+		timeout = *expansionTimeout
+	}
+
+	return retryutil.RetryFor(time.Duration(timeout)*time.Minute, callback)
 }
 
 // GetVolumeStorageSize returns requested storage size of a volume claim.

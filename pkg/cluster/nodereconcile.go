@@ -800,8 +800,9 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			// When online resize failed for any of the member volumes then proceed with
 			// normal rolling upgrade since the Pod must be recreated.
 			case pvcState.IsResizeFailed(pvc.Name):
-				log.Info("Unable to expand volume in place, falling back to rolling upgrade", "cluster", c.namespacedName(), "volume", pvc.Name)
-				c.raiseEvent(k8sutil.ExpandVolumeFallbackEvent(pvc.Name, c.cluster))
+				err := pvcState.GetReasonForResizeFailed(pvc.Name)
+				log.Info("Unable to expand volume in place, falling back to rolling upgrade", "cluster", c.namespacedName(), "volume", pvc.Name, "error", err)
+				c.raiseEvent(k8sutil.ExpandVolumeFallbackEvent(pvc.Name, c.cluster, err.Error()))
 
 				// Remove volume expansion flag.
 				if c.checkVolumeExpansionState() {
@@ -825,7 +826,6 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				if err != nil {
 					return err
 				}
-
 				// Flag that a volume expansion is occurring.
 				if err := c.setVolumeExpansionState(true); err != nil {
 					return err
@@ -842,7 +842,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 
 				return nil
 			}
-
+			// volume expansion state is not set
 			if !c.checkVolumeExpansionState() {
 				continue
 			}

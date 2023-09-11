@@ -53,6 +53,8 @@ const (
 	admissionDefaultPullPolicy = string(corev1.PullIfNotPresent)
 
 	defaultExpirationTime = 10 * 365 * 24 * time.Hour
+
+	skipValidation = "skip-validation"
 )
 
 // generateAdmissionOptions defines options for creating the admission controller.
@@ -659,7 +661,7 @@ func (o *generateAdmissionOptions) getAdmissionService() *corev1.Service {
 // getAdmissionValidatingWebhook creates a validating webhook for the admission controller.
 func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace string, ca []byte) *admissionregistrationv1.ValidatingWebhookConfiguration {
 	// You need a webhook per controller when running in namespaced mode.
-	// IF we resued the same one each time, we'd need to aggregate the webhooks
+	// IF we reused the same one each time, we'd need to aggregate the webhooks
 	// and act as a client doing read/modify/write.  This is complex so instead
 	// just name them deterministically (for deletion) and make many resources.
 	name := AdmissionResourceName
@@ -727,6 +729,14 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 				SideEffects:   &sideEffectClass,
 				AdmissionReviewVersions: []string{
 					"v1",
+				},
+				NamespaceSelector: &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      skipValidation,
+							Operator: metav1.LabelSelectorOpDoesNotExist,
+						},
+					},
 				},
 			},
 		},

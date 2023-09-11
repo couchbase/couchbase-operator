@@ -2244,6 +2244,14 @@ type ClusterSpec struct {
 	// rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
 	// More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims
 	EnableOnlineVolumeExpansion bool `json:"enableOnlineVolumeExpansion,omitempty"`
+
+	// OnlineVolumeExpansionTimeout must be provided as a retry mechanism with a timeout in minutes
+	// for expanding volumes. This must only be provided, if EnableOnlineVolumeExpansion is set to true.
+	// Value must be between 0 and 30.
+	// If no value is provided, then it defaults to 10 minutes.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=30
+	OnlineVolumeExpansionTimeout *int `json:"onlineVolumeExpansionTimeout,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {

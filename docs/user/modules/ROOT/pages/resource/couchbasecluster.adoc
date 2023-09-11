@@ -192,6 +192,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-networking-tls-tlsminimumversion,tlsMinimumVersion>>: TLS1.2
     <<couchbaseclusters-spec-networking-waitforaddressreachable,waitForAddressReachable>>: 10m
     <<couchbaseclusters-spec-networking-waitforaddressreachabledelay,waitForAddressReachableDelay>>: 2m
+  <<couchbaseclusters-spec-onlinevolumeexpansiontimeout,onlineVolumeExpansionTimeout>>: 0
   <<couchbaseclusters-spec-paused,paused>>: false
   <<couchbaseclusters-spec-platform,platform>>: ""
   <<couchbaseclusters-spec-recoverypolicy,recoveryPolicy>>: ""
@@ -2550,6 +2551,23 @@ Polling of DNS name availability inherently dangerous due to negative caching, s
 
 WaitForAddressReachableDelay is used to defer operator checks that ensure external addresses are reachable before new nodes are balanced in to the cluster.
 This prevents negative DNS caching while waiting for external-DDNS controllers to propagate addresses.
+
+=== couchbaseclusters.spec.onlineVolumeExpansionTimeout
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `30`
+
+==== Description
+
+OnlineVolumeExpansionTimeout must be provided as a retry mechanism with a timeout in minutes for expanding volumes.
+This must only be provided, if EnableOnlineVolumeExpansion is set to true.
+Value must be between 0 and 30.
+If no value is provided, then it defaults to 10 minutes.
 
 === couchbaseclusters.spec.paused
 

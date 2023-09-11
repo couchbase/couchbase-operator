@@ -211,11 +211,11 @@ func ExpandVolumeSucceededEvent(volumeName string, cl *couchbasev2.CouchbaseClus
 	return event
 }
 
-func ExpandVolumeFallbackEvent(volumeName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func ExpandVolumeFallbackEvent(volumeName string, cl *couchbasev2.CouchbaseCluster, errorString string) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonExpandVolumeFallback
-	event.Message = fmt.Sprintf("Volume %s cannot be expanded in-place, falling back to rolling upgrade", volumeName)
+	event.Message = fmt.Sprintf("Volume %s cannot be expanded in-place, reason: %s; falling back to rolling upgrade", volumeName, errorString)
 
 	return event
 }
