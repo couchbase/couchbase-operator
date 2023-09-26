@@ -695,3 +695,25 @@ func MustVerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbase
 		Die(t, err)
 	}
 }
+
+// storageBackendUnchanged polls the Couchbase API for the named bucket to verify the storage backend is unchanged.
+func storageBackendUnchanged(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, expectedStorageBackendType couchbaseutil.CouchbaseStorageBackend, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.StorageBackend != expectedStorageBackendType {
+			return fmt.Errorf("storage backend from API %v, expected %v", info.StorageBackend, expectedStorageBackendType)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyStorageBackendUnchanged(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, storageBackendType couchbaseutil.CouchbaseStorageBackend, timeout time.Duration) {
+	if err := storageBackendUnchanged(t, k8s, cluster, bucket, storageBackendType, timeout); err != nil {
+		Die(t, err)
+	}
+}

@@ -901,13 +901,6 @@ func MustPatchBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, pat
 	return resource.(metav1.Object)
 }
 
-// MustNotPatchBucket patches the bucket with a list of JSON patch objects, dying if the patch succeeds.
-func MustNotPatchBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, patches jsonpatch.PatchSet) {
-	if _, err := patchResource(k8s, bucket.(runtime.Object), patches, 30*time.Second); err == nil {
-		Die(t, fmt.Errorf("bucket patch applied unexpectedly"))
-	}
-}
-
 func MustPatchReplication(t *testing.T, k8s *types.Cluster, replication *couchbasev2.CouchbaseReplication, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseReplication {
 	resource, err := patchResource(k8s, replication, patches, timeout)
 	if err != nil {

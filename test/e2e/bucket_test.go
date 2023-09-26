@@ -574,8 +574,11 @@ func TestCouchbaseBucketStorageBackendDefault(t *testing.T) {
 
 	// assert bucket storage backend is couchstore (default)
 	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendCouchstore, 2*time.Minute)
+
+	// Trying to change the storage backend.
+	e2eutil.MustPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendMagma), time.Minute)
 	// Must not be able to change storage backend.
-	e2eutil.MustNotPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendMagma))
+	e2eutil.MustVerifyStorageBackendUnchanged(t, kubernetes, cluster, bucket.GetName(), couchbaseutil.CouchbaseStorageBackendCouchstore, time.Minute)
 }
 
 // TestCouchbaseBucketStorageBackendMagma checks the behaviors related to
@@ -619,8 +622,11 @@ func TestCouchbaseBucketStorageBackendMagma(t *testing.T) {
 
 	// assert bucket storage backend is magma
 	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendMagma, 2*time.Minute)
+
+	// Trying to change the storage backend.
+	e2eutil.MustPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendCouchstore), time.Minute)
 	// Must not be able to change storage backend.
-	e2eutil.MustNotPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendCouchstore))
+	e2eutil.MustVerifyStorageBackendUnchanged(t, kubernetes, cluster, bucket.GetName(), couchbaseutil.CouchbaseStorageBackendMagma, time.Minute)
 }
 
 func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *testing.T) {
