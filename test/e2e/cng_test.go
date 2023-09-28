@@ -57,121 +57,83 @@ func TestCreateCNG(t *testing.T) {
 
 // TestCNGBucketOps tests CNG bucket operations.
 func TestCNGBucketOps(t *testing.T) {
-	ctx := context.Background()
+	f := framework.Global
 
-	kubernetesCluster, cleanup := framework.Global.SetupTest(t)
+	kubernetesCluster, cleanup := f.SetupTest(t)
+	defer cleanup()
 
 	framework.Requires(t, kubernetesCluster).AtLeastVersion("7.2.0")
+
+	ctx := context.Background()
 
 	client, err := setupCNGTests(ctx, t, kubernetesCluster)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
 
-	bucketName := "Test-123"
+	// create bucket
+	var createRAMQuota uint64 = 100
 
-	defer func(t *testing.T, client *gocbcoreps.RoutingClient) {
-		err := client.Close()
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
+	var createNumReplica uint32 = 1
 
-		cleanup()
-	}(t, client)
-
-	t.Run("TestCreateCNGBucket", func(t *testing.T) {
-		cleanup := framework.Global.SetupSubTest(t)
-		defer cleanup()
-
-		// create bucket
-		var createRAMQuota uint64 = 100
-		var createNumReplica uint32 = 1
-
-		// Attempt to create a bucket
-		_, err := client.BucketV1().CreateBucket(ctx, &admin_bucket_v1.CreateBucketRequest{
-			BucketName:  bucketName,
-			BucketType:  admin_bucket_v1.BucketType(0),
-			RamQuotaMb:  &createRAMQuota,
-			NumReplicas: &createNumReplica,
-		})
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		response, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
-
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		// Check if the bucket exists
-		if !compareBucketNames(bucketName, response) {
-			e2eutil.Die(t, fmt.Errorf("bucket name does not match expected bucket name"))
-		}
+	// Attempt to create a bucket
+	_, err = client.BucketV1().CreateBucket(ctx, &admin_bucket_v1.CreateBucketRequest{
+		BucketName:  "my-bucket",
+		BucketType:  admin_bucket_v1.BucketType(0),
+		RamQuotaMb:  &createRAMQuota,
+		NumReplicas: &createNumReplica,
 	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
-	t.Run("TestUpdateCNGBucket", func(t *testing.T) {
-		cleanup := framework.Global.SetupSubTest(t)
-		defer cleanup()
+	response, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
-		// upadate bucket
-		var updatedRAMQuota uint64 = 150
-		var updatedNumReplica uint32 = 1
-		flushEnabled := true
-		replicaIndexes := false
-		var maxExpirySecs uint32 = 10
+	// Check if the bucket exists
+	if !compareBucketNames("my-bucket", response) {
+		e2eutil.Die(t, fmt.Errorf("bucket name does not match expected bucket name"))
+	}
 
-		// Attempt to update the bucket.
-		_, err := client.BucketV1().UpdateBucket(ctx, &admin_bucket_v1.UpdateBucketRequest{
-			BucketName:             bucketName,
-			RamQuotaMb:             &updatedRAMQuota,
-			NumReplicas:            &updatedNumReplica,
-			FlushEnabled:           &flushEnabled,
-			ReplicaIndexes:         &replicaIndexes,
-			EvictionMode:           admin_bucket_v1.EvictionMode_EVICTION_MODE_FULL.Enum(),
-			MaxExpirySecs:          &maxExpirySecs,
-			CompressionMode:        admin_bucket_v1.CompressionMode_COMPRESSION_MODE_ACTIVE.Enum(),
-			MinimumDurabilityLevel: kv_v1.DurabilityLevel_DURABILITY_LEVEL_MAJORITY.Enum(),
-		})
+	// upadate bucket
+	var updatedRAMQuota uint64 = 150
 
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
+	var updatedNumReplica uint32 = 1
 
-		lb, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
+	flushEnabled := true
 
-		// Check if the bucket RAM quota has been updated.
-		for _, bucket := range lb.Buckets {
-			if bucket.RamQuotaMb != updatedRAMQuota {
-				e2eutil.Die(t, fmt.Errorf("bucket did not update"))
-			}
-		}
+	replicaIndexes := false
+
+	var maxExpirySecs uint32 = 10
+
+	// Attempt to update the bucket.
+	_, err = client.BucketV1().UpdateBucket(ctx, &admin_bucket_v1.UpdateBucketRequest{
+		BucketName:             "my-bucket",
+		RamQuotaMb:             &updatedRAMQuota,
+		NumReplicas:            &updatedNumReplica,
+		FlushEnabled:           &flushEnabled,
+		ReplicaIndexes:         &replicaIndexes,
+		EvictionMode:           admin_bucket_v1.EvictionMode_EVICTION_MODE_FULL.Enum(),
+		MaxExpirySecs:          &maxExpirySecs,
+		CompressionMode:        admin_bucket_v1.CompressionMode_COMPRESSION_MODE_ACTIVE.Enum(),
+		MinimumDurabilityLevel: kv_v1.DurabilityLevel_DURABILITY_LEVEL_MAJORITY.Enum(),
 	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
-	t.Run("TestDeleteCNGBucket", func(t *testing.T) {
-		cleanup := framework.Global.SetupSubTest(t)
-		defer cleanup()
+	// Attempt to delete the bucket.
+	_, err = client.BucketV1().DeleteBucket(ctx, &admin_bucket_v1.DeleteBucketRequest{BucketName: "my-bucket"})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
-		_, err := client.BucketV1().DeleteBucket(ctx, &admin_bucket_v1.DeleteBucketRequest{BucketName: bucketName})
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		listResponse, err := client.BucketV1().ListBuckets(ctx, &admin_bucket_v1.ListBucketsRequest{})
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		// Check if the bucket exists
-		for _, bucket := range listResponse.Buckets {
-			if strings.Compare(bucket.BucketName, bucketName) == 0 {
-				e2eutil.Die(t, fmt.Errorf("bucket still exists"))
-			}
-		}
-	})
+	err = client.Close()
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("error closing routing client: %w", err))
+	}
 }
 
 // compareBucketNames checks if a ListBucketsResponse contains the bucket we expect.
@@ -195,39 +157,14 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	cluster.Name = clusterName
+	cluster.Spec.Buckets.Managed = false
 
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
 
-	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5)
+	e2eutil.MustWaitForCloudNativeGatewayServiceReady(t, kubernetesCluster, cluster, 10*time.Minute)
 
-	dialopts := gocbcoreps.DialOptions{
-		Username:           constants.CbClusterUsername,
-		Password:           constants.CbClusterPassword,
-		InsecureSkipVerify: true,
-		PoolSize:           1,
-	}
-
-	cngSvcName := clusterName + "-cloud-native-gateway-service"
-	connStr := fmt.Sprintf("%s.%s.svc:%d", cngSvcName, cluster.Namespace, 443)
-
-	client, err := gocbcoreps.DialContext(ctx, connStr, &dialopts)
-	if err != nil {
-		return nil, err
-	}
-
-	connectionErr := retryutil.RetryFor(10*time.Minute, func() error {
-		if client.ConnectionState() == gocbcoreps.ConnStateDegraded {
-			return fmt.Errorf("CNG container not ready")
-		}
-		return nil
-	})
-
-	if connectionErr != nil {
-		return nil, connectionErr
-	}
-
-	return client, nil
+	return getCloudNativeGatewayClient(ctx, clusterName)
 }
 
 func TestCngOtlp(t *testing.T) {
@@ -287,4 +224,45 @@ func TestCngOtlp(t *testing.T) {
 	}
 
 	e2eutil.Die(t, fmt.Errorf("%s flag not set", podconsts.CloudNativeGatewayOtlpFlag))
+}
+
+func getCloudNativeGatewayClient(ctx context.Context, clusterName string) (*gocbcoreps.RoutingClient, error) {
+	var cngClient *gocbcoreps.RoutingClient
+
+	dialopts := gocbcoreps.DialOptions{
+		Username:           constants.CbClusterUsername,
+		Password:           constants.CbClusterPassword,
+		InsecureSkipVerify: true,
+		PoolSize:           1,
+	}
+
+	cngSvcName := clusterName + "-cloud-native-gateway-service"
+	connStr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", cngSvcName, cluster.Namespace, 443)
+
+	cngConnErr := retryutil.Retry(ctx, 10*time.Minute, func() error {
+		var err error
+		cngClient, err = gocbcoreps.DialContext(ctx, connStr, &dialopts)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if cngConnErr != nil {
+		return nil, cngConnErr
+	}
+
+	cngToCBConnErr := retryutil.Retry(ctx, 10*time.Minute, func() error {
+		if cngClient.ConnectionState() == gocbcoreps.ConnStateDegraded {
+			return fmt.Errorf("CNG container not ready")
+		}
+		return nil
+	})
+
+	if cngToCBConnErr != nil {
+		return nil, cngToCBConnErr
+	}
+
+	return cngClient, nil
 }

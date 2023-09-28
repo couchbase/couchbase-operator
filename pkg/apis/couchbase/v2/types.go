@@ -2563,6 +2563,15 @@ type CloudNativeGateway struct {
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// TLS defines the TLS configuration for the Cloud Native Gateway server including
 	// server and client certificate configuration, and TLS security policies.
+	// If no TLS config are explicitly provided, the operator generates/manages self-signed certs/keys
+	// and creates a k8s secret named `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>`
+	// unique to a Couchbase cluster, which is volume mounted to the cb k8s pod.
+	// This action could be overidden at the outset or later, by using the below
+	// TLS config or generating the secret of same name as
+	// `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` with certificates
+	// conforming to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
+	// N.B. The secret is on per cluster basis so it's advised to use the unique cluster name else
+	// would be ignored.
 	TLS *CloudNativeGatewayTLS `json:"tls,omitempty"`
 
 	OTLP *CloudNativeGatewayOTLP `json:"-" annotation:"otlp"`

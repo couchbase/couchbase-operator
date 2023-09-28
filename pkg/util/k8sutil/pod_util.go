@@ -55,6 +55,8 @@ const (
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
 	CloudNativeGatewayContainerName           = "cloud-native-gateway"
 	CngTLSSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-cng-tls"
+	CngSelfSignedCertSecretNamePrefix         = "couchbase-cloud-native-gateway-self-signed-secret"
+	CngVolumeName                             = "couchbase-cloud-native-gateway-volume"
 )
 
 type PodReadinessConfig struct {
@@ -929,7 +931,7 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	}
 
 	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
-	applyCloudNativeGateway(cluster, pod)
+	applyCloudNativeGateway(client, cluster, pod)
 
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
@@ -1036,7 +1038,7 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 }
 
 // applyCloudNativeGateway adds a Cloud Native Gateway for gRPC access to the cb cluster.
-func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	// If cloudNativeGateway is enabled add the necessary sidecars.
 	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return
@@ -1050,16 +1052,75 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod)
 		}
 	}
 
-	cngContainer := createCloudNativeGatewayImageContainer(cluster, pod)
+	cngContainer, err := createCloudNativeGatewayContainer(client, cluster, pod)
+	if err != nil {
+		log.Error(err, "error creating cloud-native-gateway container", "cluster", cluster.NamespacedName())
+		return
+	}
+
 	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
 	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 }
 
-// applyCloudNativeGatewayPodTLS adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
-func applyCloudNativeGatewayPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
-	// Add the Cloud Native Gateway server secret volume to the pod
-	volumeName := "couchbase-cloud-native-gateway-volume"
-	secretName := cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName
+// applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
+func applyCloudNativeGatewayPodTLSProvided(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) error {
+	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("%w: error fetching provided cloud-native-gateway self-signed secret: %s", err, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
+	}
+
+	addSecretToPodVolume(container, pod, CngVolumeName, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
+
+	return nil
+}
+
+func getSelfCertSecretName(clusterName string) string {
+	return fmt.Sprintf("%s-%s", CngSelfSignedCertSecretNamePrefix, clusterName)
+}
+
+// applyCloudNativeGatewayPodTLSSelfCert adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted
+// by generating a self-signed cert and creating the secret, if doesn't exist already.
+func applyCloudNativeGatewayPodTLSSelfCert(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) error {
+	// check named cng self-signed secret exists
+	selfCertSecretName := getSelfCertSecretName(cluster.Name)
+
+	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), selfCertSecretName, metav1.GetOptions{})
+	if err != nil {
+		// named secret not found, create a new one
+		dnsName := ""
+		if cluster.Spec.Networking.DNS != nil {
+			dnsName = cluster.Spec.Networking.DNS.Domain
+		}
+
+		ssc, err := GenerateSelfSignedCert(cluster.Namespace, 10*365*24*time.Hour, dnsName)
+		if err != nil {
+			return err
+		}
+
+		selfSignedSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: selfCertSecretName,
+			},
+			Data: map[string][]byte{
+				"tls.crt": ssc.cert,
+				"tls.key": ssc.key,
+			},
+		}
+
+		_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), selfSignedSecret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("%w: error creating cloud-native-gateway self-signed secret", err)
+		}
+	}
+
+	addSecretToPodVolume(container, pod, CngVolumeName, selfCertSecretName)
+
+	return nil
+}
+
+// addSecretToPodVolume adds the cng server secret name to a volume which then gets added to the pod.
+func addSecretToPodVolume(container *v1.Container, pod *v1.Pod, volumeName, secretName string) {
+	// volume finds the secret by name to be used.
 	volume := v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
@@ -1070,7 +1131,7 @@ func applyCloudNativeGatewayPodTLS(cluster *couchbasev2.CouchbaseCluster, contai
 	}
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
 
-	// Mount the secret volume
+	// mount the secret volume
 	volumeMount := v1.VolumeMount{
 		Name:      volumeName,
 		ReadOnly:  true,
@@ -1703,8 +1764,9 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	return initContainer
 }
 
-// createCloudNativeGatewayImageContainer creates a new Cloud Native Gateway container based on inputs from manifest.
-func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {
+// createCloudNativeGatewayContainer creates a new Cloud Native Gateway container based on inputs from manifest.
+func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) (v1.Container, error) {
+	// create a basic cng container.
 	container := v1.Container{
 		Name:  CloudNativeGatewayContainerName,
 		Image: cluster.Spec.CloudNativeGatewayImage(),
@@ -1738,6 +1800,19 @@ func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluste
 		},
 	}
 
+	// In either case, as the CNG container/pod is secured now, customers could use
+	// K8S Ingress/OC Routes to forward encrypted traffic to the secured CNG server.
+	// without SSL termination at Ingress/Route.
+	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
+		if err := applyCloudNativeGatewayPodTLSProvided(client, cluster, &container, pod); err != nil {
+			return v1.Container{}, err
+		}
+	} else {
+		if err := applyCloudNativeGatewayPodTLSSelfCert(client, cluster, &container, pod); err != nil {
+			return v1.Container{}, err
+		}
+	}
+
 	if cluster.Spec.Security.SecurityContext != nil {
 		container.SecurityContext = cluster.Spec.Security.SecurityContext
 	}
@@ -1749,13 +1824,7 @@ func createCloudNativeGatewayImageContainer(cluster *couchbasev2.CouchbaseCluste
 		container.Args = append(container.Args, constants.CloudNativeGatewayOtlpFlag, otlp.Endpoint)
 	}
 
-	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
-		applyCloudNativeGatewayPodTLS(cluster, &container, pod)
-	} else {
-		container.Args = append(container.Args, "--self-sign")
-	}
-
-	return container
+	return container, nil
 }
 
 func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
