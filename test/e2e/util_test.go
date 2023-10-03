@@ -126,6 +126,7 @@ func registerTests() {
 		framework.NewTestDef(TestBackupFullIncrementalAzure).WithTags(TagSuiteSanity, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupFullIncrementalGCP).WithTags(TagSuiteSanity, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestRBACCreateAdminUser).WithTags(TagSuiteSanity, TagFeatureRBAC),
+		framework.NewTestDef(TestRBACCreateUserClusterRoles).WithTags(TagSuiteSanity, TagFeatureRBAC),
 		framework.NewTestDef(TestRotateAdminPassword).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestNoLogOrAuditConfig).WithTags(TagSuiteSanity, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingAndAuditingDefaults).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),

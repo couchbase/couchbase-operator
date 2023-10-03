@@ -767,6 +767,7 @@ var clusterRoles = []RoleName{
 	RoleQueryExecuteGlobalExternalFunctions,
 	RoleAnalyticsAdmin,
 	RoleExternalStatsReader,
+	RoleEventingAdmin,
 }
 
 // bucketRoles can be bucket scoped.
@@ -780,7 +781,6 @@ var bucketRoles = []RoleName{
 	RoleViewsAdmin,
 	RoleViewsReader,
 	RoleSyncGateway,
-	RoleEventingAdmin,
 }
 
 // scopeRoles can be bucket + scope scoped.

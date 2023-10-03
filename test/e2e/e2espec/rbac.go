@@ -2,10 +2,57 @@ package e2espec
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func GetAllClusterRoles(v *couchbaseutil.Version) ([]string, error) {
+	version7, err := couchbaseutil.NewVersion("7.0.0")
+
+	if err != nil {
+		return nil, err
+	}
+
+	if v.Less(version7) {
+		return clusterRoles6, nil
+	}
+
+	return clusterRoles7, nil
+}
+
+var clusterRoles6 = []string{
+	e2e_constants.RoleFullAdmin,
+	e2e_constants.ClusterAdminRole,
+	e2e_constants.RoleReadOnlyAdmin,
+	e2e_constants.RoleXDCRAdmin,
+	e2e_constants.RoleQueryCurlAccess,
+	e2e_constants.RoleQuestySystemAccess,
+	e2e_constants.RoleAnalyticsReader,
+	e2e_constants.RoleSecurityAdmin,
+	e2e_constants.RoleAnalyticsAdmin,
+}
+
+var clusterRoles7 = []string{
+	e2e_constants.RoleFullAdmin,
+	e2e_constants.ClusterAdminRole,
+	e2e_constants.RoleReadOnlyAdmin,
+	e2e_constants.RoleXDCRAdmin,
+	e2e_constants.RoleQueryCurlAccess,
+	e2e_constants.RoleQuestySystemAccess,
+	e2e_constants.RoleAnalyticsReader,
+	e2e_constants.RoleSecurityAdminExternal,
+	e2e_constants.RoleSecurityAdminLocal,
+	e2e_constants.RoleBackupAdmin,
+	e2e_constants.RoleQueryManageGlobalFunctions,
+	e2e_constants.RoleQueryExecuteGlobalFunctions,
+	e2e_constants.RoleQueryManageGlobalExternalFunctions,
+	e2e_constants.RoleQueryExecuteGlobalExternalFunctions,
+	e2e_constants.RoleAnalyticsAdmin,
+	e2e_constants.RoleExternalStatsReader,
+	e2e_constants.RoleEventingAdmin,
+}
 
 // NewDefaultUser creates a new default user.
 func NewDefaultUser() *couchbasev2.CouchbaseUser {
@@ -40,6 +87,25 @@ func NewClusterAdminGroup() *couchbasev2.CouchbaseGroup {
 	}
 	spec := couchbasev2.CouchbaseGroupSpec{
 		Roles: []couchbasev2.Role{clusterAdminRole},
+	}
+
+	// crd
+	return &couchbasev2.CouchbaseGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2e_constants.ClusterRoleName,
+		},
+		Spec: spec,
+	}
+}
+
+// NewGroupWithRoles creates group with specified roles.
+func NewGroupWithRoles(roleNames []string) *couchbasev2.CouchbaseGroup {
+	spec := couchbasev2.CouchbaseGroupSpec{}
+
+	for _, roleName := range roleNames {
+		spec.Roles = append(spec.Roles, couchbasev2.Role{
+			Name: couchbasev2.RoleName(roleName),
+		})
 	}
 
 	// crd

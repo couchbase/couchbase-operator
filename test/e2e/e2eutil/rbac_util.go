@@ -169,6 +169,18 @@ type Role struct {
 	scope      string
 }
 
+func NewUserRoles(roleNames []string) []couchbaseutil.UserRole {
+	roles := []couchbaseutil.UserRole{}
+
+	for _, roleName := range roleNames {
+		roles = append(roles, couchbaseutil.UserRole{
+			Role: roleName,
+		})
+	}
+
+	return roles
+}
+
 func NewRole(role string) *Role {
 	return &Role{
 		role: role,
