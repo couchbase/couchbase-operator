@@ -1,6 +1,6 @@
 # This must be kept in lockstep with the builder images due to library
 # dependencies.
-ARG GO_VERSION=1.20
+ARG GO_VERSION=1.20.8
 FROM golang:${GO_VERSION}
 
 # Install whatever compression and archival stuff we need to stream off
