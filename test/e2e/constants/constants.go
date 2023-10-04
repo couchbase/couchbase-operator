@@ -82,9 +82,28 @@ const (
 	BucketRoleName        = "bucket-role"
 	RoleBindingName       = "role-binding"
 
-	// Couchbase specific roles.
-	ClusterAdminRole = "cluster_admin"
-	BucketAdminRole  = "bucket_admin"
+	// Couchbase specific cluster roles.
+	ClusterAdminRole                        = "cluster_admin"
+	RoleFullAdmin                           = "admin"
+	RoleReadOnlyAdmin                       = "ro_admin"
+	RoleSecurityAdmin                       = "security_admin"
+	RoleXDCRAdmin                           = "replication_admin"
+	RoleQueryCurlAccess                     = "query_external_access"
+	RoleQuestySystemAccess                  = "query_system_catalog"
+	RoleAnalyticsReader                     = "analytics_reader"
+	RoleSecurityAdminExternal               = "security_admin_external"
+	RoleSecurityAdminLocal                  = "security_admin_local"
+	RoleBackupAdmin                         = "backup_admin"
+	RoleQueryManageGlobalFunctions          = "query_manage_global_functions"
+	RoleQueryExecuteGlobalFunctions         = "query_execute_global_functions"
+	RoleQueryManageGlobalExternalFunctions  = "query_manage_global_external_functions"
+	RoleQueryExecuteGlobalExternalFunctions = "query_execute_global_external_functions"
+	RoleAnalyticsAdmin                      = "analytics_admin"
+	RoleExternalStatsReader                 = "external_stats_reader"
+	RoleEventingAdmin                       = "eventing_admin"
+
+	// Couchbase specific bucket roles.
+	BucketAdminRole = "bucket_admin"
 
 	// Binding.
 	CouchbaseSubjectUserKind  = "CouchbaseUser"

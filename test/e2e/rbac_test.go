@@ -39,6 +39,14 @@ func mustCreateBoundUser(t *testing.T, k8s *types.Cluster) (*couchbasev2.Couchba
 	return user, group, binding
 }
 
+func mustCreateBoundUserWithRoles(t *testing.T, k8s *types.Cluster, roleNames []string) (*couchbasev2.CouchbaseUser, *couchbasev2.CouchbaseGroup, *couchbasev2.CouchbaseRoleBinding) {
+	user := e2eutil.MustNewUser(t, k8s, e2espec.NewDefaultUser())
+	group := e2eutil.MustNewGroup(t, k8s, e2espec.NewGroupWithRoles(roleNames))
+	binding := e2eutil.MustNewRoleBinding(t, k8s, e2espec.NewClusterRoleBinding())
+
+	return user, group, binding
+}
+
 // Create cluster with user and cluster admin binding.
 func TestRBACCreateAdminUser(t *testing.T) {
 	// Plaform configuration.
@@ -70,6 +78,47 @@ func TestRBACCreateAdminUser(t *testing.T) {
 	// Check if group has appropriate role
 	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
 	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
+}
+
+// Create cluster with user and all clluster bindings.
+func TestRBACCreateUserClusterRoles(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	v, err := couchbaseutil.NewVersion(e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion))
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	roleNames, err := e2espec.GetAllClusterRoles(v)
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Create user
+	user, group, _ := mustCreateBoundUserWithRoles(t, kubernetes, roleNames)
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, 4*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	// Check if group has appropriate roles
+	allClusterRoles := e2eutil.NewUserRoles(roleNames)
+	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, allClusterRoles...)
 }
 
 // TestRBACDeleteUser verifies basic user deletion.
