@@ -122,7 +122,8 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 
 // logFailedMember outputs any debug information we can about a failed member creation.
 func (c *Cluster) logFailedMember(message, name string) {
-	log.Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
+	log.Info(message, "cluster", c.namespacedName(), "name", name)
+	log.V(1).Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
 // Creates new Couchbase cluster members (pods).
