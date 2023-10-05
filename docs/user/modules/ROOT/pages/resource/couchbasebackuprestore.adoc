@@ -140,8 +140,6 @@ Number of times the restore job should try to execute.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description

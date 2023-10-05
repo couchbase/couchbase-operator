@@ -543,7 +543,7 @@ type CouchbaseBackupRestore struct {
 type CouchbaseBackupRestoreSpec struct {
 	// The backup resource name associated with this restore, or the backup PVC
 	// name to restore from.
-	Backup string `json:"backup"`
+	Backup string `json:"backup,omitempty"`
 
 	// Repo is the backup folder to restore from.  If no repository is specified,
 	// the backup container will choose the latest.

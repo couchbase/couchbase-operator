@@ -393,6 +393,9 @@ type Restore struct {
 
 	// cert to be used with the custom object endpoint.
 	objStoreEndpointCert *v1.Secret
+
+	// use blank backup name
+	useBlankBackupName bool
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -511,6 +514,13 @@ func (r *Restore) WithCustomStoreCert(secret *v1.Secret) *Restore {
 	return r
 }
 
+// UseBlankBackupName doesn't set spec.backup in the created restore.
+func (r *Restore) UseBlankBackupName(useBlankBackupName bool) *Restore {
+	r.useBlankBackupName = useBlankBackupName
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -520,9 +530,11 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: generateName,
 		},
-		Spec: couchbasev2.CouchbaseBackupRestoreSpec{
-			Backup: r.backup.Name,
-		},
+		Spec: couchbasev2.CouchbaseBackupRestoreSpec{},
+	}
+
+	if !r.useBlankBackupName {
+		restore.Spec.Backup = r.backup.Name
 	}
 
 	if r.s3Bucket != "" && r.objStore != "" {

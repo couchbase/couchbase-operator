@@ -519,7 +519,7 @@ func TestReplaceFullIncrementalBackupGCP(t *testing.T) {
 	testReplaceFullIncrementalBackup(t, cloud.CloudProviderGCP)
 }
 
-func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
+func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType, useBlankBackupName bool) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -568,7 +568,7 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(useBlankBackupName).MustCreate(t, kubernetes)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -593,19 +593,19 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType) {
 }
 
 func TestBackupAndRestore(t *testing.T) {
-	testBackupAndRestore(t, cloud.NoCloudProvider)
+	testBackupAndRestore(t, cloud.NoCloudProvider, false)
 }
 
 func TestBackupAndRestoreS3(t *testing.T) {
-	testBackupAndRestore(t, cloud.CloudProviderAWS)
+	testBackupAndRestore(t, cloud.CloudProviderAWS, true)
 }
 
 func TestBackupAndRestoreAzure(t *testing.T) {
-	testBackupAndRestore(t, cloud.CloudProviderAzure)
+	testBackupAndRestore(t, cloud.CloudProviderAzure, true)
 }
 
 func TestBackupAndRestoreGCP(t *testing.T) {
-	testBackupAndRestore(t, cloud.CloudProviderGCP)
+	testBackupAndRestore(t, cloud.CloudProviderGCP, true)
 }
 
 // Test that CouchbaseBackup Status fields update when the initial backup job is created

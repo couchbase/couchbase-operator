@@ -485,6 +485,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.OnlineVolumeExpansionTimeout != nil {
+		in, out := &in.OnlineVolumeExpansionTimeout, &out.OnlineVolumeExpansionTimeout
+		*out = new(int)
+		**out = **in
+	}
 	return
 }
 
