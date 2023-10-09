@@ -86,6 +86,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintBackupObjectEndpointSecret,
 		checkConstraintBucketStorageBackend,
 		checkConstraintK8sSecurityContext,
+		checkConstraintMutuallyExclusiveUpgradeFields,
 	}
 
 	var errs []error
@@ -105,6 +106,16 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.UpgradeProcess != nil && cluster.Spec.UpgradeStrategy != nil {
+		if *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
+			return fmt.Errorf("cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery")
+		}
 	}
 
 	return nil

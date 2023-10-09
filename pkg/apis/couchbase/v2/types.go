@@ -2012,6 +2012,20 @@ const (
 	PrioritizeUptime RecoveryPolicy = "PrioritizeUptime"
 )
 
+// This defines the default upgrade process for couchbase pods. Defaults to SwapRebalance.
+// +kubebuilder:validation:Enum=SwapRebalance;DeltaRecovery
+type UpgradeProcess string
+
+const (
+	// SwapRebalance will default to upgrading one node at a time. This is much
+	// safer but will take a longer time than a DeltaRecovery.
+	SwapRebalance UpgradeProcess = "SwapRebalance"
+
+	// DeltaRecovery will kill all pods and attempt to upgrade them at once. This
+	// is much faster but causes disruption to cluster operations.
+	DeltaRecovery UpgradeProcess = "DeltaRecovery"
+)
+
 // This controls how aggressive to be with upgrades.
 // +kubebuilder:validation:Enum=RollingUpgrade;ImmediateUpgrade
 type UpgradeStrategy string
@@ -2104,6 +2118,13 @@ type ClusterSpec struct {
 	// This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defaulting
 	// to "PrioritizeDataIntegrity".
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
+
+	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
+	// When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
+	// ImmediateUpgrade (determined by UpgradeStrategy). When DeltaRecovery is requested, the operator will
+	// perform an in-place upgrade on a best effort basis. DeltaRecovery cannot be used if the UpgradeStrategy
+	// is set to ImmediateUpgrade.
+	UpgradeProcess *UpgradeProcess `json:"upgradeProcess,omitempty"`
 
 	// UpgradeStrategy controls how aggressive the Operator is when performing a cluster
 	// upgrade.  When a rolling upgrade is requested, pods are upgraded one at a time.  This

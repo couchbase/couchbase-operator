@@ -895,6 +895,16 @@ func (c *CouchbaseCluster) GetRecoveryPolicy() RecoveryPolicy {
 	return *c.Spec.RecoveryPolicy
 }
 
+// GetUpgradeProcess returns the user provided upgrade process or default value if
+// none is specified.
+func (c *CouchbaseCluster) GetUpgradeProcess() UpgradeProcess {
+	if c.Spec.UpgradeProcess == nil {
+		return SwapRebalance
+	}
+
+	return *c.Spec.UpgradeProcess
+}
+
 // GetUpgradeStrategy returns the user provided upgrade strategy or a safe default if
 // none is specified.
 func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {

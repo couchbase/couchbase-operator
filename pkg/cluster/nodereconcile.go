@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
@@ -929,6 +930,60 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet) (c
 	return candidates, nil
 }
 
+func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
+	upgraded := len(c.members) - len(candidates)
+
+	status := &couchbasev2.UpgradeStatus{
+		TargetCount: upgraded,
+		TotalCount:  len(c.members),
+	}
+
+	// Flag that an upgrade is in action, validation will use this to control what
+	// resource modifications are allowed.
+	if err := c.reportUpgrade(status); err != nil {
+		return err
+	}
+
+	for _, candidate := range candidates {
+		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+			return err
+		}
+
+		serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+		if serverClass == nil {
+			continue
+		}
+
+		// Update candidate version
+		candidate.SetVersion(targetVersion)
+
+		if c.k8s.PersistentVolumeClaims != nil {
+			// Update volumes
+			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
+			if err != nil {
+				return err
+			}
+
+			for _, volume := range pvcState.List() {
+				volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
+				volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
+				_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
+
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Recreate the pod
+		if err := c.recreatePod(candidate); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance {
@@ -978,55 +1033,64 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	candidatesSlice := make([]couchbaseutil.Member, 0, len(candidates))
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(candidates))
 
-	for _, candidate := range candidates {
-		log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion)
-
-		// Remove the candidate from the scheduler.
-		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && c.k8s.PersistentVolumeClaims != nil {
+		err := r.handleDeltaRecovery(c, candidates, targetVersion)
+		if err != nil {
 			return err
 		}
+	} else {
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && c.k8s.PersistentVolumeClaims == nil {
+			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		}
+		for _, candidate := range candidates {
+			log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion)
 
-		// Grab the server class.
-		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
-		if class == nil {
-			return fmt.Errorf("upgrade unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			// Remove the candidate from the scheduler.
+			if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+				return err
+			}
+
+			// Grab the server class.
+			class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+
+			toCreate = append(toCreate, *class)
+			candidatesSlice = append(candidatesSlice, candidate)
 		}
 
-		toCreate = append(toCreate, *class)
-		candidatesSlice = append(candidatesSlice, candidate)
-	}
-
-	// Add the new members.
-	memberResults, err := c.addMembers(toCreate...)
-	if err != nil {
-		return fmt.Errorf("upgrade failed to add new nodes to cluster: %w", err)
-	}
-
-	numErrors := 0
-
-	for _, result := range memberResults {
-		if result.Err != nil {
-			numErrors++
+		// Add the new members.
+		memberResults, err := c.addMembers(toCreate...)
+		if err != nil {
+			return fmt.Errorf("upgrade failed to add new nodes to cluster: %w", err)
 		}
-	}
 
-	errs := make([]error, 0, numErrors)
+		numErrors := 0
 
-	for index, result := range memberResults {
-		if result.Err != nil {
-			errs = append(errs, fmt.Errorf("upgrade failed to add new node to cluster: %w", result.Err))
-			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
-		} else { // Update book keeping
-			r.addMember(result.Member)
-			r.removeMemberUser(candidatesSlice[index])
+		for _, result := range memberResults {
+			if result.Err != nil {
+				numErrors++
+			}
 		}
+
+		errs := make([]error, 0, numErrors)
+
+		for index, result := range memberResults {
+			if result.Err != nil {
+				errs = append(errs, fmt.Errorf("upgrade failed to add new node to cluster: %w", result.Err))
+				log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+			} else { // Update book keeping
+				r.addMember(result.Member)
+				r.removeMemberUser(candidatesSlice[index])
+			}
+		}
+
+		if len(errs) == 0 {
+			return nil
+		}
+
+		return errors.Join(errs...)
 	}
 
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return errors.Join(errs...)
+	return nil
 }
 
 // handleServerGroups moves nodes from their current server group into the one

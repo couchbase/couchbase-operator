@@ -297,6 +297,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-servers-volumemounts-index,index>>: ""
       <<couchbaseclusters-spec-servers-volumemounts-logs,logs>>: ""
   <<couchbaseclusters-spec-softwareupdatenotifications,softwareUpdateNotifications>>: false
+  <<couchbaseclusters-spec-upgradeprocess,upgradeProcess>>: ""
   <<couchbaseclusters-spec-upgradestrategy,upgradeStrategy>>: ""
   <<couchbaseclusters-spec-volumeclaimtemplates,volumeClaimTemplates>>: []
   <<couchbaseclusters-spec-xdcr,xdcr>>:
@@ -3791,6 +3792,21 @@ The reason for this is that a failure of these nodes will require indexes to be 
 
 SoftwareUpdateNotifications enables software update notifications in the UI.
 When enabled, the UI will alert when a Couchbase server upgrade is available.
+
+=== couchbaseclusters.spec.upgradeProcess
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `SwapRebalance, DeltaRecovery`
+
+==== Description
+
+UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
+When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or ImmediateUpgrade (determined by UpgradeStrategy).
+When DeltaRecovery is requested, the operator will perform an in-place upgrade on a best effort basis.
+DeltaRecovery cannot be used if the UpgradeStrategy is set to ImmediateUpgrade.
 
 === couchbaseclusters.spec.upgradeStrategy
 
