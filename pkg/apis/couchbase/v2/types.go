@@ -2021,8 +2021,8 @@ const (
 	// safer but will take a longer time than a DeltaRecovery.
 	SwapRebalance UpgradeProcess = "SwapRebalance"
 
-	// DeltaRecovery will kill all pods and attempt to upgrade them at once. This
-	// is much faster but causes disruption to cluster operations.
+	// DeltaRecovery will perform an in-place upgrade of the pods in the cluster.
+	// It will also update PVCs to use the new couchbase server version.
 	DeltaRecovery UpgradeProcess = "DeltaRecovery"
 )
 

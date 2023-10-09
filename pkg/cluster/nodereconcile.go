@@ -1002,6 +1002,15 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	r.log()
 
+	pvcPresent := true
+
+	for _, candidate := range candidates {
+		if c.isPodRecoverable(candidate) == false {
+			pvcPresent = false
+			break
+		}
+	}
+
 	constrained, err := c.selectUpgradeCandidates(candidates)
 	if err != nil {
 		return err
@@ -1033,13 +1042,13 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	candidatesSlice := make([]couchbaseutil.Member, 0, len(candidates))
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(candidates))
 
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && c.k8s.PersistentVolumeClaims != nil {
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
 		err := r.handleDeltaRecovery(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
 	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && c.k8s.PersistentVolumeClaims == nil {
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
 			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 		for _, candidate := range candidates {
