@@ -120,6 +120,10 @@ const (
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion
 
+	EKSTopologyLabel   = "topology.ebs.csi.aws.com/zone"
+	GKETopologyLabel   = "topology.gke.io/zone"
+	AzureTopologyLabel = "topology.disk.csi.azure.com/zone"
+
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 

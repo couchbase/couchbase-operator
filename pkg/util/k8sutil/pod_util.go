@@ -103,7 +103,7 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 			// 0 and 1 in A and B would result in the new pod for 0 being scheduled in
 			// B to keep things in balance, however its volumes are still in A.
 			if serverGroup != "" {
-				pvc.Annotations[constants.ServerGroupLabel] = serverGroup
+				addServerGroupAnnotations(pvc, serverGroup, cluster)
 			}
 
 			if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
@@ -126,6 +126,19 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 	addOwnerRefToObject(pod, cluster.AsOwner())
 
 	return CreatePod(client, cluster.Namespace, pod)
+}
+
+func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup string, cluster *couchbasev2.CouchbaseCluster) {
+	pvc.Annotations[constants.ServerGroupLabel] = serverGroup
+
+	switch cluster.Spec.Platform {
+	case couchbasev2.PlatformTypeAWS:
+		pvc.Annotations[constants.EKSTopologyLabel] = serverGroup
+	case couchbasev2.PlatformTypeGCE:
+		pvc.Annotations[constants.GKETopologyLabel] = serverGroup
+	case couchbasev2.PlatformTypeAzure:
+		pvc.Annotations[constants.AzureTopologyLabel] = serverGroup
+	}
 }
 
 // PersistentVolumeClaimState contains all the information we could ever need about

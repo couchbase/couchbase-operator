@@ -7,7 +7,9 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	v1 "k8s.io/api/core/v1"
 )
 
 func (l volumeMountList) getVolumeMount(t *testing.T, name volumeMountName) volumeMount {
@@ -151,5 +153,46 @@ func TestPopulateCNG(t *testing.T) {
 
 	if cluster.Spec.Networking.CloudNativeGateway.OTLP.Endpoint != "foo.bar" {
 		t.Fatal("expected foo.bar but not found")
+	}
+}
+
+func TestAddServerGroupAnnotations(t *testing.T) {
+	serverGroup := "cb-manc-3"
+	platformTopologyMap := map[couchbasev2.PlatformType]string{
+		couchbasev2.PlatformTypeAWS:   constants.EKSTopologyLabel,
+		couchbasev2.PlatformTypeAzure: constants.AzureTopologyLabel,
+		couchbasev2.PlatformTypeGCE:   constants.GKETopologyLabel,
+	}
+
+	for platformType, topologyLabel := range platformTopologyMap {
+		cluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{
+			Platform: platformType,
+		}}
+
+		pvc := &v1.PersistentVolumeClaim{}
+
+		pvc.Annotations = make(map[string]string)
+
+		addServerGroupAnnotations(pvc, serverGroup, cluster)
+
+		expectedAnnotations := map[string]string{constants.ServerGroupLabel: serverGroup, topologyLabel: serverGroup}
+
+		if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
+			t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
+		}
+	}
+
+	cluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{}}
+
+	pvc := &v1.PersistentVolumeClaim{}
+
+	pvc.Annotations = make(map[string]string)
+
+	addServerGroupAnnotations(pvc, serverGroup, cluster)
+
+	expectedAnnotations := map[string]string{constants.ServerGroupLabel: serverGroup}
+
+	if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
+		t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
 	}
 }
