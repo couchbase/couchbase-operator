@@ -316,6 +316,14 @@ func configure() (err error) {
 		value: 0,
 	}
 
+	podReadinessDelay := durationVar{
+		value: 10 * time.Second,
+	}
+
+	podReadinessPeriod := durationVar{
+		value: 20 * time.Second,
+	}
+
 	compression := bucketCompression{
 		value: couchbasev2.CouchbaseBucketCompressionModePassive,
 	}
@@ -430,6 +438,10 @@ func configure() (err error) {
 		"Time before giving up on pod creation.  Platforms with cluster autoscaling may require a larger value e.g. 15m.")
 	flag.Var(&podDeleteDelay, "pod-delete-delay",
 		"Time before deleting a pod after determining it should be deleted.")
+	flag.Var(&podReadinessDelay, "pod-readiness-delay",
+		"Time before starting readiness probes")
+	flag.Var(&podReadinessPeriod, "pod-readiness-period",
+		"Time between readiness probes")
 	flag.BoolVar(&params.EnableIstio, "istio",
 		false,
 		"Enable istio injection.  This annotates per-test namespaces with Istio injection, and enables any Operator specific workarounds.")
@@ -456,6 +468,8 @@ func configure() (err error) {
 	params.RegistryConfigs = registries.values
 	params.PodCreateTimeout = podCreateTimeout.value
 	params.PodDeleteDelay = podDeleteDelay.value
+	params.PodReadinessDelay = podReadinessDelay.value
+	params.PodReadinessPeriod = podReadinessPeriod.value
 	params.Platform = couchbasev2.PlatformType(platform)
 	params.CompressionMode = compression.value
 	params.BucketType = bucket.value
@@ -483,8 +497,8 @@ func configure() (err error) {
 	return nil
 }
 
-func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout time.Duration, logLevel string, podDeleteDelay time.Duration) *appsv1.Deployment {
-	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, podCreateTimeout, logLevel, podDeleteDelay)
+func createOperatorDeployment(k8s *types.Cluster, operatorImage string, podCreateTimeout time.Duration, logLevel string, podDeleteDelay time.Duration, podReadinessDelay time.Duration, podReadinessPeriod time.Duration) *appsv1.Deployment {
+	deployment := config.GetOperatorDeployment(operatorImage, k8s.PullSecrets, podCreateTimeout, logLevel, podDeleteDelay, podReadinessDelay, podReadinessPeriod)
 
 	return deployment
 }
@@ -1046,6 +1060,8 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			"--image=" + f.OpImage,
 			"--pod-creation-timeout=" + f.PodCreateTimeout.String(),
 			"--pod-delete-delay=" + f.PodDeleteDelay.String(),
+			"--pod-readiness-delay=" + f.PodReadinessDelay.String(),
+			"--pod-readiness-period=" + f.PodReadinessPeriod.String(),
 			"--log-level=" + f.LogLevel,
 			"--namespace=" + cluster.Namespace,
 			"--kubeconfig=" + cluster.KubeConfPath,
@@ -1070,7 +1086,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		// For waiting and for re-creation, cache the deployment by calling directly
 		// into the configuration code.  Remember to populate the namespace too as
 		// that's what the framework uses.
-		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout, f.LogLevel, f.PodDeleteDelay)
+		cluster.OperatorDeployment = createOperatorDeployment(cluster, f.OpImage, f.PodCreateTimeout, f.LogLevel, f.PodDeleteDelay, f.PodReadinessDelay, f.PodReadinessPeriod)
 		cluster.OperatorDeployment.Namespace = cluster.Namespace
 
 		if err := e2eutil.WaitUntilOperatorReady(cluster, 5*time.Minute); err != nil {

@@ -41,8 +41,10 @@ var log = logf.Log.WithName("cluster")
 // var podTerminationGracePeriod = int64(0)
 
 type Config struct {
-	PodCreateTimeout string
-	PodDeleteDelay   string
+	PodCreateTimeout   time.Duration
+	PodDeleteDelay     time.Duration
+	PodReadinessDelay  time.Duration
+	PodReadinessPeriod time.Duration
 }
 
 // Cluster is the core internal data type representing a Couchbase cluster.

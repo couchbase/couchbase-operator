@@ -31,6 +31,12 @@ const (
 	// operatorDefaultDeleteDelay is the default wait time for deleting a pod.
 	operatorDefaultDeleteDelay = time.Duration(0)
 
+	// operatorDefaultPodReadinessDelay is the default delay time for starting readiness probes.
+	operatorDefaultPodReadinessDelay = 10 * time.Second
+
+	// operatorDefaultPodReadinessPeriod is the default period between readiness probes.
+	operatorDefaultPodReadinessPeriod = 20 * time.Second
+
 	// operatorDefaultCPURequest is the number of CPUs to schedule for.
 	// On my laptop it's using ~2% cpu at idle, and the operator either polls or
 	// is event driven, there is no CPU heavy spining.
@@ -80,6 +86,12 @@ type generateOperatorOptions struct {
 	// podDeleteDelay is the time to wait before actually removing a pod.
 	podDeleteDelay durationVar
 
+	// podReadinessDelay is the time to wait before startubg the readiness probes.
+	podReadinessDelay durationVar
+
+	// podReadinessPeriod is the time between readiness probes.
+	podReadinessPeriod durationVar
+
 	// withResources allows you to add resource requests and limits.
 	withResources bool
 
@@ -106,6 +118,8 @@ func newGenerateOperatorOptions() *generateOperatorOptions {
 		logLevel:           newZapLogLevelVar(operatorDefaultLogLevel),
 		podCreationTimeout: newDurationVar(operatorDefaultPodCreationTimout),
 		podDeleteDelay:     newDurationVar(operatorDefaultDeleteDelay),
+		podReadinessDelay:  newDurationVar(operatorDefaultPodReadinessDelay),
+		podReadinessPeriod: newDurationVar(operatorDefaultPodReadinessPeriod),
 		cpuRequest:         newQuantityVar(operatorDefaultCPURequest),
 		cpuLimit:           newQuantityVar(operatorDefaultCPULimit),
 		memoryRequest:      newQuantityVar(operatorDefaultMemoryRequest),
@@ -122,6 +136,8 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
 	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
 	cmd.Flags().Var(&o.podDeleteDelay, "pod-delete-delay", "How long to wait before performing a delete on a failed pod.")
+	cmd.Flags().Var(&o.podReadinessDelay, "pod-readiness-delay", "How long to wait before starting readiness probes on server pods.")
+	cmd.Flags().Var(&o.podReadinessPeriod, "pod-readiness-period", "How long to wait between readiness probes on server pods.")
 	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
 	cmd.Flags().Var(&o.cpuRequest, "cpu-request", "CPU requested for scheduling")
 	cmd.Flags().Var(&o.cpuLimit, "cpu-limit", "CPU limit for constraining")
@@ -577,6 +593,8 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 	operatorCommandArgs := []string{
 		"--pod-create-timeout=" + o.podCreationTimeout.value.String(),
 		"--pod-delete-delay=" + o.podDeleteDelay.value.String(),
+		"--pod-readiness-delay=" + o.podReadinessDelay.String(),
+		"--pod-readiness-period=" + o.podReadinessPeriod.String(),
 		"--zap-log-level=" + o.logLevel.value,
 	}
 
@@ -712,12 +730,14 @@ func (o *generateOperatorOptions) getOperatorService() *corev1.Service {
 }
 
 // GetOperatorDeployment is a hook for use by QE.
-func GetOperatorDeployment(image string, imagePullSecrets []string, podCreationTimeout time.Duration, logLevel string, podDeleteDelay time.Duration) *appsv1.Deployment {
+func GetOperatorDeployment(image string, imagePullSecrets []string, podCreationTimeout time.Duration, logLevel string, podDeleteDelay time.Duration, podReadinessDelay time.Duration, podReadinessPeriod time.Duration) *appsv1.Deployment {
 	o := newGenerateOperatorOptions()
 	o.image = image
 	o.imagePullSecret.imagePullSecrets = imagePullSecrets
 	o.podCreationTimeout.value = podCreationTimeout
 	o.podDeleteDelay.value = podDeleteDelay
+	o.podReadinessDelay.value = podReadinessDelay
+	o.podReadinessPeriod.value = podReadinessPeriod
 	o.logLevel.value = logLevel
 
 	return o.getOperatorDeployment()

@@ -62,14 +62,14 @@ func (c *Cluster) RunningVersionIsAtLeast(v string) (bool, error) {
 }
 
 func (config *Config) GetDeleteOptions() metav1.DeleteOptions {
-	deleteDelay, err := time.ParseDuration(config.PodDeleteDelay)
-	if err != nil {
-		log.Error(err, "Error parsing delete delay")
-
-		deleteDelay = time.Duration(0)
-	}
-
-	deleteDelayInSeconds := int64(deleteDelay / time.Second)
+	deleteDelayInSeconds := int64(config.PodDeleteDelay / time.Second)
 
 	return *metav1.NewDeleteOptions(deleteDelayInSeconds)
+}
+
+func (config Config) GetPodReadinessConfig() k8sutil.PodReadinessConfig {
+	return k8sutil.PodReadinessConfig{
+		PodReadinessDelay:  config.PodReadinessDelay,
+		PodReadinessPeriod: config.PodReadinessPeriod,
+	}
 }

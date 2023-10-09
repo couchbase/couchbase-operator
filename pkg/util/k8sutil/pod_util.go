@@ -57,9 +57,14 @@ const (
 	CngTLSSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-cng-tls"
 )
 
+type PodReadinessConfig struct {
+	PodReadinessDelay  time.Duration
+	PodReadinessPeriod time.Duration
+}
+
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
 	pvcState, err := GetPodVolumes(client, m, cluster, config)
 	if err != nil {
@@ -89,7 +94,7 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 	}
 
 	// Create the actual pod specification.
-	pod, err := CreateCouchbasePodSpec(client, m, cluster, config, serverGroup, pvcState, image)
+	pod, err := CreateCouchbasePodSpec(client, m, cluster, config, serverGroup, pvcState, image, readinessConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -823,7 +828,7 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, serverConfig couchbasev2.ServerConfig, serverGroupZone string, pvcState *PersistentVolumeClaimState, image string) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, serverConfig couchbasev2.ServerConfig, serverGroupZone string, pvcState *PersistentVolumeClaimState, image string, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster, &serverConfig, image)
 
@@ -846,9 +851,9 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 				Port: intstr.FromInt(port),
 			},
 		},
-		InitialDelaySeconds: 10,
+		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
 		TimeoutSeconds:      5,
-		PeriodSeconds:       20,
+		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
 		FailureThreshold:    1,
 	}
 

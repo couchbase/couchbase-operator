@@ -35,7 +35,7 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 		}
 	}()
 
-	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec); err != nil {
+	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig()); err != nil {
 		return err
 	}
 
@@ -72,12 +72,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	}
 
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
-	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
-	if err != nil {
-		return fmt.Errorf("PodCreateTimeout improperly formatted: %w", errors.NewStackTracedError(err))
-	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
+	ctx, cancel := context.WithTimeout(c.ctx, c.config.PodCreateTimeout)
 	defer cancel()
 
 	// Don't delete the volumes here, we need them to recover from, and they
@@ -154,7 +149,7 @@ func (c *Cluster) reconcilePods() error {
 			image = pvcState.Image
 		}
 
-		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image)
+		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
 		if err != nil {
 			return err
 		}
@@ -206,7 +201,7 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 	// Regeneration is used for upgrades, so the CRD is the source of truth here.
 	image := c.cluster.Spec.CouchbaseImage()
 
-	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image)
+	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
 	if err != nil {
 		return nil, err
 	}

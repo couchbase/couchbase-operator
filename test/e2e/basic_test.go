@@ -1,12 +1,17 @@
 package e2e
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Tests creation of a 3 node cluster with 0 buckets
@@ -32,6 +37,49 @@ func TestCreateCluster(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestCLIParametersCluster(t *testing.T) {
+	// Copy the global framework so that we can control the parameters being passed to the operator
+	// without modifying the values for other tests.
+	globalFrameworkCopy := *framework.Global
+	f := &globalFrameworkCopy
+
+	f.PodReadinessDelay = 16 * time.Second
+	f.PodReadinessPeriod = 26 * time.Second
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Check the Readiness probe matches the parameters we passed in
+	cbPodName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	pod, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).Get(context.TODO(), cbPodName, metav1.GetOptions{})
+
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("Pod not found"))
+	}
+
+	readinessProbe := pod.Spec.Containers[0].ReadinessProbe
+	if podReadinessDelaySeconds := readinessProbe.InitialDelaySeconds; podReadinessDelaySeconds != int32(f.PodReadinessDelay.Seconds()) {
+		e2eutil.Die(t, fmt.Errorf("Pod readiness probe delay (%v)s doesnt match passed in parameter (%v)", podReadinessDelaySeconds, f.PodReadinessDelay))
+	}
+
+	if podReadinessPeriod := readinessProbe.PeriodSeconds; podReadinessPeriod != int32(f.PodReadinessPeriod.Seconds()) {
+		e2eutil.Die(t, fmt.Errorf("Pod readiness probe period (%v)s doesnt match passed in parameter (%v)", podReadinessPeriod, f.PodReadinessPeriod))
+	}
 }
 
 // Tests creation of a 3 node cluster with 1 bucket

@@ -131,12 +131,7 @@ func (c *Cluster) logFailedMember(message, name string) {
 // also can return an error...
 func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) { //
 	// The pod creation timeout is global across this operation e.g. PVCs, pods, the lot.
-	podCreateTimeout, err := time.ParseDuration(c.config.PodCreateTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("PodCreateTimeout improperly formatted: %w", errors.NewStackTracedError(err))
-	}
-
-	ctx, cancel := context.WithTimeout(c.ctx, podCreateTimeout)
+	ctx, cancel := context.WithTimeout(c.ctx, c.config.PodCreateTimeout)
 	defer cancel()
 
 	// Allocate an index to be used in the name.  Get the current index then increment

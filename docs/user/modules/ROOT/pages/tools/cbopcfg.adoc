@@ -455,6 +455,20 @@ How long to wait before declaring an error when provisioning a pod.
 +
 How long to wait before performing a delete on a failed pod.
 
+--pod-readiness-delay::
+*Type*: string
++
+*Default*: 10s
++
+How long to wait before starting readiness probes on server pods.
+
+--pod-readiness-period::
+*Type*: string
++
+*Default*: 20s
++
+How long to wait between readiness probes on server pods.
+
 --scope::
 *Type*: string
 +
@@ -1339,6 +1353,20 @@ How long to wait before declaring an error when provisioning a pod.
 *Default*: 0s
 +
 How long to wait before performing a delete on a failed pod.
+
+--pod-readiness-delay::
+*Type*: string
++
+*Default*: 10s
++
+How long to wait before starting readiness probes on server pods.
+
+--pod-readiness-period::
+*Type*: string
++
+*Default*: 20s
++
+How long to wait between readiness probes on server pods.
 
 --scope::
 *Type*: string

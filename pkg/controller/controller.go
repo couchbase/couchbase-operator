@@ -24,10 +24,9 @@ var log = logf.Log.WithName("controller")
 // CouchbaseClusterReconciler is a reconciler object that implements to Reconciler interface
 // as defined by the controller-runtime.
 type CouchbaseClusterReconciler struct {
-	client           client.Client
-	clusters         *ManagedClusters
-	podCreateTimeout string
-	podDeleteDelay   string
+	client        client.Client
+	clusters      *ManagedClusters
+	clusterConfig cluster.Config
 }
 
 // Reconcile is triggered when an event occurs on a watched resource.
@@ -72,7 +71,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		// Cluster created or detected during a restart, start a new management routine.
 		log.V(2).Info("Creating cluster", "cluster", request.NamespacedName)
 
-		c, err := cluster.New(cluster.Config{PodCreateTimeout: r.podCreateTimeout, PodDeleteDelay: r.podDeleteDelay}, couchbase)
+		c, err := cluster.New(r.clusterConfig, couchbase)
 		if err != nil {
 			log.Error(err, "Failed to create Couchbase cluster", "cluster", request.NamespacedName)
 			return reconcile.Result{}, err
@@ -95,12 +94,11 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 // AddToManager registers a controller reconciler with the manager and triggers updates
 // when CouchbaseCluster objects are modified.
-func AddToManager(mgr manager.Manager, createTimeout string, concurrency int, deleteDelay string) error {
+func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Config) error {
 	r := &CouchbaseClusterReconciler{
-		client:           mgr.GetClient(),
-		clusters:         CreateManagedClusters(),
-		podCreateTimeout: createTimeout,
-		podDeleteDelay:   deleteDelay,
+		client:        mgr.GetClient(),
+		clusters:      CreateManagedClusters(),
+		clusterConfig: clusterConfig,
 	}
 
 	options := controller.Options{

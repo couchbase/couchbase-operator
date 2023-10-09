@@ -7,9 +7,11 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis"
 	"github.com/couchbase/couchbase-operator/pkg/chaos"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/controller"
 	"github.com/couchbase/couchbase-operator/pkg/logging"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
@@ -25,12 +27,14 @@ import (
 )
 
 var (
-	listenAddr       string
-	printVersion     bool
-	podCreateTimeout string
-	podDeleteDelay   string
-	chaosLevel       int
-	concurrency      int
+	listenAddr         string
+	printVersion       bool
+	podCreateTimeout   string
+	podDeleteDelay     string
+	podReadinessDelay  string
+	podReadinessPeriod string
+	chaosLevel         int
+	concurrency        int
 
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
@@ -50,6 +54,8 @@ func main() {
 	pflag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	pflag.StringVar(&podCreateTimeout, "pod-create-timeout", "10m", "Sets the amount of time to wait for Pod creation to complete")
 	pflag.StringVar(&podDeleteDelay, "pod-delete-delay", "0m", "Sets the amount of time to wait to allow a pod to recover before deleting it")
+	pflag.StringVar(&podReadinessDelay, "pod-readiness-delay", "10s", "Sets the amount of time to wait after the pod has started before readiness probes are initiated")
+	pflag.StringVar(&podReadinessPeriod, "pod-readiness-period", "20s", "Sets the period between readiness probes")
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
@@ -101,7 +107,14 @@ func main() {
 
 	log.V(1).Info("Initializing controller.")
 
-	if err := controller.AddToManager(mgr, podCreateTimeout, concurrency, podDeleteDelay); err != nil {
+	clusterConfig := cluster.Config{
+		PodCreateTimeout:   parseDuration(podCreateTimeout),
+		PodDeleteDelay:     parseDuration(podDeleteDelay),
+		PodReadinessDelay:  parseDuration(podReadinessDelay),
+		PodReadinessPeriod: parseDuration(podReadinessPeriod),
+	}
+
+	if err := controller.AddToManager(mgr, concurrency, clusterConfig); err != nil {
 		log.Error(err, "Error adding controller to manager")
 		os.Exit(1)
 	}
@@ -121,4 +134,14 @@ func main() {
 		log.Error(err, "Error starting resource manager")
 		os.Exit(1)
 	}
+}
+
+func parseDuration(durationString string) time.Duration {
+	duration, err := time.ParseDuration(durationString)
+	if err != nil {
+		log.Error(err, "Error parsing cli options")
+		os.Exit(1)
+	}
+
+	return duration
 }

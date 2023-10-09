@@ -103,6 +103,7 @@ func registerTests() {
 		framework.NewTestDef(TestCNGBucketOps).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCngOtlp).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
+		framework.NewTestDef(TestCLIParametersCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateBucketCluster).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestResizeCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestEditClusterSettings).WithTags(TagSuiteSanity, TagSuitePlatform),

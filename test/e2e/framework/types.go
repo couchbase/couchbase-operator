@@ -84,7 +84,11 @@ type Framework struct {
 	// PodDeleteDelay is the time we expect to wait before deleting a pod after determining
 	// it must be deleted.
 	PodDeleteDelay time.Duration
-	Platform       couchbasev2.PlatformType
+	// PodReadinessDelay is the time we wait before starting readiness probes
+	PodReadinessDelay time.Duration
+	// PodReadinessPeriod is the time between readiness probes
+	PodReadinessPeriod time.Duration
+	Platform           couchbasev2.PlatformType
 	// RegistryConfigs define private container registries that need to be defined
 	// as docker pull secrets in order to access private container images.
 	RegistryConfigs []RegistryConfig
