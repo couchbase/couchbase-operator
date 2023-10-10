@@ -467,7 +467,7 @@ dockerized-lint: $(GENERATED_FILES)
 .PHONY: lint
 lint: $(GENERATED_FILES)
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) $(GOLINT_VERSION) 
-	$(GOBIN)/golangci-lint run --timeout=10m ./pkg/... ./cmd/... ./test/...
+	$(GOBIN)/golangci-lint run --timeout=20m ./pkg/... ./cmd/... ./test/...
 
 # Lint python scripts for dodgy code.
 .PHONY: lint-python
