@@ -860,7 +860,6 @@ type TestOption int
 // need one for example.
 const (
 	NoOperator TestOption = 1 << iota
-	NoAdmissionController
 )
 
 // optionSet determines whether an option is defined or not.
@@ -877,31 +876,6 @@ func optionSet(options []TestOption, option TestOption) bool {
 // SetupTest is called by parallelizable tests that require a single cluster
 // to run in.
 func (f *Framework) SetupTest(t *testing.T, o ...TestOption) (*types.Cluster, func()) {
-	// This will stop execution of the test here, it will allow the underlying
-	// go testing framework to release jobs based on the requested parallelism.
-	t.Parallel()
-
-	// Schedule a cluster to run on.
-	index1 := f.allocate()
-
-	cluster1, cleanup1 := f.setupCluster(t, index1, o)
-
-	// Start the test.
-	reporter := analyzer.New()
-
-	cleanup := func() {
-		// Report the test status.
-		reporter.Report(t, recover())
-
-		cleanup1()
-	}
-
-	return cluster1, cleanup
-}
-
-// SetupTestWithNoDAC is called by parallelizable tests that require a single cluster
-// to run in and adds a label to the k8s namespace.
-func (f *Framework) SetupTestWithNoDAC(t *testing.T, o ...TestOption) (*types.Cluster, func()) {
 	// This will stop execution of the test here, it will allow the underlying
 	// go testing framework to release jobs based on the requested parallelism.
 	t.Parallel()
@@ -991,20 +965,14 @@ func (f *Framework) SetupSubTest(t *testing.T) func() {
 func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*types.Cluster, func()) {
 	cluster := f.ClusterSpec[index].Copy()
 
-	labels := map[string]string{
-		"istio-injection":  constants.EnabledValue,
-		constants.LabelApp: namespaceLabel,
-	}
-
-	if !optionSet(o, NoAdmissionController) {
-		labels["skip-validation"] = constants.EnabledValue
-	}
-
 	// Create a namespace.
 	namespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: namespacePrefix,
-			Labels:       labels,
+			Labels: map[string]string{
+				"istio-injection":  constants.EnabledValue,
+				constants.LabelApp: namespaceLabel,
+			},
 		},
 	}
 

@@ -53,8 +53,6 @@ const (
 	admissionDefaultPullPolicy = string(corev1.PullIfNotPresent)
 
 	defaultExpirationTime = 10 * 365 * 24 * time.Hour
-
-	skipValidation = "skip-validation"
 )
 
 // generateAdmissionOptions defines options for creating the admission controller.
@@ -729,14 +727,6 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 				SideEffects:   &sideEffectClass,
 				AdmissionReviewVersions: []string{
 					"v1",
-				},
-				NamespaceSelector: &metav1.LabelSelector{
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      skipValidation,
-							Operator: metav1.LabelSelectorOpDoesNotExist,
-						},
-					},
 				},
 			},
 		},
