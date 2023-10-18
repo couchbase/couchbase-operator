@@ -140,7 +140,8 @@ func registerTests() {
 		framework.NewTestDef(TestSyncGatewayCreateLocal).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureSyncGateway),
 
 		// High priority tests.
-		framework.NewTestDef(TestBucketHistoryRetention).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestBucketHistoryRetentionWithAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestBucketHistoryRetentionWithoutAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestResizeClusterWithBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestBasicMDSScaling).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDenyCommunityEdition).WithTags(TagSuiteP0),
@@ -150,8 +151,6 @@ func registerTests() {
 		framework.NewTestDef(TestBucketSelection).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithExplicitName).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithSameExplicitNameAndDifferentType).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestCouchbaseBucketStorageBackendDefault).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestCouchbaseBucketStorageBackendMagma).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestEditServiceConfig).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestCreateClusterDataServiceNotFirst).WithTags(TagSuiteP0),

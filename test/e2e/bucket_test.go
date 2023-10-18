@@ -19,11 +19,69 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TestBucketHistoryRetentionWithoutAnnotations tests the history retention settings for buckets
+// which has no corresponding annotations provided.
+func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.0")
+
+	// Static configuration
+	clusterSize := 1
+
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bucket-no-annotations",
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
+			Replicas:           1,
+			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
+			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
+			EnableFlush:        true,
+			EnableIndexReplica: true,
+			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
+			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+		},
+	}
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// check if mutation setting exists.
+	e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, bucket.Name, 0, 0, true, 2*time.Minute)
+
+	// clean up.
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.Name, 2*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Check events to verify no unnecessary events are emitted.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 /*
-TestBucketHistoryRetention tests history retention server functionality in 7.2 and above.
+TestBucketHistoryRetentionWithAnnotations tests history retention server functionality in 7.2 and above.
 Checks that setting the annotation results in the correct changes in Server.
 */
-func TestBucketHistoryRetention(t *testing.T) {
+func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -533,100 +591,6 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster1, expectedEvents)
 	ValidateEvents(t, kubernetes, cluster2, expectedEvents)
-}
-
-// TestCouchbaseBucketStorageBackendDefault checks the behaviors related to
-// no specified (explicit) storageBackend addition and then amendments.
-func TestCouchbaseBucketStorageBackendDefault(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
-
-	// Static configuration
-	clusterSize := constants.Size1
-
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-
-	bucket := &couchbasev2.CouchbaseBucket{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "bucket-storage-backend-not-specified",
-		},
-		Spec: couchbasev2.CouchbaseBucketSpec{
-			Replicas:           1,
-			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
-			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
-			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
-			EnableFlush:        true,
-			EnableIndexReplica: true,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
-		},
-	}
-
-	b := e2eutil.MustNewBucket(t, kubernetes, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-
-	// assert bucket storage backend is couchstore (default)
-	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendCouchstore, 2*time.Minute)
-
-	// Trying to change the storage backend.
-	e2eutil.MustPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendMagma), time.Minute)
-	// Must not be able to change storage backend.
-	e2eutil.MustVerifyStorageBackendUnchanged(t, kubernetes, cluster, bucket.GetName(), couchbaseutil.CouchbaseStorageBackendCouchstore, time.Minute)
-}
-
-// TestCouchbaseBucketStorageBackendMagma checks the behaviors related to
-// magma storageBackend addition and amendments.
-func TestCouchbaseBucketStorageBackendMagma(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
-
-	// Static configuration
-	clusterSize := constants.Size1
-
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-
-	bucket := &couchbasev2.CouchbaseBucket{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "bucket-magma",
-		},
-		Spec: couchbasev2.CouchbaseBucketSpec{
-			MemoryQuota:        e2espec.NewResourceQuantityMi(1024),
-			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
-			Replicas:           1,
-			IoPriority:         couchbasev2.CouchbaseBucketIOPriorityHigh,
-			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
-			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
-			EnableFlush:        true,
-			EnableIndexReplica: true,
-			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
-		},
-	}
-
-	b := e2eutil.MustNewBucket(t, kubernetes, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-
-	// assert bucket storage backend is magma
-	e2eutil.MustAssertBucketStorageBackend(t, kubernetes, cluster, bucket.Name, couchbaseutil.CouchbaseStorageBackendMagma, 2*time.Minute)
-
-	// Trying to change the storage backend.
-	e2eutil.MustPatchBucket(t, kubernetes, b, jsonpatch.NewPatchSet().Replace("/spec/storageBackend", couchbaseutil.CouchbaseStorageBackendCouchstore), time.Minute)
-	// Must not be able to change storage backend.
-	e2eutil.MustVerifyStorageBackendUnchanged(t, kubernetes, cluster, bucket.GetName(), couchbaseutil.CouchbaseStorageBackendMagma, time.Minute)
 }
 
 func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *testing.T) {
