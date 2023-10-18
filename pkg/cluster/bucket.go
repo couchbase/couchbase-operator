@@ -69,7 +69,14 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		applyBucketBackend(&b, bucket, storageBackendSupported, magmaStorageBackendSupported)
+		applyBucketStorageBackend(&b, bucket, storageBackendSupported, magmaStorageBackendSupported)
+
+		// Defaults to true, when bucket is magma.
+		// Hence, setting it to true to avoid false reconciliation updates.
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention {
+			historyRetentionCollectionDefaultTrue := true
+			b.HistoryRetentionCollectionDefault = &historyRetentionCollectionDefaultTrue
+		}
 
 		// CDC is only supported on Magma
 		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
@@ -84,7 +91,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	return outputBuckets
 }
 
-func applyBucketBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseBucket, storageBackendCouchstore, storageBackendMagma bool) {
+func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseBucket, storageBackendCouchstore, storageBackendMagma bool) {
 	// cb server version below 7.0.0.
 	if !storageBackendCouchstore && bucket.Spec.StorageBackend != "" {
 		// warning log for user why spec.StorageBackend is ignored.
