@@ -99,6 +99,8 @@ func registerTests() {
 		framework.NewTestDef(TestRBACValidationLDAP).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCNGVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketMigrationPre76Invalid).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketMigrationPost76Validation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),

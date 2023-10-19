@@ -1,0 +1,41 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+spec:
+  image: couchbase/server:7.6.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+  cluster:
+    dataServiceMemoryQuota: 2048Mi  
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 1024Mi
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket2
+spec:
+  storageBackend: magma
+  memoryQuota: 1024Mi
+  evictionPolicy: fullEviction

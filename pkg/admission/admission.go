@@ -201,6 +201,12 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 		Allowed: true,
 	}
 
+	options := &types.ValidatorOptions{
+		ValidateSecrets:        config.ValidateSecrets,
+		ValidateStorageClasses: config.ValidateStorageClasses,
+		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
+	}
+
 	// Check that the CouchbaseCluster is correctly configured with respect to an existing resource
 	if ar.Request.Operation == admissionv1.Update {
 		// Ignore errors here as we could be upgrading from v1 to v2.  In this scenario
@@ -215,12 +221,11 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
 		}
-	}
 
-	options := &types.ValidatorOptions{
-		ValidateSecrets:        config.ValidateSecrets,
-		ValidateStorageClasses: config.ValidateStorageClasses,
-		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
+		if err := validator.CheckChangeConstraints(validator.New(getClient(), getCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
+			log.Error(err, "Rejecting resource")
+			return errorResponse(err)
+		}
 	}
 
 	// Check that the CouchbaseCluster is correctly configured

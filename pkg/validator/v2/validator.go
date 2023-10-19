@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -3047,16 +3048,6 @@ func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseClu
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
-	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
-		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
-	}
-
-	if prev.Spec.StorageBackend != curr.Spec.StorageBackend {
-		if !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
-			errs = append(errs, fmt.Errorf("spec.storageBackend value in body %s cannot be different from previous value %s", curr.Spec.StorageBackend, prev.Spec.StorageBackend))
-		}
-	}
-
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
@@ -3068,6 +3059,64 @@ func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	return nil
 }
 
+func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket) error {
+	var errs []error
+
+	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
+		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
+	}
+
+	if prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
+		allClustersAtleast76, err := areAllBucketsClustersAtleast76(v, curr)
+
+		if err != nil {
+			return err
+		}
+
+		if !allClustersAtleast76 {
+			errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) (bool, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return false, err
+	}
+
+	for _, cluster := range clusters.Items {
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return false, err
+		}
+
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+			if err != nil {
+				return false, err
+			}
+
+			after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
+
+			if err != nil {
+				return false, err
+			}
+
+			if !after76 {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
 	var errs []error
 

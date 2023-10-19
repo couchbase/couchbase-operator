@@ -16,7 +16,7 @@ COPY crd.yaml /
 
 COPY README.txt /
 COPY License.txt /
-COPY validation.yaml /resources/validation/
+COPY validation /resources/validation/
 
 # Create a non-root user to run as.
 RUN adduser --uid 8453 --shell /bin/false couchbase
