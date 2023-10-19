@@ -168,7 +168,7 @@ type AutoFailoverSettings struct {
 	Timeout                  int64                         `url:"timeout" json:"timeout"`
 	Count                    uint8                         `json:"count"`
 	FailoverOnDataDiskIssues FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
-	FailoverServerGroup      bool                          `url:"failoverServerGroup" json:"failoverServerGroup"`
+	FailoverServerGroup      *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
 	MaxCount                 uint64                        `url:"maxCount" json:"maxCount"`
 }
 
@@ -258,6 +258,10 @@ type NodeInfo struct {
 	AvailableStorage   AvailableStorageInfo `json:"storage"`
 	AlternateAddresses *AlternateAddresses  `json:"alternateAddresses,omitempty"`
 	Version            string               `json:"version"`
+
+	// This property is only available if a bucket in the cluster has been changed from
+	// couchstore to magma.
+	StorageBackend string `json:"storageBackend"`
 
 	// AddressFamily is the actual network configuration of the node, and controls
 	// the protocol Couchbase talks to itself over (A vs AAAA lookups most likely).
@@ -443,6 +447,7 @@ type Bucket struct {
 }
 
 type BucketList []Bucket
+type BucketStatusList []BucketStatus
 
 func (b BucketList) Get(name string) (*Bucket, error) {
 	for i := range b {

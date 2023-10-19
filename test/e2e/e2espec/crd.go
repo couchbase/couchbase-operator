@@ -84,6 +84,17 @@ var (
 		},
 	}
 
+	// DataOnlyEphemeralTopology is a simple ephemeral cluster, useful for testing
+	// basic configuration settings and reducing memory usage.
+	DataOnlyEphemeralTopology = ClusterTopology{
+		{
+			Name: "default",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+			},
+		},
+	}
+
 	// MixedEphemeralTopology separates stateful and
 	// stateless services into separate server groups.
 	MixedEphemeralTopology = ClusterTopology{

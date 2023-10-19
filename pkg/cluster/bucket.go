@@ -278,10 +278,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				// Since, BucketStorageBackend is non-editable, once created.
-				// This avoids running any update reconcile loop,
-				// if BucketStorageBackend seems to be the only one different.
-				r.BucketStorageBackend = a.BucketStorageBackend
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
 					c.logUpdate(a, r)

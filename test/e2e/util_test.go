@@ -584,6 +584,9 @@ func registerTests() {
 		framework.NewTestDef(TestPodDeletedAfterExpectedDelay).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
 		framework.NewTestDef(TestAnalyticsKillPods).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestAnalyticsKillPodsWithPVC).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade),
+		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),

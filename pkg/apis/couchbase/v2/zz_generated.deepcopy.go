@@ -429,6 +429,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(RecoveryPolicy)
 		**out = **in
 	}
+	if in.UpgradeProcess != nil {
+		in, out := &in.UpgradeProcess, &out.UpgradeProcess
+		*out = new(UpgradeProcess)
+		**out = **in
+	}
 	if in.UpgradeStrategy != nil {
 		in, out := &in.UpgradeStrategy, &out.UpgradeStrategy
 		*out = new(UpgradeStrategy)

@@ -69,6 +69,9 @@ type Bucket struct {
 
 	// scopes is a slice containing the scopes to be added.
 	scopes []metav1.Object
+
+	// CouchbaseStorageBackend can either be "couchstore" or "magma"
+	storageBackend couchbasev2.CouchbaseStorageBackend
 }
 
 // NewBucket creates a bucket with any required parameters.
@@ -140,6 +143,12 @@ func (b *Bucket) WithTTL(ttl int) *Bucket {
 	return b
 }
 
+func (b *Bucket) WithStorageBackend(backend couchbasev2.CouchbaseStorageBackend) *Bucket {
+	b.storageBackend = backend
+
+	return b
+}
+
 // WithScopes takes a variable amount of scope objects, and adds them to the bucket.
 func (b *Bucket) WithScopes(scopes ...metav1.Object) *Bucket {
 	b.scopes = append(b.scopes, scopes...)
@@ -202,6 +211,10 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 
 		if b.maxTTL != 0 {
 			bucket.Spec.MaxTTL = e2espec.NewDurationS(uint64(b.maxTTL))
+		}
+
+		if b.storageBackend != "" {
+			bucket.Spec.StorageBackend = b.storageBackend
 		}
 
 		if b.scopes != nil {
@@ -333,12 +346,7 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 	return nil
 }
 
-func (b *Bucket) MustCreateManually(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string) *couchbaseutil.Bucket {
-	client, err := CreateAdminConsoleClient(kubernetes, cluster)
-	if err != nil {
-		Die(t, err)
-	}
-
+func (b *Bucket) toBucketForAPI(name string) *couchbaseutil.Bucket {
 	bucket := &couchbaseutil.Bucket{
 		BucketName:         name,
 		BucketType:         string(b.kind),
@@ -394,11 +402,53 @@ func (b *Bucket) MustCreateManually(t *testing.T, kubernetes *types.Cluster, clu
 		bucket.MaxTTL = b.maxTTL
 	}
 
+	if b.storageBackend != "" {
+		bucket.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(b.storageBackend)
+	}
+
+	return bucket
+}
+
+func (b *Bucket) MustCreateManually(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string) *couchbaseutil.Bucket {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	bucket := b.toBucketForAPI(name)
+
 	if len(b.scopes) > 0 {
 		Die(t, fmt.Errorf("cannot use builder to manually create scopes"))
 	}
 
-	if err := couchbaseutil.CreateBucket(bucket).On(client.client, client.host); err != nil {
+	err = retryutil.RetryFor(30*time.Second, func() error {
+		return couchbaseutil.CreateBucket(bucket).On(client.client, client.host)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	return bucket
+}
+
+func (b *Bucket) MustUpdateManually(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) *couchbaseutil.Bucket {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	bucket := b.toBucketForAPI(name)
+
+	if len(b.scopes) > 0 {
+		Die(t, fmt.Errorf("cannot use builder to manually create scopes"))
+	}
+
+	err = retryutil.RetryFor(timeout, func() error {
+		return couchbaseutil.UpdateBucket(bucket).On(client.client, client.host)
+	})
+
+	if err != nil {
 		Die(t, err)
 	}
 
@@ -495,6 +545,10 @@ func mustAssertCouchbaseBucket(t *testing.T, got *couchbasev2.CouchbaseBucket, e
 	// ttl
 	if got.Spec.MaxTTL.Duration != time.Second*time.Duration(expected.MaxTTL) {
 		Die(t, fmt.Errorf("max ttl does not match: expected %s, got %s", time.Second*time.Duration(expected.MaxTTL), got.Spec.MaxTTL.Duration))
+	}
+
+	if got.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackend(expected.BucketStorageBackend) {
+		Die(t, fmt.Errorf("storage backend does not match: expected %s, got %s", expected.BucketStorageBackend, got.Spec.StorageBackend))
 	}
 }
 

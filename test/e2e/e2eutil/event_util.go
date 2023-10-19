@@ -14,6 +14,15 @@ import (
 
 type EventList []v1.Event
 
+var SwapRebalanceSequence = eventschema.Sequence{
+	Validators: []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	},
+}
+
 func (e EventList) Len() int {
 	return len(e)
 }
