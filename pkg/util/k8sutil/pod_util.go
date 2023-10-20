@@ -1784,13 +1784,8 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 		},
 		LivenessProbe: &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
-				HTTPGet: &v1.HTTPGetAction{
-					Path: metricsEndpointPath,
-					Port: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: prometheusPort,
-					},
-					Scheme: v1.URISchemeHTTP,
+				GRPC: &v1.GRPCAction{
+					Port: int32(snDataPort),
 				},
 			},
 			InitialDelaySeconds: 10,
