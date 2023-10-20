@@ -1874,7 +1874,7 @@ type CouchbaseRoleBindingList struct {
 }
 
 // CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler
-// to interactive with the Couchbase cluster and provide autoscaling.  This resource is
+// to interact with the Couchbase cluster and provide autoscaling.  This resource is
 // not defined by the end user, and is managed by the Operator.
 // +genclient
 // +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/api/autoscaling/v1.Scale

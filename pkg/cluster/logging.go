@@ -16,7 +16,7 @@ const (
 	LoggingConfigurationManagedAnnotation = "logging.couchbase.com/managed"
 )
 
-// reconcileLogConfig will create a default ConfigMap for log configuration if one does not exist.
+// reconcileLogConfig will create a default Secret for log configuration if one does not exist.
 func (c *Cluster) reconcileLogConfig() error {
 	fbs := c.cluster.Spec.Logging.Server
 	if fbs == nil || !fbs.Enabled {
@@ -39,7 +39,7 @@ func (c *Cluster) reconcileLogConfig() error {
 	// Retrieve the current configuration and whether it exists at all
 	current, exists := c.k8s.Secrets.Get(fbs.ConfigurationName)
 
-	// Use a ConfigMap as this can then be dynamically changed and picked up by existing sidecars (or new ones).
+	// Use a Secret as this can then be dynamically changed and picked up by existing sidecars (or new ones).
 	// The config map means we are fully configurable as well to handle output to ES, Azure, S3, etc, per customer.
 	// Note that FluentBit currently does not support hot reloading: https://github.com/fluent/fluent-bit/issues/365
 	requestedConfig := &v1.Secret{

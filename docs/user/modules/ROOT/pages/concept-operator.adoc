@@ -140,6 +140,55 @@ Detailed role requirements are documented in the xref:reference-operator-rbac.ad
 
 A `Service` is provided to allow access to Operator Prometheus metrics, if desired.
 
+
+=== Reconciliation Order
+
+The Operator takes a wide range of actions on the Couchbase cluster based on the `CouchbaseCluster` resource, this can sometimes result in unexpected behaviour on the cluster if multiple changes are made to the `CouchbaseCluster` resource at once.
+The order of reconciliation operations that the Operator performs is as follows:
+
+==== Hibernation
+Hibernating the cluster takes priority over everything else, if `spec.hibernate` is `true` then the Operator will hibernate the cluster without taking any further action.
+
+==== Pre-requisite resources
+The operator reconciles the requisite resources that are needed for the cluster to operate, this includes:
+
+* Kubernetes services to enable communication between Couchbase Pods
+* Kubernetes service to access the admin console (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposeadminconsole[`couchbaseclusters.spec.networking.exposeAdminConsole`])
+* TLS Secrets
+* Logging Config Secret (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server[`couchbaseclusters.spec.logging.server`])
+
+==== Cluster Creation
+The Operator focuses on ensuring that a Couchbase Cluster is available by either recovering down pods or creating an initial Couchbase pod to start the cluster.
+
+==== Node Reconciliation
+The Operator makes topology changes to the cluster in the following order:
+
+* Waiting for nodes to warmp-up
+* Handling down and failed nodes
+* Removing nodes from deleted server configs
+* Volume expansions for persistent volumes
+* Upgrading Couchbase Server pods based on spec changes
+* Scaling down
+* Scaling up
+* Kubernetes services for Couchbase exposed features (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`])
+* Triggering Node Rebalancing
+
+==== Post Topology Reconciliation
+The Operator makes reconciles other cluster properties in the following order:
+
+* Cluster Networking
+* Mutable Pod Metadata (no topology changes)
+* Couchbase Server cluster settings
+* Buckets
+* Scopes and Collections
+* Bucket synchronization (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-buckets-synchronize[`couchbaseclusters.spec.buckets.synchronize`])
+* XDCR connections (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-xdcr[`couchbaseclusters.spec.xdcr`])
+* Kubernetes services for Couchbase exposed features (xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`])
+* RBAC
+* Backups
+* Backup Restores
+* Cloud Native Gateway service
+
 == Couchbase Cluster
 
 Couchbase clusters are create by the Operator responding to `CouchbaseCluster` resources.
