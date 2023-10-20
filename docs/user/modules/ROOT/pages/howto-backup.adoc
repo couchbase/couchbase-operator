@@ -3,7 +3,7 @@
 include::partial$constants.adoc[]
 
 [abstract]
-You can configure the Autonomous Operator to take periodic, automated backups of your Couchbase cluster with the existing functionality provided by `cbbackupmgr`.
+You can configure the Autonomous Operator to take periodic, automated backups of your Couchbase cluster with the existing functionality provided by `cbbackupmgr`, as well as being able to trigger automated immediate backups.
 
 == Overview
 
@@ -86,20 +86,39 @@ kind: CouchbaseBackup
 metadata:
   name: my-backup
 spec:
-  strategy: full_incremental
+  strategy: full_incremental # <1>
   full:
-    schedule: "0 3 * * 0" # <1>
+    schedule: "0 3 * * 0" # <2>
   incremental:
-    schedule: "0 3 * * 1-6" # <1>
-  size: 20Gi # <2>
+    schedule: "0 3 * * 1-6" # <2>
+  size: 20Gi # <3>
 ----
 
-<1> On detection of the `CouchbaseBackup` resource, the Autonomous Operator creates the correct cron jobs for the `spec.full.schedule` and the `spec.incremental.schedule`.
+<1> Periodic backups require `spec.strategy` to be either `full_only` or `full_incremental`
+
+<2> On detection of the `CouchbaseBackup` resource, the Autonomous Operator creates the correct cron jobs for the `spec.full.schedule` and the `spec.incremental.schedule`.
 In this example a full backup would be performed at 3:00AM on a Sunday and then an incremental backup on every other day of the week at 3:00AM.
 
-<2> The Autonomous Operator will also create a PersistentVolumeClaim (PVC) to store the backups and logs with the same name that is specified in `metadata.name`.
+<3> The Autonomous Operator will also create a PersistentVolumeClaim (PVC) to store the backups and logs with the same name that is specified in `metadata.name`.
 So if a PVC called "my-backup" does not yet exist in this case, one will be created.
 This would also happen if for some reason the PVC was deleted.
+
+
+An immediate backup can also be triggered immediately using `CouchbaseBackup` resources with the `immediate_full` or `immediate_incremental` strategies. When the Autonomous Operatore detects `CouchbaseBackup` resource with either of these strategues it will attempt to trigger a backup Job immediatelyThe following is a simple configuration with the minimum required fields set to take an immediate backup.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: my-backup
+spec:
+  strategy: immediate_full # <1>
+  size: 20Gi
+----
+
+<1> Immediated backups require `spec.strategy` to be either `immediate_full` or `immediate_incremental`
+
 
 Once you have created a `CouchbaseBackup`, we can check that for the expected behavior by viewing the Operator logs.
 
@@ -144,6 +163,7 @@ Kubernetes::
 [source,console]
 ----
 $ kubectl get cronjob
+$ kubectl get job
 $ kubectl get pvc
 ----
 --
@@ -154,12 +174,13 @@ OpenShift::
 [source,console]
 ----
 $ oc get cronjob
+$ oc get job
 $ oc get pvc
 ----
 --
 ====
 
-For example, the output should look like:
+For example, for periodic backups the output of the `cronjobs` should look like:
 [source,console]
 ----
 NAME                        SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
@@ -167,6 +188,14 @@ my-backup-full              0 3 * * 0     False     0        <none>          18s
 my-backup-incremental       0 3 * * 1-6   False     0        <none>          18s
 ----
 
+And for immediate backups the jobs should like:
+[source,console]
+----
+NAME                        COMPLETIONS   DURATION   AGE
+my-immediate-backup-full    1/1           20s        17h
+----
+
+Any backups that have been triggered should have PVCs with the backup data:
 [source%nowrap,console]
 ----
 NAME        STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
