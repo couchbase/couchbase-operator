@@ -10,32 +10,36 @@ The Couchbase Server version can be xref:howto-couchbase-upgrade.adoc[upgraded] 
 
 Upgrades may be performed using one of a number of different strategies as specified by xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradestrategy[`couchbaseclusters.spec.upgradeStrategy`] in the `CouchbaseCluster` resource:
 
+* DeltaRecovery performs an in-place upgrade on one, or more, pods at a time
 * Rolling upgrades upgrade one, or more, pods at a time
 * Immediate upgrades upgrade all pods at the same time
 
-This process is as follows:
+For rolling and immediate upgrades, the process is as follows:
 
 * One or more candidate pods are selected
 * New pods are created for each of the candidates with the same Couchbase configuration as the existing ones
 * Data is rebalanced from the old pods to the new ones
 * The candidate pods are deleted
 
+For delta recovery, the process is as follows:
+
+* One or more candidate pods are selected
+* Each candidate is failed over and updated with the new version
+* Each PVC associated with the candidate is updated with the new version
+* Operator performs a delta recovery on the candidate
+
 When using rolling upgrades, performing the operation one pod at a time, risk is limited in the event of an issue, and can be rolled back.
 A rolling upgrade requires the least network and compute overhead, so will affect client operation less.
 
 When using immediate upgrades, there is a greater risk, and requires greater resource during the upgrade, however the operation itself is significantly faster.
-Immediate upgrades may have an undesired affect on client performance as all pods in the cluster are undergoing upgrade at the same time.
+Immediate upgrades may have an undesired effect on client performance as all pods in the cluster are undergoing upgrade at the same time.
 
-You can balance time against risk by tailoring rolling upgrades with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter.
+When using delta recovery, the pods and PVCs are updated to use the new version. This is quicker than a rolling upgrade and will retain the same PVCs (data retained).
+Delta recovery cannot be used in conjunction with immediate upgrades. The validator will fail the request if immediate upgrade strategy and delta recovery upgrade process are both specified.
+The same pod names and networking settings will be retained when the pod is restarted by the operator.
+
+You can balance time against risk by tailoring rolling updates with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter.
 This allows rolling upgrades to upgrade 2 pods at a time, or 20% of the cluster at a time, for example.
-
-[IMPORTANT]
-====
-Ideally, the Operator should replace an old pod for a new one, retaining any existing persistent storage, then performing a delta-node recovery to perform a fast upgrade.
-Couchbase Server requires an offline upgrade task to migrate old data structures to new ones before starting the service.
-The Operator is unable -- at present -- to perform this upgrade action, therefore it must create new storage for new pods and copy data to the new storage.
-Any time required for an upgrade must be considered when planning an upgrade.
-====
 
 === Couchbase Server Upgrade Constraints
 
@@ -79,3 +83,5 @@ This mechanism allows a cluster to be used from evaluation right up to productio
 Online persistent volume resizing support is not yet available in all supported versions of Kubernetes.
 As a result the Operator supports xref:howto-persistent-volume-resize.adoc[persistent volume resizing] using a similar mechanism to <<upgrading-pods>>.
 The Operator will detect a modification to the specification of a persistent volume template and schedule a pod upgrade in order to satisfy the request.
+
+During delta recovery, the PVC will be updated to include the updated image and couchbase server versions. The size of the PVC and data within it will not be edited.

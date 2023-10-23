@@ -27,3 +27,28 @@ spec:
 
 <.> The modification will trigger the Operator to detect that existing pod specifications do not match the new pod specifications.
 This will perform a xref:concept-upgrade.adoc#upgrading-couchbase-server[rolling upgrade] of Couchbase Server.
+
+== Delta Recovery
+Given the existing configuration:
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  image: couchbase/server:{couchbase-version-upgrade-from}
+  upgradeProcess: DeltaRecovery # <.>
+----
+
+<.> This field will inform the operator that we want to perform an in-place upgrade of the existing pods.
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  image: couchbase/server:{couchbase-version} # <.>
+  upgradeProcess: DeltaRecovery
+----
+
+<.> The Operator will detect that existing pod specifications do not match the new pod specifications and trigger an in-place upgrade.
