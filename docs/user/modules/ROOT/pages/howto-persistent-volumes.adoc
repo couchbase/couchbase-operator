@@ -109,6 +109,7 @@ metadata:
   name: cb-example
 spec:
   enableOnlineVolumeExpansion: true # <.>
+  onlineVolumeExpansionTimeoutInMins: 10 # <.>
   volumeClaimTemplates:
   - metadata:
       name: couchbase
@@ -120,6 +121,8 @@ spec:
 ----
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`]: This field must be set to `true` for the Autonomous Operator to allow online volume expansion.
+
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins[`couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins`]: This field must be provided as a retry mechanism with a timeout in minutes. It could be in between 0 to 30 mins, defaulting to 10 mins. No unit is needed to be provided.
 
 <.> Modifying the storage size will trigger the Autonomous Operator to detect that existing persistent volume claims do not match the intended size (as it normally would).
 However, if the new value is larger than the previous value, the Autonomous Operator will attempt an online expansion of the volume.
@@ -146,8 +149,7 @@ It may take some time for online volume expansion to complete, especially since 
 
 [CAUTION]
 ====
-There is no timeout for volume expansion tasks.
-Volumes will remain at their current size until the underlying infrastructure provides larger volumes or reports a failure.
+Once the provided timeout in xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins[`couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins`] is reached for retries and the volume resize is not successful, as the underlying infrastructure could not provide larger volumes, it would report a failure.
 Unfortunately, the request cannot be rolled back since the request can only be increased.
 Therefore, the only way to abort a suspended expansion task is to set xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`] back to `false` so that a rolling upgrade may occur.
 

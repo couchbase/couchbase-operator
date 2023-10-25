@@ -503,7 +503,7 @@ func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *
 			pvc.Annotations[constants.AnnotationVolumeMountSubPaths] = mountMapping.mountPath
 		}
 
-		if err := state.addVolume(client, pvc, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion, cluster.Spec.OnlineVolumeExpansionTimeout); err != nil {
+		if err := state.addVolume(client, pvc, member, mountMapping, cluster.Spec.EnableOnlineVolumeExpansion, cluster.Spec.OnlineVolumeExpansionTimeoutInMins); err != nil {
 			return nil, err
 		}
 
