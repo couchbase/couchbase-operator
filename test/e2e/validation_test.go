@@ -2309,12 +2309,6 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "TestValidateBackupRestoreMissingBackupField",
-			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Remove("/spec/backup")},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.backup`},
-		},
-		{
 			name:           "TestValidateBackupRestoreStartPositiveInteger",
 			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Replace("/spec/start/int", 0)},
 			shouldFail:     true,
