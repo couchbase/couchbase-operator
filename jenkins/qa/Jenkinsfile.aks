@@ -402,6 +402,67 @@ pipeline {
       }
     }
 
+    stage('Test Local Persistent Volumes') {
+      when {
+        expression {
+          params.lpv
+        }
+      }
+      steps {
+        script {
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+            --clean \
+            --parallel 6 \
+            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name lpv \
+            -- \
+            -suite lpv \
+            -platform-type kubernetes \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+            -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -istio=${params.enable_istio} \
+            -collect-logs \
+            -color=false \
+            -ignore-errors=${params.enable_istio}"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+          sh 'tar xf lpv.tar.bz2'
+          sh 'tar xf results.tar.bz'
+        }
+      }
+      post {
+        always {
+          // Save JUnit results, this is what we will review.
+          junit 'artifacts/*.xml'
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          sh 'tar czf lpv.tar.gz artifacts/logs'
+          archiveArtifacts artifacts: 'lpv.tar.gz', fingerprint: true
+        }
+      }
+    }
+
     stage('Test PlatformCert') {
       when {
         expression {

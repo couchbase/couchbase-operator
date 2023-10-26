@@ -34,6 +34,7 @@ const (
 	TagFeatureMetrics           = "metrics"
 	TagFeatureTLS               = "tls"
 	TagFeaturePersistentVolumes = "persistentvolumes"
+	TagFeatureLPV               = "lpv"
 	TagFeatureUpgrade           = "upgrade"
 	TagFeatureSyncGateway       = "syncgateway"
 	TagFeatureXDCR              = "xdcr"
@@ -227,9 +228,6 @@ func registerTests() {
 		framework.NewTestDef(TestPersistentVolumeAutoFailover).WithTags(TagSuiteP0, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestPersistentVolumeAutoRecovery).WithTags(TagSuiteP0, TagSuitePlatform, TagFeaturePersistentVolumes, TagFeatureRecovery),
 		framework.NewTestDef(TestPersistentVolumeKillAllPodsTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeaturePersistentVolumes, TagSuitePlatform),
-		framework.NewTestDef(TestLocalVolumeMountReuse).WithTags(TagSuiteP0, TagFeaturePersistentVolumes),
-		framework.NewTestDef(TestMixedVolumeMountReuse).WithTags(TagSuiteP0, TagFeaturePersistentVolumes),
-		framework.NewTestDef(TestLocalVolumeAutoFailover).WithTags(TagSuiteP0, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestServerGroupAutoFailover).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestMultiNodeAutoFailover).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestAnalyticsResizeCluster).WithTags(TagSuiteP0),
@@ -672,6 +670,11 @@ func registerTests() {
 
 		// System tests.
 		framework.NewTestDef(TestFeaturesAll).WithTags(TagSuiteSystem),
+
+		// Local Persistent Volume tests
+		framework.NewTestDef(TestLocalVolumeMountReuse).WithTags(TagFeatureLPV),
+		framework.NewTestDef(TestMixedVolumeMountReuse).WithTags(TagFeatureLPV),
+		framework.NewTestDef(TestLocalVolumeAutoFailover).WithTags(TagFeatureLPV),
 	}
 }
 
