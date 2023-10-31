@@ -324,4 +324,4 @@ Legal scope names have a maximum length of 251 characters and may be composed of
 ==== Description
 
 Selector allows resources to be implicitly considered for inclusion in this bucket.
-More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta.
+More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
