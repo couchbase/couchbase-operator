@@ -11,17 +11,7 @@ import (
 
 // checks cluster version is above minimum version requirement.
 func (c *Cluster) IsAtLeastVersion(v string) (bool, error) {
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return false, err
-	}
-
-	available, err := couchbaseutil.VersionAfter(tag, v)
-	if err != nil {
-		return false, err
-	}
-
-	return available, nil
+	return c.cluster.IsAtLeastVersion(v)
 }
 
 // checks all pods in a cluster are above a minimum version requirement.

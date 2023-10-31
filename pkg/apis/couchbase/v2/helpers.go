@@ -9,13 +9,18 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+var log = logf.Log.WithName("cluster")
 
 func (c *CouchbaseCluster) AsOwner() metav1.OwnerReference {
 	trueVar := true
@@ -517,6 +522,16 @@ func (c *CouchbaseCluster) IndexStorageMode() CouchbaseClusterIndexStorageSettin
 	return c.Spec.ClusterSettings.IndexStorageSetting
 }
 
+// GetDefaultBucketStorageBackend gets the default storage backend if it is set,
+// otherwise it returns the default default (I know), Couchstore (for now).
+func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() CouchbaseStorageBackend {
+	if c.Spec.Buckets.DefaultStorageBackend != "" {
+		return c.Spec.Buckets.DefaultStorageBackend
+	}
+
+	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+}
+
 // IsSupportable tells us whether a specific server class is supportable, it must
 // have volume mounts, the default claim, or the logs claim if all enabled services
 // are stateless.
@@ -956,6 +971,21 @@ func (c *CouchbaseCluster) GetBackupStoreEndpoint() *ObjectEndpoint {
 	return c.Spec.Backup.ObjectEndpoint
 }
 
+// Checks cluster version is above minimum version requirement.
+func (c *CouchbaseCluster) IsAtLeastVersion(v string) (bool, error) {
+	tag, err := couchbaseutil.CouchbaseImageVersion(c.Spec.CouchbaseImage())
+	if err != nil {
+		return false, err
+	}
+
+	available, err := couchbaseutil.VersionAfter(tag, v)
+	if err != nil {
+		return false, err
+	}
+
+	return available, nil
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {
@@ -1044,6 +1074,40 @@ func (b *CouchbaseBucket) GetScopes() *ScopeSelector {
 
 func (b *CouchbaseBucket) AddScopeResource(resource ScopeLocalObjectReference) {
 	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
+}
+
+func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) CouchbaseStorageBackend {
+	// If there is no cluster then we can't check if cluster version supports the backend,
+	// or get the cluster default so we trust the bucket and get the default default
+	if cluster == nil {
+		return b.getStorageBackend()
+	}
+
+	magmaSupported, err := cluster.IsAtLeastVersion("7.1.0")
+
+	if err != nil {
+		// we couldn't parse the cluster version so we'll trust the bucket/get default default
+		log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
+		return b.getStorageBackend()
+	}
+
+	if !magmaSupported {
+		return CouchbaseStorageBackendCouchstore
+	}
+
+	if b.Spec.StorageBackend == "" {
+		return cluster.GetDefaultBucketStorageBackend()
+	}
+
+	return b.Spec.StorageBackend
+}
+
+func (b *CouchbaseBucket) getStorageBackend() CouchbaseStorageBackend {
+	if b.Spec.StorageBackend == "" {
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	}
+
+	return b.Spec.StorageBackend
 }
 
 func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {

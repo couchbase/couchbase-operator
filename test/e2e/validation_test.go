@@ -3205,3 +3205,67 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration-76.yaml"})
 }
+
+func TestAnnotationValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestInvalidCAOClusterAnnotation",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{"cao.couchbase.com/invalidAnnotation": "v"})},
+			expectedErrors: []string{"could not find field"},
+			shouldFail:     true,
+		},
+		{
+			name: "TestValidCAOClusterAnnotations",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend":               "magma",
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestClusterAnnotationsBackendValuesInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend":               "supamagma",
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "coldmagma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"must be a valid storage backend"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-migration-76.yaml"})
+}
+
+func TestAnnotationVersionValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestTargetUnmanagedBackendAnnotationInvalidVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "couchstore",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"server version 7.6.0 or larger"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-migration.yaml"})
+}
+
+func TestDefaultStorageBackendChangeValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestDefaultBackendChangeCausingInvalingBackendMigration",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"backend changes are only supported for server version >= 7.6.0"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
+}

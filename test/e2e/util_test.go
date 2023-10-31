@@ -101,6 +101,9 @@ func registerTests() {
 		framework.NewTestDef(TestCNGVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMigrationPre76Invalid).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMigrationPost76Validation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestAnnotationValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestAnnotationVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestDefaultStorageBackendChangeValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),

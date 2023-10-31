@@ -2227,7 +2227,7 @@ type ClusterSpec struct {
 
 	// Buckets defines whether the Operator should manage buckets, and how to lookup
 	// bucket resources.
-	Buckets Buckets `json:"buckets,omitempty"`
+	Buckets Buckets `json:"buckets,omitempty" annotation:"buckets"`
 
 	// XDCR defines whether the Operator should manage XDCR, remote clusters and how
 	// to lookup replication resources.
@@ -3234,6 +3234,15 @@ type Buckets struct {
 	// Selector is a label selector used to list buckets in the namespace
 	// that are managed by the Operator.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// Defined the default storage backend to use if a backend is not specified for a bucket,
+	// if this isn't specified then the default will be Couchstore.
+	// +kubebuilder:default=couchstore
+	DefaultStorageBackend CouchbaseStorageBackend `json:"-" annotation:"defaultStorageBackend"`
+
+	// Allows the operator to reconcile the storage backend for unmanaged buckets to match
+	// this value.
+	TargetUnmanagedBucketStorageBackend *CouchbaseStorageBackend `json:"-" annotation:"targetUnmanagedBucketStorageBackend"`
 }
 
 type RBAC struct {

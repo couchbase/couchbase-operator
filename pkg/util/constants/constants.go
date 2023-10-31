@@ -92,6 +92,8 @@ var (
 	ClientSecretServerKey  = "tls.key"
 	ClientSecretMutualCert = "mtls.crt"
 	ClientSecretMutualKey  = "mtls.key"
+
+	DefaultBucketStorageBackend = "couchstore"
 )
 
 // Label types added to pods.

@@ -91,7 +91,11 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 }
 
 func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object) error {
-	switch t := current.(type) { //nolint:all
+	switch t := current.(type) {
+	case *couchbasev2.CouchbaseCluster:
+		if t2, ok := updated.(*couchbasev2.CouchbaseCluster); ok {
+			return validationv2.CheckChangeConstraintsCluster(v, t, t2)
+		}
 	case *couchbasev2.CouchbaseBucket:
 		if t2, ok := updated.(*couchbasev2.CouchbaseBucket); ok {
 			return validationv2.CheckChangeConstraintsBucket(v, t, t2)
