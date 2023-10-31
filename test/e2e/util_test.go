@@ -51,6 +51,7 @@ const (
 	TagFeatureSynchronization   = "synchronization"
 	TagFeatureDeleteDelay       = "deletedelay"
 	TagFeatureCNG               = "cng"
+	TagFeatureBucketMigration   = "bucketmigration"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -587,9 +588,11 @@ func registerTests() {
 		framework.NewTestDef(TestPodDeletedAfterExpectedDelay).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
 		framework.NewTestDef(TestAnalyticsKillPods).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestAnalyticsKillPodsWithPVC).WithTags(TagSuiteP1),
-		framework.NewTestDef(TestCouchstoreBucketToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade),
-		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade),
-		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),

@@ -206,6 +206,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcilePods,
 		(*Cluster).reconcileClusterSettings,
 		(*Cluster).reconcileBuckets,
+		(*Cluster).reconcileUnmanagedBucketsBackends,
 		(*Cluster).reconcileScopesAndCollections,
 		(*Cluster).reconcileSynchronizeBuckets,
 		(*Cluster).reconcileXDCR,

@@ -847,12 +847,18 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 }
 
 func MustWaitUntilAllNodeStorageBackendMagma(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	if err := WaitUntilAllNodeStorageBackendMagma(k8s, couchbase, timeout); err != nil {
+	if err := WaitUntilAllNodeStorageBackendMatch(k8s, couchbase, timeout, couchbaseutil.CouchbaseStorageBackendMagma); err != nil {
 		Die(t, err)
 	}
 }
 
-func WaitUntilAllNodeStorageBackendMagma(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+func MustWaitUntilAllNodeStorageBackendCouchstore(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := WaitUntilAllNodeStorageBackendMatch(k8s, couchbase, timeout, couchbaseutil.CouchbaseStorageBackendCouchstore); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitUntilAllNodeStorageBackendMatch(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, targetBackend couchbaseutil.CouchbaseStorageBackend) error {
 	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
 		if err != nil {
@@ -871,14 +877,14 @@ func WaitUntilAllNodeStorageBackendMagma(k8s *types.Cluster, couchbase *couchbas
 		}
 
 		for _, bucket := range clusterBuckets {
-			if bucket.StorageBackend != "magma" {
-				return fmt.Errorf("waiting for bucket `%s` to have magma backend", bucket.BucketName)
+			if bucket.StorageBackend != targetBackend {
+				return fmt.Errorf("waiting for bucket `%s` to have %s backend", targetBackend, bucket.BucketName)
 			}
 
 			for _, node := range bucket.Nodes {
 				// If node storage backend is empty it means it matches the global backend for bucket
-				if node.StorageBackend != "" && node.StorageBackend != "magma" {
-					return fmt.Errorf("waiting for node `%s` to have magma backend", node.HostName)
+				if node.StorageBackend != "" && node.StorageBackend != string(targetBackend) {
+					return fmt.Errorf("waiting for node `%s` to have %s backend", targetBackend, node.HostName)
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/go-openapi/errors"
 
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -392,6 +393,50 @@ func (c *Cluster) reconcileBuckets() error {
 
 	for _, name := range names {
 		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, statuses[name])
+	}
+
+	return nil
+}
+
+func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
+	if c.cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend == nil || c.cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	if isAtleast76, err := c.IsAtLeastVersion("7.6.0"); err == nil && !isAtleast76 {
+		return nil
+	}
+
+	targetBackend := *c.cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend
+
+	buckets := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&buckets).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	var errs []error
+
+	for _, bucket := range buckets {
+		if string(bucket.BucketStorageBackend) == string(targetBackend) {
+			continue
+		}
+
+		if ok, reason := bucket.CanBeMigrated(couchbaseutil.CouchbaseStorageBackend(targetBackend)); !ok {
+			log.Info("[WARN] Cannot migrate bucket as it doesn't meet requirements for backend change.", "bucket-name", bucket.BucketName, "reason", reason, "target-backend", targetBackend)
+			continue
+		}
+
+		log.Info("Updating storage backend of unmanaged bucket", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+
+		bucket.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(targetBackend)
+		if err := couchbaseutil.UpdateBucket(&bucket).On(c.api, c.readyMembers()); err != nil {
+			log.Error(err, "Bucket update failed", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) != 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
