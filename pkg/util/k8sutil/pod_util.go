@@ -1046,8 +1046,8 @@ func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.Couchba
 
 	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
 	if err == nil {
-		if srvVerAfter72, err := couchbaseutil.VersionAfter(tag, "7.2.0"); !srvVerAfter72 && err == nil {
-			log.Info("[WARN] server version must be 7.2 or later for cloud native gateway support. Check server version.")
+		if minSrvVerForCNG, err := couchbaseutil.VersionAfter(tag, constants.MinimumCouchbaseVersionForCNG); !minSrvVerForCNG && err == nil {
+			log.Info("[WARN] invalid couchbase server version for cloud native gateway support. Check server version.", "Minimum version needed", constants.MinimumCouchbaseVersionForCNG)
 			return
 		}
 	}

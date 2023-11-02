@@ -32,7 +32,7 @@ func TestCreateCNG(t *testing.T) {
 
 	kubernetesCluster, cleanup := f.SetupTest(t)
 
-	framework.Requires(t, kubernetesCluster).AtLeastVersion("7.2.0")
+	framework.Requires(t, kubernetesCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
 
 	defer cleanup()
 
@@ -62,7 +62,7 @@ func TestCNGBucketOps(t *testing.T) {
 	kubernetesCluster, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetesCluster).AtLeastVersion("7.2.0")
+	framework.Requires(t, kubernetesCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
 
 	ctx := context.Background()
 

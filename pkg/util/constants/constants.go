@@ -191,6 +191,9 @@ const (
 	CommunityEditionImage = "couchbase/server:community-6.6.0"
 	// InvalidBaseImage is an invalid/nonexistant base image used for testing.
 	InvalidBaseImage = "basecouch/123:enterprise-6.6.2"
+
+	// MinimumCouchbaseVersionForCNG is the minimum CB version for CNG support.
+	MinimumCouchbaseVersionForCNG = "7.2.2"
 )
 
 const (

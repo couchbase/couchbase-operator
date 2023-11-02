@@ -1033,8 +1033,8 @@ func checkConstraintCloudNativeGatewayProvisioning(_ *types.Validator, cluster *
 		return err
 	}
 
-	if srvVerAfter72, err := couchbaseutil.VersionAfter(tag, "7.2.0"); !srvVerAfter72 && err == nil {
-		return fmt.Errorf("server version must be 7.2 or later for cloud native gateway support")
+	if minSrvVerForCNG, err := couchbaseutil.VersionAfter(tag, constants.MinimumCouchbaseVersionForCNG); !minSrvVerForCNG && err == nil {
+		return fmt.Errorf("cb server version must be %s or later for cloud native gateway support", constants.MinimumCouchbaseVersionForCNG)
 	}
 
 	if err != nil {
