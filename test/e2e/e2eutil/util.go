@@ -52,7 +52,7 @@ func RandomSuffix() string {
 // 0-9a-z as that is compatible with DNS names and Couchbase Server passwords.
 func RandomString(length int) string {
 	// Seed the PRNG so we get vagely random suffixes across runs
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// Generate a random 5 character suffix for the cluster name
 	suffix := ""

@@ -111,7 +111,7 @@ BLD_NUM ?= 999
 # This controls the golang version of the docker container used
 # to build binaries. This version takes precedence over the build
 # version specified by the build system.
-GO_VERSION := 1.20.6
+GO_VERSION := 1.20
 
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
