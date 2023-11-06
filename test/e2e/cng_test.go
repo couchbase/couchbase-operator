@@ -104,8 +104,6 @@ func TestCNGBucketOps(t *testing.T) {
 
 	flushEnabled := true
 
-	replicaIndexes := false
-
 	var maxExpirySecs uint32 = 10
 
 	// Attempt to update the bucket.
@@ -114,7 +112,6 @@ func TestCNGBucketOps(t *testing.T) {
 		RamQuotaMb:             &updatedRAMQuota,
 		NumReplicas:            &updatedNumReplica,
 		FlushEnabled:           &flushEnabled,
-		ReplicaIndexes:         &replicaIndexes,
 		EvictionMode:           admin_bucket_v1.EvictionMode_EVICTION_MODE_FULL.Enum(),
 		MaxExpirySecs:          &maxExpirySecs,
 		CompressionMode:        admin_bucket_v1.CompressionMode_COMPRESSION_MODE_ACTIVE.Enum(),

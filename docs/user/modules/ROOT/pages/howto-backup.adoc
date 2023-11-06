@@ -104,7 +104,7 @@ So if a PVC called "my-backup" does not yet exist in this case, one will be crea
 This would also happen if for some reason the PVC was deleted.
 
 
-An immediate backup can also be triggered immediately using `CouchbaseBackup` resources with the `immediate_full` or `immediate_incremental` strategies. When the Autonomous Operatore detects `CouchbaseBackup` resource with either of these strategues it will attempt to trigger a backup Job immediatelyThe following is a simple configuration with the minimum required fields set to take an immediate backup.
+An immediate backup can also be triggered immediately using `CouchbaseBackup` resources with the `immediate_full` or `immediate_incremental` strategies. When the Autonomous Operator detects `CouchbaseBackup` resource with either of these strategies it will attempt to trigger a backup Job immediately. The following is a simple configuration with the minimum required fields set to take an immediate backup.
 
 [source,yaml]
 ----
@@ -117,7 +117,7 @@ spec:
   size: 20Gi
 ----
 
-<1> Immediated backups require `spec.strategy` to be either `immediate_full` or `immediate_incremental`
+<1> Immediate backups require `spec.strategy` to be either `immediate_full` or `immediate_incremental`
 
 
 Once you have created a `CouchbaseBackup`, we can check that for the expected behavior by viewing the Operator logs.

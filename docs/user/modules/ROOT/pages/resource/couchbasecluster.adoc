@@ -3076,7 +3076,8 @@ Note that this field cannot be set when spec.os.name is windows.
 localhostProfile indicates a profile defined in a file on the node should be used.
 The profile must be preconfigured on the node to work.
 Must be a descending path, relative to the kubelet's configured seccomp profile location.
-Must only be set if type is "Localhost".
+Must be set if type is "Localhost".
+Must NOT be set for any other type.
 
 === couchbaseclusters.spec.security.podSecurityContext.seccompProfile.type
 
@@ -3102,8 +3103,9 @@ Unconfined - no profile should be applied.
 
 ==== Description
 
-A list of groups applied to the first process run in each container, in addition to the container's primary GID.
-If unspecified, no groups will be added to any container.
+A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process.
+If unspecified, no additional groups are added to any container.
+Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.sysctls
@@ -3184,8 +3186,6 @@ GMSACredentialSpecName is the name of the GMSA credential spec to use.
 ==== Description
 
 HostProcess determines if a container should be run as a 'Host Process' container.
-This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag.
-Setting this field without the feature flag will result in errors when validating the Pod.
 All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
 In addition, if HostProcess is true then HostNetwork must also be set to true.
 
@@ -3446,7 +3446,8 @@ Note that this field cannot be set when spec.os.name is windows.
 localhostProfile indicates a profile defined in a file on the node should be used.
 The profile must be preconfigured on the node to work.
 Must be a descending path, relative to the kubelet's configured seccomp profile location.
-Must only be set if type is "Localhost".
+Must be set if type is "Localhost".
+Must NOT be set for any other type.
 
 === couchbaseclusters.spec.security.securityContext.seccompProfile.type
 
@@ -3506,8 +3507,6 @@ GMSACredentialSpecName is the name of the GMSA credential spec to use.
 ==== Description
 
 HostProcess determines if a container should be run as a 'Host Process' container.
-This field is alpha-level and will only be honored by components that enable the WindowsHostProcessContainers feature flag.
-Setting this field without the feature flag will result in errors when validating the Pod.
 All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
 In addition, if HostProcess is true then HostNetwork must also be set to true.
 

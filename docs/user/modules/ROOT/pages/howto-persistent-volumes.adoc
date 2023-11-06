@@ -122,7 +122,7 @@ spec:
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-enableonlinevolumeexpansion[`couchbaseclusters.spec.enableOnlineVolumeExpansion`]: This field must be set to `true` for the Autonomous Operator to allow online volume expansion.
 
-<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins[`couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins`]: This field must be provided as a retry mechanism with a timeout in minutes. It could be in between 0 to 30 mins, defaulting to 10 mins. No unit is needed to be provided.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins[`couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins`]: This field must be provided as a retry mechanism with a timeout in minutes. It could be in between 0 to 30 minutes, defaulting to 10 minutes. No unit is needed to be provided.
 
 <.> Modifying the storage size will trigger the Autonomous Operator to detect that existing persistent volume claims do not match the intended size (as it normally would).
 However, if the new value is larger than the previous value, the Autonomous Operator will attempt an online expansion of the volume.

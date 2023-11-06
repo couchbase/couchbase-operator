@@ -144,6 +144,13 @@ Specifies the customer name for log uploading. This value must be a string whose
 +
 Collect logs in a specific directory
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +

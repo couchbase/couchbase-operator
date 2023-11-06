@@ -111,5 +111,7 @@ func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Co
 		return err
 	}
 
-	return c.Watch(&source.Kind{Type: &couchbasev2.CouchbaseCluster{}}, &handler.EnqueueRequestForObject{})
+	src := source.Kind(mgr.GetCache(), &couchbasev2.CouchbaseCluster{})
+
+	return c.Watch(src, &handler.EnqueueRequestForObject{})
 }

@@ -19,11 +19,15 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	klog "k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 var (
@@ -89,8 +93,14 @@ func main() {
 	log.V(1).Info("Initializing resource manager.")
 
 	mgr, err := manager.New(cfg, manager.Options{
-		Namespace:               namespace,
-		MetricsBindAddress:      fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				namespace: {LabelSelector: labels.Everything(), FieldSelector: fields.Everything()},
+			},
+		},
+		Metrics: server.Options{
+			BindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+		},
 		LeaderElection:          true,
 		LeaderElectionNamespace: namespace,
 		LeaderElectionID:        "couchbase-operator",
