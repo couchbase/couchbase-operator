@@ -1792,6 +1792,9 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 			TimeoutSeconds:      5,
 			PeriodSeconds:       10,
 			FailureThreshold:    3,
+			// because default query timeout for n1ql queries in CB Server is 75 secs. So, 5 secs added to that.
+			// TODO: Would be part of crd type to be amendable by customer based on their query timeout threshold.
+			TerminationGracePeriodSeconds: func(t int64) *int64 { return &t }(80),
 		},
 	}
 
