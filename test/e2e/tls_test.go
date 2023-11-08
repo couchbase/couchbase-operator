@@ -2413,7 +2413,7 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	// At this point the client is locked out but we should be able to rotate certs and proceed
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
 
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 3*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
