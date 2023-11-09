@@ -76,7 +76,7 @@ func ExecWithOptions(k8s *types.Cluster, options ExecOptions) (string, string, e
 
 	var stdout, stderr bytes.Buffer
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdin: options.Stdin, Stdout: &stdout, Stderr: &stderr}); err != nil {
+	if err := exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{Stdin: options.Stdin, Stdout: &stdout, Stderr: &stderr}); err != nil {
 		return "", "", err
 	}
 

@@ -919,7 +919,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 
 	var stdout bytes.Buffer
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: &stdout}); err != nil {
+	if err := exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{Stdout: &stdout}); err != nil {
 		return err
 	}
 

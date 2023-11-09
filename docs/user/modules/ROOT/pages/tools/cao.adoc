@@ -197,6 +197,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -610,6 +617,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -840,6 +854,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -945,6 +966,13 @@ The name of the kubeconfig cluster to use
 *Type*: string
 +
 The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
 
 --insecure-skip-tls-verify::
 *Type*: bool
@@ -1154,6 +1182,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -1277,6 +1312,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -1375,6 +1417,13 @@ The name of the kubeconfig cluster to use
 *Type*: string
 +
 The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
 
 --insecure-skip-tls-verify::
 *Type*: bool
@@ -1494,6 +1543,13 @@ The name of the kubeconfig cluster to use
 *Type*: string
 +
 The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
 
 --insecure-skip-tls-verify::
 *Type*: bool
@@ -1725,6 +1781,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -1830,6 +1893,13 @@ The name of the kubeconfig cluster to use
 *Type*: string
 +
 The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
 
 --insecure-skip-tls-verify::
 *Type*: bool
@@ -2039,6 +2109,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -2224,6 +2301,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -2377,6 +2461,13 @@ The name of the kubeconfig cluster to use
 +
 The name of the kubeconfig context to use
 
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +
@@ -2475,6 +2566,13 @@ The name of the kubeconfig cluster to use
 *Type*: string
 +
 The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
 
 --insecure-skip-tls-verify::
 *Type*: bool
