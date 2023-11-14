@@ -156,7 +156,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 	sched := &stripeSchedulerImpl{
 		serverClasses:              serverClassGroupMap{},
 		unschedulableServerClasses: serverClassGroupMap{},
-		removableServerClasses:     serverClassServerRemovalMap{},
+		removableServerClasses:     map[string]*serverRemovalQueue{},
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {

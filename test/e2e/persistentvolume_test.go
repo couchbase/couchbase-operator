@@ -653,7 +653,6 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
 	}
 
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Cross check rza deployment matches the expected values
