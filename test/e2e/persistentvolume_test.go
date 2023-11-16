@@ -638,7 +638,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, kubernetes, cluster)
 
-	// Kill nodes in 1st server group
+	// Kill nodes on 1st server group
 	victimGroup := 0
 	victims := []int{}
 
@@ -648,9 +648,10 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		}
 	}
 
-	// Loop to kill the nodes
+	// Loop to kill the nodes and check for rebalalnce started events.
 	for _, podMemberToKill := range victims {
 		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.RebalanceStartedEvent(cluster), 20*time.Minute)
 	}
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
@@ -661,7 +662,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		e2eutil.PodDownFailedWithPVCRecoverySequence(len(victims)),
+		eventschema.Repeat{Times: len(victims), Validator: e2eutil.PodRecoverySequenceAfterKilled()},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

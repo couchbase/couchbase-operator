@@ -280,6 +280,30 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	}
 }
 
+// PodRecoverySequenceAfterKilled checks the sequence in which pods goes down without removing
+// the volumes and how they recover, followed by the rebalalnce which takes place.
+func PodRecoverySequenceAfterKilled() eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		},
+	}
+}
+
 // KubernetesUpgradeSequenceEphemeral is the expected even sequence for a Kubernets upgrade with
 // an epehemeral cluster.  Note the down even is optional as the Operator may get evicted at
 // the same time as a pod and miss the event as Couchbase has already failed over the pod.
