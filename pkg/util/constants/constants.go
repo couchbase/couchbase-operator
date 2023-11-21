@@ -194,6 +194,12 @@ const (
 
 	// MinimumCouchbaseVersionForCNG is the minimum CB version for CNG support.
 	MinimumCouchbaseVersionForCNG = "7.2.2"
+
+	// MinimumCouchbaseVersionNoCNGRestriction is the minimum cb version where we dont restrict
+	// CNG version (due to the cbauth issue in versions before this).
+	MinimumCouchbaseVersionNoCNGRestriction = "7.2.4"
+	// MinimumCNGVersionWithCBAuthSupport is the first CNG version that has CBAuth support.
+	MinimumCNGVersionWithCBAuthSupport = "0.2.0"
 )
 
 const (

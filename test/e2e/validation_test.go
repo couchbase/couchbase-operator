@@ -3127,3 +3127,30 @@ func TestAutoscalerValidation(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
+
+func TestCNGVersionValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestMinimunCBVersionForCNGSupport",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
+					Image: "ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-137",
+				}).
+				Replace("/spec/image", "couchbase/server:7.2.0")},
+			expectedErrors: []string{"for cloud native gateway support"},
+			shouldFail:     true,
+		},
+		{
+			name: "TestRestrictedCNGVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
+					Image: "ghcr.io/cb-vanilla/cloud-native-gateway:0.2.0-136",
+				}).
+				Replace("/spec/image", "couchbase/server:7.2.2")},
+			expectedErrors: []string{"to support cloud native gateway versio"},
+			shouldFail:     true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}

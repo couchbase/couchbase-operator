@@ -1037,6 +1037,21 @@ func checkConstraintCloudNativeGatewayProvisioning(_ *types.Validator, cluster *
 		return fmt.Errorf("cb server version must be %s or later for cloud native gateway support", constants.MinimumCouchbaseVersionForCNG)
 	}
 
+	if cngVerUnrestricted, err := couchbaseutil.VersionAfter(tag, constants.MinimumCouchbaseVersionNoCNGRestriction); !cngVerUnrestricted && err == nil {
+		cngVer, err := k8sutil.CouchbaseVersion(cluster.Spec.CloudNativeGatewayImage())
+
+		if err != nil {
+			return err
+		}
+
+		if unallowedCNGVer, err := couchbaseutil.VersionAfter(cngVer, constants.MinimumCNGVersionWithCBAuthSupport); unallowedCNGVer && err == nil {
+			return fmt.Errorf(
+				"cb server version must be %s or later to support cloud native gateway version %s or later",
+				constants.MinimumCouchbaseVersionNoCNGRestriction,
+				constants.MinimumCNGVersionWithCBAuthSupport)
+		}
+	}
+
 	if err != nil {
 		return err
 	}
