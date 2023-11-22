@@ -689,9 +689,9 @@ func getMetrics(c *Cluster) (allMetrics, error) {
 	return allMetrics{idx: idxMetrics, data: dataMetrics, view: viewsMetrics}, nil
 }
 
-func parseSizePerMember(memberName string, allmetrices allMetrics) (int64, error) {
-	sizeByService := func(sm couchbaseutil.StatsRangeMetrics) (int64, error) {
-		var size int64
+func parseSizePerMember(memberName string, allmetrices allMetrics) (float64, error) {
+	sizeByService := func(sm couchbaseutil.StatsRangeMetrics) (float64, error) {
+		var size float64
 
 		for _, data := range sm.Data {
 			if len(data.Metric.Nodes) > 0 {
@@ -706,9 +706,9 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) (int64, error
 
 				s, ok := value[1].(string)
 				if ok {
-					i, err := strconv.ParseInt(s, 10, 64)
+					i, err := strconv.ParseFloat(s, 64)
 					if err != nil {
-						return 0, fmt.Errorf("%w: error converting %s to int64 format", err, s)
+						return 0, fmt.Errorf("%w: error converting %s to float64 format", err, s)
 					}
 
 					size += i
@@ -761,7 +761,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		})
 
 	// map used to avoid any chance of duplicate member names.
-	memberToSize := map[string]int64{}
+	memberToSize := map[string]float64{}
 	memNames := make([]string, 0, len(memberToSize))
 
 	allm, err := getMetrics(c)
