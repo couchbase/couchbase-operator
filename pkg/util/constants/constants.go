@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	EnvOperatorPodName             = "MY_POD_NAME"
+	EnvOperatorPodName             = "POD_NAME"
 	EnvOperatorPodNamespace        = "MY_POD_NAMESPACE"
 	EnvCouchbaseImageName          = "RELATED_IMAGE_COUCHBASE_SERVER"
 	EnvBackupImageName             = "RELATED_IMAGE_COUCHBASE_BACKUP"
