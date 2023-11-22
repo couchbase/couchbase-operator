@@ -193,20 +193,26 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
-		return "", fmt.Errorf("%s: server group map missing server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return "", fmt.Errorf("%s: no server list present for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	serverGroup := sched.serverClasses[class].largestGroup()
+	allServerGroupsForClass := []string{}
+
+	for s := range sched.serverClasses[class] {
+		allServerGroupsForClass = append(allServerGroupsForClass, s)
+	}
 
 	var podName string
 
 	// Victims are selected based on priority order of the backing serverRemovalQueue.
 	rq, ok := sched.removableServerClasses[class]
 	if !ok {
+		serverGroup := sched.serverClasses[class].largestGroup()
+
 		// Select the victim server deterministically based on alphabetical order
 		server, err := sched.serverClasses[class][serverGroup].pop()
 		if err != nil {
-			return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+			return "", fmt.Errorf("%s: no server list found for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		podName = server
@@ -214,9 +220,15 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 		// if present, dequeue and delete
 		podName = rq.dequeue()
 
-		err := sched.serverClasses[class][serverGroup].del(podName)
-		if err != nil {
-			return "", fmt.Errorf("%s: server group '%s' in class '%s' empty: %w", stripeErrorHeader, serverGroup, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		// looks up the server name(unique pod name) in all server groups for the particular class and delete, if found.
+		for _, serverGroup := range allServerGroupsForClass {
+			if found := sched.serverClasses[class][serverGroup].find(podName); found {
+				err := sched.serverClasses[class][serverGroup].del(podName)
+				if err != nil {
+					return "", fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+				}
+				break
+			}
 		}
 	}
 

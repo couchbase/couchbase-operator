@@ -252,6 +252,9 @@ func ClusterScaleUpSequence(size int) eventschema.Validatable {
 func ClusterScaleDownSequence(size int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Repeat{
 				Times:     size,

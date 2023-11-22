@@ -47,6 +47,17 @@ func (s *serverList) del(name string) error {
 	return fmt.Errorf("%w: server name doesn't exist in server list", errors.NewStackTracedError(errors.ErrInternalError))
 }
 
+// find looks for a particular named server from the server list.
+func (s *serverList) find(name string) bool {
+	for _, server := range s.servers {
+		if server == name {
+			return true
+		}
+	}
+
+	return false
+}
+
 // serverGroups maps server group names to a list of servers.
 type serverGroups map[string]*serverList
 

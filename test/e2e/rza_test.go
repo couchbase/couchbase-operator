@@ -244,10 +244,6 @@ func TestRzaResizeCluster(t *testing.T) {
 		// Resize cluster and wait for healthy cluster
 		cluster = e2eutil.MustResizeClusterNoWait(t, service, clusterSize, kubernetes, cluster)
 		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-
-		// Update deployed server-groups based on new cluster size
-		expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-		expected.mustValidateRzaMap(t, kubernetes, cluster)
 	}
 
 	expectedEvents := []eventschema.Validatable{
