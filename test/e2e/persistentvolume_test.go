@@ -87,6 +87,31 @@ func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMa
 	}
 }
 
+func mustVerifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int) {
+	if err := verifyPvcPerPod(t, k8s, clusterName, expectedPods); err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+func verifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int) error {
+	podList, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerPodLabelStr + clusterName})
+	if err != nil {
+		return err
+	}
+
+	if len(podList.Items) != expectedPods {
+		return fmt.Errorf("expected %v pods but found %v", expectedPods, len(podList.Items))
+	}
+
+	expectedPvcMap := make(map[string]int)
+
+	for _, pod := range podList.Items {
+		expectedPvcMap[pod.Name] = 1
+	}
+
+	return verifyPvcMappingForPods(t, k8s, expectedPvcMap)
+}
+
 // TestPersistentVolumeAutoFailover tests couchbase server can failover a node
 // with PV backing and the operator can reconcile.
 func TestPersistentVolumeAutoFailover(t *testing.T) {

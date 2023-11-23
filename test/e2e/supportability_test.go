@@ -1642,12 +1642,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 4, kubernetes, cbCluster, 5*time.Minute)
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 1, kubernetes, cbCluster, 5*time.Minute)
 
-	mustVerifyPvcMappingForPods(t, kubernetes, map[string]int{
-		couchbaseutil.CreateMemberName(cbCluster.Name, 0): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 1): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 2): 1,
-		couchbaseutil.CreateMemberName(cbCluster.Name, 3): 1,
-	})
+	mustVerifyPvcPerPod(t, kubernetes, cbCluster.Name, 4)
 
 	// Check the events match what we expect:
 	// * Cluster created

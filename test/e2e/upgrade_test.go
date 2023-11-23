@@ -594,6 +594,7 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// * For iterations up to the victim cycle expect nodes upgrade
 	// * Victim node failed to balance in and is ejected to maintain scale
 	// * For the remaining iterations upgrades nodes upgrade
+	//    (one upgrade sequence can be captured by upgradeDownRecoverableSequence which is why it's optional)
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -601,7 +602,8 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
 		upgradeDownRecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
+		eventschema.Optional{Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
