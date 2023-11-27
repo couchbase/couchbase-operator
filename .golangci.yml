@@ -62,6 +62,14 @@ linters:
   - scopelint # deprecated replaced by exportloopref
   - interfacer # deprecated
   - golint # deprecated replaced by revive
+  - depguard
+  - typecheck
+  - tagalign
+  - mirror
+  - inamedparam
+  - protogetter
+  - perfsprint
+  - stylecheck
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test

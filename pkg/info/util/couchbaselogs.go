@@ -3,6 +3,7 @@ package util
 import (
 	"archive/tar"
 	"bytes"
+	ctx "context"
 	"errors"
 	"fmt"
 	"io"
@@ -75,7 +76,7 @@ func CollectInfo(context *context.Context, pod *v1.Pod) (result *CollectInfoResu
 	// Stdout appears to be required for this to work
 	stdout := &bytes.Buffer{}
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
+	if err := exec.StreamWithContext(ctx.TODO(), remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		result.Err = fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 		return
 	}
@@ -108,7 +109,7 @@ func CopyFromPod(context *context.Context, pod *v1.Pod, paths []string) error {
 	// Finally run the copy command
 	stdout := &bytes.Buffer{}
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
+	if err := exec.StreamWithContext(ctx.TODO(), remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 
@@ -161,7 +162,7 @@ func CleanLogs(context *context.Context, pod *v1.Pod) error {
 	// Finally run the delete command
 	stdout := &bytes.Buffer{}
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: stdout}); err != nil {
+	if err := exec.StreamWithContext(ctx.TODO(), remotecommand.StreamOptions{Stdout: stdout}); err != nil {
 		return fmt.Errorf("log collection on %s failed: %w", pod.Name, err)
 	}
 

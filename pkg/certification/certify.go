@@ -915,7 +915,7 @@ func (o *certifyOptions) downloadArtifacts() error {
 
 	var stdout bytes.Buffer
 
-	if err := exec.Stream(remotecommand.StreamOptions{Stdout: &stdout}); err != nil {
+	if err := exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{Stdout: &stdout}); err != nil {
 		return err
 	}
 
@@ -1152,7 +1152,7 @@ func (o *certifyOptions) prepareOutput() {
 	stdoutHash := sha256.New()
 	resultsHash := sha256.New()
 
-	fsys, err := archiver.FileSystem(o.archiveName.archiveName())
+	fsys, err := archiver.FileSystem(context.TODO(), o.archiveName.archiveName())
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -1234,7 +1234,7 @@ func (o *certifyOptions) verifyOutput() error {
 		return ErrInvalidOutputArchive
 	}
 
-	fsys, err := archiver.FileSystem(o.verifyFile)
+	fsys, err := archiver.FileSystem(context.TODO(), o.verifyFile)
 	if err != nil {
 		return err
 	}
