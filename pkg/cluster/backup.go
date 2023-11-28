@@ -1238,7 +1238,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 
 // Creates the base template for backup/restore jobs.
 func (c *Cluster) createBaseJobSpec(backoffLimit, ttlSecondsAfterFinished *int32, container corev1.Container, volume corev1.Volume) *batchv1.JobSpec {
-	return &batchv1.JobSpec{
+	jobSpec := &batchv1.JobSpec{
 		BackoffLimit:            backoffLimit,
 		TTLSecondsAfterFinished: ttlSecondsAfterFinished,
 		Template: corev1.PodTemplateSpec{
@@ -1255,7 +1255,6 @@ func (c *Cluster) createBaseJobSpec(backoffLimit, ttlSecondsAfterFinished *int32
 				ServiceAccountName: c.cluster.Spec.Backup.ServiceAccount,
 				ImagePullSecrets:   c.cluster.Spec.Backup.ImagePullSecrets,
 				RestartPolicy:      corev1.RestartPolicyNever,
-				SecurityContext:    c.cluster.Spec.SecurityContext,
 				Containers: []corev1.Container{
 					container,
 				},
@@ -1273,6 +1272,16 @@ func (c *Cluster) createBaseJobSpec(backoffLimit, ttlSecondsAfterFinished *int32
 			},
 		},
 	}
+
+	if c.cluster.Spec.Security.PodSecurityContext != nil {
+		// both cluster.Spec.SecurityContext (if present) and cluster.Spec.Security.PodSecurityContext
+		// are equal.
+		jobSpec.Template.Spec.SecurityContext = c.cluster.Spec.Security.PodSecurityContext
+	} else {
+		jobSpec.Template.Spec.SecurityContext = c.cluster.Spec.SecurityContext
+	}
+
+	return jobSpec
 }
 
 func generatePersistentBackupVolume(claimName string) corev1.Volume {
