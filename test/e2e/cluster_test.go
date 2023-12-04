@@ -985,7 +985,7 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times:     9,
+			Times:     5,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}
