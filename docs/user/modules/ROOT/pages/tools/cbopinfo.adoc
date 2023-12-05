@@ -151,6 +151,13 @@ Collect logs in a specific directory
 +
 If true, opt-out of response compression for all requests to the server
 
+--event-collector-port::
+*Type*: string
++
+*Default*: 8080
++
+Event collector API port
+
 --insecure-skip-tls-verify::
 *Type*: bool
 +

@@ -74,6 +74,10 @@ var (
 			Reason: "Used to determine issues with Operator and Dynamic Admission Control deployments",
 		},
 		{
+			Resource: &appsv1.Deployment{}, Scope: resource.ScopeEventCollectorDeployment, LogLevel: resource.LogLevelRequired,
+			Reason: "Used to determine issues with the entire cluster",
+		},
+		{
 			Resource: &rbacv1.ClusterRole{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelSensitive,
 			Reason: "Used to determine whether RBAC Is correctly setup for the running Operator version.",
 		},

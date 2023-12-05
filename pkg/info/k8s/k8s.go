@@ -133,8 +133,24 @@ func IsOperatorDeployment(context *context.Context, deployment *appsv1.Deploymen
 		}
 	}
 
+	// Next, check the label on the deployment
+	if deployment.Labels["app"] == "couchbase-operator" {
+		return true
+	}
+
 	// Next, guess :D Chances are the name will be useful...
 	if strings.Contains(deployment.Name, "couchbase") && strings.Contains(deployment.Name, "operator") && !strings.Contains(deployment.Name, "admission") {
+		return true
+	}
+
+	return false
+}
+
+// IsEventCollectorDeployment does a best effor check of whether a deployment is for a EventLogger
+// we mainly rely on the labels applied to the deploymet.
+func IsEventCollectorDeployment(deployment *appsv1.Deployment) bool {
+	// Next, check the label on the deployment
+	if deployment.Labels["app"] == "event-collector" {
 		return true
 	}
 

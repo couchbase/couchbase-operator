@@ -37,6 +37,10 @@ type Reference interface {
 	IsOperator() bool
 	// SetIsOperator set this as the operator deployment.
 	SetIsOperator()
+	// IsEventCollector is a flag to say this resource is the event collector.
+	IsEventCollector() bool
+	// SetIsEventCollector set this as the event collector.
+	SetIsEventCollector()
 }
 
 // getResourceSelector returns a label selector which will scope the resources we
@@ -108,6 +112,9 @@ const (
 
 	// ScopeOperatorDeployment collects only the Operator deployment based on image name.
 	ScopeOperatorDeployment Scope = "operator"
+
+	// ScopeEventCollectorDeployment collects only the Event Collector deployment based on label.
+	ScopeEventCollectorDeployment Scope = "eventcollector"
 )
 
 // LogLevel records how necessary a resource collection is.
@@ -232,6 +239,16 @@ func filterObject(context *context.Context, scope Scope, o *unstructured.Unstruc
 		if !context.Config.All && !k8s.IsOperatorDeployment(context, deployment) {
 			return true
 		}
+	case ScopeEventCollectorDeployment:
+		// Check that it's actually a Deployment
+		deployment := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, deployment); err != nil {
+			return true
+		}
+
+		if !k8s.IsEventCollectorDeployment(deployment) {
+			return true
+		}
 	}
 
 	return false
@@ -293,6 +310,10 @@ func processResourceMetadata(context *context.Context, o *unstructured.Unstructu
 			reference.SetIsOperator()
 
 			log_meta.SetOperator(context.Config.OperatorImage)
+		}
+
+		if k8s.IsEventCollectorDeployment(deployment) {
+			reference.SetIsEventCollector()
 		}
 	}
 }

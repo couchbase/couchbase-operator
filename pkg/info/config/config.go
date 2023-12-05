@@ -28,6 +28,8 @@ type Configuration struct {
 	// CollectInfoCollect determines the logs to collect from the CLI.  Valid values
 	// are an indices e.g. 1, ranges 2-3, a comma separated combination 1,3,5-6 or all.
 	CollectInfoCollect string
+	// EventCollectorPort defines the port that the event collector
+	EventCollectorPort string
 	// OperatorImage defines what the operator image is called.
 	OperatorImage string
 	// OperatorRestPort defines what port the operator is listening on for HTTP requests.
@@ -71,6 +73,7 @@ const (
 	customerFlag            = "customer"
 	uploadProxyFlag         = "upload-proxy"
 	ticketFlag              = "ticket"
+	eventCollectorPortFlag  = "event-collector-port"
 )
 
 type AppendStringVar struct {
@@ -111,4 +114,5 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.Customer, customerFlag, "default", "Specifies the customer name for log uploading. This value must be a string whose maximum length is 50 characters. Only the following characters can be used: [A-Za-z0-9_.-].")
 	flags.StringVar(&c.UploadProxy, uploadProxyFlag, "", "Specifies a proxy for log uploading")
 	flags.StringVar(&c.Ticket, ticketFlag, "", "Specifies the Couchbase Support ticket-number. The value must be a string with a maximum length of 7 characters, containing only digits in the range of 0-9.")
+	flags.StringVar(&c.EventCollectorPort, eventCollectorPortFlag, "8080", "Event collector API port")
 }

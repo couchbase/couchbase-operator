@@ -1,9 +1,10 @@
 package resource
 
 type referenceImpl struct {
-	kind       string
-	name       string
-	isOperator bool
+	kind             string
+	name             string
+	isOperator       bool
+	isEventCollector bool
 }
 
 func NewReference(kind, name string) Reference {
@@ -27,4 +28,12 @@ func (r referenceImpl) IsOperator() bool {
 
 func (r *referenceImpl) SetIsOperator() {
 	r.isOperator = true
+}
+
+func (r referenceImpl) IsEventCollector() bool {
+	return r.isEventCollector
+}
+
+func (r *referenceImpl) SetIsEventCollector() {
+	r.isEventCollector = true
 }

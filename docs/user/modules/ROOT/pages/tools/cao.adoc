@@ -387,6 +387,12 @@ Log Level: Required
 Scope: cluster
 +
 Reason: Used to determine issues with automatic Kubernetes upgrades
+Deployment::
+Log Level: Required
++
+Scope: eventcollector
++
+Reason: Used to determine issues with the entire cluster
 CustomResourceDefinition::
 Log Level: Required
 +
@@ -530,6 +536,13 @@ Specifies the customer name for log uploading. This value must be a string whose
 *Type*: string
 +
 Collect logs in a specific directory
+
+--event-collector-port::
+*Type*: string
++
+*Default*: 8080
++
+Event collector API port
 
 --log-level::
 *Type*: int
