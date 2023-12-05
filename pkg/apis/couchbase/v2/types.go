@@ -994,7 +994,7 @@ type CollectionSelector struct {
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// scope or scopes.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -1091,7 +1091,7 @@ type ScopeSelector struct {
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// bucket.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -1733,7 +1733,7 @@ type BucketRoleSpec struct {
 	Resources []BucketLocalObjectReference `json:"resources,omitempty"`
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// role.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -1765,7 +1765,7 @@ type ScopeRoleSpec struct {
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// scope or scopes.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -1778,7 +1778,7 @@ type CollectionRoleSpec struct {
 
 	// Selector allows resources to be implicitly considered for inclusion in this
 	// collection or collections.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#labelselector-v1-meta
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
@@ -2526,7 +2526,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// service type defined and any other options that Kubernetes provides.  When using
 	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
 	// reserves the right to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#service-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core
 	AdminConsoleServiceTemplate *ServiceTemplateSpec `json:"adminConsoleServiceTemplate,omitempty"`
 
 	// DEPRECATED - by adminConsoleServiceTemplate.
@@ -2554,7 +2554,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// service type defined and any other options that Kubernetes provides.  When using
 	// a LoadBalancer service type, TLS and dynamic DNS must also be enabled. The Operator
 	// reserves the right to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#service-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core
 	ExposedFeatureServiceTemplate *ServiceTemplateSpec `json:"exposedFeatureServiceTemplate,omitempty"`
 
 	// DEPRECATED - by exposedFeatureServiceTemplate.
@@ -3144,7 +3144,7 @@ type ServerConfig struct {
 	// update the pod in-place.  Any other modification will result in a cluster
 	// upgrade in order to fulfill the request. The Operator reserves the right
 	// to modify or replace any field.  More info:
-	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#pod-v1-core
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pod-v1-core
 	Pod *PodTemplate `json:"pod,omitempty"`
 
 	// VolumeMounts define persistent volume claims to attach to pod.
