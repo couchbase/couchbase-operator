@@ -71,6 +71,8 @@ spec:
           enabled: true # <.>
   image: couchbase/server:{couchbase-version}
   security:
+    podSecurityContext:
+      fsGroup: 1000
     adminSecret: cb-example-auth
   buckets:
     managed: true
