@@ -1098,7 +1098,7 @@ func (c *Cluster) applyObjEndpointToContainer(container *corev1.Container, objec
 		}
 
 		if objectEndpoint.UseVirtualPath {
-			container.Args = append(container.Args, "--s3-force-path-style", fmt.Sprintf("%t", objectEndpoint.UseVirtualPath))
+			container.Args = append(container.Args, "--s3-force-path-style", "false")
 		}
 	}
 }
