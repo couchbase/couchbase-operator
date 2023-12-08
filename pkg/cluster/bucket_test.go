@@ -47,3 +47,34 @@ func TestHistoryRetention(t *testing.T) {
 		t.Fatalf("expected HistoryRetentionCollectionDefault=true, found %t", *(newBuckets[0].HistoryRetentionCollectionDefault))
 	}
 }
+
+func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
+	k8sBucket := make([]*couchbasev2.CouchbaseBucket, 0)
+	k8sBucket = append(k8sBucket, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: v1.ObjectMeta{
+			Annotations: map[string]string{
+				"cao.couchbase.com/magmaSeqTreeDataBlockSize": "5555",
+				"cao.couchbase.com/magmaKeyTreeDataBlockSize": "6666",
+			},
+		},
+
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			Name:           "test",
+			MemoryQuota:    resource.NewQuantity(100, resource.BinarySI),
+			StorageBackend: "magma",
+		},
+	})
+
+	features := SupportedFeatureMap{
+		SupportedBackendMagma: true,
+	}
+
+	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil)
+	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 5555 {
+		t.Fatalf("expected MagmaSeqTreeDataBlockSize=5555, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
+	}
+
+	if newBuckets[0].MagmaKeyTreeDataBlockSize != nil && *(newBuckets[0].MagmaKeyTreeDataBlockSize) != 6666 {
+		t.Fatalf("expected MagmaKeyTreeDataBlockSize=6666, found %d", *(newBuckets[0].MagmaKeyTreeDataBlockSize))
+	}
+}

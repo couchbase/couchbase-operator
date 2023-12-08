@@ -673,6 +673,31 @@ func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, 
 	}
 }
 
+func verifyMagmaBucketBlockSizeSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, seqTreeDataBlockSizeBytes, keyTreeDataBlockSize uint64, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucketName)
+		if err != nil {
+			return err
+		}
+
+		if *info.MagmaSeqTreeDataBlockSize != seqTreeDataBlockSizeBytes {
+			return fmt.Errorf("magma seqIndex block size expected %d bytes but found %d", seqTreeDataBlockSizeBytes, info.MagmaSeqTreeDataBlockSize)
+		}
+
+		if *info.MagmaKeyTreeDataBlockSize != keyTreeDataBlockSize {
+			return fmt.Errorf("magma keyIndex block size expected %d bytes but found %d", keyTreeDataBlockSize, *info.MagmaKeyTreeDataBlockSize)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyMagmaBucketBlockSizeSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, seqTreeDataBlockSizeBytes, keyTreeDataBlockSize uint64, timeout time.Duration) {
+	if err := verifyMagmaBucketBlockSizeSettings(t, k8s, cluster, bucketName, seqTreeDataBlockSizeBytes, keyTreeDataBlockSize, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // verifyReplicaCount polls the Couchbase API for the named bucket and checks whether the
 // Replica number matches the expected replicaNumber.
 func verifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {

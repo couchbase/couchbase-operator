@@ -1245,6 +1245,12 @@ type CouchbaseBucketSpec struct {
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
 
 	HistoryRetentionSettings *HistoryRetentionSettings `json:"-" annotation:"historyRetention"`
+
+	// MagmaSeqTreeDataBlockSize is the block size, in bytes, for Magma seqIndex blocks.
+	MagmaSeqTreeDataBlockSize *uint64 `json:"-" annotation:"magmaSeqTreeDataBlockSize"`
+
+	// MagmaKeyTreeDataBlockSize is the block size, in bytes, for Magma keyIndex blocks.
+	MagmaKeyTreeDataBlockSize *uint64 `json:"-" annotation:"magmaKeyTreeDataBlockSize"`
 }
 
 type HistoryRetentionSettings struct {

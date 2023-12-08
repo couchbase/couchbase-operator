@@ -438,6 +438,8 @@ type Bucket struct {
 	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds"`
 	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault"`
+	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize"`
+	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize"`
 }
 
 type BucketList []Bucket
@@ -488,6 +490,8 @@ type BucketStatus struct {
 	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds,omitempty"`
 	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes,omitempty"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault,omitempty"`
+	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize,omitempty"`
+	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize,omitempty"`
 }
 
 type VBucketServerMap struct {
@@ -743,6 +747,8 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.HistoryRetentionBytes = status.HistoryRetentionBytes
 		b.HistoryRetentionSeconds = status.HistoryRetentionSeconds
 		b.HistoryRetentionCollectionDefault = status.HistoryRetentionCollectionDefault
+		b.MagmaSeqTreeDataBlockSize = status.MagmaSeqTreeDataBlockSize
+		b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
 	}
 
 	if ramQuotaBytes, ok := status.Quota["rawRAM"]; ok {
@@ -829,6 +835,14 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 		data.Set("historyRetentionBytes", strconv.FormatUint(b.HistoryRetentionBytes, 10))
 		data.Set("historyRetentionSeconds", strconv.FormatUint(b.HistoryRetentionSeconds, 10))
+
+		if b.MagmaSeqTreeDataBlockSize != nil {
+			data.Set("magmaSeqTreeDataBlockSize", strconv.FormatUint(*b.MagmaSeqTreeDataBlockSize, 10))
+		}
+
+		if b.MagmaKeyTreeDataBlockSize != nil {
+			data.Set("magmaKeyTreeDataBlockSize", strconv.FormatUint(*b.MagmaKeyTreeDataBlockSize, 10))
+		}
 	}
 
 	return []byte(data.Encode())

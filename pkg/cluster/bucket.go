@@ -85,6 +85,16 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
 		}
 
+		// MagmaSeqTreeDataBlockSize only supported on Magma
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && bucket.Spec.MagmaSeqTreeDataBlockSize != nil {
+			b.MagmaSeqTreeDataBlockSize = bucket.Spec.MagmaSeqTreeDataBlockSize
+		}
+
+		// MagmaKeyTreeDataBlockSize only supported on Magma
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && bucket.Spec.MagmaKeyTreeDataBlockSize != nil {
+			b.MagmaKeyTreeDataBlockSize = bucket.Spec.MagmaKeyTreeDataBlockSize
+		}
+
 		outputBuckets = append(outputBuckets, b)
 	}
 

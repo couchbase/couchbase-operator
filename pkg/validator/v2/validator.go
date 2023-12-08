@@ -1349,11 +1349,29 @@ func checkHistoryRetentionBytes(val string) error {
 	return nil
 }
 
+func checkMagmaDataBlockSize(val string) error {
+	bytes, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	minExpected := uint64(4 * 1024)
+	maxExpected := uint64(128 * 1024)
+
+	if bytes < minExpected || bytes > maxExpected {
+		return fmt.Errorf("data block size %d must be in the size range of %d to %d", bytes, minExpected, maxExpected)
+	}
+
+	return nil
+}
+
 func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	cdcAnnotations := map[string]func(string) error{
 		"cao.couchbase.com/historyRetention.seconds":                  checkStringToUint,
 		"cao.couchbase.com/historyRetention.bytes":                    checkHistoryRetentionBytes,
 		"cao.couchbase.com/historyRetention.collectionHistoryDefault": checkStringToBool,
+		"cao.couchbase.com/magmaSeqTreeDataBlockSize":                 checkMagmaDataBlockSize,
+		"cao.couchbase.com/magmaKeyTreeDataBlockSize":                 checkMagmaDataBlockSize,
 	}
 
 	var errs []error
