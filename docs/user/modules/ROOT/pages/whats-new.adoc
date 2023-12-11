@@ -1,68 +1,37 @@
 = What's New?
 include::partial$constants.adoc[]
 
-Autonomous Operator {operator-version-minor} release is primarily focused on adding some key features introduced in Couchbase Server 7.1 to Autonomous Operator such as support for ARM platforms and Encrypted Certificates, as well as other improvements related to TLS Certificate Management, cloud backups, index configuration, and the Prometheus Exporter.
+Autonomous Operator {operator-version-minor} release is primarily focused on platform updates, feature parity with Couchbase Server, improvements to Pod Management and Security, as well as a number of minor fixes. 
+== Immediate Backups
 
-== ARM Platform Support
+It is now possible to run a CouchbaseBackup resource immediately via the new immediate_full and immediate_incremental backup strategies.
 
-Over the last few years, the ARM v8 processors which have generally been found in mobile devices, have gained popularity with both desktop hardware vendors and major Cloud Service providers.
-In Couchbase Server 7.1.0 we added support for AWS Graviton-based instances, and since Couchbase Server 7.1.1 we have published multi-arch Docker container images supporting both `amd64` and `arm64` architectures.
+See xref:howto-backup.adoc#configure-backups[Configure Backups] for futher details.
 
-Now, with Autonomous Operator {operator-version-minor}, all tools and container images for Open Source Kubernetes platforms are available for both architectures, allowing deployments on either `amd64` or `arm64` as well as migrations between the two.
+== Improved Pod Management
 
-NOTE: Support for ARM on the OpenShift Container Platform was added in Operator 2.4.2.
+Couchbase Operator now takes into consideration data topography and Couchbase Server version when determining which pods to scale down.  
 
-== Encrypted Certificates
+== Log Uploads
 
-Couchbase Server 7.1 introduced support for xref:7.1@server:introduction:whats-new.adoc#encrypted-private-keys[Encrypted Private Keys], allowing administrators to use an encrypted private key using PKCS #5 v2 algorithms like AES 256.
+There are new parameters that can be passed to the `cao collect-logs` command that will automatically upload the logs to Couchbase Support.
 
-Autonomous Operator {operator-version-minor} now exposes this feature, which prevents storing the TLS private key unencrypted anywhere on the system.
+See xref:tools/cao.adoc#cao-collect-logs[Cao Collect Logs] for further details.
 
-See xref:concept-tls.adoc#tls-passphrase-protection[TLS Passphrase Protection] for further details.
+== Delta Recovery Upgrades
 
-== TLS Certificate Management
+Couchbase Clusters can now be configured to perform a Delta-Recovery upgrades.  This upgrade is considerably faster than the current SwapRebalance method.
 
-This release adds several other improvements in the area of TLS Certificate Management.
+See xref:resources/couchbasecluster.adoc#couchbaseclusters-spec-upgradeProcess[Upgrade Process] for further details
 
-With support for multiple Root CA's in Server 7.1, certificates no longer need to be explicitly supplied for LDAP and instead can be placed inside the `RootCAs` array.  See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-ldap-tlssecret[tlsSecret]
+== Quality of Life Improvements
 
-It is now possible to include multi-PEM CAs in the Server `secretSource`.
-See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-secretsource-serversecretname[serverSecretName]
+Added an onlineExpansionTimeout to Couchbase Cluster to specify the number of minutes operator should wait before falling back to a rolling upgrade when volume expansion fails.
+Added annotations to better help integrations with Prometheus.
+Added platform specific zone labels to persistent volume claims for EKS, GKE and AKS.
 
-Certificate Rotation has been expanded to allow plain text reload as a last resort in case of already-expired certificates.
-See xref:howto-tls-rotation.adoc#replacing-expired-certificates[Replacing expired Certificates]
+== Pod Readiness Delay and Pod Readiness Period
 
-Relatedly, the Operator now raises Kubernetes Events when it detects TLS expiration.
+Added pod readiness delay and pod readiness period parameters to the `cao create operator` command.  These will be applied to all Couchbase Server pods created by the operator.
 
-== Cloud Backup Improvements
-
-Cloud Backup and Restore in Couchbase Server 7.1 now supports the use of Azure and GCP blob storage, and also adds the option to use an ephemeral volume for the staging directory.
-See xref:howto-backup.adoc#backup-and-restore-to-a-cloud-store[Backup and Restore to a Cloud Store]
-
-== Storage Engines
-
-Couchbase Server 7.1 introduced a new Storage Engine, xref:7.1@server:learn:buckets-memory-and-storage/storage-engines.adoc#storage-engine-magma[Magma], alongside the default of Couchstore.
-
-With Operator 2.4, the per-bucket Storage Engine setting is now exposed via xref:resource/couchbasebucket.adoc#couchbasebuckets-spec-storagebackend
-[storageBackend].
-
-== Global Indexer Configuration
-
-To improve Secondary Index management on an Operator-managed cluster, two additional Couchbase Server features are now exposed:
-
-* xref:7.1@server:learn:services-and-indexes/services/index-service.adoc#index-replication[Default Index Replicas] via xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-indexer-numreplica[numReplica]
-
-* xref:7.1@server:learn:clusters-and-availability/rebalance.adoc#rebalancing-the-index-service[Index Redistribution on Rebalance] via xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-indexer-redistributeindexes[redistributeIndexes]
-
-== Prometheus Exporter Improvements
-
-Although the Exporter is no longer required when using Couchbase Server 7.x, which contains a native Prometheus endpoint, it may still be desirable to use the Couchbase Prometheus Exporter.
-
-This release adds performance improvements and tuning options, see xref:howto-prometheus.adoc[] for details.
-
-== Local Persistent Volumes (from Couchbase Autonomous Operator 2.4.1)
-
-In Kubernetes it is possible to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume (see https://kubernetes.io/docs/concepts/storage/volumes/#local[local]).
-
-From Couchbase Autonomous Operator 2.4.1, it is now possible to use these Local Volumes when deploying Couchbase Server resources.
-See xref:concept-persistent-volumes.adoc#local-persistent-volumes[Local Persistent Volumes] for full details.
+See xref:/tools/cao.adoc#cao-create-operator[Cao Create Operator] for further details.
