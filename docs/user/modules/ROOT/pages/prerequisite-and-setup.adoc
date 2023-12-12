@@ -25,7 +25,7 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 6.6 - 7.2^*^
+| 7.0 - 7.2^*^
 |===
 
 *: Couchbase Server 7.2 is supported with Operator 2.4, however new features in 7.2 are only supported on Operator 2.4.1
@@ -46,9 +46,9 @@ This release supports the following container images for xref:concept-backup.ado
 | Backup Utility
 | Backup From and Restore To
 
-a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.2`^]
-a| https://docs.couchbase.com/server/7.1/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.1.3`^]
-| Couchbase Server 6.6--7.1
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.6`^]
+a| https://docs.couchbase.com/server/7.2.3/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.2.3`^]
+| Couchbase Server 7.0--7.2
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
@@ -66,17 +66,18 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 | Couchbase Operator Version
 | Supported Couchbase Fluent Bit Versions
 
-| 2.2.0
-| 1.0.0 - 1.0.4
-
-| 2.2.1
-| 1.0.0 - 1.0.4, 1.1.0 - 1.1.3, 1.2.0
-
 | 2.3.0
 | 1.0.4, 1.1.0 - 1.1.3, 1.2.0
 
 | 2.4.0
-| 1.1.0 - 1.1.3, 1.2.0, 1.2.2
+| 1.1.0 - 1.1.3, 1.2.0 - 1.2.7
+
+| 2.5.0
+| 1.2.0 - 1.2.7
+
+| 2.6.0
+| 1.2.0 - 1.2.7
+
 |===
 
 .Operator Fluent Bit Compatibility
@@ -103,10 +104,10 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.21 - 1.25
+| 1.25 - 1.28
 
 | Red Hat OpenShift Container Platform
-| 4.8 - 4.12
+| 4.11 - 4.14
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:

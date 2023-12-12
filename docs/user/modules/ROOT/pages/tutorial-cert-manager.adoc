@@ -391,7 +391,7 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:6.6.0
+  image: couchbase/server:7.2.3
   security:
     adminSecret: cb-example-auth
   networking:
@@ -432,7 +432,7 @@ If the Couchbase cluster was deployed successfully, the output should look like 
 [source,console]
 ----
 NAME         VERSION   SIZE   STATUS      UUID                               AGE
-cb-example   6.6.0     3      Available   8c531b1cc11680c286d04616cc7a8185   3m31s
+cb-example   7.2.3     3      Available   8c531b1cc11680c286d04616cc7a8185   3m31s
 ----
 
 == Summary
