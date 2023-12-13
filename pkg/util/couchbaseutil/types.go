@@ -781,6 +781,9 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	// Couchbase only things
 	b.EnableIndexReplica = status.EnableIndexReplica
 
+	b.MagmaSeqTreeDataBlockSize = status.MagmaSeqTreeDataBlockSize
+	b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
+
 	return nil
 }
 
