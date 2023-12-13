@@ -264,3 +264,10 @@ var ImageDigests = map[string]string{
 	"8f2be774ca3f573b903ad4926cdf5e57769f2328d5a2e5a78c2af56f4c6cbbe3": "fluent-1.2.0-4",
 	"b5475e68861b9b9b6595d907e6e0f8ad80b567adeeb1a915ef1578b6a6f7b6d6": "fluent-1.2.1-1",
 }
+
+const (
+	// MagmaSeqTreeDataDefaultBlockSize default block size for Magma seqIndex.
+	MagmaSeqTreeDataDefaultBlockSize = 4096
+	// MagmaKeyTreeDataDefaultBlockSize default block size for Magma keyIndex.
+	MagmaKeyTreeDataDefaultBlockSize = 4096
+)

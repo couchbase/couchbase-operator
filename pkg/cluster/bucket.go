@@ -78,21 +78,27 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.HistoryRetentionCollectionDefault = &historyRetentionCollectionDefaultTrue
 		}
 
-		// CDC is only supported on Magma
-		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
-			b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
-			b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
-			b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
+		// Although, the API doesn't need us to pass default values
+		// but, our reconciler comparison fails, when nil. So, setting default values.
+		notNilOrDefault := func(val *uint64, defaultVal uint64) *uint64 {
+			if val != nil {
+				return val
+			}
+
+			return &defaultVal
 		}
 
-		// MagmaSeqTreeDataBlockSize only supported on Magma
-		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && bucket.Spec.MagmaSeqTreeDataBlockSize != nil {
-			b.MagmaSeqTreeDataBlockSize = bucket.Spec.MagmaSeqTreeDataBlockSize
-		}
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+			// MagmaSeqTreeDataBlockSize/MagmaKeyTreeDataBlockSize only supported on Magma
+			b.MagmaSeqTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaSeqTreeDataBlockSize, constants.MagmaSeqTreeDataDefaultBlockSize)
+			b.MagmaKeyTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaKeyTreeDataBlockSize, constants.MagmaKeyTreeDataDefaultBlockSize)
 
-		// MagmaKeyTreeDataBlockSize only supported on Magma
-		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && bucket.Spec.MagmaKeyTreeDataBlockSize != nil {
-			b.MagmaKeyTreeDataBlockSize = bucket.Spec.MagmaKeyTreeDataBlockSize
+			// CDC is only supported on Magma
+			if SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
+				b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
+				b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
+				b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
+			}
 		}
 
 		outputBuckets = append(outputBuckets, b)
