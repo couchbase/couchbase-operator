@@ -2,6 +2,7 @@
 include::partial$constants.adoc[]
 
 Autonomous Operator {operator-version-minor} release is primarily focused on platform updates, feature parity with Couchbase Server, improvements to Pod Management and Security, as well as a number of minor fixes. 
+
 == Immediate Backups
 
 It is now possible to run a CouchbaseBackup resource immediately via the new immediate_full and immediate_incremental backup strategies.
