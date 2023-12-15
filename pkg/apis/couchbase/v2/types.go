@@ -2,6 +2,8 @@
 package v2
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3246,6 +3248,32 @@ type RBAC struct {
 type PodTemplate struct {
 	ObjectMeta `json:"metadata,omitempty"`
 	Spec       v1.PodSpec `json:"spec,omitempty"`
+}
+
+// MarshalJSON overrides the default JSON Marshalling so we can add the omitempty
+// annotation to PodSpec.Containers so that we don't get unknown field warnings
+func (t *PodTemplate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ObjectMeta `json:"metadata,omitempty"`
+		Spec       couchbasePodSpec `json:"spec,omitempty"`
+	}{
+		ObjectMeta: t.ObjectMeta,
+		Spec:       couchbasePodSpec(t.Spec),
+	})
+}
+
+// Use a new type so we can override MarshalJSON
+type couchbasePodSpec v1.PodSpec
+
+// Embedding inherits everything and then we override the Containers field
+func (t *couchbasePodSpec) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		*v1.PodSpec
+		Containers []v1.Container `json:"containers,omitempty"`
+	}{
+		PodSpec:    (*v1.PodSpec)(t),
+		Containers: t.Containers,
+	})
 }
 
 type ServerConfig struct {
