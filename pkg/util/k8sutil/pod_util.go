@@ -1788,8 +1788,8 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 					Port: int32(snDataPort),
 				},
 			},
-			InitialDelaySeconds: 10,
-			TimeoutSeconds:      5,
+			InitialDelaySeconds: 60, // number of seconds k8s should wait before initiating the first liveness probe after the container starts.
+			TimeoutSeconds:      60, // the maximum amount of time the probe is allowed to take
 			PeriodSeconds:       10,
 			FailureThreshold:    3,
 			// because default query timeout for n1ql queries in CB Server is 75 secs. So, 5 secs added to that.
