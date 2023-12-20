@@ -5,7 +5,7 @@ Autonomous Operator {operator-version-minor} release is primarily focused on pla
 
 == Platform Updates
 
-Autonomous Operator {operator-version-minor} is supported on versions 1.24 through 1.27 of Kubernetes, Rancher K3s, the equivalent managed cloud versions from Amazon Elastic Kubernetes Service (EKS), Google Kubernetes Engine (GKE), Microsoft Azure Kubernetes Service (AKS), and Red Hat OpenShift.
+Autonomous Operator {operator-version-minor} is supported on versions 1.24 through 1.28 of Kubernetes, Rancher K3s, the equivalent managed cloud versions from Amazon Elastic Kubernetes Service (EKS), Google Kubernetes Engine (GKE), Microsoft Azure Kubernetes Service (AKS), and Red Hat OpenShift.
 
 == Feature Parity with Couchbase Server
 
