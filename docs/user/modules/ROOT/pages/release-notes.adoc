@@ -92,6 +92,9 @@ a| *Summary:* Previously the Operator would not allow you remove the setting for
 a| https://issues.couchbase.com/browse/K8S-3283[K8S-3283^]
 a| *Summary:* Previously the Operator would not use the new `couchbasecluster.spec.security.podSecurityContext` when creating backup jobs
 
+a| https://issues.couchbase.com/browse/K8S-3167[K8S-3167^]
+a| *Summary:* Previously the operator would continually update Magma Bucket settings if History Retention Annotations were missing
+
 |===
 
 == Feedback
