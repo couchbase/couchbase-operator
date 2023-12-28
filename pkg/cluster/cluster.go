@@ -536,11 +536,7 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {
-	d, err := diff.Diff(old, new)
-	if err != nil {
-		log.Error(err, "failed to create diff", "cluster", c.namespacedName())
-		return
-	}
+	d := diff.PrettyDiff(old, new)
 
 	// reflect.DeepEqual doesn't make the difference between a nil map and an
 	// empty one, so this could be legitimately triggered even if there is no
