@@ -118,6 +118,7 @@ const (
 	AnnotationPrometheusPath      = "prometheus.io/path"
 	AnnotationPrometheusPort      = "prometheus.io/port"
 	AnnotationPrometheusScheme    = "prometheus.io/scheme"
+	AnnotationReschedule          = "cao.couchbase.com/reschedule"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion

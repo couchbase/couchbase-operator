@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -989,5 +991,57 @@ func TestModifyDataServiceSettings(t *testing.T) {
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestMovePod(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + cluster.Name,
+	}
+
+	var podsList = corev1.PodList{}
+
+	var podsCall = func() error {
+		pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+		podsList = *pods
+		return nil
+	}
+
+	err := retryutil.Retry(context.Background(), 5*time.Minute, podsCall)
+
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, podsList.Items[0])
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+	}
+
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

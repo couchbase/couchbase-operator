@@ -22,13 +22,17 @@ func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbas
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	callback := func() error {
-		err := addCustomAnnotationAndLabels(k8s, couchbase, annotations, labels)
-		if err != nil {
-			Die(t, err)
-		}
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
 
-		return nil
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		Die(t, err)
+	}
+
+	callback := func() error {
+		return addCustomAnnotationAndLabels(k8s, annotations, labels, *pods)
 	}
 
 	if err := retryutil.Retry(ctx, 10*time.Second, callback); err != nil {
@@ -36,16 +40,24 @@ func MustAddCustomAnnotationAndLabels(t *testing.T, k8s *types.Cluster, couchbas
 	}
 }
 
-func addCustomAnnotationAndLabels(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, annotations, labels map[string]string) error {
-	listOptions := metav1.ListOptions{
-		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+func MustAddCustomAnnotationAndLabelsSinglePod(t *testing.T, k8s *types.Cluster, annotations, labels map[string]string, pod v1.Pod) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	var pods = []v1.Pod{pod}
+
+	var podList = v1.PodList{Items: pods}
+
+	callback := func() error {
+		return addCustomAnnotationAndLabels(k8s, annotations, labels, podList)
 	}
 
-	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
-	if err != nil {
-		return err
+	if err := retryutil.Retry(ctx, 10*time.Second, callback); err != nil {
+		Die(t, err)
 	}
+}
 
+func addCustomAnnotationAndLabels(k8s *types.Cluster, annotations, labels map[string]string, pods v1.PodList) error {
 	for _, pod := range pods.Items {
 		newPod := pod.DeepCopy()
 		newAnnotations := newPod.ObjectMeta.Annotations

@@ -297,6 +297,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleFailedNodes,
 		(*ReconcileMachine).handleUnknownServerConfigs,
 		(*ReconcileMachine).handleVolumeExpansion,
+		(*ReconcileMachine).handleMoveNodes,
 		(*ReconcileMachine).handleUpgradeNode,
 		(*ReconcileMachine).handleBucketStorageBackendMigration,
 		(*ReconcileMachine).handleRemoveNode,
@@ -1072,7 +1073,6 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 
 		for _, name := range candidates.Names()[:maxUpgradable] {
 			constrained.Add(candidates[name])
-			log.Info(candidates[name].Name())
 		}
 
 		candidates = constrained
@@ -1193,6 +1193,77 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 		if err := c.rebalance(c.members, nil); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
+	// Don't do anything if the cluster is currently upgrading
+	if upgrading, err := c.isUpgrading(); upgrading && err == nil {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	// If the cluster needs a rebalance, let's do that first
+	if r.needsRebalance {
+		return nil
+	}
+
+	r.log()
+
+	// Check which pods need moving
+	candidates := c.needsMove()
+
+	if candidates.Empty() {
+		return nil
+	}
+
+	// Get the max upgradeable candidates
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
+	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+
+	if err != nil {
+		return err
+	}
+
+	candidates = constrained
+
+	// Is it possible to do DeltaRecovery if that's what they asked for?
+	pvcPresent := true
+
+	var targetVersion string
+
+	for _, candidate := range candidates {
+		// The target version is going to stay the same as the current version
+		targetVersion = candidate.Version()
+
+		if c.isPodRecoverable(candidate) == false {
+			pvcPresent = false
+			break
+		}
+	}
+
+	// Carry out the move
+	// We can use the upgrade methods to do this (even though we're not changing the version)
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
+		err := r.handleDeltaRecovery(c, candidates, targetVersion)
+		if err != nil {
+			return err
+		}
+	} else {
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
+			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		}
+
+		return r.swapRebalanceMembers(c, candidates)
 	}
 
 	return nil

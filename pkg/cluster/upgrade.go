@@ -14,6 +14,26 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
+func (c *Cluster) needsMove() couchbaseutil.MemberSet {
+	candidates := couchbaseutil.MemberSet{}
+
+	for name, member := range c.members {
+		actual, exists := c.k8s.Pods.Get(name)
+		if !exists {
+			continue
+		}
+
+		shouldMove, ok := actual.Annotations[constants.AnnotationReschedule]
+		if !ok {
+			continue
+		} else if shouldMove == "true" {
+			candidates.Add(member)
+		}
+	}
+
+	return candidates
+}
+
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
