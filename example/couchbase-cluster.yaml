@@ -8,13 +8,14 @@ kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
-  image: couchbase/server:7.2.0
+  image: couchbase/server:7.2.3
   security:
     adminSecret: cb-example-auth
     rbac:
       managed: true
   buckets:
     managed: true
+  upgradeProcess: DeltaRecovery
   servers:
     - size: 3
       name: all_services
