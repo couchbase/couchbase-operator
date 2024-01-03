@@ -1676,3 +1676,10 @@ type StatsRangeMetrics struct {
 	StartTimestamp int                     `json:"startTimestamp"`
 	EndTimestamp   int                     `json:"endTimestamp"`
 }
+
+type TerseClusterInfo struct {
+	ClusterUUID          string `json:"clusterUUID"`
+	Orchestrator         string `json:"orchestrator"`
+	IsBalanced           bool   `json:"isBalanced"`
+	ClusterCompatVersion string `json:"clusterCompatVersion"`
+}

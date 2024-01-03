@@ -914,3 +914,7 @@ func GetStatsRangeAvgMetrics(service string, metrics *StatsRangeMetrics) *Reques
 
 	return NewRequest((*Client).Get, "/pools/default/stats/range"+metricName+"/avg?start=-10&step=10", nil, metrics)
 }
+
+func GetTerseClusterInfo(clusterInfo *TerseClusterInfo) *Request {
+	return NewRequest((*Client).Get, "/pools/default/terseClusterInfo", nil, clusterInfo)
+}

@@ -1006,12 +1006,17 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 
 // selectUpgradeCandidates applies an upgrade heuristic to the set of all upgradable pods
 // and filters this down into a set of pods that will be upgraded this turn.
-func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, orchestrator string) (couchbaseutil.MemberSet, error) {
 	// Rolling upgrade defaults to a single node at a time, however this can
 	// be increased to an absolute number or a relative size of the cluster.
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
 		// Default to one at a time
 		upgradeLimit := 1
+
+		// Remove orchestrator from list if rolling upgrade
+		if len(candidates) != 1 {
+			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
+		}
 
 		if c.cluster.Spec.RollingUpgrade != nil {
 			// Start with a big number and pick the smallest of any
@@ -1064,12 +1069,36 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet) (c
 
 		for _, name := range candidates.Names()[:maxUpgradable] {
 			constrained.Add(candidates[name])
+			log.Info(candidates[name].Name())
 		}
 
 		candidates = constrained
 	}
 
 	return candidates, nil
+}
+
+func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orchestratorName string) (couchbaseutil.MemberSet, couchbaseutil.Member) {
+	var candidatesNoOrchestrator = couchbaseutil.MemberSet{}
+
+	var orchestrator couchbaseutil.Member
+
+	if orchestratorName == "undefined" {
+		return candidates, nil
+	}
+
+	for _, candidate := range candidates {
+		if strings.Contains(orchestratorName, candidate.Name()) {
+			orchestratorCandidate := candidate
+			orchestrator = orchestratorCandidate
+
+			continue
+		}
+
+		candidatesNoOrchestrator.Add(candidate)
+	}
+
+	return candidatesNoOrchestrator, orchestrator
 }
 
 func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
@@ -1116,7 +1145,6 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 				}
 			}
 		}
-
 		// Recreate the pod
 		if err := c.recreatePod(candidate); err != nil {
 			return err
@@ -1153,7 +1181,15 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		}
 	}
 
-	constrained, err := c.selectUpgradeCandidates(candidates)
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
+	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+
 	if err != nil {
 		return err
 	}
@@ -1342,6 +1378,11 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return err
 	}
 
+	clusterInfo := couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil
@@ -1358,34 +1399,42 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return err
 	}
 
-	var migrateCandidate couchbaseutil.Member
+	var candidates = couchbaseutil.MemberSet{}
 
-	// We will SwapRebalance one node at a time for now
 	for _, bucket := range clusterBuckets {
 		for _, node := range bucket.Nodes {
 			// node.StorageBackend is empty if it matches the bucket storageMode
 			if node.StorageBackend != "" {
-				migrateCandidate = c.members[node.HostName.GetMemberName()]
-				break
+				candidates.Add(c.members[node.HostName.GetMemberName()])
 			}
-		}
-
-		if migrateCandidate != nil {
-			break
 		}
 	}
 
-	if migrateCandidate == nil {
+	candidatesNoOrchestrator, orchestrator := separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
+
+	if len(candidatesNoOrchestrator) == 0 && orchestrator == nil {
 		return nil
 	}
 
-	log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", migrateCandidate.Name())
+	var migrateCandidate couchbaseutil.Member
 
-	if err := c.scheduler.Upgrade(migrateCandidate.Config(), migrateCandidate.Name()); err != nil {
-		return err
+	if len(candidatesNoOrchestrator) != 0 {
+		migrateCandidate = candidatesNoOrchestrator[candidatesNoOrchestrator.Names()[0]]
+	} else if orchestrator != nil {
+		migrateCandidate = orchestrator
 	}
 
-	return r.swapRebalanceMembers(c, couchbaseutil.NewMemberSet(migrateCandidate))
+	if len(candidatesNoOrchestrator) != 0 || orchestrator != nil {
+		log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", migrateCandidate.Name())
+
+		if err := c.scheduler.Upgrade(migrateCandidate.Config(), migrateCandidate.Name()); err != nil {
+			return err
+		}
+
+		return r.swapRebalanceMembers(c, couchbaseutil.NewMemberSet(migrateCandidate))
+	}
+
+	return nil
 }
 
 func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseutil.MemberSet) error {
