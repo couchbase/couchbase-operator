@@ -102,6 +102,53 @@ This change will affect all users of logging, and will require a cluster upgrade
 Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
 This has been fixed so that logs older than or equal to the time period are cleaned.
 
+[#release-v243]
+== Release 2.4.3
+
+Couchbase Autonomous Operator 2.4.3 was released in January 2024.
+
+[#changes-in-behavior-v243]
+=== New Features and Behavioral Changes
+
+==== Support for New Kubernetes Platforms
+
+Autonomous Operator 2.4.3 adds support for Kubernetes versions 1.26, 1.27 and 1.28.
+
+[#fixed-issues-v243]
+=== Fixed Issues
+
+[#table-fixed-issues-v243,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3231[K8S-3231^]
+a| *Summary:* Previously the Operator identified the `eventing_admin` role as a Bucket role and not a Cluster role.
+
+a| https://issues.couchbase.com/browse/K8S-3232[K8S-3232^]
+a| *Summary:* Previously the Operator would log a large JSON structure to the logs when it failed to create a Pod.
+
+a| https://issues.couchbase.com/browse/K8S-3233[K8S-3233^]
+a| *Summary:* Previously the Operator would continually update Magma Bucket settings if History Retention Annotations were missing.
+
+a| https://issues.couchbase.com/browse/K8S-3238[K8S-3238^]
+a| *Summary:* Previously the Operator would get stuck in a reconciliation loop when failing to compare two unsorted arrays.
+
+a| https://issues.couchbase.com/browse/K8S-3240[K8S-3240^]
+a| *Summary:* Previously the Operator was not including Cluster details in a number of log messages.
+
+a| https://issues.couchbase.com/browse/K8S-3241[K8S-3241^]
+a| *Summary:* Previously the Operator was logging excessive node-related 'Reconcile completed' messages at `info` rather than `debug`.
+
+a| https://issues.couchbase.com/browse/K8S-3242[K8S-3242^]
+a| *Summary:* Previously the Operator certification suite was failing on auto-scaling related tests due to a removed API.
+
+a| https://issues.couchbase.com/browse/K8S-3243[K8S-3243^]
+a| *Summary:* Previously the Operator would crash if a Backup resource was added with missing schedules.
+
+a| https://issues.couchbase.com/browse/K8S-3252[K8S-3252^]
+a| *Summary:* Previously the Operator was not correctly ignoring/discarding existing XDCR Cluster References when Managed XDCR was enabled on an already-managed Couchbase Cluster.
+
+|===
 [#release-v242]
 == Release 2.4.2
 
