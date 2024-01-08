@@ -378,6 +378,11 @@ func ListBuckets(buckets *BucketList) *Request {
 	return NewRequest((*Client).Get, "/pools/default/buckets/", nil, buckets)
 }
 
+// ListBucketStatuses lists all bucket statuses on the system.
+func ListBucketStatuses(buckets *BucketStatusList) *Request {
+	return NewRequest((*Client).Get, "/pools/default/buckets/", nil, buckets)
+}
+
 // SetAutoFailoverSettings sets auto failover settings.
 func SetAutoFailoverSettings(settings *AutoFailoverSettings) *Request {
 	data, err := urlencoding.Marshal(settings)

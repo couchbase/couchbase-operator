@@ -226,7 +226,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		}
 
 		if err := waitAlternateAddressReachable(timeout, addresses); err != nil {
-			return err
+			return fmt.Errorf("could not reach hostname: %s, %w", addresses.Hostname, err)
 		}
 
 		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)

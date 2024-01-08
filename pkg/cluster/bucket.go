@@ -9,6 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/go-openapi/errors"
 
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -25,7 +26,7 @@ const (
 type SupportedFeatureMap map[SupportedFeature]bool
 
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
-func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
@@ -69,7 +70,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
 		}
 
-		applyBucketStorageBackend(&b, bucket, storageBackendSupported, magmaStorageBackendSupported)
+		applyBucketStorageBackend(&b, bucket, storageBackendSupported, magmaStorageBackendSupported, cluster)
 
 		// Defaults to true, when bucket is magma.
 		// Hence, setting it to true to avoid false reconciliation updates.
@@ -78,11 +79,27 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.HistoryRetentionCollectionDefault = &historyRetentionCollectionDefaultTrue
 		}
 
-		// CDC is only supported on Magma
-		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
-			b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
-			b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
-			b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
+		// Although, the API doesn't need us to pass default values
+		// but, our reconciler comparison fails, when nil. So, setting default values.
+		notNilOrDefault := func(val *uint64, defaultVal uint64) *uint64 {
+			if val != nil {
+				return val
+			}
+
+			return &defaultVal
+		}
+
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+			// MagmaSeqTreeDataBlockSize/MagmaKeyTreeDataBlockSize only supported on Magma
+			b.MagmaSeqTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaSeqTreeDataBlockSize, constants.MagmaSeqTreeDataDefaultBlockSize)
+			b.MagmaKeyTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaKeyTreeDataBlockSize, constants.MagmaKeyTreeDataDefaultBlockSize)
+
+			// CDC is only supported on Magma
+			if SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
+				b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
+				b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
+				b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
+			}
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -91,7 +108,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	return outputBuckets
 }
 
-func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseBucket, storageBackendCouchstore, storageBackendMagma bool) {
+func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseBucket, storageBackendCouchstore, storageBackendMagma bool, cluster *couchbasev2.CouchbaseCluster) {
 	// cb server version below 7.0.0.
 	if !storageBackendCouchstore && bucket.Spec.StorageBackend != "" {
 		// warning log for user why spec.StorageBackend is ignored.
@@ -102,8 +119,6 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 	// default is "couchstore"
 	if storageBackendCouchstore && !storageBackendMagma && bucket.Spec.StorageBackend == "" {
 		log.Info("[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore")
-
-		b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
 	}
 
 	// cb server version greater or equal to 7.0.0 but less than 7.1.0.
@@ -111,19 +126,9 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 	// default is "couchstore"
 	if storageBackendCouchstore && !storageBackendMagma && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackend(couchbaseutil.CouchbaseStorageBackendMagma) {
 		log.Info("[WARN] spec.storageBackend cannot be magma for server version below 7.1.0 - default to couchstore")
-
-		b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
 	}
 
-	// cb server version greater or equal to 7.1.0 and bucket.Spec.StorageBackend not specified.
-	if storageBackendMagma && bucket.Spec.StorageBackend == "" {
-		b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackendCouchstore
-	}
-
-	// cb server version greater or equal to 7.1.0 and bucket.Spec.StorageBackend specified.
-	if storageBackendMagma && bucket.Spec.StorageBackend != "" {
-		b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(bucket.Spec.StorageBackend)
-	}
+	b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(bucket.GetStorageBackend(cluster))
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
@@ -231,7 +236,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	allBuckets := []couchbaseutil.Bucket{}
 
-	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets)
+	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets, c.cluster)
 	allBuckets = gatherEphemeralBuckets(durablitySupported, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets)
 
@@ -262,10 +267,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				// Since, BucketStorageBackend is non-editable, once created.
-				// This avoids running any update reconcile loop,
-				// if BucketStorageBackend seems to be the only one different.
-				r.BucketStorageBackend = a.BucketStorageBackend
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
 					c.logUpdate(a, r)
@@ -289,7 +290,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, r := range requested {
 			if a.BucketName == r.BucketName {
+				matchBackendsIfBefore76(&r, &a, c.cluster)
+
 				found = true
+
 				break
 			}
 		}
@@ -300,6 +304,20 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	}
 
 	return create, update, remove, requested, nil
+}
+
+// Since, BucketStorageBackend is non-editable, once created for CB version < 7.6.0.
+// This avoids running any update reconcile loop,
+// if BucketStorageBackend seems to be the only one different.
+func matchBackendsIfBefore76(r, a *couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster) {
+	if isAtleast76, err := cluster.IsAtLeastVersion("7.6.0"); err == nil && !isAtleast76 {
+		r.BucketStorageBackend = a.BucketStorageBackend
+		if r.BucketStorageBackend != a.BucketStorageBackend {
+			r.BucketStorageBackend = a.BucketStorageBackend
+
+			log.Info("[WARN] spec.storageBackend cannot be changed for server version below 7.6.0")
+		}
+	}
 }
 
 // reconcile buckets by adding or removing
@@ -375,6 +393,50 @@ func (c *Cluster) reconcileBuckets() error {
 
 	for _, name := range names {
 		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, statuses[name])
+	}
+
+	return nil
+}
+
+func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
+	if c.cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend == nil || c.cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	if isAtleast76, err := c.IsAtLeastVersion("7.6.0"); err == nil && !isAtleast76 {
+		return nil
+	}
+
+	targetBackend := *c.cluster.Spec.Buckets.TargetUnmanagedBucketStorageBackend
+
+	buckets := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&buckets).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	var errs []error
+
+	for _, bucket := range buckets {
+		if string(bucket.BucketStorageBackend) == string(targetBackend) {
+			continue
+		}
+
+		if ok, reason := bucket.CanBeMigrated(couchbaseutil.CouchbaseStorageBackend(targetBackend)); !ok {
+			log.Info("[WARN] Cannot migrate bucket as it doesn't meet requirements for backend change.", "bucket-name", bucket.BucketName, "reason", reason, "target-backend", targetBackend)
+			continue
+		}
+
+		log.Info("Updating storage backend of unmanaged bucket", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+
+		bucket.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(targetBackend)
+		if err := couchbaseutil.UpdateBucket(&bucket).On(c.api, c.readyMembers()); err != nil {
+			log.Error(err, "Bucket update failed", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) != 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil

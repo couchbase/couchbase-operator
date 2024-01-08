@@ -921,7 +921,11 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	applyPodScheduling(cluster, pod, serverGroupZone)
 	applyPodNetworking(cluster, pod, m)
 	applyPodStorage(pod, pvcState)
-	applyPodLogging(cluster, pod)
+
+	if err := applyPodLogging(cluster, pod); err != nil {
+		return nil, err
+	}
+
 	applyPodPassphraseVolumes(cluster, pod)
 
 	// Note: anything using clients to look up state at this point, is probably doing
@@ -1280,16 +1284,20 @@ func applyPodPassphraseVolumes(cluster *couchbasev2.CouchbaseCluster, pod *v1.Po
 		})
 }
 
-func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 	fbs := cluster.Spec.Logging.Server
 
 	if fbs == nil || !fbs.Enabled {
-		return
+		return nil
 	}
 
 	// Iterate over mounts to find the one we need for logs
 	container, _ := GetCouchbaseContainer(pod)
 	mount := getLoggingMount(container)
+
+	if mount == nil {
+		return errors.NewStackTracedError(errors.ErrNoLoggingVolume)
+	}
 
 	sidecarConfig := fbs.Sidecar
 
@@ -1451,14 +1459,14 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	acs := cluster.Spec.Logging.Audit
 
 	if acs == nil || !acs.Enabled || acs.GarbageCollection == nil {
-		return
+		return nil
 	}
 
 	// Determine if GC is enabled
 	gc := acs.GarbageCollection.Sidecar
 
 	if gc == nil || !gc.Enabled {
-		return
+		return nil
 	}
 
 	// Convert & truncate age to mmin units to handle more granularity than days with mtime
@@ -1526,6 +1534,8 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
 	}
 
 	pod.Spec.Containers = append(pod.Spec.Containers, auditcleanerContainer)
+
+	return nil
 }
 
 func applyMetricsPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
@@ -1788,8 +1798,8 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 					Port: int32(snDataPort),
 				},
 			},
-			InitialDelaySeconds: 10,
-			TimeoutSeconds:      5,
+			InitialDelaySeconds: 60, // number of seconds k8s should wait before initiating the first liveness probe after the container starts.
+			TimeoutSeconds:      60, // the maximum amount of time the probe is allowed to take
 			PeriodSeconds:       10,
 			FailureThreshold:    3,
 			// because default query timeout for n1ql queries in CB Server is 75 secs. So, 5 secs added to that.

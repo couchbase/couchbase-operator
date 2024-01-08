@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -171,4 +172,22 @@ func VerifyVersion(version string) error {
 	}
 
 	return nil
+}
+
+func CouchbaseImageVersion(image string) (string, error) {
+	parts := strings.Split(image, ":")
+
+	lenParts := len(parts)
+	if lenParts < 2 {
+		return "", fmt.Errorf("%w: invalid image string %s", errors.NewStackTracedError(errors.ErrInvalidVersion), image)
+	}
+
+	version := parts[lenParts-1]
+
+	// lookup version associated with sha256 digest
+	if IsSHA256Version(version) {
+		return GetSHA256Version(version), nil
+	}
+
+	return version, nil
 }

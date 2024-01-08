@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -22,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -87,9 +89,16 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintBucketStorageBackend,
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
+		checkConstraintBucketsAnnotations,
 	}
 
 	var errs []error
+
+	// Check that any CAO annotations are valid
+	err := annotations.Populate(&cluster.Spec, cluster.Annotations)
+	if err != nil {
+		errs = append(errs, err)
+	}
 
 	for _, check := range checks {
 		if err := check(v, cluster); err != nil {
@@ -116,6 +125,55 @@ func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *
 		if *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
 			return fmt.Errorf("cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery")
 		}
+	}
+
+	return nil
+}
+
+var validStorageBackends = map[couchbasev2.CouchbaseStorageBackend]bool{
+	couchbasev2.CouchbaseStorageBackendMagma:      true,
+	couchbasev2.CouchbaseStorageBackendCouchstore: true,
+}
+
+func checkValidStorageBackend(backend, annotation string) error {
+	if _, ok := validStorageBackends[couchbasev2.CouchbaseStorageBackend(backend)]; !ok {
+		return fmt.Errorf("%s: (%s) annotation must be a valid storage backend: %v", annotation, backend, reflect.ValueOf(validStorageBackends).MapKeys())
+	}
+
+	return nil
+}
+
+func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	targetUnmanagedBucketStorageBackendValidation := func(backend, annotation string) error {
+		tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+		if err != nil {
+			return err
+		}
+
+		if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); !after76 && err == nil {
+			return fmt.Errorf("%s annotation can only be used with server version 7.6.0 or larger", annotation)
+		}
+
+		return checkValidStorageBackend(backend, annotation)
+	}
+	bucketAnnotations := map[string]func(string, string) error{
+		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
+		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
+	}
+
+	for k, v := range cluster.Annotations {
+		if testFunc, ok := bucketAnnotations[k]; ok {
+			if err := testFunc(v, k); err != nil {
+				errs = append(errs, fmt.Errorf("annotation '%s' failed to parse with error %w", k, err))
+				continue
+			}
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
@@ -1349,11 +1407,29 @@ func checkHistoryRetentionBytes(val string) error {
 	return nil
 }
 
+func checkMagmaDataBlockSize(val string) error {
+	bytes, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	minExpected := uint64(4 * 1024)
+	maxExpected := uint64(128 * 1024)
+
+	if bytes < minExpected || bytes > maxExpected {
+		return fmt.Errorf("data block size %d must be in the size range of %d to %d", bytes, minExpected, maxExpected)
+	}
+
+	return nil
+}
+
 func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	cdcAnnotations := map[string]func(string) error{
 		"cao.couchbase.com/historyRetention.seconds":                  checkStringToUint,
 		"cao.couchbase.com/historyRetention.bytes":                    checkHistoryRetentionBytes,
 		"cao.couchbase.com/historyRetention.collectionHistoryDefault": checkStringToBool,
+		"cao.couchbase.com/magmaSeqTreeDataBlockSize":                 checkMagmaDataBlockSize,
+		"cao.couchbase.com/magmaKeyTreeDataBlockSize":                 checkMagmaDataBlockSize,
 	}
 
 	var errs []error
@@ -3029,16 +3105,6 @@ func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseClu
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
-	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
-		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
-	}
-
-	if prev.Spec.StorageBackend != curr.Spec.StorageBackend {
-		if !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
-			errs = append(errs, fmt.Errorf("spec.storageBackend value in body %s cannot be different from previous value %s", curr.Spec.StorageBackend, prev.Spec.StorageBackend))
-		}
-	}
-
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
@@ -3050,6 +3116,126 @@ func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	return nil
 }
 
+func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
+	err := annotations.Populate(&prev.Spec, prev.Annotations)
+	if err != nil {
+		return err
+	}
+
+	err = annotations.Populate(&curr.Spec, curr.Annotations)
+	if err != nil {
+		return err
+	}
+
+	// We check here if the change in default storage backend would result in a bucket backend
+	// change for a bucket in a CB cluster < 7.6.0. The operator shouldn't actually attempt the
+	// migration but we still want to keep the state of CB K8s resources and CB Server in sync
+	// where we can.
+	// This is a heavy ce=heck which is why we gate it behind if the default storage backend
+	// actually changes
+	if curr.GetDefaultBucketStorageBackend() != prev.GetDefaultBucketStorageBackend() {
+		tag, err := k8sutil.CouchbaseVersion(curr.Spec.Image)
+		if err != nil {
+			return err
+		}
+
+		// If it's after 7.6.0 then backend can be changed so we don't need to check further
+		if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); after76 && err == nil {
+			return nil
+		}
+
+		buckets, err := v.Abstraction.GetCouchbaseBuckets(curr.Namespace, curr.Spec.Buckets.Selector)
+
+		if err != nil {
+			return err
+		}
+
+		prevSelector := labels.Everything()
+		if prev.Spec.Buckets.Selector != nil {
+			prevSelector, err = metav1.LabelSelectorAsSelector(prev.Spec.Buckets.Selector)
+			if err != nil {
+				return nil
+			}
+		}
+
+		var errs []error
+
+		for _, bucket := range buckets.Items {
+			if !prevSelector.Matches(labels.Set(bucket.Labels)) {
+				continue
+			}
+
+			if bucket.GetStorageBackend(prev) != bucket.GetStorageBackend(curr) {
+				errs = append(errs, fmt.Errorf("cannot change default bucket backend as %s backend would change, backend changes are only supported for server version >= 7.6.0", bucket.Name))
+			}
+		}
+
+		if errs != nil {
+			return errors.CompositeValidationError(errs...)
+		}
+	}
+
+	return nil
+}
+
+func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket) error {
+	var errs []error
+
+	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
+		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
+	}
+
+	if prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
+		allClustersAtleast76, err := areAllBucketsClustersAtleast76(v, curr)
+
+		if err != nil {
+			return err
+		}
+
+		if !allClustersAtleast76 {
+			errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) (bool, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return false, err
+	}
+
+	for _, cluster := range clusters.Items {
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return false, err
+		}
+
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+			if err != nil {
+				return false, err
+			}
+
+			after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
+
+			if err != nil {
+				return false, err
+			}
+
+			if !after76 {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
 	var errs []error
 

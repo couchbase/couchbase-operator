@@ -168,7 +168,7 @@ type AutoFailoverSettings struct {
 	Timeout                  int64                         `url:"timeout" json:"timeout"`
 	Count                    uint8                         `json:"count"`
 	FailoverOnDataDiskIssues FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
-	FailoverServerGroup      bool                          `url:"failoverServerGroup" json:"failoverServerGroup"`
+	FailoverServerGroup      *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
 	MaxCount                 uint64                        `url:"maxCount" json:"maxCount"`
 }
 
@@ -258,6 +258,10 @@ type NodeInfo struct {
 	AvailableStorage   AvailableStorageInfo `json:"storage"`
 	AlternateAddresses *AlternateAddresses  `json:"alternateAddresses,omitempty"`
 	Version            string               `json:"version"`
+
+	// This property is only available if a bucket in the cluster has been changed from
+	// couchstore to magma.
+	StorageBackend string `json:"storageBackend"`
 
 	// AddressFamily is the actual network configuration of the node, and controls
 	// the protocol Couchbase talks to itself over (A vs AAAA lookups most likely).
@@ -438,9 +442,12 @@ type Bucket struct {
 	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds"`
 	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault"`
+	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize"`
+	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize"`
 }
 
 type BucketList []Bucket
+type BucketStatusList []BucketStatus
 
 func (b BucketList) Get(name string) (*Bucket, error) {
 	for i := range b {
@@ -488,6 +495,8 @@ type BucketStatus struct {
 	HistoryRetentionSeconds           uint64                  `json:"historyRetentionSeconds,omitempty"`
 	HistoryRetentionBytes             uint64                  `json:"historyRetentionBytes,omitempty"`
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault,omitempty"`
+	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize,omitempty"`
+	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize,omitempty"`
 }
 
 type VBucketServerMap struct {
@@ -743,6 +752,8 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.HistoryRetentionBytes = status.HistoryRetentionBytes
 		b.HistoryRetentionSeconds = status.HistoryRetentionSeconds
 		b.HistoryRetentionCollectionDefault = status.HistoryRetentionCollectionDefault
+		b.MagmaSeqTreeDataBlockSize = status.MagmaSeqTreeDataBlockSize
+		b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
 	}
 
 	if ramQuotaBytes, ok := status.Quota["rawRAM"]; ok {
@@ -774,6 +785,9 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 
 	// Couchbase only things
 	b.EnableIndexReplica = status.EnableIndexReplica
+
+	b.MagmaSeqTreeDataBlockSize = status.MagmaSeqTreeDataBlockSize
+	b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
 
 	return nil
 }
@@ -829,6 +843,14 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 		data.Set("historyRetentionBytes", strconv.FormatUint(b.HistoryRetentionBytes, 10))
 		data.Set("historyRetentionSeconds", strconv.FormatUint(b.HistoryRetentionSeconds, 10))
+
+		if b.MagmaSeqTreeDataBlockSize != nil {
+			data.Set("magmaSeqTreeDataBlockSize", strconv.FormatUint(*b.MagmaSeqTreeDataBlockSize, 10))
+		}
+
+		if b.MagmaKeyTreeDataBlockSize != nil {
+			data.Set("magmaKeyTreeDataBlockSize", strconv.FormatUint(*b.MagmaKeyTreeDataBlockSize, 10))
+		}
 	}
 
 	return []byte(data.Encode())

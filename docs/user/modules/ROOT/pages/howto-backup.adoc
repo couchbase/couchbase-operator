@@ -17,7 +17,7 @@ The examples on this page assume a backup schedule based on the _Full/Incrementa
 [IMPORTANT]
 ====
 Backup and restore jobs rely on a shared persistent volume claim (PVC) when in use.
-On Kubernetes platforms you must specify a value for xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-securitycontext[`couchbaseclusters.spec.securityContext.fsGroup`] in order for volume permissions to be the same across all jobs.
+On Kubernetes platforms you must specify a value for xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-podsecuritycontext-fsgroup[`couchbaseclusters.spec.security.podSecurityContext.fsGroup`] in order for volume permissions to be the same across all jobs.
 Red Hat OpenShift is not affected by this constraint.
 
 For further information about setting file system groups see the xref:concept-persistent-volumes.adoc#using-storage-classes[persistent volume concepts] page.

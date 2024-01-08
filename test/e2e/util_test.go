@@ -51,6 +51,7 @@ const (
 	TagFeatureSynchronization   = "synchronization"
 	TagFeatureDeleteDelay       = "deletedelay"
 	TagFeatureCNG               = "cng"
+	TagFeatureBucketMigration   = "bucketmigration"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -99,6 +100,11 @@ func registerTests() {
 		framework.NewTestDef(TestRBACValidationLDAP).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCNGVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketMigrationPre76Invalid).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketMigrationPost76Validation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestAnnotationValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestAnnotationVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestDefaultStorageBackendChangeValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -582,6 +588,11 @@ func registerTests() {
 		framework.NewTestDef(TestPodDeletedAfterExpectedDelay).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
 		framework.NewTestDef(TestAnalyticsKillPods).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestAnalyticsKillPodsWithPVC).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),

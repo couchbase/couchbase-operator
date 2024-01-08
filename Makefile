@@ -105,7 +105,7 @@ PRODUCT := couchbase-autonomous-operator
 # These are overidden by the build system, so need to be optional
 # if undefined.  The build system also doesn't use -e to override
 # so we need to be careful here.
-VERSION ?= 2.6.0
+VERSION ?= 2.7.0
 BLD_NUM ?= 999
 
 # This controls the golang version of the docker container used
@@ -396,6 +396,8 @@ IMAGE_FILES := \
 	License.txt \
 	README.txt
 
+VALIDATION_FILES := $(addprefix validation/,$(shell ls test/e2e/resources/validation))
+
 ifeq ($(IMAGE),couchbase-operator)
 IMAGE_FILES += passwd
 else ifeq ($(IMAGE),couchbase-admission-controller)
@@ -403,8 +405,8 @@ IMAGE_FILES += passwd
 else ifeq ($(IMAGE),couchbase-operator-certification)
 IMAGE_FILES += \
 	$(TARGET)/cao \
-	validation.yaml \
-	crd.yaml
+	crd.yaml \
+	$(VALIDATION_FILES)
 endif
 
 IMAGE_ARTIFACT_NAME := couchbase-operator-image_$(VERSION)-$(BLD_NUM)
@@ -425,7 +427,9 @@ DIRECTORIES := \
   $(TOOLS_ARTIFACT_BUILDDIR) \
   $(TOOLS_ARTIFACT_BUILDDIR)/bin \
   $(IMAGE_ARTIFACT_BUILDDIR) \
-  $(IMAGE_ARTIFACT_BUILDDIR)/$(TARGET)
+  $(IMAGE_ARTIFACT_BUILDDIR)/$(TARGET) \
+  $(IMAGE_ARTIFACT_BUILDDIR)/validation 
+
 
 ################################################################################
 # User Goals
@@ -702,7 +706,7 @@ $(IMAGE_ARTIFACT_BUILDDIR)/Dockerfile.rhel: docker/$(IMAGE)/Dockerfile.rhel | $(
 	cp $< $@
 $(IMAGE_ARTIFACT_BUILDDIR)/passwd: scripts/passwd | $(IMAGE_ARTIFACT_BUILDDIR)
 	cp $< $@
-$(IMAGE_ARTIFACT_BUILDDIR)/validation.yaml: test/e2e/resources/validation/validation.yaml | $(IMAGE_ARTIFACT_BUILDDIR)
+$(IMAGE_ARTIFACT_BUILDDIR)/validation/%.yaml: test/e2e/resources/validation/%.yaml | $(IMAGE_ARTIFACT_BUILDDIR)/validation
 	cp $< $@
 $(IMAGE_ARTIFACT_BUILDDIR)/crd.yaml: $(CRD_FILE) | $(IMAGE_ARTIFACT_BUILDDIR)
 	cp $< $@

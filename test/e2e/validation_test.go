@@ -326,6 +326,9 @@ type validationContext struct {
 
 	// tls may be set, if left zero, then it will default to legacy mode.
 	tls validationTLSType
+
+	// validationFile may be set, if left zero, then it will default to validation.yaml.
+	validationFile string
 }
 
 func runValidationTest(t *testing.T, testDefs []testDef, validation validationContext) {
@@ -334,8 +337,11 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 	kubernetes, cleanup := f.SetupTest(t, framework.NoOperator)
 	defer cleanup()
 
+	if validation.validationFile == "" {
+		validation.validationFile = "validation.yaml"
+	}
 	// Clean up resources that may have been left behind by a job that was interrupted.
-	objectsPristine, err := loadResources("/resources/validation/validation.yaml")
+	objectsPristine, err := loadResources("/resources/validation/" + validation.validationFile)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -411,38 +417,41 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 
 				// Do XDCR configuration.
 				remoteClusters, found, err := unstructured.NestedSlice(object.Object, "spec", "xdcr", "remoteClusters")
-				if !found || err != nil {
-					e2eutil.Die(t, err)
-				}
-				for _, remoteCluster := range remoteClusters {
-					rc, ok := remoteCluster.(map[string]interface{})
-					if !ok {
-						e2eutil.Die(t, fmt.Errorf("unexpected data type"))
+				if found {
+					if err != nil {
+						e2eutil.Die(t, err)
 					}
-					rc["authenticationSecret"] = kubernetes.DefaultSecret.Name
-				}
-				if err := unstructured.SetNestedField(object.Object, remoteClusters, "spec", "xdcr", "remoteClusters"); err != nil {
-					e2eutil.Die(t, err)
+					for _, remoteCluster := range remoteClusters {
+						rc, ok := remoteCluster.(map[string]interface{})
+						if !ok {
+							e2eutil.Die(t, fmt.Errorf("unexpected data type"))
+						}
+						rc["authenticationSecret"] = kubernetes.DefaultSecret.Name
+					}
+					if err := unstructured.SetNestedField(object.Object, remoteClusters, "spec", "xdcr", "remoteClusters"); err != nil {
+						e2eutil.Die(t, err)
+					}
 				}
 
 				// Do PVC configuration.
 				pvcTemplates, found, err := unstructured.NestedSlice(object.Object, "spec", "volumeClaimTemplates")
-				if !found || err != nil {
-					e2eutil.Die(t, err)
-				}
-				for _, pvcTemplate := range pvcTemplates {
-					pvct, ok := pvcTemplate.(map[string]interface{})
-					if !ok {
-						e2eutil.Die(t, fmt.Errorf("unexpected data type"))
+				if found {
+					if err != nil {
+						e2eutil.Die(t, err)
 					}
-					if err := unstructured.SetNestedField(pvct, getStorageClass(t, kubernetes), "spec", "storageClassName"); err != nil {
+					for _, pvcTemplate := range pvcTemplates {
+						pvct, ok := pvcTemplate.(map[string]interface{})
+						if !ok {
+							e2eutil.Die(t, fmt.Errorf("unexpected data type"))
+						}
+						if err := unstructured.SetNestedField(pvct, getStorageClass(t, kubernetes), "spec", "storageClassName"); err != nil {
+							e2eutil.Die(t, err)
+						}
+					}
+					if err := unstructured.SetNestedField(object.Object, pvcTemplates, "spec", "volumeClaimTemplates"); err != nil {
 						e2eutil.Die(t, err)
 					}
 				}
-				if err := unstructured.SetNestedField(object.Object, pvcTemplates, "spec", "volumeClaimTemplates"); err != nil {
-					e2eutil.Die(t, err)
-				}
-
 				// Turn back into JSON.
 				raw, err := json.Marshal(object)
 				if err != nil {
@@ -2926,6 +2935,12 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.filterExpression"},
 		},
+		{
+			name:           "TestValidateBucketInvalidCouchbaseStorageBackendChange",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/storageBackend", "magma")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.storageBackend`},
+		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
@@ -3153,4 +3168,104 @@ func TestCNGVersionValidation(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestBucketMigrationPre76Invalid(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestBucketMigrationToCouchstoreInvalid",
+			mutations:      patchMap{"bucket2": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore")},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"},
+			shouldFail:     true,
+		},
+		{
+			name:           "TestBucketMigrationToMagmaPre76Invalid",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma")},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"},
+			shouldFail:     true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
+}
+
+func TestBucketMigrationPost76Validation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestBucketMigrationToCouchstoreValid",
+			mutations:  patchMap{"bucket2": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore")},
+			shouldFail: false,
+		},
+		{
+			name:       "TestBucketMigrationToMagmaValid",
+			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma")},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration-76.yaml"})
+}
+
+func TestAnnotationValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestInvalidCAOClusterAnnotation",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{"cao.couchbase.com/invalidAnnotation": "v"})},
+			expectedErrors: []string{"could not find field"},
+			shouldFail:     true,
+		},
+		{
+			name: "TestValidCAOClusterAnnotations",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend":               "magma",
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestClusterAnnotationsBackendValuesInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend":               "supamagma",
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "coldmagma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"must be a valid storage backend"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-migration-76.yaml"})
+}
+
+func TestAnnotationVersionValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestTargetUnmanagedBackendAnnotationInvalidVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "couchstore",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"server version 7.6.0 or larger"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-migration.yaml"})
+}
+
+func TestDefaultStorageBackendChangeValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestDefaultBackendChangeCausingInvalingBackendMigration",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"backend changes are only supported for server version >= 7.6.0"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
 }

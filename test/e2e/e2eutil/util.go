@@ -379,6 +379,15 @@ func (o *ClusterOptions) WithEphemeralTopology(size int) *ClusterOptions {
 	return o
 }
 
+func (o *ClusterOptions) WithDataOnlyEphemeralTopology(size int) *ClusterOptions {
+	topology := e2espec.DataOnlyEphemeralTopology.DeepCopy()
+	topology[0].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
 // WithMixedEphemeralTopology defines a cluster as having
 // data/index in one server class and query in the other.
 func (o *ClusterOptions) WithMixedEphemeralTopology(size int) *ClusterOptions {

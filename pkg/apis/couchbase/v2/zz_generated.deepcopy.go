@@ -237,6 +237,11 @@ func (in *Buckets) DeepCopyInto(out *Buckets) {
 		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TargetUnmanagedBucketStorageBackend != nil {
+		in, out := &in.TargetUnmanagedBucketStorageBackend, &out.TargetUnmanagedBucketStorageBackend
+		*out = new(CouchbaseStorageBackend)
+		**out = **in
+	}
 	return
 }
 
@@ -427,6 +432,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 	if in.RecoveryPolicy != nil {
 		in, out := &in.RecoveryPolicy, &out.RecoveryPolicy
 		*out = new(RecoveryPolicy)
+		**out = **in
+	}
+	if in.UpgradeProcess != nil {
+		in, out := &in.UpgradeProcess, &out.UpgradeProcess
+		*out = new(UpgradeProcess)
 		**out = **in
 	}
 	if in.UpgradeStrategy != nil {

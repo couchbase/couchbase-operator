@@ -574,7 +574,7 @@ func AutoscaleUpEvent(cl *couchbasev2.CouchbaseCluster, name string, from int, t
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventAutoscaleUp
-	event.Message = fmt.Sprintf("Autoscaling up conifg `%s` from %d to %d", name, from, to)
+	event.Message = fmt.Sprintf("Autoscaling up config `%s` from %d to %d", name, from, to)
 
 	return event
 }

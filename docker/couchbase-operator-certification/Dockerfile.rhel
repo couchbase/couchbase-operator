@@ -27,7 +27,7 @@ COPY crd.yaml /
 COPY License.txt /licenses/License.txt
 COPY README.txt /help.1
 
-COPY validation.yaml /resources/validation/
+COPY validation /resources/validation/
 
 RUN useradd -u 8453 -m -s /bin/false couchbase
 USER 8453

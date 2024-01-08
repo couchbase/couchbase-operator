@@ -295,6 +295,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleUnknownServerConfigs,
 		(*ReconcileMachine).handleVolumeExpansion,
 		(*ReconcileMachine).handleUpgradeNode,
+		(*ReconcileMachine).handleBucketStorageBackendMigration,
 		(*ReconcileMachine).handleRemoveNode,
 		(*ReconcileMachine).handleAddNode,
 		(*ReconcileMachine).handleServerGroups,
@@ -1180,8 +1181,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	candidatesSlice := make([]couchbaseutil.Member, 0, len(candidates))
-	toCreate := make([]couchbasev2.ServerConfig, 0, len(candidates))
+	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 
 	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
 		err := r.handleDeltaRecovery(c, candidates, targetVersion)
@@ -1192,52 +1192,8 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
 			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
-		for _, candidate := range candidates {
-			log.Info("Pod upgrading", "cluster", c.namespacedName(), "name", candidate.Name(), "source", candidate.Version(), "target", targetVersion)
 
-			// Remove the candidate from the scheduler.
-			if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-				return err
-			}
-
-			// Grab the server class.
-			class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
-
-			toCreate = append(toCreate, *class)
-			candidatesSlice = append(candidatesSlice, candidate)
-		}
-
-		// Add the new members.
-		memberResults, err := c.addMembers(toCreate...)
-		if err != nil {
-			return fmt.Errorf("upgrade failed to add new nodes to cluster: %w", err)
-		}
-
-		numErrors := 0
-
-		for _, result := range memberResults {
-			if result.Err != nil {
-				numErrors++
-			}
-		}
-
-		errs := make([]error, 0, numErrors)
-
-		for index, result := range memberResults {
-			if result.Err != nil {
-				errs = append(errs, fmt.Errorf("upgrade failed to add new node to cluster: %w", result.Err))
-				log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
-			} else { // Update book keeping
-				r.addMember(result.Member)
-				r.removeMemberUser(candidatesSlice[index])
-			}
-		}
-
-		if len(errs) == 0 {
-			return nil
-		}
-
-		return errors.Join(errs...)
+		return r.swapRebalanceMembers(c, candidates)
 	}
 
 	return nil
@@ -1376,4 +1332,113 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 	}
 
 	return false
+}
+
+func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
+	// Let's finish upgrading before we try to migrate the buckets
+	if upgrading, err := c.isUpgrading(); upgrading && err == nil {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	if err != nil {
+		return nil
+	}
+
+	// We can only migrate the nodes if CB server is >= 7.6
+	if !atleast76 {
+		return nil
+	}
+
+	// Get all buckets
+	clusterBuckets := couchbaseutil.BucketStatusList{}
+	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	var migrateCandidate couchbaseutil.Member
+
+	// We will SwapRebalance one node at a time for now
+	for _, bucket := range clusterBuckets {
+		for _, node := range bucket.Nodes {
+			// node.StorageBackend is empty if it matches the bucket storageMode
+			if node.StorageBackend != "" {
+				migrateCandidate = c.members[node.HostName.GetMemberName()]
+				break
+			}
+		}
+
+		if migrateCandidate != nil {
+			break
+		}
+	}
+
+	if migrateCandidate == nil {
+		return nil
+	}
+
+	log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", migrateCandidate.Name())
+
+	if err := c.scheduler.Upgrade(migrateCandidate.Config(), migrateCandidate.Name()); err != nil {
+		return err
+	}
+
+	return r.swapRebalanceMembers(c, couchbaseutil.NewMemberSet(migrateCandidate))
+}
+
+func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseutil.MemberSet) error {
+	candidatesSlice := make([]couchbaseutil.Member, 0, len(members))
+	toCreate := make([]couchbasev2.ServerConfig, 0, len(members))
+
+	for _, candidate := range members {
+		log.Info("Swap-Rebalancing pod ", "cluster", c.namespacedName(), "name", candidate.Name(), "source-version", candidate.Version())
+
+		// Remove the candidate from the scheduler.
+		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+			return err
+		}
+
+		// Grab the server class.
+		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+		if class == nil {
+			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		toCreate = append(toCreate, *class)
+		candidatesSlice = append(candidatesSlice, candidate)
+	}
+
+	// Add the new members.
+	memberResults, err := c.addMembers(toCreate...)
+	if err != nil {
+		return fmt.Errorf("swap rebalance failed to add new nodes to cluster: %w", err)
+	}
+
+	numErrors := 0
+
+	for _, result := range memberResults {
+		if result.Err != nil {
+			numErrors++
+		}
+	}
+
+	errs := make([]error, 0, numErrors)
+
+	for index, result := range memberResults {
+		if result.Err != nil {
+			errs = append(errs, fmt.Errorf("swap rebalance failed to add new node to cluster: %w", result.Err))
+			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+		} else { // Update book keeping
+			r.addMember(result.Member)
+			r.removeMemberUser(candidatesSlice[index])
+		}
+	}
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return errors.Join(errs...)
 }

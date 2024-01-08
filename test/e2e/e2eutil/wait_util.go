@@ -482,6 +482,45 @@ func WaitUntilBucketsExist(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 	return retryutil.Retry(ctx, retryInterval, callback)
 }
 
+func MustWaitUntilUnmanagedBucketExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucket interface{}, timeout time.Duration) {
+	name, err := getBucketName(bucket)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if err := WaitUntilUnmanagedBucketExists(k8s, couchbase, name, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitUntilUnmanagedBucketExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, bucketName string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// Wait until all nodes are warmed up before allowing tests to do I/O
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+
+	callback := func() error {
+		buckets := &couchbaseutil.BucketList{}
+		if err := couchbaseutil.ListBuckets(buckets).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, bucket := range *buckets {
+			if bucket.BucketName == bucketName {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("bucket %s doesn't exist on cluster", bucketName)
+	}
+
+	return retryutil.Retry(ctx, retryInterval, callback)
+}
+
 func MustWaitUntilBucketsExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, buckets []string, timeout time.Duration) {
 	if err := WaitUntilBucketsExist(k8s, couchbase, buckets, timeout); err != nil {
 		Die(t, err)
@@ -804,6 +843,52 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 
 		u := &couchbaseutil.User{}
 		return couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
+	})
+}
+
+func MustWaitUntilAllNodeStorageBackendMagma(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := WaitUntilAllNodeStorageBackendMatch(k8s, couchbase, timeout, couchbaseutil.CouchbaseStorageBackendMagma); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitUntilAllNodeStorageBackendCouchstore(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := WaitUntilAllNodeStorageBackendMatch(k8s, couchbase, timeout, couchbaseutil.CouchbaseStorageBackendCouchstore); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitUntilAllNodeStorageBackendMatch(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, targetBackend couchbaseutil.CouchbaseStorageBackend) error {
+	return retryutil.RetryFor(timeout, func() error {
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// user must also be in couchbase
+		client, err := CreateAdminConsoleClient(k8s, currCluster)
+		if err != nil {
+			return err
+		}
+
+		clusterBuckets := couchbaseutil.BucketStatusList{}
+		if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, bucket := range clusterBuckets {
+			if bucket.StorageBackend != targetBackend {
+				return fmt.Errorf("waiting for bucket `%s` to have %s backend", targetBackend, bucket.BucketName)
+			}
+
+			for _, node := range bucket.Nodes {
+				// If node storage backend is empty it means it matches the global backend for bucket
+				if node.StorageBackend != "" && node.StorageBackend != string(targetBackend) {
+					return fmt.Errorf("waiting for node `%s` to have %s backend", targetBackend, node.HostName)
+				}
+			}
+		}
+		return nil
 	})
 }
 

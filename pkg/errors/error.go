@@ -75,6 +75,14 @@ var (
 	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
 )
 
+// Logging errors
+
+var (
+	// ErrNoLoggingVolume is raised when there are no mounts defined when trying to enable logging.
+	// Wouldn't be needed if the DAC was used.
+	ErrNoLoggingVolume = errors.New("cannot enable logging with no logging mounts defined")
+)
+
 // Backup Errors.
 var (
 	// ErrBackupInvalidConfiguration is raised when fields are missing or misconfigured

@@ -45,21 +45,7 @@ func ApplyBaseAnnotations(object metav1.Object) {
 }
 
 func CouchbaseVersion(image string) (string, error) {
-	parts := strings.Split(image, ":")
-
-	lenParts := len(parts)
-	if lenParts < 2 {
-		return "", fmt.Errorf("%w: invalid image string %s", errors.NewStackTracedError(errors.ErrInvalidVersion), image)
-	}
-
-	version := parts[lenParts-1]
-
-	// lookup version associated with sha256 digest
-	if couchbaseutil.IsSHA256Version(version) {
-		return couchbaseutil.GetSHA256Version(version), nil
-	}
-
-	return version, nil
+	return couchbaseutil.CouchbaseImageVersion(image)
 }
 
 func SetCouchbaseVersion(pod *v1.Pod, image string) error {

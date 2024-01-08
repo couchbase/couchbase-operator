@@ -61,6 +61,9 @@ func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
 	// check if mutation setting exists.
 	e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, bucket.Name, 0, 0, true, 2*time.Minute)
 
+	// validate whether magma block size settings are default as no related annotations where passed
+	e2eutil.MustVerifyMagmaBucketBlockSizeSettings(t, kubernetes, cluster, bucket.Name, 4096, 4096, 2*time.Minute)
+
 	// clean up.
 	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.Name, 2*time.Minute)
@@ -71,6 +74,9 @@ func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 	}
 
@@ -109,6 +115,8 @@ func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 					"cao.couchbase.com/historyRetention.seconds":                  "100",
 					"cao.couchbase.com/historyRetention.bytes":                    "2147483648",
 					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "false",
+					"cao.couchbase.com/magmaSeqTreeDataBlockSize":                 "5555",
+					"cao.couchbase.com/magmaKeyTreeDataBlockSize":                 "6666",
 				},
 			},
 			Spec: couchbasev2.CouchbaseBucketSpec{
@@ -130,6 +138,8 @@ func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 					"cao.couchbase.com/historyRetention.seconds":                  "100",
 					"cao.couchbase.com/historyRetention.bytes":                    "2147483648",
 					"cao.couchbase.com/historyRetention.collectionHistoryDefault": "true",
+					"cao.couchbase.com/magmaSeqTreeDataBlockSize":                 "5555",
+					"cao.couchbase.com/magmaKeyTreeDataBlockSize":                 "6666",
 				},
 			},
 			Spec: couchbasev2.CouchbaseBucketSpec{
@@ -159,6 +169,7 @@ func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 	// check if mutation setting exists.
 	for i := 1; i < len(buckets); i++ {
 		e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, buckets[i].GetName(), 100, 2147483648, expected[i], 2*time.Minute)
+		e2eutil.MustVerifyMagmaBucketBlockSizeSettings(t, kubernetes, cluster, buckets[i].GetName(), 5555, 6666, 2*time.Minute)
 	}
 
 	// clean up.

@@ -2,6 +2,8 @@
 package v2
 
 import (
+	"encoding/json"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1245,6 +1247,12 @@ type CouchbaseBucketSpec struct {
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
 
 	HistoryRetentionSettings *HistoryRetentionSettings `json:"-" annotation:"historyRetention"`
+
+	// MagmaSeqTreeDataBlockSize is the block size, in bytes, for Magma seqIndex blocks.
+	MagmaSeqTreeDataBlockSize *uint64 `json:"-" annotation:"magmaSeqTreeDataBlockSize"`
+
+	// MagmaKeyTreeDataBlockSize is the block size, in bytes, for Magma keyIndex blocks.
+	MagmaKeyTreeDataBlockSize *uint64 `json:"-" annotation:"magmaKeyTreeDataBlockSize"`
 }
 
 type HistoryRetentionSettings struct {
@@ -2219,7 +2227,7 @@ type ClusterSpec struct {
 
 	// Buckets defines whether the Operator should manage buckets, and how to lookup
 	// bucket resources.
-	Buckets Buckets `json:"buckets,omitempty"`
+	Buckets Buckets `json:"buckets,omitempty" annotation:"buckets"`
 
 	// XDCR defines whether the Operator should manage XDCR, remote clusters and how
 	// to lookup replication resources.
@@ -3226,6 +3234,15 @@ type Buckets struct {
 	// Selector is a label selector used to list buckets in the namespace
 	// that are managed by the Operator.
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+
+	// Defined the default storage backend to use if a backend is not specified for a bucket,
+	// if this isn't specified then the default will be Couchstore.
+	// +kubebuilder:default=couchstore
+	DefaultStorageBackend CouchbaseStorageBackend `json:"-" annotation:"defaultStorageBackend"`
+
+	// Allows the operator to reconcile the storage backend for unmanaged buckets to match
+	// this value.
+	TargetUnmanagedBucketStorageBackend *CouchbaseStorageBackend `json:"-" annotation:"targetUnmanagedBucketStorageBackend"`
 }
 
 type RBAC struct {
@@ -3240,6 +3257,32 @@ type RBAC struct {
 type PodTemplate struct {
 	ObjectMeta `json:"metadata,omitempty"`
 	Spec       v1.PodSpec `json:"spec,omitempty"`
+}
+
+// MarshalJSON overrides the default JSON Marshalling so we can add the omitempty
+// annotation to PodSpec.Containers so that we don't get unknown field warnings
+func (t *PodTemplate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ObjectMeta `json:"metadata,omitempty"`
+		Spec       couchbasePodSpec `json:"spec,omitempty"`
+	}{
+		ObjectMeta: t.ObjectMeta,
+		Spec:       couchbasePodSpec(t.Spec),
+	})
+}
+
+// Use a new type so we can override MarshalJSON
+type couchbasePodSpec v1.PodSpec
+
+// Embedding inherits everything and then we override the Containers field
+func (t *couchbasePodSpec) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		*v1.PodSpec
+		Containers []v1.Container `json:"containers,omitempty"`
+	}{
+		PodSpec:    (*v1.PodSpec)(t),
+		Containers: t.Containers,
+	})
 }
 
 type ServerConfig struct {
