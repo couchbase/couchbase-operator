@@ -2604,6 +2604,11 @@ type CloudNativeGateway struct {
 	TLS *CloudNativeGatewayTLS `json:"tls,omitempty"`
 
 	OTLP *CloudNativeGatewayOTLP `json:"-" annotation:"otlp"`
+
+	// TerminationGracePeriodSeconds specifies the grace period for the container to
+	// terminate. Defaults to 75 seconds.
+	// +kubebuilder:default=75
+	TerminationGracePeriodSeconds int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {
