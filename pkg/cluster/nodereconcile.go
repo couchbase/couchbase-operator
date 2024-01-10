@@ -12,10 +12,13 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
+var ErrNoRunningTasks = fmt.Errorf("no running tasks found")
+var ErrStatusRunning = fmt.Errorf("task is currently running")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -1101,6 +1104,35 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 	return candidatesNoOrchestrator, orchestrator
 }
 
+// gracefulFailoverMember will gracefully fail over a member and watch the tasks endpoint to wait for the failover to finish.
+func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member, c *Cluster) error {
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
+	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+		return err
+	}
+
+	err := retryutil.RetryFor(5*time.Minute, func() error {
+		runningTasks := couchbaseutil.RunningTasks{}
+		err := couchbaseutil.GetRunningTasks(&runningTasks).On(c.api, c.readyMembers())
+		if err != nil {
+			return err
+		}
+
+		for _, task := range runningTasks {
+			if strings.Compare(task.SubType, "gracefulFailover") == 0 {
+				if strings.Compare(task.Status, "notRunning") == 0 {
+					return nil
+				}
+				return ErrStatusRunning
+			}
+		}
+		return ErrNoRunningTasks
+	})
+
+	return err
+}
+
 func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	upgraded := len(c.members) - len(candidates)
 
@@ -1145,8 +1177,20 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 				}
 			}
 		}
-		// Recreate the pod
+
+		if err := r.gracefulFailoverMember(candidate, c); err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
 		if err := c.recreatePod(candidate); err != nil {
+			return err
+		}
+
+		if err := c.rebalance(c.members, nil); err != nil {
 			return err
 		}
 	}
@@ -1217,10 +1261,10 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
-
 	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
+		log.Info("Upgrading pods with DeltaRecovery", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 		err := r.handleDeltaRecovery(c, candidates, targetVersion)
+
 		if err != nil {
 			return err
 		}
@@ -1229,6 +1273,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
+		log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 		return r.swapRebalanceMembers(c, candidates)
 	}
 
