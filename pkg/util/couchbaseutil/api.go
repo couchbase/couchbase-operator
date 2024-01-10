@@ -804,6 +804,21 @@ func DisableExternalListener(s *ListenerConfiguration) *Request {
 	return NewRequest((*Client).Post, "/node/controller/disableExternalListener", data, nil)
 }
 
+func GetRunningTasks(runningTasks *RunningTasks) *Request {
+	return NewRequest((*Client).Get, "/pools/default/tasks", nil, runningTasks)
+}
+
+// GracefulFailover will start a graceful failover of a set of OTPNodes.
+// NOTE: You will have to poll the tasks API to watch the status of the failover.
+func GracefulFailover(otpNodeList OTPNodeList) *Request {
+	data := url.Values{}
+	for _, otpNode := range otpNodeList {
+		data.Add("otpNode", string(otpNode))
+	}
+
+	return NewRequest((*Client).Post, "/controller/startGracefulFailover", []byte(data.Encode()), nil)
+}
+
 // Failover forces a down node to go into the failed state so the operator can start to recover it.
 // THIS IS VERY DANGEROUS AND CAN DESTROY A USER'S DATASET.  ONLY USE IF YOU KNOW WHAT YOU ARE
 // DOING.  AND I REALLY REALLY MEAN IT.

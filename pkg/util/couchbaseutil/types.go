@@ -1683,3 +1683,15 @@ type TerseClusterInfo struct {
 	IsBalanced           bool   `json:"isBalanced"`
 	ClusterCompatVersion string `json:"clusterCompatVersion"`
 }
+
+type RunningTasks []RunningTask
+
+type RunningTask struct {
+	StatusID              string `json:"statusId"`
+	TaskType              string `json:"type"`
+	SubType               string `json:"subtype"`
+	Status                string `json:"status"`
+	StatusIsStale         bool   `json:"statusIsStale"`
+	MasterRequestTimedOut bool   `json:"masterRequestTimedOut"`
+	LastReportURI         string `json:"lastReportURI"`
+}
