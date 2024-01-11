@@ -394,3 +394,33 @@ func SetInvalidLogStreamingConfig(t *testing.T, k8s *types.Cluster, configName s
 	}
 	MustCreateSecret(t, k8s, defaultConfig)
 }
+
+func MustFindLog(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, container string, expectedLog string) {
+	err := retryutil.RetryFor(5*time.Minute, func() error {
+		listOptions := metav1.ListOptions{
+			LabelSelector: constants.CouchbaseServerClusterKey + "=" + cluster.Name,
+		}
+
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range pods.Items {
+			logs, err := getLogsOfContainerInPod(k8s, cluster, pod.Name, "cloud-native-gateway")
+			if err != nil {
+				return err
+			}
+
+			if strings.Contains(logs, expectedLog) {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("expected string %s not found in container %s logs", expectedLog, container)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}

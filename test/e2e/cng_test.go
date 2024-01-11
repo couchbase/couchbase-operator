@@ -9,6 +9,7 @@ import (
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -46,6 +47,9 @@ func TestCreateCNG(t *testing.T) {
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
 
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5)
+
+	// Verify the CM exists
+	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -223,6 +227,41 @@ func TestCngOtlp(t *testing.T) {
 	e2eutil.Die(t, fmt.Errorf("%s flag not set", podconsts.CloudNativeGatewayOtlpFlag))
 }
 
+// TestCNGLiveConfigReload tests the ability to propagate log level changes to CNG without restarting the pod.
+func TestCNGLiveConfigReload(t *testing.T) {
+	f := framework.Global
+
+	kubernetesCluster, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetesCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster spec
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
+
+	// Create the cluster
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
+
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5)
+
+	// Verify the CM exists
+	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetesCluster, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/cloudNativeGateway/logLevel", "debug"), time.Minute)
+	e2eutil.MustFindLog(t, kubernetesCluster, cluster, k8sutil.CloudNativeGatewayContainerName, "updated log level")
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
+}
+
 func getCloudNativeGatewayClient(ctx context.Context, clusterName string) (*gocbcoreps.RoutingClient, error) {
 	var cngClient *gocbcoreps.RoutingClient
 
@@ -262,4 +301,21 @@ func getCloudNativeGatewayClient(ctx context.Context, clusterName string) (*gocb
 	}
 
 	return cngClient, nil
+}
+
+func mustGetCNGConfigMap(t *testing.T, kubernetesCluster *types.Cluster, cluster *v2.CouchbaseCluster) {
+	configMapName := k8sutil.GetCNGConfigMapName(cluster)
+
+	err := retryutil.RetryFor(1*time.Minute, func() error {
+		_, k8sErr := kubernetesCluster.KubeClient.CoreV1().ConfigMaps(kubernetesCluster.Namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
+		if k8sErr == nil {
+			return nil
+		}
+
+		return fmt.Errorf("%s configmap not found for cluster: %s", configMapName, cluster.Name)
+	})
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 }

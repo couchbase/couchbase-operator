@@ -114,6 +114,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).refreshTLSClientSecret,
 		(*Cluster).refreshTLSPassphraseResources,
 		(*Cluster).reconcileLogConfig,
+		(*Cluster).reconcileCloudNativeGatewayConfig,
 	}
 
 	if err := preCreationReconcilers.run(c); err != nil {

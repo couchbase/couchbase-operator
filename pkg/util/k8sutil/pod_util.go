@@ -1062,6 +1062,7 @@ func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.Couchba
 		return
 	}
 
+	pod.Spec.Volumes = append(pod.Spec.Volumes, createCNGVolume(cluster))
 	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
 	pod.Labels = mergeLabels(pod.Labels, map[string]string{constants.LabelCloudNativeGateway: constants.EnabledValue})
 }
@@ -1806,7 +1807,17 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 			// TODO: Would be part of crd type to be amendable by customer based on their query timeout threshold.
 			TerminationGracePeriodSeconds: &cluster.Spec.Networking.CloudNativeGateway.TerminationGracePeriodSeconds,
 		},
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      CngConfigVolumeName,
+				ReadOnly:  true,
+				MountPath: CngConfigMountPath,
+			},
+		},
 	}
+
+	container.Args = append(container.Args, "--config", getCNGConfigFilePath())
+	container.Args = append(container.Args, "--watch-config")
 
 	// In either case, as the CNG container/pod is secured now, customers could use
 	// K8S Ingress/OC Routes to forward encrypted traffic to the secured CNG server.

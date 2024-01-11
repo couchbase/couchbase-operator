@@ -108,6 +108,7 @@ func registerTests() {
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
+		framework.NewTestDef(TestCNGLiveConfigReload).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCNGBucketOps).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCngOtlp).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),

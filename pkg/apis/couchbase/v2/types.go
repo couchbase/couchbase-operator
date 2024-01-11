@@ -2582,6 +2582,20 @@ type CloudNativeGatewayTLS struct {
 	ServerSecretName string `json:"serverSecretName,omitempty"`
 }
 
+// CloudNativeGatewayLogLevel controls the verbosity of indexer logs.
+// +kubebuilder:validation:Enum=fatal;panic;dpanic;error;warn;info;debug
+type CloudNativeGatewayLogLevel string
+
+const (
+	CloudNativeGatewayLogLevelFatal  CloudNativeGatewayLogLevel = "fatal"
+	CloudNativeGatewayLogLevelPanic  CloudNativeGatewayLogLevel = "panic"
+	CloudNativeGatewayLogLevelDPanic CloudNativeGatewayLogLevel = "dpanic"
+	CloudNativeGatewayLogLevelError  CloudNativeGatewayLogLevel = "error"
+	CloudNativeGatewayLogLevelWarn   CloudNativeGatewayLogLevel = "warn"
+	CloudNativeGatewayLogLevelInfo   CloudNativeGatewayLogLevel = "info"
+	CloudNativeGatewayLogLevelDebug  CloudNativeGatewayLogLevel = "debug"
+)
+
 type CloudNativeGateway struct {
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// Image is the Cloud Native Gateway image to be used to run the sidecar container.
@@ -2609,6 +2623,12 @@ type CloudNativeGateway struct {
 	// terminate. Defaults to 75 seconds.
 	// +kubebuilder:default=75
 	TerminationGracePeriodSeconds int64 `json:"terminationGracePeriodSeconds,omitempty"`
+
+	// DEVELOPER PREVIEW - This feature is in developer preview.
+	// LogLevel controls the verbosity of cloud native logs.  This field must be one of
+	// "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
+	// +kubebuilder:default="info"
+	LogLevel CloudNativeGatewayLogLevel `json:"logLevel,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {
