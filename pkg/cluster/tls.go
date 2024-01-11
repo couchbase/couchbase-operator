@@ -431,39 +431,61 @@ func (c *Cluster) refreshPassphrasePublicKey() error {
 	return nil
 }
 
-// refreshPassphraseConfigMap creatse configmap script if it doesn't exist
+// refreshPassphraseConfigMap creates the configmap script if it doesn't exist
 // and deletes when TLS is disabled.
 func (c *Cluster) refreshPassphraseConfigMap() error {
 	name := k8sutil.PassphraseKeySecretName(c.cluster)
-	configMap, ok := c.k8s.ConfigMaps.Get(name)
+	configMap, cmExists := c.k8s.ConfigMaps.Get(name)
 
-	if ok && !c.cluster.IsTLSEnabled() {
+	if cmExists && !c.cluster.IsTLSEnabled() {
 		// TLS is disabled remove configMap script
 		if err := c.k8s.KubeClient.CoreV1().ConfigMaps(configMap.Namespace).Delete(context.Background(), configMap.Name, metav1.DeleteOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 
 		return nil
-	} else if !ok {
-		// Creating the config map as a mountable script.
-		// The script receives encoded passphrase as arg '$1'
-		// and decrypts with mounted private key
-		decoderScript := fmt.Sprintf("#!/bin/sh\necho $1 | base64 -d | openssl rsautl -decrypt -inkey /var/run/secrets/couchbase.com/couchbase-tls/%s", constants.CouchbaseTLSPassphraseKey)
-		configMap = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   name,
-				Labels: k8sutil.LabelsForCluster(c.cluster),
-				OwnerReferences: []metav1.OwnerReference{
-					c.cluster.AsOwner(),
-				},
+	}
+
+	opensslCommand := "openssl rsautl"
+
+	if cbUsingOpenssl3, err := c.RunningVersionIsAtLeast("7.2.4"); err != nil {
+		return err
+	} else if cbUsingOpenssl3 {
+		opensslCommand = "openssl pkeyutl"
+	}
+
+	decoderScript := fmt.Sprintf("#!/bin/sh\necho $1 | base64 -d | %s -decrypt -inkey /var/run/secrets/couchbase.com/couchbase-tls/%s", opensslCommand, constants.CouchbaseTLSPassphraseKey)
+
+	// Creating the config map as a mountable script.
+	// The script receives encoded passphrase as arg '$1'
+	// and decrypts with mounted private key
+	requestedConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: k8sutil.LabelsForCluster(c.cluster),
+			OwnerReferences: []metav1.OwnerReference{
+				c.cluster.AsOwner(),
 			},
-			Data: map[string]string{
-				constants.CouchbaseTLSPassphraseScript: decoderScript,
-			},
+		},
+		Data: map[string]string{
+			constants.CouchbaseTLSPassphraseScript: decoderScript,
+		},
+	}
+
+	if !cmExists {
+		log.Info("Creating TLS configmap", "configMapName", requestedConfigMap.Name, "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(context.Background(), requestedConfigMap, metav1.CreateOptions{}); err != nil {
+			return errors.NewStackTracedError(err)
 		}
 
-		log.Info("Creating TLS configmap", "configMapName", configMap.Name, "cluster", c.namespacedName())
-		if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Create(context.Background(), configMap, metav1.CreateOptions{}); err != nil {
+		return nil
+	}
+
+	if !reflect.DeepEqual(requestedConfigMap.Data, configMap.Data) {
+		log.Info("Updating TLS configmap", "configMapName", requestedConfigMap.Name, "cluster", c.namespacedName())
+
+		if _, err := c.k8s.KubeClient.CoreV1().ConfigMaps(c.cluster.Namespace).Update(context.Background(), requestedConfigMap, metav1.UpdateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
 		}
 	}
