@@ -213,7 +213,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf validation.tar.gz artifacts/logs'
+          sh 'tar czf validation.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'validation.tar.gz', fingerprint: true
         }
       }
@@ -274,7 +274,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf sanity.tar.gz artifacts/logs'
+          sh 'tar czf sanity.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'sanity.tar.gz', fingerprint: true
         }
       }
@@ -335,7 +335,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf p0.tar.gz artifacts/logs'
+          sh 'tar czf p0.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'p0.tar.gz', fingerprint: true
         }
       }
@@ -396,7 +396,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf p1.tar.gz artifacts/logs'
+          sh 'tar czf p1.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'p1.tar.gz', fingerprint: true
         }
       }
@@ -457,7 +457,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf lpv.tar.gz artifacts/logs'
+          sh 'tar czf lpv.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'lpv.tar.gz', fingerprint: true
         }
       }
@@ -518,7 +518,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf platform.tar.gz artifacts/logs'
+          sh 'tar czf platform.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'platform.tar.gz', fingerprint: true
         }
       }
@@ -579,7 +579,7 @@ pipeline {
           junit 'artifacts/*.xml'
 
           // Archive any logs as an artifact, these may be needed to debug an issue.
-          sh 'tar czf custom.tar.gz artifacts/logs'
+          sh 'tar czf custom.tar.gz artifacts/*'
           archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
         }
       }
