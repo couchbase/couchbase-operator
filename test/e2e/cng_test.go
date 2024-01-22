@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -23,8 +23,6 @@ import (
 
 	podconsts "github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
-
-var cluster *v2.CouchbaseCluster
 
 // TestCreateCNG tests the ability to create a three node cluster with CNG enabled.
 func TestCreateCNG(t *testing.T) {
@@ -66,7 +64,7 @@ func TestCNGBucketOps(t *testing.T) {
 
 	ctx := context.Background()
 
-	client, err := setupCNGTests(ctx, t, kubernetesCluster)
+	client, _, err := setupCNGTests(ctx, t, kubernetesCluster)
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -145,12 +143,12 @@ func compareBucketNames(bucketName string, response *admin_bucket_v1.ListBuckets
 }
 
 // setupCNGTests performs the basic setup for all CNG tests.
-func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.Cluster) (*gocbcoreps.RoutingClient, error) {
+func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.Cluster) (*gocbcoreps.RoutingClient, *couchbasev2.CouchbaseCluster, error) {
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster spec
-	cluster = clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
 
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	cluster.Name = clusterName
@@ -161,7 +159,9 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 
 	e2eutil.MustWaitForCloudNativeGatewayServiceReady(t, kubernetesCluster, cluster, 10*time.Minute)
 
-	return getCloudNativeGatewayClient(ctx, clusterName)
+	client, err := getCloudNativeGatewayClient(ctx, cluster, clusterName)
+
+	return client, cluster, err
 }
 
 func TestCngOtlp(t *testing.T) {
@@ -223,7 +223,7 @@ func TestCngOtlp(t *testing.T) {
 	e2eutil.Die(t, fmt.Errorf("%s flag not set", podconsts.CloudNativeGatewayOtlpFlag))
 }
 
-func getCloudNativeGatewayClient(ctx context.Context, clusterName string) (*gocbcoreps.RoutingClient, error) {
+func getCloudNativeGatewayClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster, clusterName string) (*gocbcoreps.RoutingClient, error) {
 	var cngClient *gocbcoreps.RoutingClient
 
 	dialopts := gocbcoreps.DialOptions{
