@@ -50,7 +50,7 @@ func TestScopeCreateExplicit(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScopes(scopeName, scopeGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -92,7 +92,7 @@ func TestScopeCreateImplicit(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScopes(scopeName, scopeGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -135,7 +135,7 @@ func TestScopeCreateMixed(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScopes(scopeName, scopeGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -175,13 +175,13 @@ func TestScopeDelete(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScopes(scopeName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Delete the scope and wait for it to disappear.
 	e2eutil.MustDeleteScope(t, kubernetes, scopeName)
 
-	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected = e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Expect there to be a scopes & collections updated event for creation
@@ -223,7 +223,7 @@ func TestScopeUnmanaged(t *testing.T) {
 	e2eutil.MustCreateScopeManually(t, kubernetes, cluster, bucket.GetName(), scopeName)
 
 	// Assert scopes are created as expected, and stay that way.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScopes(scopeName)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Expect there to be no scopes and collections updated event.
@@ -267,7 +267,7 @@ func TestCollectionCreateExplicit(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -322,7 +322,7 @@ func TestCollectionWithAnnotations(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
@@ -366,7 +366,7 @@ func TestCollectionCreateImplicit(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -412,7 +412,7 @@ func TestCollectionCreateMixed(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -456,14 +456,14 @@ func TestCollectionDelete(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Delete the collection and wait for it to disappear.
 	e2eutil.MustDeleteCollection(t, kubernetes, collectionName)
 
-	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScope(scopeName)
+	expected = e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScope(scopeName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Expect there to be a scopes & collections updated event.
@@ -505,14 +505,14 @@ func TestCollectionUnmanaged(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for the scope to appear.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScope(scopeName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScope(scopeName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Manually create a collection.
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName)
 
 	// Assert scopes and collections are created as expected, and stay that way.
-	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected = e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -552,7 +552,7 @@ func TestDefaultCollectionDeletion(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for the default collection to be deleted.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScope()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScope()
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Expect there to be no scopes and collections updated event.
@@ -607,7 +607,7 @@ func TestScopesAndCollectionsSharedScopeTopology(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket1, expected, time.Minute)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket2, expected, time.Minute)
@@ -662,7 +662,7 @@ func TestScopesAndCollectionsSharedCollectionTopology(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName1).WithCollections(collectionGroupNames)
 	expected.WithScope(scopeName2).WithCollections(collectionGroupNames)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
@@ -705,13 +705,13 @@ func TestScopesAndCollectionsCascadingScopeDeletion(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 
 	// Delete the scope and wait for the scopes and collections to be updated.
 	e2eutil.MustDeleteScope(t, kubernetes, scopeName)
 
-	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected = e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Expect there to be a scopes & collections updated event for creation and deletion.
@@ -830,7 +830,7 @@ func TestGSIWithCollections(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// insert docs to backup

@@ -391,7 +391,7 @@ func TestAnalyticsCreateDataSetWithCollections(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 

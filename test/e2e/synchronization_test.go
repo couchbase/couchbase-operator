@@ -57,7 +57,7 @@ func TestDataSynchronizationBasic(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }
 
@@ -93,7 +93,7 @@ func TestDataSynchronizationUpdate(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScope(scopeName).WithCollection(collectionName1)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScope(scopeName).WithCollection(collectionName1)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Go unmanaged.
@@ -113,7 +113,7 @@ func TestDataSynchronizationUpdate(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still.
-	expected = e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScope(scopeName).WithCollections(collectionName1, collectionName2)
+	expected = e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScope(scopeName).WithCollections(collectionName1, collectionName2)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucket.GetName(), expected, 3*time.Minute)
 }
 
@@ -260,7 +260,7 @@ func TestDataSynchronizationDefaultCollectionDeleted(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", true), time.Minute)
 
 	// Check things are alive still - and the default collection hasn't been reanimated.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScope().WithScopes(scopeName).WithCollection(collectionName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScope().WithScopes(scopeName).WithCollection(collectionName)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }
 
@@ -354,6 +354,6 @@ func TestDataSynchronizationOperatorRestart(t *testing.T) {
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionSynchronized, corev1.ConditionTrue, cluster, time.Minute)
 
 	// Check things are alive still.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection().WithScopes(scopeName).WithCollection(collectionName)
 	e2eutil.MustAssertScopesAndCollectionsFor(t, kubernetes, cluster, bucketName, expected, 3*time.Minute)
 }
