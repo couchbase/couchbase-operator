@@ -1057,7 +1057,7 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	}
 
 	// Wait for the scope and collection to be created on both clusters
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
@@ -1152,7 +1152,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	}
 
 	// Wait for the scope and collection to be created on both clusters.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, deniedCollectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
@@ -1255,7 +1255,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	replication2.ExplicitMapping = mapping
 
 	// Wait for the scope and collection to be created on both clusters.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName, deniedCollectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
@@ -1389,7 +1389,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	}
 
 	// Wait for the scope and collection to be created on both clusters.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName1).WithCollections(collectionName1, collectionName2, deniedCollectionName)
 	expected.WithScope(scopeName2).WithCollections(collectionName1, collectionName2, deniedCollectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
@@ -1469,7 +1469,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
 
 	// Wait for the scope and collection to be created on both clusters
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
@@ -1584,7 +1584,7 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	}
 
 	// Wait for the scope and collection to be created on both clusters
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, targetBucket, expected, time.Minute)
 
@@ -1711,7 +1711,7 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	}
 
 	// Wait for the scope and collection to be created on both clusters
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scope1Name).WithCollections(collection1Name, collection2Name)
 	expected.WithScope(scope2Name).WithCollections(collection2Name)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, targetBucket, expected, time.Minute)
@@ -1791,7 +1791,7 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 	replication := e2espec.GetReplication(bucket.GetName(), bucketNoScopes.GetName())
 
 	// Wait for the scope and collection to be created on both clusters
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
 

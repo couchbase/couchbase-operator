@@ -102,7 +102,6 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	if err != nil {
 		return err
 	}
-
 	// Transform the list into a map for no other reason than O(1) lookups.
 	requestedScopes := map[string]interface{}{}
 
@@ -152,6 +151,11 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 
 	// Reconcile collections.
 	for _, scope := range scopes {
+		// We're not allowed to touch system scope
+		if scope.CouchbaseName() == couchbasev2.SystemScope {
+			continue
+		}
+
 		if scope.Spec.Collections == nil || !scope.Spec.Collections.Managed {
 			continue
 		}
@@ -172,7 +176,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 // gatherScopes looks up all scopes that are referenced by a bucket and returns
 // a list of scopes that should exist.  Only active resources that are referenced are
 // considered.  This is the point where we also worry about the indestructable default
-// collection.
+// collection, and system scope.
 func (c *Cluster) gatherScopes(bucket couchbasev2.AbstractBucket) ([]*couchbasev2.CouchbaseScope, error) {
 	var scopes []*couchbasev2.CouchbaseScope
 
@@ -191,6 +195,19 @@ func (c *Cluster) gatherScopes(bucket couchbasev2.AbstractBucket) ([]*couchbasev
 		scopes = append(scopes, &couchbasev2.CouchbaseScope{
 			Spec: couchbasev2.CouchbaseScopeSpec{
 				DefaultScope: true,
+			},
+		})
+	}
+
+	addSystemScope, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if addSystemScope {
+		scopes = append(scopes, &couchbasev2.CouchbaseScope{
+			Spec: couchbasev2.CouchbaseScopeSpec{
+				Name: couchbasev2.ScopeOrCollectionName(couchbasev2.SystemScope),
 			},
 		})
 	}
