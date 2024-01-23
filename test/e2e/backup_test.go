@@ -2180,7 +2180,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -2280,7 +2280,7 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -2388,7 +2388,7 @@ func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
@@ -2495,7 +2495,7 @@ func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderTyp
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName1, collectionName2)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 

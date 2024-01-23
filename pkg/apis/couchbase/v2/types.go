@@ -810,6 +810,9 @@ type ScopeOrCollectionNameList []ScopeOrCollectionName
 // DefaultScopeOrCollection is the name of the default scope and collection.
 const DefaultScopeOrCollection = "_default"
 
+// SystemScope is the name of the default scope and collection.
+const SystemScope = "_system"
+
 // CouchbaseCollection represent the finest grained size of data storage in Couchbase.
 // Collections contain all documents and indexes in the system.  Collections also form
 // the finest grain basis for role-based access control (RBAC) and cross-datacenter
@@ -3166,8 +3169,9 @@ type Buckets struct {
 	// scopes, and collections using the Couchbase UI, or other tooling.  When you wish to
 	// commit to Kubernetes resources, you must specify a unique label selector in the
 	// `spec.buckets.selector` field, and this field is set to true.  The Operator will
-	// create Kubernetes resources for you, and upon completion set the cluster's
-	// `Synchronized` status condition.  You may then safely set `spec.buckets.managed` to
+	// create Kubernetes resources for you, and upon completion set the cluster's `Synchronized`
+	// status condition. Synchronizing will not create a Kubernetes resource for the Couchbase
+	// Server maintained _system scope. You may then safely set `spec.buckets.managed` to
 	// true and the Operator will manage these resources as per usual.  To update an already
 	// managed data topology, you must first set it to unmanaged, make any changes, and delete
 	// any old resources, then follow the standard synchronization workflow.  The Operator

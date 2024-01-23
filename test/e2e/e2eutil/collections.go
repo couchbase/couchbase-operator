@@ -349,6 +349,7 @@ func (c *CollectionGroup) MustCreate(t *testing.T, kubernetes *types.Cluster) *c
 type ExpectedScopesAndCollections struct {
 	currentScope string
 	expected     map[string]map[string]interface{}
+	ignoreSystem bool
 }
 
 // NewExpectedScopesAndCollections creates a new expected scopes and collections topology.
@@ -366,6 +367,11 @@ func (e *ExpectedScopesAndCollections) WithDefaultScope() *ExpectedScopesAndColl
 // WithDefaultScopeAndCollection adds a default scope and collection to the topology.
 func (e *ExpectedScopesAndCollections) WithDefaultScopeAndCollection() *ExpectedScopesAndCollections {
 	return e.WithScope(couchbasev2.DefaultScopeOrCollection).WithCollections(couchbasev2.DefaultScopeOrCollection)
+}
+
+func (e *ExpectedScopesAndCollections) WithIgnoreSystemScope() *ExpectedScopesAndCollections {
+	e.ignoreSystem = true
+	return e
 }
 
 // WithScope adds the named scope to the topology.  It also implicitly sets the current scope
@@ -606,6 +612,10 @@ func MustWaitForScopesAndCollections(t *testing.T, kubernetes *types.Cluster, cl
 		// Iterate over the actual scopes and find any that aren't expected to be
 		// there.
 		for _, scope := range scopes.Scopes {
+			if scope.Name == couchbasev2.SystemScope && expected.ignoreSystem {
+				continue
+			}
+
 			if _, ok := expected.expected[scope.Name]; !ok {
 				return fmt.Errorf("scope `%v` not expected in bucket `%v`", scope.Name, bucket.GetName())
 			}
@@ -614,6 +624,10 @@ func MustWaitForScopesAndCollections(t *testing.T, kubernetes *types.Cluster, cl
 		// Iterate over the expected scopes and find any that are meant to be there,
 		// but aren't.
 		for scope, collections := range expected.expected {
+			if scope == couchbasev2.SystemScope && expected.ignoreSystem {
+				continue
+			}
+
 			if !scopes.HasScope(scope) {
 				return fmt.Errorf("expected scope `%v` not in bucket `%v`", scope, bucket.GetName())
 			}
@@ -713,6 +727,10 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 		// Iterate over the actual scopes and find any that aren't expected to be
 		// there.
 		for _, scope := range scopes.Scopes {
+			if scope.Name == couchbasev2.SystemScope && expected.ignoreSystem {
+				continue
+			}
+
 			if _, ok := expected.expected[scope.Name]; !ok {
 				return fmt.Errorf("scope `%v` not expected in bucket `%v`", scope.Name, bucketName)
 			}
@@ -721,6 +739,10 @@ func MustAssertScopesAndCollectionsFor(t *testing.T, kubernetes *types.Cluster, 
 		// Iterate over the expected scopes and find any that are meant to be there,
 		// but aren't.
 		for scope, collections := range expected.expected {
+			if scope == couchbasev2.SystemScope && expected.ignoreSystem {
+				continue
+			}
+
 			if !scopes.HasScope(scope) {
 				return fmt.Errorf("expected scope `%v` not in bucket `%v`", scope, bucketName)
 			}

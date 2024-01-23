@@ -140,7 +140,7 @@ func TestViewsWithScopesAndCollections(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Wait for all scopes to be created as expected.
-	expected := e2eutil.NewExpectedScopesAndCollections().WithDefaultScopeAndCollection()
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollection(collectionName)
 	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
