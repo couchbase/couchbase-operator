@@ -171,6 +171,7 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 // picks up and sets the various options available for couchbase bucket configuration.
 func TestDataSynchronizationCouchbaseBucketConfig(t *testing.T) {
 	bucketType := e2eutil.BucketTypeCouchbase
+	storageBackend := couchbasev2.CouchbaseStorageBackendCouchstore
 	memoryQuota := 200
 	replicas := 2
 	ioPrio := couchbasev2.CouchbaseBucketIOPriorityHigh
@@ -180,7 +181,7 @@ func TestDataSynchronizationCouchbaseBucketConfig(t *testing.T) {
 	durability := couchbaseutil.DurabilityMajority
 	ttl := 600
 
-	manualBucket := e2eutil.NewBucket(bucketType).WithMemoryQuota(memoryQuota).WithReplicas(replicas).WithIOPriority(ioPrio).WithEvictionPolicy(eviction).WithConflictResolution(resolution).WithFlush().WithIndexReplica().WithCompressionMode(compression).WithDurability(durability).WithTTL(ttl)
+	manualBucket := e2eutil.NewBucket(bucketType).WithMemoryQuota(memoryQuota).WithReplicas(replicas).WithIOPriority(ioPrio).WithEvictionPolicy(eviction).WithConflictResolution(resolution).WithFlush().WithIndexReplica().WithCompressionMode(compression).WithDurability(durability).WithTTL(ttl).WithStorageBackend(storageBackend)
 
 	testDataSynchronizationBucketConfig(t, manualBucket)
 }
