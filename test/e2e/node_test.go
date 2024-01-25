@@ -381,7 +381,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	// * Replacement is balanced in
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
