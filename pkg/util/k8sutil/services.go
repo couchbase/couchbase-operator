@@ -84,8 +84,9 @@ const (
 	viewServicePortTLS     = tlsBasePort + viewServicePort
 
 	// stellar-nebula-gateway related constants.
-	snDataPort = 18098
-	snSdPort   = 18099
+	snWebapiPort = 9091
+	snDataPort   = 18098
+	snSdPort     = 18099
 )
 
 var (

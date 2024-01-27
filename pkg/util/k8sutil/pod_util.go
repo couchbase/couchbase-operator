@@ -1794,8 +1794,13 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 		},
 		LivenessProbe: &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
-				GRPC: &v1.GRPCAction{
-					Port: int32(snDataPort),
+				HTTPGet: &v1.HTTPGetAction{
+					Path: "/health",
+					Port: intstr.IntOrString{
+						Type:   intstr.Int,
+						IntVal: snWebapiPort,
+					},
+					Scheme: v1.URISchemeHTTP,
 				},
 			},
 			InitialDelaySeconds: 60, // number of seconds k8s should wait before initiating the first liveness probe after the container starts.
