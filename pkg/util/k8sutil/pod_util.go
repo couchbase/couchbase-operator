@@ -1792,10 +1792,10 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
-		LivenessProbe: &v1.Probe{
+		ReadinessProbe: &v1.Probe{
 			ProbeHandler: v1.ProbeHandler{
 				HTTPGet: &v1.HTTPGetAction{
-					Path: "/health",
+					Path: "/ready",
 					Port: intstr.IntOrString{
 						Type:   intstr.Int,
 						IntVal: snWebapiPort,
@@ -1803,13 +1803,6 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 					Scheme: v1.URISchemeHTTP,
 				},
 			},
-			InitialDelaySeconds: 60, // number of seconds k8s should wait before initiating the first liveness probe after the container starts.
-			TimeoutSeconds:      60, // the maximum amount of time the probe is allowed to take
-			PeriodSeconds:       10,
-			FailureThreshold:    3,
-			// because default query timeout for n1ql queries in CB Server is 75 secs. So, 5 secs added to that.
-			// TODO: Would be part of crd type to be amendable by customer based on their query timeout threshold.
-			TerminationGracePeriodSeconds: func(t int64) *int64 { return &t }(80),
 		},
 	}
 
@@ -1830,8 +1823,8 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 		container.SecurityContext = cluster.Spec.Security.SecurityContext
 	}
 
-	// add cb host 127.0.0.1 and run on daemon mode.
-	container.Args = append(container.Args, "--daemon", "--cb-host", "127.0.0.1")
+	// add cb host 127.0.0.1 and run in daemon and auto-restart mode.
+	container.Args = append(container.Args, "--daemon", "--auto-restart", "--cb-host", "127.0.0.1")
 
 	if otlp := cluster.Spec.Networking.CloudNativeGateway.OTLP; otlp != nil && otlp.Endpoint != "" {
 		container.Args = append(container.Args, constants.CloudNativeGatewayOtlpFlag, otlp.Endpoint)
