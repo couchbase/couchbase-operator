@@ -38,7 +38,7 @@ const (
 	// UUID is the UUID of the cluster under management.
 	UUID PersistentKind = "uuid"
 
-	// Version is the Couchbase version we are on or upgrading from.
+	// Version is the lowest Couchbase version we are on or upgrading from.
 	Version PersistentKind = "version"
 
 	// Upgrading is flagged when an upgrade starts and removed on termination.

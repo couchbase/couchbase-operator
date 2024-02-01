@@ -282,6 +282,7 @@ The following is an example resource, depicting the overall structure and any de
   - <<couchbaseclusters-spec-servers-autoscaleenabled,autoscaleEnabled>>: false
     <<couchbaseclusters-spec-servers-env,env>>: []
     <<couchbaseclusters-spec-servers-envfrom,envFrom>>: []
+    <<couchbaseclusters-spec-servers-image,image>>: ""
     <<couchbaseclusters-spec-servers-name,name>>: ""
     <<couchbaseclusters-spec-servers-pod,pod>>: {}
     <<couchbaseclusters-spec-servers-resources,resources>>: {}
@@ -1590,6 +1591,7 @@ When Immediate the Operator will immediately delete all pods and take no further
 
 Image is the container image name that will be used to launch Couchbase server instances.
 Updating this field will cause an automatic upgrade of the cluster.
+Explicitly specifying the image for a server class will override this value for the server class.
 
 === couchbaseclusters.spec.logging
 
@@ -3630,6 +3632,22 @@ Env allows the setting of environment variables in the Couchbase server containe
 ==== Description
 
 EnvFrom allows the setting of environment variables in the Couchbase server container.
+
+=== couchbaseclusters.spec.servers.image
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(.\*?(:\d+)?/)?.\*?/.\*?(:.\*?\d+\.\d+\.\d+.\*|@sha256:[0-9a-f]\{64})$`
+
+==== Description
+
+Image is the container image name that will be used to launch Couchbase server instances in this server class.
+You cannot downgrade the Couchbase version.
+Across spec.image and all server classes there can only be two different Couchbase images.
+Updating this field to a value different than spec.image will cause an automatic upgrade of the server class.
+If it isn't specified then the cluster image will be used.
 
 === couchbaseclusters.spec.servers.name
 

@@ -743,9 +743,14 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) (float64, err
 	return idxSize + dataSize + viewSize, nil
 }
 
-// populateRemovalQueuePerServerClass enqueus pod(server) names which are version 7.0+.
+// populateRemovalQueuePerServerClass enqueues pod(server) names which are version 7.0+.
 func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers couchbaseutil.MemberSet, c *Cluster) error {
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	serverConf := c.cluster.Spec.GetServerConfigByName(serverClass)
+	if serverConf == nil {
+		return fmt.Errorf("server class not found %s: %w", serverClass, errors.NewStackTracedError(errors.ErrServerClassNotFound))
+	}
+
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
 	if err != nil {
 		return err
 	}
@@ -1329,11 +1334,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	upgraded := len(c.members) - len(candidates)
 
 	// Do any events/conditions that make the upgrade observable.
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return err
-	}
-
 	status := &couchbasev2.UpgradeStatus{
 		TargetCount: upgraded,
 		TotalCount:  len(c.members),
@@ -1345,20 +1345,38 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
-		log.Info("Upgrading pods with DeltaRecovery", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
-		err := r.handleDeltaRecovery(c, candidates, targetVersion)
+	errs := []error{}
 
+	groupedCandidates := candidates.GroupByServerConfigs()
+	for serverConfigName, serverCandidates := range groupedCandidates {
+		serverConf := c.cluster.Spec.GetServerConfigByName(serverConfigName)
+
+		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
 		if err != nil {
 			return err
 		}
-	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
-			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
+			log.Info("Upgrading pods with DeltaRecovery", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
+
+			err = r.handleDeltaRecovery(c, serverCandidates, targetVersion)
+		} else {
+			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
+				log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+			}
+
+			log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
+
+			err = r.swapRebalanceMembers(c, serverCandidates)
 		}
 
-		log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
-		return r.swapRebalanceMembers(c, candidates)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil

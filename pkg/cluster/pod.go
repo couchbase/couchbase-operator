@@ -143,7 +143,7 @@ func (c *Cluster) reconcilePods() error {
 			}
 		}
 
-		image := c.cluster.Spec.CouchbaseImage()
+		image := c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
 
 		if pvcState != nil && pvcState.Image != "" {
 			image = pvcState.Image
@@ -199,7 +199,7 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 	}
 
 	// Regeneration is used for upgrades, so the CRD is the source of truth here.
-	image := c.cluster.Spec.CouchbaseImage()
+	image := c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
 
 	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
 	if err != nil {
@@ -263,12 +263,8 @@ func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version strin
 // We update the image digest map early in reconciliation because it's
 // used in c.IsAtLeastVersion().
 func (c *Cluster) reconcilePodServerVersions() error {
-	version := couchbaseutil.GetVersionTag(c.cluster.Spec.CouchbaseImage())
-
-	// check if we know about this image.
-	if _, ok := constants.ImageDigests[version]; ok {
-		return nil
-	}
+	couchbaseImageToVersion := map[string]string{}
+	couchbaseImageToVersion[c.cluster.Spec.CouchbaseImage()] = ""
 
 	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.cluster.Name)
 
@@ -284,15 +280,32 @@ func (c *Cluster) reconcilePodServerVersions() error {
 			continue
 		}
 
+		config := c.cluster.Spec.GetServerConfigByName(member.Config())
+		image := c.cluster.Spec.ServerClassCouchbaseImage(config)
+
 		for _, container := range pod.Spec.Containers {
-			if container.Image == c.cluster.Spec.CouchbaseImage() {
-				if newVersion, updated := couchbaseutil.UpdateImageDigestMap(c.cluster.Spec.CouchbaseImage(), info.Version); newVersion != "" && updated {
-					log.V(2).Info("found server version", "version", info.Version, "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.cluster.Name)
-
-					return c.updatePersistenceVersion(newVersion)
+			if container.Image == image {
+				if version, exists := couchbaseImageToVersion[image]; !exists || version == "" {
+					couchbaseImageToVersion[image] = info.Version
 				}
+			}
+		}
+	}
 
-				return nil
+	for image, cbversion := range couchbaseImageToVersion {
+		version := couchbaseutil.GetVersionTag(image)
+		// check if we know about this image.
+		if _, ok := constants.ImageDigests[version]; ok {
+			continue
+		}
+
+		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion); newVersion != "" && updated {
+			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.cluster.Name)
+
+			err := c.updatePersistenceVersion(newVersion)
+
+			if err != nil {
+				return err
 			}
 		}
 	}

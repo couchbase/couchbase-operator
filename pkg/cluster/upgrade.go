@@ -165,7 +165,12 @@ func (c *Cluster) reportUpgradeComplete() error {
 	// Upgrade has completed, raise and event, remove the cluster condition
 	// update the current cluster version and clear the upgrading flag in
 	// persistent storage.
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	lowestImageVer, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	version, err := k8sutil.CouchbaseVersion(lowestImageVer)
 	if err != nil {
 		return err
 	}

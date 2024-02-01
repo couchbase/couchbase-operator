@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
@@ -296,6 +297,84 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 	}
 
 	return image
+}
+
+// ServerClassCouchbaseImage selects the image to use for a server class. The priority
+// order is:
+// * Operator Environment image if EnvImagePrecedence is set
+// * Server class image
+// * Cluster image.
+func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
+	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
+			return annotatedImage
+		}
+	}
+
+	if classImage := server.Image; classImage != "" {
+		return classImage
+	}
+
+	return cs.Image
+}
+
+// LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
+// that is in use. Operator Environment image takes the highest priority
+// If all server classes have their image set to a higher version image than the cluster image
+// then the higher server class image will be returned as the cluster image isn't in use.
+func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {
+	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
+		if cs.EnvImagePrecedence && annotatedImage != "" {
+			return annotatedImage, nil
+		}
+	}
+
+	clusterImage := cs.Image
+
+	serverConfImage := ""
+	allServerClassesOverriding := true
+
+	for _, serverConf := range cs.Servers {
+		image := serverConf.Image
+
+		if image == "" || image == clusterImage {
+			allServerClassesOverriding = false
+			continue
+		}
+
+		if serverConfImage == "" {
+			serverConfImage = image
+			continue
+		}
+
+		if serverConfImage != image {
+			return "", errors.ErrTooManyServerImages
+		}
+	}
+
+	if serverConfImage == "" {
+		return clusterImage, nil
+	}
+
+	if allServerClassesOverriding {
+		return serverConfImage, nil
+	}
+
+	clusterImageVersion, err := couchbaseutil.NewVersionFromImage(clusterImage)
+	if err != nil {
+		return "", err
+	}
+
+	serverImageVersion, err := couchbaseutil.NewVersionFromImage(serverConfImage)
+	if err != nil {
+		return "", err
+	}
+
+	if clusterImageVersion.Less(serverImageVersion) {
+		return clusterImage, nil
+	}
+
+	return serverConfImage, nil
 }
 
 // Backup Image represents the image to use for backup.
@@ -973,7 +1052,12 @@ func (c *CouchbaseCluster) GetBackupStoreEndpoint() *ObjectEndpoint {
 
 // Checks cluster version is above minimum version requirement.
 func (c *CouchbaseCluster) IsAtLeastVersion(v string) (bool, error) {
-	tag, err := couchbaseutil.CouchbaseImageVersion(c.Spec.CouchbaseImage())
+	lowestImage, err := c.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false, err
+	}
+
+	tag, err := couchbaseutil.CouchbaseImageVersion(lowestImage)
 	if err != nil {
 		return false, err
 	}

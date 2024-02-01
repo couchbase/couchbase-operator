@@ -262,7 +262,12 @@ func (c *Cluster) addDataServiceExternalPorts(k8sAddressPorts *couchbaseutil.Alt
 // or not e.g. only the requested familiy shows up, rather than the normal
 // dual-stack stuff.
 func (c *Cluster) supportsAFFiltering() bool {
-	tag, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false
+	}
+
+	tag, err := k8sutil.CouchbaseVersion(lowestImage)
 	if err != nil {
 		return false
 	}

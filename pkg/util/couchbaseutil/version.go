@@ -23,6 +23,20 @@ type Version struct {
 	semver []int
 }
 
+func NewVersionFromImage(image string) (*Version, error) {
+	imageTag, err := CouchbaseImageVersion(image)
+	if err != nil {
+		return nil, err
+	}
+
+	version, err := NewVersion(imageTag)
+	if err != nil {
+		return nil, err
+	}
+
+	return version, nil
+}
+
 // Initialise the version struct.  Prefix and semver are lazilly initialised.
 func NewVersion(version string) (*Version, error) {
 	if version == "" {

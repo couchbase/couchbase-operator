@@ -16,6 +16,9 @@ var (
 	CouchbaseServerAltConfig   = "test_config_2"
 	CouchbaseNodeLabel         = "couchbase_node"
 	CouchbaseVolumeLabel       = "couchbase_volume"
+	CouchbaseNodeConfKey       = "couchbase_node_conf"
+
+	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 
 	// List of Couchbase-cluster services.
 	StatefulCbServiceList = couchbasev2.ServiceList{

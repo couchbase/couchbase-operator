@@ -214,3 +214,38 @@ func FindBackupEphemeralVolume(kubernetes *types.Cluster, backupName string) (*v
 
 	return nil, fmt.Errorf("unable to find pvc %s", pvcName)
 }
+
+func MustCheckServerClassPodsForVersion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serverClass, image, version string) {
+	err := retryutil.RetryFor(time.Second, func() error {
+		return checkServerClassPodsForVersion(k8s, couchbase, serverClass, image, version)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkServerClassPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serverClass, expectedImage, expectedVersion string) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name + "," + constants.CouchbaseNodeConfKey + "=" + serverClass,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods.Items {
+		if pod.Spec.Containers[0].Image != expectedImage {
+			return fmt.Errorf("expected pod (%s) image to be: %s but found: %s", pod.Name, expectedImage, pod.Spec.Containers[0].Image)
+		}
+
+		if podVersion, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
+			return fmt.Errorf("expected pod (%s) to have %s annotation", pod.Name, constants.CouchbaseVersionAnnotationKey)
+		} else if podVersion != expectedVersion {
+			return fmt.Errorf("expected pod (%s) version to be %s but found %s", pod.Name, expectedVersion, podVersion)
+		}
+	}
+
+	return nil
+}

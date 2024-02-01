@@ -148,7 +148,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 
 	usedPodIndex := 0
 	for index, serverSpec := range serverSpecs {
-		newMember, err := c.newMember(availableIndexes[usedPodIndex], serverSpec.Name, c.cluster.Spec.CouchbaseImage())
+		newMember, err := c.newMember(availableIndexes[usedPodIndex], serverSpec.Name, c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec))
 		if err != nil {
 			return nil, err // since we've not managed to create anything lets just error out
 		}
@@ -243,7 +243,8 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 
 	// check if we already know about this SHA256
 	// update the digest map
-	newVersion, updated := couchbaseutil.UpdateImageDigestMap(c.cluster.Spec.CouchbaseImage(), info.Version)
+	serverImage := c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec)
+	newVersion, updated := couchbaseutil.UpdateImageDigestMap(serverImage, info.Version)
 	// check the member version, if it's different then update EVERYTHING.
 	if newVersion != "" {
 		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
@@ -256,7 +257,7 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	// i.e this is a new cluster. We don't want to change versions until we're finished
 	// upgrading.
 	if updated {
-		log.V(2).Info("discovered new SHA256 ", "image", c.cluster.Spec.CouchbaseImage(), "version", info.Version, "cluster", c.cluster.Name)
+		log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.cluster.Name)
 
 		if err := c.updatePersistenceVersion(newVersion); err != nil {
 			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.cluster.Name)

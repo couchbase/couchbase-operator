@@ -252,7 +252,12 @@ func (c *Cluster) Delete() {
 }
 
 func (c *Cluster) initializeClusterState() error {
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	version, err := k8sutil.CouchbaseVersion(lowestImage)
 	if err != nil {
 		return err
 	}
@@ -315,7 +320,12 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	version, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	version, err := k8sutil.CouchbaseVersion(lowestImage)
 	if err != nil {
 		return err
 	}

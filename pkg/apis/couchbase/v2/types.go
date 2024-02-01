@@ -2096,7 +2096,8 @@ const (
 type ClusterSpec struct {
 	// Image is the container image name that will be used to launch Couchbase
 	// server instances.  Updating this field will cause an automatic upgrade of
-	// the cluster.
+	// the cluster. Explicitly specifying the image for a server class will override
+	// this value for the server class.
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image"`
 
@@ -3377,6 +3378,15 @@ type ServerConfig struct {
 	// server class.  The CouchbaseAutoscaler implements the Kubernetes scale API and
 	// can be controlled by the Kubernetes horizontal pod autoscaler (HPA).
 	AutoscaleEnabled bool `json:"autoscaleEnabled,omitempty"`
+
+	// Image is the container image name that will be used to launch Couchbase
+	// server instances in this server class. You cannot downgrade the Couchbase
+	// version. Across spec.image and all server classes there can only be two
+	// different Couchbase images. Updating this field to a value different than
+	// spec.image will cause an automatic upgrade of the server class. If it isn't
+	// specified then the cluster image will be used.
+	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
+	Image string `json:"image,omitempty"`
 }
 
 type VolumeMountName string

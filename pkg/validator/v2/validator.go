@@ -40,6 +40,7 @@ const (
 // CRDv3 thing.
 func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
+		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
 		checkConstraintIndexServiceMemoryQuota,
@@ -1040,6 +1041,29 @@ func checkConstraintServerMinimumVersion(_ *types.Validator, cluster *couchbasev
 	minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
 	if currentVersion.Less(minVersion) {
 		return fmt.Errorf("unsupported Couchbase version: %s, minimum version required: %s", currentVersion, constants.CouchbaseVersionMin)
+	}
+
+	return nil
+}
+
+func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	versionSet := map[string]bool{}
+
+	versionSet[cluster.Spec.Image] = true
+
+	for _, serverConf := range cluster.Spec.Servers {
+		if serverConf.Image != "" {
+			versionSet[serverConf.Image] = true
+		}
+	}
+
+	if len(versionSet) > 2 {
+		versions := []string{}
+		for version := range versionSet {
+			versions = append(versions, version)
+		}
+
+		return fmt.Errorf("a maximum of two couchbase server images can be used in a single cluster, %v images are in use: %v", len(versionSet), versions)
 	}
 
 	return nil
@@ -3363,7 +3387,12 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 		return nil
 	}
 
-	srvImgTag, err := k8sutil.CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	lowestImageVer, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	srvImgTag, err := k8sutil.CouchbaseVersion(lowestImageVer)
 	if err != nil {
 		return err
 	}

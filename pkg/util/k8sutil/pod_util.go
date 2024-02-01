@@ -82,7 +82,7 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 		serverGroup = pvcState.availabilityZone
 	}
 
-	image := cluster.Spec.CouchbaseImage()
+	image := cluster.Spec.ServerClassCouchbaseImage(&config)
 
 	if pvcState != nil && pvcState.Image != "" {
 		image = pvcState.Image
@@ -395,7 +395,9 @@ func (p *PersistentVolumeClaimState) addVolumeMounts(mountMappings volumeMountLi
 // generatePVC consumes the member, its server class configuration and generates the required
 // PVC for a specific mount mapping for that member.
 func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member, mount volumeMount, config couchbasev2.ServerConfig) (*v1.PersistentVolumeClaim, error) {
-	version, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	cbImage := cluster.Spec.ServerClassCouchbaseImage(&config)
+	version, err := CouchbaseVersion(cbImage)
+
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +420,7 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 		constants.AnnotationVolumeMountPath:     mount.mountPath,
 		constants.AnnotationVolumeNodeConf:      config.Name,
 		constants.CouchbaseVersionAnnotationKey: version,
-		constants.PVCImageAnnotation:            cluster.Spec.CouchbaseImage(),
+		constants.PVCImageAnnotation:            cbImage,
 	}
 
 	// Merge our labels/annotations on top of any user defined ones.  We take
@@ -935,14 +937,14 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	}
 
 	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
-	applyCloudNativeGateway(client, cluster, pod)
+	applyCloudNativeGateway(client, cluster, pod, &serverConfig)
 
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
-	applyMetadata(cluster, pod)
+	applyMetadata(cluster, pod, &serverConfig)
 
 	// If TLS is specified then add the certificate volume.
-	if err := applyPodTLSConfiguration(cluster, pod); err != nil {
+	if err := applyPodTLSConfiguration(cluster, pod, &serverConfig); err != nil {
 		return nil, err
 	}
 
@@ -1042,13 +1044,13 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 }
 
 // applyCloudNativeGateway adds a Cloud Native Gateway for gRPC access to the cb cluster.
-func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) {
 	// If cloudNativeGateway is enabled add the necessary sidecars.
 	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return
 	}
 
-	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	tag, err := CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(conf))
 	if err == nil {
 		if minSrvVerForCNG, err := couchbaseutil.VersionAfter(tag, constants.MinimumCouchbaseVersionForCNG); !minSrvVerForCNG && err == nil {
 			log.Info("[WARN] invalid couchbase server version for cloud native gateway support. Check server version.", "Minimum version needed", constants.MinimumCouchbaseVersionForCNG)
@@ -1179,11 +1181,11 @@ func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseClu
 	return nil
 }
 
-func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) {
+func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) {
 	// Are we using a version of Server that has its own metrics exporter
 	serverVersionPrometheus := false
 
-	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	tag, err := CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(conf))
 	if err == nil {
 		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
 	}
@@ -1964,7 +1966,7 @@ func PassphraseKeySecretName(cluster *couchbasev2.CouchbaseCluster) string {
 }
 
 // Adds any necessary pod prerequisites before enabling TLS.
-func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
+func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) error {
 	container, err := GetCouchbaseContainer(pod)
 	if err != nil {
 		return err
@@ -2013,7 +2015,7 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 	// In 7.1 the CA must be installed in the pod, and not injected over
 	// HTTP... which is a pain.  It must also *always* exist, as we need
 	// to install the CA before upgading to TLS.
-	tag, err := CouchbaseVersion(cluster.Spec.CouchbaseImage())
+	tag, err := CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(conf))
 	if err != nil {
 		return err
 	}

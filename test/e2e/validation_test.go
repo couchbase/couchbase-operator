@@ -2693,6 +2693,12 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
+		{
+			name:           "TestValidateMaxTwoImages",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/image", "couchbase/server:7.2.1").Add("/spec/servers/1/image", "couchbase/server:7.2.2")},
+			shouldFail:     true,
+			expectedErrors: []string{"a maximum of two couchbase server images"},
+		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }

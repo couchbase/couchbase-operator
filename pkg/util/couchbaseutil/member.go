@@ -370,6 +370,20 @@ func (ms MemberSet) GroupByServerConfig(config string) MemberSet {
 	return rv
 }
 
+func (ms MemberSet) GroupByServerConfigs() map[string]MemberSet {
+	groupedMembers := map[string]MemberSet{}
+
+	for _, m := range ms {
+		if set, ok := groupedMembers[m.Config()]; ok {
+			set.Add(m)
+		} else {
+			groupedMembers[m.Config()] = NewMemberSet(m)
+		}
+	}
+
+	return groupedMembers
+}
+
 // CreateMemberName is a helper function that defines a member name based on
 // cluster and numerical index.
 func CreateMemberName(cluster string, member int) string {

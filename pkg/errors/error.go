@@ -103,6 +103,14 @@ var (
 	// ErrDeleteDelayPreventsReconcile is an error that is surfaced when a pod is scheduled
 	// for deletion but has not reached the expiration of its delay.
 	ErrDeleteDelayPreventsReconcile = errors.New("pod not removed due to delete delay")
+
+	// ErrTooManyServerImages is raised when too many couchbase server images are found
+	// in a CouchbaseCluster spec.
+	ErrTooManyServerImages = errors.New("expected there to be 1 or 2 server images in the cluster spec but found more")
+
+	// ErrServerClassNotFound is raised when the operator looks for a server class
+	// that doesn't exist.
+	ErrServerClassNotFound = errors.New("server class not found")
 )
 
 // CLI errors.
