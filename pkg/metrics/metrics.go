@@ -117,6 +117,21 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "method", "service", "host"})
 
+	// VolumeExpansionMetric
+	// name: volume_expansions_total
+	// type: counter
+	// help: Total number of times the size of volumes have been increased under management
+	// unit:
+	// added: 2.7.0
+	// stability: committed
+	// labels: name, volumeName
+	VolumeExpansionMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "volume_expansions_total",
+		Help:      "Total number of times the size of volumes have been increased under management",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name", "volumeName"})
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -129,5 +144,6 @@ func init() {
 		HTTPRequestFailureMetric,
 		HTTPRequestDurationMSMetric,
 		buildInfoCollector,
+		VolumeExpansionMetric,
 	)
 }

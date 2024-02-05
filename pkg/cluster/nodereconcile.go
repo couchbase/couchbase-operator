@@ -9,6 +9,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -983,6 +984,8 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				requestedSize := k8sutil.GetVolumeStorageSize(requestedClaim)
 				c.raiseEvent(k8sutil.ExpandVolumeStartedEvent(pvc.Name, currentSize, requestedSize, c.cluster))
 				log.Info("Volume expanding", "cluster", c.namespacedName(), "name", pvc.Name, "current", currentSize, "requested", requestedSize)
+
+				metrics.VolumeExpansionMetric.WithLabelValues(c.cluster.Name, pvc.Name).Inc()
 
 				// Done for now. Not going to upgrade all volumes at once.
 				r.abort("persistent volumes expanding")
