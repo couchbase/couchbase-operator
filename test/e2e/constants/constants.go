@@ -17,6 +17,8 @@ var (
 	CouchbaseNodeLabel         = "couchbase_node"
 	CouchbaseVolumeLabel       = "couchbase_volume"
 
+	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
+
 	// List of Couchbase-cluster services.
 	StatefulCbServiceList = couchbasev2.ServiceList{
 		couchbasev2.DataService,
