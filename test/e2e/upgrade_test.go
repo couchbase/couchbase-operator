@@ -1201,8 +1201,8 @@ func TestDeltaRecovery(t *testing.T) {
 	upgradeProcess := couchbasev2.DeltaRecovery
 	numOfDocs := f.DocsCount
 
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
-	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeProcess = &upgradeProcess
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -1212,7 +1212,7 @@ func TestDeltaRecovery(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -1220,18 +1220,6 @@ func TestDeltaRecovery(t *testing.T) {
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Optional{Validator: eventschema.RepeatAtLeast{
-			Times:     1,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-		}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
 }
