@@ -844,6 +844,12 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers(\[2\])?.serverGroups`},
 		},
+		{
+			name:           "TestNoServicelessClassBelow76",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", []string{})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.servers(\[3\])?.services requires atleast one service`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

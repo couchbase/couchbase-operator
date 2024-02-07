@@ -439,6 +439,18 @@ func (o *ClusterOptions) WithSplitEphemeralTopology(size int) *ClusterOptions {
 	return o
 }
 
+// WithEphemeralAndServicelessTopology just adds a serviceless class to the
+// Ephemeral topology.
+func (o *ClusterOptions) WithEphemeralAndServicelessTopology(size int) *ClusterOptions {
+	topology := e2espec.EphemeralAndServicelessTopology.DeepCopy()
+	topology[0].Size = size
+	topology[1].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
 func (o *ClusterOptions) WithDefaultLogStreaming() *ClusterOptions {
 	o.LogStreaming = &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
 		Enabled:           true,

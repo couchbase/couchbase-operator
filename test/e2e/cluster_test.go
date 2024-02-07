@@ -1062,3 +1062,26 @@ func TestMovePod(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestServicelessClass(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
+	clusterSize := 1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralAndServicelessTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize * 2),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

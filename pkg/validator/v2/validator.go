@@ -62,6 +62,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
+		checkoutConstraintNoServicelessClassBelow76,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
 		checkConstraintDefaultAndLogVolumesMututallyExclusive,
@@ -805,6 +806,32 @@ func checkConstraintServerClassContainsDataService(_ *types.Validator, cluster *
 	}
 
 	return errors.Required("at least one \"data\" service", "spec.servers.services", nil)
+}
+
+func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	clusterVersionImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	version, err := k8sutil.CouchbaseVersion(clusterVersionImage)
+	if err != nil {
+		return err
+	}
+
+	if after76, err := couchbaseutil.VersionAfter(version, "7.6.0"); err != nil {
+		return err
+	} else if after76 {
+		return nil
+	}
+
+	for i, config := range cluster.Spec.Servers {
+		if len(config.Services) == 0 {
+			return fmt.Errorf("spec.servers[%d].services requires atleast one service", i)
+		}
+	}
+
+	return nil
 }
 
 // checkConstraintClusterSupportable checks that if you have one supportable class, they all are.

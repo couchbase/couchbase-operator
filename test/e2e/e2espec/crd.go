@@ -176,6 +176,23 @@ var (
 			},
 		},
 	}
+
+	// EphemeralAndServicelessTopology is a simple ephemeral cluster with,
+	// an additional serviceless class.
+	EphemeralAndServicelessTopology = ClusterTopology{
+		{
+			Name: "default",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+		},
+		{
+			Name:     "serviceless",
+			Services: []couchbasev2.Service{},
+		},
+	}
 )
 
 // ClusterOptions allows things about a cluster to be modified.
