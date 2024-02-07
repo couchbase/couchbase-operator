@@ -26,17 +26,17 @@ pipeline {
 
   parameters {
     string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
-    string(name: 'server_image', defaultValue: 'couchbase/server:7.2.0', , description: 'Version of Couchbase to test')
-    string(name: 'server_image_version', defaultValue: '7.2.0', , description: 'Override the version of Couchbase to test')
-    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:6.6.4', description: 'Version of Couchbase to upgrade from')
-    string(name: 'server_image_upgrade_version', defaultValue: '6.6.4', description: 'Override the version of Couchbase to upgrade from')
-    string(name: 'backup_image', defaultValue: 'aemerycb/couchbase-operator-backup:0e73896ed9cd273dfdaed804160d00a944fb31a7', description: 'Version of the Couchbase backup image to test')
-    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.5', description: 'Version of the Prometheus exporter to test')
-    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.4', description: 'Version of the Prometheus exporter to upgrade from')
-    string(name: 'logging_image', defaultValue: 'aemerycb/fluent-bit:b66da5a59dc4ac89abc019ecbd1d9e2ab31c80b4', description: 'Version of the log shipping sidecar to test')
-    string(name: 'logging_image_upgrade', defaultValue: 'couchbase/fluent-bit:1.0.4', description: 'Version of the log shipping sidecar to upgrade from')
-    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-132', description: 'Image to use for the cloud native gateway deployment')
-    string(name: 'mobile_image', defaultValue: 'couchbase/sync-gateway:2.8.3-enterprise', description: 'Version of Sync-Gateway to test')
+    string(name: 'server_image', defaultValue: 'cb-vanilla/server:7.6.0', , description: 'Version of Couchbase to test')
+    string(name: 'server_image_version', defaultValue: '', , description: 'Override the version of Couchbase to test')
+    string(name: 'server_image_upgrade', defaultValue: 'cb-vanilla/server:7.2.4', description: 'Version of Couchbase to upgrade from')
+    string(name: 'server_image_upgrade_version', defaultValue: '', description: 'Override the version of Couchbase to upgrade from')
+    string(name: 'backup_image', defaultValue: 'cb-vanilla/operator-backup:latest', description: 'Version of the Couchbase backup image to test')
+    string(name: 'exporter_image', defaultValue: 'cb-vanilla/exporter:latest', description: 'Version of the Prometheus exporter to test')
+    string(name: 'exporter_image_upgrade', defaultValue: 'cb-vanilla/exporter:1.0.9', description: 'Version of the Prometheus exporter to upgrade from')
+    string(name: 'logging_image', defaultValue: 'cb-vanilla/fluent-bit:latest', description: 'Version of the log shipping sidecar to test')
+    string(name: 'logging_image_upgrade', defaultValue: 'cb-vanilla/fluent-bit:1.2.6', description: 'Version of the log shipping sidecar to upgrade from')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:latest', description: 'Image to use for the cloud native gateway deployment')
+    string(name: 'mobile_image', defaultValue: 'cb-vanilla/sync-gateway:2.8.3-enterprise', description: 'Version of Sync-Gateway to test')
     choice(name: 'bucket_type', choices: ['couchbase', 'ephemeral', 'memcached'], description: 'Bucket type to test with, for tests where bucket type is dynamic')
     choice(name: 'compression_mode', choices: ['passive', 'active', 'off'], description: 'Bucket compression to test with, for tests where compression is dynamic')
     choice(name: 'suites', choices: ['', 'p0', 'p0 p1'], description: 'Any additional suites to run (validation and sanity are mandarory)')
@@ -57,7 +57,7 @@ pipeline {
     AZURE_CREDENTIALS = credentials('azure-alex')
     GCP_CREDENTIALS = credentials('gcp-operator')
     GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
-    KIND_VERSION = "0.19.0"
+    KIND_VERSION = "0.21.0"
   }
 
   stages {
@@ -118,7 +118,7 @@ pipeline {
         axes {
           axis {
             name 'version'
-            values 'v1.22.9', 'v1.23.6', 'v1.24.2'
+            values 'v1.27.10', 'v1.28.6', 'v1.29.1'
           }
         }
 
