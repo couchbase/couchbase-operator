@@ -570,9 +570,7 @@ If you receive a `NotFound` error, then you'll need to https://github.com/kubern
 Couchbase metrics need to be exposed through the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^] in order to use them for auto-scaling.
 This is a requirement if you wish to use metrics like memory quota and query latency as targets to determine when auto-scaling should occur.
 
-Couchbase metrics may be collected by the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] or the native Prometheus Endpoint that is exposed in Couchbase Server versions 7.0+.
-
-When using the Prometheus Exporter, the `CouchbaseCluster` resource must have xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-monitoring-prometheus-enabled[`couchbaseclusters.spec.monitoring.prometheus.enabled`] set to `true` in order for Couchbase metrics to be collected by the custom metrics API service.
+Couchbase metrics may be collected by the native Prometheus Endpoint that is exposed in Couchbase Server versions 7.0+.
 
 You can run the following command to verify that your cluster is capable of performing auto-scaling based on metrics exposed by the Prometheus Endpoint:
 
@@ -585,7 +583,7 @@ If you receive a `NotFound` error then you will need to install a custom metrics
 The recommended custom metrics service to use with the Autonomous Operator is the https://github.com/DirectXMan12/k8s-prometheus-adapter[Prometheus Adapter^].
 
 When performing auto-scaling based on Couchbase Server metrics, the discovery of available metrics can be performed through Prometheus queries that are beyond the scope of this document.
-However, the Couchbase Exporter repository contains a https://github.com/couchbase/couchbase-exporter/blob/master/example/config.json[list of the Couchbase metrics being exported^].
+However, the Couchbase Server docs contain a https://docs.couchbase.com/server/current/metrics-reference/metrics-reference.html[list of the Couchbase metrics available^].
 
 === Couchbase Native Metrics
 

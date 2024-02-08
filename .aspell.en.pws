@@ -278,3 +278,4 @@ unpause
 vbucket
 DeltaRecovery
 validator
+ServiceMonitor

@@ -84,6 +84,7 @@ image:compatibility-fluentbit.png[]
 
 [[couchbase-exporter-compatibility]]
 === Couchbase Exporter Compatibility
+kbd:[deprecated]
 
 This release is compatible with all versions of the Couchbase Exporter image.
 The Couchbase Exporter images are all compatible with all versions of Couchbase Server that are supported by this release.

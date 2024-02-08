@@ -1902,7 +1902,8 @@ Will be populated by Kubernetes defaults if not specified.
 
 ==== Description
 
-Monitoring defines any Operator managed integration into 3rd party monitoring infrastructure.
+*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+ Monitoring defines any Operator managed integration into 3rd party monitoring infrastructure.
+
 
 === couchbaseclusters.spec.monitoring.prometheus
 
@@ -1912,7 +1913,8 @@ Monitoring defines any Operator managed integration into 3rd party monitoring in
 
 ==== Description
 
-Prometheus provides integration with Prometheus monitoring.
+*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+ Prometheus provides integration with Prometheus monitoring.
+
 
 === couchbaseclusters.spec.monitoring.prometheus.authorizationSecret
 

@@ -2237,6 +2237,7 @@ type ClusterSpec struct {
 	// to lookup replication resources.
 	XDCR XDCR `json:"xdcr,omitempty"`
 
+	// DEPRECATED - By Couchbase Server metrics endpoint on version 7.0+
 	// Monitoring defines any Operator managed integration into 3rd party monitoring
 	// infrastructure.
 	Monitoring *CouchbaseClusterMonitoringSpec `json:"monitoring,omitempty"`
@@ -3873,6 +3874,7 @@ const (
 )
 
 type CouchbaseClusterMonitoringSpec struct {
+	// DEPRECATED - By Couchbase Server metrics endpoint on version 7.0+
 	// Prometheus provides integration with Prometheus monitoring.
 	Prometheus *CouchbaseClusterMonitoringPrometheusSpec `json:"prometheus,omitempty"`
 }

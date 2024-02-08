@@ -2,8 +2,7 @@
 include::partial$constants.adoc[]
 
 [abstract]
-You can set up the Autonomous Operator to use the Couchbase Exporter or Couchbase Server's native support for metrics collection.
-The Couchbase Exporter is a https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#how-pods-manage-multiple-containers["sidecar" container^] that is injected into each Couchbase Server pod.
+You can set up the Autonomous Operator to use the Couchbase Server's native support for metrics collection.
 Couchbase native support for metric collection exposes an Prometheus compatible endpoint on all Pods without the use of 3rd party tools.
 Couchbase native support is available for Couchbase Server versions 7.0 or higher and is the recommended way for collecting metrics with Prometheus.
 
@@ -40,8 +39,6 @@ metadata:
   labels:
     app.couchbase.com/name: couchbase  # <.>
   name: cb-metrics
-spec:
-  ports:
 spec:
   ports:
   - name: metrics
@@ -147,8 +144,17 @@ If no results are returned, check Status -> Targets for any unhealthy endpoints 
 
 
 === Couchbase Prometheus Exporter
+kbd:[deprecated]
+
+[WARNING]
+====
+Use of Prometheus exporter is deprecated and will be removed in a future release.
+It is highly recommended that you use the native Couchbase Server Metrics endpoint.
+====
 
 The Autonomous Operator provides Prometheus integration for collecting and exposing Couchbase Server metrics via the https://github.com/couchbase/couchbase-exporter[Couchbase Prometheus Exporter^].
+
+The Couchbase Exporter is a https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#how-pods-manage-multiple-containers["sidecar" container^] that is injected into each Couchbase Server pod.
 
 Prometheus metrics collection is enabled in the `CouchbaseCluster` resource.
 The configuration allows you to specify a Couchbase-provided container image that contains the Prometheus Exporter.
