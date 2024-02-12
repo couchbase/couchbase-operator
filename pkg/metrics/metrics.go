@@ -132,6 +132,36 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "volumeName"})
 
+	// SwapRebalancesTotalMetric
+	// name: swap_rebalances_total
+	// type: counter
+	// help: Total number of swap rebalances performed by the operator
+	// unit:
+	// added: 2.7.0
+	// stability: committed
+	// labels: name
+	SwapRebalancesTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "swap_rebalances_total",
+		Help:      "Total number of swap rebalances performed by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name"})
+
+	// SwapRebalanceFailuresMetric
+	// name: swap_rebalance_failures
+	// type: counter
+	// help: Total number of times swap rebalances have failed
+	// unit:
+	// added: 2.7.0
+	// stability: committed
+	// labels: name
+	SwapRebalanceFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "swap_rebalance_failures",
+		Help:      "Total number of times swap rebalances have failed",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name"})
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -145,5 +175,7 @@ func init() {
 		HTTPRequestDurationMSMetric,
 		buildInfoCollector,
 		VolumeExpansionMetric,
+		SwapRebalancesTotalMetric,
+		SwapRebalanceFailuresMetric,
 	)
 }

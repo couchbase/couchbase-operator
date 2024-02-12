@@ -81,6 +81,24 @@
             "host"
         ]
     },
+    "swap_rebalance_failures": {
+        "type": "counter",
+        "help": "Total number of times swap rebalances have failed",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
+    "swap_rebalances_total": {
+        "type": "counter",
+        "help": "Total number of swap rebalances performed by the operator",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
     "volume_expansions_total": {
         "type": "counter",
         "help": "Total number of times the size of volumes have been increased under management",

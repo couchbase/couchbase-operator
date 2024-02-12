@@ -1565,12 +1565,14 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 
 		// Remove the candidate from the scheduler.
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
 		// Grab the server class.
 		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if class == nil {
+			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
@@ -1581,6 +1583,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	// Add the new members.
 	memberResults, err := c.addMembers(toCreate...)
 	if err != nil {
+		metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 		return fmt.Errorf("swap rebalance failed to add new nodes to cluster: %w", err)
 	}
 
@@ -1601,12 +1604,15 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		} else { // Update book keeping
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
+			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
 		}
 	}
 
 	if len(errs) == 0 {
 		return nil
 	}
+
+	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 
 	return errors.Join(errs...)
 }
