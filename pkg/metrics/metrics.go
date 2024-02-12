@@ -147,6 +147,21 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
 
+	// PodReplacementsMetric
+	// name: pod_replacements_total
+	// type: counter
+	// help: The amount of times operator has replaced a couchbase server pod due to a change in a couchbase cluster resources
+	// unit:
+	// added: 2.7.0
+	// stability: committed
+	// labels: name
+	PodReplacementsMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_replacements_total",
+		Help:      "The amount of times operator has replaced a couchbase server pod due to a change in a couchbase cluster resources",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name"})
+
 	// DeltaRecoveriesTotalMetric
 	// name: delta_recoveries_total
 	// type: counter
@@ -192,6 +207,21 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
 
+	// PodReplacementsFailedMetric
+	// name: pod_replacements_failed
+	// type: counter
+	// help: Total number of times pods have failed to be recovered by the operator
+	// unit:
+	// added: 2.7.0
+	// stability: committed
+	// labels: name
+	PodReplacementsFailedMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_replacements_failed",
+		Help:      "Total number of times pods have failed to be recovered by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name"})
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -209,5 +239,7 @@ func init() {
 		SwapRebalanceFailuresMetric,
 		DeltaRecoveriesTotalMetric,
 		DeltaRecoveryFailuresMetric,
+		PodReplacementsMetric,
+		PodReplacementsFailedMetric,
 	)
 }

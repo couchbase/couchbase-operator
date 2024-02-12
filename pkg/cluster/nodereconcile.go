@@ -1192,25 +1192,34 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 
 		if err := r.gracefulFailoverMember(candidate, c); err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return err
 		}
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return err
 		}
 
 		if err := c.recreatePod(candidate); err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return err
 		}
 
 		if err := c.rebalance(c.members, nil); err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return err
 		}
 
 		metrics.DeltaRecoveriesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.PodReplacementsMetric.WithLabelValues(c.cluster.Name).Inc()
 	}
 
 	return nil
@@ -1594,6 +1603,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		// Remove the candidate from the scheduler.
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
 			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return err
 		}
 
@@ -1601,6 +1612,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if class == nil {
 			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
@@ -1612,6 +1625,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	memberResults, err := c.addMembers(toCreate...)
 	if err != nil {
 		metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
 		return fmt.Errorf("swap rebalance failed to add new nodes to cluster: %w", err)
 	}
 
@@ -1629,10 +1644,12 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		if result.Err != nil {
 			errs = append(errs, fmt.Errorf("swap rebalance failed to add new node to cluster: %w", result.Err))
 			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
 		} else { // Update book keeping
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
 			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.PodReplacementsMetric.WithLabelValues(c.cluster.Name).Inc()
 		}
 	}
 

@@ -17,6 +17,24 @@
             "name"
         ]
     },
+    "pod_replacements_failed": {
+        "type": "counter",
+        "help": "Total number of times pods have failed to be recovered by the operator",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
+    "pod_replacements_total": {
+        "type": "counter",
+        "help": "The amount of times operator has replaced a couchbase server pod due to a change in a couchbase cluster resources",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
     "reconcile_failures": {
         "type": "counter",
         "help": "Total failed reconcile operations performed on a specific cluster",
