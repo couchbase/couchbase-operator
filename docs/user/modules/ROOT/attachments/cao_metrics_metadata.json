@@ -17,6 +17,26 @@
             "name"
         ]
     },
+    "pod_recoveries_total": {
+        "type": "counter",
+        "help": "Total number of times operator has recovered a pod when the pod has been down",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "podName"
+        ]
+    },
+    "pod_recovery_failures_total": {
+        "type": "counter",
+        "help": "Total number of times operator has failed to recover a pod",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "podName"
+        ]
+    },
     "pod_replacements_failed": {
         "type": "counter",
         "help": "Total number of times pods have failed to be recovered by the operator",

@@ -451,6 +451,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 
 		// Timeout has expired, recreate the pod.
 		if err := c.recreatePod(m); err != nil {
+			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.cluster.Name, m.Name()).Inc()
 			return fmt.Errorf("pod recovery failed for member %s: %w", name, err)
 		}
 
@@ -459,6 +460,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 		delete(c.recoveryTime, name)
 
+		metrics.PodRecoveriesMetric.WithLabelValues(c.cluster.Name, name).Inc()
 		recovered++
 	}
 
@@ -638,6 +640,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
+				metrics.PodRecoveryFailuresMetric.WithLabelValues(c.cluster.Name, m.Name()).Inc()
 
 				r.abort("unable to recover pod")
 
@@ -645,6 +648,8 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 			}
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
+
+			metrics.PodRecoveriesMetric.WithLabelValues(c.cluster.Name, name).Inc()
 
 			return fmt.Errorf("%w: recovering node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
 		}
