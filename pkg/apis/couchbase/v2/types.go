@@ -3015,6 +3015,13 @@ type CouchbaseClusterIndexerSettings struct {
 	// If false (the default), such redistribution does not occur.
 	// +kubebuilder:default=false
 	RedistributeIndexes bool `json:"redistributeIndexes,omitempty"`
+
+	// EnableShardAffinity when false Index Servers rebuild any index that
+	// are newly assigned to them during a rebalance. When set to true,
+	// Couchbase Server moves a reassigned index’s files between Index Servers.
+	// This field is only supported on CB versions 7.6.0+.
+	// +kubebuilder:default=false
+	EnableShardAffinity bool `json:"enableShardAffinity,omitempty"`
 }
 
 // CouchbaseClusterQuerySettings allow query tweaks.

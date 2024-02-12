@@ -156,6 +156,7 @@ type IndexSettings struct {
 	LogLevel            IndexLogLevel    `url:"logLevel" json:"logLevel"`
 	NumberOfReplica     int              `url:"numReplica,omitempty" json:"numReplica"`
 	RedistributeIndexes bool             `url:"redistributeIndexes,omitempty" json:"redistributeIndexes"`
+	EnableShardAffinity *bool            `url:"enableShardAffinity,omitempty" json:"enableShardAffinity"`
 }
 
 type FailoverOnDiskFailureSettings struct {

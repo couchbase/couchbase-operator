@@ -88,6 +88,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: memory_optimized
     <<couchbaseclusters-spec-cluster-indexer,indexer>>:
+      <<couchbaseclusters-spec-cluster-indexer-enableshardaffinity,enableShardAffinity>>: false
       <<couchbaseclusters-spec-cluster-indexer-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-cluster-indexer-maxrollbackpoints,maxRollbackPoints>>: 2
       <<couchbaseclusters-spec-cluster-indexer-memorysnapshotinterval,memorySnapshotInterval>>: 200ms
@@ -1300,6 +1301,20 @@ This field is immutable and cannot be changed unless there are no server classes
 ==== Description
 
 Indexer allows the indexer to be configured.
+
+=== couchbaseclusters.spec.cluster.indexer.enableShardAffinity
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+EnableShardAffinity when false Index Servers rebuild any index that are newly assigned to them during a rebalance.
+When set to true, Couchbase Server moves a reassigned index’s files between Index Servers.
+This field is only supported on CB versions 7.6.0+.
 
 === couchbaseclusters.spec.cluster.indexer.logLevel
 
