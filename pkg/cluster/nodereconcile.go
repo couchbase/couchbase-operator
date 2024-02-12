@@ -1147,11 +1147,13 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 	// Flag that an upgrade is in action, validation will use this to control what
 	// resource modifications are allowed.
 	if err := c.reportUpgrade(status); err != nil {
+		metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 		return err
 	}
 
 	for _, candidate := range candidates {
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
@@ -1167,6 +1169,7 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			// Update volumes
 			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
 			if err != nil {
+				metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 				return err
 			}
 
@@ -1176,26 +1179,33 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 				_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
 
 				if err != nil {
+					metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 					return err
 				}
 			}
 		}
 
 		if err := r.gracefulFailoverMember(candidate, c); err != nil {
+			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
 		if err := c.recreatePod(candidate); err != nil {
+			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
 		if err := c.rebalance(c.members, nil); err != nil {
+			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
+
+		metrics.DeltaRecoveriesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
 	}
 
 	return nil

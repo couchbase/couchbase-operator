@@ -1,4 +1,22 @@
 {
+    "delta_recoveries_total": {
+        "type": "counter",
+        "help": "Total number of delta recoveries performed by operator",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
+    "delta_recovery_failures": {
+        "type": "counter",
+        "help": "The number of times delta recoveries have failed",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
     "reconcile_failures": {
         "type": "counter",
         "help": "Total failed reconcile operations performed on a specific cluster",
