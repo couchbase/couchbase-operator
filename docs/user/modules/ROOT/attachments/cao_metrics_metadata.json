@@ -17,6 +17,17 @@
             "name"
         ]
     },
+    "pod_readiness_duration": {
+        "type": "gauge",
+        "help": "The time it takes for a pod to enter a ready state",
+        "unit": "milliseconds",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "serverClass"
+        ]
+    },
     "pod_recoveries_total": {
         "type": "counter",
         "help": "Total number of times operator has recovered a pod when the pod has been down",

@@ -337,6 +337,8 @@ func (c *Cluster) create() error {
 		return err
 	}
 
+	start := time.Now()
+
 	member, class, err := c.createInitialMember()
 	if err != nil {
 		return err
@@ -349,6 +351,8 @@ func (c *Cluster) create() error {
 	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
 
 	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
+
+	metrics.PodReadinessDurationMetric.WithLabelValues(c.cluster.Name, class.Name).Observe(float64(time.Since(start)))
 
 	// This takes a while to get set, yawn...
 	var uuid string

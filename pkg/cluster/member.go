@@ -9,6 +9,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -301,6 +302,7 @@ func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchb
 	}
 
 	for index, memberResult := range memberResults {
+		start := time.Now()
 		serverSpec := serverSpecs[index]
 
 		if memberResult.Err != nil {
@@ -337,6 +339,9 @@ func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchb
 		if err := k8sutil.SetPodInitialized(c.k8s, memberResult.Member.Name()); err != nil {
 			memberResult.Err = err
 		}
+
+		class := c.cluster.Spec.Servers[index]
+		metrics.PodReadinessDurationMetric.WithLabelValues(c.cluster.Name, class.Name).Observe(float64(time.Since(start)))
 	}
 
 	return memberResults, nil

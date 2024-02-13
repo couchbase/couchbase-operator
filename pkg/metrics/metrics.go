@@ -266,6 +266,21 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name", "podName"})
 
+	// PodReadinessDurationMetric
+	// name: pod_readiness_duration
+	// type: gauge
+	// help: The time it takes for a pod to enter a ready state
+	// unit: milliseconds
+	// added: 2.7.0
+	// stability: committed
+	// labels: name, serverClass
+	PodReadinessDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "pod_readiness_duration",
+		Help:      "The time it takes for a pod to enter a ready state",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name", "serverClass"})
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -288,5 +303,6 @@ func init() {
 		PodRecoveriesMetric,
 		PodRecoveryFailuresMetric,
 		UpgradeDurationMSMetric,
+		PodReadinessDurationMetric,
 	)
 }
