@@ -1153,6 +1153,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{`spec.cluster.autoFailoverTimeout`},
 		},
 		{
+			name:           "TestValidateAutoFailoverTimeoutUnderflowWithCB76",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", "0s").Replace("/spec/image", "couchbase/server:7.6.4")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoFailoverTimeout`},
+		},
+		{
 			name:           "TestValidateAutoFailoverTimeoutOverflow",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", "2h")},
 			shouldFail:     true,
@@ -1241,6 +1247,19 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/redistributeIndexes", "slim-shady")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.redistributeIndexes`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestCBVersionSpecificPosValidationsCreateCouchbaseClusterSettings(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateAutoFailoverTimeoutNoUnderflowWithCB76",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", "3s").Replace("/spec/image", "couchbase/server:7.6.4")},
+			shouldFail:     false,
+			expectedErrors: []string{`spec.cluster.autoFailoverTimeout`},
 		},
 	}
 

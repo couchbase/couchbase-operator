@@ -303,8 +303,18 @@ func checkConstraintAutoFailoverTimeout(_ *types.Validator, cluster *couchbasev2
 		return errors.Required("spec.cluster.autoFailoverTimeout", "body", nil)
 	}
 
-	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < 5.0 {
-		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to 5s")
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	minSeconds := 5.0
+	if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); after76 && err == nil {
+		minSeconds = 1.0
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() < minSeconds {
+		return fmt.Errorf("spec.cluster.autoFailoverTimeout in body should be greater than or equal to the min autoFailover timeout")
 	}
 
 	if cluster.Spec.ClusterSettings.AutoFailoverTimeout.Seconds() > 3600.0 {
