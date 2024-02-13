@@ -147,6 +147,20 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
 
+	// UpgradeDurationMSMetric
+	// name: upgrade_duration
+	// help: The time taken to perform an upgrade
+	// unit: milliseconds
+	// added: 2.7.0
+	// stability: committed
+	// labels: name
+	UpgradeDurationMSMetric = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "upgrade_duration",
+		Help:      "The time taken to perform an upgrade",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name"})
+
 	// PodReplacementsMetric
 	// name: pod_replacements_total
 	// type: counter
@@ -273,5 +287,6 @@ func init() {
 		PodReplacementsFailedMetric,
 		PodRecoveriesMetric,
 		PodRecoveryFailuresMetric,
+		UpgradeDurationMSMetric,
 	)
 }

@@ -155,6 +155,16 @@
             "name"
         ]
     },
+    "upgrade_duration": {
+        "type": "",
+        "help": "The time taken to perform an upgrade",
+        "unit": "milliseconds",
+        "added": "2.7.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ]
+    },
     "volume_expansions_total": {
         "type": "counter",
         "help": "Total number of times the size of volumes have been increased under management",

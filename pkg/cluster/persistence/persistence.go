@@ -58,6 +58,8 @@ const (
 
 	// VolumeExpansion is flagged when an volume expansion task starts and removed on termination.
 	VolumeExpansion PersistentKind = "volumeExpansion"
+
+	UpgradeTime PersistentKind = "upgradeTime"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

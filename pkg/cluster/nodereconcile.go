@@ -1359,8 +1359,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	errs := []error{}
-
 	groupedCandidates := candidates.GroupByServerConfigs()
 	for serverConfigName, serverCandidates := range groupedCandidates {
 		serverConf := c.cluster.Spec.GetServerConfigByName(serverConfigName)
@@ -1385,12 +1383,8 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		}
 
 		if err != nil {
-			errs = append(errs, err)
+			return err
 		}
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs...)
 	}
 
 	return nil

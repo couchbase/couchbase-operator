@@ -2,16 +2,18 @@ package cluster
 
 import (
 	"encoding/json"
+	"strings"
+	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
-
-	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
 func (c *Cluster) needsMove() couchbaseutil.MemberSet {
@@ -133,6 +135,19 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 			return err
 		}
 
+		startTime := time.Now().String()
+		startTimeNoMono, _, found := strings.Cut(startTime, " m")
+
+		if !found {
+			return err
+		}
+
+		log.Info(startTimeNoMono)
+
+		if err := c.state.Insert(persistence.UpgradeTime, startTimeNoMono); err != nil {
+			return err
+		}
+
 		c.raiseEvent(k8sutil.UpgradeStartedEvent(c.cluster))
 	}
 
@@ -186,6 +201,18 @@ func (c *Cluster) reportUpgradeComplete() error {
 	c.raiseEvent(k8sutil.UpgradeFinishedEvent(c.cluster))
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+
+	upgradeStartTime, err := c.state.Get(persistence.UpgradeTime)
+	if err != nil {
+		return err
+	}
+
+	parsedStartTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", upgradeStartTime)
+	if err != nil {
+		return err
+	}
+
+	metrics.UpgradeDurationMSMetric.WithLabelValues(c.cluster.Name).Set(float64(time.Since(parsedStartTime)))
 
 	return c.updateCRStatus()
 }
