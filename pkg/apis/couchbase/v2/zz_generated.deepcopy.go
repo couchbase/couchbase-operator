@@ -1416,6 +1416,16 @@ func (in *CouchbaseBucketSpec) DeepCopyInto(out *CouchbaseBucketSpec) {
 		*out = new(HistoryRetentionSettings)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.MagmaSeqTreeDataBlockSize != nil {
+		in, out := &in.MagmaSeqTreeDataBlockSize, &out.MagmaSeqTreeDataBlockSize
+		*out = new(uint64)
+		**out = **in
+	}
+	if in.MagmaKeyTreeDataBlockSize != nil {
+		in, out := &in.MagmaKeyTreeDataBlockSize, &out.MagmaKeyTreeDataBlockSize
+		*out = new(uint64)
+		**out = **in
+	}
 	return
 }
 
@@ -1817,7 +1827,7 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 	}
 	if in.ExposedFeatureTrafficPolicy != nil {
 		in, out := &in.ExposedFeatureTrafficPolicy, &out.ExposedFeatureTrafficPolicy
-		*out = new(corev1.ServiceExternalTrafficPolicyType)
+		*out = new(corev1.ServiceExternalTrafficPolicy)
 		**out = **in
 	}
 	if in.TLS != nil {

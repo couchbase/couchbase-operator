@@ -1219,7 +1219,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	pvcPresent := true
 
 	for _, candidate := range candidates {
-		if c.isPodRecoverable(candidate) == false {
+		if !c.isPodRecoverable(candidate) {
 			pvcPresent = false
 			break
 		}

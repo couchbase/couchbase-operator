@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"math/rand"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
@@ -56,6 +58,8 @@ const (
 	CloudNativeGatewayContainerName           = "cloud-native-gateway"
 	CngTLSSecretMountPath                     = "/var/run/secrets/couchbase.com/couchbase-cng-tls"
 	CngSelfSignedCertSecretNamePrefix         = "couchbase-cloud-native-gateway-self-signed-secret"
+	CngAdminUserSecretPrefix                  = "couchbase-cloud-native-gateway-admin-secret"
+	CngAdminUserNamePrefix                    = "cng-admin"
 	CngVolumeName                             = "couchbase-cloud-native-gateway-volume"
 )
 
@@ -1082,6 +1086,114 @@ func getSelfCertSecretName(clusterName string) string {
 	return fmt.Sprintf("%s-%s", CngSelfSignedCertSecretNamePrefix, clusterName)
 }
 
+func getAdminUserSecretName(clusterName string) string {
+	return fmt.Sprintf("%s-%s", CngAdminUserSecretPrefix, clusterName)
+}
+
+func applyCloudNativeGatewayAdminSecret(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container) error {
+	// check named cng self-signed secret exists
+	adminSecretName := getAdminUserSecretName(cluster.Name)
+
+	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), adminSecretName, metav1.GetOptions{})
+	if err != nil {
+		// named secret not found, create a new one
+		username := generateUserName(cluster.Name)
+		password := generateCouchbasePassword()
+
+		cngAdminSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: adminSecretName,
+			},
+			Data: map[string][]byte{
+				"username": username,
+				"password": password,
+			},
+		}
+
+		_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), cngAdminSecret, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("%w: error creating cloud-native-gateway admin secret", err)
+		}
+	}
+
+	addAdminSecretToContainerEnvVars(container, adminSecretName)
+
+	return nil
+}
+
+func addAdminSecretToContainerEnvVars(container *v1.Container, adminSecretName string) {
+	container.Env = append(container.Env, v1.EnvVar{
+		Name: "STG_CB_USER",
+		ValueFrom: &v1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: adminSecretName,
+				},
+				Key: "username",
+			},
+		},
+	})
+	container.Env = append(container.Env, v1.EnvVar{
+		Name: "STG_CB_PASS",
+		ValueFrom: &v1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: adminSecretName,
+				},
+				Key: "password",
+			},
+		},
+	})
+}
+
+const (
+	charSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(){}[]|"
+)
+
+func generateCouchbasePassword() []byte {
+	size := rand.Intn(85) + 15
+	passwordBytes := make([]byte, size)
+
+	for i := range passwordBytes {
+		passwordBytes[i] = charSet[rand.Intn(len(charSet))]
+	}
+
+	hasUpper := false
+	hasLower := false
+	hasSpecial := false
+	hasNumber := false
+	password := string(passwordBytes)
+
+	for _, c := range password {
+		if unicode.IsUpper(c) {
+			hasUpper = true
+		}
+
+		if unicode.IsLower(c) {
+			hasLower = true
+		}
+
+		if unicode.IsDigit(c) {
+			hasNumber = true
+		}
+
+		if unicode.IsPunct(c) || unicode.IsSymbol(c) {
+			hasSpecial = true
+		}
+	}
+
+	match := hasUpper && hasLower && hasSpecial && hasNumber
+	if match {
+		return passwordBytes
+	}
+
+	return generateCouchbasePassword()
+}
+
+func generateUserName(clusterName string) []byte {
+	return []byte(fmt.Sprintf("%s@%s", CngAdminUserNamePrefix, clusterName))
+}
+
 // applyCloudNativeGatewayPodTLSSelfCert adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted
 // by generating a self-signed cert and creating the secret, if doesn't exist already.
 func applyCloudNativeGatewayPodTLSSelfCert(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) error {
@@ -1780,6 +1892,12 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 	container := v1.Container{
 		Name:  CloudNativeGatewayContainerName,
 		Image: cluster.Spec.CloudNativeGatewayImage(),
+		Env: []v1.EnvVar{
+			{
+				Name:  "STG_WEB_PORT",
+				Value: fmt.Sprint(snWebapiPort),
+			},
+		},
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "sn-data-port",
@@ -1803,6 +1921,8 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 					Scheme: v1.URISchemeHTTP,
 				},
 			},
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       60,
 		},
 	}
 
@@ -1817,6 +1937,10 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 		if err := applyCloudNativeGatewayPodTLSSelfCert(client, cluster, &container, pod); err != nil {
 			return v1.Container{}, err
 		}
+	}
+
+	if err := applyCloudNativeGatewayAdminSecret(client, cluster, &container); err != nil {
+		return v1.Container{}, err
 	}
 
 	if cluster.Spec.Security.SecurityContext != nil {
