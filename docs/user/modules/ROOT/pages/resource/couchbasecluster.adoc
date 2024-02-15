@@ -148,6 +148,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: NodePort
     <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
     - ""
+    <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
+      <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
+      <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
+        <<couchbaseclusters-spec-networking-cloudnativegateway-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-disableuioverhttp,disableUIOverHTTP>>: false
     <<couchbaseclusters-spec-networking-disableuioverhttps,disableUIOverHTTPS>>: false
     <<couchbaseclusters-spec-networking-dns,dns>>:
@@ -2033,6 +2037,55 @@ This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort"
 AdminConsoleServices is a selector to choose specific services to expose via the admin console.
 This field may contain any of "data", "index", "query", "search", "eventing" and "analytics".
 Each service may only be included once.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase cluster.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.image
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Image is the Cloud Native Gateway image to be used to run the sidecar container.
+No validation is carried out as this can be any arbitrary repo and tag.
+TODO: provide a default kubebuilder default image tag as field is mandatory.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.tls
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+TLS defines the TLS configuration for the Cloud Native Gateway server including server and client certificate configuration, and TLS security policies.
+If no TLS config are explicitly provided, the operator generates/manages self-signed certs/keys and creates a k8s secret named `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` unique to a Couchbase cluster, which is volume mounted to the cb k8s pod.
+This action could be overidden at the outset or later, by using the below TLS config or generating the secret of same name as `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` with certificates conforming to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
+N.B.
+The secret is on per cluster basis so it's advised to use the unique cluster name else would be ignored.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.tls.serverSecretName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains Cloud Native Gateway gRPC server TLS data.
+The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
 
 === couchbaseclusters.spec.networking.disableUIOverHTTP
 

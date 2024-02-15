@@ -43,12 +43,7 @@ NATIVE_TYPES = [
     'couchbaseephemeralbuckets.spec.scopes.selector',
 ]
 
-EXCLUDES = [
-    'couchbaseclusters.spec.networking.cloudNativeGateway',
-    'couchbaseclusters.spec.networking.cloudNativeGateway.image',
-    'couchbaseclusters.spec.networking.cloudNativeGateway.tls',
-    'couchbaseclusters.spec.networking.cloudNativeGateway.tls.serverSecretName',
-]
+EXCLUDES = []
 
 # Output constants.
 CONSTRAINTS_HEADING = 'Constraints'
