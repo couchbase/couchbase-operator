@@ -133,7 +133,7 @@ func TestFTSWithScopesAndCollections(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetBucket("couchbase", f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 
