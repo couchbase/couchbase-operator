@@ -116,6 +116,12 @@ func (c *Cluster) gatherDataTopologyResources() ([]runtime.Object, error) {
 		}
 
 		for _, apiScope := range apiScopes.Scopes {
+			// The system scope is only for use by Couchbase services and should NOT
+			// be used by users so we won't create a resource for it.
+			if apiScope.Name == couchbasev2.SystemScope {
+				continue
+			}
+
 			// For each scope within the bucket, convert it to a Kubernetes API
 			// scope.  Again, these will have names unique to this cluster and
 			// bucket, and be deterministic.  Link the scope to the bucket to
