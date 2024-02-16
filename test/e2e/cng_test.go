@@ -44,7 +44,7 @@ func TestCreateCNG(t *testing.T) {
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
 
-	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
 	// Verify the CM exists
 	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
@@ -53,6 +53,11 @@ func TestCreateCNG(t *testing.T) {
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
 	}
 	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
 }
@@ -162,8 +167,12 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
 
 	e2eutil.MustWaitForCloudNativeGatewayServiceReady(t, kubernetesCluster, cluster, 10*time.Minute)
+	// this is here because the service may be created, but it takes some time (50 seconds or so) for CNG to fully start up
+	time.Sleep(90 * time.Second)
 
-	client, err := getCloudNativeGatewayClient(ctx, cluster, clusterName)
+	username := string(kubernetesCluster.DefaultSecret.Data["username"])
+	password := string(kubernetesCluster.DefaultSecret.Data["password"])
+	client, err := getCloudNativeGatewayClient(ctx, cluster, clusterName, username, password)
 
 	return client, cluster, err
 }
@@ -262,12 +271,12 @@ func TestCNGLiveConfigReload(t *testing.T) {
 	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
 }
 
-func getCloudNativeGatewayClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster, clusterName string) (*gocbcoreps.RoutingClient, error) {
+func getCloudNativeGatewayClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster, clusterName string, username string, password string) (*gocbcoreps.RoutingClient, error) {
 	var cngClient *gocbcoreps.RoutingClient
 
 	dialopts := gocbcoreps.DialOptions{
-		Username:           constants.CbClusterUsername,
-		Password:           constants.CbClusterPassword,
+		Username:           username,
+		Password:           password,
 		InsecureSkipVerify: true,
 		PoolSize:           1,
 	}

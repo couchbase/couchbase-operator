@@ -1086,6 +1086,7 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 
 		for _, name := range candidates.Names()[:maxUpgradable] {
 			constrained.Add(candidates[name])
+			log.Info(candidates[name].Name())
 		}
 
 		candidates = constrained
@@ -1322,7 +1323,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	pvcPresent := true
 
 	for _, candidate := range candidates {
-		if c.isPodRecoverable(candidate) == false {
+		if !c.isPodRecoverable(candidate) {
 			pvcPresent = false
 			break
 		}

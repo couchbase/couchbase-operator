@@ -937,6 +937,11 @@ func (c *Cluster) reconcileRBAC() error {
 		if err := c.reconcileRBACResources(); err != nil {
 			return err
 		}
+	} else if c.cluster.Spec.Networking.CloudNativeGateway != nil {
+		// need to create the admin user
+		if err := c.createCloudNativeGatewayAdminUser(); err != nil {
+			return err
+		}
 	}
 
 	// When LDAP settings are provided to Couchbase Cluster then

@@ -1,7 +1,7 @@
 = Release Notes for Couchbase Autonomous Operator {operator-version-minor}
 include::partial$constants.adoc[]
 
-Couchbase Autonomous Operator {operator-version-minor} release is primarily focused on adding some key features introduced in Couchbase Server 7.1 to Autonomous Operator such as support for ARM platforms and Encrypted Certificates, as well as other improvements related to TLS Certificate Management, cloud backups, index configuration, and the Prometheus Exporter
+Autonomous Operator {operator-version-minor} release is primarily focused on platform updates, feature parity with Couchbase Server, improvements to Pod Management and Security, as well as a number of minor fixes.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
@@ -16,58 +16,16 @@ For installation instructions, refer to:
 
 The necessary steps needed to upgrade to this release depend on which version of the Autonomous Operator you are upgrading from.
 
-* Version 1.x.x
-** There is no direct upgrade path from versions prior to 2.0.x.
-To upgrade from a 1.x.x release, you must first upgrade to 2.0.x, paying particular attention to supported Kubernetes platforms and Couchbase Server versions.
-Refer to the xref:2.0@operator::howto-operator-upgrade.adoc[2.0.x upgrade steps] if upgrading from a 1.x.x release.
+=== Upgrading from 1.x, 2.0, or 2.1
 
-* Version 2.0.x
-** Additional steps and considerations are required when upgrading from version 2.0.x.
-Please refer to <<upgrade-v20x>>.
+There is no direct upgrade path from versions prior to 2.2.0.
+To upgrade from a 1.x, 2.0.x, or 2.1.x release, you must first upgrade to 2.4.x, paying particular attention to supported Kubernetes platforms and Couchbase Server versions.
+Refer to the xref:2.4@operator::howto-operator-upgrade.adoc[Operator 2.4 upgrade steps] if upgrading from a pre-2.2 release.
 
-* Version 2.1.x
-** There are no additional upgrade steps or considerations when upgrading from this version.
-You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
+=== Upgrading from 2.2, 2.3, 2.4, or 2.5
 
-* Version 2.2.x
-** There are no additional upgrade steps or considerations when upgrading from this version.
-You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
-
-* Version 2.3.x
-** There are no additional upgrade steps or considerations when upgrading from this version.
-You may follow xref:howto-operator-upgrade.adoc[standard upgrade process].
-
-[[upgrade-v20x]]
-=== Upgrading from Version 2.0.x
-
-First, ensure that you are running xref:prerequisite-and-setup.adoc[compatible versions] of Kubernetes and Couchbase Server before upgrading.
-
-==== TLS Requirements
-
-If you are *not* utilizing TLS, you can skip this section.
-
-The TLS requirements have been modified as of Autonomous Operator 2.1.
-In order to ease the migration from legacy client bootstrap (CCCP) to the newest version (GCCCP), the Autonomous Operator requires Couchbase cluster subject alternative names (SANs) to be updated.
-Consult the xref:tutorial-tls.adoc[TLS tutorial] for a full list of all the required SANs, and the xref:howto-tls-rotation.adoc[TLS rotation guide] in order to prepare for upgrade.
-Failure to perform this step will result in errors from the dynamic admission controller (DAC) once upgraded.
-
-==== Mandatory Couchbase Upgrade Cycle
-
-When upgrading from version 2.0.x, Couchbase clusters will undergo a mandatory upgrade cycle.
-
-Pod readiness checks were previously driven by an `exec` based readiness probe.
-This was a security concern because it granted the Autonomous Operator `pods/exec` privileges, which may not be acceptable in highly regulated environments.
-As of Autonomous Operator 2.1, readiness checks are performed using readiness gates that use the Kubernetes API exclusively.
-
-You can use the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter to speed up this upgrade.
-To enable this feature while upgrading the Autonomous Operator, stop the old Operator, replace the CRDs, edit the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] field to enable bulk upgrades, then start the new Operator.
-Refer to xref:howto-operator-upgrade.adoc[] for further details.
-
-=== Upgrading from 2.0, 2.1, 2.2, and 2.3
-
-==== Mandatory Couchbase Upgrade Cycle
-
-Some users will encounter a mandatory upgrade cycle when upgrading to this release.
+There are no additional upgrade steps when upgrading from these versions, and you may follow the xref:howto-operator-upgrade.adoc[standard upgrade process].
+However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from releases older than 2.5.0, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
 
 [IMPORTANT]
 ====
@@ -78,261 +36,64 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
-===== TLS Users
+[#release-v260]
+== Release 2.6.0
 
-In prior versions, Couchbase Server pod readiness checks were done over plain text port 8091.
-With the introduction of strict mode TLS in this release, port 8091 can be disabled to inhibit all non TLS ports.
-The Operator has been updated to use port 18091 -- Couchbase Server's TLS admin port -- when TLS management is enabled.
+Couchbase Autonomous Operator 2.6.0 was released in December 2023.
 
-===== Server Groups Users
-
-A pod upgrade is also required for users of the server groups feature.
-
-When the Operator was first released, the only available Node label that was available across all platforms to allow explicit pod scheduling was `failure-domain.beta.kubernetes.io/zone`.
-This label has been deprecated since Kubernetes 1.17, in favor of `topology.kubernetes.io/zone`.
-
-To ensure correct operation of the Operator in the future, the decision has been taken to start using the new label as of Operator 2.3.
-This ensures that the Operator is compatible with all future Kubernetes releases in the event of the deprecated label being removed.
-
-===== Logging Users
-
-To control memory usage, memory buffer limits have been implemented for the logging sidecar.
-This change will affect all users of logging, and will require a cluster upgrade.
-
-Additionally a bug in the audit clean up script caused old logs to be deleted only if their age matched the specified time period exactly.
-This has been fixed so that logs older than or equal to the time period are cleaned.
-
-[#release-v242]
-== Release 2.4.2
-
-Couchbase Autonomous Operator 2.4.2 was released in June 2023.
-
-[#changes-in-behavior-v242]
+[#changes-in-behavior-v260]
 === New Features and Behavioral Changes
 
-==== Support for New Features in Couchbase Server 7.2.0
+==== Immediate Backups
 
-With the addition of the Change History feature in Couchbase Server 7.2.0, Collections can now be modified (to enable/disable History Retention).
+The CouchbaseBackup resource now has the backup strategies of immediate_full and immediate_incremental to run a backup immediately.
 
-Operator 2.4.2 now allows Collection objects to be mutated.
+==== Pod Management
 
-==== ARM Platform Support
+The operator now takes into consideration index placement, data placement, and server version to identify pods to remove on scaling events.
+The operator now will perform in place upgrades using Delta Recovery rebalances on Couchbase Server version upgrades.
 
-Operator 2.4.0 added support for deploying on ARM platforms where available on AWS, Azure, and GCP managed Kubernetes services, as well as on open source Kubernetes distributions.
+==== Pod and Container Changes
 
-With Operator 2.4.2 this now includes deploying on OpenShift on ARM platforms.
+The operator now adds the prometheus.io/scheme annotation to pods.
+The operator now adds platform specific zone labels for EKS, GKE and AKS to Couchbase Server persistent volume claims.
 
-[#fixed-issues-v242]
+==== CRD Changes
+
+The field `couchbasebackuprestore.spec.backup` is no longer mandatory when using ephemeral volumes.
+The field `couchbasecluster.spec.onlineExpansionTimeout` has been added as an int that specifies the number of minutes between 0-30 that the operator should wait before failing over to swap rebalance for volume expansions.
+The field `couchbasecluster.spec.upgradeProcess` has been added as an enum of "DeltaRecovery" or "SwapRebalance".  Default is "SwapRebalance".
+
+==== CLI Changes
+
+Logs can now be uploaded directly to the Couchbase support portal via the `--upload-host`, `--customer`, `--upload-proxy` and `--ticket` parameters
+Pod Readiness Delay and Pod Readiness period can be set via the `cao create operator` command.  These settings will be applied to all pods created by the operator.
+
+
+[#fixed-issues-v260]
 === Fixed Issues
 
-[#table-fixed-issues-v242,cols="25,66"]
+[#table-fixed-issues-v260,cols="25,66"]
 |===
 | Issue | Description
 
-a| https://issues.couchbase.com/browse/K8S-2997[K8S-2997]
-a| *Summary:* Fixed issue where `TestUpgradeSupportableKillStatefulPodOnCreate` results were inconsistent.
+a| https://issues.couchbase.com/browse/K8S-3216[K8S-3216^]
+a| *Summary:* Previously the operator would loop on buckets with specific settings, continuously updating and spamming logs.
 
-a| https://issues.couchbase.com/browse/K8S-3061[K8S-3061]
-a| *Summary:* Fixed issue where `TestPersistentVolumeRzaNodesKilledUnbalanced` results were inconsistent.
+a| https://issues.couchbase.com/browse/K8S-3189[K8S-3189^]
+a| *Summary:* Previously the operator identified the eventing_admin role as a bucket role and not a cluster role
 
-a| https://issues.couchbase.com/browse/K8S-3062[K8S-3062]
-a| *Summary:* Fixed issues where `TestMandatoryMutualTLSRotateCAExpiring` results were inconsistent.
+a| https://issues.couchbase.com/browse/K8S-3179[K8S-3179^]
+a| *Summary:* Previously the operator would log a large json structure to the logs when it failed to create a pod.  
 
-|===
+a| https://issues.couchbase.com/browse/K8S-3095[K8S-3095^]
+a| *Summary:* Previously the Operator would not allow you remove the setting for readerThreads
 
-[#known-issues-v242]
-=== Known Issues
+a| https://issues.couchbase.com/browse/K8S-3283[K8S-3283^]
+a| *Summary:* Previously the Operator would not use the new `couchbasecluster.spec.security.podSecurityContext` when creating backup jobs
 
-[#table-known-issues-v242,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-3063[K8S-3063]
-a| *Summary:* `TestClusterUpdateUsingRest` and `TestTLSScriptCreateRestRotate` may cause "schema overflowed" messages.
-
-This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
-
-|===
-
-[#release-v241]
-== Release 2.4.1
-
-Couchbase Autonomous Operator 2.4.1 was released in May 2023.
-
-[#changes-in-behavior-v241]
-=== New Features and Behavioral Changes
-
-==== Support for New Features in Couchbase Server 7.2.0
-
-Per Collection Change-History. Maintain a change history for all collections in a bucket.
-Changes to documents in collections are included in the change history for the bucket.
-A maximum size for the change history can be specified in bytes or seconds.
-See xref:server:learn:data:change-history.adoc[Change History].
-
-You can now configure block size for Magma storage when you create a bucket.
-See xref:server:rest-api:rest-bucket-create.adoc#magmaseqtreedatablocksize[Creating and Editing Buckets].
-
-==== Local Persistent Volumes
-
-The ability to use a local storage device (such as a disk, partition, or directory) as a Persistent Volume when deploying Couchbase Server resources.
-
-[#fixed-issues-v241]
-=== Fixed Issues
-
-[#table-fixed-issues-v241,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-2843[K8S-2843^]
-a| *Summary:* Previously the Operator was not able to rotate an expired, self-signed Admission Controller certificate on the Mutating/Validating Webhook.
-
-a| https://issues.couchbase.com/browse/K8S-2885[K8S-2885^]
-a| *Summary:* Fixed extraneous Rebalance messages under certain Couchbase Server upgrade conditions.
-
-a| https://issues.couchbase.com/browse/K8S-2934[K8S-2934^]
-a| *Summary:* Check for existence of old persistence secret before creating a new one, and avoid reusing an existing one.
-
-a| https://issues.couchbase.com/browse/K8S-2944[K8S-2944^]
-a| *Summary:* Fixed issue where URL Encoding breaks string lists with `cipherSuites`.
-
-a| https://issues.couchbase.com/browse/K8S-2971[K8S-2971^]
-a| *Summary:* Fixed issue where `storageBackend` warnings occur after Operator upgrade.
-
-|===
-
-[#known-issues-v241]
-=== Known Issues
-
-[#table-known-issues-v241,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-2997[K8S-2997]
-a| *Summary:*
-`TestUpgradeSupportableKillStatefulPodOnCreate` results are inconsistent.
-
-This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
-
-a| https://issues.couchbase.com/browse/K8S-3061[K8S-3061]
-a| *Summary:*
-`TestPersistentVolumeRzaNodesKilledUnbalanced` results are inconsistent.
-
-This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
-
-a| https://issues.couchbase.com/browse/K8S-3062[K8S-3062]
-a| *Summary:*
-`TestMandatoryMutualTLSRotateCAExpiring` results are inconsistent.
-
-This may cause issues while attempting the xref:concept-platform-certification.adoc[Self-Certification] process.
-
-a| https://issues.couchbase.com/browse/K8S-2891[K8S-2891]
-a| *Summary:*
-`cao certify` is not supported on Openshift ARM clusters.
-
-Full support for OpenShift on ARM will be available in a future release.
-
-a| https://issues.couchbase.com/browse/K8S-3033[K8S-3033]
-a| *Summary:*
-`autoFailoverMaxCount` defaults to 3, which is inconsistent with the Couchbase Server default of 1.
-
-The workaround is to set the appropriate value for the cluster.
-
-a| https://issues.couchbase.com/browse/K8S-3066[K8S-3066]
-a| *Summary:*
-It is not yet possible to mutate an existing Collection using the Operator.
-
-See the linked issue for details of a workaround.
-
-|===
-
-[#release-v240]
-== Release 2.4.0
-
-Couchbase Autonomous Operator 2.4.0 was released in January 2023.
-
-[#changes-in-behavior-v240]
-=== New Features and Behavioral Changes
-
-==== ARM Platform Support
-
-The Couchbase Autonomous Operator, and all related container images, can now be deployed on ARM platforms where available on AWS, Azure, and GCP managed Kubernetes services, as well as on open source Kubernetes distributions.
-Support for OpenShift on ARM will be available in a future release.
-
-==== TLS Certificate Management
-
-* Added support for Encrypted Private Keys
-* LDAP Server configuration can now make use of the main Root CA's array
-* Allow multi-PEM CAs in the Server `secretSource`
-* Allow insecure reload of expired certificates as a last resort
-* Raise events on TLS expiration
-
-[#fixed-issues-v240]
-=== Fixed Issues
-
-[#table-fixed-issues-v240,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-2825[K8S-2825^]
-a| *Summary:* Previously the Operator did not correctly propagate the changes when the client certificates were updated.
-
-a| https://issues.couchbase.com/browse/K8S-2838[K8S-2838^]
-a| *Summary:* Previously the CRD was not correctly inheriting the entirety of `v1.PodSpec`, meaning that attributes such as `affinity` were not available.
-
-|===
-
-[#known-issues-v240]
-=== Known Issues
-
-[#table-known-issues-v240,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-2944[K8S-2944]
-a| *Summary:*
-URL Encoding breaks string lists with `cipherSuites`.
-
-The following fails with "Invalid format. Expecting a list of ciphers.":
-
-[source,yaml]
-----
-  tls:
-    cipherSuites:
-    - TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-    - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
-    - TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384
-    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
-    tlsMinimumVersion: TLS1.2
-----
-
-As a workaround, escape the ciphers with quotation marks as shown below (the single quotes allow the double quotes to be passed through for further parsing):
-
-[source,yaml]
-----
-  tls:
-      cipherSuites:
-      - '"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"'
-      - '"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"'
-      - '"TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384"'
-      - '"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"'
-      tlsMinimumVersion: TLS1.2
-----
-
-a| https://issues.couchbase.com/browse/K8S-2971[K8S-2971]
-a| *Summary:*
-`storageBackend` warnings occur after Operator upgrade
-
-By default before Operator 2.4.0, Bucket resources do not have `storageBackend` set.
-When Upgrading to 2.4 the Operator will send warnings if server is also < 7.1.0:
-
-[source,console]
-----
-{"level":"info","ts":1674524426.697536,"logger":"cluster","msg":"[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore"}
-----
-
-Under normal upgrade scenarios the workaround for this is to:
-
-* Edit `couchbaseBucket` with `storageBackend` = `couchstore`
+a| https://issues.couchbase.com/browse/K8S-3167[K8S-3167^]
+a| *Summary:* Previously the operator would continually update Magma Bucket settings if History Retention Annotations were missing
 
 |===
 

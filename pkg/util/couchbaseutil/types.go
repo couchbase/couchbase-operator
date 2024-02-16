@@ -327,15 +327,22 @@ type Task struct {
 	Status string   `json:"status"`
 
 	// Rebalance attributes.
-	Progress float64 `json:"progress"`
-	Stale    bool    `json:"statusIsStale"`
-	Timeout  bool    `json:"masterRequestTimedOut"`
+	Progress  float64            `json:"progress"`
+	Stale     bool               `json:"statusIsStale"`
+	Timeout   bool               `json:"masterRequestTimedOut"`
+	NodesInfo RebalanceNodesInfo `json:"nodesInfo"`
 
 	// Replication attributes.
 	Source           string          `json:"source"`
 	Target           string          `json:"target"`
 	ReplicationType  ReplicationType `url:"replicationType"`
 	FilterExpression string          `url:"filterExpression"`
+}
+
+type RebalanceNodesInfo struct {
+	ActiveNodes []string `json:"active_nodes"`
+	KeepNodes   []string `json:"keep_nodes"`
+	EjectNodes  []string `json:"eject_nodes"`
 }
 
 type TaskList []Task

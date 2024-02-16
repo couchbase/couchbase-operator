@@ -177,6 +177,40 @@ func checkPodSpecAnnotationsForNodeSelector(k8s *types.Cluster, couchbase *couch
 	return nil
 }
 
+func MustCheckPodsForVersion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedImage, expectedVersion string) {
+	err := retryutil.RetryFor(15*time.Second, func() error {
+		return CheckPodsForVersion(k8s, couchbase, expectedImage, expectedVersion)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+func CheckPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedImage, expectedVersion string) error {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range pods.Items {
+		if pod.Spec.Containers[0].Image != expectedImage {
+			return fmt.Errorf("expected pod (%s) image to be: %s but found: %s", pod.Name, expectedImage, pod.Spec.Containers[0].Image)
+		}
+
+		if podVersion, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
+			return fmt.Errorf("expected pod (%s) to have %s annotation", pod.Name, constants.CouchbaseVersionAnnotationKey)
+		} else if podVersion != expectedVersion {
+			return fmt.Errorf("expected pod (%s) version to be %s but found %s", pod.Name, expectedVersion, podVersion)
+		}
+	}
+
+	return nil
+}
+
 // Ephemeral Volumes are named deterministically.
 // <pod-name>-<volume-name>
 // pods are suffixed with the backup name, so we can recreate the generated name and fetch it.

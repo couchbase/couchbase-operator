@@ -41,6 +41,29 @@ func (c *Cluster) reconcileRBACResources() error {
 	return nil
 }
 
+func (c *Cluster) createCloudNativeGatewayAdminUser() error {
+	userName := fmt.Sprintf("%s@%s", k8sutil.CngAdminUserNamePrefix, c.cluster.Name)
+	cngUser := couchbaseutil.User{
+		ID:     userName,
+		Name:   userName,
+		Domain: couchbaseutil.InternalAuthDomain,
+	}
+
+	secretName := fmt.Sprintf("%s-%s", k8sutil.CngAdminUserSecretPrefix, c.cluster.Name)
+	password, err := c.getRBACAuthPassword(secretName)
+
+	if err != nil {
+		return err
+	}
+
+	cngUser.Password = password
+	cngUser.Roles = append(cngUser.Roles, couchbaseutil.UserRole{
+		Role: string(couchbasev2.RoleFullAdmin),
+	})
+
+	return couchbaseutil.CreateUser(&cngUser).On(c.api, c.readyMembers())
+}
+
 func (c *Cluster) getScopesBySelector(scopeSpec couchbasev2.ScopeRoleSpec) []*couchbasev2.CouchbaseScope {
 	scopes := []*couchbasev2.CouchbaseScope{}
 	selector := labels.Nothing()
@@ -593,6 +616,30 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 
 			users[subject.Name] = user
 		}
+	}
+
+	// if CNG is added and users are managed we need to make sure we don't delete the cng-admin user
+	if c.cluster.Spec.Networking.CloudNativeGateway != nil {
+		userName := fmt.Sprintf("%s@%s", k8sutil.CngAdminUserNamePrefix, c.cluster.Name)
+		cngUser := couchbaseutil.User{
+			ID:     userName,
+			Name:   userName,
+			Domain: couchbaseutil.InternalAuthDomain,
+			Groups: []string{},
+		}
+
+		secretName := fmt.Sprintf("%s-%s", k8sutil.CngAdminUserSecretPrefix, c.cluster.Name)
+		password, err := c.getRBACAuthPassword(secretName)
+
+		if err != nil {
+			return nil, err
+		}
+
+		cngUser.Password = password
+		cngUser.Roles = append(cngUser.Roles, couchbaseutil.UserRole{
+			Role: string(couchbasev2.RoleFullAdmin),
+		})
+		users[cngUser.Name] = cngUser
 	}
 
 	return users, nil

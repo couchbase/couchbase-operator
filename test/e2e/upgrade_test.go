@@ -623,9 +623,7 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
 	victimCycle := 1
-	victimIndex := clusterSize + victimCycle
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -640,30 +638,14 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	e2eutil.MustWaitForRebalanceEjectingNode(t, kubernetes, cluster, victimName, 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimCycle, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
 
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
-	// * Victim node failed to balance in and is ejected to maintain scale
-	// * For the remaining iterations upgrades nodes upgrade
-	// * Upgrade completes
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
-		upgradeDownRecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
-		eventschema.Optional{Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	expectedVersion := couchbaseutil.GetVersionTag(f.CouchbaseServerImage)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, expectedVersion)
 }
 
 // TestUpgradeSupportableKillStatelessPodOnCreate tests that upgrades work for a supportable cluster
@@ -1219,8 +1201,8 @@ func TestDeltaRecovery(t *testing.T) {
 	upgradeProcess := couchbasev2.DeltaRecovery
 	numOfDocs := f.DocsCount
 
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
-	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeProcess = &upgradeProcess
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -1230,7 +1212,7 @@ func TestDeltaRecovery(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -1238,20 +1220,8 @@ func TestDeltaRecovery(t *testing.T) {
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Optional{Validator: eventschema.RepeatAtLeast{
-			Times:     1,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-		}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
 }
 
 func TestPartialUpgrade(t *testing.T) {

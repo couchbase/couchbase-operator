@@ -155,14 +155,14 @@ $ kubectl logs cb-example-0000 logging
 
 Example log event on standard console output:
 ----
-[1615311121.859344000, {"filename":"/fluent-bit/test/logs/memcached.log.000000.txt","timestamp":"2021-03-09T17:32:01.859344+00:00","level":"INFO","message":"Couchbase version 6.6.0-7909 starting."}]
+[1615311121.859344000, {"filename":"/fluent-bit/test/logs/memcached.log.000000.txt","timestamp":"2021-03-09T17:32:01.859344+00:00","level":"INFO","message":"Couchbase version 7.2.3-7909 starting."}]
 ----
 
 You'll notice that processed log events are structured messages with keys and values:
 
 * `"timestamp":"2021-03-09T17:32:01.859344+00:00"`
 * `"level":"INFO"`
-* `"message":"Couchbase version 6.6.0-7909 starting."`
+* `"message":"Couchbase version 7.2.3-7909 starting."`
 
 The default configuration used has support for Elasticsearch, Loki, Splunk and standard console output as destinations for logs.
 However, everything aside from standard console output will not match any streams by default.

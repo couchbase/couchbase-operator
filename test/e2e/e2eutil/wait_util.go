@@ -792,6 +792,46 @@ func MustWaitForRebalanceProgress(t *testing.T, k8s *types.Cluster, couchbase *c
 	}
 }
 
+func WaitForRebalanceEjectingNode(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, node string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return retryutil.Retry(ctx, time.Second, func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		tasks := &couchbaseutil.TaskList{}
+		err = couchbaseutil.ListTasks(tasks).On(client.client, client.host)
+		if err != nil {
+			return err
+		}
+
+		task, err := tasks.GetTask(couchbaseutil.TaskTypeRebalance)
+		if err != nil {
+			return err
+		}
+
+		if task.Status != "running" {
+			return fmt.Errorf("rebalance status %s", task.Status)
+		}
+
+		for _, ejectingNode := range task.NodesInfo.EjectNodes {
+			if strings.Contains(ejectingNode, node) {
+				return nil
+			}
+		}
+		return fmt.Errorf("node %s not being ejected", node)
+	})
+}
+
+func MustWaitForRebalanceEjectingNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, node string, timeout time.Duration) {
+	if err := WaitForRebalanceEjectingNode(k8s, cluster, node, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 func WaitUntilGroupExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, group string, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
