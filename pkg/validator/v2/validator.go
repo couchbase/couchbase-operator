@@ -1551,10 +1551,39 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
+	if err := checkBucketReplicasCount(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
 	errs = append(errs, checkBucketAnnotations(bucket)...)
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MinReplicasCount <= bucket.Spec.Replicas {
+			continue
+		}
+
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return err
+		}
+
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
+				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
+		}
 	}
 
 	return nil
@@ -3297,6 +3326,7 @@ func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.Couc
 
 	return true, nil
 }
+
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
 	var errs []error
 

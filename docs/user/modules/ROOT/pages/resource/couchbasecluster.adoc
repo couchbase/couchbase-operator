@@ -80,6 +80,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-clustername,clusterName>>: ""
     <<couchbaseclusters-spec-cluster-data,data>>:
       <<couchbaseclusters-spec-cluster-data-auxiothreads,auxIOThreads>>: 0
+      <<couchbaseclusters-spec-cluster-data-minreplicascount,minReplicasCount>>: 0
       <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: 0
@@ -1174,6 +1175,20 @@ This indicates the number of threads that are to be used in the AuxIO thread poo
 This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
 and should only be increased where there are sufficient CPU resources allocated for their use.
 If not specified, this defaults to the default value set by Couchbase Server.
+
+=== couchbaseclusters.spec.cluster.data.minReplicasCount
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `0`
+
+==== Description
+
+MinReplicasCount allows the minimum number of replicas required for buckets to be set.
+New buckets cannot be created with less than this minimum.
+Defaults to 0.
 
 === couchbaseclusters.spec.cluster.data.nonIOThreads
 

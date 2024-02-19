@@ -1703,3 +1703,7 @@ type RunningTask struct {
 	MasterRequestTimedOut bool   `json:"masterRequestTimedOut"`
 	LastReportURI         string `json:"lastReportURI"`
 }
+
+type DataServiceSettings struct {
+	MinReplicasCount int `url:"minReplicasCount" json:"minReplicasCount"`
+}

@@ -933,3 +933,18 @@ func GetStatsRangeAvgMetrics(service string, metrics *StatsRangeMetrics) *Reques
 func GetTerseClusterInfo(clusterInfo *TerseClusterInfo) *Request {
 	return NewRequest((*Client).Get, "/pools/default/terseClusterInfo", nil, clusterInfo)
 }
+
+// GetDataSettings gets data service settings.
+func GetDataServiceSettings(settings *DataServiceSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/dataService", nil, settings)
+}
+
+// SetDataServiceSettings sets data service settings.
+func SetDataServiceSettings(settings *DataServiceSettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/dataService", data, nil)
+}

@@ -536,6 +536,14 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 
 // reconcileDataSettings updates stuff to do with the data service.
 func (c *Cluster) reconcileDataSettings() error {
+	if err := c.reconcileMemcachedDataSettings(); err != nil {
+		return err
+	}
+
+	return c.reconcileDataServiceSettings()
+}
+
+func (c *Cluster) reconcileMemcachedDataSettings() error {
 	// This is yet another quality API.  The values don't exist until you set them,
 	// then remain for the rest of existence.  So if nothing is set, then leave it
 	// alone.
@@ -568,7 +576,41 @@ func (c *Cluster) reconcileDataSettings() error {
 	}
 
 	log.V(2).Info("Memcached settings updated", "cluster", c.namespacedName())
-	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("data service", c.cluster))
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memcached settings", c.cluster))
+
+	return nil
+}
+
+func (c *Cluster) reconcileDataServiceSettings() error {
+	if c.cluster.Spec.ClusterSettings.Data == nil {
+		return nil
+	}
+
+	if atleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
+		return err
+	} else if !atleast76 {
+		return nil
+	}
+
+	current := couchbaseutil.DataServiceSettings{}
+	if err := couchbaseutil.GetDataServiceSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	requested.MinReplicasCount = c.cluster.Spec.ClusterSettings.Data.MinReplicasCount
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetDataServiceSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	log.V(2).Info("Data Service settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("data service settings", c.cluster))
 
 	return nil
 }

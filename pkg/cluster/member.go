@@ -461,6 +461,22 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 		return err
 	}
 
+	if atleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && atleast76 {
+		dataSettings := couchbaseutil.DataServiceSettings{}
+
+		if err := couchbaseutil.GetDataServiceSettings(&dataSettings).On(c.api, m); err != nil {
+			return err
+		}
+
+		if settings.Data != nil {
+			dataSettings.MinReplicasCount = settings.Data.MinReplicasCount
+		}
+
+		if err := couchbaseutil.SetDataServiceSettings(&dataSettings).On(c.api, m); err != nil {
+			return err
+		}
+	}
+
 	// Setup the services running on this node.
 	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
 	if err != nil {

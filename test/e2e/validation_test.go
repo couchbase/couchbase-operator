@@ -3300,3 +3300,33 @@ func TestDefaultStorageBackendChangeValidation(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
 }
+
+func TestBucketMinReplicasCountApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestBucketEnoughReplicas",
+			shouldFail: false,
+		},
+		{
+			name:           "TestBucketNotEnoughReplicas",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.replicas"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-replicas.yaml"})
+}
+
+func TestBucketMinReplicasCountCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestBucketNotEnoughReplicas",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.replicas"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-replicas.yaml"})
+}

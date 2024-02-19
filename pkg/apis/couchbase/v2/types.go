@@ -3088,6 +3088,12 @@ type CouchbaseClusterDataSettings struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
 	AuxIOThreads *int `json:"auxIOThreads,omitempty"`
+
+	// MinReplicasCount allows the minimum number of replicas required for
+	// buckets to be set. New buckets cannot be created with less than this minimum.
+	// Defaults to 0.
+	// +kubebuilder:default=0
+	MinReplicasCount int `json:"minReplicasCount,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

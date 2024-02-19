@@ -998,13 +998,27 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: nil, WriterThreads: nil, NonIOThreads: nil, AuxIOThreads: nil}), time.Minute)
 	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
 
+	numPatches := 5
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		minReplicaCounts := 1
+		cluster := e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/minReplicasCount", minReplicaCounts), time.Minute)
+		e2eutil.MustPatchDataServiceSettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinReplicasCount", minReplicaCounts), time.Minute)
+
+		numPatches++
+	}
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.RepeatAtLeast{
-			Times:     5,
+			Times:     numPatches,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}

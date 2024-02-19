@@ -664,6 +664,43 @@ func PatchCouchbaseInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 	})
 }
 
+type clusterFetcher func(client *CouchbaseClient) (interface{}, error)
+
+func getClusterFetcher[T any](fn func(settings *T) *couchbaseutil.Request) clusterFetcher {
+	return func(c *CouchbaseClient) (interface{}, error) {
+		settings := new(T)
+		if err := fn(settings).On(c.client, c.host); err != nil {
+			return nil, err
+		}
+
+		return settings, nil
+	}
+}
+
+func MustPatchDataServiceSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	dataSettingsFetcher := getClusterFetcher(couchbaseutil.GetDataServiceSettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, dataSettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
+func PatchCluster(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration, getSettingsFn clusterFetcher) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		settings, err := getSettingsFn(client)
+		if err != nil {
+			return err
+		}
+
+		return jsonpatch.Apply(settings, patches.Patches())
+	})
+}
+
 func MustPatchCouchbaseInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchCouchbaseInfo(k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)
