@@ -151,6 +151,8 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
       <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
+      <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
+      <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 75
       <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
         <<couchbaseclusters-spec-networking-cloudnativegateway-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-disableuioverhttp,disableUIOverHTTP>>: false
@@ -2080,6 +2082,36 @@ CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase clus
 Image is the Cloud Native Gateway image to be used to run the sidecar container.
 No validation is carried out as this can be any arbitrary repo and tag.
 TODO: provide a default kubebuilder default image tag as field is mandatory.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.logLevel
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `info`
+
+*Enumerations*: `fatal, panic, dpanic, error, warn, info, debug`
+
+==== Description
+
+*DEVELOPER PREVIEW* - This feature is in developer preview.
+
+LogLevel controls the verbosity of cloud native logs.
+This field must be one of "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.terminationGracePeriodSeconds
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `75`
+
+==== Description
+
+TerminationGracePeriodSeconds specifies the grace period for the container to terminate.
+Defaults to 75 seconds.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.tls
 
