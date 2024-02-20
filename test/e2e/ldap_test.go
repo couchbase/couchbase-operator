@@ -390,3 +390,28 @@ func TestVerifyLDAPManualManagement(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestLdapSettings(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	cluster := setupLDAP(t, kubernetes)
+
+	middleboxCompMode := false
+	authenticationEnabled := false
+
+	// Change the settings from defaults and verify they get updated in Server
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/ldap/authenticationEnabled", authenticationEnabled), time.Minute)
+	e2eutil.MustPatchLdapSetting(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/AuthenticationEnabled", authenticationEnabled), time.Minute)
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if after76, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if after76 {
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/ldap/middleboxCompMode", middleboxCompMode), time.Minute)
+		e2eutil.MustPatchLdapSetting(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MiddleboxCompMode", &middleboxCompMode), time.Minute)
+	}
+}

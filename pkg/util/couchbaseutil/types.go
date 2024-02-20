@@ -592,6 +592,8 @@ type LDAPSettings struct {
 	NestedGroupsMaxDepth uint64 `json:"nestedGroupsMaxDepth,omitempty"`
 	// Lifetime of values in cache in milliseconds. Default 300000 ms.
 	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
+	// Enabled Moddlebox compatibility mode (only 7.6+)
+	MiddleboxCompMode *bool `json:"middleboxCompMode,omitempty"`
 }
 
 type LDAPUserDNMapping struct {
@@ -1192,6 +1194,10 @@ func (s *LDAPSettings) FormEncode() ([]byte, error) {
 	data.Set("authorizationEnabled", strconv.FormatBool(s.AuthorizationEnabled))
 	data.Set("encryption", string(s.Encryption))
 	data.Set("serverCertValidation", strconv.FormatBool(s.EnableCertValidation))
+
+	if s.MiddleboxCompMode != nil {
+		data.Set("middleboxCompMode", strconv.FormatBool(*s.MiddleboxCompMode))
+	}
 
 	if s.EnableCertValidation {
 		data.Set("cacert", s.CACert)

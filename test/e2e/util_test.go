@@ -286,6 +286,7 @@ func registerTests() {
 		framework.NewTestDef(TestLDAPUpdateRole).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
 		framework.NewTestDef(TestVerifyLDAPConfigRetention).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
 		framework.NewTestDef(TestVerifyLDAPManualManagement).WithTags(TagSuiteP0, TagFeatureRBAC, TagFeatureLDAP),
+		framework.NewTestDef(TestLdapSettings).WithTags(TagSuiteP0, TagFeatureLDAP),
 		framework.NewTestDef(TestBackupFullOnly).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestore).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupFullIncrementalOverTLS).WithTags(TagSuiteP0, TagFeatureTLS),

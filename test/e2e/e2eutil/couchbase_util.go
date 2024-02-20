@@ -751,6 +751,14 @@ func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 	}
 }
 
+func MustPatchLdapSetting(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	ldapSettingsFetcher := getClusterFetcher(couchbaseutil.GetLDAPSettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, ldapSettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func PatchAutoCompactionSettings(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)

@@ -785,6 +785,10 @@ func (c *Cluster) reconcileLDAPSettings() error {
 		}
 	}
 
+	if atleast76, err := c.IsAtLeastVersion("7.6.0"); err == nil && atleast76 {
+		specLDAPSettings.MiddleboxCompMode = &ldap.MiddleboxCompMode
+	}
+
 	// Get current ldap cluster spec
 	apiLDAPSettings := &couchbaseutil.LDAPSettings{}
 	if err := couchbaseutil.GetLDAPSettings(apiLDAPSettings).On(c.api, c.readyMembers()); err != nil {

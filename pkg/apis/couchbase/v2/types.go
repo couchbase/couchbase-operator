@@ -2451,6 +2451,11 @@ type CouchbaseClusterLDAPSpec struct {
 	// https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html
 	// +kubebuilder:default=30000
 	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
+
+	// Sets middlebox compatibility mode for LDAP. This option is only available on
+	// Couchbase Server 7.6.0+.
+	// +kubebuilder:default=true
+	MiddleboxCompMode bool `json:"middleboxCompMode,omitempty"`
 }
 
 type LDAPUserDNMapping struct {
