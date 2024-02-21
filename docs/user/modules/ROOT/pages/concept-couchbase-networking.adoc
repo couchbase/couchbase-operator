@@ -8,7 +8,8 @@ This section outlines supported strategies and key concepts.
 Couchbase Server is a high performance database, where data is distributed across all pods in a cluster.
 Clients are aware of which pod a data item should reside on and perform client-side load balancing.
 By performing the load balancing in the client, this avoids unnecessary network hops and improves performance.
-For this reason Couchbase Server cannot be accessed using normal Kubernetes `Service` or `Ingress` resources.
+For this reason Couchbase Server cannot be accessed using normal Kubernetes `Service` or `Ingress` resources,
+unless accessed via xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway] (CNG).
 
 The following options depict the possible networking topologies for connecting clients to a Couchbase cluster.
 Clients includes all Couchbase Client SDKs, Couchbase Mobile and Couchbase XDCR connections unless otherwise stated.
