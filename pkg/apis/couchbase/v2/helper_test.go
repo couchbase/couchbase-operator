@@ -187,3 +187,35 @@ func TestLowestInUseCouchbaseVersionImageOverrideClusterLow(t *testing.T) {
 		t.Errorf("expected image to be: %s, but got: %s", LowVersionImage, lowImage)
 	}
 }
+
+func TestHighestInUseCouchbaseVersionImageOnlyClusterImage(t *testing.T) {
+	spec := ClusterSpec{
+		Image: HighVersionImage,
+	}
+
+	if highImage, err := spec.HighestInUseCouchbaseVersionImage(); err != nil {
+		t.Error(err)
+	} else if highImage != HighVersionImage {
+		t.Errorf("expected image to be: %s, but got: %s", HighVersionImage, highImage)
+	}
+}
+
+func TestHighestInUseCouchbaseVersionImageLowCluster(t *testing.T) {
+	spec := ClusterSpec{
+		Image: LowVersionImage,
+		Servers: []ServerConfig{
+			{
+				Image: HighVersionImage,
+			},
+			{
+				Image: LowVersionImage,
+			},
+		},
+	}
+
+	if highImage, err := spec.HighestInUseCouchbaseVersionImage(); err != nil {
+		t.Error(err)
+	} else if highImage != HighVersionImage {
+		t.Errorf("expected image to be: %s, but got: %s", HighVersionImage, highImage)
+	}
+}

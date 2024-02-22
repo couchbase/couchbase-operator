@@ -318,14 +318,10 @@ func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 	return cs.Image
 }
 
-// LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
-// that is in use. Operator Environment image takes the highest priority
-// If all server classes have their image set to a higher version image than the cluster image
-// then the higher server class image will be returned as the cluster image isn't in use.
-func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {
+func (cs *ClusterSpec) getInUseCouchbaseImages() ([]string, error) {
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
 		if cs.EnvImagePrecedence && annotatedImage != "" {
-			return annotatedImage, nil
+			return []string{annotatedImage}, nil
 		}
 	}
 
@@ -348,33 +344,92 @@ func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {
 		}
 
 		if serverConfImage != image {
-			return "", errors.ErrTooManyServerImages
+			return []string{""}, errors.ErrTooManyServerImages
 		}
 	}
 
 	if serverConfImage == "" {
-		return clusterImage, nil
+		return []string{clusterImage}, nil
 	}
 
 	if allServerClassesOverriding {
-		return serverConfImage, nil
+		return []string{serverConfImage}, nil
 	}
 
-	clusterImageVersion, err := couchbaseutil.NewVersionFromImage(clusterImage)
+	return []string{clusterImage, serverConfImage}, nil
+}
+
+// LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
+// that is in use. Operator Environment image takes the highest priority
+// If all server classes have their image set to a higher version image than the cluster image
+// then the higher server class image will be returned as the cluster image isn't in use.
+func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {
+	images, err := cs.getInUseCouchbaseImages()
 	if err != nil {
 		return "", err
 	}
 
-	serverImageVersion, err := couchbaseutil.NewVersionFromImage(serverConfImage)
+	switch len(images) {
+	case 1:
+		return images[0], nil
+	case 2:
+		break
+	default:
+		return "", errors.NewStackTracedError(fmt.Errorf("%w: got more images from cluster spec than expected", errors.ErrInternalError))
+	}
+
+	image1, image2 := images[0], images[1]
+
+	image1Version, err := couchbaseutil.NewVersionFromImage(image1)
 	if err != nil {
 		return "", err
 	}
 
-	if clusterImageVersion.Less(serverImageVersion) {
-		return clusterImage, nil
+	image2Version, err := couchbaseutil.NewVersionFromImage(image2)
+	if err != nil {
+		return "", err
 	}
 
-	return serverConfImage, nil
+	if image1Version.Less(image2Version) {
+		return image1, nil
+	}
+
+	return image2, nil
+}
+
+// HighestInUseCouchbaseVersionImage does the inverse of LowestInUseCouchbaseVersionImage.
+func (cs *ClusterSpec) HighestInUseCouchbaseVersionImage() (string, error) {
+	images, err := cs.getInUseCouchbaseImages()
+	if err != nil {
+		return "", err
+	}
+
+	switch len(images) {
+	case 1:
+		return images[0], nil
+	case 2:
+		break
+	default:
+		return "", errors.NewStackTracedError(fmt.Errorf("%w: got more images from cluster spec than expected", errors.ErrInternalError))
+	}
+
+	image1, image2 := images[0], images[1]
+
+	image1Version, err := couchbaseutil.NewVersionFromImage(image1)
+	if err != nil {
+		return "", err
+	}
+
+	image2Version, err := couchbaseutil.NewVersionFromImage(image2)
+	if err != nil {
+		return "", err
+	}
+
+	if image1Version.Less(image2Version) {
+		return image2, nil
+	}
+
+	return image1, nil
 }
 
 // Backup Image represents the image to use for backup.

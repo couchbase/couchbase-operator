@@ -3265,6 +3265,46 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		}
 	}
 
+	//nolint:revive
+	if err := CheckClusterVersionUpgradePath(prev, curr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CheckClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) error {
+	oldImage, err := prev.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	newImage, err := curr.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	oldVersion, err := k8sutil.CouchbaseVersion(oldImage)
+	if err != nil {
+		return err
+	}
+
+	newVersion, err := couchbaseutil.CouchbaseImageVersion(newImage)
+	if err != nil {
+		return err
+	}
+
+	if validUpgrade, err := couchbaseutil.ValidUpgrade(oldVersion, newVersion); err != nil {
+		return err
+	} else if !validUpgrade {
+		upperboundVersion, err := couchbaseutil.GetUpgradeUpperbound(oldVersion)
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("cannot upgrade from %s to %s. Version must be less than %s", oldVersion, newVersion, upperboundVersion)
+	}
+
 	return nil
 }
 

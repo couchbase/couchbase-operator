@@ -1,0 +1,57 @@
+package couchbaseutil
+
+// SupportedUpgradePath represents the valid upgrade path.
+// Each version is put into a group based on the versions in this array,
+// Versions are only valid if they are within the same group or to the next group.
+// E.g. Group 1 is version >= 5.0.0 AND < 6.6.0.
+var SupportedUpgradePath = []string{"0.0.0", "5.0.0", "6.6.0", "7.1.0", "7.2.4"}
+
+func ValidUpgrade(old, new string) (bool, error) {
+	if isUpgrade, err := VersionAfter(new, old); err != nil {
+		return false, err
+	} else if !isUpgrade {
+		return false, nil
+	}
+
+	oldGroup, err := getUpgradeGroup(old)
+	if err != nil {
+		return false, err
+	}
+
+	newGroup, err := getUpgradeGroup(new)
+	if err != nil {
+		return false, err
+	}
+
+	return (newGroup == oldGroup || oldGroup+1 == newGroup), nil
+}
+
+func GetUpgradeUpperbound(version string) (string, error) {
+	upgradeGroup, err := getUpgradeGroup(version)
+	if err != nil {
+		return "", err
+	}
+
+	upperBoundGroup := upgradeGroup + 2
+
+	if upperBoundGroup >= len(SupportedUpgradePath) {
+		return "", nil
+	}
+
+	return SupportedUpgradePath[upperBoundGroup], nil
+}
+
+func getUpgradeGroup(version string) (int, error) {
+	for versionGroup := range SupportedUpgradePath {
+		after, err := VersionAfter(version, SupportedUpgradePath[versionGroup])
+		if err != nil {
+			return 0, err
+		}
+
+		if !after {
+			return versionGroup - 1, nil
+		}
+	}
+
+	return len(SupportedUpgradePath) - 1, nil
+}

@@ -3330,3 +3330,21 @@ func TestBucketMinReplicasCountCreate(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-replicas.yaml"})
 }
+
+func TestVersionUpgradePath(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "ValidUpgradePath",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.2.3")},
+			shouldFail: false,
+		},
+		{
+			name:           "InvalidUpgradePath",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.2.4")},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot upgrade"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
+}

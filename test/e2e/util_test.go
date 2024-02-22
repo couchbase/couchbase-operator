@@ -108,6 +108,7 @@ func registerTests() {
 		framework.NewTestDef(TestDefaultStorageBackendChangeValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestVersionUpgradePath).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
