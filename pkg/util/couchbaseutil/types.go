@@ -1524,6 +1524,7 @@ type Collection struct {
 // Creating a separate struct for now.
 type CollectionPatchRequest struct {
 	History *bool `json:"history" url:"history,omitempty"`
+	MaxTTL  int   `json:"maxTTL" url:"maxTTL,omitempty"`
 }
 
 // HasScope determines whether the named scope exists in the list.

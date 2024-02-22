@@ -902,7 +902,7 @@ func CreateCollection(bucket, scope string, collection Collection) *Request {
 
 func PatchCollection(bucket, scope string, collection Collection) *Request {
 	// only mutation field is mutable
-	data, err := urlencoding.Marshal(CollectionPatchRequest{History: collection.History})
+	data, err := urlencoding.Marshal(CollectionPatchRequest{History: collection.History, MaxTTL: collection.MaxTTL})
 	if err != nil {
 		return NewRequestError(err)
 	}

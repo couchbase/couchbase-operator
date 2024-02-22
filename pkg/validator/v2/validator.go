@@ -3436,32 +3436,6 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	return nil
 }
 
-func CheckImmutableFieldsCollection(prev, curr *couchbasev2.CouchbaseCollection) error {
-	var errs []error
-
-	prevTTL := &metav1.Duration{}
-
-	if prev.Spec.MaxTTL != nil {
-		prevTTL = prev.Spec.MaxTTL
-	}
-
-	currTTL := &metav1.Duration{}
-
-	if curr.Spec.MaxTTL != nil {
-		currTTL = curr.Spec.MaxTTL
-	}
-
-	if prevTTL.Duration != currTTL.Duration {
-		errs = append(errs, util.NewUpdateError("spec.maxTTL", "body"))
-	}
-
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
-	}
-
-	return nil
-}
-
 func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollectionGroup) error {
 	var errs []error
 

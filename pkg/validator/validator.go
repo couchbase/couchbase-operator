@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"fmt"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
@@ -78,8 +80,8 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 			return validationv2.CheckImmutableFieldsAutoscaler(t, t2)
 		}
 	case *couchbasev2.CouchbaseCollection:
-		if t2, ok := updated.(*couchbasev2.CouchbaseCollection); ok {
-			return validationv2.CheckImmutableFieldsCollection(t, t2)
+		if _, ok := updated.(*couchbasev2.CouchbaseCollection); !ok {
+			return fmt.Errorf("failed to update couchbase collection")
 		}
 	case *couchbasev2.CouchbaseCollectionGroup:
 		if t2, ok := updated.(*couchbasev2.CouchbaseCollectionGroup); ok {
