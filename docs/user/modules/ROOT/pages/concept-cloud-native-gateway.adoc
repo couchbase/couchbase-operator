@@ -2,7 +2,6 @@
 :page-toclevels: 2
 :description: A direct gRPC interface to key Couchbase services, abstracting topology details behind a service endpoint.
 
-
 [abstract]
 {description}
 
@@ -32,7 +31,6 @@ This can be useful in the rare cases where an SDK may not exist for your languag
 NOTE: gRPC was chosen because it aligns well to the low latency performance of Couchbase --
 gRPC over HTTP/2 is an efficient binary wire protocol which can be efficiently marshaled to the native services of Couchbase Server.
 
-
 == How it is Deployed
 
 The Cloud Native Gateway runs as a _sidecar_ image to every Couchbase Server node in a cluster.
@@ -54,7 +52,6 @@ networking:
 CAUTION: At the moment, adding CNG to an existing cluster requires a rebalance which will create new pods and move data.
 For compatibility with commonly deployed Kubernetes and OpenShift releases, the Couchbase Autonomous Operator cannot yet use some of the newer features for sidecar management.
 
-
 == Monitoring Health
 
 === Metrics
@@ -65,7 +62,6 @@ WARNING: In this release, metrics are _volatile_ interface stability.
 This means that the metrics may change in updated releases, even maintenance releases.
 Please consider this interface stability when planning system monitoring.
 
-
 === Logs
 
 Logs for the Cloud Native Gateway are available via `kubectl logs` and are collected with the xref:tools/cbopinfo.adoc[cbopinfo] command when creating a logs archive.
@@ -74,7 +70,7 @@ One way you may view the logs is through the standard `kubectl logs` specifying 
 
 [source,console]
 ----
-$ kubectl logs  pod/mycluster-0000 -c cloud-native-gateway
+$ kubectl logs pod/mycluster-0000 -c cloud-native-gateway
 ----
 
 === Using grpcurl to Verify
@@ -88,8 +84,7 @@ First, forward a port to any of the nodes in your defined cluster:
 ----
 $ kubectl port-forward pod/mycluster-0000 18098:18098
 ----
-//// TODO: update the above to use the service when added in operator 2.7 ////
-
+// TODO: update the above to use the service when added in operator 2.7
 
 Then call it with `grpcurl` against a default `Health/Check` once you have the definition.
 To get the RPC definition:
@@ -115,7 +110,6 @@ And you should see a response:
 }
 ----
 
-
 == Upgrade Considerations
 
 The Cloud Native Gateway container can be upgraded independently of the rest of a deployment.
@@ -126,7 +120,6 @@ simply update the `image` in the deployment via normal Kubernetes or OpenShift t
 IMPORTANT: Changing the image used for the `cloudNativeGateway` requires a rebalance at this time.
 In the future, we expect to be able to improve this through the Kubernetes sidecar APIs.
 At the time of writing (February 2024), these are not available on OpenShift or from Kubernetes at popular Cloud Service Providers.
-
 
 == Platform Integration
 
