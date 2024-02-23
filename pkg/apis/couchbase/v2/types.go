@@ -1156,7 +1156,6 @@ type CouchbaseBucketSpec struct {
 
 	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
 	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
-	// This cannot be edited after bucket creation.
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
