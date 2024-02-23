@@ -110,6 +110,7 @@ include::partial$autogen-reference.adoc[]
  ** xref:reference-reference-architecture.adoc[`CouchbaseCluster` Reference Architecture]
  ** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
  ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
+ ** xref:reference-bucket-backend-migration.adoc[Bucket Backend Migration Documentation]
 * Helm
  ** xref:helm-couchbase-config.adoc[Couchbase Helm Chart Specification]
 * Tools
