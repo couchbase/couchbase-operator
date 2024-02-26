@@ -21,6 +21,7 @@ const (
 	SupportedBackendCouchstore
 	SupportedBackendMagma
 	SupportedHistoryRetention
+	SupportedRank
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -30,7 +31,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
-	SupportedHistoryRetention := supportedFeatures[SupportedHistoryRetention]
+	supportedHistoryRetention := supportedFeatures[SupportedHistoryRetention]
+	supportedRank := supportedFeatures[SupportedRank]
 
 	for _, bucket := range k8sBuckets {
 		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
@@ -74,7 +76,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		// Defaults to true, when bucket is magma.
 		// Hence, setting it to true to avoid false reconciliation updates.
-		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && SupportedHistoryRetention {
+		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && supportedHistoryRetention {
 			historyRetentionCollectionDefaultTrue := true
 			b.HistoryRetentionCollectionDefault = &historyRetentionCollectionDefaultTrue
 		}
@@ -95,11 +97,15 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.MagmaKeyTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaKeyTreeDataBlockSize, constants.MagmaKeyTreeDataDefaultBlockSize)
 
 			// CDC is only supported on Magma
-			if SupportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
+			if supportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
 				b.HistoryRetentionCollectionDefault = bucket.Spec.HistoryRetentionSettings.CollectionDefault
 				b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
 				b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
 			}
+		}
+
+		if supportedRank {
+			b.Rank = &bucket.Spec.Rank
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -132,7 +138,10 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
-func gatherEphemeralBuckets(durablitySupported bool, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+	durablitySupported := supportedFeatures[SupportedDurability]
+	supportedRank := supportedFeatures[SupportedRank]
+
 	for _, bucket := range k8sEphemeralBuckets {
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
@@ -162,6 +171,10 @@ func gatherEphemeralBuckets(durablitySupported bool, selector labels.Selector, k
 
 		if bucket.Spec.MaxTTL != nil {
 			b.MaxTTL = int(bucket.Spec.MaxTTL.Duration.Seconds())
+		}
+
+		if supportedRank {
+			b.Rank = &bucket.Spec.Rank
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -234,10 +247,17 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	supportedFeatures[SupportedHistoryRetention] = historyRetentionSupported
 
+	rankSupported, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	supportedFeatures[SupportedRank] = rankSupported
+
 	allBuckets := []couchbaseutil.Bucket{}
 
 	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets, c.cluster)
-	allBuckets = gatherEphemeralBuckets(durablitySupported, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets)
 
 	return allBuckets, nil

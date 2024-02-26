@@ -452,6 +452,7 @@ type Bucket struct {
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault"`
 	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize"`
 	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize"`
+	Rank                              *int                    `json:"rank"`
 }
 
 type BucketList []Bucket
@@ -505,6 +506,7 @@ type BucketStatus struct {
 	HistoryRetentionCollectionDefault *bool                   `json:"historyRetentionCollectionDefault,omitempty"`
 	MagmaSeqTreeDataBlockSize         *uint64                 `json:"magmaSeqTreeDataBlockSize,omitempty"`
 	MagmaKeyTreeDataBlockSize         *uint64                 `json:"magmaKeyTreeDataBlockSize,omitempty"`
+	Rank                              *int                    `json:"rank"`
 }
 
 type VBucketServerMap struct {
@@ -788,6 +790,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.IoPriority = status.GetIoPriority()
 	b.DurabilityMinLevel = status.DurabilityMinLevel
 	b.MaxTTL = status.MaxTTL
+	b.Rank = status.Rank
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -844,6 +847,10 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.DurabilityMinLevel != "" {
 		data.Set("durabilityMinLevel", string(b.DurabilityMinLevel))
+	}
+
+	if b.Rank != nil {
+		data.Set("rank", strconv.Itoa(*b.Rank))
 	}
 
 	if b.BucketStorageBackend == CouchbaseStorageBackendMagma {

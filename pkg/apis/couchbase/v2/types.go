@@ -1255,6 +1255,17 @@ type CouchbaseBucketSpec struct {
 
 	// MagmaKeyTreeDataBlockSize is the block size, in bytes, for Magma keyIndex blocks.
 	MagmaKeyTreeDataBlockSize *uint64 `json:"-" annotation:"magmaKeyTreeDataBlockSize"`
+
+	// Rank determines the bucket’s place in the order in which the rebalance process
+	// handles the buckets on the cluster. The higher a bucket’s assigned integer
+	// (in relation to the integers assigned other buckets), the sooner in the
+	// rebalance process the bucket is handled. This assignment of rank allows a
+	// cluster’s most mission-critical data to be rebalanced with top priority.
+	// This option is only supported for Couchbase Server 7.6.0+.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1000
+	Rank int `json:"rank,omitempty"`
 }
 
 type HistoryRetentionSettings struct {
@@ -1385,6 +1396,17 @@ type CouchbaseEphemeralBucketSpec struct {
 	// Scopes defines whether the Operator manages scopes for the bucket or not, and
 	// the set of scopes defined for the bucket.
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
+
+	// Rank determines the bucket’s place in the order in which the rebalance process
+	// handles the buckets on the cluster. The higher a bucket’s assigned integer
+	// (in relation to the integers assigned other buckets), the sooner in the
+	// rebalance process the bucket is handled. This assignment of rank allows a
+	// cluster’s most mission-critical data to be rebalanced with top priority.
+	// This option is only supported for Couchbase Server 7.6.0+.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1000
+	Rank int `json:"rank,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
