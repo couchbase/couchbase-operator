@@ -1,0 +1,96 @@
+pipeline {
+    parameters {
+        string(name: 'jobName', description: 'Job Name', defaultValue: 'k8s-cbop-aks-pipeline')
+        string(name: 'buildNumber', description: 'Build Number', defaultValue: '685')
+    }
+    agent any
+    stages {
+        stage('Download Scripts') {
+            steps {
+                script {
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/stanton11/FailedTestFromJenkins']]])
+                }
+            }
+        }
+        stage('Run getParams.py') {
+            steps {
+                script {
+                    env.JOB_NAME = params.jobName
+                    env.BUILD_NUMBER = params.buildNumber
+                    env.paramsResult = sh(
+                        script: 'python3 getParams.py "$JOB_NAME" "$BUILD_NUMBER"',
+                        returnStdout: true
+                    ).trim()
+                    // Use a more specific delimiter for splitting
+                    split = env.paramsResult.tokenize('\n')
+                    env.val = split[1]
+                    env.san = split[2]
+                    env.p0 = split[3]
+                    env.p1 = split[4]
+                    env.custom = split[5]
+                    new_params = split[0].tokenize(',')
+                    new_params = new_params.drop(1)
+                }
+            }
+        }
+        stage('Run getFailedTest.py') {
+            steps {
+                script {
+                    env.customTestsResult = sh(
+                        script: 'python3 getFailedTestLW.py "$JOB_NAME"/"$BUILD_NUMBER" "$val" "$san" "$p0" "$p1" "$custom"',
+                        returnStdout: true
+                    ).trim()
+                    env.customTestsResult = env.customTestsResult.split('\n').last()
+                    echo "Custom Tests Result: ${env.customTestsResult}"
+                }
+            }
+        }
+        stage('Build Job') {
+            steps {
+                script {
+                    // Build Param Set
+                    final_params = []
+                    for (param in new_params) {
+                        p = (param.replaceAll("'", ''))
+                        final_params.add(p.replaceAll(' ', ''))
+                    }
+                    new_params = final_params
+                    print('paramsObject: ' + new_params)
+                    build job: env.JOB_NAME, parameters: [string(name: 'refspec', value: new_params[0]), \
+                    string(name: 'operator_image', value: new_params[1]), \
+                    string(name: 'admission_image', value: new_params[2]), \
+                    string(name: 'certification_image', value: new_params[3]), \
+                    string(name: 'server_image', value: new_params[4]), \
+                    string(name: 'server_image_upgrade', value: new_params[5]), \
+                    string(name: 'backup_image', value: new_params[6]), \
+                    string(name: 'exporter_image', value: new_params[7]), \
+                    string(name: 'exporter_image_upgrade', value: new_params[8]), \
+                    string(name: 'logging_image', value: new_params[9]), \
+                    string(name: 'logging_image_upgrade', value: new_params[10]), \
+                    string(name: 'cloud_native_gateway_image', value: new_params[11]), \
+                    string(name: 'mobile_image', value: new_params[12]), \
+                    string(name: 'kubernetes_version', value: new_params[13]), \
+                    string(name: 'storage_class', value: new_params[14]), \
+                    booleanParam(name: 'lpv', value: new_params[15].toBoolean()), \
+                    string(name: 'bucket_type', value: new_params[16]), \
+                    string(name: 'compression_mode', value: new_params[17]), \
+                    string(name: 'kubectl_version', value: new_params[18]), \
+                    string(name: 's3_region', value: new_params[19]), \
+                    string(name: 'docs', value: new_params[20]), \
+                    booleanParam(name: 'enable_istio', value: new_params[21].toBoolean()), \
+                    string(name: 'istio_version', value: new_params[22]), \
+                    string(name: 'istio_mode', value: new_params[23]), \
+                    string(name: 'terraform_version', value: new_params[24]), \
+                    booleanParam(name: 'validation', value: false), \
+                    booleanParam(name: 'sanity', value: false), \
+                    booleanParam(name: 'p0', value: false), \
+                    booleanParam(name: 'p1', value: false), \
+                    booleanParam(name: 'platformcert', value: false), \
+                    booleanParam(name: 'custom', value: true), \
+                    string(name: 'custom_args', value: env.customTestsResult)],
+                    wait: false
+                }
+            }
+        }
+    }
+}
