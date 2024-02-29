@@ -4038,6 +4038,9 @@ type CouchbaseClusterLogRotationSpec struct {
 type CouchbaseClusterAuditGarbageCollectionSpec struct {
 	// Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
 	Sidecar *CouchbaseClusterAuditCleanupSidecarSpec `json:"sidecar,omitempty"`
+
+	// Couchbase Server 7.2.4+ can prune audit logs after a certain time period.
+	NativePruning *CouchbaseClusterAuditCleanupSpec `json:"nativePruning,omitempty"`
 }
 
 type CouchbaseClusterAuditCleanupSidecarSpec struct {
@@ -4060,4 +4063,12 @@ type CouchbaseClusterAuditCleanupSidecarSpec struct {
 	// Resources is the resource requirements for the cleanup container.
 	// Will be populated by Kubernetes defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+}
+
+type CouchbaseClusterAuditCleanupSpec struct {
+	// How long Couchbase Server keeps rotated audit logs in minutes.
+	// If set to 0 (the default) then audit logs won't be pruned.
+	// Has a maximum of 35791394 seconds.
+	// +kubebuilder:default="0"
+	PruneAge *metav1.Duration `json:"age,omitempty"`
 }

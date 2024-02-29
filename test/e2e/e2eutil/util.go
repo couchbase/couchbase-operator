@@ -482,8 +482,16 @@ func (o *ClusterOptions) WithCustomLogStreaming() *ClusterOptions {
 	return o
 }
 
+type AuditGarbageCollection int
+
+const (
+	None = iota
+	Sidecar
+	Native
+)
+
 // Create auditing configuration with short rotation size and cleanup interval for testing.
-func (o *ClusterOptions) WithAuditing(enableCleanup bool) *ClusterOptions {
+func (o *ClusterOptions) WithAuditing(garbageCollection AuditGarbageCollection) *ClusterOptions {
 	o.AuditConfiguration = &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 		Enabled:        true,
 		DisabledEvents: []int{},
@@ -493,11 +501,17 @@ func (o *ClusterOptions) WithAuditing(enableCleanup bool) *ClusterOptions {
 		},
 	}
 
-	if enableCleanup {
+	if garbageCollection == Sidecar {
 		o.AuditConfiguration.GarbageCollection = &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
 			Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
 				Enabled:  true,
 				Interval: k8sutil.NewDurationS(30),
+			},
+		}
+	} else if garbageCollection == Native {
+		o.AuditConfiguration.GarbageCollection = &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+			NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+				PruneAge: k8sutil.NewDurationS(30),
 			},
 		}
 	}

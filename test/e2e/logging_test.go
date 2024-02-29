@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -60,14 +61,8 @@ func TestNoLogOrAuditConfig(t *testing.T) {
 
 // Audit log appears on standard output when enabled.
 // Audit logs are removed automatically by the GC - confirm with short rotation interval and check output of the sidecar includes log names.
-func TestLoggingAndAuditingDefaults(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithAuditing(true).WithDefaultLogStreaming().Generate(kubernetes)
+func testLoggingAndAuditingDefaults(t *testing.T, kubernetes *types.Cluster, cleanupType e2eutil.AuditGarbageCollection) {
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).WithAuditing(cleanupType).WithDefaultLogStreaming().Generate(kubernetes)
 
 	// Create a dodgy log config to prove it is reconciled correctly later
 	e2eutil.SetInvalidLogStreamingConfig(t, kubernetes, cluster.Spec.Logging.Server.ConfigurationName)
@@ -101,6 +96,26 @@ func TestLoggingAndAuditingDefaults(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestLoggingAndAuditingDefaults(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	testLoggingAndAuditingDefaults(t, kubernetes, e2eutil.Sidecar)
+}
+
+func TestLoggingAndAuditingNativeCleanup(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.4")
+
+	testLoggingAndAuditingDefaults(t, kubernetes, e2eutil.Native)
+}
+
 // If no GC enabled then sidecar is not running.
 // Can enable auditing without logging.
 // Audit configuration passed through to REST API - verify with some custom updates to the CRD and check the audit REST API response.
@@ -112,7 +127,7 @@ func TestAuditingNoLogging(t *testing.T) {
 	defer cleanup()
 
 	// GC is not supported without logging - tested by validation - so disable here.
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(false).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(e2eutil.None).MustCreate(t, kubernetes)
 
 	e2eutil.MustCheckAuditConfiguration(t, kubernetes, cluster)
 	// Check no extra sidecars

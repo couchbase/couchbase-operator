@@ -608,6 +608,12 @@ func (c *CouchbaseCluster) IsAuditGarbageCollectionSidecarEnabled() bool {
 	return c.IsAuditGarbageCollectionEnabled() && c.Spec.Logging.Audit.GarbageCollection.Sidecar != nil && c.Spec.Logging.Audit.GarbageCollection.Sidecar.Enabled
 }
 
+func (c *CouchbaseCluster) IsNativeAuditCleanupEnabled() bool {
+	return c.IsAuditLoggingEnabled() && c.Spec.Logging.Audit.GarbageCollection != nil &&
+		c.Spec.Logging.Audit.GarbageCollection.NativePruning != nil &&
+		c.Spec.Logging.Audit.GarbageCollection.NativePruning.PruneAge != nil
+}
+
 // IsIndexerEnabled tells us whether any server class is running the index service.
 // This is useful as the storage mode cannot be changed on the fly.
 func (c *CouchbaseCluster) IsIndexerEnabled() bool {

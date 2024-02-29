@@ -11,6 +11,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -1026,6 +1027,93 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 					Remove("/spec/servers/0/volumeMounts"),
 			},
 			shouldFail: true,
+		},
+		{
+			name: "TestValidateLoggingIgnoresNativeGCWithNoAudit",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: false,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+								PruneAge: k8sutil.NewDurationS(30),
+							},
+						},
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateLoggingFailsAuditNativeGCUnsupportedVersion",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: true,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+								PruneAge: k8sutil.NewDurationS(30),
+							},
+						},
+					}).
+					Replace("/spec/image", "couchbase/server:7.2.0"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`only supported for server version 7.2.4`},
+		},
+		{
+			name: "TestValidateLoggingFailsAuditNativeAndSidecarGC",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: true,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+								PruneAge: k8sutil.NewDurationS(30),
+							},
+							Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
+								Enabled: true,
+							},
+						},
+					}).
+					Replace("/spec/image", "couchbase/server:7.2.4"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`mutually exclusive`},
+		},
+		{
+			name: "TestValidateLoggingFailsAuditNativeGCWithNoPersistentVolume",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: true,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+								PruneAge: k8sutil.NewDurationS(30),
+							},
+						},
+					}).
+					Replace("/spec/image", "couchbase/server:7.2.4").
+					Remove("/spec/servers/0/volumeMounts"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.servers.volumeMounts`},
+		},
+		{
+			name: "TestValidateLoggingFailsAuditNativeGCOverMaximum",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
+						Enabled: true,
+						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
+							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
+								PruneAge: k8sutil.NewDurationS(35791395),
+							},
+						},
+					}).
+					Replace("/spec/image", "couchbase/server:7.2.4"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`has a maximum of`},
 		},
 		{
 			name: "TestValidateLoggingFailsForInvalidAuditUser",

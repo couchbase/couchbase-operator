@@ -1435,6 +1435,8 @@ type AuditSettings struct {
 	RotateSize int `json:"rotateSize" url:"rotateSize"`
 	// Not to be set ever but we do have to make sure we default it correctly in case someone else sets it
 	LogPath string `json:"logPath" url:"logPath"`
+	// The number of seconds Couchbase Server keeps rotated audit logs.
+	PruneAge *uint32 `json:"pruneAge,omitempty" url:"pruneAge"`
 }
 
 type AuditUser struct {

@@ -148,6 +148,7 @@ func registerTests() {
 		framework.NewTestDef(TestRotateAdminPassword).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestNoLogOrAuditConfig).WithTags(TagSuiteSanity, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingAndAuditingDefaults).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),
+		framework.NewTestDef(TestLoggingAndAuditingNativeCleanup).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),
 		framework.NewTestDef(TestViewsCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestFTSCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestSyncGatewayCreateLocal).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureSyncGateway),

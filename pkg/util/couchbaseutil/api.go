@@ -473,6 +473,10 @@ func SetAuditSettings(settings AuditSettings) *Request {
 
 	data.Set("disabledUsers", usersCSV)
 
+	if settings.PruneAge != nil {
+		data.Set("pruneAge", IntToStr(int(*settings.PruneAge)))
+	}
+
 	return NewRequest((*Client).Post, "/settings/audit", []byte(data.Encode()), nil)
 }
 

@@ -742,6 +742,13 @@ func (c *Cluster) reconcileAuditSettings() error {
 		requested.DisabledEvents = []int{}
 	}
 
+	if pruningSupported, err := c.IsAtLeastVersion("7.2.4"); err != nil {
+		return err
+	} else if pruningSupported && c.cluster.IsNativeAuditCleanupEnabled() {
+		pruneAge := uint32(auditSettings.GarbageCollection.NativePruning.PruneAge.Duration.Seconds())
+		requested.PruneAge = &pruneAge
+	}
+
 	sort.Ints(requested.DisabledEvents)
 	sort.Ints(current.DisabledEvents)
 

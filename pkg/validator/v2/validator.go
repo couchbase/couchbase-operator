@@ -31,7 +31,8 @@ import (
 )
 
 const (
-	bucketTTLMax = (1 << 31) - 1 // Puny 32 bit signed integers
+	bucketTTLMax       = (1 << 31) - 1 // Puny 32 bit signed integers
+	pruneAgeMaxSeconds = 35791394
 )
 
 // CheckConstraints does domain specific validation for a Couchbase cluster.
@@ -475,8 +476,29 @@ func checkConstraintLoggingPermissible(_ *types.Validator, cluster *couchbasev2.
 // checkConstraintAuditLoggingPermissible checks that when using the audit log
 // garbage collector, shared volumes are enabled and audit logging is also enabled.
 func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if !cluster.IsAuditGarbageCollectionSidecarEnabled() {
+	if !cluster.IsAuditGarbageCollectionSidecarEnabled() && !cluster.IsNativeAuditCleanupEnabled() {
 		return nil
+	}
+
+	if cluster.IsAuditGarbageCollectionSidecarEnabled() && cluster.IsNativeAuditCleanupEnabled() {
+		return fmt.Errorf("'spec.logging.audit.garbageCollection.sidecar' and 'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' are mutually exclusive")
+	}
+
+	if cluster.IsNativeAuditCleanupEnabled() {
+		tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+		if err != nil {
+			return err
+		}
+
+		if nativeCleanupSupported, err := couchbaseutil.VersionAfter(tag, "7.2.4"); err != nil {
+			return err
+		} else if !nativeCleanupSupported {
+			return fmt.Errorf("'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' is only supported for server version 7.2.4+")
+		}
+
+		if int(cluster.Spec.Logging.Audit.GarbageCollection.NativePruning.PruneAge.Seconds()) > pruneAgeMaxSeconds {
+			return fmt.Errorf("'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.pruneAge' has a maximum of 35791394 seconds")
+		}
 	}
 
 	if !cluster.IsSupportable() {
@@ -484,7 +506,7 @@ func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchba
 	}
 
 	if !cluster.IsAuditLoggingEnabled() {
-		return fmt.Errorf("server audit logging requires 'spec.logging.audit.garbageCollection.sidecar.enabled' to be set")
+		return fmt.Errorf("server audit logging requires 'spec.logging.audit.garbageCollection.sidecar.enabled' or 'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' to be set")
 	}
 
 	return nil
