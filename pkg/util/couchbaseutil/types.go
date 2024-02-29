@@ -1720,6 +1720,21 @@ type RunningTask struct {
 	LastReportURI         string `json:"lastReportURI"`
 }
 
+type XDCRConnectionPreCheckResponse struct {
+	HostName string `json:"hostname"`
+	TaskID   string `json:"taskId"`
+	Username string `json:"username"`
+}
+
+// XdcrConnectionCheckResponse I hate this but that's what the API gives us :(.
+type XdcrConnectionCheckResponse struct {
+	Done   bool                           `json:"done"`
+	Result map[string]map[string][]string `json:"result"`
+	TaskID string                         `json:"taskId"`
+}
+
+// End of the formatting I hate
+
 type DataServiceSettings struct {
 	MinReplicasCount int `url:"minReplicasCount" json:"minReplicasCount"`
 }

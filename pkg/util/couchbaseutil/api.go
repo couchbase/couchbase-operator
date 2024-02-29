@@ -653,6 +653,24 @@ func DeleteRemoteCluster(r *RemoteCluster) *Request {
 	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), nil, nil)
 }
 
+// PreCheckXDCR sends a request to check the XDCR connections.
+// NOTE: You will need to watch the response to make sure the task completes successfully.
+func PreCheckXDCR(r *RemoteCluster, xdcrConnectionPreCheckResponse *XDCRConnectionPreCheckResponse) *Request {
+	data, err := urlencoding.Marshal(r)
+
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/xdcr/connectionPreCheck", data, xdcrConnectionPreCheckResponse)
+}
+
+func CheckXDCRCheckTask(response XDCRConnectionPreCheckResponse, s *XdcrConnectionCheckResponse) *Request {
+	taskID := response.TaskID
+
+	return NewRequest((*Client).Get, fmt.Sprintf("/xdcr/connectionPreCheck?taskId=%s", taskID), nil, s)
+}
+
 // GetReplicationSettings helps manage the utter horror show that is XDCR
 // replications.
 func GetReplicationSettings(s *ReplicationSettings, uuid, from, to string) *Request {

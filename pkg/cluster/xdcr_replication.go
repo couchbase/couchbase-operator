@@ -8,12 +8,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -24,6 +26,7 @@ var (
 	ErrXDCRMigrationNoRules              = fmt.Errorf("no migration rules defined")
 	ErrXDCRMigrationNoTargetCollection   = fmt.Errorf("no target collection specified")
 	ErrXDCRReplicationInvalidMappingRule = fmt.Errorf("invalid replication rule")
+	ErrXDCRCheckFailed                   = fmt.Errorf("XDCR pre check failed")
 )
 
 const (
@@ -733,10 +736,51 @@ func (c *Cluster) reconcileXDCRReplications(requestedReplications couchbaseutil.
 	return nil
 }
 
+// checkXDCRTask checks the XDCR connections.
+func (c *Cluster) checkXDCRTask(cluster *couchbaseutil.RemoteCluster, atLeast721 bool) error {
+	if !atLeast721 {
+		return nil
+	}
+
+	xdcrPreCheckResponse := couchbaseutil.XDCRConnectionPreCheckResponse{}
+
+	if err := couchbaseutil.PreCheckXDCR(cluster, &xdcrPreCheckResponse).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	err := retryutil.RetryFor(5*time.Minute, func() error {
+		xdcrCheckResponse := couchbaseutil.XdcrConnectionCheckResponse{}
+
+		if err := couchbaseutil.CheckXDCRCheckTask(xdcrPreCheckResponse, &xdcrCheckResponse).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		resultMessage := xdcrCheckResponse.Result
+
+		for item := range resultMessage {
+			resultMessageNode := resultMessage[item]
+			for node := range resultMessageNode {
+				resultString := resultMessageNode[node]
+				if strings.Contains(resultString[0], "successful") {
+					return nil
+				}
+			}
+		}
+		return ErrXDCRCheckFailed
+	})
+
+	return err
+}
+
 // reconcileXDCR creates and deletes XDCR connections dynamically.
 func (c *Cluster) reconcileXDCR() error {
 	if !c.cluster.Spec.XDCR.Managed {
 		return nil
+	}
+
+	atLeast721, err := c.IsAtLeastVersion("7.2.1")
+	if err != nil {
+		return err
 	}
 
 	requestedClusters, requestedReplications, err := c.generateXDCR()
@@ -754,6 +798,10 @@ func (c *Cluster) reconcileXDCR() error {
 	for i := range updates {
 		cluster := &updates[i]
 
+		if err := c.checkXDCRTask(cluster, atLeast721); err != nil {
+			return err
+		}
+
 		log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
 		if err := couchbaseutil.UpdateRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
@@ -770,6 +818,10 @@ func (c *Cluster) reconcileXDCR() error {
 	creates := remoteClusterCreations(currentClusters, requestedClusters)
 	for i := range creates {
 		cluster := &creates[i]
+
+		if err := c.checkXDCRTask(cluster, atLeast721); err != nil {
+			return err
+		}
 
 		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
@@ -796,6 +848,10 @@ func (c *Cluster) reconcileXDCR() error {
 	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
 	for i := range deletes {
 		cluster := &deletes[i]
+
+		if err := c.checkXDCRTask(cluster, atLeast721); err != nil {
+			return err
+		}
 
 		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
