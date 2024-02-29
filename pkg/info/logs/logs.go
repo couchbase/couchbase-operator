@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
@@ -459,6 +460,50 @@ func configure(context *context.Context, logEntries LogEntryList) indexSet {
 	return configureNonInteractive(context, logEntries)
 }
 
+func runCollect(resultChan chan *util.CollectInfoResult, context *context.Context, entry LogEntry) {
+	// Always return a result.
+	result := &util.CollectInfoResult{
+		Pod: entry.pod,
+	}
+
+	defer func() {
+		resultChan <- result
+	}()
+	// Handle log volumes specially, they need an ephemeral pod creating
+	// and destroying once complete.
+	if entry.Type == LogTypePersistentVolumeClaim {
+		// Create the temporary pod.
+		var cleanup func()
+
+		result.Pod, cleanup, result.Err = createEphemeralPod(context, entry.pvc)
+		if result.Err != nil {
+			return
+		}
+
+		// Ensure we clean up the pod in the event of an error.
+		defer cleanup()
+	}
+
+	// Collect the logs locally to the pod
+	result = util.CollectInfo(context, result.Pod)
+	if result.Err != nil {
+		return
+	}
+
+	// Download the logs to the local host
+	result.Err = util.CopyFromPod(context, result.Pod, []string{result.FileName})
+	if result.Err != nil {
+		return
+	}
+
+	// Clean up so as to not exhaust space
+	result.Err = util.CleanLogs(context, result.Pod)
+
+	if result.Err != nil {
+		return
+	}
+}
+
 // Collect is the top level server log collection function.
 func Collect(context *context.Context) error {
 	// Only collect logs if the user has asked for it.
@@ -482,53 +527,32 @@ func Collect(context *context.Context) error {
 	indices := configure(context, logList)
 
 	// Collect the logs in parallel.
-	resultChan := make(chan *util.CollectInfoResult)
+	resultChan := make(chan *util.CollectInfoResult, len(indices))
+
+	wg := sync.WaitGroup{}
+
+	var counter int
 
 	for index := range indices {
-		go func(entry LogEntry) {
-			// Always return a result.
-			result := &util.CollectInfoResult{
-				Pod: entry.pod,
-			}
+		if counter < context.Config.Parallel+1 {
+			wg.Add(1)
 
-			defer func() {
-				resultChan <- result
+			go func() {
+				defer wg.Done()
+
+				runCollect(resultChan, context, logList[index])
 			}()
+		}
+		counter++
 
-			// Handle log volumes specially, they need an ephemeral pod creating
-			// and destroying once complete.
-			if entry.Type == LogTypePersistentVolumeClaim {
-				// Create the temporary pod.
-				var cleanup func()
+		if counter >= context.Config.Parallel+1 {
+			wg.Wait()
 
-				result.Pod, cleanup, result.Err = createEphemeralPod(context, entry.pvc)
-				if result.Err != nil {
-					return
-				}
-
-				// Ensure we clean up the pod in the event of an error.
-				defer cleanup()
-			}
-
-			// Collect the logs locally to the pod
-			result = util.CollectInfo(context, result.Pod)
-			if result.Err != nil {
-				return
-			}
-
-			// Download the logs to the local host
-			result.Err = util.CopyFromPod(context, result.Pod, []string{result.FileName})
-			if result.Err != nil {
-				return
-			}
-
-			// Clean up so as to not exhaust space
-			result.Err = util.CleanLogs(context, result.Pod)
-			if result.Err != nil {
-				return
-			}
-		}(logList[index])
+			counter = 0
+		}
 	}
+
+	wg.Wait()
 
 	// Fan in the results for display.
 	results := []*util.CollectInfoResult{}

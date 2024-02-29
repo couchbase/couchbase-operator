@@ -28,6 +28,8 @@ type Configuration struct {
 	// CollectInfoCollect determines the logs to collect from the CLI.  Valid values
 	// are an indices e.g. 1, ranges 2-3, a comma separated combination 1,3,5-6 or all.
 	CollectInfoCollect string
+	// Parallel determines how many pods to collect logs from at once
+	Parallel int
 	// EventCollectorPort defines the port that the event collector
 	EventCollectorPort string
 	// OperatorImage defines what the operator image is called.
@@ -65,6 +67,7 @@ const (
 	collectInfoRedactFlag   = "collectinfo-redact"
 	collectInfoListFlag     = "collectinfo-list"
 	collectInfoCollectFlag  = "collectinfo-collect"
+	parallelFlag            = "parallel"
 	directoryFlag           = "directory"
 	clusterFlag             = "couchbase-cluster"
 	logLevelFlag            = "log-level"
@@ -101,6 +104,7 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.OperatorMetricsPort, operatorMetricsPortFlag, "8383", "Operator metrics port")
 	flags.StringVar(&c.ServerImage, serverImageFlag, "couchbase/server:7.1.3", "Couchbase server image")
 	flags.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, "", "Collect couchbase server logs non-interactively, requires the -"+collectInfoFlag+" flag to be set")
+	flags.IntVar(&c.Parallel, parallelFlag, 5, "How many pods to collect logs from at the same time")
 	flags.StringVar(&c.Directory, directoryFlag, "", "Collect logs in a specific directory")
 	flags.BoolVar(&c.All, allFlag, false, "Collect all resources from the namespace")
 	flags.BoolVar(&c.System, systemFlag, false, "Collect kube-system resources and logs")
