@@ -2505,7 +2505,7 @@ func TestTLSScriptCreateRestRotate(t *testing.T) {
 	secretName := "tls-passphrase"
 	passphraseNew := "restpass"
 	address := e2eutil.GetHostAddressWithPort(t, 1000, 6000)
-	s := startWebServ(address, passphrase)
+	s := startWebServ(address, passphraseNew)
 
 	defer func() {
 		_ = s.Shutdown(context.Background())
@@ -2543,32 +2543,22 @@ func TestTLSScriptCreateRestRotate(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
-	// Create the passphrase secret
-	secret = &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: passphraseNew,
-		},
-		Data: map[string][]byte{
-			pkgconstants.PassphraseSecretKey: []byte(passphraseNew),
-		},
-	}
-	e2eutil.MustCreateSecret(t, kubernetes, secret)
-
 	// Rotate the server certificates with new passphrase
 	opts.KeyPassphrase = passphraseNew
 	e2eutil.MustRotateServerCertificate(t, ctx, &opts)
 
-	// Check the events match what we expect:
-	// * Cluster created
-	// * TLS update event occurred
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{
-			Times:     clusterSize,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		},
-	}
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	// Change the passphrase config from script to rest
+	patchset := jsonpatch.NewPatchSet().
+		Remove("/spec/networking/tls/passphrase/script").
+		Add("/spec/networking/tls/passphrase/rest", &couchbasev2.PassphraseRestConfig{
+			URL: "http://" + address,
+		})
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 }
 
 func TestClusterUpdateUsingScript(t *testing.T) {
