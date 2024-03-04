@@ -418,14 +418,12 @@ func TestAutoscaleConflict(t *testing.T) {
 	configName := cluster.Spec.Servers[0].Name
 
 	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.AutoscaleUpEvent(cluster, configName, 2, 3), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, v1.ConditionTrue, cluster, time.Minute)
 
 	// Change CouchbaseAutoscaler size to 6 (max Pods) before cluster finishes scaling.
 	// This imitates behavior of HPA wanting to scale while rebalance is occurring.
 	autoscalerName := cluster.Spec.Servers[0].AutoscalerName(cluster.Name)
 	e2eutil.MustUpdateScale(t, kubernetes, cluster.Namespace, autoscalerName, 6)
-
-	// Allow cluster to finish rebalancing
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 
 	// Also Change CouchbaseCluster size to 2 before cluster finishes scaling.
 	// This would occur if user observes an autoscale happening but wanted to manually go
