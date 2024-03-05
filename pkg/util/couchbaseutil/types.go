@@ -159,8 +159,8 @@ type IndexSettings struct {
 }
 
 type FailoverOnDiskFailureSettings struct {
-	Enabled    bool  `url:"failoverOnDataDiskIssues[enabled]" json:"enabled"`
-	TimePeriod int64 `url:"failoverOnDataDiskIssues[timePeriod]" json:"timePeriod"`
+	Enabled    bool   `url:"failoverOnDataDiskIssues[enabled]" json:"enabled"`
+	TimePeriod *int64 `url:"failoverOnDataDiskIssues[timePeriod],omitempty" json:"timePeriod"`
 }
 
 type AutoFailoverSettings struct {
