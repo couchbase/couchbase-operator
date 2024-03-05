@@ -411,13 +411,16 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 
 	// Marshal the CR spec into the same type as the existing failover settings
 	clusterSettings := c.cluster.Spec.ClusterSettings
+
+	dataDiskFailoverTimePeriod := k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod)
+
 	specFailoverSettings := &couchbaseutil.AutoFailoverSettings{
 		Enabled:  true,
 		Timeout:  k8sutil.Seconds(clusterSettings.AutoFailoverTimeout),
 		MaxCount: clusterSettings.AutoFailoverMaxCount,
 		FailoverOnDataDiskIssues: couchbaseutil.FailoverOnDiskFailureSettings{
 			Enabled:    clusterSettings.AutoFailoverOnDataDiskIssues,
-			TimePeriod: k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod),
+			TimePeriod: &dataDiskFailoverTimePeriod,
 		},
 		FailoverServerGroup: &failoverServerGroup,
 	}
@@ -434,15 +437,21 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// requests when it refuses to obey our commands. Mask these out too if
 	// irrelevant
 	if !failoverSettings.FailoverOnDataDiskIssues.Enabled {
-		failoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
+		*failoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
 	}
 
 	if !specFailoverSettings.FailoverOnDataDiskIssues.Enabled {
-		specFailoverSettings.FailoverOnDataDiskIssues.TimePeriod = 0
+		dataDiskFailoverTimePeriod = 0
 	}
 
 	// Check to see if we need to reconcile
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
+		// CB Server 7.6.0 won't let this value be 0 so remove it
+		// and in earlier versions it's ignore if enabled = false.
+		if !specFailoverSettings.FailoverOnDataDiskIssues.Enabled {
+			specFailoverSettings.FailoverOnDataDiskIssues.TimePeriod = nil
+		}
+
 		if err := couchbaseutil.SetAutoFailoverSettings(specFailoverSettings).On(c.api, c.readyMembers()); err != nil {
 			log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)

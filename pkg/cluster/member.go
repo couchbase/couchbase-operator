@@ -453,6 +453,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 
 	failoverServerGroup := settings.AutoFailoverServerGroup
 
+	dataDiskFailoverTimePeriod := k8sutil.Seconds(settings.AutoFailoverOnDataDiskIssuesTimePeriod)
 	// Enable autofailover by default.
 	autoFailoverSettings := &couchbaseutil.AutoFailoverSettings{
 		Enabled:  true,
@@ -460,7 +461,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 		MaxCount: settings.AutoFailoverMaxCount,
 		FailoverOnDataDiskIssues: couchbaseutil.FailoverOnDiskFailureSettings{
 			Enabled:    settings.AutoFailoverOnDataDiskIssues,
-			TimePeriod: k8sutil.Seconds(settings.AutoFailoverOnDataDiskIssuesTimePeriod),
+			TimePeriod: &dataDiskFailoverTimePeriod,
 		},
 		FailoverServerGroup: &failoverServerGroup,
 	}
