@@ -78,15 +78,8 @@ spec:
         interval: “15m”
         size: “20Mi”
       garbageCollection:
-        sidecar:
-          enabled: true # <.>
-          image: "{logging-helper}" # <.>
-          age: “1h”
-          interval: “20m”
-          resources:
-            requests:
-              cpu:
-              memory:
+        nativePruning:
+          age: "1h" # <.>
 ----
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-enabled[`couchbaseclusters.spec.logging.audit.enabled`]: Setting this field to `true` enables audit logging on the Couchbase cluster.
@@ -99,6 +92,50 @@ This field normally defaults to an empty array.
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-disabledusers[`couchbaseclusters.spec.logging.audit.disabledUsers`]: This field can be set to an array of one or more xref:server:learn:security/auditing.adoc#filterable-and-non-filterable-events[filterable] xref:server:manage:manage-security/manage-auditing.adoc#ignoring-events-by-user[user strings] that will be disabled for auditing purposes.
 This field normally defaults to an empty array.
+
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection-nativepruning-age[`couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.age`]: Setting this field to any time period enables garbage collection of rotated audit logs.
+This field defaults to `0`.
++
+This is technically the only field that is required to configure garbage collection of rotated audit logs using native audit log cleanup which is available 
+in Couchbase Server 7.2.4+. Note, however, that garbage collection can only be enabled if xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-enabled[`couchbaseclusters.spec.logging.audit.enabled`] is also set to `true`.
+
+After enabling automated audit logging, you should take care only to use the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification for making further modifications to the audit logging configuration.
+Manual changes that are made to the configuration via the Couchbase UI, CLI, or REST API (such as changing the audit log directory) are not prevented by the Autonomous Operator, and can cause audit logging failures.
+
+NOTE: Changing the location of the audit log is not supported, as it would break the ability for the Autonomous Operator to xref:concept-couchbase-logging.adoc#log-forwarding[forward] audit logs.
+
+==== Sidecar Garbage Collection
+kbd:[deprecated]
+
+Native audit log cleanup was introduced in Couchbase Server 7.2.4, for earlier versions the Couchbase Autonomous Operator can deploy ba sidecar container with the Couchbase Server to cleanup rotated logs. 
+
+[source,yaml,subs="attributes,verbatim"]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+spec:
+  logging:
+    audit:
+      enabled: true
+      disabledEvents:
+        - 8243
+      disabledUsers:
+        - "@eventing/local"
+        - "@cbq-engine/local"
+      rotation:
+        interval: “15m”
+        size: “20Mi”
+      garbageCollection:
+        sidecar:
+          enabled: true # <.>
+          image: "{logging-helper}" # <.>
+          age: “1h”
+          interval: “20m”
+          resources:
+            requests:
+              cpu:
+              memory:
+----
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-enabled[`couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.enabled`]: Setting this field to `true` enables garbage collection of rotated audit logs.
 This field defaults to `false`.
@@ -113,10 +150,12 @@ Be aware that there are security concerns with using a standard Linux image, suc
 In order to limit potential abuse, the garbage collection sidecar uses a sub-path to only mount the logs directory.
 In addition, the commands run by the garbage collector are not configurable, and the filenames of removed logs are printed to the garbage collector's standard output.
 
-After enabling automated audit logging, you should take care only to use the xref:resource/couchbasecluster.adoc[`CouchbaseCluster`] resource specification for making further modifications to the audit logging configuration.
-Manual changes that are made to the configuration via the Couchbase UI, CLI, or REST API (such as changing the audit log directory) are not prevented by the Autonomous Operator, and can cause audit logging failures.
 
-NOTE: Changing the location of the audit log is not supported, as it would break the ability for the Autonomous Operator to xref:concept-couchbase-logging.adoc#log-forwarding[forward] audit logs.
+[WARNING]
+====
+Use of this configuration mode is deprecated and will be removed in a future release.
+It is highly recommended that you use, or migrate to, one of the other modes.
+====
 
 == Collecting Logs
 

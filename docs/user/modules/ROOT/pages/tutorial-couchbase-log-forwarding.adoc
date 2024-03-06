@@ -67,6 +67,9 @@ spec:
     audit:
       enabled: true # <.>
       garbageCollection:
+        nativePruning:
+          age: "1h" # <.>
+
         sidecar:
           enabled: true # <.>
   image: couchbase/server:{couchbase-version}
@@ -109,11 +112,9 @@ This field normally defaults to `false`.
 Unlike other Couchbase logging, audit logging is not turned on by default.
 Since some of the examples in this tutorial utilize audit logs, we want to make sure it is turned on.
 
-<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-enabled[`couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.enabled`]: Setting this field to `true` enables garbage collection of rotated audit logs, and instructs the Autonomous Operator to deploy a sidecar helper container in each Couchbase pod for cleaning up rotated logs.
-This field normally defaults to `false`.
-+
-Couchbase Server rotates audit logs, but cannot, itself, expire or delete them.
-Therefore, for the purposes of this tutorial, we want to enable garbage collection to clean up rotated audit logs so that they don't accidentally consume all available storage.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection-nativepruning-age[`couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.age`]: Setting this field to a time period enables garbage collection of rotated audit logs using Couchbase Servers 
+native audit log cleanup available in Couchbase Server 7.2.4+.
+This field normally defaults to `0`.
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-volumeclaimtemplates[`couchbaseclusters.spec.volumeClaimTemplates`]: This setting is not specifically for log forwarding, it is purely that log forwarding requires a persistent volume to access the logs so this shows an example of how to set one up.
 Refer to the storage documentation for your platform as well as the xref:concept-persistent-volumes.adoc[Couchbase documentation] for full details.

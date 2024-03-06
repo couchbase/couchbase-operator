@@ -63,9 +63,6 @@ spec:
         image: "couchbase/{logging-version}" # <.>
     audit:
       enabled: false # <.>
-      garbageCollection:
-        sidecar:
-          enabled: false
 ----
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-server-enabled[`couchbaseclusters.spec.logging.server.enabled`]: This is technically the only field that must be changed in order to enable log forwarding.
