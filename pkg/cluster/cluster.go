@@ -824,6 +824,20 @@ func (c *Cluster) indexOfServerConfigWithService(svc couchbasev2.Service) int {
 	return -1
 }
 
+func (c *Cluster) amountOfServersWithService(svc couchbasev2.Service) int {
+	numberOfPods := 0
+
+	for _, member := range c.members {
+		for _, service := range c.cluster.Spec.GetServerConfigByName(member.Config()).Services {
+			if service == svc {
+				numberOfPods++
+			}
+		}
+	}
+
+	return numberOfPods
+}
+
 // clusterCreateMember create a new member and adds it to our member list.
 func (c *Cluster) clusterCreateMember(member couchbaseutil.Member) error {
 	firstMember := c.members.Empty()

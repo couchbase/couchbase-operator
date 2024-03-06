@@ -1119,11 +1119,28 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 }
 
 // gracefulFailoverMember will gracefully fail over a member and watch the tasks endpoint to wait for the failover to finish.
-func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member, c *Cluster) error {
+// Returns a bool if it's possible to perform a deltaRecovery.
+func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
+	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+	services := serverClass.Services
+	gracefulFailover := false
+
+	for _, service := range services {
+		if service == couchbasev2.DataService && c.amountOfServersWithService(couchbasev2.DataService) > 1 {
+			gracefulFailover = true
+			break
+		}
+	}
+
+	if !gracefulFailover {
+		log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
+		return false, nil
+	}
+
 	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
 
 	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
-		return err
+		return false, err
 	}
 
 	err := retryutil.RetryFor(5*time.Minute, func() error {
@@ -1144,7 +1161,7 @@ func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member
 		return ErrNoRunningTasks
 	})
 
-	return err
+	return true, err
 }
 
 func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
@@ -1196,14 +1213,15 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			}
 		}
 
-		if err := r.gracefulFailoverMember(candidate, c); err != nil {
+		canDeltaRecover, err := r.gracefulFailoverMember(candidate, c)
+		if err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
 
 			return err
 		}
 
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil && canDeltaRecover {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
 
