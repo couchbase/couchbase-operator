@@ -1034,10 +1034,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 				"cluster": jsonpatch.NewPatchSet().
 					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 						Enabled: false,
-						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-								PruneAge: k8sutil.NewDurationS(30),
-							},
+						Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+							PruneAge: k8sutil.NewDurationS(30),
 						},
 					}),
 			},
@@ -1049,10 +1047,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 				"cluster": jsonpatch.NewPatchSet().
 					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 						Enabled: true,
-						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-								PruneAge: k8sutil.NewDurationS(30),
-							},
+						Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+							PruneAge: k8sutil.NewDurationS(30),
 						},
 					}).
 					Replace("/spec/image", "couchbase/server:7.2.0"),
@@ -1067,12 +1063,12 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 						Enabled: true,
 						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-								PruneAge: k8sutil.NewDurationS(30),
-							},
 							Sidecar: &couchbasev2.CouchbaseClusterAuditCleanupSidecarSpec{
 								Enabled: true,
 							},
+						},
+						Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+							PruneAge: k8sutil.NewDurationS(30),
 						},
 					}).
 					Replace("/spec/image", "couchbase/server:7.2.4"),
@@ -1086,10 +1082,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 				"cluster": jsonpatch.NewPatchSet().
 					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 						Enabled: true,
-						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-								PruneAge: k8sutil.NewDurationS(30),
-							},
+						Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+							PruneAge: k8sutil.NewDurationS(30),
 						},
 					}).
 					Replace("/spec/image", "couchbase/server:7.2.4").
@@ -1104,10 +1098,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 				"cluster": jsonpatch.NewPatchSet().
 					Add("/spec/logging/audit", &couchbasev2.CouchbaseClusterAuditLoggingSpec{
 						Enabled: true,
-						GarbageCollection: &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-							NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-								PruneAge: k8sutil.NewDurationS(35791395),
-							},
+						Rotation: &couchbasev2.CouchbaseClusterLogRotationSpec{
+							PruneAge: k8sutil.NewDurationS(35791395),
 						},
 					}).
 					Replace("/spec/image", "couchbase/server:7.2.4"),

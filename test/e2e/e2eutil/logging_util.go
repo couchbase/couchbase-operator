@@ -68,11 +68,10 @@ func checkAuditSpec(auditSpec *couchbasev2.CouchbaseClusterAuditLoggingSpec, act
 			return NewErrInvalidIntegerCheck("auditing disabled users length: %d != %d", len(actualSettings.DisabledUsers), len(auditSpec.DisabledUsers))
 		}
 
-		if auditSpec.GarbageCollection != nil &&
-			auditSpec.GarbageCollection.NativePruning != nil &&
-			auditSpec.GarbageCollection.NativePruning.PruneAge != nil &&
-			int(auditSpec.GarbageCollection.NativePruning.PruneAge.Duration.Seconds()) != int(*actualSettings.PruneAge) {
-			return NewErrInvalidIntegerCheck("auditing cleanup prune age: %d != %d", int(auditSpec.GarbageCollection.NativePruning.PruneAge.Duration.Seconds()), int(*actualSettings.PruneAge))
+		if auditSpec.Rotation != nil &&
+			auditSpec.Rotation.PruneAge != nil &&
+			int(auditSpec.Rotation.PruneAge.Duration.Seconds()) != int(*actualSettings.PruneAge) {
+			return NewErrInvalidIntegerCheck("auditing cleanup prune age: %d != %d", int(auditSpec.Rotation.PruneAge.Duration.Seconds()), int(*actualSettings.PruneAge))
 		}
 	} else if actualSettings.Enabled {
 		// Auditing was not enabled in the CRD but is reported as enabled

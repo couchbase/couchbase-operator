@@ -509,11 +509,7 @@ func (o *ClusterOptions) WithAuditing(garbageCollection AuditGarbageCollection) 
 			},
 		}
 	} else if garbageCollection == Native {
-		o.AuditConfiguration.GarbageCollection = &couchbasev2.CouchbaseClusterAuditGarbageCollectionSpec{
-			NativePruning: &couchbasev2.CouchbaseClusterAuditCleanupSpec{
-				PruneAge: k8sutil.NewDurationS(30),
-			},
-		}
+		o.AuditConfiguration.Rotation.PruneAge = k8sutil.NewDurationS(30)
 	}
 
 	return o

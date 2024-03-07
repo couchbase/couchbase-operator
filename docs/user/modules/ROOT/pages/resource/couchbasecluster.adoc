@@ -118,8 +118,6 @@ The following is an example resource, depicting the overall structure and any de
       - ""
       <<couchbaseclusters-spec-logging-audit-enabled,enabled>>: false
       <<couchbaseclusters-spec-logging-audit-garbagecollection,garbageCollection>>:
-        <<couchbaseclusters-spec-logging-audit-garbagecollection-nativepruning,nativePruning>>:
-          <<couchbaseclusters-spec-logging-audit-garbagecollection-nativepruning-age,age>>: 0
         <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar,sidecar>>:
           <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-age,age>>: 1h
           <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-enabled,enabled>>: false
@@ -128,6 +126,7 @@ The following is an example resource, depicting the overall structure and any de
           <<couchbaseclusters-spec-logging-audit-garbagecollection-sidecar-resources,resources>>: {}
       <<couchbaseclusters-spec-logging-audit-rotation,rotation>>:
         <<couchbaseclusters-spec-logging-audit-rotation-interval,interval>>: 15m
+        <<couchbaseclusters-spec-logging-audit-rotation-pruneage,pruneAge>>: 0
         <<couchbaseclusters-spec-logging-audit-rotation-size,size>>: 20Mi
     <<couchbaseclusters-spec-logging-logretentioncount,logRetentionCount>>: 0
     <<couchbaseclusters-spec-logging-logretentiontime,logRetentionTime>>: ""
@@ -1687,30 +1686,6 @@ This is not part of the audit REST API, it is intended to handle GC automaticall
 By default the Couchbase Server rotates the audit logs but does not clean up the rotated logs.
 This is left as an operation for the cluster administrator to manage, the operator allows for us to automate this: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
 
-=== couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning
-
-==== Constraints
-
-*Type*: `object`
-
-==== Description
-
-Couchbase Server 7.2.4+ can prune audit logs after a certain time period.
-
-=== couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.age
-
-==== Constraints
-
-*Type*: `string`
-
-*Default*: `0`
-
-==== Description
-
-How long Couchbase Server keeps rotated audit logs in minutes.
-If set to 0 (the default) then audit logs won't be pruned.
-Has a maximum of 35791394 seconds.
-
 === couchbaseclusters.spec.logging.audit.garbageCollection.sidecar
 
 ==== Constraints
@@ -1719,7 +1694,8 @@ Has a maximum of 35791394 seconds.
 
 ==== Description
 
-Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
+*DEPRECATED* - by spec.logging.audit.nativePruning for Couchbase Server 7.2.4+ Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
+
 
 === couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.age
 
@@ -1801,6 +1777,20 @@ This is passed to the REST API, see here for details: https://docs.couchbase.com
 ==== Description
 
 The interval at which to rotate log files, defaults to 15 minutes.
+
+=== couchbaseclusters.spec.logging.audit.rotation.pruneAge
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `0`
+
+==== Description
+
+How long Couchbase Server keeps rotated audit logs.
+If set to 0 (the default) then audit logs won't be pruned.
+Has a maximum of 35791394 seconds.
 
 === couchbaseclusters.spec.logging.audit.rotation.size
 

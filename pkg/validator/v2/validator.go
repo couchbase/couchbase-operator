@@ -481,7 +481,7 @@ func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchba
 	}
 
 	if cluster.IsAuditGarbageCollectionSidecarEnabled() && cluster.IsNativeAuditCleanupEnabled() {
-		return fmt.Errorf("'spec.logging.audit.garbageCollection.sidecar' and 'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' are mutually exclusive")
+		return fmt.Errorf("'spec.logging.audit.garbageCollection.sidecar' and 'spec.logging.audit.rotation.pruneAge' are mutually exclusive")
 	}
 
 	if cluster.IsNativeAuditCleanupEnabled() {
@@ -493,11 +493,11 @@ func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchba
 		if nativeCleanupSupported, err := couchbaseutil.VersionAfter(tag, "7.2.4"); err != nil {
 			return err
 		} else if !nativeCleanupSupported {
-			return fmt.Errorf("'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' is only supported for server version 7.2.4+")
+			return fmt.Errorf("'spec.logging.audit.rotation.pruneAge' is only supported for server version 7.2.4+")
 		}
 
-		if int(cluster.Spec.Logging.Audit.GarbageCollection.NativePruning.PruneAge.Seconds()) > pruneAgeMaxSeconds {
-			return fmt.Errorf("'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.pruneAge' has a maximum of 35791394 seconds")
+		if int(cluster.Spec.Logging.Audit.Rotation.PruneAge.Duration.Seconds()) > pruneAgeMaxSeconds {
+			return fmt.Errorf("'spec.logging.audit.rotation.pruneAge' has a maximum of 35791394 seconds")
 		}
 	}
 
@@ -506,7 +506,7 @@ func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchba
 	}
 
 	if !cluster.IsAuditLoggingEnabled() {
-		return fmt.Errorf("server audit logging requires 'spec.logging.audit.garbageCollection.sidecar.enabled' or 'couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning' to be set")
+		return fmt.Errorf("server audit logging requires 'spec.logging.audit.garbageCollection.sidecar.enabled' or 'spec.logging.audit.rotation.pruneAge' to be set")
 	}
 
 	return nil

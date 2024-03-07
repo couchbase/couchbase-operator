@@ -77,9 +77,7 @@ spec:
       rotation:
         interval: “15m”
         size: “20Mi”
-      garbageCollection:
-        nativePruning:
-          age: "1h" # <.>
+        pruneAge: "1h" # <.>
 ----
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-enabled[`couchbaseclusters.spec.logging.audit.enabled`]: Setting this field to `true` enables audit logging on the Couchbase cluster.
@@ -93,7 +91,7 @@ This field normally defaults to an empty array.
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-disabledusers[`couchbaseclusters.spec.logging.audit.disabledUsers`]: This field can be set to an array of one or more xref:server:learn:security/auditing.adoc#filterable-and-non-filterable-events[filterable] xref:server:manage:manage-security/manage-auditing.adoc#ignoring-events-by-user[user strings] that will be disabled for auditing purposes.
 This field normally defaults to an empty array.
 
-<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection-nativepruning-age[`couchbaseclusters.spec.logging.audit.garbageCollection.nativePruning.age`]: Setting this field to any time period enables garbage collection of rotated audit logs.
+<.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-rotation-pruneage[`couchbaseclusters.spec.logging.audit.rotation.pruneAge`]: Setting this field to any time period enables garbage collection of rotated audit logs.
 This field defaults to `0`.
 +
 This is technically the only field that is required to configure garbage collection of rotated audit logs using native audit log cleanup which is available 
