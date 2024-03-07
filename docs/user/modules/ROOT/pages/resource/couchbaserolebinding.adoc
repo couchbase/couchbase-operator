@@ -33,7 +33,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbaserolebindings.kind
@@ -63,7 +64,8 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbaserolebinding
 === Description
 
 CouchbaseRoleBindingSpec defines the group of subjects i.e.
-users, and the role i.e.
+users, and the
+role i.e.
 group they are a member of.
 
 === couchbaserolebindings.spec.roleRef

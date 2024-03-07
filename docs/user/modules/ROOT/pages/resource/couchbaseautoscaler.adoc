@@ -5,8 +5,10 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbaseautoscaler]
 :resource-name-plural: couchbaseautoscalers
 :resource-name-kind: CouchbaseAutoscaler
 
-CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler to interact with the Couchbase cluster and provide autoscaling.
-This resource is not defined by the end user, and is managed by the Operator.
+CouchbaseAutoscaler provides an interface for the Kubernetes Horizontal Pod Autoscaler
+to interact with the Couchbase cluster and provide autoscaling.
+This resource is
+not defined by the end user, and is managed by the Operator.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
 
@@ -33,7 +35,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbaseautoscalers.kind
@@ -100,7 +103,8 @@ Size allows the server group to be dynamically scaled.
 
 === Description
 
-CouchbaseAutoscalerStatus provides information to the HPA to assist with scaling server groups.
+CouchbaseAutoscalerStatus provides information to the HPA to assist with scaling
+server groups.
 
 === couchbaseautoscalers.status.labelSelector
 
@@ -112,7 +116,8 @@ CouchbaseAutoscalerStatus provides information to the HPA to assist with scaling
 
 ==== Description
 
-LabelSelector allows the HPA to select resources to monitor for resource utilization in order to trigger scaling.
+LabelSelector allows the HPA to select resources to monitor for resource
+utilization in order to trigger scaling.
 
 === couchbaseautoscalers.status.size
 

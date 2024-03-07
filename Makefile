@@ -111,7 +111,7 @@ BLD_NUM ?= 999
 # This controls the golang version of the docker container used
 # to build binaries. This version takes precedence over the build
 # version specified by the build system.
-GO_VERSION := 1.20.8
+GO_VERSION := 1.22.1
 
 # Short cut for setting the platform across all targets.
 PLATFORM := kubernetes
@@ -252,7 +252,7 @@ GOPATH := $(shell go env GOPATH)
 GOBIN := $(if $(GOPATH),$(GOPATH)/bin,$(HOME)/go/bin)
 GOLINT_VERSION := v1.54.2
 CODE_GENERATOR_VERSION := v0.23.2 # Should be kept in sync with other libs in go.mod
-CONTROLLER_TOOLS_VERSION := v0.8.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
+CONTROLLER_TOOLS_VERSION := v0.14.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
 
 # Common environment settings for all Go builds.
 STATIC_GOENV := CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH)

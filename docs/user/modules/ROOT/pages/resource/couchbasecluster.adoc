@@ -6,7 +6,8 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasecluster]
 :resource-name-kind: CouchbaseCluster
 
 The CouchbaseCluster resource represents a Couchbase cluster.
-It allows configuration of cluster topology, networking, storage and security options.
+It allows configuration
+of cluster topology, networking, storage and security options.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
 
@@ -381,7 +382,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbaseclusters.kind
@@ -410,7 +412,8 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasecluster]
 
 === Description
 
-ClusterSpec is the specification for a CouchbaseCluster resources, and allows the cluster to be customized.
+ClusterSpec is the specification for a CouchbaseCluster resources, and allows
+the cluster to be customized.
 
 === couchbaseclusters.spec.antiAffinity
 
@@ -420,9 +423,12 @@ ClusterSpec is the specification for a CouchbaseCluster resources, and allows th
 
 ==== Description
 
-AntiAffinity forces the Operator to schedule different Couchbase server pods on different Kubernetes nodes.
-Anti-affinity reduces the likelihood of unrecoverable failure in the event of a node issue.
-Use of anti-affinity is highly recommended for production clusters.
+AntiAffinity forces the Operator to schedule different Couchbase server pods on
+different Kubernetes nodes.
+Anti-affinity reduces the likelihood of unrecoverable
+failure in the event of a node issue.
+Use of anti-affinity is highly recommended for
+production clusters.
 
 === couchbaseclusters.spec.autoResourceAllocation
 
@@ -432,10 +438,16 @@ Use of anti-affinity is highly recommended for production clusters.
 
 ==== Description
 
-AutoResourceAllocation populates pod resource requests based on the services running on that pod.
-When enabled, this feature will calculate the memory request as the total of service allocations defined in `spec.cluster`, plus an overhead defined by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for a service will cause a cluster upgrade as allocations are modified in the underlying pods.
+AutoResourceAllocation populates pod resource requests based on the services running
+on that pod.
+When enabled, this feature will calculate the memory request as the
+total of service allocations defined in `spec.cluster`, plus an overhead defined
+by `spec.autoResourceAllocation.overheadPercent`.Changing individual allocations for
+a service will cause a cluster upgrade as allocations are modified in the underlying
+pods.
 This field also allows default pod CPU requests and limits to be applied.
-All resource allocations can be overridden by explicitly configuring them in the `spec.servers.resources` field.
+All resource allocations can be overridden by explicitly configuring them in the
+`spec.servers.resources` field.
 
 === couchbaseclusters.spec.autoResourceAllocation.cpuLimits
 
@@ -449,10 +461,13 @@ All resource allocations can be overridden by explicitly configuring them in the
 
 ==== Description
 
-CPULimits automatically populates the CPU limits across all Couchbase server pods.
+CPULimits automatically populates the CPU limits across all Couchbase
+server pods.
 This field defaults to "4" CPUs.
-Explicitly specifying the CPU limit for a particular server class will override this value.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+Explicitly specifying the CPU
+limit for a particular server class will override this value.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.autoResourceAllocation.cpuRequests
 
@@ -466,10 +481,14 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-CPURequests automatically populates the CPU requests across all Couchbase server pods.
-The default value of "2", is the minimum recommended number of CPUs required to run Couchbase Server.
-Explicitly specifying the CPU request for a particular server class will override this value.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+CPURequests automatically populates the CPU requests across all Couchbase
+server pods.
+The default value of "2", is the minimum recommended number of
+CPUs required to run Couchbase Server.
+Explicitly specifying the CPU request
+for a particular server class will override this value.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.autoResourceAllocation.enabled
 
@@ -493,7 +512,8 @@ Enabled defines whether auto-resource allocation is enabled.
 
 ==== Description
 
-OverheadPercent defines the amount of memory above that required for individual services on a pod.
+OverheadPercent defines the amount of memory above that required for individual
+services on a pod.
 For Couchbase Server this should be approximately 25%.
 
 === couchbaseclusters.spec.autoscaleStabilizationPeriod
@@ -504,10 +524,17 @@ For Couchbase Server this should be approximately 25%.
 
 ==== Description
 
-AutoscaleStabilizationPeriod defines how long after a rebalance the corresponding HorizontalPodAutoscaler should remain in maintenance mode.
-During maintenance mode all autoscaling is disabled since every HorizontalPodAutoscaler associated with the cluster becomes inactive.
-Since certain metrics can be unpredictable when Couchbase is rebalancing or upgrading, setting a stabilization period helps to prevent scaling recommendations from the HorizontalPodAutoscaler for a provided period of time.
-Values must be a valid Kubernetes duration of 0s or higher: https://golang.org/pkg/time/#ParseDuration A value of 0, puts the cluster in maintenance mode during rebalance but immediately exits this mode once the rebalance has completed.
+AutoscaleStabilizationPeriod defines how long after a rebalance the
+corresponding HorizontalPodAutoscaler should remain in maintenance mode.
+During maintenance mode all autoscaling is disabled since every HorizontalPodAutoscaler
+associated with the cluster becomes inactive.
+Since certain metrics can be unpredictable when Couchbase is rebalancing or upgrading,
+setting a stabilization period helps to prevent scaling recommendations from the
+HorizontalPodAutoscaler for a provided period of time.
+Values must be a valid Kubernetes duration of 0s or higher:
+https://golang.org/pkg/time/#ParseDuration
+A value of 0, puts the cluster in maintenance mode during rebalance but
+immediately exits this mode once the rebalance has completed.
 When undefined, the HPA is never put into maintenance mode during rebalance.
 
 === couchbaseclusters.spec.backup
@@ -518,7 +545,8 @@ When undefined, the HPA is never put into maintenance mode during rebalance.
 
 ==== Description
 
-Backup defines whether the Operator should manage automated backups, and how to lookup backup resources.
+Backup defines whether the Operator should manage automated backups, and how
+to lookup backup resources.
 
 === couchbaseclusters.spec.backup.annotations
 
@@ -552,7 +580,8 @@ The Backup Image to run on backup pods.
 
 ==== Description
 
-ImagePullSecrets allow you to use an image from private repositories and non-dockerhub ones.
+ImagePullSecrets allow you to use an image from private
+repositories and non-dockerhub ones.
 
 === couchbaseclusters.spec.backup.imagePullSecrets.name
 
@@ -563,7 +592,8 @@ ImagePullSecrets allow you to use an image from private repositories and non-doc
 ==== Description
 
 Name of the referent.
-More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields.
 apiVersion, kind, uid?.
 
 === couchbaseclusters.spec.backup.labels
@@ -594,7 +624,8 @@ Managed defines whether backups are managed by us or the clients.
 
 ==== Description
 
-NodeSelector defines which nodes to constrain the pods that run any backup and restore operations to.
+NodeSelector defines which nodes to constrain the pods that
+run any backup and restore operations to.
 
 === couchbaseclusters.spec.backup.objectEndpoint
 
@@ -604,7 +635,8 @@ NodeSelector defines which nodes to constrain the pods that run any backup and r
 
 ==== Description
 
-Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
+Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint
+ObjectEndpoint contains the configuration for connecting to a custom S3 compliant object store.
 
 === couchbaseclusters.spec.backup.objectEndpoint.secret
 
@@ -614,7 +646,8 @@ Deprecated: by CouchbaseBackup.spec.objectStore.Endpoint ObjectEndpoint contains
 
 ==== Description
 
-The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint
+The secret must have the key with the name "tls.crt".
 
 === couchbaseclusters.spec.backup.objectEndpoint.url
 
@@ -634,7 +667,8 @@ The host/address of the custom object endpoint.
 
 ==== Description
 
-UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
+UseVirtualPath will force the AWS SDK to use the new virtual style paths
+which are often required by S3 compatible object stores.
 
 === couchbaseclusters.spec.backup.resources
 
@@ -644,7 +678,8 @@ UseVirtualPath will force the AWS SDK to use the new virtual style paths which a
 
 ==== Description
 
-Resources is the resource requirements for the backup and restore containers.
+Resources is the resource requirements for the backup and restore
+containers.
 Will be populated by defaults if not specified.
 
 === couchbaseclusters.spec.backup.s3Secret
@@ -655,8 +690,10 @@ Will be populated by defaults if not specified.
 
 ==== Description
 
-Deprecated: by CouchbaseBackup.spec.objectStore.secret S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
-This field must be popluated when the `spec.s3bucket` field is specified for a backup or restore resource.
+Deprecated: by CouchbaseBackup.spec.objectStore.secret
+S3Secret contains the key region and optionally access-key-id and secret-access-key for operating backups in S3.
+This field must be popluated when the `spec.s3bucket` field is specified
+for a backup or restore resource.
 
 === couchbaseclusters.spec.backup.selector
 
@@ -666,7 +703,8 @@ This field must be popluated when the `spec.s3bucket` field is specified for a b
 
 ==== Description
 
-Selector allows CouchbaseBackup and CouchbaseBackupRestore resources to be filtered based on labels.
+Selector allows CouchbaseBackup and CouchbaseBackupRestore
+resources to be filtered based on labels.
 
 === couchbaseclusters.spec.backup.serviceAccountName
 
@@ -726,7 +764,8 @@ If the key is empty, operator must be Exists; this combination means to match al
 Operator represents a key's relationship to the value.
 Valid operators are Exists and Equal.
 Defaults to Equal.
-Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.
+Exists is equivalent to wildcard for value, so that a pod can
+tolerate all taints of a particular category.
 
 === couchbaseclusters.spec.backup.tolerations.tolerationSeconds
 
@@ -736,9 +775,12 @@ Exists is equivalent to wildcard for value, so that a pod can tolerate all taint
 
 ==== Description
 
-TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint.
-By default, it is not set, which means tolerate the taint forever (do not evict).
-Zero and negative values will be treated as 0 (evict immediately) by the system.
+TolerationSeconds represents the period of time the toleration (which must be
+of effect NoExecute, otherwise this field is ignored) tolerates the taint.
+By default,
+it is not set, which means tolerate the taint forever (do not evict).
+Zero and
+negative values will be treated as 0 (evict immediately) by the system.
 
 === couchbaseclusters.spec.backup.tolerations.value
 
@@ -759,7 +801,8 @@ If the operator is Exists, the value should be empty, otherwise just a regular s
 
 ==== Description
 
-Deprecated: by CouchbaseBackup.spec.objectStore.useIAM UseIAMRole enables backup to fetch EC2 instance metadata.
+Deprecated: by CouchbaseBackup.spec.objectStore.useIAM
+UseIAMRole enables backup to fetch EC2 instance metadata.
 This allows the AWS SDK to use the EC2's IAM Role for S3 access.
 UseIAMRole will ignore credentials in s3Secret.
 
@@ -771,7 +814,8 @@ UseIAMRole will ignore credentials in s3Secret.
 
 ==== Description
 
-Buckets defines whether the Operator should manage buckets, and how to lookup bucket resources.
+Buckets defines whether the Operator should manage buckets, and how to lookup
+bucket resources.
 
 === couchbaseclusters.spec.buckets.managed
 
@@ -782,9 +826,12 @@ Buckets defines whether the Operator should manage buckets, and how to lookup bu
 ==== Description
 
 Managed defines whether buckets are managed by the Operator (true), or user managed (false).
-When Operator managed, all buckets must be defined with either CouchbaseBucket, CouchbaseEphemeralBucket or CouchbaseMemcachedBucket resources.
-Manual addition of buckets will be reverted by the Operator.
-When user managed, the Operator will not interrogate buckets at all.
+When Operator managed, all buckets must be defined with either CouchbaseBucket,
+CouchbaseEphemeralBucket or CouchbaseMemcachedBucket resources.
+Manual addition
+of buckets will be reverted by the Operator.
+When user managed, the Operator
+will not interrogate buckets at all.
 This field defaults to false.
 
 === couchbaseclusters.spec.buckets.selector
@@ -795,7 +842,8 @@ This field defaults to false.
 
 ==== Description
 
-Selector is a label selector used to list buckets in the namespace that are managed by the Operator.
+Selector is a label selector used to list buckets in the namespace
+that are managed by the Operator.
 
 === couchbaseclusters.spec.buckets.selector.matchExpressions
 
@@ -842,9 +890,12 @@ Valid operators are In, NotIn, Exists and DoesNotExist.
 ==== Description
 
 values is an array of string values.
-If the operator is In or NotIn, the values array must be non-empty.
-If the operator is Exists or DoesNotExist, the values array must be empty.
-This array is replaced during a strategic merge patch.
+If the operator is In or NotIn,
+the values array must be non-empty.
+If the operator is Exists or DoesNotExist,
+the values array must be empty.
+This array is replaced during a strategic
+merge patch.
 
 === couchbaseclusters.spec.buckets.selector.matchLabels
 
@@ -855,7 +906,9 @@ This array is replaced during a strategic merge patch.
 ==== Description
 
 matchLabels is a map of {key,value} pairs.
-A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value".
+A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value".
 The requirements are ANDed.
 
 === couchbaseclusters.spec.buckets.synchronize
@@ -866,17 +919,33 @@ The requirements are ANDed.
 
 ==== Description
 
-Synchronize allows unmanaged buckets, scopes, and collections to be synchronized as Kubernetes resources by the Operator.
-This feature is intended for development only and should not be used for production workloads.
-The synchronization workflow starts with `spec.buckets.managed` being set to false, the user can manually create buckets, scopes, and collections using the Couchbase UI, or other tooling.
-When you wish to commit to Kubernetes resources, you must specify a unique label selector in the `spec.buckets.selector` field, and this field is set to true.
-The Operator will create Kubernetes resources for you, and upon completion set the cluster's `Synchronized` status condition.
-Synchronizing will not create a Kubernetes resource for the Couchbase Server maintained _system scope.
-You may then safely set `spec.buckets.managed` to true and the Operator will manage these resources as per usual.
-To update an already managed data topology, you must first set it to unmanaged, make any changes, and delete any old resources, then follow the standard synchronization workflow.
-The Operator can not, and will not, ever delete, or make modifications to resource specifications that are intended to be user managed, or managed by a life cycle management tool.
-These actions must be instigated by an end user.
-For a more complete experience, refer to the documentation for the `cao save` and `cao restore` CLI commands.
+Synchronize allows unmanaged buckets, scopes, and collections to be synchronized as
+Kubernetes resources by the Operator.
+This feature is intended for development only
+and should not be used for production workloads.
+The synchronization workflow starts
+with `spec.buckets.managed` being set to false, the user can manually create buckets,
+scopes, and collections using the Couchbase UI, or other tooling.
+When you wish to
+commit to Kubernetes resources, you must specify a unique label selector in the
+`spec.buckets.selector` field, and this field is set to true.
+The Operator will
+create Kubernetes resources for you, and upon completion set the cluster's `Synchronized`
+status condition.
+Synchronizing will not create a Kubernetes resource for the Couchbase
+Server maintained _system scope.
+You may then safely set `spec.buckets.managed` to
+true and the Operator will manage these resources as per usual.
+To update an already
+managed data topology, you must first set it to unmanaged, make any changes, and delete
+any old resources, then follow the standard synchronization workflow.
+The Operator
+can not, and will not, ever delete, or make modifications to resource specifications
+that are intended to be user managed, or managed by a life cycle management tool.
+These
+actions must be instigated by an end user.
+For a more complete experience, refer to
+the documentation for the `cao save` and `cao restore` CLI commands.
 
 === couchbaseclusters.spec.cluster
 
@@ -888,7 +957,8 @@ For a more complete experience, refer to the documentation for the `cao save` an
 
 ==== Description
 
-ClusterSettings define Couchbase cluster-wide settings such as memory allocation, failover characteristics and index settings.
+ClusterSettings define Couchbase cluster-wide settings such as memory allocation,
+failover characteristics and index settings.
 
 === couchbaseclusters.spec.cluster.analyticsServiceMemoryQuota
 
@@ -903,10 +973,13 @@ ClusterSettings define Couchbase cluster-wide settings such as memory allocation
 ==== Description
 
 AnalyticsServiceMemQuota is the amount of memory that should be allocated to the analytics service.
-This value is per-pod, and only applicable to pods belonging to server classes running the analytics service.
+This value is per-pod, and only applicable to pods belonging to server classes running
+the analytics service.
 This field must be a quantity greater than or equal to 1Gi.
-This field defaults to 1Gi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+This
+field defaults to 1Gi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.autoCompaction
 
@@ -918,7 +991,8 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-AutoCompaction allows the configuration of auto-compaction, including on what conditions disk space is reclaimed and when it is allowed to run.
+AutoCompaction allows the configuration of auto-compaction, including on what
+conditions disk space is reclaimed and when it is allowed to run.
 
 === couchbaseclusters.spec.cluster.autoCompaction.databaseFragmentationThreshold
 
@@ -946,7 +1020,8 @@ DatabaseFragmentationThreshold defines triggers for when database compaction sho
 
 ==== Description
 
-Percent is the percentage of disk fragmentation after which to decompaction will be triggered.
+Percent is the percentage of disk fragmentation after which to decompaction will be
+triggered.
 This field must be in the range 2-100, defaulting to 30.
 
 === couchbaseclusters.spec.cluster.autoCompaction.databaseFragmentationThreshold.size
@@ -960,7 +1035,8 @@ This field must be in the range 2-100, defaulting to 30.
 ==== Description
 
 Size is the amount of disk framentation, that once exceeded, will trigger decompaction.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.autoCompaction.parallelCompaction
 
@@ -970,7 +1046,8 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-ParallelCompaction controls whether database and view compactions can happen in parallel.
+ParallelCompaction controls whether database and view compactions can happen
+in parallel.
 
 === couchbaseclusters.spec.cluster.autoCompaction.timeWindow
 
@@ -992,7 +1069,8 @@ TimeWindow allows restriction of when compaction can occur.
 
 ==== Description
 
-AbortCompactionOutsideWindow stops compaction processes when the process moves outside the window.
+AbortCompactionOutsideWindow stops compaction processes when the
+process moves outside the window.
 
 === couchbaseclusters.spec.cluster.autoCompaction.timeWindow.end
 
@@ -1058,7 +1136,8 @@ ViewFragmentationThreshold defines triggers for when view compaction should star
 
 ==== Description
 
-Percent is the percentage of disk fragmentation after which to decompaction will be triggered.
+Percent is the percentage of disk fragmentation after which to decompaction will be
+triggered.
 This field must be in the range 2-100, defaulting to 30.
 
 === couchbaseclusters.spec.cluster.autoCompaction.viewFragmentationThreshold.size
@@ -1072,7 +1151,8 @@ This field must be in the range 2-100, defaulting to 30.
 ==== Description
 
 Size is the amount of disk framentation, that once exceeded, will trigger decompaction.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.autoFailoverMaxCount
 
@@ -1086,8 +1166,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server will allow before not allowing any more.
-This field must be between 1-3 for server versions prior to 7.1.0 default is 1.
+AutoFailoverMaxCount is the maximum number of automatic failovers Couchbase server
+will allow before not allowing any more.
+This field must be between 1-3 for server versions prior to 7.1.0
+default is 1.
 
 === couchbaseclusters.spec.cluster.autoFailoverOnDataDiskIssues
 
@@ -1097,7 +1179,8 @@ This field must be between 1-3 for server versions prior to 7.1.0 default is 1.
 
 ==== Description
 
-AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a pod if a disk issue was detected.
+AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a pod
+if a disk issue was detected.
 
 === couchbaseclusters.spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod
 
@@ -1109,8 +1192,10 @@ AutoFailoverOnDataDiskIssues defines whether Couchbase server should failover a 
 
 ==== Description
 
-AutoFailoverOnDataDiskIssuesTimePeriod defines how long to wait for transient errors before failing over a faulty disk.
-This field must be in the range 5-3600s, defaulting to 120s.
+AutoFailoverOnDataDiskIssuesTimePeriod defines how long to wait for transient errors
+before failing over a faulty disk.
+This field must be in the range 5-3600s, defaulting
+to 120s.
 More info:  https://golang.org/pkg/time/#ParseDuration.
 
 === couchbaseclusters.spec.cluster.autoFailoverServerGroup
@@ -1134,8 +1219,11 @@ This field is ignored in server versions 7.1+ as it has been removed from the Co
 
 ==== Description
 
-AutoFailoverTimeout defines how long Couchbase server will wait between a pod being witnessed as down, until when it will failover the pod.
-Couchbase server will only failover pods if it deems it safe to do so, and not result in data loss.
+AutoFailoverTimeout defines how long Couchbase server will wait between a pod
+being witnessed as down, until when it will failover the pod.
+Couchbase server
+will only failover pods if it deems it safe to do so, and not result in data
+loss.
 This field must be in the range 5-3600s, defaulting to 120s.
 More info:  https://golang.org/pkg/time/#ParseDuration.
 
@@ -1148,7 +1236,8 @@ More info:  https://golang.org/pkg/time/#ParseDuration.
 ==== Description
 
 ClusterName defines the name of the cluster, as displayed in the Couchbase UI.
-By default, the cluster name is that specified in the CouchbaseCluster resource's metadata.
+By default, the cluster name is that specified in the CouchbaseCluster resource's
+metadata.
 
 === couchbaseclusters.spec.cluster.data
 
@@ -1172,11 +1261,15 @@ Data allows the data service to be configured.
 
 ==== Description
 
-AuxIOThreads allows the number of threads used by the data service, per pod, to be altered.
-This indicates the number of threads that are to be used in the AuxIO thread pool to run auxiliary I/O tasks.
+AuxIOThreads allows the number of threads used by the data service,
+per pod, to be altered.
+This indicates the number of threads that are
+to be used in the AuxIO thread pool to run auxiliary I/O tasks.
 This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources allocated for their use.
-If not specified, this defaults to the default value set by Couchbase Server.
+and should only be increased where there are sufficient CPU resources
+allocated for their use.
+If not specified, this defaults to the
+default value set by Couchbase Server.
 
 === couchbaseclusters.spec.cluster.data.minReplicasCount
 
@@ -1188,7 +1281,8 @@ If not specified, this defaults to the default value set by Couchbase Server.
 
 ==== Description
 
-MinReplicasCount allows the minimum number of replicas required for buckets to be set.
+MinReplicasCount allows the minimum number of replicas required for
+buckets to be set.
 New buckets cannot be created with less than this minimum.
 Defaults to 0.
 
@@ -1204,11 +1298,15 @@ Defaults to 0.
 
 ==== Description
 
-NonIOThreads allows the number of threads used by the data service, per pod, to be altered.
-This indicates the number of threads that are to be used in the NonIO thread pool to run in memory tasks.
+NonIOThreads allows the number of threads used by the data service,
+per pod, to be altered.
+This indicates the number of threads that are
+to be used in the NonIO thread pool to run in memory tasks.
 This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources allocated for their use.
-If not specified, this defaults to the default value set by Couchbase Server.
+and should only be increased where there are sufficient CPU resources
+allocated for their use.
+If not specified, this defaults to the
+default value set by Couchbase Server.
 
 === couchbaseclusters.spec.cluster.data.readerThreads
 
@@ -1222,10 +1320,14 @@ If not specified, this defaults to the default value set by Couchbase Server.
 
 ==== Description
 
-ReaderThreads allows the number of threads used by the data service, per pod, to be altered.
-This value must be between 4 and 64 threads for CB versions below 7.1.0 and, or 1 and 64 for CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources allocated for their use.
-If not specified, this defaults to the default value set by Couchbase Server.
+ReaderThreads allows the number of threads used by the data service,
+per pod, to be altered.
+This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
+or 1 and 64 for CB versions 7.1.0+.
+and should only be increased where there are sufficient CPU resources
+allocated for their use.
+If not specified, this defaults to the
+default value set by Couchbase Server.
 
 === couchbaseclusters.spec.cluster.data.writerThreads
 
@@ -1239,11 +1341,17 @@ If not specified, this defaults to the default value set by Couchbase Server.
 
 ==== Description
 
-WriterThreads allows the number of threads used by the data service, per pod, to be altered.
-This setting is especially relevant when using "durable writes", increasing this field will have a large impact on performance.
-This value must be between 4 and 64 threads for CB versions below 7.1.0 and, // or 1 and 64 for CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources allocated for their use.
-If not specified, this defaults to the default value set by Couchbase Server.
+WriterThreads allows the number of threads used by the data service,
+per pod, to be altered.
+This setting is especially relevant when
+using "durable writes", increasing this field will have a large
+impact on performance.
+This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
+	// or 1 and 64 for CB versions 7.1.0+.
+and should only be increased where there are sufficient CPU resources
+allocated for their use.
+If not specified, this defaults to the
+default value set by Couchbase Server.
 
 === couchbaseclusters.spec.cluster.dataServiceMemoryQuota
 
@@ -1258,10 +1366,13 @@ If not specified, this defaults to the default value set by Couchbase Server.
 ==== Description
 
 DataServiceMemQuota is the amount of memory that should be allocated to the data service.
-This value is per-pod, and only applicable to pods belonging to server classes running the data service.
+This value is per-pod, and only applicable to pods belonging to server classes running
+the data service.
 This field must be a quantity greater than or equal to 256Mi.
-This field defaults to 256Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+This
+field defaults to 256Mi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.eventingServiceMemoryQuota
 
@@ -1276,10 +1387,13 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 ==== Description
 
 EventingServiceMemQuota is the amount of memory that should be allocated to the eventing service.
-This value is per-pod, and only applicable to pods belonging to server classes running the eventing service.
+This value is per-pod, and only applicable to pods belonging to server classes running
+the eventing service.
 This field must be a quantity greater than or equal to 256Mi.
-This field defaults to 256Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+This
+field defaults to 256Mi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.indexServiceMemoryQuota
 
@@ -1294,10 +1408,13 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 ==== Description
 
 IndexServiceMemQuota is the amount of memory that should be allocated to the index service.
-This value is per-pod, and only applicable to pods belonging to server classes running the index service.
+This value is per-pod, and only applicable to pods belonging to server classes running
+the index service.
 This field must be a quantity greater than or equal to 256Mi.
-This field defaults to 256Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+This
+field defaults to 256Mi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.indexStorageSetting
 
@@ -1314,8 +1431,11 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 *DEPRECATED* - by indexer.
 
 The index storage mode to use for secondary indexing.
-This field must be one of "memory_optimized" or "plasma", defaulting to "memory_optimized".
-This field is immutable and cannot be changed unless there are no server classes running the index service in the cluster.
+This field must be one of
+"memory_optimized" or "plasma", defaulting to "memory_optimized".
+This field is
+immutable and cannot be changed unless there are no server classes running the
+index service in the cluster.
 
 === couchbaseclusters.spec.cluster.indexer
 
@@ -1337,8 +1457,10 @@ Indexer allows the indexer to be configured.
 
 ==== Description
 
-EnableShardAffinity when false Index Servers rebuild any index that are newly assigned to them during a rebalance.
-When set to true, Couchbase Server moves a reassigned index’s files between Index Servers.
+EnableShardAffinity when false Index Servers rebuild any index that
+are newly assigned to them during a rebalance.
+When set to true,
+Couchbase Server moves a reassigned index’s files between Index Servers.
 This field is only supported on CB versions 7.6.0+.
 
 === couchbaseclusters.spec.cluster.indexer.logLevel
@@ -1354,7 +1476,9 @@ This field is only supported on CB versions 7.6.0+.
 ==== Description
 
 LogLevel controls the verbosity of indexer logs.
-This field must be one of "silent", "fatal", "error", "warn", "info", "verbose", "timing", "debug" or "trace", defaulting to "info".
+This field must be one of
+"silent", "fatal", "error", "warn", "info", "verbose", "timing", "debug" or
+"trace", defaulting to "info".
 
 === couchbaseclusters.spec.cluster.indexer.maxRollbackPoints
 
@@ -1368,7 +1492,8 @@ This field must be one of "silent", "fatal", "error", "warn", "info", "verbose",
 
 ==== Description
 
-MaxRollbackPoints controls the number of checkpoints that can be rolled back to.
+MaxRollbackPoints controls the number of checkpoints that can be rolled
+back to.
 The default is 2, with a minimum of 1.
 
 === couchbaseclusters.spec.cluster.indexer.memorySnapshotInterval
@@ -1396,8 +1521,12 @@ This defaults to 200ms, and must be greater than or equal to 1ms.
 
 ==== Description
 
-NumberOfReplica specifies number of secondary index replicas to be created by the Index Service whenever CREATE INDEX is invoked, which ensures high availability and high performance.
-Note, if nodes and num_replica are both specified in the WITH clause, the specified number of nodes must be one greater than num_replica This defaults to 0, which means no index replicas to be created by default.
+NumberOfReplica specifies number of secondary index replicas to be created
+by the Index Service whenever CREATE INDEX is invoked, which ensures
+high availability and high performance.
+Note, if nodes and num_replica are both specified in the WITH clause,
+the specified number of nodes must be one greater than num_replica
+This defaults to 0, which means no index replicas to be created by default.
 Minimum must be 0.
 
 === couchbaseclusters.spec.cluster.indexer.redistributeIndexes
@@ -1410,7 +1539,8 @@ Minimum must be 0.
 
 ==== Description
 
-RedistributeIndexes when true, Couchbase Server redistributes indexes when rebalance occurs, in order to optimize performance.
+RedistributeIndexes when true, Couchbase Server redistributes indexes
+when rebalance occurs, in order to optimize performance.
 If false (the default), such redistribution does not occur.
 
 === couchbaseclusters.spec.cluster.indexer.stableSnapshotInterval
@@ -1439,8 +1569,11 @@ This defaults to 5s, and must be greater than or equal to 1ms.
 ==== Description
 
 StorageMode controls the underlying storage engine for indexes.
-Once set it can only be modified if there are no nodes in the cluster running the index service.
-The field must be one of "memory_optimized" or "plasma", defaulting to "memory_optimized".
+Once set
+it can only be modified if there are no nodes in the cluster running the
+index service.
+The field must be one of "memory_optimized" or "plasma",
+defaulting to "memory_optimized".
 
 === couchbaseclusters.spec.cluster.indexer.threads
 
@@ -1454,7 +1587,8 @@ The field must be one of "memory_optimized" or "plasma", defaulting to "memory_o
 
 Threads controls the number of processor threads to use for indexing.
 A value of 0 means 1 per CPU.
-This attribute must be greater than or equal to 0, defaulting to 0.
+This attribute must be greater
+than or equal to 0, defaulting to 0.
 
 === couchbaseclusters.spec.cluster.query
 
@@ -1490,9 +1624,12 @@ BackfillEnabled allows the query service to backfill.
 
 ==== Description
 
-TemporarySpace allows the temporary storage used by the query service backfill, per-pod, to be modified.
-This field requires `backfillEnabled` to be set to true in order to have any effect.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+TemporarySpace allows the temporary storage used by the query
+service backfill, per-pod, to be modified.
+This field requires
+`backfillEnabled` to be set to true in order to have any effect.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.query.temporarySpaceUnlimited
 
@@ -1502,8 +1639,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-TemporarySpaceUnlimited allows the temporary storage used by the query service backfill, per-pod, to be unconstrained.
-This field requires `backfillEnabled` to be set to true in order to have any effect.
+TemporarySpaceUnlimited allows the temporary storage used by
+the query service backfill, per-pod, to be unconstrained.
+This field
+requires `backfillEnabled` to be set to true in order to have any effect.
 This field overrides `temporarySpace`.
 
 === couchbaseclusters.spec.cluster.queryServiceMemoryQuota
@@ -1517,9 +1656,14 @@ This field overrides `temporarySpace`.
 ==== Description
 
 QueryServiceMemQuota is a dummy field.
-By default, Couchbase server provides no memory resource constraints for the query service, so this has no effect on Couchbase server.
-It is, however, used when the spec.autoResourceAllocation feature is enabled, and is used to define the amount of memory reserved by the query service for use with Kubernetes resource scheduling.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+By default, Couchbase server provides no
+memory resource constraints for the query service, so this has no effect on Couchbase
+server.
+It is, however, used when the spec.autoResourceAllocation feature is enabled,
+and is used to define the amount of memory reserved by the query service for use with
+Kubernetes resource scheduling.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.cluster.searchServiceMemoryQuota
 
@@ -1534,10 +1678,13 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 ==== Description
 
 SearchServiceMemQuota is the amount of memory that should be allocated to the search service.
-This value is per-pod, and only applicable to pods belonging to server classes running the search service.
+This value is per-pod, and only applicable to pods belonging to server classes running
+the search service.
 This field must be a quantity greater than or equal to 256Mi.
-This field defaults to 256Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+This
+field defaults to 256Mi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.enableOnlineVolumeExpansion
 
@@ -1549,10 +1696,15 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 EnableOnlineVolumeExpansion enables online expansion of Persistent Volumes.
 You can only expand a PVC if its storage class's "allowVolumeExpansion" field is set to true.
-Additionally, Kubernetes feature "ExpandInUsePersistentVolumes" must be enabled in order to expand the volumes which are actively bound to Pods.
+Additionally, Kubernetes feature "ExpandInUsePersistentVolumes" must be enabled in order to
+expand the volumes which are actively bound to Pods.
 Volumes can only be expanded and not reduced to a smaller size.
-See: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim 
- If "EnableOnlineVolumeExpansion" is enabled for use within an environment that does not actually support online volume and file system expansion then the cluster will fallback to rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
+See: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#resizing-an-in-use-persistentvolumeclaim
+
+
+If "EnableOnlineVolumeExpansion" is enabled for use within an environment that does
+not actually support online volume and file system expansion then the cluster will fallback to
+rolling upgrade procedure to create a new set of Pods for use with resized Volumes.
 More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expanding-persistent-volumes-claims.
 
 === couchbaseclusters.spec.enablePreviewScaling
@@ -1563,7 +1715,8 @@ More info:  https://kubernetes.io/docs/concepts/storage/persistent-volumes/#expa
 
 ==== Description
 
-*DEPRECATED* - This option only exists for backwards compatibility and no longer restricts autoscaling to ephemeral services.
+*DEPRECATED* - This option only exists for backwards compatibility and no longer
+restricts autoscaling to ephemeral services.
 
 EnablePreviewScaling enables autoscaling for stateful services and buckets.
 
@@ -1575,8 +1728,10 @@ EnablePreviewScaling enables autoscaling for stateful services and buckets.
 
 ==== Description
 
-EnvImagePrecedence gives precedence over the default container image name in `spec.Image` to an image name provided through Operator environment variables.
-For more info on using Operator environment variables: https://docs.couchbase.com/operator/current/reference-operator-configuration.html.
+EnvImagePrecedence gives precedence over the default container image name in
+`spec.Image` to an image name provided through Operator environment variables.
+For more info on using Operator environment variables:
+https://docs.couchbase.com/operator/current/reference-operator-configuration.html.
 
 === couchbaseclusters.spec.hibernate
 
@@ -1599,7 +1754,9 @@ Hibernate is whether to hibernate the cluster.
 ==== Description
 
 HibernationStrategy defines how to hibernate the cluster.
-When Immediate the Operator will immediately delete all pods and take no further action until the hibernate field is set to false.
+When Immediate
+the Operator will immediately delete all pods and take no further action until
+the hibernate field is set to false.
 
 === couchbaseclusters.spec.image
 
@@ -1613,9 +1770,12 @@ When Immediate the Operator will immediately delete all pods and take no further
 
 ==== Description
 
-Image is the container image name that will be used to launch Couchbase server instances.
-Updating this field will cause an automatic upgrade of the cluster.
-Explicitly specifying the image for a server class will override this value for the server class.
+Image is the container image name that will be used to launch Couchbase
+server instances.
+Updating this field will cause an automatic upgrade of
+the cluster.
+Explicitly specifying the image for a server class will override
+this value for the server class.
 
 === couchbaseclusters.spec.logging
 
@@ -1647,7 +1807,8 @@ Used to manage the audit configuration directly.
 
 The list of event ids to disable for auditing purposes.
 This is passed to the REST API with no verification by the operator.
-Refer to the documentation for details: https://docs.couchbase.com/server/current/audit-event-reference/audit-event-reference.html.
+Refer to the documentation for details:
+https://docs.couchbase.com/server/current/audit-event-reference/audit-event-reference.html.
 
 === couchbaseclusters.spec.logging.audit.disabledUsers
 
@@ -1661,7 +1822,8 @@ Refer to the documentation for details: https://docs.couchbase.com/server/curren
 
 The list of users to ignore for auditing purposes.
 This is passed to the REST API with minimal validation it meets an acceptable regex pattern.
-Refer to the documentation for full details on how to configure this: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html#ignoring-events-by-user.
+Refer to the documentation for full details on how to configure this:
+https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html#ignoring-events-by-user.
 
 === couchbaseclusters.spec.logging.audit.enabled
 
@@ -1684,7 +1846,8 @@ Enabled is a boolean that enables the audit capabilities.
 Handle all optional garbage collection (GC) configuration for the audit functionality.
 This is not part of the audit REST API, it is intended to handle GC automatically for the audit logs.
 By default the Couchbase Server rotates the audit logs but does not clean up the rotated logs.
-This is left as an operation for the cluster administrator to manage, the operator allows for us to automate this: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
+This is left as an operation for the cluster administrator to manage, the operator allows for us to automate this:
+https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
 
 === couchbaseclusters.spec.logging.audit.garbageCollection.sidecar
 
@@ -1694,7 +1857,8 @@ This is left as an operation for the cluster administrator to manage, the operat
 
 ==== Description
 
-*DEPRECATED* - by spec.logging.audit.nativePruning for Couchbase Server 7.2.4+ Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
+*DEPRECATED* - by spec.logging.audit.nativePruning for Couchbase Server 7.2.4+
+Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
 
 
 === couchbaseclusters.spec.logging.audit.garbageCollection.sidecar.age
@@ -1764,7 +1928,8 @@ Will be populated by Kubernetes defaults if not specified.
 ==== Description
 
 The interval to optionally rotate the audit log.
-This is passed to the REST API, see here for details: https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
+This is passed to the REST API, see here for details:
+https://docs.couchbase.com/server/current/manage/manage-security/manage-auditing.html.
 
 === couchbaseclusters.spec.logging.audit.rotation.interval
 
@@ -1805,7 +1970,8 @@ Has a maximum of 35791394 seconds.
 ==== Description
 
 Size allows the specification of a rotation size for the log, defaults to 20Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.spec.logging.logRetentionCount
 
@@ -1854,7 +2020,9 @@ Specification of all logging configuration required to manage the sidecar contai
 ConfigurationName is the name of the Secret to use holding the logging configuration in the namespace.
 A Secret is used to ensure we can safely store credentials but this can be populated from plaintext if acceptable too.
 If it does not exist then one will be created with defaults in the namespace so it can be easily updated whilst running.
-Note that if running multiple clusters in the same kubernetes namespace then you should use a separate Secret for each, otherwise the first cluster will take ownership (if created) and the Secret will be cleaned up when that cluster is removed.
+Note that if running multiple clusters in the same kubernetes namespace then you should use a separate Secret for each,
+otherwise the first cluster will take ownership (if created) and the Secret will be cleaned up when that cluster is
+removed.
 If running clusters in separate namespaces then they will be separate Secrets anyway.
 
 === couchbaseclusters.spec.logging.server.enabled
@@ -1880,7 +2048,8 @@ Enabled is a boolean that enables the logging sidecar container.
 A boolean which indicates whether the operator should manage the configuration or not.
 If omitted then this defaults to true which means the operator will attempt to reconcile it to default values.
 To use a custom configuration make sure to set this to false.
-Note that the ownership of any Secret is not changed so if a Secret is created externally it can be updated by the operator but it's ownership stays the same so it will be cleaned up when it's owner is.
+Note that the ownership of any Secret is not changed so if a Secret is created externally it can be updated by
+the operator but it's ownership stays the same so it will be cleaned up when it's owner is.
 
 === couchbaseclusters.spec.logging.server.sidecar
 
@@ -1906,7 +2075,9 @@ Any specific logging sidecar container configuration.
 
 ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
 If another log shipping image is used that needs a different mount then modify this.
-Note that the configuration file must be called 'fluent-bit.conf' at the root of this path, there is no provision for overriding the name of the config file passed as the COUCHBASE_LOGS_CONFIG_FILE environment variable.
+Note that the configuration file must be called 'fluent-bit.conf' at the root of this path,
+there is no provision for overriding the name of the config file passed as the
+COUCHBASE_LOGS_CONFIG_FILE environment variable.
 
 === couchbaseclusters.spec.logging.server.sidecar.image
 
@@ -1941,7 +2112,9 @@ Will be populated by Kubernetes defaults if not specified.
 
 ==== Description
 
-*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+ Monitoring defines any Operator managed integration into 3rd party monitoring infrastructure.
+*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+
+Monitoring defines any Operator managed integration into 3rd party monitoring
+infrastructure.
 
 
 === couchbaseclusters.spec.monitoring.prometheus
@@ -1952,7 +2125,8 @@ Will be populated by Kubernetes defaults if not specified.
 
 ==== Description
 
-*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+ Prometheus provides integration with Prometheus monitoring.
+*DEPRECATED* - By Couchbase Server metrics endpoint on version 7.0+
+Prometheus provides integration with Prometheus monitoring.
 
 
 === couchbaseclusters.spec.monitoring.prometheus.authorizationSecret
@@ -1963,7 +2137,8 @@ Will be populated by Kubernetes defaults if not specified.
 
 ==== Description
 
-AuthorizationSecret is the name of a Kubernetes secret that contains a bearer token to authorize GET requests to the metrics endpoint.
+AuthorizationSecret is the name of a Kubernetes secret that contains a
+bearer token to authorize GET requests to the metrics endpoint.
 
 === couchbaseclusters.spec.monitoring.prometheus.enabled
 
@@ -2005,7 +2180,8 @@ enabled must be set to true, when image is provided.
 ==== Description
 
 RefreshRate is the frequency in which cached statistics are updated in seconds.
-Shorter intervals will add additional resource overhead to clusters running Couchbase Server 7.0+ Default is 60 seconds, Maximum value is 600 seconds, and minimum value is 1 second.
+Shorter intervals will add additional resource overhead to clusters running Couchbase Server 7.0+
+Default is 60 seconds, Maximum value is 600 seconds, and minimum value is 1 second.
 
 === couchbaseclusters.spec.monitoring.prometheus.resources
 
@@ -2026,7 +2202,8 @@ Will be populated by Kubernetes defaults if not specified.
 
 ==== Description
 
-Networking defines Couchbase cluster networking options such as network topology, TLS and DDNS settings.
+Networking defines Couchbase cluster networking options such as network
+topology, TLS and DDNS settings.
 
 === couchbaseclusters.spec.networking.addressFamily
 
@@ -2039,9 +2216,14 @@ Networking defines Couchbase cluster networking options such as network topology
 ==== Description
 
 AddressFamily allows the manual selection of the address family to use.
-When this field is not set, Couchbase server will default to using IPv4 for internal communication and also support IPv6 on dual stack systems.
-Setting this field to either IPv4 or IPv6 will force Couchbase to use the selected protocol for internal communication, and also disable all other protocols to provide added security and simplicty when defining firewall rules.
-Disabling of address families is only supported in Couchbase Server 7.0.2+.
+When this field is not set, Couchbase server will default to using IPv4
+for internal communication and also support IPv6 on dual stack systems.
+Setting this field to either IPv4 or IPv6 will force Couchbase to use the
+selected protocol for internal communication, and also disable all other
+protocols to provide added security and simplicty when defining firewall
+rules.
+Disabling of address families is only supported in Couchbase
+Server 7.0.2+.
 
 === couchbaseclusters.spec.networking.adminConsoleServiceTemplate
 
@@ -2051,11 +2233,16 @@ Disabling of address families is only supported in Couchbase Server 7.0.2+.
 
 ==== Description
 
-AdminConsoleServiceTemplate provides a template used by the Operator to create and manage the admin console service.
-This allows services to be annotated, the service type defined and any other options that Kubernetes provides.
-When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
-The Operator reserves the right to modify or replace any field.
-More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core.
+AdminConsoleServiceTemplate provides a template used by the Operator to create
+and manage the admin console service.
+This allows services to be annotated, the
+service type defined and any other options that Kubernetes provides.
+When using
+a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
+The Operator
+reserves the right to modify or replace any field.
+More info:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core.
 
 === couchbaseclusters.spec.networking.adminConsoleServiceType
 
@@ -2087,8 +2274,10 @@ This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort"
 
 *DEPRECATED* - not required by Couchbase Server.
 
-AdminConsoleServices is a selector to choose specific services to expose via the admin console.
-This field may contain any of "data", "index", "query", "search", "eventing" and "analytics".
+AdminConsoleServices is a selector to choose specific services to expose via the admin
+console.
+This field may contain any of "data", "index", "query", "search", "eventing"
+and "analytics".
 Each service may only be included once.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway
@@ -2099,7 +2288,8 @@ Each service may only be included once.
 
 ==== Description
 
-CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase cluster.
+CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
+cluster.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.image
 
@@ -2130,7 +2320,8 @@ TODO: provide a default kubebuilder default image tag as field is mandatory.
 *DEVELOPER PREVIEW* - This feature is in developer preview.
 
 LogLevel controls the verbosity of cloud native logs.
-This field must be one of "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
+This field must be one of
+"fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.terminationGracePeriodSeconds
 
@@ -2142,7 +2333,8 @@ This field must be one of "fatal", "panic", "dpanic", "error", "warn", "info", "
 
 ==== Description
 
-TerminationGracePeriodSeconds specifies the grace period for the container to terminate.
+TerminationGracePeriodSeconds specifies the grace period for the container to
+terminate.
 Defaults to 75 seconds.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.tls
@@ -2153,11 +2345,18 @@ Defaults to 75 seconds.
 
 ==== Description
 
-TLS defines the TLS configuration for the Cloud Native Gateway server including server and client certificate configuration, and TLS security policies.
-If no TLS config are explicitly provided, the operator generates/manages self-signed certs/keys and creates a k8s secret named `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` unique to a Couchbase cluster, which is volume mounted to the cb k8s pod.
-This action could be overidden at the outset or later, by using the below TLS config or generating the secret of same name as `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` with certificates conforming to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
+TLS defines the TLS configuration for the Cloud Native Gateway server including
+server and client certificate configuration, and TLS security policies.
+If no TLS config are explicitly provided, the operator generates/manages self-signed certs/keys
+and creates a k8s secret named `couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>`
+unique to a Couchbase cluster, which is volume mounted to the cb k8s pod.
+This action could be overidden at the outset or later, by using the below
+TLS config or generating the secret of same name as
+`couchbase-cloud-native-gateway-self-signed-secret-<cluster-name>` with certificates
+conforming to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
 N.B.
-The secret is on per cluster basis so it's advised to use the unique cluster name else would be ignored.
+The secret is on per cluster basis so it's advised to use the unique cluster name else
+would be ignored.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.tls.serverSecretName
 
@@ -2167,8 +2366,10 @@ The secret is on per cluster basis so it's advised to use the unique cluster nam
 
 ==== Description
 
-ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains Cloud Native Gateway gRPC server TLS data.
-The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
+ServerSecretName specifies the secret name, in the same namespace as the cluster,
+that contains Cloud Native Gateway gRPC server TLS data.
+The secret is expected to contain "tls.crt" and
+"tls.key" as per the kubernetes.io/tls secret type.
 
 === couchbaseclusters.spec.networking.disableUIOverHTTP
 
@@ -2178,7 +2379,8 @@ The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.
 
 ==== Description
 
-DisableUIOverHTTP is used to explicitly enable and disable UI access over the HTTP protocol.
+DisableUIOverHTTP is used to explicitly enable and disable UI access over
+the HTTP protocol.
 If not specified, this field defaults to false.
 
 === couchbaseclusters.spec.networking.disableUIOverHTTPS
@@ -2189,7 +2391,8 @@ If not specified, this field defaults to false.
 
 ==== Description
 
-DisableUIOverHTTPS is used to explicitly enable and disable UI access over the HTTPS protocol.
+DisableUIOverHTTPS is used to explicitly enable and disable UI access over
+the HTTPS protocol.
 If not specified, this field defaults to false.
 
 === couchbaseclusters.spec.networking.dns
@@ -2211,8 +2414,12 @@ DNS defines information required for Dynamic DNS support.
 ==== Description
 
 Domain is the domain to create pods in.
-When populated the Operator will annotate the admin console and per-pod services with the key "external-dns.alpha.kubernetes.io/hostname".
-These annotations can be used directly by a Kubernetes External-DNS controller to replicate load balancer service IP addresses into a public DNS server.
+When populated the Operator
+will annotate the admin console and per-pod services with the key
+"external-dns.alpha.kubernetes.io/hostname".
+These annotations can
+be used directly by a Kubernetes External-DNS controller to replicate
+load balancer service IP addresses into a public DNS server.
 
 === couchbaseclusters.spec.networking.exposeAdminConsole
 
@@ -2233,11 +2440,16 @@ The service is configured by the adminConsoleServiceTemplate field.
 
 ==== Description
 
-ExposedFeatureServiceTemplate provides a template used by the Operator to create and manage per-pod services.
-This allows services to be annotated, the service type defined and any other options that Kubernetes provides.
-When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
-The Operator reserves the right to modify or replace any field.
-More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core.
+ExposedFeatureServiceTemplate provides a template used by the Operator to create
+and manage per-pod services.
+This allows services to be annotated, the
+service type defined and any other options that Kubernetes provides.
+When using
+a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
+The Operator
+reserves the right to modify or replace any field.
+More info:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core.
 
 === couchbaseclusters.spec.networking.exposedFeatureServiceType
 
@@ -2269,11 +2481,15 @@ This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort"
 
 *DEPRECATED*  - by exposedFeatureServiceTemplate.
 
-ExposedFeatureTrafficPolicy defines how packets should be routed from a load balancer service to a Couchbase pod.
+ExposedFeatureTrafficPolicy defines how packets should be routed from a load balancer
+service to a Couchbase pod.
 When local, traffic is routed directly to the pod.
-When cluster, traffic is routed to any node, then forwarded on.
-While cluster routing may be slower, there are some situations where it is required for connectivity.
-This field must be either "Cluster" or "Local", defaulting to "Local",.
+When
+cluster, traffic is routed to any node, then forwarded on.
+While cluster routing may be
+slower, there are some situations where it is required for connectivity.
+This field
+must be either "Cluster" or "Local", defaulting to "Local",.
 
 === couchbaseclusters.spec.networking.exposedFeatures
 
@@ -2285,14 +2501,20 @@ This field must be either "Cluster" or "Local", defaulting to "Local",.
 
 ==== Description
 
-ExposedFeatures is a list of Couchbase features to expose when using a networking model that exposes the Couchbase cluster externally to Kubernetes.
-This field also triggers the creation of per-pod services used by clients to connect to the Couchbase cluster.
-When admin, only the administrator port is exposed, allowing remote administration.
+ExposedFeatures is a list of Couchbase features to expose when using a networking
+model that exposes the Couchbase cluster externally to Kubernetes.
+This field also
+triggers the creation of per-pod services used by clients to connect to the Couchbase
+cluster.
+When admin, only the administrator port is exposed, allowing remote
+administration.
 When xdcr, only the services required for remote replication are exposed.
-The xdcr feature is only required when the cluster is the destination of an XDCR replication.
+The xdcr feature is only required when the cluster is the destination of an XDCR
+replication.
 When client, all services are exposed as required for client SDK operation.
 This field may contain any of "admin", "xdcr" and "client".
-Each feature may only be included once.
+Each feature may only be
+included once.
 
 === couchbaseclusters.spec.networking.loadBalancerSourceRanges
 
@@ -2306,8 +2528,11 @@ Each feature may only be included once.
 
 *DEPRECATED* - by adminConsoleServiceTemplate and exposedFeatureServiceTemplate.
 
-LoadBalancerSourceRanges applies only when an exposed service is of type LoadBalancer and limits the source IP ranges that are allowed to use the service.
-Items must use IPv4 class-less interdomain routing (CIDR) notation e.g.
+LoadBalancerSourceRanges applies only when an exposed service is of type
+LoadBalancer and limits the source IP ranges that are allowed to use the
+service.
+Items must use IPv4 class-less interdomain routing (CIDR) notation
+e.g.
 10.0.0.0/16.
 
 === couchbaseclusters.spec.networking.networkPlatform
@@ -2320,7 +2545,8 @@ Items must use IPv4 class-less interdomain routing (CIDR) notation e.g.
 
 ==== Description
 
-NetworkPlatform is used to enable support for various networking technologies.
+NetworkPlatform is used to enable support for various networking
+technologies.
 This field must be one of "Istio".
 
 === couchbaseclusters.spec.networking.serviceAnnotations
@@ -2334,7 +2560,8 @@ This field must be one of "Istio".
 *DEPRECATED* - by adminConsoleServiceTemplate and exposedFeatureServiceTemplate.
 
 ServiceAnnotations allows services to be annotated with custom labels.
-Operator annotations are merged on top of these so have precedence as they are required for correct operation.
+Operator annotations are merged on top of these so have precedence as
+they are required for correct operation.
 
 === couchbaseclusters.spec.networking.tls
 
@@ -2344,7 +2571,8 @@ Operator annotations are merged on top of these so have precedence as they are r
 
 ==== Description
 
-TLS defines the TLS configuration for the cluster including server and client certificate configuration, and TLS security policies.
+TLS defines the TLS configuration for the cluster including
+server and client certificate configuration, and TLS security policies.
 
 === couchbaseclusters.spec.networking.tls.allowPlainTextCertReload
 
@@ -2357,8 +2585,11 @@ TLS defines the TLS configuration for the cluster including server and client ce
 ==== Description
 
 AllowPlainTextCertReload allows the reload of TLS certificates in plain text.
-This option should only be enabled as a means to recover connectivity with server in the event that any of the server certificates expire.
-When enabled the Operator only attempts plain text cert reloading when expired certificates are detected.
+This option should only be enabled as a means to recover connectivity with
+server in the event that any of the server certificates expire.
+When enabled
+the Operator only attempts plain text cert reloading when expired certificates
+are detected.
 
 === couchbaseclusters.spec.networking.tls.cipherSuites
 
@@ -2368,9 +2599,12 @@ When enabled the Operator only attempts plain text cert reloading when expired c
 
 ==== Description
 
-CipherSuites specifies a list of cipher suites for Couchbase server to select from when negotiating TLS handshakes with a client.
-Suites are not validated by the Operator.
-Run "openssl ciphers -v" in a Couchbase server pod to interrogate supported values.
+CipherSuites specifies a list of cipher suites for Couchbase server to select
+from when negotiating TLS handshakes with a client.
+Suites are not validated
+by the Operator.
+Run "openssl ciphers -v" in a Couchbase server pod to
+interrogate supported values.
 
 === couchbaseclusters.spec.networking.tls.clientCertificatePaths
 
@@ -2380,7 +2614,8 @@ Run "openssl ciphers -v" in a Couchbase server pod to interrogate supported valu
 
 ==== Description
 
-ClientCertificatePaths defines where to look in client certificates in order to extract the user name.
+ClientCertificatePaths defines where to look in client certificates in order
+to extract the user name.
 
 === couchbaseclusters.spec.networking.tls.clientCertificatePaths.delimiter
 
@@ -2390,7 +2625,8 @@ ClientCertificatePaths defines where to look in client certificates in order to 
 
 ==== Description
 
-Delimiter if specified allows a suffix to be stripped from the username, once extracted from the certificate path.
+Delimiter if specified allows a suffix to be stripped from the username, once
+extracted from the certificate path.
 
 === couchbaseclusters.spec.networking.tls.clientCertificatePaths.path
 
@@ -2415,7 +2651,8 @@ This field must be either "subject.cn", "san.uri", "san.dnsname" or  "san.email"
 
 ==== Description
 
-Prefix allows a prefix to be stripped from the username, once extracted from the certificate path.
+Prefix allows a prefix to be stripped from the username, once extracted from the
+certificate path.
 
 === couchbaseclusters.spec.networking.tls.clientCertificatePolicy
 
@@ -2428,7 +2665,8 @@ Prefix allows a prefix to be stripped from the username, once extracted from the
 ==== Description
 
 ClientCertificatePolicy defines the client authentication policy to use.
-If set, the Operator expects TLS configuration to contain a valid certificate/key pair for the Administrator account.
+If set, the Operator expects TLS configuration to contain a valid certificate/key pair
+for the Administrator account.
 
 === couchbaseclusters.spec.networking.tls.nodeToNodeEncryption
 
@@ -2440,13 +2678,18 @@ If set, the Operator expects TLS configuration to contain a valid certificate/ke
 
 ==== Description
 
-NodeToNodeEncryption specifies whether to encrypt data between Couchbase nodes within the same cluster.
+NodeToNodeEncryption specifies whether to encrypt data between Couchbase nodes
+within the same cluster.
 This may come at the expense of performance.
-When control plane only encryption is used, only cluster management traffic is encrypted between nodes.
+When
+control plane only encryption is used, only cluster management traffic is encrypted
+between nodes.
 When all, all traffic is encrypted, including database documents.
-When strict mode is used, it is the same as all, but also disables all plaintext ports.
+When strict mode is used, it is the same as all, but also disables all plaintext
+ports.
 Strict mode is only available on Couchbase Server versions 7.1 and greater.
-Node to node encryption can only be used when TLS certificates are managed by the Operator.
+Node to node encryption can only be used when TLS certificates are managed by the
+Operator.
 This field must be either "ControlPlaneOnly", "All", or "Strict".
 
 === couchbaseclusters.spec.networking.tls.passphrase
@@ -2458,8 +2701,10 @@ This field must be either "ControlPlaneOnly", "All", or "Strict".
 ==== Description
 
 PassphraseConfig configures the passphrase key to use with encrypted certificates.
-The passphrase may be registered with Couchbase Server using a local script or a rest endpoint.
-Private key encryption is only available on Couchbase Server versions 7.1 and greater.
+The passphrase may be registered with Couchbase Server using a local script or a
+rest endpoint.
+Private key encryption is only available on Couchbase Server
+versions 7.1 and greater.
 
 === couchbaseclusters.spec.networking.tls.passphrase.rest
 
@@ -2470,8 +2715,10 @@ Private key encryption is only available on Couchbase Server versions 7.1 and gr
 ==== Description
 
 PassphraseRestConfig is the configuration to register a private key passphrase with a rest endpoint.
-When the private key is accessed, Couchbase Server attempts to extract the password by means of the specified endpoint.
-The response status must be 200 and the response text must be the exact passphrase excluding newlines and extraneous spaces.
+When the private key is accessed, Couchbase Server attempts to extract the password by means of the
+specified endpoint.
+The response status must be 200 and the response text must be the exact passphrase
+excluding newlines and extraneous spaces.
 
 === couchbaseclusters.spec.networking.tls.passphrase.rest.addressFamily
 
@@ -2544,7 +2791,8 @@ VerifyPeer ensures peer verification is performed when Https is used.
 ==== Description
 
 PassphraseScriptConfig is the configuration to register a private key passphrase with a script.
-The Operator auto-provisions the underlying script so this config simply provides a mechanism to perform the decryption of the Couchbase Private Key using a local script.
+The Operator auto-provisions the underlying script so this config simply provides a mechanism
+to perform the decryption of the Couchbase Private Key using a local script.
 
 === couchbaseclusters.spec.networking.tls.passphrase.script.secret
 
@@ -2557,7 +2805,8 @@ The Operator auto-provisions the underlying script so this config simply provide
 ==== Description
 
 Secret is the secret containing the passphrase string.
-The secret is expected to contain "passphrase" key with the passphrase string as a value.
+The secret is expected
+to contain "passphrase" key with the passphrase string as a value.
 
 === couchbaseclusters.spec.networking.tls.rootCAs
 
@@ -2567,10 +2816,16 @@ The secret is expected to contain "passphrase" key with the passphrase string as
 
 ==== Description
 
-RootCAs defines a set of secrets that reside in this namespace that contain additional CA certificates that should be installed in Couchbase.
-The CA certificates that are defined here are in addition to those defined for the cluster, optionally by couchbaseclusters.spec.networking.tls.secretSource, and thus should not be duplicated.
-Each Secret referred to must be of well-known type "kubernetes.io/tls" and must contain one or more CA certificates under the key "tls.crt".
-Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater, and not with legacy couchbaseclusters.spec.networking.tls.static configuration.
+RootCAs defines a set of secrets that reside in this namespace that contain
+additional CA certificates that should be installed in Couchbase.
+The CA
+certificates that are defined here are in addition to those defined for the
+cluster, optionally by couchbaseclusters.spec.networking.tls.secretSource, and
+thus should not be duplicated.
+Each Secret referred to must be of well-known type
+"kubernetes.io/tls" and must contain one or more CA certificates under the key "tls.crt".
+Multiple root CA certificates are only supported on Couchbase Server 7.1 and greater,
+and not with legacy couchbaseclusters.spec.networking.tls.static configuration.
 
 === couchbaseclusters.spec.networking.tls.secretSource
 
@@ -2580,10 +2835,17 @@ Multiple root CA certificates are only supported on Couchbase Server 7.1 and gre
 
 ==== Description
 
-SecretSource enables the user to specify a secret conforming to the Kubernetes TLS secret specification that is used for the Couchbase server certificate, and optionally the Operator's client certificate, providing cert-manager compatibility without having to specify a separate root CA.
-A server CA certificate must be supplied by one of the provided methods.
-Certificates referred to must conform to the keys of well-known type "kubernetes.io/tls" with "tls.crt" and "tls.key".
-If the "tls.key" is an encrypted private key then the secret type can be the generic Opaque type since "kubernetes.io/tls" type secrets cannot verify encrypted keys.
+SecretSource enables the user to specify a secret conforming to the Kubernetes TLS
+secret specification that is used for the Couchbase server certificate, and optionally
+the Operator's client certificate, providing cert-manager compatibility without having
+to specify a separate root CA.
+A server CA certificate must be supplied by one of the
+provided methods.
+Certificates referred to must conform to the keys of well-known type
+"kubernetes.io/tls" with "tls.crt" and "tls.key".
+If the "tls.key" is an encrypted
+private key then the secret type can be the generic Opaque type since "kubernetes.io/tls"
+type secrets cannot verify encrypted keys.
 
 === couchbaseclusters.spec.networking.tls.secretSource.clientSecretName
 
@@ -2593,8 +2855,10 @@ If the "tls.key" is an encrypted private key then the secret type can be the gen
 
 ==== Description
 
-ClientSecretName specifies the secret name, in the same namespace as the cluster, the contains client TLS data.
-The secret is expected to contain "tls.crt" and "tls.key" as per the Kubernetes.io/tls secret type.
+ClientSecretName specifies the secret name, in the same namespace as the cluster,
+the contains client TLS data.
+The secret is expected to contain "tls.crt" and
+"tls.key" as per the Kubernetes.io/tls secret type.
 
 === couchbaseclusters.spec.networking.tls.secretSource.serverSecretName
 
@@ -2606,8 +2870,10 @@ The secret is expected to contain "tls.crt" and "tls.key" as per the Kubernetes.
 
 ==== Description
 
-ServerSecretName specifies the secret name, in the same namespace as the cluster, that contains server TLS data.
-The secret is expected to contain "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.
+ServerSecretName specifies the secret name, in the same namespace as the cluster,
+that contains server TLS data.
+The secret is expected to contain "tls.crt" and
+"tls.key" as per the kubernetes.io/tls secret type.
 It may also contain "ca.crt".
 Only a single PEM formated x509 certificate can be provided to "ca.crt".
 The single certificate may also bundle together multiple root CA certificates.
@@ -2623,8 +2889,10 @@ Multiple root CA certificates are only supported on Couchbase Server 7.1 and gre
 
 *DEPRECATED* - by couchbaseclusters.spec.networking.tls.secretSource.
 
-Static enables user to generate static x509 certificates and keys, put them into Kubernetes secrets, and specify them here.
-Static secrets are Couchbase specific, and follow no well-known standards.
+Static enables user to generate static x509 certificates and keys,
+put them into Kubernetes secrets, and specify them here.
+Static secrets
+are Couchbase specific, and follow no well-known standards.
 
 === couchbaseclusters.spec.networking.tls.static.operatorSecret
 
@@ -2634,9 +2902,13 @@ Static secrets are Couchbase specific, and follow no well-known standards.
 
 ==== Description
 
-OperatorSecret is a secret name containing TLS certs used by operator to talk securely to this cluster.
-The secret must contain a CA certificate (data key ca.crt).
-If client authentication is enabled, then the secret must also contain a client certificate chain (data key "couchbase-operator.crt") and private key (data key "couchbase-operator.key").
+OperatorSecret is a secret name containing TLS certs used by operator to
+talk securely to this cluster.
+The secret must contain a CA certificate (data key
+ca.crt).
+If client authentication is enabled, then the secret must also contain
+a client certificate chain (data key "couchbase-operator.crt") and private key
+(data key "couchbase-operator.key").
 
 === couchbaseclusters.spec.networking.tls.static.serverSecret
 
@@ -2646,11 +2918,17 @@ If client authentication is enabled, then the secret must also contain a client 
 
 ==== Description
 
-ServerSecret is a secret name containing TLS certs used by each Couchbase member pod for the communication between Couchbase server and its clients.
-The secret must contain a certificate chain (data key "chain.pem") and a private key (data key "pkey.key").
-The private key must be in the PKCS#1 RSA format.
-The certificate chain must have a required set of X.509v3 subject alternative names for all cluster addressing modes.
-See the Operator TLS documentation for more information.
+ServerSecret is a secret name containing TLS certs used by each Couchbase member pod
+for the communication between Couchbase server and its clients.
+The secret must
+contain a certificate chain (data key "chain.pem") and a private
+key (data key "pkey.key").
+The private key must be in the PKCS#1 RSA
+format.
+The certificate chain must have a required set of X.509v3 subject alternative
+names for all cluster addressing modes.
+See the Operator TLS documentation for more
+information.
 
 === couchbaseclusters.spec.networking.tls.tlsMinimumVersion
 
@@ -2664,8 +2942,10 @@ See the Operator TLS documentation for more information.
 
 ==== Description
 
-TLSMinimumVersion specifies the minimum TLS version the Couchbase server can negotiate with a client.
-Must be one of TLS1.0, TLS1.1 TLS1.2 or TLS1.3, defaulting to TLS1.2.
+TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
+negotiate with a client.
+Must be one of TLS1.0, TLS1.1 TLS1.2 or TLS1.3,
+defaulting to TLS1.2.
 TLS1.3 is only valid for Couchbase Server 7.1.0 onward.
 TLS1.0 and TLS1.1 are not valid for Couchbase Server 7.6.0 onward.
 
@@ -2679,8 +2959,11 @@ TLS1.0 and TLS1.1 are not valid for Couchbase Server 7.6.0 onward.
 
 ==== Description
 
-WaitForAddressReachable is used to set the timeout between when polling of external addresses is started, and when it is deemed a failure.
-Polling of DNS name availability inherently dangerous due to negative caching, so prefer the use of an initial `waitForAddressReachableDelay` to allow propagation.
+WaitForAddressReachable is used to set the timeout between when polling of
+external addresses is started, and when it is deemed a failure.
+Polling of
+DNS name availability inherently dangerous due to negative caching, so prefer
+the use of an initial `waitForAddressReachableDelay` to allow propagation.
 
 === couchbaseclusters.spec.networking.waitForAddressReachableDelay
 
@@ -2692,8 +2975,11 @@ Polling of DNS name availability inherently dangerous due to negative caching, s
 
 ==== Description
 
-WaitForAddressReachableDelay is used to defer operator checks that ensure external addresses are reachable before new nodes are balanced in to the cluster.
-This prevents negative DNS caching while waiting for external-DDNS controllers to propagate addresses.
+WaitForAddressReachableDelay is used to defer operator checks that
+ensure external addresses are reachable before new nodes are balanced
+in to the cluster.
+This prevents negative DNS caching while waiting
+for external-DDNS controllers to propagate addresses.
 
 === couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins
 
@@ -2707,7 +2993,8 @@ This prevents negative DNS caching while waiting for external-DDNS controllers t
 
 ==== Description
 
-OnlineVolumeExpansionTimeoutInMins must be provided as a retry mechanism with a timeout in minutes for expanding volumes.
+OnlineVolumeExpansionTimeoutInMins must be provided as a retry mechanism with a timeout in minutes
+for expanding volumes.
 This must only be provided, if EnableOnlineVolumeExpansion is set to true.
 Value must be between 0 and 30.
 If no value is provided, then it defaults to 10 minutes.
@@ -2721,7 +3008,8 @@ If no value is provided, then it defaults to 10 minutes.
 ==== Description
 
 Paused is to pause the control of the operator for the Couchbase cluster.
-This does not pause the cluster itself, instead stopping the operator from taking any action.
+This does not pause the cluster itself, instead stopping the operator from
+taking any action.
 
 === couchbaseclusters.spec.platform
 
@@ -2733,7 +3021,8 @@ This does not pause the cluster itself, instead stopping the operator from takin
 
 ==== Description
 
-Platform gives a hint as to what platform we are running on and how to configure services.
+Platform gives a hint as to what platform we are running on and how
+to configure services.
 This field must be one of "aws", "gke" or "azure".
 
 === couchbaseclusters.spec.recoveryPolicy
@@ -2746,11 +3035,17 @@ This field must be one of "aws", "gke" or "azure".
 
 ==== Description
 
-RecoveryPolicy controls how aggressive the Operator is when recovering cluster topology.
-When PrioritizeDataIntegrity, the Operator will delegate failover exclusively to Couchbase server, relying on it to only allow recovery when safe to do so.
-When PrioritizeUptime, the Operator will wait for a period after the expected auto-failover of the cluster, before forcefully failing-over the pods.
-This may cause data loss, and is only expected to be used on clusters with ephemeral data, where the loss of the pod means that the data is known to be unrecoverable.
-This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defaulting to "PrioritizeDataIntegrity".
+RecoveryPolicy controls how aggressive the Operator is when recovering cluster
+topology.
+When PrioritizeDataIntegrity, the Operator will delegate failover
+exclusively to Couchbase server, relying on it to only allow recovery when safe to
+do so.
+When PrioritizeUptime, the Operator will wait for a period after the
+expected auto-failover of the cluster, before forcefully failing-over the pods.
+This may cause data loss, and is only expected to be used on clusters with ephemeral
+data, where the loss of the pod means that the data is known to be unrecoverable.
+This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defaulting
+to "PrioritizeDataIntegrity".
 
 === couchbaseclusters.spec.rollingUpgrade
 
@@ -2760,7 +3055,8 @@ This field must be either "PrioritizeDataIntegrity" or "PrioritizeUptime", defau
 
 ==== Description
 
-When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod at a time.
+When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
+at a time.
 If this field is specified then that number can be increased.
 
 === couchbaseclusters.spec.rollingUpgrade.maxUpgradable
@@ -2773,11 +3069,14 @@ If this field is specified then that number can be increased.
 
 ==== Description
 
-MaxUpgradable allows the number of pods affected by an upgrade at any one time to be increased.
-By default a rolling upgrade will upgrade one pod at a time.
+MaxUpgradable allows the number of pods affected by an upgrade at any
+one time to be increased.
+By default a rolling upgrade will
+upgrade one pod at a time.
 This field allows that limit to be removed.
 This field must be greater than zero.
-The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if both are defined.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+both are defined.
 
 === couchbaseclusters.spec.rollingUpgrade.maxUpgradablePercent
 
@@ -2789,14 +3088,20 @@ The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if b
 
 ==== Description
 
-MaxUpgradablePercent allows the number of pods affected by an upgrade at any one time to be increased.
-By default a rolling upgrade will upgrade one pod at a time.
+MaxUpgradablePercent allows the number of pods affected by an upgrade at any
+one time to be increased.
+By default a rolling upgrade will
+upgrade one pod at a time.
 This field allows that limit to be removed.
 This field must be an integer percentage, e.g.
 "10%", in the range 1% to 100%.
-Percentages are relative to the total cluster size, and rounded down to the nearest whole number, with a minimum of 1.
-For example, a 10 pod cluster, and 25% allowed to upgrade, would yield 2.5 pods per iteration, rounded down to 2.
-The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if both are defined.
+Percentages are relative to the total cluster size, and rounded down to
+the nearest whole number, with a minimum of 1.
+For example, a 10 pod
+cluster, and 25% allowed to upgrade, would yield 2.5 pods per iteration,
+rounded down to 2.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+both are defined.
 
 === couchbaseclusters.spec.security
 
@@ -2808,7 +3113,8 @@ The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if b
 
 ==== Description
 
-Security defines Couchbase cluster security options such as the administrator account username and password, and user RBAC settings.
+Security defines Couchbase cluster security options such as the administrator
+account username and password, and user RBAC settings.
 
 === couchbaseclusters.spec.security.adminSecret
 
@@ -2822,7 +3128,9 @@ Security defines Couchbase cluster security options such as the administrator ac
 
 AdminSecret is the name of a Kubernetes secret to use for administrator authentication.
 The admin secret must contain the keys "username" and "password".
-The password data must be at least 6 characters in length, and not contain the any of the characters `()<>,;:\"/[]?={}`.
+The password data
+must be at least 6 characters in length, and not contain the any of the characters
+`()<>,;:\"/[]?={}`.
 
 === couchbaseclusters.spec.security.ldap
 
@@ -2833,7 +3141,8 @@ The password data must be at least 6 characters in length, and not contain the a
 ==== Description
 
 LDAP provides settings to authenticate and authorize LDAP users with Couchbase Server.
-When specified, the Operator keeps these settings in sync with Cocuhbase Server's LDAP configuration.
+When specified, the Operator keeps these settings in sync with Cocuhbase Server's
+LDAP configuration.
 Leave empty to manually manage LDAP configuration.
 
 === couchbaseclusters.spec.security.ldap.authenticationEnabled
@@ -2846,7 +3155,8 @@ Leave empty to manually manage LDAP configuration.
 
 ==== Description
 
-AuthenticationEnabled allows users who attempt to access Couchbase Server without having been added as local users to be authenticated against the specified LDAP Host(s).
+AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
+added as local users to be authenticated against the specified LDAP Host(s).
 
 === couchbaseclusters.spec.security.ldap.authorizationEnabled
 
@@ -2856,7 +3166,8 @@ AuthenticationEnabled allows users who attempt to access Couchbase Server withou
 
 ==== Description
 
-AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC roles granted to any Couchbase Server group associated with the user.
+AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC roles granted to
+any Couchbase Server group associated with the user.
 
 === couchbaseclusters.spec.security.ldap.bindDN
 
@@ -2867,7 +3178,8 @@ AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC 
 ==== Description
 
 DN to use for searching users and groups synchronization.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.bindSecret
 
@@ -2880,7 +3192,8 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 ==== Description
 
 BindSecret is the name of a Kubernetes secret to use containing password for LDAP user binding.
-The bindSecret must have a key with the name "password" and a value which corresponds to the password of the binding LDAP user.
+The bindSecret must have a key with the name "password" and a value which corresponds to the
+password of the binding LDAP user.
 
 === couchbaseclusters.spec.security.ldap.cacert
 
@@ -2907,7 +3220,8 @@ This cert is the string form of the secret provided to `spec.tls.tlsSecret`.
 
 Lifetime of values in cache in milliseconds.
 Default 300000 ms.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.encryption
 
@@ -2922,7 +3236,9 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 Encryption determines how the connection with the LDAP server should be encrypted.
 Encryption may set as either StartTLSExtension, TLS, or false.
 When set to "false" then no verification of the LDAP hostname is performed.
-When Encryption is StartTLSExtension, or TLS is set then the default behavior is to use the certificate already loaded into the Couchbase Cluster for certificate validation, otherwise `ldap.tlsSecret` may be set to override The Couchbase certificate.
+When Encryption is StartTLSExtension, or TLS is set then the default behavior is to
+use the certificate already loaded into the Couchbase Cluster for certificate validation,
+otherwise `ldap.tlsSecret` may be set to override The Couchbase certificate.
 
 === couchbaseclusters.spec.security.ldap.groupsQuery
 
@@ -2933,7 +3249,8 @@ When Encryption is StartTLSExtension, or TLS is set then the default behavior is
 ==== Description
 
 LDAP query, to get the users' groups by username in RFC4516 format.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.hosts
 
@@ -2961,7 +3278,8 @@ Host name must be a valid IP address or DNS Name e.g openldap.default.svc, 10.0.
 ==== Description
 
 Sets middlebox compatibility mode for LDAP.
-This option is only available on Couchbase Server 7.6.0+.
+This option is only available on
+Couchbase Server 7.6.0+.
 
 === couchbaseclusters.spec.security.ldap.nestedGroupsEnabled
 
@@ -2971,9 +3289,11 @@ This option is only available on Couchbase Server 7.6.0+.
 
 ==== Description
 
-If enabled Couchbase server will try to recursively search for groups for every discovered ldap group.
+If enabled Couchbase server will try to recursively search for groups
+for every discovered ldap group.
 groups_query will be user for the search.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.nestedGroupsMaxDepth
 
@@ -2992,7 +3312,8 @@ More info: https://docs.couchbase.com/server/current/manage/manage-security/conf
 Maximum number of recursive groups requests the server is allowed to perform.
 Requires NestedGroupsEnabled.
 Values between 1 and 100: the default is 10.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.port
 
@@ -3028,7 +3349,8 @@ Whether server certificate validation be enabled.
 ==== Description
 
 TLSSecret is the name of a Kubernetes secret to use explcitly for LDAP ca cert.
-If TLSSecret is not provided, certificates found in `couchbaseclusters.spec.networking.tls.rootCAs` will be used instead.
+If TLSSecret is not provided, certificates found in `couchbaseclusters.spec.networking.tls.rootCAs`
+will be used instead.
 If provided, the secret must contain the ca to be used under the name "ca.crt".
 
 === couchbaseclusters.spec.security.ldap.userDNMapping
@@ -3040,8 +3362,10 @@ If provided, the secret must contain the ca to be used under the name "ca.crt".
 ==== Description
 
 User to distinguished name (DN) mapping.
-If none is specified, the username is used as the user’s distinguished name.
-More info: https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
+If none is specified,
+the username is used as the user’s distinguished name.
+More info:
+https://docs.couchbase.com/server/current/manage/manage-security/configure-ldap.html.
 
 === couchbaseclusters.spec.security.ldap.userDNMapping.query
 
@@ -3062,7 +3386,8 @@ Query is the LDAP query to run to map from Couchbase user to LDAP distinguished 
 ==== Description
 
 This field specifies list of templates to use for providing username to DN mapping.
-The template may contain a placeholder specified as `%u` to represent the Couchbase user who is attempting to gain access.
+The template may contain a placeholder specified as `%u` to represent the Couchbase
+user who is attempting to gain access.
 
 === couchbaseclusters.spec.security.podSecurityContext
 
@@ -3072,10 +3397,15 @@ The template may contain a placeholder specified as `%u` to represent the Couchb
 
 ==== Description
 
-PodSecurityContext allows the configuration of the security context for all Couchbase server pods.
-When using persistent volumes you may need to set the fsGroup field in order to write to the volume.
-For non-root clusters you must also set runAsUser to 1000, corresponding to the Couchbase user in official container images.
-More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
+PodSecurityContext allows the configuration of the security context for all
+Couchbase server pods.
+When using persistent volumes you may need to set
+the fsGroup field in order to write to the volume.
+For non-root clusters
+you must also set runAsUser to 1000, corresponding to the Couchbase user
+in official container images.
+More info:
+https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
 
 === couchbaseclusters.spec.security.podSecurityContext.fsGroup
 
@@ -3086,12 +3416,19 @@ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-con
 ==== Description
 
 A special supplemental group that applies to all containers in a pod.
-Some volume types allow the Kubelet to change the ownership of that volume to be owned by the pod: 
- 1.
-The owning GID will be the FSGroup 2.
-The setgid bit is set (new files created in the volume will be owned by FSGroup) 3.
-The permission bits are OR'd with rw-rw---- 
- If unset, the Kubelet will not modify the ownership and permissions of any volume.
+Some volume types allow the Kubelet to change the ownership of that volume
+to be owned by the pod:
+
+
+1.
+The owning GID will be the FSGroup
+2.
+The setgid bit is set (new files created in the volume will be owned by FSGroup)
+3.
+The permission bits are OR'd with rw-rw----
+
+
+If unset, the Kubelet will not modify the ownership and permissions of any volume.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.fsGroupChangePolicy
@@ -3102,9 +3439,12 @@ Note that this field cannot be set when spec.os.name is windows.
 
 ==== Description
 
-fsGroupChangePolicy defines behavior of changing ownership and permission of the volume before being exposed inside Pod.
-This field will only apply to volume types which support fsGroup based ownership(and permissions).
-It will have no effect on ephemeral volume types such as: secret, configmaps and emptydir.
+fsGroupChangePolicy defines behavior of changing ownership and permission of the volume
+before being exposed inside Pod.
+This field will only apply to
+volume types which support fsGroup based ownership(and permissions).
+It will have no effect on ephemeral volume types such as: secret, configmaps
+and emptydir.
 Valid values are "OnRootMismatch" and "Always".
 If not specified, "Always" is used.
 Note that this field cannot be set when spec.os.name is windows.
@@ -3120,7 +3460,9 @@ Note that this field cannot be set when spec.os.name is windows.
 The GID to run the entrypoint of the container process.
 Uses runtime default if unset.
 May also be set in SecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence
+for that container.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.runAsNonRoot
@@ -3132,10 +3474,12 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 Indicates that the container must run as a non-root user.
-If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does.
+If true, the Kubelet will validate the image at runtime to ensure that it
+does not run as UID 0 (root) and fail to start the container if it does.
 If unset or false, no such validation will be performed.
 May also be set in SecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 
 === couchbaseclusters.spec.security.podSecurityContext.runAsUser
 
@@ -3148,7 +3492,9 @@ If set in both SecurityContext and PodSecurityContext, the value specified in Se
 The UID to run the entrypoint of the container process.
 Defaults to user specified in image metadata if unspecified.
 May also be set in SecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence
+for that container.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions
@@ -3160,9 +3506,12 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 The SELinux context to be applied to all containers.
-If unspecified, the container runtime will allocate a random SELinux context for each container.
+If unspecified, the container runtime will allocate a random SELinux context for each
+container.
 May also be set in SecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container.
+If set in
+both SecurityContext and PodSecurityContext, the value specified in SecurityContext
+takes precedence for that container.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.seLinuxOptions.level
@@ -3241,8 +3590,10 @@ Must NOT be set for any other type.
 ==== Description
 
 type indicates which kind of seccomp profile will be applied.
-Valid options are: 
- Localhost - a profile defined in a file on the node should be used.
+Valid options are:
+
+
+Localhost - a profile defined in a file on the node should be used.
 RuntimeDefault - the container runtime default profile should be used.
 Unconfined - no profile should be applied.
 
@@ -3254,9 +3605,14 @@ Unconfined - no profile should be applied.
 
 ==== Description
 
-A list of groups applied to the first process run in each container, in addition to the container's primary GID, the fsGroup (if specified), and group memberships defined in the container image for the uid of the container process.
-If unspecified, no additional groups are added to any container.
-Note that group memberships defined in the container image for the uid of the container process are still effective, even if they are not included in this list.
+A list of groups applied to the first process run in each container, in addition
+to the container's primary GID, the fsGroup (if specified), and group memberships
+defined in the container image for the uid of the container process.
+If unspecified,
+no additional groups are added to any container.
+Note that group memberships
+defined in the container image for the uid of the container process are still effective,
+even if they are not included in this list.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.sysctls
@@ -3268,7 +3624,8 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 Sysctls hold a list of namespaced sysctls used for the pod.
-Pods with unsupported sysctls (by the container runtime) might fail to launch.
+Pods with unsupported
+sysctls (by the container runtime) might fail to launch.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.podSecurityContext.sysctls.name
@@ -3316,7 +3673,9 @@ Note that this field cannot be set when spec.os.name is linux.
 
 ==== Description
 
-GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.
+GMSACredentialSpec is where the GMSA admission webhook
+(https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+GMSA credential spec named by the GMSACredentialSpecName field.
 
 === couchbaseclusters.spec.security.podSecurityContext.windowsOptions.gmsaCredentialSpecName
 
@@ -3337,7 +3696,8 @@ GMSACredentialSpecName is the name of the GMSA credential spec to use.
 ==== Description
 
 HostProcess determines if a container should be run as a 'Host Process' container.
-All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+All of a Pod's containers must have the same effective HostProcess value
+(it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
 In addition, if HostProcess is true then HostNetwork must also be set to true.
 
 === couchbaseclusters.spec.security.podSecurityContext.windowsOptions.runAsUserName
@@ -3351,7 +3711,8 @@ In addition, if HostProcess is true then HostNetwork must also be set to true.
 The UserName in Windows to run the entrypoint of the container process.
 Defaults to the user specified in image metadata if unspecified.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 
 === couchbaseclusters.spec.security.rbac
 
@@ -3381,7 +3742,8 @@ Managed defines whether RBAC is managed by us or the clients.
 
 ==== Description
 
-Selector is a label selector used to list RBAC resources in the namespace that are managed by the Operator.
+Selector is a label selector used to list RBAC resources in the namespace
+that are managed by the Operator.
 
 === couchbaseclusters.spec.security.securityContext
 
@@ -3404,9 +3766,14 @@ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-con
 
 ==== Description
 
-AllowPrivilegeEscalation controls whether a process can gain more privileges than its parent process.
-This bool directly controls if the no_new_privs flag will be set on the container process.
-AllowPrivilegeEscalation is true always when the container is: 1) run as Privileged 2) has CAP_SYS_ADMIN Note that this field cannot be set when spec.os.name is windows.
+AllowPrivilegeEscalation controls whether a process can gain more
+privileges than its parent process.
+This bool directly controls if
+the no_new_privs flag will be set on the container process.
+AllowPrivilegeEscalation is true always when the container is:
+1) run as Privileged
+2) has CAP_SYS_ADMIN
+Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.securityContext.capabilities
 
@@ -3462,7 +3829,8 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 procMount denotes the type of proc mount to use for the containers.
-The default is DefaultProcMount which uses the container runtime defaults for readonly paths and masked paths.
+The default is DefaultProcMount which uses the container runtime defaults for
+readonly paths and masked paths.
 This requires the ProcMountType feature flag to be enabled.
 Note that this field cannot be set when spec.os.name is windows.
 
@@ -3489,7 +3857,8 @@ Note that this field cannot be set when spec.os.name is windows.
 The GID to run the entrypoint of the container process.
 Uses runtime default if unset.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.securityContext.runAsNonRoot
@@ -3501,10 +3870,12 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 Indicates that the container must run as a non-root user.
-If true, the Kubelet will validate the image at runtime to ensure that it does not run as UID 0 (root) and fail to start the container if it does.
+If true, the Kubelet will validate the image at runtime to ensure that it
+does not run as UID 0 (root) and fail to start the container if it does.
 If unset or false, no such validation will be performed.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 
 === couchbaseclusters.spec.security.securityContext.runAsUser
 
@@ -3517,7 +3888,8 @@ If set in both SecurityContext and PodSecurityContext, the value specified in Se
 The UID to run the entrypoint of the container process.
 Defaults to user specified in image metadata if unspecified.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.securityContext.seLinuxOptions
@@ -3529,9 +3901,11 @@ Note that this field cannot be set when spec.os.name is windows.
 ==== Description
 
 The SELinux context to be applied to the container.
-If unspecified, the container runtime will allocate a random SELinux context for each container.
+If unspecified, the container runtime will allocate a random SELinux context for each
+container.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.securityContext.seLinuxOptions.level
@@ -3583,7 +3957,9 @@ User is a SELinux user label that applies to the container.
 ==== Description
 
 The seccomp options to use by this container.
-If seccomp options are provided at both the pod & container level, the container options override the pod options.
+If seccomp options are
+provided at both the pod & container level, the container options
+override the pod options.
 Note that this field cannot be set when spec.os.name is windows.
 
 === couchbaseclusters.spec.security.securityContext.seccompProfile.localhostProfile
@@ -3611,8 +3987,10 @@ Must NOT be set for any other type.
 ==== Description
 
 type indicates which kind of seccomp profile will be applied.
-Valid options are: 
- Localhost - a profile defined in a file on the node should be used.
+Valid options are:
+
+
+Localhost - a profile defined in a file on the node should be used.
 RuntimeDefault - the container runtime default profile should be used.
 Unconfined - no profile should be applied.
 
@@ -3637,7 +4015,9 @@ Note that this field cannot be set when spec.os.name is linux.
 
 ==== Description
 
-GMSACredentialSpec is where the GMSA admission webhook (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the GMSA credential spec named by the GMSACredentialSpecName field.
+GMSACredentialSpec is where the GMSA admission webhook
+(https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+GMSA credential spec named by the GMSACredentialSpecName field.
 
 === couchbaseclusters.spec.security.securityContext.windowsOptions.gmsaCredentialSpecName
 
@@ -3658,7 +4038,8 @@ GMSACredentialSpecName is the name of the GMSA credential spec to use.
 ==== Description
 
 HostProcess determines if a container should be run as a 'Host Process' container.
-All of a Pod's containers must have the same effective HostProcess value (it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
+All of a Pod's containers must have the same effective HostProcess value
+(it is not allowed to have a mix of HostProcess containers and non-HostProcess containers).
 In addition, if HostProcess is true then HostNetwork must also be set to true.
 
 === couchbaseclusters.spec.security.securityContext.windowsOptions.runAsUserName
@@ -3672,7 +4053,8 @@ In addition, if HostProcess is true then HostNetwork must also be set to true.
 The UserName in Windows to run the entrypoint of the container process.
 Defaults to the user specified in image metadata if unspecified.
 May also be set in PodSecurityContext.
-If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence.
+If set in both SecurityContext and
+PodSecurityContext, the value specified in SecurityContext takes precedence.
 
 === couchbaseclusters.spec.security.uiSessionTimeout
 
@@ -3688,7 +4070,8 @@ If set in both SecurityContext and PodSecurityContext, the value specified in Se
 
 ==== Description
 
-UISessionTimeout sets how long, in minutes, before a user is declared inactive and signed out from the Couchbase Server UI.
+UISessionTimeout sets how long, in minutes, before a user is declared inactive
+and signed out from the Couchbase Server UI.
 0 represents no time out.
 
 === couchbaseclusters.spec.securityContext
@@ -3699,11 +4082,17 @@ UISessionTimeout sets how long, in minutes, before a user is declared inactive a
 
 ==== Description
 
-*DEPRECATED* - by spec.security.securityContext SecurityContext allows the configuration of the security context for all Couchbase server pods.
+*DEPRECATED* - by spec.security.securityContext
+SecurityContext allows the configuration of the security context for all
+Couchbase server pods.
 
-When using persistent volumes you may need to set the fsGroup field in order to write to the volume.
-For non-root clusters you must also set runAsUser to 1000, corresponding to the Couchbase user in official container images.
-More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
+When using persistent volumes you may need to set
+the fsGroup field in order to write to the volume.
+For non-root clusters
+you must also set runAsUser to 1000, corresponding to the Couchbase user
+in official container images.
+More info:
+https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
 
 === couchbaseclusters.spec.serverGroups
 
@@ -3713,10 +4102,18 @@ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-con
 
 ==== Description
 
-ServerGroups define the set of availability zones you want to distribute pods over, and construct Couchbase server groups for.
-By default, most cloud providers will label nodes with the key "topology.kubernetes.io/zone", the values associated with that key are used here to provide explicit scheduling by the Operator.
-You may manually label nodes using the "topology.kubernetes.io/zone" key, to provide failure-domain aware scheduling when none is provided for you.
-Global server groups are applied to all server classes, and may be overridden on a per-server class basis to give more control over scheduling and server groups.
+ServerGroups define the set of availability zones you want to distribute
+pods over, and construct Couchbase server groups for.
+By default, most
+cloud providers will label nodes with the key "topology.kubernetes.io/zone",
+the values associated with that key are used here to provide explicit
+scheduling by the Operator.
+You may manually label nodes using the
+"topology.kubernetes.io/zone" key, to provide failure-domain
+aware scheduling when none is provided for you.
+Global server groups are
+applied to all server classes, and may be overridden on a per-server class
+basis to give more control over scheduling and server groups.
 
 === couchbaseclusters.spec.servers
 
@@ -3731,9 +4128,13 @@ Global server groups are applied to all server classes, and may be overridden on
 ==== Description
 
 Servers defines server classes for the Operator to provision and manage.
-A server class defines what services are running and how many members make up that class.
-Specifying multiple server classes allows the Operator to provision clusters with Multi-Dimensional Scaling (MDS).
-At least one server class must be defined, and at least one server class must be running the data service.
+A server class defines what services are running and how many members make
+up that class.
+Specifying multiple server classes allows the Operator to
+provision clusters with Multi-Dimensional Scaling (MDS).
+At least one server
+class must be defined, and at least one server class must be running the data
+service.
 
 === couchbaseclusters.spec.servers.autoscaleEnabled
 
@@ -3744,8 +4145,10 @@ At least one server class must be defined, and at least one server class must be
 ==== Description
 
 AutoscaledEnabled defines whether the autoscaling feature is enabled for this class.
-When true, the Operator will create a CouchbaseAutoscaler resource for this server class.
-The CouchbaseAutoscaler implements the Kubernetes scale API and can be controlled by the Kubernetes horizontal pod autoscaler (HPA).
+When true, the Operator will create a CouchbaseAutoscaler resource for this
+server class.
+The CouchbaseAutoscaler implements the Kubernetes scale API and
+can be controlled by the Kubernetes horizontal pod autoscaler (HPA).
 
 === couchbaseclusters.spec.servers.env
 
@@ -3777,11 +4180,16 @@ EnvFrom allows the setting of environment variables in the Couchbase server cont
 
 ==== Description
 
-Image is the container image name that will be used to launch Couchbase server instances in this server class.
-You cannot downgrade the Couchbase version.
-Across spec.image and all server classes there can only be two different Couchbase images.
-Updating this field to a value different than spec.image will cause an automatic upgrade of the server class.
-If it isn't specified then the cluster image will be used.
+Image is the container image name that will be used to launch Couchbase
+server instances in this server class.
+You cannot downgrade the Couchbase
+version.
+Across spec.image and all server classes there can only be two
+different Couchbase images.
+Updating this field to a value different than
+spec.image will cause an automatic upgrade of the server class.
+If it isn't
+specified then the cluster image will be used.
 
 === couchbaseclusters.spec.servers.name
 
@@ -3794,7 +4202,8 @@ If it isn't specified then the cluster image will be used.
 ==== Description
 
 Name is a textual name for the server configuration and must be unique.
-The name is used by the operator to uniquely identify a server class, and map pods back to an intended configuration.
+The name is used by the operator to uniquely identify a server class,
+and map pods back to an intended configuration.
 
 === couchbaseclusters.spec.servers.pod
 
@@ -3804,11 +4213,16 @@ The name is used by the operator to uniquely identify a server class, and map po
 
 ==== Description
 
-Pod defines a template used to create pod for each Couchbase server instance.
-Modifying pod metadata such as labels and annotations will update the pod in-place.
-Any other modification will result in a cluster upgrade in order to fulfill the request.
-The Operator reserves the right to modify or replace any field.
-More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pod-v1-core.
+Pod defines a template used to create pod for each Couchbase server
+instance.
+Modifying pod metadata such as labels and annotations will
+update the pod in-place.
+Any other modification will result in a cluster
+upgrade in order to fulfill the request.
+The Operator reserves the right
+to modify or replace any field.
+More info:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#pod-v1-core.
 
 === couchbaseclusters.spec.servers.resources
 
@@ -3819,7 +4233,8 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#
 ==== Description
 
 Resources are the resource requirements for the Couchbase server container.
-This field overrides any automatic allocation as defined by `spec.autoResourceAllocation`.
+This field overrides any automatic allocation as defined by
+`spec.autoResourceAllocation`.
 
 === couchbaseclusters.spec.servers.serverGroups
 
@@ -3829,10 +4244,18 @@ This field overrides any automatic allocation as defined by `spec.autoResourceAl
 
 ==== Description
 
-ServerGroups define the set of availability zones you want to distribute pods over, and construct Couchbase server groups for.
-By default, most cloud providers will label nodes with the key "topology.kubernetes.io/zone", the values associated with that key are used here to provide explicit scheduling by the Operator.
-You may manually label nodes using the "topology.kubernetes.io/zone" key, to provide failure-domain aware scheduling when none is provided for you.
-Global server groups are applied to all server classes, and may be overridden on a per-server class basis to give more control over scheduling and server groups.
+ServerGroups define the set of availability zones you want to distribute
+pods over, and construct Couchbase server groups for.
+By default, most
+cloud providers will label nodes with the key "topology.kubernetes.io/zone",
+the values associated with that key are used here to provide explicit
+scheduling by the Operator.
+You may manually label nodes using the
+"topology.kubernetes.io/zone" key, to provide failure-domain
+aware scheduling when none is provided for you.
+Global server groups are
+applied to all server classes, and may be overridden on a per-server class
+basis to give more control over scheduling and server groups.
 
 === couchbaseclusters.spec.servers.services
 
@@ -3848,7 +4271,8 @@ Global server groups are applied to all server classes, and may be overridden on
 
 Services is the set of Couchbase services to run on this server class.
 At least one class must contain the data service.
-The field may contain any of "data", "index", "query", "search", "eventing" or "analytics".
+The field may contain
+any of "data", "index", "query", "search", "eventing" or "analytics".
 Each service may only be specified once.
 
 === couchbaseclusters.spec.servers.size
@@ -3864,7 +4288,8 @@ Each service may only be specified once.
 ==== Description
 
 Size is the expected requested of the server class.
-This field must be greater than or equal to 1.
+This field
+must be greater than or equal to 1.
 
 === couchbaseclusters.spec.servers.volumeMounts
 
@@ -3884,11 +4309,15 @@ VolumeMounts define persistent volume claims to attach to pod.
 
 ==== Description
 
-AnalyticsClaims are persistent volumes that encompass analytics storage associated with the analytics service.
-Analytics claims can only be used on server classes running the analytics service, and must be used in conjunction with the default claim.
+AnalyticsClaims are persistent volumes that encompass analytics storage associated
+with the analytics service.
+Analytics claims can only be used on server classes
+running the analytics service, and must be used in conjunction with the default claim.
 This field allows the analytics service to use different storage media (e.g.
-SSD), and scale horizontally, to improve performance of this service.
-This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
+SSD), and
+scale horizontally, to improve performance of this service.
+This field references a volume
+claim template name as defined in "spec.volumeClaimTemplates".
 
 === couchbaseclusters.spec.servers.volumeMounts.data
 
@@ -3898,11 +4327,16 @@ This field references a volume claim template name as defined in "spec.volumeCla
 
 ==== Description
 
-DataClaim is a persistent volume that encompasses key/value storage associated with the data service.
-The data claim can only be used on server classes running the data service, and must be used in conjunction with the default claim.
-This field allows the data service to use different storage media (e.g.
-SSD) to improve performance of this service.
-This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
+DataClaim is a persistent volume that encompasses key/value storage associated
+with the data service.
+The data claim can only be used on server classes running
+the data service, and must be used in conjunction with the default claim.
+This
+field allows the data service to use different storage media (e.g.
+SSD) to
+improve performance of this service.
+This field references a volume
+claim template name as defined in "spec.volumeClaimTemplates".
 
 === couchbaseclusters.spec.servers.volumeMounts.default
 
@@ -3912,11 +4346,17 @@ This field references a volume claim template name as defined in "spec.volumeCla
 
 ==== Description
 
-DefaultClaim is a persistent volume that encompasses all Couchbase persistent data, including document storage, indexes and logs.
-The default volume can be used with any server class.
-Use of the default claim allows the Operator to recover failed pods from the persistent volume far quicker than if the pod were using ephemeral storage.
-The default claim cannot be used at the same time as the logs claim within the same server class.
-This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
+DefaultClaim is a persistent volume that encompasses all Couchbase persistent
+data, including document storage, indexes and logs.
+The default volume can be
+used with any server class.
+Use of the default claim allows the Operator to
+recover failed pods from the persistent volume far quicker than if the pod were
+using ephemeral storage.
+The default claim cannot be used at the same time
+as the logs claim within the same server class.
+This field references a volume
+claim template name as defined in "spec.volumeClaimTemplates".
 
 === couchbaseclusters.spec.servers.volumeMounts.index
 
@@ -3926,12 +4366,18 @@ This field references a volume claim template name as defined in "spec.volumeCla
 
 ==== Description
 
-IndexClaim s a persistent volume that encompasses index storage associated with the index and search services.
-The index claim can only be used on server classes running the index or search services, and must be used in conjunction with the default claim.
-This field allows the index and/or search service to use different storage media (e.g.
-SSD) to improve performance of this service.
-This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
-Whilst this references index primarily, note that the full text search (FTS) service also uses this same mount.
+IndexClaim s a persistent volume that encompasses index storage associated
+with the index and search services.
+The index claim can only be used on server classes running
+the index or search services, and must be used in conjunction with the default claim.
+This
+field allows the index and/or search service to use different storage media (e.g.
+SSD) to
+improve performance of this service.
+This field references a volume
+claim template name as defined in "spec.volumeClaimTemplates".
+Whilst this references index primarily, note that the full text search (FTS) service
+also uses this same mount.
 
 === couchbaseclusters.spec.servers.volumeMounts.logs
 
@@ -3941,12 +4387,18 @@ Whilst this references index primarily, note that the full text search (FTS) ser
 
 ==== Description
 
-LogsClaim is a persistent volume that encompasses only Couchbase server logs to aid with supporting the product.
-The logs claim can only be used on server classes running the following services: query, search & eventing.
-The logs claim cannot be used at the same time as the default claim within the same server class.
-This field references a volume claim template name as defined in "spec.volumeClaimTemplates".
-Whilst the logs claim can be used with the search service, the recommendation is to use the default claim for these.
-The reason for this is that a failure of these nodes will require indexes to be rebuilt and subsequent performance impact.
+LogsClaim is a persistent volume that encompasses only Couchbase server logs to aid
+with supporting the product.
+The logs claim can only be used on server classes running
+the following services: query, search & eventing.
+The logs claim cannot be used at the same
+time as the default claim within the same server class.
+This field references a volume
+claim template name as defined in "spec.volumeClaimTemplates".
+Whilst the logs claim can be used with the search service, the recommendation is to use the
+default claim for these.
+The reason for this is that a failure of these nodes will require
+indexes to be rebuilt and subsequent performance impact.
 
 === couchbaseclusters.spec.softwareUpdateNotifications
 
@@ -3970,9 +4422,12 @@ When enabled, the UI will alert when a Couchbase server upgrade is available.
 ==== Description
 
 UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
-When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or ImmediateUpgrade (determined by UpgradeStrategy).
-When DeltaRecovery is requested, the operator will perform an in-place upgrade on a best effort basis.
-DeltaRecovery cannot be used if the UpgradeStrategy is set to ImmediateUpgrade.
+When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
+ImmediateUpgrade (determined by UpgradeStrategy).
+When DeltaRecovery is requested, the operator will
+perform an in-place upgrade on a best effort basis.
+DeltaRecovery cannot be used if the UpgradeStrategy
+is set to ImmediateUpgrade.
 
 === couchbaseclusters.spec.upgradeStrategy
 
@@ -3984,12 +4439,17 @@ DeltaRecovery cannot be used if the UpgradeStrategy is set to ImmediateUpgrade.
 
 ==== Description
 
-UpgradeStrategy controls how aggressive the Operator is when performing a cluster upgrade.
+UpgradeStrategy controls how aggressive the Operator is when performing a cluster
+upgrade.
 When a rolling upgrade is requested, pods are upgraded one at a time.
-This strategy is slower, however less disruptive.
-When an immediate upgrade strategy is requested, all pods are upgraded at the same time.
-This strategy is faster, but more disruptive.
-This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting to "RollingUpgrade".
+This
+strategy is slower, however less disruptive.
+When an immediate upgrade strategy is
+requested, all pods are upgraded at the same time.
+This strategy is faster, but more
+disruptive.
+This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting
+to "RollingUpgrade".
 
 === couchbaseclusters.spec.volumeClaimTemplates
 
@@ -3999,8 +4459,11 @@ This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting to 
 
 ==== Description
 
-VolumeClaimTemplates define the desired characteristics of a volume that can be requested/claimed by a pod, for example the storage class to use and the volume size.
-Volume claim templates are referred to by name by server class volume mount configuration.
+VolumeClaimTemplates define the desired characteristics of a volume
+that can be requested/claimed by a pod, for example the storage class to
+use and the volume size.
+Volume claim templates are referred to by name
+by server class volume mount configuration.
 
 === couchbaseclusters.spec.xdcr
 
@@ -4010,7 +4473,8 @@ Volume claim templates are referred to by name by server class volume mount conf
 
 ==== Description
 
-XDCR defines whether the Operator should manage XDCR, remote clusters and how to lookup replication resources.
+XDCR defines whether the Operator should manage XDCR, remote clusters and how
+to lookup replication resources.
 
 === couchbaseclusters.spec.xdcr.managed
 
@@ -4040,9 +4504,12 @@ RemoteClusters is a set of named remote clusters to establish replications to.
 
 ==== Description
 
-AuthenticationSecret is a secret used to authenticate when establishing a remote connection.
+AuthenticationSecret is a secret used to authenticate when establishing a
+remote connection.
 It is only required when not using mTLS.
-The secret must contain a username (secret key "username") and password (secret key "password").
+The secret
+must contain a username (secret key "username") and password (secret key
+"password").
 
 === couchbaseclusters.spec.xdcr.remoteClusters.hostname
 
@@ -4070,7 +4537,8 @@ To use IPv6, place brackets (`[`, `]`) around the IPv6 value.
 ==== Description
 
 Name of the remote cluster.
-Note that, -operator-managed is added as suffix by operator automatically to the name in order to diffrentiate from non operator managed remote clusters.
+Note that, -operator-managed is added as suffix by operator automatically
+to the name in order to diffrentiate from non operator managed remote clusters.
 
 === couchbaseclusters.spec.xdcr.remoteClusters.replications
 
@@ -4082,7 +4550,8 @@ Note that, -operator-managed is added as suffix by operator automatically to the
 
 Replications are replication streams from this cluster to the remote one.
 This field defines how to look up CouchbaseReplication resources.
-By default any CouchbaseReplication resources in the namespace will be considered.
+By default
+any CouchbaseReplication resources in the namespace will be considered.
 
 === couchbaseclusters.spec.xdcr.remoteClusters.replications.selector
 
@@ -4092,7 +4561,8 @@ By default any CouchbaseReplication resources in the namespace will be considere
 
 ==== Description
 
-Selector allows CouchbaseReplication resources to be filtered based on labels.
+Selector allows CouchbaseReplication resources to be filtered
+based on labels.
 
 === couchbaseclusters.spec.xdcr.remoteClusters.tls
 
@@ -4102,7 +4572,8 @@ Selector allows CouchbaseReplication resources to be filtered based on labels.
 
 ==== Description
 
-TLS if specified references a resource containing the necessary certificate data for an encrypted connection.
+TLS if specified references a resource containing the necessary certificate
+data for an encrypted connection.
 
 === couchbaseclusters.spec.xdcr.remoteClusters.tls.secret
 
@@ -4114,7 +4585,9 @@ TLS if specified references a resource containing the necessary certificate data
 
 ==== Description
 
-Secret references a secret containing the CA certificate (data key "ca"), and optionally a client certificate (data key "certificate") and key (data key "key").
+Secret references a secret containing the CA certificate (data key "ca"),
+and optionally a client certificate (data key "certificate") and key
+(data key "key").
 
 === couchbaseclusters.spec.xdcr.remoteClusters.uuid
 
@@ -4129,7 +4602,8 @@ Secret references a secret containing the CA certificate (data key "ca"), and op
 ==== Description
 
 UUID of the remote cluster.
-The UUID of a CouchbaseCluster resource is advertised in the status.clusterId field of the resource.
+The UUID of a CouchbaseCluster resource
+is advertised in the status.clusterId field of the resource.
 
 == couchbaseclusters.status
 
@@ -4162,7 +4636,8 @@ Allocations shows memory allocations within server classes.
 ==== Description
 
 AllocatedMemory defines the total memory allocated for constrained Couchbase services.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.allocatedMemoryPercent
 
@@ -4172,7 +4647,8 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-AllocatedMemoryPercent is set when memory resources are requested and define how much of the requested memory is allocated to constrained Couchbase services.
+AllocatedMemoryPercent is set when memory resources are requested and define how much of
+the requested memory is allocated to constrained Couchbase services.
 
 === couchbaseclusters.status.allocations.analyticsServiceAllocation
 
@@ -4184,8 +4660,10 @@ AllocatedMemoryPercent is set when memory resources are requested and define how
 
 ==== Description
 
-AnalyticsServiceAllocation is set when the analytics service is enabled for this class and defines how much memory this service consumes per pod.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+AnalyticsServiceAllocation is set when the analytics service is enabled for this class and
+defines how much memory this service consumes per pod.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.dataServiceAllocation
 
@@ -4197,8 +4675,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-DataServiceAllocation is set when the data service is enabled for this class and defines how much memory this service consumes per pod.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+DataServiceAllocation is set when the data service is enabled for this class and
+defines how much memory this service consumes per pod.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.eventingServiceAllocation
 
@@ -4210,8 +4690,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-EventingServiceAllocation is set when the eventing service is enabled for this class and defines how much memory this service consumes per pod.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+EventingServiceAllocation is set when the eventing service is enabled for this class and
+defines how much memory this service consumes per pod.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.indexServiceAllocation
 
@@ -4223,8 +4705,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-IndexServiceAllocation is set when the index service is enabled for this class and defines how much memory this service consumes per pod.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+IndexServiceAllocation is set when the index service is enabled for this class and
+defines how much memory this service consumes per pod.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.name
 
@@ -4249,7 +4733,8 @@ Name is the name of the server class defined in spec.servers.
 ==== Description
 
 RequestedMemory, if set, defines the Kubernetes resource request for the server class.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.searchServiceAllocation
 
@@ -4261,8 +4746,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-SearchServiceAllocation is set when the search service is enabled for this class and defines how much memory this service consumes per pod.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+SearchServiceAllocation is set when the search service is enabled for this class and
+defines how much memory this service consumes per pod.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.unusedMemory
 
@@ -4274,8 +4761,10 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-UnusedMemory is set when memory resources are requested and is the difference between the requestedMemory and allocatedMemory.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+UnusedMemory is set when memory resources are requested and is the difference between
+the requestedMemory and allocatedMemory.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbaseclusters.status.allocations.unusedMemoryPercent
 
@@ -4285,7 +4774,8 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 
 ==== Description
 
-UnusedMemoryPercent is set when memory resources are requested and defines how much requested memory is not allocated.
+UnusedMemoryPercent is set when memory resources are requested and defines how much
+requested memory is not allocated.
 Couchbase server expects at least a 20% overhead.
 
 === couchbaseclusters.status.autoscalers
@@ -4330,7 +4820,8 @@ CompressionMode defines how documents are compressed.
 
 ==== Description
 
-ConflictResolution is relevant for `couchbase` and `ephemeral` bucket types and indicates how to resolve conflicts when using multi-master XDCR.
+ConflictResolution is relevant for `couchbase` and `ephemeral` bucket types
+and indicates how to resolve conflicts when using multi-master XDCR.
 
 === couchbaseclusters.status.buckets.enableFlush
 
@@ -4366,7 +4857,8 @@ EnableIndexReplica is whether indexes against bucket documents are replicated.
 
 ==== Description
 
-EvictionPolicy is relevant for `couchbase` and `ephemeral` bucket types and indicates how documents are evicted from memory when it is exhausted.
+EvictionPolicy is relevant for `couchbase` and `ephemeral` bucket types
+and indicates how documents are evicted from memory when it is exhausted.
 
 === couchbaseclusters.status.buckets.ioPriority
 
@@ -4378,7 +4870,8 @@ EvictionPolicy is relevant for `couchbase` and `ephemeral` bucket types and indi
 
 ==== Description
 
-IoPriority is `low` or `high` depending on the number of threads spawned for data processing.
+IoPriority is `low` or `high` depending on the number of threads
+spawned for data processing.
 
 === couchbaseclusters.status.buckets.memoryQuota
 
@@ -4459,7 +4952,9 @@ BucketType is the type of the bucket.
 ==== Description
 
 ClusterID is the unique cluster UUID.
-This is generated every time a new cluster is created, so may vary over the lifetime of a cluster if it is recreated by disaster recovery mechanisms.
+This is generated every time
+a new cluster is created, so may vary over the lifetime of a cluster
+if it is recreated by disaster recovery mechanisms.
 
 === couchbaseclusters.status.conditions
 
@@ -4546,7 +5041,8 @@ Type is the type of condition.
 
 ==== Description
 
-ControlPaused indicates if the Operator has acknowledged and paused the control of the cluster.
+ControlPaused indicates if the Operator has acknowledged and paused the
+control of the cluster.
 
 === couchbaseclusters.status.currentVersion
 
@@ -4557,7 +5053,9 @@ ControlPaused indicates if the Operator has acknowledged and paused the control 
 ==== Description
 
 CurrentVersion is the current Couchbase version.
-This reflects the version of the whole cluster, therefore during upgrade, it is only updated when the upgrade has completed.
+This reflects the
+version of the whole cluster, therefore during upgrade, it is only
+updated when the upgrade has completed.
 
 === couchbaseclusters.status.groups
 
@@ -4587,7 +5085,8 @@ Members are the Couchbase members in the cluster.
 
 ==== Description
 
-Ready are the Couchbase members that are clustered and ready to serve client requests.
+Ready are the Couchbase members that are clustered and ready to serve
+client requests.
 The member names are the same as the Couchbase pod names.
 
 === couchbaseclusters.status.members.unready
@@ -4598,7 +5097,8 @@ The member names are the same as the Couchbase pod names.
 
 ==== Description
 
-Unready are the Couchbase members not clustered or unready to serve client requests.
+Unready are the Couchbase members not clustered or unready to serve
+client requests.
 The member names are the same as the Couchbase pod names.
 
 === couchbaseclusters.status.size
@@ -4612,7 +5112,8 @@ The member names are the same as the Couchbase pod names.
 ==== Description
 
 Size is the current size of the cluster in terms of pods.
-Individual pod status conditions are listed in the members status.
+Individual
+pod status conditions are listed in the members status.
 
 === couchbaseclusters.status.users
 

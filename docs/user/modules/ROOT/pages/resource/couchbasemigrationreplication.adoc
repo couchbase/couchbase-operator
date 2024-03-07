@@ -5,8 +5,11 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasemigrationreplicati
 :resource-name-plural: couchbasemigrationreplications
 :resource-name-kind: CouchbaseMigrationReplication
 
-The CouchbaseScopeMigration resource represents the use of the special migration mapping within XDCR to take a filtered list from the default scope and collection of the source bucket, replicate it to named scopes and collections within the target bucket.
-The bucket-to-bucket replication cannot duplicate any used by the CouchbaseReplication resource, as these two types of replication are mutually exclusive between buckets.
+The CouchbaseScopeMigration resource represents the use of the special migration mapping
+within XDCR to take a filtered list from the default scope and collection of the source bucket,
+replicate it to named scopes and collections within the target bucket.
+The bucket-to-bucket replication cannot duplicate any used by the CouchbaseReplication resource,
+as these two types of replication are mutually exclusive between buckets.
 https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#migration.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
@@ -40,7 +43,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbasemigrationreplications.kind
@@ -170,9 +174,12 @@ CouchbaseReplicationSpec allows configuration of an XDCR replication.
 ==== Description
 
 Bucket is the source bucket to replicate from.
-This refers to the Couchbase bucket name, not the resource name of the bucket.
-A bucket with this name must be defined on this cluster.
-Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
+This refers to the Couchbase
+bucket name, not the resource name of the bucket.
+A bucket with this name must
+be defined on this cluster.
+Legal bucket names have a maximum length of 100
+characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 
 === couchbasemigrationreplications.spec.compressionType
 
@@ -187,8 +194,10 @@ Legal bucket names have a maximum length of 100 characters and may be composed o
 ==== Description
 
 CompressionType is the type of compression to apply to the replication.
-When None, no compression will be applied to documents as they are transferred between clusters.
-When Auto, Couchbase server will automatically compress documents as they are transferred to reduce bandwidth requirements.
+When None, no compression will be applied to documents as they are
+transferred between clusters.
+When Auto, Couchbase server will automatically
+compress documents as they are transferred to reduce bandwidth requirements.
 This field must be one of "None" or "Auto", defaulting to "Auto".
 
 === couchbasemigrationreplications.spec.filterExpression
@@ -209,7 +218,8 @@ FilterExpression allows certain documents to be filtered out of the replication.
 
 ==== Description
 
-Paused allows a replication to be stopped and restarted without having to restart the replication from the beginning.
+Paused allows a replication to be stopped and restarted without having to
+restart the replication from the beginning.
 
 === couchbasemigrationreplications.spec.remoteBucket
 
@@ -226,5 +236,8 @@ Paused allows a replication to be stopped and restarted without having to restar
 ==== Description
 
 RemoteBucket is the remote bucket name to synchronize to.
-This refers to the Couchbase bucket name, not the resource name of the bucket.
-Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
+This refers to the
+Couchbase bucket name, not the resource name of the bucket.
+Legal bucket names
+have a maximum length of 100 characters and may be composed of any character from
+"a-z", "A-Z", "0-9" and "-_%\.".

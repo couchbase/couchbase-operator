@@ -5,11 +5,16 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasescope]
 :resource-name-plural: couchbasescopes
 :resource-name-kind: CouchbaseScope
 
-CouchbaseScope represents a logical unit of data storage that sits between buckets and collections e.g.
-a bucket may contain multiple scopes, and a scope may contain multiple collections.
-At present, scopes are not nested, so provide only a single level of abstraction.
-Scopes provide a coarser grained basis for role-based access control (RBAC) and cross-datacenter replication (XDCR) than collections, but finer that buckets.
-In order to be considered by the Operator, a scope must be referenced by either a `CouchbaseBucket` or `CouchbaseEphemeralBucket` resource.
+CouchbaseScope represents a logical unit of data storage that sits between buckets and
+collections e.g.
+a bucket may contain multiple scopes, and a scope may contain multiple
+collections.
+At present, scopes are not nested, so provide only a single level of
+abstraction.
+Scopes provide a coarser grained basis for role-based access control (RBAC)
+and cross-datacenter replication (XDCR) than collections, but finer that buckets.
+In order to be considered by the Operator, a scope must be referenced by either a
+`CouchbaseBucket` or `CouchbaseEphemeralBucket` resource.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
 
@@ -40,7 +45,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbasescopes.kind
@@ -80,8 +86,10 @@ Spec defines the desired state of the resource.
 ==== Description
 
 Collections defines how to collate collections included in this scope or scope group.
-Any of the provided methods may be used to collate a set of collections to manage.
-Collated collections must have unique names, otherwise it is considered ambiguous, and an error condition.
+Any of the provided methods may be used to collate a set of collections to
+manage.
+Collated collections must have unique names, otherwise it is
+considered ambiguous, and an error condition.
 
 === couchbasescopes.spec.collections.managed
 
@@ -92,7 +100,8 @@ Collated collections must have unique names, otherwise it is considered ambiguou
 ==== Description
 
 Managed indicates whether collections within this scope are managed.
-If not then you can dynamically create and delete collections with the Couchbase UI or SDKs.
+If not then you can dynamically create and delete collections with
+the Couchbase UI or SDKs.
 
 === couchbasescopes.spec.collections.preserveDefaultCollection
 
@@ -102,11 +111,18 @@ If not then you can dynamically create and delete collections with the Couchbase
 
 ==== Description
 
-PreserveDefaultCollection indicates whether the Operator should manage the default collection within the default scope.
-The default collection can be deleted, but can not be recreated by Couchbase Server.
-By setting this field to `true`, the Operator will implicitly manage the default collection within the default scope.
-The default collection cannot be modified and will have no document time-to-live (TTL).
-When set to `false`, the operator will not manage the default collection, which will be deleted and cannot be used or recreated.
+PreserveDefaultCollection indicates whether the Operator should manage the
+default collection within the default scope.
+The default collection can
+be deleted, but can not be recreated by Couchbase Server.
+By setting this
+field to `true`, the Operator will implicitly manage the default collection
+within the default scope.
+The default collection cannot be modified and
+will have no document time-to-live (TTL).
+When set to `false`, the operator
+will not manage the default collection, which will be deleted and cannot be
+used or recreated.
 
 === couchbasescopes.spec.collections.resources
 
@@ -116,8 +132,11 @@ When set to `false`, the operator will not manage the default collection, which 
 
 ==== Description
 
-Resources is an explicit list of named resources that will be considered for inclusion in this scope or scopes.
-If a resource reference doesn't match a resource, then no error conditions are raised due to undefined resource creation ordering and eventual consistency.
+Resources is an explicit list of named resources that will be considered
+for inclusion in this scope or scopes.
+If a resource reference doesn't
+match a resource, then no error conditions are raised due to undefined
+resource creation ordering and eventual consistency.
 
 === couchbasescopes.spec.collections.resources.kind
 
@@ -132,8 +151,11 @@ If a resource reference doesn't match a resource, then no error conditions are r
 ==== Description
 
 Kind indicates the kind of resource that is being referenced.
-A scope can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup` resource kinds.
-This field defaults to `CouchbaseCollection` if not specified.
+A scope
+can only reference `CouchbaseCollection` and `CouchbaseCollectionGroup`
+resource kinds.
+This field defaults to `CouchbaseCollection` if not
+specified.
 
 === couchbasescopes.spec.collections.resources.name
 
@@ -152,7 +174,8 @@ This field defaults to `CouchbaseCollection` if not specified.
 ==== Description
 
 Name is the name of the Kubernetes resource name that is being referenced.
-Legal collection names have a maximum length of 251 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
+Legal collection names have a maximum length of 251
+characters and may be composed of any character from "a-z", "A-Z", "0-9" and "_-%".
 
 === couchbasescopes.spec.collections.selector
 
@@ -162,8 +185,10 @@ Legal collection names have a maximum length of 251 characters and may be compos
 
 ==== Description
 
-Selector allows resources to be implicitly considered for inclusion in this scope or scopes.
-More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
+Selector allows resources to be implicitly considered for inclusion in this
+scope or scopes.
+More info:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
 
 === couchbasescopes.spec.defaultScope
 
@@ -173,11 +198,17 @@ More info: https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#
 
 ==== Description
 
-DefaultScope indicates whether this resource represents the default scope for a bucket.
-When set to `true`, this allows the user to refer to and manage collections within the default scope.
-When not defined, the Operator will implicitly manage the default scope as the default scope can not be deleted from Couchbase Server.
-The Operator defined default scope will also have the `persistDefaultCollection` flag set to `true`.
-Only one default scope is permitted to be contained in a bucket.
+DefaultScope indicates whether this resource represents the default scope
+for a bucket.
+When set to `true`, this allows the user to refer to and
+manage collections within the default scope.
+When not defined, the Operator
+will implicitly manage the default scope as the default scope can not be
+deleted from Couchbase Server.
+The Operator defined default scope will
+also have the `persistDefaultCollection` flag set to `true`.
+Only one
+default scope is permitted to be contained in a bucket.
 
 === couchbasescopes.spec.name
 
@@ -194,6 +225,10 @@ Only one default scope is permitted to be contained in a bucket.
 ==== Description
 
 Name specifies the name of the scope.
-By default, the metadata.name is used to define the scope name, however, due to the limited character set, this field can be used to override the default and provide the full functionality.
-Additionally the `metadata.name` field is a DNS label, and thus limited to 63 characters, this field must be used if the name is longer than this limit.
-Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%] and not start with either _ or %.
+By default, the metadata.name is
+used to define the scope name, however, due to the limited character set,
+this field can be used to override the default and provide the full functionality.
+Additionally the `metadata.name` field is a DNS label, and thus limited to 63
+characters, this field must be used if the name is longer than this limit.
+Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
+and not start with either _ or %.

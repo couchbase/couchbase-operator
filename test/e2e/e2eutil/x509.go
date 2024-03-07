@@ -373,7 +373,7 @@ func generateSubjectKeyIdentifier(pub interface{}) ([]byte, error) {
 	case *rsa.PublicKey:
 		subjectPublicKey, err = asn1.Marshal(*pub)
 	case *ecdsa.PublicKey:
-		subjectPublicKey = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
+		subjectPublicKey = elliptic.MarshalCompressed(pub.Curve, pub.X, pub.Y)
 	default:
 		return nil, fmt.Errorf("invalid public key type")
 	}

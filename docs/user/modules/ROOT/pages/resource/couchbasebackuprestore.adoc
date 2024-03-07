@@ -5,7 +5,8 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasebackuprestore]
 :resource-name-plural: couchbasebackuprestores
 :resource-name-kind: CouchbaseBackupRestore
 
-CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from a CouchbaseBackup resource.
+CouchbaseBackupRestore allows the restoration of all Couchbase cluster data from
+a CouchbaseBackup resource.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
 
@@ -92,7 +93,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbasebackuprestores.kind
@@ -121,8 +123,10 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasebackupresto
 
 === Description
 
-CouchbaseBackupRestoreSpec allows the specification of data restoration to be configured.
-This includes the backup and repository to restore data from, and the time range of data to be restored.
+CouchbaseBackupRestoreSpec allows the specification of data restoration to be
+configured.
+This includes the backup and repository to restore data from, and
+the time range of data to be restored.
 
 === couchbasebackuprestores.spec.backoffLimit
 
@@ -144,7 +148,8 @@ Number of times the restore job should try to execute.
 
 ==== Description
 
-The backup resource name associated with this restore, or the backup PVC name to restore from.
+The backup resource name associated with this restore, or the backup PVC
+name to restore from.
 
 === couchbasebackuprestores.spec.buckets
 
@@ -156,7 +161,8 @@ The backup resource name associated with this restore, or the backup PVC name to
 
 *DEPRECATED* - by spec.data.
 
-Specific buckets can be explicitly included or excluded in the restore, as well as bucket mappings.
+Specific buckets can be explicitly included or excluded in the restore,
+as well as bucket mappings.
 This field is now ignored.
 
 === couchbasebackuprestores.spec.data
@@ -167,7 +173,8 @@ This field is now ignored.
 
 ==== Description
 
-Data allows control over what key-value/document data is included in the restore.
+Data allows control over what key-value/document data is included in the
+restore.
 By default, all data is included.
 
 === couchbasebackuprestores.spec.data.exclude
@@ -183,12 +190,17 @@ By default, all data is included.
 ==== Description
 
 Exclude defines the buckets, scopes or collections that are excluded from the backup.
-When this field is set, it implies that by default everything will be backed up, and data items can be explicitly excluded.
-You may define an exclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
-Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
-Excluded data cannot overlap e.g.
+When this field is set, it implies that by default everything will be backed up,
+and data items can be explicitly excluded.
+You may define an exclusion as a bucket
+-- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+period is the separator used to delimit scopes and collections.
+Excluded data cannot overlap
+e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
-This field cannot be used at the same time as included items.
+This field cannot
+be used at the same time as included items.
 
 === couchbasebackuprestores.spec.data.filterKeys
 
@@ -223,12 +235,17 @@ FilterValues only restores documents whose values match the provided regular exp
 ==== Description
 
 Include defines the buckets, scopes or collections that are included in the restore.
-When this field is set, it implies that by default nothing will be restored, and data items must be explicitly included.
-You may define an inclusion as a bucket -- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
-Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as period is the separator used to delimit scopes and collections.
-Included data cannot overlap e.g.
+When this field is set, it implies that by default nothing will be restored,
+and data items must be explicitly included.
+You may define an inclusion as a bucket
+-- `my-bucket`, a scope -- `my-bucket.my-scope`, or a collection -- `my-bucket.my-scope.my-collection`.
+Buckets may contain periods, and therefore must be escaped -- `my\.bucket.my-scope`, as
+period is the separator used to delimit scopes and collections.
+Included data cannot overlap
+e.g.
 specifying `my-bucket` and `my-bucket.my-scope` is illegal.
-This field cannot be used at the same time as excluded items.
+This field cannot
+be used at the same time as excluded items.
 
 === couchbasebackuprestores.spec.data.map
 
@@ -240,9 +257,11 @@ This field cannot be used at the same time as excluded items.
 
 Map allows data items in the restore to be remapped to a different named container.
 Buckets can be remapped to other buckets e.g.
-"source=target", scopes and collections can be remapped to other scopes and collections within the same bucket only e.g.
+"source=target", scopes and collections
+can be remapped to other scopes and collections within the same bucket only e.g.
 "bucket.scope=bucket.other" or "bucket.scope.collection=bucket.scope.other".
-Map sources may only be specified once, and may not overlap.
+Map
+sources may only be specified once, and may not overlap.
 
 === couchbasebackuprestores.spec.data.map.source
 
@@ -256,7 +275,8 @@ Map sources may only be specified once, and may not overlap.
 
 ==== Description
 
-Source defines the data source of the mapping, this may be either a bucket, scope or collection.
+Source defines the data source of the mapping, this may be either
+a bucket, scope or collection.
 
 === couchbasebackuprestores.spec.data.map.target
 
@@ -270,7 +290,9 @@ Source defines the data source of the mapping, this may be either a bucket, scop
 
 ==== Description
 
-Target defines the data target of the mapping, this may be either a bucket, scope or collection, and must refer to the same type as the restore source.
+Target defines the data target of the mapping, this may be either
+a bucket, scope or collection, and must refer to the same type
+as the restore source.
 
 === couchbasebackuprestores.spec.end
 
@@ -281,8 +303,11 @@ Target defines the data target of the mapping, this may be either a bucket, scop
 ==== Description
 
 End denotes the last backup to restore from.
-Omitting this field will only restore the backup referenced by start.
-This may be specified as an integer index (starting from 1), a string specifying a short date DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
+Omitting this field will only
+restore the backup referenced by start.
+This may be specified as
+an integer index (starting from 1), a string specifying a short date
+DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
 
 === couchbasebackuprestores.spec.end.int
 
@@ -314,7 +339,8 @@ Str references an absolute backup by name.
 
 ==== Description
 
-Forces data in the Couchbase cluster to be overwritten even if the data in the cluster is newer than the restore.
+Forces data in the Couchbase cluster to be overwritten
+even if the data in the cluster is newer than the restore.
 
 === couchbasebackuprestores.spec.logRetention
 
@@ -327,7 +353,8 @@ Forces data in the Couchbase cluster to be overwritten even if the data in the c
 ==== Description
 
 Number of hours to hold restore script logs for, everything older will be deleted.
-More info: https://golang.org/pkg/time/#ParseDuration.
+More info:
+https://golang.org/pkg/time/#ParseDuration.
 
 === couchbasebackuprestores.spec.objectStore
 
@@ -348,7 +375,8 @@ The remote destination for backup.
 ==== Description
 
 Endpoint contains the configuration for connecting to a custom Azure/S3/GCP compliant object store.
-If set will override `CouchbaseCluster.spec.backup.objectEndpoint` See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores.
+If set will override `CouchbaseCluster.spec.backup.objectEndpoint`
+See https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-cloud.html#compatible-object-stores.
 
 === couchbasebackuprestores.spec.objectStore.endpoint.secret
 
@@ -358,7 +386,8 @@ If set will override `CouchbaseCluster.spec.backup.objectEndpoint` See https://d
 
 ==== Description
 
-The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint The secret must have the key with the name "tls.crt".
+The name of the secret, in this namespace, that contains the CA certificate for verification of a TLS endpoint
+The secret must have the key with the name "tls.crt".
 
 === couchbasebackuprestores.spec.objectStore.endpoint.url
 
@@ -378,7 +407,8 @@ The host/address of the custom object endpoint.
 
 ==== Description
 
-UseVirtualPath will force the AWS SDK to use the new virtual style paths which are often required by S3 compatible object stores.
+UseVirtualPath will force the AWS SDK to use the new virtual style paths
+which are often required by S3 compatible object stores.
 
 === couchbasebackuprestores.spec.objectStore.secret
 
@@ -389,7 +419,8 @@ UseVirtualPath will force the AWS SDK to use the new virtual style paths which a
 ==== Description
 
 ObjStoreSecret must contain two fields, access-key-id, secret-access-key and optionally either region or refresh-token.
-These correspond to the fields used by cbbackupmgr https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2.
+These correspond to the fields used by cbbackupmgr
+https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-backup.html#optional-2.
 
 === couchbasebackuprestores.spec.objectStore.uri
 
@@ -413,7 +444,8 @@ i.e s3://bucket, az://bucket or gs://bucket.
 
 ==== Description
 
-Whether to allow the backup SDK to attempt to authenticate using the instance metadata api.
+Whether to allow the backup SDK to attempt to authenticate
+using the instance metadata api.
 If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 
 === couchbasebackuprestores.spec.repo
@@ -425,7 +457,8 @@ If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 ==== Description
 
 Repo is the backup folder to restore from.
-If no repository is specified, the backup container will choose the latest.
+If no repository is specified,
+the backup container will choose the latest.
 
 === couchbasebackuprestores.spec.s3bucket
 
@@ -437,7 +470,8 @@ If no repository is specified, the backup container will choose the latest.
 
 ==== Description
 
-*DEPRECATED* - by spec.objectStore.uri Name of S3 bucket to restore from.
+*DEPRECATED* - by spec.objectStore.uri
+Name of S3 bucket to restore from.
 
 If non-empty this overrides local backup.
 
@@ -464,7 +498,8 @@ This list accepts a certain set of parameters that will disable that data and pr
 ==== Description
 
 Analytics restores analytics datasets from the backup.
-This field defaults to true.
+This field
+defaults to true.
 
 === couchbasebackuprestores.spec.services.bucketConfig
 
@@ -475,9 +510,14 @@ This field defaults to true.
 ==== Description
 
 BucketConfig restores all bucket configuration settings.
-If you are restoring to cluster with managed buckets, then this option may conflict with existing bucket settings, and the results are undefined, so avoid use.
-This option is intended for use with unmanaged buckets.
-Note that bucket durability settings are not restored in versions less than and equal to 1.1.0, and will need to be manually applied.
+If you are restoring to cluster with managed buckets, then this
+option may conflict with existing bucket settings, and the results
+are undefined, so avoid use.
+This option is intended for use
+with unmanaged buckets.
+Note that bucket durability settings are
+not restored in versions less than and equal to 1.1.0, and will
+need to be manually applied.
 This field defaults to false.
 
 === couchbasebackuprestores.spec.services.bucketQuery
@@ -530,7 +570,8 @@ This field defaults to `true`.
 ==== Description
 
 Data restores document data from the backup.
-This field defaults to true.
+This field defaults
+to true.
 
 === couchbasebackuprestores.spec.services.eventing
 
@@ -543,7 +584,8 @@ This field defaults to true.
 ==== Description
 
 Eventing restores eventing functions from the backup.
-This field defaults to true.
+This field
+defaults to true.
 
 === couchbasebackuprestores.spec.services.ftAlias
 
@@ -556,7 +598,8 @@ This field defaults to true.
 ==== Description
 
 FTAlias restores full-text search aliases from the backup.
-This field defaults to true.
+This
+field defaults to true.
 
 === couchbasebackuprestores.spec.services.ftIndex
 
@@ -569,7 +612,8 @@ This field defaults to true.
 ==== Description
 
 FTIndex restores full-text search indexes from the backup.
-This field defaults to true.
+This
+field defaults to true.
 
 === couchbasebackuprestores.spec.services.gsiIndex
 
@@ -582,7 +626,8 @@ This field defaults to true.
 ==== Description
 
 GSIIndex restores document indexes from the backup.
-This field defaults to true.
+This field
+defaults to true.
 
 === couchbasebackuprestores.spec.services.views
 
@@ -607,7 +652,8 @@ This field defaults to true.
 
 ==== Description
 
-StagingVolume contains configuration related to the ephemeral volume used as staging when restoring from a cloud backup.
+StagingVolume contains configuration related to the
+ephemeral volume used as staging when restoring from a cloud backup.
 
 === couchbasebackuprestores.spec.stagingVolume.size
 
@@ -622,7 +668,10 @@ StagingVolume contains configuration related to the ephemeral volume used as sta
 ==== Description
 
 Size allows the specification of a staging volume.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes The ephemeral volume will only be used when restoring from a cloud provider, if the backup job was created using ephemeral storage.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+The ephemeral volume will only be used when restoring from a cloud provider,
+if the backup job was created using ephemeral storage.
 Otherwise the restore job will share a staging volume with the backup job.
 
 === couchbasebackuprestores.spec.stagingVolume.storageClassName
@@ -644,7 +693,9 @@ Name of StorageClass to use.
 ==== Description
 
 Start denotes the first backup to restore from.
-This may be specified as an integer index (starting from 1), a string specifying a short date DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
+This may be specified as
+an integer index (starting from 1), a string specifying a short date
+DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
 
 === couchbasebackuprestores.spec.start.int
 
@@ -702,8 +753,10 @@ Number of seconds to elapse before a completed job is deleted.
 
 === Description
 
-CouchbaseBackupRestoreStatus provides status indications of a restore from backup.
-This includes whether or not the restore is running, whether the restore succeed or not, and the duration the restore took.
+CouchbaseBackupRestoreStatus provides status indications of a restore from
+backup.
+This includes whether or not the restore is running, whether the
+restore succeed or not, and the duration the restore took.
 
 === couchbasebackuprestores.status.archive
 
@@ -723,7 +776,8 @@ Location of Backup Archive.
 
 ==== Description
 
-Backups gives us a full list of all backups and their respective repository locations.
+Backups gives us a full list of all backups
+and their respective repository locations.
 
 === couchbasebackuprestores.status.backups.full
 
@@ -766,7 +820,8 @@ Name of the repository.
 ==== Description
 
 Duration tells us how long the last restore took.
-More info: https://golang.org/pkg/time/#ParseDuration.
+More info:
+https://golang.org/pkg/time/#ParseDuration.
 
 === couchbasebackuprestores.status.failed
 

@@ -15,7 +15,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = '1.20'
+    GOVERSION = '1.22'
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.WORKSPACE}/go/bin:$PATH"
     VERSION = "v1.0.0"

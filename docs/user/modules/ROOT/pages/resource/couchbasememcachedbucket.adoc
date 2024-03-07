@@ -6,7 +6,8 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasememcachedbucket]
 :resource-name-kind: CouchbaseMemcachedBucket
 
 The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase server.
-A Couchbase client connects to and operates on a bucket, which provides independent management of a set documents and a security boundary for role based access control.
+A Couchbase client connects to and operates on a bucket, which provides independent
+management of a set documents and a security boundary for role based access control.
 A CouchbaseEphemeralBucket provides in-memory only storage for documents contained by it.
 
 The following is an example resource, depicting the overall structure and any defaults (consult the field reference for valid values for "empty" values, such as empty strings etc.):
@@ -32,7 +33,8 @@ The following is an example resource, depicting the overall structure and any de
 === Description
 
 APIVersion defines the versioned schema of this representation of an object.
-Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values.
+Servers should convert recognized schemas to the latest internal value, and
+may reject unrecognized values.
 More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources.
 
 == couchbasememcachedbuckets.kind
@@ -61,7 +63,8 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasememcachedbu
 
 === Description
 
-CouchbaseMemcachedBucketSpec is the specification for a Memcached bucket resource, and allows the bucket to be customized.
+CouchbaseMemcachedBucketSpec is the specification for a Memcached bucket
+resource, and allows the bucket to be customized.
 
 === couchbasememcachedbuckets.spec.enableFlush
 
@@ -87,9 +90,12 @@ This field defaults to false.
 ==== Description
 
 MemoryQuota is a memory limit to the size of a bucket.
-The memory quota is defined per Couchbase pod running the data service.
-This field defaults to, and must be greater than or equal to 100Mi.
-More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+The memory quota
+is defined per Couchbase pod running the data service.
+This field defaults to, and must
+be greater than or equal to 100Mi.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbasememcachedbuckets.spec.name
 
@@ -104,7 +110,11 @@ More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-co
 ==== Description
 
 Name is the name of the bucket within Couchbase server.
-By default the Operator will use the `metadata.name` field to define the bucket name.
-The `metadata.name` field only supports a subset of the supported character set.
-When specified, this field overrides `metadata.name`.
-Legal bucket names have a maximum length of 100 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
+By default the Operator
+will use the `metadata.name` field to define the bucket name.
+The `metadata.name`
+field only supports a subset of the supported character set.
+When specified, this
+field overrides `metadata.name`.
+Legal bucket names have a maximum length of 100
+characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
