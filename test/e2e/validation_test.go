@@ -764,6 +764,18 @@ func TestNegValidationCreateCouchbaseClusterNetworking(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.networking.tls.tlsMinimumVersion`},
 		},
+		{
+			name:           "TestValidateNewTLSVersionsPre71Illegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/tlsMinimumVersion", "TLS1.3").Replace("/spec/image", "couchbase/server:7.0.1")},
+			shouldFail:     true,
+			expectedErrors: []string{`tls1.3 is only supported for Couchbase`},
+		},
+		{
+			name:           "TestValidateOldTLSVersionsPost76Illegal",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/networking/tls/tlsMinimumVersion", "TLS1.0").Replace("/spec/image", "couchbase/server:7.6.1")},
+			shouldFail:     true,
+			expectedErrors: []string{`tls1.0 and tls1.1 are not supported`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

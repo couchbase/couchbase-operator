@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/tlsutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
@@ -73,6 +74,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintVolumeTemplateSize,
 		checkConstraintVolumeTemplateStorageClass,
 		checkConstraintServerMinimumVersion,
+		checkConstraintTLSMinimumVersion,
 		checkConstraintTLS,
 		checkConstraintCloudNativeGatewayProvisioning,
 		checkConstraintCloudNativeGatewayTLS,
@@ -1100,6 +1102,40 @@ func checkConstraintServerMinimumVersion(_ *types.Validator, cluster *couchbasev
 	minVersion, _ := couchbaseutil.NewVersion(constants.CouchbaseVersionMin)
 	if currentVersion.Less(minVersion) {
 		return fmt.Errorf("unsupported Couchbase version: %s, minimum version required: %s", currentVersion, constants.CouchbaseVersionMin)
+	}
+
+	return nil
+}
+
+func checkConstraintTLSMinimumVersion(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	currentVersionString, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+
+	if err != nil {
+		return fmt.Errorf("unsupported Couchbase version: %w", err)
+	}
+
+	if after71, err := couchbaseutil.VersionAfter(currentVersionString, "7.1.0"); err != nil {
+		return err
+	} else if !after71 {
+		if invalidVersion, err := tlsutil.StringGreaterEqual(string(cluster.Spec.Networking.TLS.TLSMinimumVersion), "TLS1.3"); err != nil {
+			return err
+		} else if invalidVersion {
+			return fmt.Errorf("tls1.3 is only supported for Couchbase 7.1.0+")
+		}
+	}
+
+	if after76, err := couchbaseutil.VersionAfter(currentVersionString, "7.6.0"); err != nil {
+		return err
+	} else if after76 {
+		if validVersion, err := tlsutil.StringGreaterEqual(string(cluster.Spec.Networking.TLS.TLSMinimumVersion), "TLS1.2"); err != nil {
+			return err
+		} else if !validVersion {
+			return fmt.Errorf("tls1.0 and tls1.1 are not supported for Couchbase 7.6.0+")
+		}
 	}
 
 	return nil

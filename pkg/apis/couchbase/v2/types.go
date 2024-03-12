@@ -3558,6 +3558,7 @@ type TLSPolicy struct {
 	// TLSMinimumVersion specifies the minimum TLS version the Couchbase server can
 	// negotiate with a client.  Must be one of TLS1.0, TLS1.1 TLS1.2 or TLS1.3,
 	// defaulting to TLS1.2.  TLS1.3 is only valid for Couchbase Server 7.1.0 onward.
+	// TLS1.0 and TLS1.1 are not valid for Couchbase Server 7.6.0 onward.
 	// +kubebuilder:default=TLS1.2
 	TLSMinimumVersion TLSVersion `json:"tlsMinimumVersion,omitempty"`
 
