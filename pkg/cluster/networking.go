@@ -9,6 +9,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -203,6 +204,48 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 	return returnErr
 }
 
+func (c *Cluster) handleHostnameAA(ctx context.Context) error {
+	shouldAddHostAA, ok := c.cluster.Annotations[constants.ImprovedHostNetworkAnnotation]
+
+	if !ok || shouldAddHostAA == "false" {
+		persistenceVar, err := c.state.Get(persistence.HostnameAAadded)
+
+		for _, member := range c.members {
+			// If we got an error, it's because the key didn't exist for the persistence var.
+			if persistenceVar == "true" && err == nil {
+				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
+					return err
+				}
+
+				return c.state.Update(persistence.HostnameAAadded, "false")
+			}
+		}
+	}
+
+	if ok && shouldAddHostAA == "true" {
+		for _, member := range c.members {
+			existingAddresses, err := c.getAlternateAddressesExternal(member)
+			if err != nil {
+				log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
+				return nil
+			}
+
+			// We get an error if the key doesn't exist. Therefore, the hostname AA can't have been added already on an error.
+			alreadyAdded, _ := c.state.Get(persistence.HostnameAAadded)
+
+			if alreadyAdded != "true" {
+				if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
+					return err
+				}
+
+				return c.state.Update(persistence.HostnameAAadded, "true")
+			}
+		}
+	}
+
+	return nil
+}
+
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
@@ -214,6 +257,10 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	delay := time.Duration(0)
 	needsReachableDelay := c.cluster.Spec.IsExposedFeatureServiceTypePublic() || c.cluster.Spec.IsAdminConsoleServiceTypePublic()
 
+	if err := c.state.Insert(persistence.HostnameAAadded, "false"); err != nil {
+		return err
+	}
+
 	if needsReachableDelay && c.cluster.Spec.Networking.WaitForAddressReachableDelay != nil {
 		delay = c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration
 	}
@@ -221,19 +268,8 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	ctx, cancel := context.WithTimeout(context.Background(), delay)
 	defer cancel()
 
-	shouldAddHostAA, ok := c.cluster.Annotations[constants.ImprovedHostNetworkAnnotation]
-	if ok && shouldAddHostAA == "true" {
-		for _, member := range c.members {
-			existingAddresses, err := c.getAlternateAddressesExternal(member)
-			if err != nil {
-				log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
-				return nil
-			}
-
-			if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
-				return err
-			}
-		}
+	if err := c.handleHostnameAA(ctx); err != nil {
+		return err
 	}
 
 	// Examine each member in turn as they will have different node
@@ -252,7 +288,8 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// If we don't have any exposed ports, but the node reports it is configured so
 		// then remove the configuration.
 		if !c.cluster.Spec.HasExposedFeatures() {
-			if existingAddresses != nil {
+			hostnameAAadded, _ := c.state.Get(persistence.HostnameAAadded)
+			if existingAddresses != nil && hostnameAAadded != "true" {
 				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
 					return err
 				}
