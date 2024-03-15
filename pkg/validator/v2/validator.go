@@ -990,6 +990,12 @@ func checkConstraintPublicNetworking(v *types.Validator, cluster *couchbasev2.Co
 		errs = append(errs, errors.Required("spec.networking.dns", "body", nil))
 	}
 
+	for _, memberConfig := range cluster.Spec.Servers {
+		if cluster.Spec.Networking.DNS != nil && memberConfig.Pod.Spec.HostNetwork {
+			errs = append(errs, fmt.Errorf("cannot enable external DNS and hostnetworking"))
+		}
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}

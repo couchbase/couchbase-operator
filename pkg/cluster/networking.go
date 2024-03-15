@@ -9,6 +9,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -22,6 +23,9 @@ import (
 func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) (*couchbaseutil.AlternateAddressesExternal, error) {
 	var hostname string
 
+	actual, exists := c.k8s.Pods.Get(member.Name())
+	shouldAddHostnameAA, ok := actual.Annotations[constants.ImprovedHostNetworkAnnotation]
+
 	if c.cluster.Spec.Networking.DNS != nil {
 		// Use the user provided DNS name.
 		hostname = k8sutil.GetDNSName(c.cluster, member.Name())
@@ -32,6 +36,10 @@ func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if exists && ok && shouldAddHostnameAA == "true" && actual.Spec.HostNetwork == true && c.cluster.Spec.Networking.DNS == nil {
+		hostname = actual.Spec.NodeName
 	}
 
 	ports, err := k8sutil.GetAlternateAddressExternalPorts(c.k8s, c.cluster.Namespace, member.Name())
@@ -169,6 +177,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	for _, member := range c.members {
 		// Grab the current configuration
 		existingAddresses, err := c.getAlternateAddressesExternal(member)
+
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
 			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
