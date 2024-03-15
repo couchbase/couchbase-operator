@@ -24,7 +24,6 @@ func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) 
 	var hostname string
 
 	actual, exists := c.k8s.Pods.Get(member.Name())
-	shouldAddHostnameAA, ok := actual.Annotations[constants.ImprovedHostNetworkAnnotation]
 
 	if c.cluster.Spec.Networking.DNS != nil {
 		// Use the user provided DNS name.
@@ -38,7 +37,7 @@ func (c *Cluster) createAlternateAddressesExternal(member couchbaseutil.Member) 
 		}
 	}
 
-	if exists && ok && shouldAddHostnameAA == "true" && actual.Spec.HostNetwork == true && c.cluster.Spec.Networking.DNS == nil {
+	if exists && actual.Spec.HostNetwork == true && c.cluster.Spec.Networking.DNS == nil {
 		hostname = actual.Spec.NodeName
 	}
 
@@ -153,6 +152,57 @@ func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchba
 	return nil
 }
 
+func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, existingAddresses *couchbaseutil.AlternateAddressesExternal, ctx context.Context) error {
+	// Get the requested alternate address specification.
+	addresses, err := c.createAlternateAddressesExternal(member)
+	if err != nil {
+		return err
+	}
+
+	// BUG: MB-49376
+	// Kubernetes service always exposes data ports but Couchbase doesn't
+	// include these ports in alternative address configs if node service
+	// does not explicitly include "data".
+	// Therefore for functional correctness, the Kubernetes data ports
+	// will be same as existing ports (if specified).
+	if c.alternatePortsNeedUpdating(member.Config(), addresses, existingAddresses) {
+		c.addDataServiceExternalPorts(addresses.Ports, existingAddresses.Ports)
+	}
+
+	// Check to see if we need to perform any updates, ignoring if not
+	if reflect.DeepEqual(addresses, existingAddresses) {
+		return nil
+	}
+
+	// Wait for a period of time before allowing polling to happen in order to
+	// avoid negative caching of DNS values.
+	log.Info("Waiting for DNS propagation", "cluster", c.namespacedName(), "hostname", addresses.Hostname)
+
+	<-ctx.Done()
+
+	// Next check to see if the DNS entry is actually live (and visible by the Operator),
+	// before installing it into Couchbase server, which will then propagate to clients
+	// and potentially break them.
+	log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
+
+	timeout := 10 * time.Minute
+
+	if c.cluster.Spec.Networking.WaitForAddressReachable != nil {
+		timeout = c.cluster.Spec.Networking.WaitForAddressReachable.Duration
+	}
+
+	if err := waitAlternateAddressReachable(timeout, addresses); err != nil {
+		return err
+	}
+
+	log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
+
+	// Perform the update
+	returnErr := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member)
+
+	return returnErr
+}
+
 // initMemberAlternateAddresses injects the K8S node's L3 address and alternate
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
@@ -170,6 +220,21 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), delay)
 	defer cancel()
+
+	shouldAddHostAA, ok := c.cluster.Annotations[constants.ImprovedHostNetworkAnnotation]
+	if ok && shouldAddHostAA == "true" {
+		for _, member := range c.members {
+			existingAddresses, err := c.getAlternateAddressesExternal(member)
+			if err != nil {
+				log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
+				return nil
+			}
+
+			if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
+				return err
+			}
+		}
+	}
 
 	// Examine each member in turn as they will have different node
 	// addresses (i.e. you must be using anti affinity or kubernetes
@@ -196,52 +261,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			continue
 		}
 
-		// Get the requested alternate address specification.
-		addresses, err := c.createAlternateAddressesExternal(member)
-		if err != nil {
-			return err
-		}
-
-		// BUG: MB-49376
-		// Kubernetes service always exposes data ports but Couchbase doesn't
-		// include these ports in alternative address configs if node service
-		// does not explicitly include "data".
-		// Therefore for functional correctness, the Kubernetes data ports
-		// will be same as existing ports (if specified).
-		if c.alternatePortsNeedUpdating(member.Config(), addresses, existingAddresses) {
-			c.addDataServiceExternalPorts(addresses.Ports, existingAddresses.Ports)
-		}
-
-		// Check to see if we need to perform any updates, ignoring if not
-		if reflect.DeepEqual(addresses, existingAddresses) {
-			continue
-		}
-
-		// Wait for a period of time before allowing polling to happen in order to
-		// avoid negative caching of DNS values.
-		log.Info("Waiting for DNS propagation", "cluster", c.namespacedName(), "hostname", addresses.Hostname)
-
-		<-ctx.Done()
-
-		// Next check to see if the DNS entry is actually live (and visible by the Operator),
-		// before installing it into Couchbase server, which will then propagate to clients
-		// and potentially break them.
-		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
-
-		timeout := 10 * time.Minute
-
-		if c.cluster.Spec.Networking.WaitForAddressReachable != nil {
-			timeout = c.cluster.Spec.Networking.WaitForAddressReachable.Duration
-		}
-
-		if err := waitAlternateAddressReachable(timeout, addresses); err != nil {
-			return err
-		}
-
-		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
-
-		// Perform the update
-		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {
+		if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
 			return err
 		}
 	}
