@@ -224,6 +224,8 @@ func TestIndexerSettings(t *testing.T) {
 // TestQuerySettings tests that query setting updates are accepted by the Couchbase API
 // and the necessary events are raised.
 func TestQuerySettings(t *testing.T) {
+	f := framework.Global
+
 	// Platform configuration.
 	kubernetes, cleanup := framework.Global.SetupTest(t)
 	defer cleanup()
@@ -233,26 +235,112 @@ func TestQuerySettings(t *testing.T) {
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{}
+	cluster.Spec.ClusterSettings.Query = &couchbasev2.CouchbaseClusterQuerySettings{
+		NumActiveTransactionRecords:  1024,
+		CBOEnabled:                   true,
+		CleanupClientAttemptsEnabled: true,
+		CleanupLostAttemptsEnabled:   true,
+		CompletedTrackingEnabled:     true,
+	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	// Play with the settings and ensure events are raised.
-	op := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
+	// Play with the settings and ensure they are as expected.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpace", "2Gi"), time.Minute)
-	e2eutil.MustReceiveErrorValue(t, op)
+	tmpSpaceSize := resource.MustParse("2Gi")
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/TemporarySpaceSize", k8sutil.Megabytes(&tmpSpaceSize)), time.Minute)
 
-	op = e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/temporarySpaceUnlimited", true), time.Minute)
-	e2eutil.MustReceiveErrorValue(t, op)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/TemporarySpaceSize", int64(-1)), time.Minute)
 
-	op = e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.ClusterSettingsEditedEvent("query service", cluster), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/backfillEnabled", false), time.Minute)
-	e2eutil.MustReceiveErrorValue(t, op)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/TemporarySpaceSize", int64(0)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/pipelineBatch", 12), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/PipelineBatch", int32(12)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/pipelineCap", 1024), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/PipelineCap", int32(1024)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/scanCap", 1024), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/ScanCap", int32(1024)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/timeout", "1024ns"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Timeout", int64(1024)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/preparedLimit", 65536), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/PreparedLimit", int32(65536)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedLimit", 7000), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedLimit", int32(7000)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingThreshold", e2espec.NewDurationS(1)).Replace("/spec/cluster/query/completedTrackingEnabled", true), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(1000)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingAllRequests", true), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(0)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingEnabled", false), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(-1)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/logLevel", couchbasev2.QueryLogLevelWarn), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.QueryLogLevelWarn), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/maxParallelism", 3), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MaxParallelism", int32(3)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/txTimeout", "10ms"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/TxTimeout", "10000000ns"), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/memoryQuota", "4Mi"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MemoryQuota", int32(4)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/cboEnabled", false), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CBOEnabled", false), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/cleanupClientAttemptsEnabled", false), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CleanupClientAttemptsEnabled", false), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/cleanupLostAttemptsEnabled", false), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CleanupLostAttemptsEnabled", false), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/cleanupWindow", "5us"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CleanupWindow", "5000ns"), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/numActiveTransactionRecords", 512), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumActiveTransactionRecords", int32(512)), time.Minute)
+
+	patchCycles := 22
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/nodeQuota", "600Mi"), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuota", int32(600)), time.Minute)
+		patchCycles++
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/query/useReplica", true), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", couchbaseutil.QueryUseReplicaOn), time.Minute)
+		patchCycles++
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/useReplica", nil), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", couchbaseutil.QueryUseReplicaUnset), time.Minute)
+		patchCycles++
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/nodeQuotaValPercent", 11), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuotaValPercent", int32(11)), time.Minute)
+		patchCycles++
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedMaxPlanSize", "2883584"), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", int32(2883584)), time.Minute)
+		patchCycles++
+	}
 
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}}, // One optional one to make up for defaults
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

@@ -729,6 +729,14 @@ func MustPatchAutoFailoverInfo(t *testing.T, k8s *types.Cluster, couchbase *couc
 	}
 }
 
+func MustPatchQuerySettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	querySettingsFetcher := getClusterFetcher(couchbaseutil.GetQuerySettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, querySettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func PatchIndexSettingInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)

@@ -1413,12 +1413,96 @@ const (
 	QueryTemporarySpaceSizeUnlimited       = -1
 )
 
+type QueryLogLevel string
+
+const (
+	QueryLogLevelDebug  QueryLogLevel = "debug"
+	QueryLogLevelTrace  QueryLogLevel = "trace"
+	QueryLogLevelInfo   QueryLogLevel = "info"
+	QueryLogLevelWarn   QueryLogLevel = "warn"
+	QueryLogLevelError  QueryLogLevel = "error"
+	QueryLogLevelSevere QueryLogLevel = "severe"
+	QueryLogLevelNone   QueryLogLevel = "none"
+)
+
+type QueryUseReplica string
+
+const (
+	QueryUseReplicaOn    QueryUseReplica = "on"
+	QueryUseReplicaOff   QueryUseReplica = "off"
+	QueryUseReplicaUnset QueryUseReplica = "unset"
+)
+
 // QuerySettings allow the query service to be tweaked.
 type QuerySettings struct {
 	// TemporarySpaceSize is another classic bit of API design, where 0 means turn backfill
 	//  off -- literally nothing to do with the size of something. -1 means unlimted, and
 	// anything else is a size in MiB.
 	TemporarySpaceSize int64 `json:"queryTmpSpaceSize" url:"queryTmpSpaceSize"`
+
+	// Number of items execution operators can batch for Fetch from the KV.
+	PipelineBatch int32 `json:"queryPipelineBatch" url:"queryPipelineBatch"`
+
+	// Maximum number of items each execution operator can buffer between various operators.
+	PipelineCap int32 `json:"queryPipelineCap" url:"queryPipelineCap"`
+
+	// Maximum buffered channel size between the indexer client and the query service for index scans.
+	ScanCap int32 `json:"queryScanCap" url:"queryScanCap"`
+
+	// Maximum  time to spend on the request before timing out (ns).
+	Timeout int64 `json:"queryTimeout" url:"queryTimeout"`
+
+	// Maximum number of prepared statements in the cache. When this cache reaches the limit.
+	PreparedLimit int32 `json:"queryPreparedLimit" url:"queryPreparedLimit"`
+
+	// Number of requests to be logged in the completed requests catalog.
+	CompletedLimit int32 `json:"queryCompletedLimit" url:"queryCompletedLimit"`
+
+	// Duration in milliseconds. All completed queries lasting longer than this threshold are logged in the completed requests catalog.
+	// Specify 0 to track all requests, independent of duration. Specify any negative number to track none.
+	CompletedThreshold int32 `json:"queryCompletedThreshold" url:"queryCompletedThreshold"`
+
+	// Query service log level.
+	LogLevel QueryLogLevel `json:"queryLogLevel" url:"queryLogLevel"`
+
+	// Specifies the maximum parallelism for queries on all Query nodes in the cluster.
+	MaxParallelism int32 `json:"queryMaxParallelism" url:"queryMaxParallelism"`
+
+	// Specifies the timeout for transaction requests.
+	TxTimeout string `json:"queryTxTimeout" url:"queryTxTimeout"`
+
+	// Specifies the maximum amount of memory a request may use.
+	MemoryQuota int32 `json:"queryMemoryQuota" url:"queryMemoryQuota"`
+
+	// Specifies whether the cost-based optimizer is enabled.
+	CBOEnabled bool `json:"queryUseCBO" url:"queryUseCBO"`
+
+	// Specifies whether the service will try to clean up transactions it has created.
+	CleanupClientAttemptsEnabled bool `json:"queryCleanupClientAttempts" url:"queryCleanupClientAttempts"`
+
+	// Specifies whether the Query service takes part in the distributed cleanup process.
+	CleanupLostAttemptsEnabled bool `json:"queryCleanupLostAttempts" url:"queryCleanupLostAttempts"`
+
+	// Specifies how frequently the Query service checks its subset of active transaction records for cleanup.
+	CleanupWindow string `json:"queryCleanupWindow,omitempty" url:"queryCleanupWindow,omitempty"`
+
+	// Specifies the total number of active transaction records for all Query nodes in the cluster.
+	NumActiveTransactionRecords int32 `json:"queryNumAtrs" url:"queryNumAtrs"`
+
+	// Sets the soft memory limit for every Query node in the cluster, in MB.
+	NodeQuota int32 `json:"queryNodeQuota" url:"queryNodeQuota"`
+
+	// Specifies whether a query can fetch data from a replica vBucket if active vBuckets are inaccessible. The possible values are:
+	// off — read from replica is disabled for all queries and cannot be overridden at request level.
+	// on — read from replica is enabled for all queries, but can be disabled at request level.
+	// unset — read from replica is enabled or disabled at request level.
+	UseReplica QueryUseReplica `json:"queryUseReplica" url:"queryUseReplica"`
+
+	// The percentage of the queryNodeQuota that is dedicated to tracked value content memory across all active requests for every Query node.
+	NodeQuotaValPercent int32 `json:"queryNodeQuotaValPercent" url:"queryNodeQuotaValPercent"`
+
+	// A plan size in bytes. Limits the size of query execution plans that can be logged in the completed requests catalog.
+	CompletedMaxPlanSize int32 `json:"queryCompletedMaxPlanSize" url:"queryCompletedMaxPlanSize"`
 }
 
 // All these settings are passed through with minimal or no verification.

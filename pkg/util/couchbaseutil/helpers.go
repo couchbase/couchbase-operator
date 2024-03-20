@@ -1,6 +1,9 @@
 package couchbaseutil
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // VersionAfter determines whether the configured version is greater than
 // or equal to the required version, useful for enabling features at runtime.
@@ -26,4 +29,10 @@ func (b *Bucket) CanBeMigrated(backend CouchbaseStorageBackend) (bool, string) {
 	}
 
 	return true, ""
+}
+
+// The Couchbase Query Duration string requires a number and a unit so we just convert to nanoseconds
+// to not lose any resolution.
+func CouchbaseQueryDurationString(t time.Duration) string {
+	return fmt.Sprintf("%vns", t.Nanoseconds())
 }

@@ -580,6 +580,11 @@ func Megabytes(quantity *resource.Quantity) int64 {
 	return quantity.Value() >> 20
 }
 
+// Bytes accepts a quantity and returns an integral value representing bytes.
+func Bytes(quantity *resource.Quantity) int64 {
+	return quantity.Value()
+}
+
 // Seconds accepts a duration and returns an integral value representing seconds.
 func Seconds(duration *metav1.Duration) int64 {
 	return int64(duration.Seconds())

@@ -706,6 +706,71 @@ func (c *Cluster) reconcileQuerySettings() error {
 		requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizBackfillDisabled
 	}
 
+	requested.PipelineBatch = apiSettings.PipelineBatch
+	requested.PipelineCap = apiSettings.PipelineCap
+	requested.ScanCap = apiSettings.ScanCap
+
+	if apiSettings.Timeout == nil {
+		requested.Timeout = 0
+	} else {
+		requested.Timeout = apiSettings.Timeout.Nanoseconds()
+	}
+
+	requested.PreparedLimit = apiSettings.PreparedLimit
+	requested.CompletedLimit = apiSettings.CompletedLimit
+	requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
+	requested.LogLevel = couchbaseutil.QueryLogLevel(apiSettings.LogLevel)
+	requested.MaxParallelism = apiSettings.MaxParallelism
+
+	// Similar to the backfill above, we make the api of this field nicer
+	if apiSettings.CompletedTrackingEnabled {
+		if apiSettings.CompletedTrackingAllRequests {
+			// 0 to track all requests
+			requested.CompletedThreshold = 0
+		} else if apiSettings.CompletedThreshold != nil {
+			requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
+		}
+	} else {
+		// Negative number to disable tracking
+		requested.CompletedThreshold = -1
+	}
+
+	requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
+	requested.MemoryQuota = int32(k8sutil.Megabytes(apiSettings.MemoryQuota))
+	requested.CBOEnabled = apiSettings.CBOEnabled
+	requested.CleanupClientAttemptsEnabled = apiSettings.CleanupClientAttemptsEnabled
+	requested.CleanupLostAttemptsEnabled = apiSettings.CleanupLostAttemptsEnabled
+
+	if apiSettings.CleanupWindow != nil {
+		requested.CleanupWindow = couchbaseutil.CouchbaseQueryDurationString(apiSettings.CleanupWindow.Duration)
+	}
+
+	if atleast76, err := c.IsAtLeastVersion("7.6.0"); err != nil {
+		return err
+	} else if atleast76 {
+		if apiSettings.NodeQuota != nil {
+			requested.NodeQuota = int32(k8sutil.Megabytes(apiSettings.NodeQuota))
+		} else {
+			requested.NodeQuota = 0
+		}
+
+		switch {
+		case apiSettings.UseReplica == nil:
+			requested.UseReplica = couchbaseutil.QueryUseReplicaUnset
+		case *apiSettings.UseReplica:
+			requested.UseReplica = couchbaseutil.QueryUseReplicaOn
+		default:
+			requested.UseReplica = couchbaseutil.QueryUseReplicaOff
+		}
+
+		requested.NodeQuotaValPercent = apiSettings.NodeQuotaValPercent
+
+		if apiSettings.CompletedMaxPlanSize != nil {
+			requested.CompletedMaxPlanSize = int32(k8sutil.Bytes(apiSettings.CompletedMaxPlanSize))
+		}
+	}
+
+	requested.NumActiveTransactionRecords = apiSettings.NumActiveTransactionRecords
 	if reflect.DeepEqual(current, &requested) {
 		return nil
 	}

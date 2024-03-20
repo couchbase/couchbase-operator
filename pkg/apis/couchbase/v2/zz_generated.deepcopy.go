@@ -1903,6 +1903,46 @@ func (in *CouchbaseClusterQuerySettings) DeepCopyInto(out *CouchbaseClusterQuery
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.Timeout != nil {
+		in, out := &in.Timeout, &out.Timeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.CompletedThreshold != nil {
+		in, out := &in.CompletedThreshold, &out.CompletedThreshold
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.TxTimeout != nil {
+		in, out := &in.TxTimeout, &out.TxTimeout
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.MemoryQuota != nil {
+		in, out := &in.MemoryQuota, &out.MemoryQuota
+		x := (*in).DeepCopy()
+		*out = &x
+	}
+	if in.CleanupWindow != nil {
+		in, out := &in.CleanupWindow, &out.CleanupWindow
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.NodeQuota != nil {
+		in, out := &in.NodeQuota, &out.NodeQuota
+		x := (*in).DeepCopy()
+		*out = &x
+	}
+	if in.UseReplica != nil {
+		in, out := &in.UseReplica, &out.UseReplica
+		*out = new(bool)
+		**out = **in
+	}
+	if in.CompletedMaxPlanSize != nil {
+		in, out := &in.CompletedMaxPlanSize, &out.CompletedMaxPlanSize
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	return
 }
 

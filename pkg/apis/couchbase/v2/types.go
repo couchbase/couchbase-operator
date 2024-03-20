@@ -3047,6 +3047,20 @@ type CouchbaseClusterIndexerSettings struct {
 	EnableShardAffinity bool `json:"enableShardAffinity,omitempty"`
 }
 
+// QueryLogLevel controls the verbosity of the query service logs.
+// +kubebuilder:validation:Enum=debug;trace;info;warn;error;severe;none
+type QueryLogLevel string
+
+const (
+	QueryLogLevelDebug  QueryLogLevel = "debug"
+	QueryLogLevelTrace  QueryLogLevel = "trace"
+	QueryLogLevelInfo   QueryLogLevel = "info"
+	QueryLogLevelWarn   QueryLogLevel = "warn"
+	QueryLogLevelError  QueryLogLevel = "error"
+	QueryLogLevelSevere QueryLogLevel = "severe"
+	QueryLogLevelNone   QueryLogLevel = "none"
+)
+
 // CouchbaseClusterQuerySettings allow query tweaks.
 type CouchbaseClusterQuerySettings struct {
 	// BackfillEnabled allows the query service to backfill.
@@ -3067,6 +3081,145 @@ type CouchbaseClusterQuerySettings struct {
 	// requires `backfillEnabled` to be set to true in order to have any effect.
 	// This field overrides `temporarySpace`.
 	TemporarySpaceUnlimited bool `json:"temporarySpaceUnlimited,omitempty"`
+
+	// PipelineBatch controls the number of items execution operators can batch for
+	// Fetch from the KV. Defaults to 16.
+	// +kubebuilder:default=16
+	PipelineBatch int32 `json:"pipelineBatch"`
+
+	// PipelineCap controls the maximum number of items each execution
+	// operator can buffer between various operators. Defaults to 512.
+	// +kubebuilder:default=512
+	PipelineCap int32 `json:"pipelineCap"`
+
+	// ScapCan sets the maximum buffered channel size between the indexer client
+	// and the query service for index scans.
+	// Defaults to 512.
+	// +kubebuilder:default=512
+	ScanCap int32 `json:"scanCap"`
+
+	// Timeout is the maximum time to spend on the request before timing out.
+	// If this field is not set then there will be no timeout.
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
+
+	// PreparedLimit is the maximum number of prepared statements in the cache.
+	// When this cache reaches the limit, the least recently used prepared
+	// statements will be discarded as new prepared statements are created.
+	// +kubebuilder:default=16384
+	PreparedLimit int32 `json:"preparedLimit"`
+
+	// CompletedLimit sets the number of requests to be logged in the completed
+	// requests catalog. As new completed requests are added, old ones are removed.
+	// +kubebuilder:default=4000
+	CompletedLimit int32 `json:"completedLimit"`
+
+	// CompletedTrackingEnabled allows completed requests to be tracked in the requests
+	// catalog.
+	// +kubebuilder:default=true
+	CompletedTrackingEnabled bool `json:"completedTrackingEnabled"`
+
+	// CompletedTrackingAllRequests allows all requests to be tracked regardless of their
+	// time. This field requires `completedTrackingEnabled` to be true.
+	// +kubebuilder:default=false
+	CompletedTrackingAllRequests bool `json:"completedTrackingAllRequests"`
+
+	// CompletedThreshold is a trigger for queries to be logged in the completed
+	// requests catalog. All completed queries lasting longer than this threshold
+	// are logged in the completed requests catalog. This field requires `completedTrackingEnabled`
+	// to be set to true and `completedTrackingAllRequests` to be false to have any effect.
+	// +kubebuilder:default="7s"
+	CompletedThreshold *metav1.Duration `json:"completedTrackingThreshold,omitempty"`
+
+	// LogLevel controls the verbosity of query logs. This field must be one of
+	// "debug", "trace", "info", "warn", "error", "severe", or "none", defaulting to "info".
+	// +kubebuilder:default="info"
+	LogLevel QueryLogLevel `json:"logLevel,omitempty"`
+
+	// MaxParallelism specifies the maximum parallelism for queries on all Query nodes in the cluster.
+	// If the value is zero, negative, or larger than the number of allowed cored the maximum parallelism
+	// is restricted to the number of allowed cores.
+	// Defaults to 1.
+	// +kubebuilder:default=1
+	MaxParallelism int32 `json:"maxParallelism"`
+
+	// TxTimeout is the maximum time to spend on a transaction before timing out. This setting
+	// only applies to requests containing the BEGIN TRANSACTION statement, or to requests where
+	// the tximplicit parameter is set. For all other requests, it is ignored.
+	// Defaults to 0ms (no timeout).
+	// +kubebuilder:default="0ms"
+	TxTimeout *metav1.Duration `json:"txTimeout,omitempty"`
+
+	// MemoryQuota specifies the maximum amount of memory a request may use on any Query node in the cluster.
+	// This parameter enforces a ceiling on the memory used for the tracked documents required for processing
+	// a request. It does not take into account any other memory that might be used to process a request,
+	// such as the stack, the operators, or some intermediate values.
+	// Defaults to 0.
+	// +kubebuilder:default="0"
+	// +kubebuilder:validation:Type=string
+	MemoryQuota *resource.Quantity `json:"memoryQuota,omitempty"`
+
+	// CBOEnabled specifies whether the cost-based optimizer is enabled.
+	// Defaults to true.
+	// +kubebuilder:default=true
+	CBOEnabled bool `json:"cboEnabled"`
+
+	// CleanupClientAttemptsEnabled specifies whether the Query service preferentially aims to clean up just
+	// transactions that it has created, leaving transactions for the distributed cleanup process only
+	// when it is forced to.
+	// Defaults to true.
+	// +kubebuilder:default=true
+	CleanupClientAttemptsEnabled bool `json:"cleanupClientAttemptsEnabled"`
+
+	// CleanupLostAttemptsEnabled specifies the Query service takes part in the distributed cleanup
+	// process, and cleans up expired transactions created by any client.
+	// Defaults to true.
+	// +kubebuilder:default=true
+	CleanupLostAttemptsEnabled bool `json:"cleanupLostAttemptsEnabled"`
+
+	// CleanupWindow specifies how frequently the Query service checks its subset of active
+	// transaction records for cleanup.
+	// Defaults to 60s
+	// +kubebuilder:default="60s"
+	CleanupWindow *metav1.Duration `json:"cleanupWindow"`
+
+	// NumActiveTransactionRecords specifies the total number of active transaction records for
+	// all Query nodes in the cluster.
+	// Default to 1024 and has a minimum of 1.
+	// +kubebuilder:default=1024
+	// +kubebuilder:validation:Minimum=1
+	NumActiveTransactionRecords int32 `json:"numActiveTransactionRecords"`
+
+	// NodeQuota sets a soft memory limit for every Query node in the cluster. The garbage
+	// collector tries to keep below this target. It is not a hard, absolute limit, and memory
+	// usage may exceed this value.
+	// This field is only supported on CB versions 7.6.0+.
+	// +kubebuilder:validation:Type=string
+	NodeQuota *resource.Quantity `json:"nodeQuota,omitempty"`
+
+	// UseReplica specifies whether a query can fetch data from a replica vBucket if active vBuckets
+	// are inaccessible. If set to true then read from replica is enabled for all queries, but can
+	// be disabled at request level. If set to false read from replica is disabled for all queries
+	// and cannot be overridden at request level. If this field is unset then it is enabled/disabled
+	// at the request level.
+	// This field is only supported on CB versions 7.6.0+.
+	UseReplica *bool `json:"useReplica,omitempty"`
+
+	// NodeQuotaValPercent sets the  percentage of the `useReplica` that is dedicated to tracked
+	// value content memory across all active requests for every Query node in the cluster.
+	// This field is only supported on CB versions 7.6.0+.
+	// Defaults to 67.
+	// +kubebuilder:default=67
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	NodeQuotaValPercent int32 `json:"nodeQuotaValPercent"`
+
+	// CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
+	// completed requests catalog. Queries with plans larger than this are not logged.
+	// This field is only supported on CB versions 7.6.0+.
+	// Defaults to 262144, maximum value is 20840448, and minimum value is 0.
+	// +kubebuilder:default="262144"
+	// +kubebuilder:validation:Type=string
+	CompletedMaxPlanSize *resource.Quantity `json:"completedMaxPlanSize"`
 }
 
 // CouchbaseClusterDataSettings allows data service tweaks.

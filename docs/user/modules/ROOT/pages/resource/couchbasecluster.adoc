@@ -101,8 +101,30 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-indexer-threads,threads>>: 0
     <<couchbaseclusters-spec-cluster-query,query>>:
       <<couchbaseclusters-spec-cluster-query-backfillenabled,backfillEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-cboenabled,cboEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-cleanupclientattemptsenabled,cleanupClientAttemptsEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-cleanuplostattemptsenabled,cleanupLostAttemptsEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-cleanupwindow,cleanupWindow>>: 60s
+      <<couchbaseclusters-spec-cluster-query-completedlimit,completedLimit>>: 4000
+      <<couchbaseclusters-spec-cluster-query-completedmaxplansize,completedMaxPlanSize>>: 262144
+      <<couchbaseclusters-spec-cluster-query-completedtrackingallrequests,completedTrackingAllRequests>>: false
+      <<couchbaseclusters-spec-cluster-query-completedtrackingenabled,completedTrackingEnabled>>: True
+      <<couchbaseclusters-spec-cluster-query-completedtrackingthreshold,completedTrackingThreshold>>: 7s
+      <<couchbaseclusters-spec-cluster-query-loglevel,logLevel>>: info
+      <<couchbaseclusters-spec-cluster-query-maxparallelism,maxParallelism>>: 1
+      <<couchbaseclusters-spec-cluster-query-memoryquota,memoryQuota>>: 0
+      <<couchbaseclusters-spec-cluster-query-nodequota,nodeQuota>>: ""
+      <<couchbaseclusters-spec-cluster-query-nodequotavalpercent,nodeQuotaValPercent>>: 67
+      <<couchbaseclusters-spec-cluster-query-numactivetransactionrecords,numActiveTransactionRecords>>: 1024
+      <<couchbaseclusters-spec-cluster-query-pipelinebatch,pipelineBatch>>: 16
+      <<couchbaseclusters-spec-cluster-query-pipelinecap,pipelineCap>>: 512
+      <<couchbaseclusters-spec-cluster-query-preparedlimit,preparedLimit>>: 16384
+      <<couchbaseclusters-spec-cluster-query-scancap,scanCap>>: 512
       <<couchbaseclusters-spec-cluster-query-temporaryspace,temporarySpace>>: 5Gi
       <<couchbaseclusters-spec-cluster-query-temporaryspaceunlimited,temporarySpaceUnlimited>>: false
+      <<couchbaseclusters-spec-cluster-query-timeout,timeout>>: ""
+      <<couchbaseclusters-spec-cluster-query-txtimeout,txTimeout>>: 0ms
+      <<couchbaseclusters-spec-cluster-query-usereplica,useReplica>>: false
     <<couchbaseclusters-spec-cluster-queryservicememoryquota,queryServiceMemoryQuota>>: ""
     <<couchbaseclusters-spec-cluster-searchservicememoryquota,searchServiceMemoryQuota>>: 256Mi
   <<couchbaseclusters-spec-enableonlinevolumeexpansion,enableOnlineVolumeExpansion>>: false
@@ -1612,6 +1634,326 @@ Query allows the query service to be configured.
 
 BackfillEnabled allows the query service to backfill.
 
+=== couchbaseclusters.spec.cluster.query.cboEnabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+CBOEnabled specifies whether the cost-based optimizer is enabled.
+Defaults to true.
+
+=== couchbaseclusters.spec.cluster.query.cleanupClientAttemptsEnabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+CleanupClientAttemptsEnabled specifies whether the Query service preferentially aims to clean up just
+transactions that it has created, leaving transactions for the distributed cleanup process only
+when it is forced to.
+Defaults to true.
+
+=== couchbaseclusters.spec.cluster.query.cleanupLostAttemptsEnabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+CleanupLostAttemptsEnabled specifies the Query service takes part in the distributed cleanup
+process, and cleans up expired transactions created by any client.
+Defaults to true.
+
+=== couchbaseclusters.spec.cluster.query.cleanupWindow
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Default*: `60s`
+
+==== Description
+
+CleanupWindow specifies how frequently the Query service checks its subset of active
+transaction records for cleanup.
+Defaults to 60s.
+
+=== couchbaseclusters.spec.cluster.query.completedLimit
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `4000`
+
+==== Description
+
+CompletedLimit sets the number of requests to be logged in the completed
+requests catalog.
+As new completed requests are added, old ones are removed.
+
+=== couchbaseclusters.spec.cluster.query.completedMaxPlanSize
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Default*: `262144`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
+completed requests catalog.
+Queries with plans larger than this are not logged.
+This field is only supported on CB versions 7.6.0+.
+Defaults to 262144, maximum value is 20840448, and minimum value is 0.
+
+=== couchbaseclusters.spec.cluster.query.completedTrackingAllRequests
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+CompletedTrackingAllRequests allows all requests to be tracked regardless of their
+time.
+This field requires `completedTrackingEnabled` to be true.
+
+=== couchbaseclusters.spec.cluster.query.completedTrackingEnabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+CompletedTrackingEnabled allows completed requests to be tracked in the requests
+catalog.
+
+=== couchbaseclusters.spec.cluster.query.completedTrackingThreshold
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `7s`
+
+==== Description
+
+CompletedThreshold is a trigger for queries to be logged in the completed
+requests catalog.
+All completed queries lasting longer than this threshold
+are logged in the completed requests catalog.
+This field requires `completedTrackingEnabled`
+to be set to true and `completedTrackingAllRequests` to be false to have any effect.
+
+=== couchbaseclusters.spec.cluster.query.logLevel
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `info`
+
+*Enumerations*: `debug, trace, info, warn, error, severe, none`
+
+==== Description
+
+LogLevel controls the verbosity of query logs.
+This field must be one of
+"debug", "trace", "info", "warn", "error", "severe", or "none", defaulting to "info".
+
+=== couchbaseclusters.spec.cluster.query.maxParallelism
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `1`
+
+==== Description
+
+MaxParallelism specifies the maximum parallelism for queries on all Query nodes in the cluster.
+If the value is zero, negative, or larger than the number of allowed cored the maximum parallelism
+is restricted to the number of allowed cores.
+Defaults to 1.
+
+=== couchbaseclusters.spec.cluster.query.memoryQuota
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `0`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+MemoryQuota specifies the maximum amount of memory a request may use on any Query node in the cluster.
+This parameter enforces a ceiling on the memory used for the tracked documents required for processing
+a request.
+It does not take into account any other memory that might be used to process a request,
+such as the stack, the operators, or some intermediate values.
+Defaults to 0.
+
+=== couchbaseclusters.spec.cluster.query.nodeQuota
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+NodeQuota sets a soft memory limit for every Query node in the cluster.
+The garbage
+collector tries to keep below this target.
+It is not a hard, absolute limit, and memory
+usage may exceed this value.
+This field is only supported on CB versions 7.6.0+.
+
+=== couchbaseclusters.spec.cluster.query.nodeQuotaValPercent
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `67`
+
+*Minimum*: `0`
+
+*Maximum*: `100`
+
+==== Description
+
+NodeQuotaValPercent sets the  percentage of the `useReplica` that is dedicated to tracked
+value content memory across all active requests for every Query node in the cluster.
+This field is only supported on CB versions 7.6.0+.
+Defaults to 67.
+
+=== couchbaseclusters.spec.cluster.query.numActiveTransactionRecords
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `1024`
+
+*Minimum*: `1`
+
+==== Description
+
+NumActiveTransactionRecords specifies the total number of active transaction records for
+all Query nodes in the cluster.
+Default to 1024 and has a minimum of 1.
+
+=== couchbaseclusters.spec.cluster.query.pipelineBatch
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `16`
+
+==== Description
+
+PipelineBatch controls the number of items execution operators can batch for
+Fetch from the KV.
+Defaults to 16.
+
+=== couchbaseclusters.spec.cluster.query.pipelineCap
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `512`
+
+==== Description
+
+PipelineCap controls the maximum number of items each execution
+operator can buffer between various operators.
+Defaults to 512.
+
+=== couchbaseclusters.spec.cluster.query.preparedLimit
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `16384`
+
+==== Description
+
+PreparedLimit is the maximum number of prepared statements in the cache.
+When this cache reaches the limit, the least recently used prepared
+statements will be discarded as new prepared statements are created.
+
+=== couchbaseclusters.spec.cluster.query.scanCap
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `512`
+
+==== Description
+
+ScapCan sets the maximum buffered channel size between the indexer client
+and the query service for index scans.
+Defaults to 512.
+
 === couchbaseclusters.spec.cluster.query.temporarySpace
 
 ==== Constraints
@@ -1644,6 +1986,52 @@ the query service backfill, per-pod, to be unconstrained.
 This field
 requires `backfillEnabled` to be set to true in order to have any effect.
 This field overrides `temporarySpace`.
+
+=== couchbaseclusters.spec.cluster.query.timeout
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Timeout is the maximum time to spend on the request before timing out.
+If this field is not set then there will be no timeout.
+
+=== couchbaseclusters.spec.cluster.query.txTimeout
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `0ms`
+
+==== Description
+
+TxTimeout is the maximum time to spend on a transaction before timing out.
+This setting
+only applies to requests containing the BEGIN TRANSACTION statement, or to requests where
+the tximplicit parameter is set.
+For all other requests, it is ignored.
+Defaults to 0ms (no timeout).
+
+=== couchbaseclusters.spec.cluster.query.useReplica
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseReplica specifies whether a query can fetch data from a replica vBucket if active vBuckets
+are inaccessible.
+If set to true then read from replica is enabled for all queries, but can
+be disabled at request level.
+If set to false read from replica is disabled for all queries
+and cannot be overridden at request level.
+If this field is unset then it is enabled/disabled
+at the request level.
+This field is only supported on CB versions 7.6.0+.
 
 === couchbaseclusters.spec.cluster.queryServiceMemoryQuota
 

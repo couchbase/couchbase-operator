@@ -105,7 +105,7 @@ NOTE: Changing the location of the audit log is not supported, as it would break
 ==== Sidecar Garbage Collection
 kbd:[deprecated]
 
-Native audit log cleanup was introduced in Couchbase Server 7.2.4, for earlier versions the Couchbase Autonomous Operator can deploy ba sidecar container with the Couchbase Server to cleanup rotated logs. 
+Native audit log cleanup was introduced in Couchbase Server 7.2.4, for earlier versions the Couchbase Autonomous Operator can deploy a sidecar container with the Couchbase Server to cleanup rotated logs. 
 
 [source,yaml,subs="attributes,verbatim"]
 ----
