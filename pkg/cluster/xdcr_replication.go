@@ -480,28 +480,11 @@ func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
 		return nil, err
 	}
 
-	// check for the unique suffix "-operator-managed" to discard the rest
-	// this is necessary to rule out all remoteClusters for this cluster
-	// which were not created/added via operator
-	if len(remoteClusters) > 0 {
-		for i, remoteCluster := range remoteClusters {
-			// probably added to this cluster as remoteCluster via UI/API (not managed by operator)
-			if !strings.HasSuffix(remoteCluster.Name, RemoteClusterOperatorManagedSuffix) {
-				// delete those remote clusters via API
-				if err := couchbaseutil.DeleteRemoteCluster(&remoteCluster).On(c.api, c.readyMembers()); err != nil {
-					return nil, err
-				}
-				// remove them from the list
-				remoteClusters = append(remoteClusters[:i], remoteClusters[i+1:]...)
-			}
-		}
-	}
-
 	for i := range remoteClusters {
 		cluster := &remoteClusters[i]
 
 		// Load up the configuration that changes... OMG!!
-		if err := c.getPersistentXDCRData(cluster, persistence.XDCRHostname, &cluster.Hostname); err != nil {
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRHostname, &cluster.Hostname); err != nil {
 			return nil, err
 		}
 
@@ -672,17 +655,34 @@ Next:
 	return replications
 }
 
-// reconcileXDCRReplications handles the creation, update and removal of replications.
-// This must be called after new remotes are added, and before old remotes are removed.
-func (c *Cluster) reconcileXDCRReplications(requestedReplications couchbaseutil.ReplicationList) error {
-	currentReplications, err := c.listReplications()
-	if err != nil {
-		return err
+func (c *Cluster) deleteXDCRReplications(requestedReplications, currentReplications couchbaseutil.ReplicationList) error {
+	// Delete any orphaned replications...
+	replicationDeletes := replicationDeletions(currentReplications, requestedReplications)
+	for i := range replicationDeletes {
+		replication := replicationDeletes[i]
+
+		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
+
+		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
+		if err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.DeleteReplication(cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(replication)))
 	}
 
+	return nil
+}
+
+// updateCreateXDCRReplications handles the creation and updates of replications.
+// This must be called after new remotes are added.
+func (c *Cluster) updateCreateXDCRReplications(requestedReplications, currentReplications couchbaseutil.ReplicationList) error {
 	// We deal with migrations first, the assumption being that these would be one-offs and they should be done
 	// first.
-
 	// Create/update any replications...
 	replicationUpdates := replicationUpdates(currentReplications, requestedReplications)
 	for i := range replicationUpdates {
@@ -715,25 +715,6 @@ func (c *Cluster) reconcileXDCRReplications(requestedReplications couchbaseutil.
 		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(replication)))
 	}
 
-	// Delete any orphaned replications...
-	replicationDeletes := replicationDeletions(currentReplications, requestedReplications)
-	for i := range replicationDeletes {
-		replication := replicationDeletes[i]
-
-		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
-
-		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
-		if err != nil {
-			return err
-		}
-
-		if err := couchbaseutil.DeleteReplication(&replication, cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(replication)))
-	}
-
 	return nil
 }
 
@@ -751,6 +732,35 @@ func (c *Cluster) reconcileXDCR() error {
 	currentClusters, err := c.listRemoteClusters()
 	if err != nil {
 		return err
+	}
+
+	currentReplications, err := c.listReplications()
+	if err != nil {
+		return err
+	}
+
+	// Delete stuff first to remove any non-managed remote-clusters that could conflict with managed ones
+	// Deleting replications first because replications need to be deleted before remote clusters
+	if err = c.deleteXDCRReplications(requestedReplications, currentReplications); err != nil {
+		return err
+	}
+
+	// Delete any orphaned clusters
+	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
+	for i := range deletes {
+		cluster := &deletes[i]
+
+		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+		if err := couchbaseutil.DeleteRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, cluster.Name))
+
+		if err := c.state.DeleteXDCR(cluster.Name); err != nil {
+			return err
+		}
 	}
 
 	// Create/update any new clusters...
@@ -792,27 +802,5 @@ func (c *Cluster) reconcileXDCR() error {
 
 	// Replications depend on remotes existing, and also need to be removed before
 	// the remote they depend on, so perform it here.
-	if err := c.reconcileXDCRReplications(requestedReplications); err != nil {
-		return err
-	}
-
-	// Delete any orphaned clusters...
-	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
-	for i := range deletes {
-		cluster := &deletes[i]
-
-		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
-
-		if err := couchbaseutil.DeleteRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.RemoteClusterRemovedEvent(c.cluster, cluster.Name))
-
-		if err := c.state.DeleteXDCR(cluster.Name); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return c.updateCreateXDCRReplications(requestedReplications, currentReplications)
 }

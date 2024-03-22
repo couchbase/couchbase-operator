@@ -671,7 +671,7 @@ func UpdateReplication(r *Replication, uuid, from, to string) *Request {
 }
 
 // DeleteReplication deletes an existing XDCR replication between clusters.
-func DeleteReplication(r *Replication, uuid, from, to string) *Request {
+func DeleteReplication(uuid, from, to string) *Request {
 	return NewRequest((*Client).Delete, "/controller/cancelXDCR/"+url.PathEscape(uuid+"/"+from+"/"+to), nil, nil)
 }
 
