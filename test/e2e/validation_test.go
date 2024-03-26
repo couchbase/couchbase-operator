@@ -3192,9 +3192,18 @@ func TestBucketMigrationPre76Invalid(t *testing.T) {
 func TestBucketMigrationPost76Validation(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:       "TestBucketMigrationToCouchstoreValid",
-			mutations:  patchMap{"bucket2": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore")},
+			name: "TestBucketMigrationToCouchstoreValid",
+			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Replace("/spec/storageBackend", "couchstore").
+				Remove("/metadata/annotations")},
 			shouldFail: false,
+		},
+		{
+			name: "TestBucketMigrationToCouchstoreInvalid",
+			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
+				Replace("/spec/storageBackend", "couchstore")},
+			expectedErrors: []string{"can only be changed from magma to couchstore if history retention is first disabled on the bucket"},
+			shouldFail:     true,
 		},
 		{
 			name:       "TestBucketMigrationToMagmaValid",

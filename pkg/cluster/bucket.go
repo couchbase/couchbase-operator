@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -421,7 +422,7 @@ func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
 			continue
 		}
 
-		if ok, reason := bucket.CanBeMigrated(couchbaseutil.CouchbaseStorageBackend(targetBackend)); !ok {
+		if ok, reason := c.canBucketBeMigrated(bucket, couchbaseutil.CouchbaseStorageBackend(targetBackend)); !ok {
 			log.Info("[WARN] Cannot migrate bucket as it doesn't meet requirements for backend change.", "bucket-name", bucket.BucketName, "reason", reason, "target-backend", targetBackend)
 			continue
 		}
@@ -440,4 +441,30 @@ func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) canBucketBeMigrated(b couchbaseutil.Bucket, backend couchbaseutil.CouchbaseStorageBackend) (bool, string) {
+	if backend == couchbaseutil.CouchbaseStorageBackendMagma {
+		if b.BucketMemoryQuota < 1024 {
+			return false, fmt.Sprintf("memory quota (%v) below minimum %v", b.BucketMemoryQuota, 1024)
+		}
+	}
+
+	if backend == couchbaseutil.CouchbaseStorageBackendCouchstore {
+		scopes := couchbaseutil.ScopeList{}
+
+		if err := couchbaseutil.ListScopes(b.BucketName, &scopes).On(c.api, c.readyMembers()); err != nil {
+			return false, fmt.Sprintf("error when fetching scopes: %s", err.Error())
+		}
+
+		for _, scope := range scopes.Scopes {
+			for _, collection := range scope.Collections {
+				if collection.History != nil && *collection.History == true {
+					return false, fmt.Sprintf("collection %s in scope %s has history enabled", collection.Name, scope.Name)
+				}
+			}
+		}
+	}
+
+	return true, ""
 }

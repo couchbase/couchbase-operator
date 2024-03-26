@@ -35,7 +35,7 @@ func testMagmaBucket(bucketName string) *couchbasev2.CouchbaseBucket {
 	return testBucket(bucketName, couchbasev2.CouchbaseStorageBackendMagma)
 }
 
-func TestCouchstoreBucketToMagmaMigration(t *testing.T) {
+func TestMagmaBucketToCouchstoreMigration(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -50,18 +50,22 @@ func TestCouchstoreBucketToMagmaMigration(t *testing.T) {
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	bucket := testCouchstoreBucket(e2e_constants.DefaultBucket)
-
+	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
+	bucket.Annotations = map[string]string{
+		"cao.couchbase.com/historyRetention.collectionHistoryDefault": "false",
+	}
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
-		Replace("/spec/storageBackend", couchbasev2.CouchbaseStorageBackendMagma),
+		Replace("/spec/storageBackend", couchbasev2.CouchbaseStorageBackendCouchstore).
+		Remove("/metadata/annotations"),
 		time.Minute)
 
-	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitUntilAllNodeStorageBackendCouchstore(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
@@ -183,6 +187,12 @@ func TestCouchstoreBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
+
+	if bucket.Annotations == nil {
+		bucket.Annotations = make(map[string]string)
+	}
+
+	bucket.Annotations["cao.couchbase.com/historyRetention.collectionHistoryDefault"] = "false"
 
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
