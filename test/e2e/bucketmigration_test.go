@@ -184,6 +184,12 @@ func TestCouchstoreBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 
 	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
 
+	if bucket.Annotations == nil {
+		bucket.Annotations = make(map[string]string)
+	}
+
+	bucket.Annotations["cao.couchbase.com/historyRetention.collectionHistoryDefault"] = "false"
+
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)

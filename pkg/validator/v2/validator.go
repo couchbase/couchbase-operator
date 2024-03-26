@@ -1555,7 +1555,7 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 
 	for k, v := range bucket.Annotations {
 		if testFunc, ok := cdcAnnotations[k]; ok {
-			if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+			if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma && len(bucket.Spec.StorageBackend) != 0 {
 				errs = append(errs, fmt.Errorf("annotation '%s' can only be used with magma storage backend", k))
 				continue
 			}
