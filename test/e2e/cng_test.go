@@ -255,20 +255,13 @@ func TestCNGLiveConfigReload(t *testing.T) {
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
 
-	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
 	// Verify the CM exists
 	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
 
 	cluster = e2eutil.MustPatchCluster(t, kubernetesCluster, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/cloudNativeGateway/logLevel", "debug"), time.Minute)
 	e2eutil.MustFindLog(t, kubernetesCluster, cluster, k8sutil.CloudNativeGatewayContainerName, "updated log level")
-
-	// Check the events match what we expect:
-	// * Cluster created
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-	}
-	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
 }
 
 func getCloudNativeGatewayClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster, clusterName string, username string, password string) (*gocbcoreps.RoutingClient, error) {

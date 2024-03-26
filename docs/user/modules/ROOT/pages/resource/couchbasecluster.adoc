@@ -2309,6 +2309,8 @@ TODO: provide a default kubebuilder default image tag as field is mandatory.
 
 ==== Constraints
 
+*Required*
+
 *Type*: `string`
 
 *Default*: `info`

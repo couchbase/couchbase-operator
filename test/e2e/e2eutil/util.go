@@ -360,8 +360,9 @@ func (o *ClusterOptions) WithPodAnnotations(annotations map[string]string) *Clus
 
 func (o *ClusterOptions) WithCloudNativeGateway(image string) *ClusterOptions {
 	o.CloudNativeGateway = &couchbasev2.CloudNativeGateway{
-		Image: image,
-		TLS:   nil,
+		Image:    image,
+		TLS:      nil,
+		LogLevel: "info",
 	}
 
 	return o

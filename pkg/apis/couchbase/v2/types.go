@@ -2656,7 +2656,7 @@ type CloudNativeGateway struct {
 	// LogLevel controls the verbosity of cloud native logs.  This field must be one of
 	// "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
 	// +kubebuilder:default="info"
-	LogLevel CloudNativeGatewayLogLevel `json:"logLevel,omitempty"`
+	LogLevel CloudNativeGatewayLogLevel `json:"logLevel"`
 }
 
 type CloudNativeGatewayOTLP struct {

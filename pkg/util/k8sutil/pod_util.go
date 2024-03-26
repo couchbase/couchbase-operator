@@ -1927,6 +1927,13 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 			InitialDelaySeconds: 60,
 			PeriodSeconds:       60,
 		},
+		VolumeMounts: []v1.VolumeMount{
+			{
+				Name:      CngConfigVolumeName,
+				MountPath: CngConfigMountPath,
+				ReadOnly:  true,
+			},
+		},
 	}
 
 	container.Args = append(container.Args, "--config", getCNGConfigFilePath())
