@@ -3279,7 +3279,7 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	// change for a bucket in a CB cluster < 7.6.0. The operator shouldn't actually attempt the
 	// migration but we still want to keep the state of CB K8s resources and CB Server in sync
 	// where we can.
-	// This is a heavy ce=heck which is why we gate it behind if the default storage backend
+	// This is a heavy check which is why we gate it behind if the default storage backend
 	// actually changes
 	if curr.GetDefaultBucketStorageBackend() != prev.GetDefaultBucketStorageBackend() {
 		tag, err := k8sutil.CouchbaseVersion(curr.Spec.Image)
@@ -3383,10 +3383,32 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		if !allClustersAtleast76 {
 			errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"))
 		}
+
+		if allClustersAtleast76 && prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "couchstore" {
+			if err := checkBucketHistoryDisabled(prev); err != nil {
+				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
+			}
+		}
 	}
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
+	if bucket.Annotations == nil {
+		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
+	}
+
+	if val, ok := bucket.Annotations["cao.couchbase.com/historyRetention.collectionHistoryDefault"]; ok {
+		if historyRetentionEnabled, err := strconv.ParseBool(val); err != nil {
+			return err
+		} else if historyRetentionEnabled {
+			return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
+		}
 	}
 
 	return nil
