@@ -36,6 +36,26 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
+[#release-v262]
+== Release 2.6.2
+
+Couchbase Autonomous Operator 2.6.2 was released in March 2024.
+
+[#fixed-issues-v262]
+=== Fixed Issues
+
+[#table-fixed-issues-v262,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3391[K8S-3391^]
+a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
+
+a| https://issues.couchbase.com/browse/K8S-3392[K8S-3392^]
+a| *Summary:* Previously the Operator was not using the correct failover mechanism for nodes without the Data Service.
+
+|===
+
 [#release-v261]
 == Release 2.6.1
 
