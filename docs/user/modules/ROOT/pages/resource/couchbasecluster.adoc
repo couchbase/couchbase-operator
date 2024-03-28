@@ -116,6 +116,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-nodequota,nodeQuota>>: ""
       <<couchbaseclusters-spec-cluster-query-nodequotavalpercent,nodeQuotaValPercent>>: 67
       <<couchbaseclusters-spec-cluster-query-numactivetransactionrecords,numActiveTransactionRecords>>: 1024
+      <<couchbaseclusters-spec-cluster-query-numcpus,numCpus>>: 0
       <<couchbaseclusters-spec-cluster-query-pipelinebatch,pipelineBatch>>: 16
       <<couchbaseclusters-spec-cluster-query-pipelinecap,pipelineCap>>: 512
       <<couchbaseclusters-spec-cluster-query-preparedlimit,preparedLimit>>: 16384
@@ -1889,6 +1890,30 @@ Defaults to 67.
 NumActiveTransactionRecords specifies the total number of active transaction records for
 all Query nodes in the cluster.
 Default to 1024 and has a minimum of 1.
+
+=== couchbaseclusters.spec.cluster.query.numCpus
+
+==== Constraints
+
+*Required*
+
+*Type*: `integer`
+
+*Default*: `0`
+
+*Minimum*: `0`
+
+==== Description
+
+NumCpus is the number of CPUs the Query service can use on any Query node in the cluster.
+When set to 0 (the default), the Query service can use all available CPUs, up to the limits described below.
+The number of CPUs can never be greater than the number of logical CPUs.
+In Community Edition, the number of allowed CPUs cannot be greater than 4.
+In Enterprise Edition, there is no limit to the number of allowed CPUs.
+This field is only supported on CB versions 7.6.0+.
+NOTE: This change requires a restart of the Query service to take effect which can be done by rescheduling
+nodes that are running the query service.
+Defaults to 0.
 
 === couchbaseclusters.spec.cluster.query.pipelineBatch
 

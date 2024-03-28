@@ -1490,19 +1490,22 @@ type QuerySettings struct {
 	NumActiveTransactionRecords int32 `json:"queryNumAtrs" url:"queryNumAtrs"`
 
 	// Sets the soft memory limit for every Query node in the cluster, in MB.
-	NodeQuota int32 `json:"queryNodeQuota" url:"queryNodeQuota"`
+	NodeQuota *int32 `json:"queryNodeQuota,omitempty" url:"queryNodeQuota,omitempty"`
 
 	// Specifies whether a query can fetch data from a replica vBucket if active vBuckets are inaccessible. The possible values are:
 	// off — read from replica is disabled for all queries and cannot be overridden at request level.
 	// on — read from replica is enabled for all queries, but can be disabled at request level.
 	// unset — read from replica is enabled or disabled at request level.
-	UseReplica QueryUseReplica `json:"queryUseReplica" url:"queryUseReplica"`
+	UseReplica *QueryUseReplica `json:"queryUseReplica,omitempty" url:"queryUseReplica,omitempty"`
 
 	// The percentage of the queryNodeQuota that is dedicated to tracked value content memory across all active requests for every Query node.
-	NodeQuotaValPercent int32 `json:"queryNodeQuotaValPercent" url:"queryNodeQuotaValPercent"`
+	NodeQuotaValPercent *int32 `json:"queryNodeQuotaValPercent,omitempty" url:"queryNodeQuotaValPercent,omitempty"`
+
+	// The number of CPUs the Query service can use on any Query node in the cluster.
+	NumCpus *int32 `json:"queryNumCpus,omitempty" url:"queryNumCpus,omitempty"`
 
 	// A plan size in bytes. Limits the size of query execution plans that can be logged in the completed requests catalog.
-	CompletedMaxPlanSize int32 `json:"queryCompletedMaxPlanSize" url:"queryCompletedMaxPlanSize"`
+	CompletedMaxPlanSize *int32 `json:"queryCompletedMaxPlanSize,omitempty" url:"queryCompletedMaxPlanSize,omitempty"`
 }
 
 // All these settings are passed through with minimal or no verification.

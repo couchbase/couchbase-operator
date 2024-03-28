@@ -748,26 +748,32 @@ func (c *Cluster) reconcileQuerySettings() error {
 	if atleast76, err := c.IsAtLeastVersion("7.6.0"); err != nil {
 		return err
 	} else if atleast76 {
+		nodeQuoata := int32(0)
 		if apiSettings.NodeQuota != nil {
-			requested.NodeQuota = int32(k8sutil.Megabytes(apiSettings.NodeQuota))
-		} else {
-			requested.NodeQuota = 0
+			nodeQuoata = int32(k8sutil.Megabytes(apiSettings.NodeQuota))
 		}
+		requested.NodeQuota = &nodeQuoata
 
+		var useReplica couchbaseutil.QueryUseReplica
 		switch {
 		case apiSettings.UseReplica == nil:
-			requested.UseReplica = couchbaseutil.QueryUseReplicaUnset
+			useReplica = couchbaseutil.QueryUseReplicaUnset
 		case *apiSettings.UseReplica:
-			requested.UseReplica = couchbaseutil.QueryUseReplicaOn
+			useReplica = couchbaseutil.QueryUseReplicaOn
 		default:
-			requested.UseReplica = couchbaseutil.QueryUseReplicaOff
+			useReplica = couchbaseutil.QueryUseReplicaOff
 		}
 
-		requested.NodeQuotaValPercent = apiSettings.NodeQuotaValPercent
+		requested.UseReplica = &useReplica
+
+		requested.NodeQuotaValPercent = &apiSettings.NodeQuotaValPercent
 
 		if apiSettings.CompletedMaxPlanSize != nil {
-			requested.CompletedMaxPlanSize = int32(k8sutil.Bytes(apiSettings.CompletedMaxPlanSize))
+			maxPlanSize := int32(k8sutil.Bytes(apiSettings.CompletedMaxPlanSize))
+			requested.CompletedMaxPlanSize = &maxPlanSize
 		}
+
+		requested.NumCpus = &apiSettings.NumCpus
 	}
 
 	requested.NumActiveTransactionRecords = apiSettings.NumActiveTransactionRecords

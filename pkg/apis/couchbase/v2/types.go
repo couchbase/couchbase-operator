@@ -3213,6 +3213,19 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:validation:Maximum=100
 	NodeQuotaValPercent int32 `json:"nodeQuotaValPercent"`
 
+	// NumCpus is the number of CPUs the Query service can use on any Query node in the cluster.
+	// When set to 0 (the default), the Query service can use all available CPUs, up to the limits described below.
+	// The number of CPUs can never be greater than the number of logical CPUs.
+	// In Community Edition, the number of allowed CPUs cannot be greater than 4.
+	// In Enterprise Edition, there is no limit to the number of allowed CPUs.
+	// This field is only supported on CB versions 7.6.0+.
+	// NOTE: This change requires a restart of the Query service to take effect which can be done by rescheduling
+	// nodes that are running the query service.
+	// Defaults to 0
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	NumCpus int32 `json:"numCpus"`
+
 	// CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
 	// completed requests catalog. Queries with plans larger than this are not logged.
 	// This field is only supported on CB versions 7.6.0+.

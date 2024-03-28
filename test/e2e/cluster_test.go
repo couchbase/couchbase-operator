@@ -331,6 +331,10 @@ func TestQuerySettings(t *testing.T) {
 		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuotaValPercent", int32(11)), time.Minute)
 		patchCycles++
 
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/numCpus", 1), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumCpus", int32(1)), time.Minute)
+		patchCycles++
+
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedMaxPlanSize", "2883584"), time.Minute)
 		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", int32(2883584)), time.Minute)
 		patchCycles++
