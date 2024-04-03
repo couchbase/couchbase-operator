@@ -2261,8 +2261,8 @@ func getRootCAs(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([][]
 	return rootCAs, nil
 }
 
-// getServerTLS returns the server key and chain, whether there was a soft error, or whether there was a hard error.
-func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
+// getServerTLS returns the server key and chain, keystore, whether there was a soft error, or whether there was a hard error.
+func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, []byte, bool, string, error) {
 	var secretPath string
 
 	var secretName string
@@ -2285,27 +2285,36 @@ func getServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 
 	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, nil, false, "", err
 	}
 
 	if !found {
-		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+		return nil, nil, nil, false, "", fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	keystore, passphrase, pkcs12Present, err := util_x509.ExtractPKCS12Info(secret)
+	if err != nil {
+		return nil, nil, nil, false, "", err
+	}
+
+	if pkcs12Present {
+		return nil, nil, keystore, true, passphrase, nil
 	}
 
 	key, ok := secret.Data[keyKey]
 	if !ok {
-		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, keyKey)
+		return nil, nil, nil, false, "", fmt.Errorf("tls secret %s must contain %s", secretName, keyKey)
 	}
 
 	chain, ok := secret.Data[chainKey]
 	if !ok {
-		return nil, nil, false, fmt.Errorf("tls secret %s must contain %s", secretName, chainKey)
+		return nil, nil, nil, false, "", fmt.Errorf("tls secret %s must contain %s", secretName, chainKey)
 	}
 
-	return key, chain, true, nil
+	return key, chain, nil, true, "", nil
 }
 
-// getClientTLS returns the client key and chain, whether there was a soft error, or whether there was a hard error.
+// getClientTLS returns the client key and chain, keystore, whether there was a soft error, or whether there was a hard error.
 func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
 	var secretPath string
 
@@ -2375,13 +2384,22 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 	}
 
 	// Check server certificates.
-	key, chain, ok, err := getServerTLS(v, cluster)
+	key, chain, keystore, ok, passphrase, err := getServerTLS(v, cluster)
 	if err != nil {
 		return []error{err}
 	}
 
 	if !ok {
 		return nil
+	}
+
+	if keystore != nil {
+		var decodeErr error
+		chain, key, _, decodeErr = util_x509.DecodePKCS12file(keystore, passphrase, cluster)
+
+		if decodeErr != nil {
+			return []error{err}
+		}
 	}
 
 	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed()); err != nil {

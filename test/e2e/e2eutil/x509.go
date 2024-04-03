@@ -30,6 +30,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/youmark/pkcs8"
+	"software.sslmate.com/src/go-pkcs12"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,10 +84,7 @@ type KeyPairRequest struct {
 
 // Generate returns a PEM encoded private key and signed certificate
 // from the specified CA.
-func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (key, cert []byte, err error) {
-	// Generate the private key
-	var pkey crypto.PrivateKey
-
+func (req *KeyPairRequest) Generate(ca *CertificateAuthority, certValidFrom, certValidTo time.Time) (pkey crypto.PrivateKey, key, cert []byte, err error) {
 	if pkey, err = GeneratePrivateKey(req.keyType); err != nil {
 		return
 	}
@@ -518,6 +516,19 @@ func CreateOperatorSecretData(namespace string, ctx *TLSContext) *corev1.Secret 
 }
 
 func CreateClusterSecretData(namespace string, ctx *TLSContext) *corev1.Secret {
+	if ctx.PKCS12Passphrase != "" {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      ctx.ClusterSecretName,
+			},
+			Data: map[string][]byte{
+				"couchbase-server.p12": ctx.ServerCert,
+				"tls-password":         []byte(ctx.PKCS12Passphrase),
+			},
+		}
+	}
+
 	if ctx.LegacyTLS() {
 		// The legacy way doesn't specify the CA.
 		return &corev1.Secret{
@@ -697,6 +708,8 @@ type TLSContext struct {
 	CASecretName string
 	// Source is the type of TLS to use for the Operator.
 	Source TLSSource
+	// PKCS12Passphrase is the passphrase to decode the .p12 file
+	PKCS12Passphrase string
 }
 
 type TLSOpts struct {
@@ -733,6 +746,10 @@ type TLSOpts struct {
 	MultipleCAs bool
 	// KeyPassphrase is the passphrase used to encrypt private key.
 	KeyPassphrase string
+	// PKCS12 states whether we're using PKCS12 certs or not
+	PKCS12 bool
+	// PKCS12Passphrase is the passphrase to use for the generated .p12 file
+	PKCS12Passphrase string
 }
 
 // clusterSANs generates a valid set of SANs for a cluster.
@@ -843,7 +860,7 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 		clientValidTo = *opts.ClientValidTo
 	}
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, clientValidFrom, clientValidTo)
+	_, operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, clientValidFrom, clientValidTo)
 	if err != nil {
 		return
 	}
@@ -855,7 +872,8 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	clusterReq := CreateCertReqDNS(clusterCN, altNames)
 	clusterReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, clusterCertType, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	pkey, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+
 	if err != nil {
 		return
 	}
@@ -871,8 +889,21 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	ctx.ServerKey = clusterKey
 	ctx.ServerCert = clusterCert
 
-	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
-		return
+	if opts.PKCS12 {
+		if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
+			return
+		}
+
+		caCert := []*x509.Certificate{ctx.CA.certificate}
+
+		pfxData, encoderErr := pkcs12.Legacy.Encode(pkey, ctx.ServerCertificate, caCert, opts.PKCS12Passphrase)
+
+		if encoderErr != nil {
+			return
+		}
+
+		ctx.ServerCert = pfxData
+		ctx.PKCS12Passphrase = opts.PKCS12Passphrase
 	}
 
 	// Create the actual secrets.
@@ -944,7 +975,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, opts *TLSOpts) {
 	clusterReq := CreateCertReqDNS(clusterCN, subjectAltNames)
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, keyEncoding, CertTypeServer, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -974,7 +1005,7 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1001,7 +1032,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1031,7 +1062,7 @@ func MustRotateClientCertificateChain(t *testing.T, ctx *TLSContext) {
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
+	_, operatorKey, operatorCert, err := operatorReqKeyPair.Generate(intermediate, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1063,7 +1094,7 @@ func MustRotateServerCertificateAndCA(t *testing.T, ctx *TLSContext) {
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1107,7 +1138,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1120,7 +1151,7 @@ func MustRotateServerCertificateClientCertificateAndCA(t *testing.T, ctx *TLSCon
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1150,7 +1181,7 @@ func MustRotateServerCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
-	clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1178,7 +1209,7 @@ func MustRotateClientCertificateWrongCA(t *testing.T, ctx *TLSContext) {
 	operatorReq := CreateCertReq(operatorCN)
 	operatorReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeClient, operatorReq)
 
-	operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
+	_, operatorKey, operatorCert, err := operatorReqKeyPair.Generate(ca, validFrom, validTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1365,7 +1396,7 @@ func InitLDAPTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err error)
 	ldapReq := CreateCertReqDNS(operatorCN, altNames)
 	ldapReqKeyPair := CreateKeyPairReqData(keyType, keyEncoding, ldapCertType, ldapReq)
 
-	ldapKey, ldapCert, err := ldapReqKeyPair.Generate(ctx.CA, validFrom, validTo)
+	_, ldapKey, ldapCert, err := ldapReqKeyPair.Generate(ctx.CA, validFrom, validTo)
 	if err != nil {
 		return
 	}

@@ -94,6 +94,10 @@ var (
 	ClientSecretMutualKey  = "mtls.key"
 
 	DefaultBucketStorageBackend = "couchstore"
+
+	// PKCS#12 secret vars.
+	PKCS12FileName = "couchbase-server.p12"
+	TLSPassword    = "tls-password"
 )
 
 // Label types added to pods.

@@ -51,6 +51,35 @@ func TestTLSCreateCluster(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestPKCS12CreateCluster(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	pkcs8 := e2eutil.KeyEncodingPKCS8
+
+	// Create the cluster.
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{PKCS12: true, KeyEncoding: &pkcs8, PKCS12Passphrase: "password", Source: e2eutil.TLSSourceKubernetesSecret})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).MustCreate(t, kubernetes)
+
+	// When the cluster is healthy, check the TLS is correctly configured.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestTLSCreateClusterWithShadowing tests deploying a cluster with standard names
 // in the TLS secret (standard as in ingresses, cert-manager, everything not Couchbase etc.)
 func TestTLSCreateClusterWithShadowing(t *testing.T) {

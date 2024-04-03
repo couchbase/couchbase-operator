@@ -27,6 +27,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/pflag v1.0.5
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a
+	golang.org/x/crypto v0.18.0
 	golang.org/x/oauth2 v0.13.0
 	golang.org/x/time v0.4.0
 	google.golang.org/api v0.149.0
@@ -39,6 +40,7 @@ require (
 	k8s.io/kube-aggregator v0.28.3
 	k8s.io/metrics v0.28.3
 	sigs.k8s.io/controller-runtime v0.16.3
+	software.sslmate.com/src/go-pkcs12 v0.4.0
 )
 
 require (
@@ -113,7 +115,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect

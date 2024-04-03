@@ -266,7 +266,7 @@ func CreateTLSPair(kubernetes *types.Cluster, host string) (*v1.Secret, error) {
 
 	req := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS8, CertTypeServer, CreateCertReqDNS("Couchbase CA", []string{host}))
 
-	key, cert, err := req.Generate(CA, validFrom, validTo)
+	_, key, cert, err := req.Generate(CA, validFrom, validTo)
 	if err != nil {
 		return nil, err
 	}

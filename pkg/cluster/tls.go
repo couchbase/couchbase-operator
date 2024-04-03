@@ -21,7 +21,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,8 +49,11 @@ type tlsCache struct {
 	// clientKey is the operator client key (optional).
 	clientKey []byte
 
-	// publicPassphraseKey is used to encrypt the passphrase before sending to server
+	// publicPassphraseKey is used to encrypt the passphrase before sending to server.
 	publicPassphraseKey *rsa.PublicKey
+
+	// pkcs12ServerCert is the server cert.
+	pkcs12ServerCert []byte
 }
 
 // initTLSCache populates the TLS cache if TLS is enabled, and attaches it to
@@ -67,17 +69,18 @@ func (c *Cluster) initTLSCache() error {
 		return err
 	}
 
-	serverCA, serverCert, serverKey, err := c.getVerifiedServerTLSData(rootCAs)
+	serverCA, serverCert, serverKey, keystore, err := c.getVerifiedServerTLSData(rootCAs)
 	if err != nil {
 		c.raiseEventCached(k8sutil.TLSInvalidEvent(c.cluster))
 		return err
 	}
 
 	cache := &tlsCache{
-		rootCAs:    rootCAs,
-		serverCA:   serverCA,
-		serverCert: serverCert,
-		serverKey:  serverKey,
+		rootCAs:          rootCAs,
+		serverCA:         serverCA,
+		serverCert:       serverCert,
+		serverKey:        serverKey,
+		pkcs12ServerCert: keystore,
 	}
 
 	if c.cluster.IsMutualTLSEnabled() {
@@ -187,8 +190,13 @@ func (c *Cluster) refreshTLSClientSecret() error {
 	// Set secret CA and cert/key to allow clients to easily
 	// host secure services on same network as couchbase.
 	requestedClientSecret.Data[constants.ClientSecretRootCA] = caBundle
-	requestedClientSecret.Data[constants.ClientSecretServerCert] = c.tlsCache.serverCert
-	requestedClientSecret.Data[constants.ClientSecretServerKey] = c.tlsCache.serverKey
+	if c.tlsCache.pkcs12ServerCert != nil {
+		requestedClientSecret.Data[constants.ClientSecretServerCert] = c.tlsCache.pkcs12ServerCert
+	} else {
+		requestedClientSecret.Data[constants.ClientSecretServerCert] = c.tlsCache.serverCert
+		requestedClientSecret.Data[constants.ClientSecretServerKey] = c.tlsCache.serverKey
+	}
+
 	// Provide client cert/keys when mtls is enabled so allow
 	// applications to communitcate securely with Couchbase.
 	if c.cluster.IsMutualTLSEnabled() {
@@ -261,7 +269,6 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 			"pkey.key":  c.tlsCache.serverKey,
 		},
 	}
-
 	// Pa's special sauce!  Support PKCS#8 keys, because we can.
 	block, _ := pem.Decode(c.tlsCache.serverKey)
 	if block == nil {
@@ -414,7 +421,7 @@ func (c *Cluster) refreshPassphrasePublicKey() error {
 		}
 	}
 
-	// retrieve prviate key
+	// retrieve private key
 	privateKeyBytes, ok := secret.Data[constants.CouchbaseTLSPassphraseKey]
 	if !ok {
 		return fmt.Errorf("%w: TLS Passphrase secret missing private key `%s`", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), constants.CouchbaseTLSPassphraseKey)
@@ -493,7 +500,7 @@ func (c *Cluster) refreshPassphraseConfigMap() error {
 	return nil
 }
 
-// updateInternalPassphraseSecret updates the prviate key used by server to decode the passphrase.
+// updateInternalPassphraseSecret updates the private key used by server to decode the passphrase.
 func (c *Cluster) updateInternalPassphraseSecret() (*corev1.Secret, error) {
 	// create private key
 	privateKey, err := util_x509.CreateRSAPrivateKey()
@@ -878,65 +885,83 @@ func (c *Cluster) getExplcitCA() ([]byte, error) {
 }
 
 // getServerTLSDataStandard get TLS server configuration using standard data layout.
-func (c *Cluster) getServerTLSDataStandard() ([]byte, []byte, error) {
+func (c *Cluster) getServerTLSDataStandard() ([]byte, []byte, []byte, string, error) {
 	if c.cluster.Spec.Networking.TLS == nil {
-		return nil, nil, fmt.Errorf("%w: TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	if c.cluster.Spec.Networking.TLS.SecretSource == nil {
-		return nil, nil, fmt.Errorf("%w: TLS source not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: TLS source not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	secret, ok := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.SecretSource.ServerSecretName)
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: unable to get TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.SecretSource.ServerSecretName)
+		return nil, nil, nil, "", fmt.Errorf("%w: unable to get TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.SecretSource.ServerSecretName)
+	}
+
+	keystore, passphrase, pkcs12Present, err := util_x509.ExtractPKCS12Info(secret)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+
+	if pkcs12Present {
+		return nil, nil, keystore, passphrase, nil
 	}
 
 	cert, ok := secret.Data[corev1.TLSCertKey]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: TLS secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: TLS secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	key, ok := secret.Data[corev1.TLSPrivateKeyKey]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: TLS secret missing tls.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: TLS secret missing tls.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	return cert, key, nil
+	return cert, key, nil, "", nil
 }
 
 // getServerTLSDataLegacy gets TLS server configuration using made-up, proprietary layout.
-func (c *Cluster) getServerTLSDataLegacy() ([]byte, []byte, error) {
+func (c *Cluster) getServerTLSDataLegacy() ([]byte, []byte, []byte, string, error) {
 	if c.cluster.Spec.Networking.TLS == nil {
-		return nil, nil, fmt.Errorf("%w: TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	if c.cluster.Spec.Networking.TLS.Static == nil {
-		return nil, nil, fmt.Errorf("%w: static TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: static TLS not defined", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	// Load the TLS data from kubernetes.
 	serverSecret, found := c.k8s.Secrets.Get(c.cluster.Spec.Networking.TLS.Static.ServerSecret)
 	if !found {
-		return nil, nil, fmt.Errorf("%w: unable to get server secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.ServerSecret)
+		return nil, nil, nil, "", fmt.Errorf("%w: unable to get server secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), c.cluster.Spec.Networking.TLS.Static.ServerSecret)
+	}
+
+	keystore, passphrase, pkcs12Present, err := util_x509.ExtractPKCS12Info(serverSecret)
+	if err != nil {
+		return nil, nil, nil, "", err
+	}
+
+	if pkcs12Present {
+		return nil, nil, keystore, passphrase, nil
 	}
 
 	// Ensure that the secrets are correctly formatted.
 	key, ok := serverSecret.Data["pkey.key"]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: server secret missing pkey.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: server secret missing pkey.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	chain, ok := serverSecret.Data["chain.pem"]
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: server secret missing chain.pem", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return nil, nil, nil, "", fmt.Errorf("%w: server secret missing chain.pem", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	return chain, key, nil
+	return chain, key, nil, "", nil
 }
 
 // getServerTLSData gets the TLS data from kubernetes and performs some error checking.
-func (c *Cluster) getServerTLSData() ([]byte, []byte, error) {
+func (c *Cluster) getServerTLSData() ([]byte, []byte, []byte, string, error) {
 	if c.cluster.IsTLSShadowed() {
 		return c.getServerTLSDataStandard()
 	}
@@ -948,11 +973,29 @@ func (c *Cluster) getServerTLSData() ([]byte, []byte, error) {
 // verification of tainted input.  Given it's possible to configure the cluster with no prior
 // knowledge of which CA is used to verify the server certificate, we use the verification data
 // to select the correct root CA to use for the HTTP client verification.
-func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []byte, error) {
+func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []byte, []byte, error) {
 	// Load server TLS data from kubernetes and verify.
-	chain, key, err := c.getServerTLSData()
+	var chain []byte
+
+	var key []byte
+
+	var keystore []byte
+
+	var err error
+
+	var passphrase string
+
+	chain, key, keystore, passphrase, err = c.getServerTLSData()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+
+	if keystore != nil {
+		chain, key, _, err = util_x509.DecodePKCS12file(keystore, passphrase, c.cluster)
+
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
 
 	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace)
@@ -963,16 +1006,16 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 
 	chains, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !c.cluster.IsTLSShadowed())
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// Verify returns chains starting from the leaf, to the the root.
 	cacert, err := util_x509.CreateCertificate(chains[0][len(chains[0])-1].Raw)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return cacert, chain, key, nil
+	return cacert, chain, key, keystore, nil
 }
 
 // getTLSClientDataStandard get TLS client configuration using standard data layout.

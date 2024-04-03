@@ -63,3 +63,22 @@ spec:
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-tls-rootcas[`couchbaseclusters.spec.networking.tls.rootCAs`]
 additional root CAs are added here.
+
+== PKCS12 Support
+As of 2.7.0 and with server version 7.6.0+, Couchbase Operator now supports PKCS12 formatted server certs. This must be accompanied in a secret with the password to extract the .p12 file.
+The secret must be formatted as such:
+
+[source, yaml]
+----
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tls-secret
+data:
+  couchbase-server.p12: MIIPEAIBAzCCDsYGCSqGSIb3DQEHAaCCDrcEgg...
+  tls-password: cGFzc3dvcmQ= # <.>
+----
+
+<.> Password should be in base64 format
+
+The key in the file and the cert must be in PKCS#8 format and must be unencrypted. The key file must not be password protected.

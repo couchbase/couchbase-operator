@@ -10,7 +10,11 @@ import (
 	"strings"
 	"sync"
 
+	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	v1 "k8s.io/api/core/v1"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 // rootDomain is a lazy cache.
@@ -197,4 +201,72 @@ func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKey
 	}
 
 	return chains, nil
+}
+
+// DecodePKCS12file will return the chain and key contained in a PKCS12 file.
+func DecodePKCS12file(keystore []byte, passphrase string, c *v2.CouchbaseCluster) ([]byte, []byte, [][]byte, error) {
+	ok, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil, nil, nil, errors.NewStackTracedError(err)
+	}
+
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("%w: pkcs12 support requires server version 7.6.0", errors.NewStackTracedError(errors.ErrPKCS12NotSupported))
+	}
+
+	// Decode PKCS12 file and extract the cert and key.
+	pkey, cert, chain, err := pkcs12.DecodeChain(keystore, passphrase)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var chainBytes [][]byte
+
+	for _, item := range chain {
+		chainBytes = append(chainBytes, item.Raw)
+	}
+
+	// Convert the cert to pem format.
+	block := pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}
+
+	certPem := pem.EncodeToMemory(&block)
+
+	// Make the key PKCS8 (it already is but we don't know that). Then convert it to pem format.
+	pkcs8Pkey, err := x509.MarshalPKCS8PrivateKey(pkey)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	pkeyBlock := pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: pkcs8Pkey,
+	}
+
+	key := pem.EncodeToMemory(&pkeyBlock)
+
+	return certPem, key, chainBytes, nil
+}
+
+// ExtractPKCS12Info extracts the PKCS12 file and passphrase from the secret.
+func ExtractPKCS12Info(secret *v1.Secret) ([]byte, string, bool, error) {
+	keystore, pkcs12 := secret.Data[constants.PKCS12FileName]
+	if pkcs12 {
+		bytePassphrase, ok := secret.Data[constants.TLSPassword]
+		if !ok {
+			return nil, "", false, fmt.Errorf("%w: PKCS12 requires a passphrase", errors.ErrPKCS12NotSupported)
+		}
+
+		b64Passphrase := string(bytePassphrase)
+
+		if b64Passphrase == "" {
+			return nil, "", false, fmt.Errorf("%w: PKCS12 requires a passphrase", errors.ErrPKCS12NotSupported)
+		}
+
+		return keystore, b64Passphrase, true, nil
+	}
+
+	return nil, "", false, nil
 }

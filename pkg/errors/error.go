@@ -29,6 +29,9 @@ var (
 	// ErrPrivateKeyInvalid is raised when a private key is malformed or not supported.
 	ErrPrivateKeyInvalid = errors.New("private key invalid")
 
+	// ErrPKCS12NotSupported is raised when attempting to use PKCS#12 when it's not supported by the server version.
+	ErrPKCS12NotSupported = errors.New("pkcs12 not supported")
+
 	// ErrTLSInvalid is raised when a TLS error occurs e.g. client/server certs don't
 	// validate.
 	ErrTLSInvalid = errors.New("TLS invalid")

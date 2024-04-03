@@ -772,7 +772,7 @@ func (c *Cluster) initCouchbaseClient() error {
 			return err
 		}
 
-		serverCA, _, _, err := c.getVerifiedServerTLSData(rootCAs)
+		serverCA, _, _, _, err := c.getVerifiedServerTLSData(rootCAs)
 		if err != nil {
 			return err
 		}
