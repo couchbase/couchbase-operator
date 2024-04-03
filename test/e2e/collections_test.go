@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -867,6 +868,78 @@ func TestGSIWithCollections(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestUpdateCollection(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.0").CouchbaseBucket()
+
+	clusterSize := 1
+	scopeName := "pinky"
+	collectionName := "brain"
+
+	// Create a collection and collection group.
+	collection := e2eutil.NewCollection(collectionName).Generate()
+	collection.Spec.MaxTTL = e2espec.NewDurationS(100)
+
+	collection = e2eutil.MustCreateCollection(t, kubernetes, collection)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create that.
+	bucket := e2espec.DefaultMagmaBucket()
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	_ = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, time.Minute)
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.2.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		if collection.Annotations == nil {
+			collection.Annotations = make(map[string]string)
+		}
+
+		collection.Annotations["cao.couchbase.com/history"] = "true"
+
+		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
+
+		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+	}
+
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		collection.Spec.MaxTTL = e2espec.NewDurationS(1000)
+		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
+		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+	}
+
+	// Expect there to be a scopes & collections updated event.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

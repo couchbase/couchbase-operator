@@ -912,3 +912,44 @@ func MustVerifyDocCountInScope(t *testing.T, k8s *types.Cluster, cluster *couchb
 		Die(t, err)
 	}
 }
+
+func MustVerifyCollection(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, collection couchbasev2.CouchbaseCollection, timeout time.Duration) {
+	if err := verifyCollection(kubernetes, cluster, bucketName, collection, timeout); err != nil {
+		Die(t, err)
+	}
+}
+func verifyCollection(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, collection couchbasev2.CouchbaseCollection, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(kubernetes, cluster)
+		if err != nil {
+			return err
+		}
+
+		var scopes couchbaseutil.ScopeList
+
+		if err := couchbaseutil.ListScopes(bucketName, &scopes).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, scope := range scopes.Scopes {
+			for _, coll := range scope.Collections {
+				if coll.Name == collection.Name {
+					if hist, ok := collection.Annotations["cao.couchbase.com/history"]; ok {
+						if histEnabled, err := strconv.ParseBool(hist); err != nil {
+							return err
+						} else if histEnabled != *coll.History {
+							return fmt.Errorf("collection history does not match")
+						}
+					}
+
+					if collection.Spec.MaxTTL != nil && int(collection.Spec.MaxTTL.Seconds()) != *coll.MaxTTL {
+						return fmt.Errorf("collection maxTTL does not match, expected %v but found %v", int(collection.Spec.MaxTTL.Seconds()), *coll.MaxTTL)
+					}
+
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("could not find collection %s", collection.Name)
+	})
+}

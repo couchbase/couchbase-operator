@@ -1611,7 +1611,7 @@ type Scope struct {
 
 type Collection struct {
 	Name    string `json:"name" url:"name"`
-	MaxTTL  int    `json:"maxTTL" url:"maxTTL"`
+	MaxTTL  *int   `json:"maxTTL" url:"maxTTL,omitempty"`
 	History *bool  `json:"history" url:"history,omitempty"`
 }
 
@@ -1620,7 +1620,7 @@ type Collection struct {
 // Creating a separate struct for now.
 type CollectionPatchRequest struct {
 	History *bool `json:"history" url:"history,omitempty"`
-	MaxTTL  int   `json:"maxTTL" url:"maxTTL,omitempty"`
+	MaxTTL  *int  `json:"maxTTL" url:"maxTTL,omitempty"`
 }
 
 // HasScope determines whether the named scope exists in the list.

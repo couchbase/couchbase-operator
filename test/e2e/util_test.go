@@ -390,6 +390,7 @@ func registerTests() {
 		framework.NewTestDef(TestFTSWithScopesAndCollections).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestAnalyticsCreateDataSetWithCollections).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestGSIWithCollections).WithTags(TagSuiteP0, TagFeatureCollections),
+		framework.NewTestDef(TestUpdateCollection).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestBackupAndRestoreCollections).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreScopesAndCollections).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestBackupAndRestoreScope).WithTags(TagSuiteP0, TagFeatureCollections, TagFeatureBackup),

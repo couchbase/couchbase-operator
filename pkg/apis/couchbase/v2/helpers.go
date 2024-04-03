@@ -311,8 +311,10 @@ func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 		}
 	}
 
-	if classImage := server.Image; classImage != "" {
-		return classImage
+	if server != nil {
+		if classImage := server.Image; classImage != "" {
+			return classImage
+		}
 	}
 
 	return cs.Image

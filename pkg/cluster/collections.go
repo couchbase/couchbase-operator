@@ -327,22 +327,35 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 		return nil
 	}
 
-	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
-		return nil
-	}
-
 	existingCollection := current.GetScope(scope.CouchbaseName()).GetCollection(collection.CouchbaseName())
 
-	if !reflect.DeepEqual(existingCollection.History, collection.Spec.History) || existingCollection.MaxTTL != int(collection.Spec.MaxTTL.Seconds()) {
-		apiCollection := couchbaseutil.Collection{
-			Name:    collection.CouchbaseName(),
-			History: collection.Spec.History,
-			MaxTTL:  int(collection.Spec.MaxTTL.Seconds()),
-		}
+	requestedCollection := existingCollection
 
+	// If backend is not magma we can't modify history
+	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+		requestedCollection.History = nil
+		existingCollection.History = nil
+	} else {
+		requestedCollection.History = collection.Spec.History
+	}
+
+	canEditTTL, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return err
+	}
+
+	if canEditTTL && collection.Spec.MaxTTL != nil {
+		maxTTL := int(collection.Spec.MaxTTL.Seconds())
+		requestedCollection.MaxTTL = &maxTTL
+	} else if !canEditTTL {
+		requestedCollection.MaxTTL = nil
+		existingCollection.History = nil
+	}
+
+	if !reflect.DeepEqual(existingCollection, requestedCollection) {
 		log.Info("Patching collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
 
-		if err := couchbaseutil.PatchCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.PatchCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), requestedCollection).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 	}
@@ -403,7 +416,8 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 		}
 
 		if collection.Spec.MaxTTL != nil {
-			apiCollection.MaxTTL = int(collection.Spec.MaxTTL.Duration.Seconds())
+			maxTTL := int(collection.Spec.MaxTTL.Seconds())
+			apiCollection.MaxTTL = &maxTTL
 		}
 
 		cdcEnabled, err := c.IsAtLeastVersion("7.2.0")

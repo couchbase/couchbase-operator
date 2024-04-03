@@ -174,7 +174,7 @@ func ConvertCouchbaseCollectionToAPICollection(bucket *couchbaseutil.Bucket, sco
 		Spec: couchbasev2.CouchbaseCollectionSpec{
 			Name: couchbasev2.ScopeOrCollectionName(collection.Name),
 			CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
-				MaxTTL:  &metav1.Duration{Duration: time.Duration(collection.MaxTTL) * time.Second},
+				MaxTTL:  &metav1.Duration{Duration: time.Duration(*collection.MaxTTL) * time.Second},
 				History: collection.History,
 			},
 		},
