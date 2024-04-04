@@ -3157,11 +3157,6 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 		return nil
 	}
 
-	currentVersion, err := k8sutil.CouchbaseVersion(current.Spec.Image)
-	if err != nil {
-		return err
-	}
-
 	updatedVersion, err := k8sutil.CouchbaseVersion(updated.Spec.Image)
 	if err != nil {
 		return err
@@ -3171,36 +3166,12 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	// Condition is not set, therefore we are starting an upgrade.
 	if upgradeCondition == nil {
-		if currentVersion == "9.9.9" && current.Status.CurrentVersion != "" { // 9.9.9 means the SHA256 image digest map look up failed.
-			// since we aren't upgrading the status should be what is actually running.
-			currentVersion = current.Status.CurrentVersion
-		}
-
 		if updatedVersion == "9.9.9" {
 			// we have no idea what this is so we trust the user
 			return nil
 		}
 
-		src, err := couchbaseutil.NewVersion(currentVersion)
-		if err != nil {
-			return err
-		}
-
-		dst, err := couchbaseutil.NewVersion(updatedVersion)
-		if err != nil {
-			return err
-		}
-
-		if dst.Less(src) {
-			return fmt.Errorf("spec.Version in body should be greater than %s", src.Semver())
-		}
-
-		if dst.Major() > src.Major()+1 {
-			max, _ := couchbaseutil.NewVersion(fmt.Sprintf("%d.0.0", src.Major()+2))
-			return fmt.Errorf("spec.Version in body should be less than %s", max.Semver())
-		}
-
-		return nil
+		return checkClusterVersionUpgradePath(current, updated)
 	}
 
 	// Modification during upgrade, only allow rollback.
@@ -3323,15 +3294,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		}
 	}
 
-	//nolint:revive
-	if err := CheckClusterVersionUpgradePath(prev, curr); err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func CheckClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) error {
+func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) error {
 	oldImage, err := prev.Spec.LowestInUseCouchbaseVersionImage()
 	if err != nil {
 		return err
@@ -3345,6 +3311,11 @@ func CheckClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 	oldVersion, err := k8sutil.CouchbaseVersion(oldImage)
 	if err != nil {
 		return err
+	}
+
+	if oldVersion == "9.9.9" && prev.Status.CurrentVersion != "" {
+		// since we aren't upgrading the status should be what is actually running.
+		oldVersion = prev.Status.CurrentVersion
 	}
 
 	newVersion, err := couchbaseutil.CouchbaseImageVersion(newImage)
