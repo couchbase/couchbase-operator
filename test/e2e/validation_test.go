@@ -2828,12 +2828,18 @@ func TestValidationApply(t *testing.T) {
 		{
 			name: "TestValidateDefault",
 		},
+		// Check Collection mutability.
+		{
+			name:       "TestValidateCollectionTTLMutable",
+			mutations:  patchMap{"collection0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
+			shouldFail: false,
+		},
 	}
 
 	// Cases to verify supported time units for Spec.LogRetentionTime
 	for _, timeUnit := range supportedTimeUnits {
 		testDefCase := testDef{
-			name:      "TestValidateApplyLogRestentionTime_" + timeUnit,
+			name:      "TestValidateApplyLogRetentionTime_" + timeUnit,
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/logging/logRetentionTime", "100"+timeUnit)},
 		}
 		testDefs = append(testDefs, testDefCase)
@@ -2874,13 +2880,6 @@ func TestNegValidationApply(t *testing.T) {
 			mutations:      patchMap{"restore0": jsonpatch.NewPatchSet().Add("/spec/start/str", "oldest")},
 			shouldFail:     true,
 			expectedErrors: []string{`specify just one value, either Str or Int`},
-		},
-		// Check Collection immutability.
-		{
-			name:           "TestValidateCollectionTTLImmutable",
-			mutations:      patchMap{"collection0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.maxTTL"},
 		},
 		{
 			name:           "TestValidateCollectionGroupTTLImmutable",
