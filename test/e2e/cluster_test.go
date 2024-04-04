@@ -1164,6 +1164,7 @@ func TestMovePod(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
