@@ -43,7 +43,7 @@ func rootCAsFromCA(ca *CertificateAuthority) [][]byte {
 
 // mustVerify checks that the PKI is valid for the given cluster.
 func mustVerify(t *testing.T, rootCAs [][]byte, chain, key []byte, extKeyUsage x509.ExtKeyUsage, zone string) {
-	if _, err := Verify(rootCAs, chain, key, extKeyUsage, []string{zone}, true); err != nil {
+	if _, err := Verify(rootCAs, chain, key, extKeyUsage, []string{zone}, true, true); err != nil {
 		t.Log(err)
 		t.FailNow()
 	}
@@ -51,7 +51,7 @@ func mustVerify(t *testing.T, rootCAs [][]byte, chain, key []byte, extKeyUsage x
 
 // mustNotVerify checks that the PKI is invalid for the given cluster.
 func mustNotVerify(t *testing.T, rootCAs [][]byte, chain, key []byte, extKeyUsage x509.ExtKeyUsage, zone string) {
-	if _, err := Verify(rootCAs, chain, key, extKeyUsage, []string{zone}, true); err == nil {
+	if _, err := Verify(rootCAs, chain, key, extKeyUsage, []string{zone}, true, true); err == nil {
 		t.Fatal("verification succeeded unexpectedly")
 	}
 }

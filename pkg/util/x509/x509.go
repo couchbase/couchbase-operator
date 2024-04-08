@@ -105,7 +105,7 @@ func DecodePEM(data []byte) (blocks []*pem.Block) {
 }
 
 // Verify checks the given chain and CA are valid to be installed.
-func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string, legacy bool) ([][]*x509.Certificate, error) {
+func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKeyUsage, subjectAltNames []string, legacy bool, validateSan bool) ([][]*x509.Certificate, error) {
 	roots := x509.NewCertPool()
 
 	for _, caData := range rootCAs {
@@ -165,15 +165,17 @@ func Verify(rootCAs [][]byte, chainData, keyData []byte, extKeyUsage x509.ExtKey
 	}
 
 	// Verify the certificate validates for each supplied zone (valid for server only)
-	for _, san := range subjectAltNames {
-		hostname := san
-		if san[0] == '*' {
-			hostname = fmt.Sprintf("host%s", san[1:])
-		}
+	if validateSan {
+		for _, san := range subjectAltNames {
+			hostname := san
+			if san[0] == '*' {
+				hostname = fmt.Sprintf("host%s", san[1:])
+			}
 
-		verifyOptions.DNSName = hostname
-		if _, err := cert.Verify(verifyOptions); err != nil {
-			return nil, fmt.Errorf("certificate cannot be verified for zone: %w", errors.NewStackTracedError(err))
+			verifyOptions.DNSName = hostname
+			if _, err := cert.Verify(verifyOptions); err != nil {
+				return nil, fmt.Errorf("certificate cannot be verified for zone: %w", errors.NewStackTracedError(err))
+			}
 		}
 	}
 
