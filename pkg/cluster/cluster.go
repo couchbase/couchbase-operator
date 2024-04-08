@@ -996,6 +996,14 @@ func (c *Cluster) logStatus(status *MemberState) {
 
 // hibernate puts the cluster to sleep, zzzz.
 func (c *Cluster) hibernate() error {
+	// Don't hibernate if the cluster is rebalancing otherwise things go bad
+	if isRebalancing, err := c.isClusterRebalancing(); err != nil {
+		return err
+	} else if isRebalancing {
+		log.Info("[WARN] The cluster is currently rebalancing, waiting for rebalance to complete before hibernating cluster")
+		return nil
+	}
+
 	for _, pod := range c.getClusterPods() {
 		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
 
@@ -1015,4 +1023,19 @@ func (c *Cluster) hibernate() error {
 	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
 	return nil
+}
+
+func (c *Cluster) isClusterRebalancing() (bool, error) {
+	rebalanceProgress := couchbaseutil.RebalanceProgress{}
+
+	if err := couchbaseutil.GetRebalanceProgress(&rebalanceProgress).On(c.api, c.readyMembers()); err != nil {
+		return true, err
+	}
+
+	switch rebalanceProgress.Status {
+	case couchbaseutil.RebalanceStatusNone, couchbaseutil.RebalanceStatusNotRunning:
+		return false, nil
+	}
+
+	return true, nil
 }

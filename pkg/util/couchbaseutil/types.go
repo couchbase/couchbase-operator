@@ -1825,3 +1825,7 @@ type XdcrConnectionCheckResponse struct {
 type DataServiceSettings struct {
 	MinReplicasCount int `url:"minReplicasCount" json:"minReplicasCount"`
 }
+
+type RebalanceProgress struct {
+	Status RebalanceStatus `json:"status"`
+}

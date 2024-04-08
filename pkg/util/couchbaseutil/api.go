@@ -354,6 +354,11 @@ func StopRebalance() *Request {
 	return NewRequest((*Client).Post, "/controller/stopRebalance", []byte(data.Encode()), nil)
 }
 
+// GetRebalanceProgress gets the progress of any rebalances in the cluster.
+func GetRebalanceProgress(progress *RebalanceProgress) *Request {
+	return NewRequest((*Client).Get, "/pools/default/rebalanceProgress", nil, progress)
+}
+
 // CreateBucket creates a new bucket.
 func CreateBucket(bucket *Bucket) *Request {
 	params := bucket.FormEncode(false)
