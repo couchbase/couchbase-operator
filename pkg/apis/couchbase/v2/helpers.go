@@ -612,7 +612,8 @@ func (c *CouchbaseCluster) IsAuditGarbageCollectionSidecarEnabled() bool {
 
 func (c *CouchbaseCluster) IsNativeAuditCleanupEnabled() bool {
 	return c.IsAuditLoggingEnabled() && c.Spec.Logging.Audit.Rotation != nil &&
-		c.Spec.Logging.Audit.Rotation.PruneAge != nil
+		c.Spec.Logging.Audit.Rotation.PruneAge != nil &&
+		int(c.Spec.Logging.Audit.Rotation.PruneAge.Duration.Seconds()) > 0
 }
 
 // IsIndexerEnabled tells us whether any server class is running the index service.

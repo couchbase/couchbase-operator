@@ -1,6 +1,11 @@
 package v2
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 const (
 	LowVersionImage      = "couchbase/server:6.5.0"
@@ -217,5 +222,30 @@ func TestHighestInUseCouchbaseVersionImageLowCluster(t *testing.T) {
 		t.Error(err)
 	} else if highImage != HighVersionImage {
 		t.Errorf("expected image to be: %s, but got: %s", HighVersionImage, highImage)
+	}
+}
+
+func TestIsNativeAuditCleanupEnabled(t *testing.T) {
+	c := CouchbaseCluster{
+		Spec: ClusterSpec{
+			Logging: CouchbaseClusterLoggingSpec{
+				Audit: &CouchbaseClusterAuditLoggingSpec{
+					Enabled: true,
+					Rotation: &CouchbaseClusterLogRotationSpec{
+						PruneAge: &v1.Duration{Duration: 0 * time.Second},
+					},
+				},
+			},
+		},
+	}
+
+	if c.IsNativeAuditCleanupEnabled() {
+		t.Error("expected IsNativeAuditCleanupEnabled to return false, but returned true")
+	}
+
+	c.Spec.Logging.Audit.Rotation.PruneAge = &v1.Duration{Duration: 10 * time.Second}
+
+	if !c.IsNativeAuditCleanupEnabled() {
+		t.Error("expected IsNativeAuditCleanupEnabled to return true, but returned false")
 	}
 }
