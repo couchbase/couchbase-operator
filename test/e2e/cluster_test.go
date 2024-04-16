@@ -315,28 +315,34 @@ func TestQuerySettings(t *testing.T) {
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
+		nodeQuota := int32(600)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/nodeQuota", "600Mi"), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuota", int32(600)), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuota", &nodeQuota), time.Minute)
 		patchCycles++
 
+		useReplica := couchbaseutil.QueryUseReplicaOn
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/query/useReplica", true), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", couchbaseutil.QueryUseReplicaOn), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", &useReplica), time.Minute)
 		patchCycles++
 
+		useReplica = couchbaseutil.QueryUseReplicaUnset
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/useReplica", nil), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", couchbaseutil.QueryUseReplicaUnset), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", &useReplica), time.Minute)
 		patchCycles++
 
+		nodeQuotaVal := int32(11)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/nodeQuotaValPercent", 11), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuotaValPercent", int32(11)), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuotaValPercent", &nodeQuotaVal), time.Minute)
 		patchCycles++
 
+		numCPU := int32(1)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/numCpus", 1), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumCpus", int32(1)), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumCpus", &numCPU), time.Minute)
 		patchCycles++
 
+		compMaxPlanSize := int32(2883584)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedMaxPlanSize", "2883584"), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", int32(2883584)), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", &compMaxPlanSize), time.Minute)
 		patchCycles++
 	}
 

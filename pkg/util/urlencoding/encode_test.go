@@ -43,3 +43,23 @@ func TestEncodingBoolPointer(t *testing.T) {
 		t.Errorf("expected %s, but got %s", "a=0&c=false", string(byteB))
 	}
 }
+
+type String string
+
+type Foo struct {
+	a *String `url:"a,omitempty"`
+}
+
+func TestStringPointer(t *testing.T) {
+	s := String("fooey")
+	foo := Foo{a: &s}
+	byteF, err := Marshal(foo)
+
+	if err != nil {
+		t.Fatalf("Error marshalling args: %v", err)
+	}
+
+	if string(byteF) != "a=fooey" {
+		t.Errorf("expected %s, but got %s", "a=fooey", string(byteF))
+	}
+}

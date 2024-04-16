@@ -68,6 +68,8 @@ func encode(v reflect.Value) (string, error) {
 			return strconv.FormatBool(nv.Bool()), nil
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			return strconv.FormatInt(nv.Int(), 10), nil
+		case reflect.String:
+			return nv.String(), nil
 		}
 	}
 
