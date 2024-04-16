@@ -462,6 +462,19 @@ func (cs *ClusterSpec) ConfigHasDataService(name string) bool {
 	return false
 }
 
+// ConfigHasStatefulService returns whether server config specifies data or index service.
+func (cs *ClusterSpec) ConfigHasStatefulService(name string) bool {
+	if config := cs.GetServerConfigByName(name); config != nil {
+		for _, service := range config.Services {
+			if service == DataService || service == IndexService {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // Monitoring Image represents the image to use for metrics exporter for monitoring.
 // defaults to Spec.Image when provided then falls back to relatedImage env variable.
 func (cs *ClusterSpec) MetricsImage() string {
