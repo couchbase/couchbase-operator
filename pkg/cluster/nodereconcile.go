@@ -1118,12 +1118,17 @@ func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member
 		}
 	}
 
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
 	if !gracefulFailover {
 		log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
-		return false, nil
-	}
 
-	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+		if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+			return false, err
+		}
+
+		return true, nil
+	}
 
 	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
 		return false, err
