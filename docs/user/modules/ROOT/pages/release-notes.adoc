@@ -36,6 +36,23 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
+[#release-v263]
+== Release 2.6.3
+
+Couchbase Autonomous Operator 2.6.3 was released in April 2024.
+
+[#fixed-issues-v263]
+=== Fixed Issues
+
+[#table-fixed-issues-v263,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3430[K8S-3430^]
+a| *Summary:* Previously the Operator was not setting the correct recovery type for nodes without the Data Service.
+
+|===
+
 [#release-v262]
 == Release 2.6.2
 
