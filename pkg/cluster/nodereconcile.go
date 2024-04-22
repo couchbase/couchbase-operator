@@ -1205,8 +1205,12 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			return err
 		}
 
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil && canDeltaRecover {
-			return err
+		canDeltaRecover = canDeltaRecover && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
+
+		if canDeltaRecover {
+			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
 		}
 
 		if err := c.recreatePod(candidate); err != nil {
