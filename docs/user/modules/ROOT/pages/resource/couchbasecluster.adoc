@@ -113,7 +113,6 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-cluster-query-maxparallelism,maxParallelism>>: 1
       <<couchbaseclusters-spec-cluster-query-memoryquota,memoryQuota>>: 0
-      <<couchbaseclusters-spec-cluster-query-nodequota,nodeQuota>>: ""
       <<couchbaseclusters-spec-cluster-query-nodequotavalpercent,nodeQuotaValPercent>>: 67
       <<couchbaseclusters-spec-cluster-query-numactivetransactionrecords,numActiveTransactionRecords>>: 1024
       <<couchbaseclusters-spec-cluster-query-numcpus,numCpus>>: 0
@@ -1835,23 +1834,6 @@ It does not take into account any other memory that might be used to process a r
 such as the stack, the operators, or some intermediate values.
 Defaults to 0.
 
-=== couchbaseclusters.spec.cluster.query.nodeQuota
-
-==== Constraints
-
-*Type*: `string`
-
-*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
-
-==== Description
-
-NodeQuota sets a soft memory limit for every Query node in the cluster.
-The garbage
-collector tries to keep below this target.
-It is not a hard, absolute limit, and memory
-usage may exceed this value.
-This field is only supported on CB versions 7.6.0+.
-
 === couchbaseclusters.spec.cluster.query.nodeQuotaValPercent
 
 ==== Constraints
@@ -2068,15 +2050,15 @@ This field is only supported on CB versions 7.6.0+.
 
 ==== Description
 
-QueryServiceMemQuota is a dummy field.
-By default, Couchbase server provides no
-memory resource constraints for the query service, so this has no effect on Couchbase
-server.
-It is, however, used when the spec.autoResourceAllocation feature is enabled,
+QueryServiceMemQuota is used when the spec.autoResourceAllocation feature is enabled,
 and is used to define the amount of memory reserved by the query service for use with
 Kubernetes resource scheduling.
 More info:
-https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+In CB Server 7.6.0+ QueryServiceMemQuota also sets a soft memory limit for every Query node in the cluster.
+The garbage collector tries to keep below this target.
+It is not a hard, absolute limit, and memory
+usage may exceed this value.
 
 === couchbaseclusters.spec.cluster.searchServiceMemoryQuota
 

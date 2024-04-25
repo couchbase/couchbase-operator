@@ -1928,11 +1928,6 @@ func (in *CouchbaseClusterQuerySettings) DeepCopyInto(out *CouchbaseClusterQuery
 		*out = new(v1.Duration)
 		**out = **in
 	}
-	if in.NodeQuota != nil {
-		in, out := &in.NodeQuota, &out.NodeQuota
-		x := (*in).DeepCopy()
-		*out = &x
-	}
 	if in.UseReplica != nil {
 		in, out := &in.UseReplica, &out.UseReplica
 		*out = new(bool)

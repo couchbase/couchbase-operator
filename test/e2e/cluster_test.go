@@ -310,16 +310,12 @@ func TestQuerySettings(t *testing.T) {
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumActiveTransactionRecords", int32(512)), time.Minute)
 
 	patchCycles := 22
+	upgradeCycles := 0
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
-		nodeQuota := int32(600)
-		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/nodeQuota", "600Mi"), time.Minute)
-		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuota", &nodeQuota), time.Minute)
-		patchCycles++
-
 		useReplica := couchbaseutil.QueryUseReplicaOn
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/query/useReplica", true), time.Minute)
 		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/UseReplica", &useReplica), time.Minute)
@@ -344,6 +340,12 @@ func TestQuerySettings(t *testing.T) {
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedMaxPlanSize", "2883584"), time.Minute)
 		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", &compMaxPlanSize), time.Minute)
 		patchCycles++
+
+		// QueryServiceMemQuota is a special case and actually causes a upgrade so give it more time
+		nodeQuota := int32(700)
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/queryServiceMemoryQuota", "700Mi"), time.Minute)
+		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NodeQuota", &nodeQuota), 5*time.Minute)
+		upgradeCycles++
 	}
 
 	// Check that the user can see the cluster being edited.
@@ -351,6 +353,7 @@ func TestQuerySettings(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}}, // One optional one to make up for defaults
+		eventschema.Repeat{Times: upgradeCycles, Validator: rollingUpgradeSequence(clusterSize, clusterSize)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

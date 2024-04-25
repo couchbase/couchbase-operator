@@ -2881,12 +2881,13 @@ type ClusterConfig struct {
 	// +kubebuilder:validation:Type=string
 	IndexServiceMemQuota *resource.Quantity `json:"indexServiceMemoryQuota,omitempty"`
 
-	// QueryServiceMemQuota is a dummy field.  By default, Couchbase server provides no
-	// memory resource constraints for the query service, so this has no effect on Couchbase
-	// server.  It is, however, used when the spec.autoResourceAllocation feature is enabled,
+	// QueryServiceMemQuota is used when the spec.autoResourceAllocation feature is enabled,
 	// and is used to define the amount of memory reserved by the query service for use with
 	// Kubernetes resource scheduling. More info:
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// In CB Server 7.6.0+ QueryServiceMemQuota also sets a soft memory limit for every Query node in the cluster.
+	// The garbage collector tries to keep below this target. It is not a hard, absolute limit, and memory
+	// usage may exceed this value.
 	// +kubebuilder:validation:Type=string
 	QueryServiceMemQuota *resource.Quantity `json:"queryServiceMemoryQuota,omitempty"`
 
@@ -3188,13 +3189,6 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:default=1024
 	// +kubebuilder:validation:Minimum=1
 	NumActiveTransactionRecords int32 `json:"numActiveTransactionRecords"`
-
-	// NodeQuota sets a soft memory limit for every Query node in the cluster. The garbage
-	// collector tries to keep below this target. It is not a hard, absolute limit, and memory
-	// usage may exceed this value.
-	// This field is only supported on CB versions 7.6.0+.
-	// +kubebuilder:validation:Type=string
-	NodeQuota *resource.Quantity `json:"nodeQuota,omitempty"`
 
 	// UseReplica specifies whether a query can fetch data from a replica vBucket if active vBuckets
 	// are inaccessible. If set to true then read from replica is enabled for all queries, but can

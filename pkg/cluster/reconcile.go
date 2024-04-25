@@ -748,11 +748,12 @@ func (c *Cluster) reconcileQuerySettings() error {
 	if atleast76, err := c.IsAtLeastVersion("7.6.0"); err != nil {
 		return err
 	} else if atleast76 {
-		nodeQuoata := int32(0)
-		if apiSettings.NodeQuota != nil {
-			nodeQuoata = int32(k8sutil.Megabytes(apiSettings.NodeQuota))
+		nodeQuota := int32(0)
+
+		if c.cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
+			nodeQuota = int32(k8sutil.Megabytes(c.cluster.Spec.ClusterSettings.QueryServiceMemQuota))
 		}
-		requested.NodeQuota = &nodeQuoata
+		requested.NodeQuota = &nodeQuota
 
 		var useReplica couchbaseutil.QueryUseReplica
 		switch {
