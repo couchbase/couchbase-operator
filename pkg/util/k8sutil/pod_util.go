@@ -277,10 +277,8 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		p.pvcs = append(p.pvcs, required)
 		p.create = append(p.create, required)
 
-		d, err := diff.Diff(nil, required.Spec)
-		if err == nil {
-			p.diff += d
-		}
+		d := diff.PrettyDiff(nil, required.Spec)
+		p.diff += d
 
 		return nil
 	}
@@ -316,10 +314,8 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		updatedClaim.Annotations = required.Annotations
 		p.update = append(p.update, updatedClaim)
 
-		d, err := diff.Diff(existingSpec, required.Spec)
-		if err == nil {
-			p.diff += d
-		}
+		d := diff.PrettyDiff(existingSpec, required.Spec)
+		p.diff += d
 
 		return nil
 	}
