@@ -216,10 +216,10 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
 					return err
 				}
-
-				return c.state.Update(persistence.HostnameAAadded, "false")
 			}
 		}
+
+		return c.state.Update(persistence.HostnameAAadded, "false")
 	}
 
 	if ok && shouldAddHostAA == "true" {
@@ -237,10 +237,10 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 				if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
 					return err
 				}
-
-				return c.state.Update(persistence.HostnameAAadded, "true")
 			}
 		}
+
+		return c.state.Update(persistence.HostnameAAadded, "true")
 	}
 
 	return nil
