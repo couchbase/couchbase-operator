@@ -1337,7 +1337,14 @@ func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderTyp
 		e2eutil.Die(t, fmt.Errorf("Index `#primary` restored"))
 	}
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+	expectedDocs := numOfDocs
+
+	// 7.6 adds docs in the system scope
+	if atleast76, _ := cluster.IsAtLeastVersion("7.6.0"); atleast76 {
+		expectedDocs += 2
+	}
+
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), expectedDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
