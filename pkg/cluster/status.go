@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -146,17 +147,38 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 	status.Balanced = len(info.Nodes) == 1 || info.Balanced
 
 	// While upgrading to server version equal or above 7.1,
-	// there is an apparent anamoly in returning the cluster balanced status.
+	// there is an apparent anomaly in returning the cluster balanced status.
 	// See issue, https://issues.couchbase.com/browse/MB-45973 for more explanations.
-	// As a temp workaraound, when encountering "balalnced": false during upgrades,
+	// As a temp workaround, when encountering "balanced": false during upgrades,
 	// we tend to check "rebalanceStatus": "none" now.
 	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
-		verAbove71, err := c.IsAtLeastVersion("7.1.0")
-		if err != nil {
-			return nil, err
+		var nodeCurrentVersion string
+
+		var found bool
+
+		var verBelow72 bool
+
+		var err error
+
+		nodes := info.Nodes
+
+		for _, node := range nodes {
+			nodeCurrentVersion, _, found = strings.Cut(node.Version, "-")
+			if !found {
+				return nil, errors.ErrImageVersionUnretrievable
+			}
+
+			verBelow72, err = c.VersionBefore(nodeCurrentVersion, "7.2.0")
+			if err != nil {
+				return nil, err
+			}
+
+			if verBelow72 {
+				break
+			}
 		}
 
-		if verAbove71 {
+		if verBelow72 {
 			status.Balanced = status.Balanced || (!info.Balanced && info.RebalanceStatus == couchbaseutil.RebalanceStatusNone)
 		}
 	}

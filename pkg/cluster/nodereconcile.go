@@ -1155,6 +1155,29 @@ func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member
 	return true, err
 }
 
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member) error {
+	if err := c.recreatePod(candidate); err != nil {
+		return err
+	}
+
+	if err := c.waitForPodAdded(c.ctx, candidate); err != nil {
+		return err
+	}
+
+	// Rebalance failed. Time to set recovery type as full.
+	if err := c.rebalance(c.members, nil); err != nil {
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()))
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		return c.rebalance(c.members, nil)
+	}
+
+	return nil
+}
+
 func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	upgraded := len(c.members) - len(candidates)
 
@@ -1211,14 +1234,8 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
 				return err
 			}
-		}
 
-		if err := c.recreatePod(candidate); err != nil {
-			return err
-		}
-
-		if err := c.rebalance(c.members, nil); err != nil {
-			return err
+			return r.recreateAndRebalanceNode(c, candidate)
 		}
 	}
 

@@ -18,6 +18,22 @@ func VersionAfter(version, required string) (bool, error) {
 	return v1.GreaterEqual(v2), nil
 }
 
+// VersionBefore determines whether the configured version is less than
+// the required version.
+func VersionBefore(version, required string) (bool, error) {
+	v1, err := NewVersion(version)
+	if err != nil {
+		return false, err
+	}
+
+	v2, err := NewVersion(required)
+	if err != nil {
+		return false, err
+	}
+
+	return v1.Less(v2), nil
+}
+
 func (b *Bucket) CanBeMigrated(backend CouchbaseStorageBackend) (bool, string) {
 	if backend == CouchbaseStorageBackendMagma {
 		if b.BucketMemoryQuota < 1024 {

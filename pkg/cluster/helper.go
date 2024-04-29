@@ -14,6 +14,10 @@ func (c *Cluster) IsAtLeastVersion(v string) (bool, error) {
 	return c.cluster.IsAtLeastVersion(v)
 }
 
+func (c *Cluster) VersionBefore(v string, requiredVersion string) (bool, error) {
+	return couchbaseutil.VersionBefore(v, requiredVersion)
+}
+
 // checks all pods in a cluster are above a minimum version requirement.
 func (c *Cluster) RunningVersionIsAtLeast(v string) (bool, error) {
 	// we'll rely on spec version when cluster is not yet initialized.

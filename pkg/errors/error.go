@@ -73,6 +73,9 @@ var (
 
 	// ErrNoVolumeMounts is raised when a pod has no volume mounts specified.
 	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
+
+	// ErrNodeNotAdded is raised when a node hasn't been added to the cluster.
+	ErrNodeNotAdded = errors.New("node not added")
 )
 
 // Logging errors
@@ -103,6 +106,8 @@ var (
 	// ErrDeleteDelayPreventsReconcile is an error that is surfaced when a pod is scheduled
 	// for deletion but has not reached the expiration of its delay.
 	ErrDeleteDelayPreventsReconcile = errors.New("pod not removed due to delete delay")
+
+	ErrImageVersionUnretrievable = errors.New("error extracting image verion")
 )
 
 // CLI errors.
