@@ -25,7 +25,8 @@ Refer to the xref:2.4@operator::howto-operator-upgrade.adoc[Operator 2.4 upgrade
 === Upgrading from 2.2, 2.3, 2.4, or 2.5
 
 There are no additional upgrade steps when upgrading from these versions, and you may follow the xref:howto-operator-upgrade.adoc[standard upgrade process].
-However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from releases older than 2.5.0, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
+However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from a release older than 2.5.0, to versions 2.5.0, 2.5.1, or 2.6.0 through 2.6.3, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
+This behavior has changed in version 2.5.2 and 2.6.4, and there is no mandatory upgrade cycle - the missing port is added the next time there is a regular maintenance activity that involves Pod creation.
 
 [IMPORTANT]
 ====
@@ -35,6 +36,34 @@ For large, production databases, ensure an adequate maintenance window is schedu
 
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
+
+[#release-v264]
+== Release 2.6.4
+
+Couchbase Autonomous Operator 2.6.4 was released in June 2024.
+
+[#changes-in-behavior-v264]
+=== New Features and Behavioral Changes
+
+==== Pod Lifecycle
+
+The default value for the per-Pod `terminationGracePeriodSeconds` is 30 seconds see (https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination[Termination of Pods^]).
+From Operator 2.6.4, any new Pods will be created with `terminationGracePeriodSeconds` set to 1200 seconds (20 minutes), to allow time for Couchbase Server to quiesce all connections and cleanly shut down.
+
+[#fixed-issues-v264]
+=== Fixed Issues
+
+[#table-fixed-issues-v264,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3452[K8S-3452^]
+a| *Summary:* Previously the Operator was triggering a mandatory upgrade cycle when upgrading from 2.4.x or earlier.
+
+a| Various
+a| *Summary:* A number of further stability/reliability improvements around in-place upgrades (using Graceful Failover / Delta Recovery where applicable).
+
+|===
 
 [#release-v263]
 == Release 2.6.3
@@ -69,7 +98,7 @@ a| https://issues.couchbase.com/browse/K8S-3391[K8S-3391^]
 a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
 
 a| https://issues.couchbase.com/browse/K8S-3392[K8S-3392^]
-a| *Summary:* Previously the Operator was not using the correct failover mechanism for nodes without the Data Service.
+a| *Summary:* Previously the Operator was not using the correct failover mechanism for nodes without the Data or Index Service.
 
 |===
 
