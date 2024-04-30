@@ -1680,7 +1680,17 @@ func TestTLSEditSettings(t *testing.T) {
 	op1 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
 	defer op1.Cancel()
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/tlsMinimumVersion", couchbasev2.TLS10), time.Minute)
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	tlsUpdateVersion := couchbasev2.TLS10
+
+	if tls10Deprecated, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if tls10Deprecated {
+		tlsUpdateVersion = couchbasev2.TLS13
+	}
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/tlsMinimumVersion", tlsUpdateVersion), time.Minute)
 	e2eutil.MustReceiveErrorValue(t, op1)
 
 	op2 := e2eutil.WaitForPendingClusterEvent(kubernetes, cluster, k8sutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdated), time.Minute)
