@@ -2119,6 +2119,7 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 
 		volumeMount := v1.VolumeMount{
 			Name:      constants.CouchbaseTLSVolumeName,
+			ReadOnly:  true,
 			MountPath: couchbaseTLSVolumeMountDir,
 		}
 
@@ -2154,6 +2155,7 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 
 		caVolumeMount := v1.VolumeMount{
 			Name:      constants.CouchbaseTLSCAVolumeName,
+			ReadOnly:  true,
 			MountPath: couchbaseTLSCAVolumeMountDir,
 		}
 
