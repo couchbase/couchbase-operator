@@ -1,5 +1,10 @@
 package couchbaseutil
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // SupportedUpgradePath represents the valid upgrade path.
 // Each version is put into a group based on the versions in this array,
 // Versions are only valid if they are within the same group or to the next group.
@@ -23,7 +28,15 @@ func ValidUpgrade(old, new string) (bool, error) {
 		return false, err
 	}
 
-	return (newGroup == oldGroup || oldGroup+1 == newGroup), nil
+	withinTwoMajorVersions, err := VersionsWithinTwoMajorVersions(old, new)
+	if err != nil {
+		return false, err
+	}
+
+	test := withinTwoMajorVersions && (newGroup == oldGroup || oldGroup+1 == newGroup)
+	fmt.Println(test)
+
+	return withinTwoMajorVersions && (newGroup == oldGroup || oldGroup+1 == newGroup), nil
 }
 
 func GetUpgradeUpperbound(version string) (string, error) {
@@ -35,7 +48,20 @@ func GetUpgradeUpperbound(version string) (string, error) {
 	upperBoundGroup := upgradeGroup + 2
 
 	if upperBoundGroup >= len(SupportedUpgradePath) {
-		return "", nil
+		v, err := NewVersion(version)
+		if err != nil {
+			return "", err
+		}
+
+		v.semver[0]++
+
+		var upperVersion string
+
+		for _, item := range v.semver {
+			upperVersion += strconv.Itoa(item) + "."
+		}
+
+		return upperVersion, nil
 	}
 
 	return SupportedUpgradePath[upperBoundGroup], nil

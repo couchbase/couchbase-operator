@@ -21,6 +21,26 @@ func VersionAfter(version, required string) (bool, error) {
 	return v1.GreaterEqual(v2), nil
 }
 
+func VersionsWithinTwoMajorVersions(oldVersion string, newVersion string) (bool, error) {
+	old, err := NewVersion(oldVersion)
+	if err != nil {
+		return false, err
+	}
+
+	newV, err := NewVersion(newVersion)
+	if err != nil {
+		return false, err
+	}
+
+	gap := newV.semver[0] - old.semver[0]
+
+	if gap >= 2 {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (b *Bucket) CanBeMigrated(backend CouchbaseStorageBackend) (bool, string) {
 	if backend == CouchbaseStorageBackendMagma {
 		if b.BucketMemoryQuota < 1024 {
