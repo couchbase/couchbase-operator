@@ -104,7 +104,7 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.25 - 1.28
+| 1.25 - 1.29
 
 | Red Hat OpenShift Container Platform
 | 4.11 - 4.14
