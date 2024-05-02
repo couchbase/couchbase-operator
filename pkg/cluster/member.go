@@ -451,11 +451,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 		return err
 	}
 
-	// we're going to ignore AutoFailoverServerGroup for server 7.1 as it is no longer part of the couchbase api.
-	failoverServerGroup := false
-	if over71, err := c.IsAtLeastVersion("7.1.0"); !over71 && err == nil {
-		failoverServerGroup = settings.AutoFailoverServerGroup
-	}
+	failoverServerGroup := settings.AutoFailoverServerGroup
 
 	// Enable autofailover by default.
 	autoFailoverSettings := &couchbaseutil.AutoFailoverSettings{
@@ -466,7 +462,12 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 			Enabled:    settings.AutoFailoverOnDataDiskIssues,
 			TimePeriod: k8sutil.Seconds(settings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
-		FailoverServerGroup: failoverServerGroup,
+		FailoverServerGroup: &failoverServerGroup,
+	}
+
+	// we're going to ignore AutoFailoverServerGroup for server 7.1 as it is no longer part of the couchbase api.
+	if over71, err := c.IsAtLeastVersion("7.1.0"); over71 && err == nil {
+		autoFailoverSettings.FailoverServerGroup = nil
 	}
 
 	// This needs a retry, setting the username and password causes server to

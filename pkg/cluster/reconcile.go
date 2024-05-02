@@ -407,10 +407,8 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		return err
 	}
 
-	failoverServerGroup := false
-	if over71, err := c.IsAtLeastVersion("7.1.0"); !over71 && err == nil {
-		failoverServerGroup = c.cluster.Spec.ClusterSettings.AutoFailoverServerGroup
-	}
+	failoverServerGroup := c.cluster.Spec.ClusterSettings.AutoFailoverServerGroup
+
 	// Marshal the CR spec into the same type as the existing failover settings
 	clusterSettings := c.cluster.Spec.ClusterSettings
 	specFailoverSettings := &couchbaseutil.AutoFailoverSettings{
@@ -421,7 +419,11 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 			Enabled:    clusterSettings.AutoFailoverOnDataDiskIssues,
 			TimePeriod: k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod),
 		},
-		FailoverServerGroup: failoverServerGroup,
+		FailoverServerGroup: &failoverServerGroup,
+	}
+
+	if over71, err := c.IsAtLeastVersion("7.1.0"); over71 && err == nil {
+		specFailoverSettings.FailoverServerGroup = nil
 	}
 
 	// Mask out any existing read only values, e.g. set it to the default value
