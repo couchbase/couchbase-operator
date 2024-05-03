@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -539,6 +540,10 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 	if cluster.Generation < c.generation {
 		log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
 		return
+	}
+
+	if err := annotations.Populate(&cluster.Spec, cluster.Annotations); err != nil {
+		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
 	}
 
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {

@@ -944,6 +944,10 @@ func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns
 
 	sourceCluster, targetCluster, bucket := createXDCRClusters(t, kubernetes1, kubernetes2, dns, tls, policy, clusterSize)
 
+	sourceCluster = e2eutil.MustPatchCluster(t, kubernetes1, sourceCluster, jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+		"cao.couchbase.com/xdcr.disablePrechecks": "true",
+	}), time.Minute)
+
 	numOfDocs := framework.Global.DocsCount
 
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)

@@ -2256,7 +2256,7 @@ type ClusterSpec struct {
 
 	// XDCR defines whether the Operator should manage XDCR, remote clusters and how
 	// to lookup replication resources.
-	XDCR XDCR `json:"xdcr,omitempty"`
+	XDCR XDCR `json:"xdcr,omitempty" annotation:"xdcr"`
 
 	// DEPRECATED - By Couchbase Server metrics endpoint on version 7.0+
 	// Monitoring defines any Operator managed integration into 3rd party monitoring
@@ -3427,6 +3427,11 @@ type XDCR struct {
 	// +listType=map
 	// +listMapKey=name
 	RemoteClusters []RemoteCluster `json:"remoteClusters,omitempty"`
+
+	// EnablePrechecks sets if the Operator will perform XDCR prechecks.
+	// Defaults to false
+	// +kubebuilder:default=false
+	DisablePrechecks bool `json:"-" annotation:"disablePrechecks"`
 }
 
 type Buckets struct {

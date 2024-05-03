@@ -719,7 +719,7 @@ func (c *Cluster) updateCreateXDCRReplications(requestedReplications, currentRep
 
 // checkXDCRTask checks the XDCR connections.
 func (c *Cluster) checkXDCRTask(cluster *couchbaseutil.RemoteCluster, atLeast721 bool) error {
-	if !atLeast721 {
+	if !atLeast721 || c.cluster.Spec.XDCR.DisablePrechecks {
 		return nil
 	}
 
