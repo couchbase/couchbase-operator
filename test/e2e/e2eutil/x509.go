@@ -889,11 +889,11 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 	ctx.ServerKey = clusterKey
 	ctx.ServerCert = clusterCert
 
-	if opts.PKCS12 {
-		if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
-			return
-		}
+	if ctx.ServerCertificate, err = ParseCertificate(clusterCert); err != nil {
+		return
+	}
 
+	if opts.PKCS12 {
 		caCert := []*x509.Certificate{ctx.CA.certificate}
 
 		pfxData, encoderErr := pkcs12.Legacy.Encode(pkey, ctx.ServerCertificate, caCert, opts.PKCS12Passphrase)
