@@ -87,11 +87,12 @@ module "cluster" {
   eks_managed_node_groups = {
     default_node_group = {
       name                   = "cao-25x-pipeline"
-      instance_types         = ["m5.xlarge"]
-      min_size               = 11
-      desired_size           = 12
-      max_size               = 13
+      instance_types         = ["m5.4xlarge"]
+      min_size               = 12
+      desired_size           = 13
+      max_size               = 14
       vpc_security_group_ids = [aws_security_group.securitygroup.id]
+      disk_size = 250
     }
   }
 }

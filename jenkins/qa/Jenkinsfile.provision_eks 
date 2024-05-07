@@ -153,12 +153,13 @@ pipeline {
         script {
           try {
             sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create operator \
-            --kubeconfig ${env.WORKSPACE}/config"
+            --kubeconfig ${env.WORKSPACE}/config1"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
+            echo "failed to load operator"
           }
-          echo "failed to load operator"
+
         }
       }
     }
@@ -167,35 +168,37 @@ pipeline {
         script {
           try {
             sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create admission \
-            --kubeconfig ${env.WORKSPACE}/config"
+            --kubeconfig ${env.WORKSPACE}/config1"
           }
           catch (e) {
             currentBuild.result = 'UNSTABLE'
+            echo "failed to load admission controller"
           }
-          echo "failed to load admission controller"
+
         }
       }
     }
-  }
-  post{
-    always{
+    /*
+   stage('destroy operator') {
       when {
-            expression
-            {
-              destroy_setup
-            }
+        expression {
+          destroy_setup
         }
-      script {
-        tfdir = "./test/e2e/resources/provisioners/eks"
-        if (params.machine == "arm") {
-          tfdir = "./test/e2e/resources/provisioners/arm"
-        }
-        dir(tfdir) {
-          sh "${env.WORKSPACE}/bin/terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
-          sh 'docker system prune --force' // Clean up docker - optimise disk usage
-          cleanWs()
+      }
+      steps {
+        script {
+          tfdir = "./test/e2e/resources/provisioners/eks"
+          if (params.machine == "arm") {
+            tfdir = "./test/e2e/resources/provisioners/arm"
+          }
+          dir(tfdir) {
+            sh "${env.WORKSPACE}/bin/terraform destroy -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+            sh 'docker system prune --force' // Clean up docker - optimise disk usage
+            cleanWs()
+          }
         }
       }
     }
+    */
   }
 }
