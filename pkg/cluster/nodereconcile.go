@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	goerrors "errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
 var ErrNoRunningTasks = fmt.Errorf("no running tasks found")
 var ErrStatusRunning = fmt.Errorf("task is currently running")
+var ErrOrchestratorNotUpgraded = fmt.Errorf("orchestrator not upgraded yet")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -1155,7 +1157,34 @@ func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member
 	return true, err
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member) error {
+func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVersion string) error {
+	callback := func() error {
+		clusterInfo := &couchbaseutil.TerseClusterInfo{}
+		if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		orchestratorName := clusterInfo.Orchestrator
+
+		var orchestratorMember couchbaseutil.Member
+
+		for name, member := range c.members {
+			if name == orchestratorName {
+				orchestratorMember = member
+			}
+		}
+
+		if orchestratorMember.Version() == targetVersion {
+			return nil
+		}
+
+		return ErrOrchestratorNotUpgraded
+	}
+
+	return retryutil.RetryFor(1*time.Minute, callback)
+}
+
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string) error {
 	if err := c.recreatePod(candidate); err != nil {
 		return err
 	}
@@ -1170,6 +1199,12 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err
+		}
+
+		if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
+			if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
+				return err
+			}
 		}
 
 		return c.rebalance(c.members, nil)
@@ -1235,7 +1270,7 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 				return err
 			}
 
-			return r.recreateAndRebalanceNode(c, candidate)
+			return r.recreateAndRebalanceNode(c, candidate, targetVersion)
 		}
 	}
 
