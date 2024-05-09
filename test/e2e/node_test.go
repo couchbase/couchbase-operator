@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -742,4 +744,44 @@ func TestAutoRecoveryEphemeralWithNoAutofailover(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestGracefulShutdown(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
+	clusterSize := constants.Size1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	victimID := 0
+	victimeName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
+
+	output := &e2eutil.ExecOutput{}
+
+	asyncOp := e2eutil.MustStartExecCommandOnPod(t, kubernetes, victimeName, "tail -f /opt/couchbase/var/lib/couchbase/logs/memcached.log.000000.txt", output, 5*time.Minute)
+	defer asyncOp.Cancel()
+
+	// Give the exec some time to start
+	time.Sleep(15 * time.Second)
+
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimID, false)
+
+	if err := asyncOp.WaitForCompletion(); err != nil && !strings.Contains(err.Error(), "terminated with exit code 137") {
+		e2eutil.Die(t, err)
+	}
+
+	if !strings.Contains(output.Stdout, "Gracefully shutting down") {
+		fmt.Println("stderr:")
+		fmt.Print(output.Stderr)
+		fmt.Println("stdout:")
+		fmt.Print(output.Stdout)
+		e2eutil.Die(t, fmt.Errorf("stdout does not contain 'Gracefully shutting down'"))
+	}
 }

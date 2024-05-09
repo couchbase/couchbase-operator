@@ -49,6 +49,10 @@ type ExecOptions struct {
 	CaptureStderr bool
 	// If false, whitespace in std{err,out} will be removed.
 	PreserveWhitespace bool
+	// If nil then context.TODO() will be used.
+	Context context.Context
+	// AlwaysReturnOutput will return output even if there is an error.
+	AlwaysReturnOutput bool
 }
 
 // ExecWithOptions executes a command in the specified container,
@@ -78,7 +82,11 @@ func ExecWithOptions(k8s *types.Cluster, options ExecOptions) (string, string, e
 
 	ctx := context.TODO()
 
-	if err := exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdin: options.Stdin, Stdout: &stdout, Stderr: &stderr}); err != nil {
+	if options.Context != nil {
+		ctx = options.Context
+	}
+
+	if err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{Stdin: options.Stdin, Stdout: &stdout, Stderr: &stderr}); err != nil && !options.AlwaysReturnOutput {
 		return "", "", err
 	}
 
@@ -102,6 +110,25 @@ func ExecCommandInContainerWithFullOutput(k8s *types.Cluster, podName, container
 		CaptureStdout:      true,
 		CaptureStderr:      true,
 		PreserveWhitespace: false,
+	})
+}
+
+// ExecCommandInContainerWithFullOutputAndContext executes a command in the
+// specified container with a context and return stdout, stderr and error.
+func ExecCommandInContainerWithFullOutputAndContext(ctx context.Context, k8s *types.Cluster, podName, containerName string, cmd ...string) (string, string, error) {
+	return ExecWithOptions(k8s, ExecOptions{
+		Command:       cmd,
+		Namespace:     k8s.Namespace,
+		PodName:       podName,
+		ContainerName: containerName,
+
+		Stdin:              nil,
+		CaptureStdout:      true,
+		CaptureStderr:      true,
+		PreserveWhitespace: false,
+
+		Context:            ctx,
+		AlwaysReturnOutput: true,
 	})
 }
 
