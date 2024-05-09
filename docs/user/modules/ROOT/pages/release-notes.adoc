@@ -25,7 +25,8 @@ Refer to the xref:2.4@operator::howto-operator-upgrade.adoc[Operator 2.4 upgrade
 === Upgrading from 2.2, 2.3, and 2.4
 
 There are no additional upgrade steps when upgrading from these versions, and you may follow the xref:howto-operator-upgrade.adoc[standard upgrade process].
-However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading to this release, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
+However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from a release older than 2.5.0, to versions 2.5.0 or 2.5.1, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
+This behavior has changed in version 2.5.2 and there is no mandatory upgrade cycle - the missing port is added the next time there is a regular maintenance activity that involves Pod creation.
 
 [IMPORTANT]
 ====
@@ -35,6 +36,29 @@ For large, production databases, ensure an adequate maintenance window is schedu
 
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
+
+[#release-v252]
+== Release 2.5.2
+
+Couchbase Autonomous Operator 2.5.2 was released in May 2024.
+
+[#fixed-issues-v252]
+=== Fixed Issues
+
+[#table-fixed-issues-v252,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3412[K8S-3412^]
+a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
+
+a| https://issues.couchbase.com/browse/K8S-3452[K8S-3452^]
+a| *Summary:* Previously the Operator was triggering a mandatory upgrade cycle when upgrading from 2.4.x or earlier.
+
+a| https://issues.couchbase.com/browse/K8S-3456[K8S-3456^]
+a| *Summary:* Previously the Operator was failing to rotate Encrypted Private Keys with Couchbase Server 7.2.4 and later.
+
+|===
 
 [#release-v251]
 == Release 2.5.1
