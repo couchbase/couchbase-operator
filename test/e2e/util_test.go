@@ -163,6 +163,7 @@ func registerTests() {
 		framework.NewTestDef(TestDeltaRecovery).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDeltaRecoveryWithoutDataService).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestResilientDeltaRecovery).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestDeltaRecoveryWithVariousServices).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestEditServiceConfig).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestCreateClusterDataServiceNotFirst).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestRemoveLastDataService).WithTags(TagSuiteP0),

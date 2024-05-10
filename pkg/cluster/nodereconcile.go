@@ -1290,7 +1290,19 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string) error {
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+	if canDeltaRecover {
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+	}
+
 	if err := c.recreatePod(candidate); err != nil {
 		return err
 	}
@@ -1371,17 +1383,7 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 
 		canDeltaRecover = canDeltaRecover && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if canDeltaRecover {
-			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
-				return err
-			}
-
-			return r.recreateAndRebalanceNode(c, candidate, targetVersion)
-		}
-
-		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
-
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canDeltaRecover); err != nil {
 			return err
 		}
 	}
