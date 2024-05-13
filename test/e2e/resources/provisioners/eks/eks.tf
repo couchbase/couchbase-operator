@@ -27,7 +27,7 @@ module "vpc" {
   name           = "${var.name}-vpc"
   cidr           = "10.0.0.0/16"
   azs            = ["us-east-2a", "us-east-2b", "us-east-2c"]
-  public_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets = ["10.0.4.0/22", "10.0.8.0/22", "10.0.12.0/22"]
 
   default_security_group_egress = [
     {
@@ -92,7 +92,7 @@ module "cluster" {
       desired_size           = 13
       max_size               = 14
       vpc_security_group_ids = [aws_security_group.securitygroup.id]
-      disk_size = 250
+      disk_size = 1000
     }
   }
 }

@@ -109,6 +109,7 @@ pipeline {
             sh "${env.WORKSPACE}/bin/terraform init -no-color -input=false"
             sh "${env.WORKSPACE}/bin/terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
             sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
+            sh ""
           }
         }
       }
@@ -120,6 +121,15 @@ pipeline {
           currentBuild.description = "refspec:${params.refspec}, operator_version:${params.operator_image}, server_version:${params.server_image}, upgrade_version:${params.server_image_upgrade}, kubernetes_version:${params.kubernetes_version}"
         }
         sh 'make touch-generated tools'
+
+        echo "Printing"
+
+        sh "python ./jenkins/qa/jenkins/print.py ${env.GHCR_CREDENTIALS_USR} ${env.GHCR_CREDENTIALS_PSW}"
+
+        sh 'kubectl create secret docker-registry registry-credential --docker-server=https://ghcr.io/ \
+        --docker-username=${env.GHCR_CREDENTIALS_USR} --docker-password=${env.GHCR_CREDENTIALS_PSW}'
+
+
       }
     }
 
@@ -148,11 +158,14 @@ pipeline {
         }
       }
     }
+
     stage('Setup operator') {
       steps {
         script {
           try {
             sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create operator \
+            --image ${params.operator_image} \
+            --image-pull-secret docker-registry \
             --kubeconfig ${env.WORKSPACE}/config1"
           }
           catch (e) {
@@ -168,6 +181,8 @@ pipeline {
         script {
           try {
             sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create admission \
+            --image ${params.admission_image} \
+            --image-pull-secret docker-registry \
             --kubeconfig ${env.WORKSPACE}/config1"
           }
           catch (e) {
