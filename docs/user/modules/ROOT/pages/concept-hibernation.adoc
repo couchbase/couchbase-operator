@@ -50,3 +50,6 @@ This will allow the Operator to force failover of the affected pods, and then re
 The Operator updates the cluster conditions during the life cycle of a hibernation.
 This allows 3rd party observers to know when a cluster has hibernated fully.
 When completely hibernated all I/O to persistent volumes will have terminated and be in a stable state.
+
+WARNING: Currently, you must make sure that no rebalance is taking place before hibernating the cluster. This can be done
+by querying the couchbase server API to https://docs.couchbase.com/server/current/rest-api/rest-get-cluster-tasks.html#no-tasks-underway[ensure there are no running tasks.]
