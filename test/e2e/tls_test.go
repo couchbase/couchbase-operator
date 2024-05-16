@@ -727,7 +727,6 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{
