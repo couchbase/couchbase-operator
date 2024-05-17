@@ -589,7 +589,7 @@ func registerTests() {
 		framework.NewTestDef(TestPodDeletedAfterExpectedDelay).WithTags(TagSuiteP1, TagSuiteSystem, TagFeatureDeleteDelay),
 		framework.NewTestDef(TestAnalyticsKillPods).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestAnalyticsKillPodsWithPVC).WithTags(TagSuiteP1),
-		framework.NewTestDef(TestCouchstoreBucketToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestMagmaBucketToCouchstoreMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
@@ -688,6 +688,9 @@ func registerTests() {
 		framework.NewTestDef(TestLocalVolumeMountReuse).WithTags(TagFeatureLPV),
 		framework.NewTestDef(TestMixedVolumeMountReuse).WithTags(TagFeatureLPV),
 		framework.NewTestDef(TestLocalVolumeAutoFailover).WithTags(TagFeatureLPV),
+
+		// Graceful Failover test
+		framework.NewTestDef(TestGracefulShutdown).WithTags(TagSuiteP1),
 	}
 }
 

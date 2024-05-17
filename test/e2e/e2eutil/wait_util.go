@@ -1294,3 +1294,40 @@ func MustWaitForPodVolumeSize(t *testing.T, k8s *types.Cluster, memberName strin
 		Die(t, err)
 	}
 }
+
+type ExecOutput struct {
+	Stdout string
+	Stderr string
+}
+
+func MustStartExecCommandOnPod(t *testing.T, k8s *types.Cluster, podName string, cmd string, output *ExecOutput, timeout time.Duration) *AsyncOperation {
+	op, err := StartExecCommandOnPod(k8s, podName, cmd, output, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return op
+}
+
+// StartExecCommandOnPod returns a channel to be
+// populated with result of a pending cluster event.
+func StartExecCommandOnPod(k8s *types.Cluster, podName string, cmd string, output *ExecOutput, timeout time.Duration) (*AsyncOperation, error) {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	f := func(ctx context.Context, ready chan struct{}) error {
+		close(ready)
+
+		output.Stdout, output.Stderr, err = ExecCommandInContainerWithFullOutputAndContext(ctx, k8s, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+
+		return err
+	}
+
+	op := NewAsyncOperationWithTimeout(timeout)
+
+	op.Run(f)
+
+	return op, nil
+}
