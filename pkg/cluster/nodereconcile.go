@@ -1334,6 +1334,12 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 
 			return r.recreateAndRebalanceNode(c, candidate, targetVersion)
 		}
+
+		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
 	}
 
 	return nil
