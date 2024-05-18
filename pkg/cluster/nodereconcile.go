@@ -21,6 +21,8 @@ var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
 var ErrNoRunningTasks = fmt.Errorf("no running tasks found")
 var ErrStatusRunning = fmt.Errorf("task is currently running")
 var ErrOrchestratorNotUpgraded = fmt.Errorf("orchestrator not upgraded yet")
+var ErrNodeNotInCluster = fmt.Errorf("node not in the cluster: ")
+var ErrNodeNotActive = fmt.Errorf("node not active: ")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -1112,6 +1114,26 @@ func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member
 	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	services := serverClass.Services
 	gracefulFailover := false
+
+	clusterInfo := couchbaseutil.ClusterInfo{}
+
+	if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return false, err
+	}
+
+	for _, node := range clusterInfo.Nodes {
+		if !c.members.Contains(node.HostName.GetMemberName()) {
+			return false, fmt.Errorf("%w, %s", ErrNodeNotInCluster, node.HostName)
+		}
+
+		if strings.Compare("active", node.Membership) != 0 {
+			return false, fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+
+		if node.Membership == "inactiveFailed" || node.Membership == "inactiveAdded" {
+			return false, fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+	}
 
 	for _, service := range services {
 		if service == couchbasev2.DataService && c.amountOfServersWithService(couchbasev2.DataService) > 1 {
