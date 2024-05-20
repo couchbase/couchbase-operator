@@ -33,6 +33,34 @@ var (
 	ErrUUIDError        = fmt.Errorf("cluster UUID error")
 )
 
+type FailedRequestError struct {
+	Method     string
+	URL        string
+	Status     string
+	Body       string
+	StatusCode int
+	err        error
+}
+
+func (e FailedRequestError) Error() string {
+	return fmt.Sprintf("request failed: %s %v %v %v: %v", e.err, e.Method, e.URL, e.Status, e.Body)
+}
+
+func (e FailedRequestError) Unwrap() error {
+	return e.err
+}
+
+func NewFailedRequestError(request *http.Request, response *http.Response, body []byte, err error) error {
+	return FailedRequestError{
+		Method:     request.Method,
+		URL:        request.URL.String(),
+		Status:     response.Status,
+		Body:       string(body),
+		StatusCode: response.StatusCode,
+		err:        err,
+	}
+}
+
 func (c *Client) getTLSConfig() (*tls.Config, error) {
 	if c.tls == nil {
 		return nil, nil
@@ -209,7 +237,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 
 	// Anything outside of a 2XX we regard as an error.
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("%w: request failed %v %v %v: %v", errors.NewStackTracedError(ErrStatusError), request.Method, request.URL.String(), response.Status, string(body))
+		return errors.NewStackTracedError(NewFailedRequestError(request, response, body, ErrStatusError))
 	}
 
 	// Don't care about the returned data, just report success.

@@ -3,6 +3,7 @@ package cluster
 import (
 	goerrors "errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -1109,6 +1110,28 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 	return candidatesNoOrchestrator, orchestrator
 }
 
+func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member, c *Cluster) error {
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
+	// We can retry on 500 and 503 codes.
+	return retryutil.RetryUntilErrorOrSuccess(time.Minute, 5*time.Second, func() (error, bool) {
+		if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+			var failedReqErr couchbaseutil.FailedRequestError
+			if goerrors.As(err, &failedReqErr) {
+				switch failedReqErr.StatusCode {
+				case http.StatusServiceUnavailable, http.StatusInternalServerError:
+					fmt.Println("Retrying graceful failover")
+					fmt.Println("failedReqErr.StatusCode: ", failedReqErr.StatusCode)
+					return nil, false
+				}
+			}
+
+			return err, false
+		}
+		return nil, true
+	})
+}
+
 func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member, c *Cluster) error {
 	clusterInfoInitial := &couchbaseutil.ClusterInfo{}
 	if err := couchbaseutil.GetPoolsDefault(clusterInfoInitial).On(c.api, candidate); err != nil {
@@ -1131,8 +1154,7 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 
 	initialCounters := clusterInfoInitial.Counters
 
-	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
-	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+	if err := r.startGracefulFailover(candidate, c); err != nil {
 		return err
 	}
 
