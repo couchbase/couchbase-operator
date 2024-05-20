@@ -5,6 +5,47 @@ import (
 	"testing"
 )
 
+func TestEmbedding(t *testing.T) {
+	jsonString := `{
+		"name": "John Doe",
+		"counters": {
+			"likes": 10,
+			"dislikes": 5,
+			"children": 2,
+			"pets": 1
+		}
+	}`
+
+	type ActivityCounters struct {
+		Likes    int `json:"likes"`
+		Dislikes int `json:"dislikes"`
+	}
+
+	type PersonalCounters struct {
+		Children int `json:"children"`
+		Pets     int `json:"pets"`
+		Women    int `json:"women"`
+	}
+
+	type Counters struct {
+		ActivityCounters
+		PersonalCounters
+	}
+
+	type person struct {
+		Name     string   `json:"name"`
+		Counters Counters `json:"counters"`
+	}
+
+	data := []byte(jsonString)
+	p := &person{}
+
+	err := json.Unmarshal(data, &p)
+	if err != nil {
+		t.Errorf("Error while unmarshalling json %s", err)
+	}
+}
+
 func TestCustomMarshallingOfUserRole(t *testing.T) {
 	t.Parallel()
 

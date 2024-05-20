@@ -18,9 +18,12 @@ import (
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
-var ErrNoRunningTasks = fmt.Errorf("no running tasks found")
-var ErrStatusRunning = fmt.Errorf("task is currently running")
 var ErrOrchestratorNotUpgraded = fmt.Errorf("orchestrator not upgraded yet")
+var ErrFailoverStartCounterNotIncremented = fmt.Errorf("failover start counter not incremented")
+var ErrFailoverSuccessCounterNotIncremented = fmt.Errorf("failover success counter not incremented")
+var ErrUnexpectedCounterChange = fmt.Errorf("unexpected counter change")
+var ErrNodeNotInCluster = fmt.Errorf("node not in the cluster: ")
+var ErrNodeNotActive = fmt.Errorf("node not active: ")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -1106,55 +1109,114 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 	return candidatesNoOrchestrator, orchestrator
 }
 
-// gracefulFailoverMember will gracefully fail over a member and watch the tasks endpoint to wait for the failover to finish.
-// Returns a bool if it's possible to perform a deltaRecovery.
-func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
+func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member, c *Cluster) error {
+	clusterInfoInitial := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(clusterInfoInitial).On(c.api, candidate); err != nil {
+		return err
+	}
+
+	for _, node := range clusterInfoInitial.Nodes {
+		if !c.members.Contains(node.HostName.GetMemberName()) {
+			return fmt.Errorf("%w, %s", ErrNodeNotInCluster, node.HostName)
+		}
+
+		if strings.Compare("active", node.Membership) != 0 {
+			return fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+
+		if node.Membership == "inactiveFailed" || node.Membership == "inactiveAdded" {
+			return fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+	}
+
+	initialCounters := clusterInfoInitial.Counters
+
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+		return err
+	}
+
+	// Wait for the graceful failover to complete
+	err := retryutil.RetryUntilErrorOrSuccess(5*time.Minute, time.Second, func() (error, bool) {
+		clusterInfo := couchbaseutil.ClusterInfo{}
+
+		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, candidate); err != nil {
+			return err, false
+		}
+
+		// Ensure the graceful failover start counter is incremented
+		if clusterInfo.Counters["graceful_failover_start"] != (initialCounters["graceful_failover_start"] + 1) {
+			return ErrFailoverStartCounterNotIncremented, false
+		}
+
+		// If the rebalance is complete check that the graceful failover success counter is incremented
+		if clusterInfo.RebalanceStatus == couchbaseutil.RebalanceStatusNone {
+			if clusterInfo.Counters["graceful_failover_success"] != (initialCounters["graceful_failover_success"] + 1) {
+				return ErrFailoverSuccessCounterNotIncremented, false
+			}
+
+			return nil, true
+		}
+
+		// Compare the counters to see if anything has changed
+		if len(initialCounters) > len(clusterInfo.Counters) {
+			return ErrUnexpectedCounterChange, false
+		}
+
+		for name, curVal := range clusterInfo.Counters {
+			oldVal := initialCounters[name]
+			switch name {
+			case "graceful_failover_start", "graceful_failover_success":
+				continue
+			}
+
+			if curVal != oldVal {
+				return ErrUnexpectedCounterChange, false
+			}
+		}
+
+		return nil, false
+	})
+
+	if err != nil {
+		return fmt.Errorf("graceful failover failed: %w", err)
+	}
+
+	return nil
+}
+
+// failoverNodeForDeltaRecovery will gracefully failover data nodes and hardfailover other nodes.
+func (r *ReconcileMachine) failoverNodeForDeltaRecovery(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
 	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	services := serverClass.Services
-	gracefulFailover := false
+	dataNode := false
 
 	for _, service := range services {
-		if service == couchbasev2.DataService && c.amountOfServersWithService(couchbasev2.DataService) > 1 {
-			gracefulFailover = true
+		if service == couchbasev2.DataService {
+			dataNode = true
 			break
 		}
 	}
 
-	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
-
-	if !gracefulFailover {
-		log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
-
-		if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+	if dataNode {
+		// Graceful failover for data nodes
+		if err := r.gracefullyFailoverNode(candidate, c); err != nil {
 			return false, err
 		}
 
 		return true, nil
 	}
 
-	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+	// Hard failover for other nodes
+	log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
+
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
+	if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
 		return false, err
 	}
 
-	err := retryutil.RetryFor(5*time.Minute, func() error {
-		runningTasks := couchbaseutil.RunningTasks{}
-		err := couchbaseutil.GetRunningTasks(&runningTasks).On(c.api, c.readyMembers())
-		if err != nil {
-			return err
-		}
-
-		for _, task := range runningTasks {
-			if strings.Compare(task.SubType, "gracefulFailover") == 0 {
-				if strings.Compare(task.Status, "notRunning") == 0 {
-					return nil
-				}
-				return ErrStatusRunning
-			}
-		}
-		return ErrNoRunningTasks
-	})
-
-	return true, err
+	return true, nil
 }
 
 func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVersion string) error {
@@ -1258,7 +1320,7 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			}
 		}
 
-		canDeltaRecover, err := r.gracefulFailoverMember(candidate, c)
+		canDeltaRecover, err := r.failoverNodeForDeltaRecovery(candidate, c)
 		if err != nil {
 			return err
 		}
