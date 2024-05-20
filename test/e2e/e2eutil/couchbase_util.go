@@ -1658,3 +1658,24 @@ func MustDropViewsDesignDocs(t *testing.T, designDoc gocb.DesignDocument, viewMa
 		Die(t, err)
 	}
 }
+
+func GetTerseClusterInfo(client *CouchbaseClient) (*couchbaseutil.TerseClusterInfo, error) {
+	info := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(info).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func MustGetOrchestratorNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) string {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	clusterInfo, err := GetTerseClusterInfo(client)
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	return clusterInfo.Orchestrator
+}

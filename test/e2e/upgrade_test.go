@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -1278,6 +1279,58 @@ func TestDeltaRecoveryWithoutDataService(t *testing.T) {
 
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestResilientDeltaRecovery(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	upgradeProcess := couchbasev2.DeltaRecovery
+	numOfDocs := f.DocsCount
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.UpgradeProcess = &upgradeProcess
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	// Get Orchestrator Node
+	orchestratorNode := e2eutil.MustGetOrchestratorNode(t, kubernetes, cluster)
+
+	index, err := couchbaseutil.GetIndexFromMemberName(strings.Split(strings.Split(orchestratorNode, "@")[1], ".")[0])
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Start upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for graceful failover to be running
+	e2eutil.MustWaitForGracefulFailoverToBeRunning(t, kubernetes, cluster, 5*time.Minute)
+
+	// Kill the orchestrator node
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, index, false)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "graceful failover failed:", cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
