@@ -2169,6 +2169,10 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 	return nil
 }
 
+func IsPodTerminating(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil
+}
+
 // Find the PVC belonging to a member that was mounted at the specified path.
 // It's not considered an error in the case that PVC cannot be found.
 func findMemberPVC(client *client.Client, memberName, path string) (*v1.PersistentVolumeClaim, error) {
