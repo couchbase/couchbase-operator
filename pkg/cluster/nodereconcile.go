@@ -1137,7 +1137,7 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 	}
 
 	// Wait for the graceful failover to complete
-	err := retryutil.RetryUntilErrorOrSuccess(5*time.Minute, time.Second, func() (error, bool) {
+	err := retryutil.RetryUntilErrorOrSuccess(30*time.Minute, time.Second, func() (error, bool) {
 		clusterInfo := couchbaseutil.ClusterInfo{}
 
 		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, candidate); err != nil {
