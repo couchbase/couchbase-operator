@@ -182,6 +182,16 @@ WitnessLoop:
 }
 
 func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
+	return c.rebalanceWithRetriesOnVerifyFails(ms, eject, 1)
+}
+
+// rebalanceWithRetriesOnVerifyFails will retry the rebalance if the verifyRebalance fails.
+func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList, maxRetries uint) error {
+	// Ensure we have a minimum of one retry.
+	if maxRetries == 0 {
+		maxRetries = 1
+	}
+
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.cluster.Status.SetUnbalancedCondition()
@@ -207,43 +217,50 @@ func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPN
 		known[i] = node.OTPNode
 	}
 
-	if err := couchbaseutil.Rebalance(known, eject).On(c.api, ms); err != nil {
-		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
-		return err
-	}
+	var err error
+	for i := uint(0); i < maxRetries; i++ {
+		if err := couchbaseutil.Rebalance(known, eject).On(c.api, ms); err != nil {
+			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+			return err
+		}
 
-	// Ensure we see the rebalance happen, if we don't do this then we can delete
-	// pods prematurely.
-	progress, status, _ := c.witnessRebalance(ms)
+		// Ensure we see the rebalance happen, if we don't do this then we can delete
+		// pods prematurely.
+		progress, status, _ := c.witnessRebalance(ms)
 
-	// Stream out rebalance status if we have observed the rebalance starting.
-	if status != nil {
-		for {
-			switch status.Status {
-			case couchbaseutil.RebalanceStatusUnknown:
-				log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", "unknown")
-			case couchbaseutil.RebalanceStatusRunning:
-				log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", status.Progress)
-			}
-
-			var ok bool
-
-			status, ok = <-progress.Status()
-			if !ok {
-				if err := progress.Error(); err != nil {
-					return err
+		// Stream out rebalance status if we have observed the rebalance starting.
+		if status != nil {
+			for {
+				switch status.Status {
+				case couchbaseutil.RebalanceStatusUnknown:
+					log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", "unknown")
+				case couchbaseutil.RebalanceStatusRunning:
+					log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", status.Progress)
 				}
 
-				break
+				var ok bool
+
+				status, ok = <-progress.Status()
+				if !ok {
+					if err := progress.Error(); err != nil {
+						return err
+					}
+
+					break
+				}
 			}
+		}
+
+		// Verify the rebalance occurred as we expected it to.  Even if we did not witness
+		// the rebalance, the cluster status may indicate that all expected members are balanced
+		// in, and there are no nodes we don't expect.  It may have happened too quickly to
+		// be observed!
+		if err = c.verifyRebalance(ms); err == nil {
+			break
 		}
 	}
 
-	// Verify the rebalance occurred as we expected it to.  Even if we did not witness
-	// the rebalance, the cluster status may indicate that all expected members are balanced
-	// in, and there are no nodes we don't expect.  It may have happened too quickly to
-	// be observed!
-	if err := c.verifyRebalance(ms); err != nil {
+	if err != nil {
 		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 		return err
 	}
