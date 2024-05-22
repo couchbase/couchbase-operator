@@ -7,6 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
@@ -76,7 +77,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			return nil, errors.NewStackTracedError(err)
 		}
 
-		podsEqual, d := c.resourcesEqual(actualSpec, requestedSpec)
+		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
@@ -85,11 +86,13 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			continue
 		}
 
+		prettyDiff := diff.PrettyDiff(actualSpec, requestedSpec)
+
 		if !pvcsEqual {
-			d += pvcState.Diff()
+			prettyDiff += pvcState.Diff()
 		}
 
-		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", d)
+		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
 
 		candidates.Add(member)
 	}

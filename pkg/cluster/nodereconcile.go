@@ -1137,7 +1137,7 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 	}
 
 	// Wait for the graceful failover to complete
-	err := retryutil.RetryUntilErrorOrSuccess(5*time.Minute, time.Second, func() (error, bool) {
+	err := retryutil.RetryUntilErrorOrSuccess(30*time.Minute, time.Second, func() (error, bool) {
 		clusterInfo := couchbaseutil.ClusterInfo{}
 
 		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, candidate); err != nil {
@@ -1333,6 +1333,12 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			}
 
 			return r.recreateAndRebalanceNode(c, candidate, targetVersion)
+		}
+
+		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
 		}
 	}
 
