@@ -648,3 +648,12 @@ func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
 
 	return nil
 }
+
+func (c *Cluster) isPodTerminating(m couchbaseutil.Member) (bool, error) {
+	pod, found := c.k8s.Pods.Get(m.Name())
+	if !found {
+		return false, errors.ErrResourceRequired
+	}
+
+	return pod.DeletionTimestamp != nil, nil
+}
