@@ -77,6 +77,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			return nil, errors.NewStackTracedError(err)
 		}
 
+		// Ignore this field so that we don't force upgrades because we changed it.
+		requestedSpec.TerminationGracePeriodSeconds = nil
+		actualSpec.TerminationGracePeriodSeconds = nil
+
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
