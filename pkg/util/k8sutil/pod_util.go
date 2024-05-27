@@ -61,6 +61,7 @@ const (
 	CngAdminUserSecretPrefix                  = "couchbase-cloud-native-gateway-admin-secret"
 	CngAdminUserNamePrefix                    = "cng-admin"
 	CngVolumeName                             = "couchbase-cloud-native-gateway-volume"
+	terminationGracePeriodSeconds             = 1200
 )
 
 type PodReadinessConfig struct {
@@ -887,6 +888,9 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.Spec.Hostname = m.Name()
 	pod.Spec.Subdomain = cluster.Name
+
+	terminationGracePeriodSeconds := int64(terminationGracePeriodSeconds)
+	pod.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
 	if cluster.Spec.Security.PodSecurityContext != nil {
 		// both cluster.Spec.SecurityContext (if present) and cluster.Spec.Security.PodSecurityContext

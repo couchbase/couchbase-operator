@@ -1286,7 +1286,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 	}
 
 	// Rebalance failed. Time to set recovery type as full.
-	if err := c.rebalance(c.members, nil); err != nil {
+	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
 		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()))
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
