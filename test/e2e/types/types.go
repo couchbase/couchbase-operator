@@ -78,6 +78,8 @@ type Cluster struct {
 	OperatorDeployment *appsv1.Deployment
 	// DefaultSecret is the secret to use defining admin credentials.
 	DefaultSecret *v1.Secret
+	// DisableResourceAllocation is whether or not to disable resource allocation (forced by on by default).
+	DisableResourceAllocation bool
 }
 
 // Copy performs a shallow copy of a cluster, static content only should be

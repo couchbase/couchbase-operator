@@ -1206,6 +1206,17 @@ func TestDeltaRecovery(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeProcess = &upgradeProcess
 
+	// This config triggers unexpected counter errors during upgrade
+	kubernetes.DisableResourceAllocation = true
+	cluster.Spec.Servers[0].Services = []couchbasev2.Service{
+		couchbasev2.DataService,
+		couchbasev2.IndexService,
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.AnalyticsService,
+		couchbasev2.EventingService,
+	}
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -1216,7 +1227,7 @@ func TestDeltaRecovery(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthyWithoutError(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
