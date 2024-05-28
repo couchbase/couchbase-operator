@@ -41,6 +41,12 @@ The same pod names and networking settings will be retained when the pod is rest
 You can balance time against risk by tailoring rolling updates with the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-rollingupgrade[`couchbaseclusters.spec.rollingUpgrade`] configuration parameter.
 This allows rolling upgrades to upgrade 2 pods at a time, or 20% of the cluster at a time, for example.
 
+[NOTE]
+====
+Delta  recovery is a volatile process that can lead to interruptions in service. It should not be used when there are less than 2 data nodes defined or data loss
+may occur.
+====
+
 === Couchbase Server Upgrade Constraints
 
 Not all upgrade paths are supported by Couchbase Server.
