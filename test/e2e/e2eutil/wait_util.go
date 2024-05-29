@@ -681,6 +681,38 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
+func WaitClusterStatusHealthyWithoutError(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	// Wait for cluster to be available and balanced.
+	waitForConstraints := ResourceConstraints(k8s, cluster,
+		resourceConditionExists(string(couchbasev2.ClusterConditionAvailable), string(v1.ConditionTrue)),
+		resourceConditionExists(string(couchbasev2.ClusterConditionBalanced), string(v1.ConditionTrue)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionUpgrading)),
+	)
+
+	strictConstraints := ResourceConstraints(k8s, cluster,
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionError)),
+	)
+
+	constraintFunc := func() (error, bool) {
+		err := strictConstraints()
+		if err != nil {
+			return err, false
+		}
+
+		err = waitForConstraints()
+
+		return nil, err == nil
+	}
+
+	return retryutil.RetryUntilErrorOrSuccess(timeout, time.Second, constraintFunc)
+}
+
+func MustWaitClusterStatusHealthyWithoutError(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := WaitClusterStatusHealthyWithoutError(k8s, cluster, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, ResourceCondition(k8s, k8s.OperatorDeployment, "Available", "True"))

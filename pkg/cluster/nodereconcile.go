@@ -1140,6 +1140,7 @@ func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member,
 	})
 }
 
+//nolint:gocognit
 func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member, c *Cluster) error {
 	clusterInfoInitial := &couchbaseutil.ClusterInfo{}
 	if err := couchbaseutil.GetPoolsDefault(clusterInfoInitial).On(c.api, candidate); err != nil {
@@ -1179,30 +1180,43 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 			return ErrFailoverStartCounterNotIncremented, false
 		}
 
-		// If the rebalance is complete check that the graceful failover success counter is incremented
-		if clusterInfo.RebalanceStatus == couchbaseutil.RebalanceStatusNone {
-			if clusterInfo.Counters["graceful_failover_success"] != (initialCounters["graceful_failover_success"] + 1) {
-				return ErrFailoverSuccessCounterNotIncremented, false
-			}
-
-			return nil, true
-		}
-
 		// Compare the counters to see if anything has changed
 		if len(initialCounters) > len(clusterInfo.Counters) {
 			return ErrUnexpectedCounterChange, false
 		}
 
+		// We track the counters to ensure that the rebalance completes and graceful failover completes.
+		// If the rebalance status completes, but another one starts (e.g. auto-failover or user intervention)
+		// then we will fail because we detect that some other counter has changed.
 		for name, curVal := range clusterInfo.Counters {
 			oldVal := initialCounters[name]
 			switch name {
 			case "graceful_failover_start", "graceful_failover_success":
+				continue
+			// We can expect the failover counters to increment by 1 because these get incremented by server
+			// before the graceful_failover_success.
+			// The order is graceful_failover_start, failover, failover_complete, graceful_failover_success.
+			case "failover", "failover_complete":
+				if curVal > oldVal+1 {
+					return ErrUnexpectedCounterChange, false
+				}
 				continue
 			}
 
 			if curVal != oldVal {
 				return ErrUnexpectedCounterChange, false
 			}
+		}
+
+		// If the rebalance is complete check that the graceful failover success counter is incremented
+		if clusterInfo.RebalanceStatus == couchbaseutil.RebalanceStatusNone {
+			if clusterInfo.Counters["graceful_failover_success"] != (initialCounters["graceful_failover_success"] + 1) {
+				return ErrFailoverSuccessCounterNotIncremented, false
+			}
+		}
+
+		if clusterInfo.Counters["graceful_failover_success"] == (initialCounters["graceful_failover_success"] + 1) {
+			return nil, true
 		}
 
 		return nil, false

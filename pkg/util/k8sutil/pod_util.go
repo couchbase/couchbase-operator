@@ -2405,7 +2405,13 @@ func FlagPodReady(client *client.Client, name string) error {
 		return errors.NewStackTracedError(err)
 	}
 
+	logPodReady(pod)
+
 	return nil
+}
+
+func logPodReady(pod *v1.Pod) {
+	log.V(1).Info("Pod marked ready by operator", "pod", pod.Name)
 }
 
 func ApplyPodAntiAffinityForCluster(clusterName string) *v1.PodAntiAffinity {
