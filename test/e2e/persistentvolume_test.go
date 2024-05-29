@@ -458,6 +458,7 @@ func TestPersistentVolumeKillAllPodsAndOperator(t *testing.T) {
 	// When ready kill all pods while the operator is down.  Upon restart expect
 	// the operator to recover a single node, then manually recover the others.
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes)
+	time.Sleep(2 * time.Second)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 2, false)
