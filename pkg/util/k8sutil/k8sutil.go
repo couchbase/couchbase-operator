@@ -254,8 +254,8 @@ func DeletePod(client *client.Client, namespace, podName string, opts metav1.Del
 	return nil
 }
 
-func CreatePod(client *client.Client, namespace string, pod *v1.Pod) (*v1.Pod, error) {
-	pod, err := client.KubeClient.CoreV1().Pods(namespace).Create(context.Background(), pod, metav1.CreateOptions{})
+func CreatePod(ctx context.Context, client *client.Client, namespace string, pod *v1.Pod) (*v1.Pod, error) {
+	pod, err := client.KubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, errors.NewStackTracedError(err)
 	}

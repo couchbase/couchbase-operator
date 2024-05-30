@@ -71,7 +71,7 @@ type PodReadinessConfig struct {
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
 	pvcState, err := GetPodVolumes(client, m, cluster, config)
 	if err != nil {
@@ -137,7 +137,7 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod, cluster.AsOwner())
 
-	return CreatePod(client, cluster.Namespace, pod)
+	return CreatePod(ctx, client, cluster.Namespace, pod)
 }
 
 func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup string, cluster *couchbasev2.CouchbaseCluster) {
