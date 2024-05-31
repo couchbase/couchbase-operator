@@ -586,11 +586,11 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 
 	for name, m := range r.couchbase.AddBackNodes {
 		if terminating, err := c.isPodTerminating(m); err != nil {
-			log.Error(err, "Pod status couldn't be confirmed, skipping add back", "cluster", c.namespacedName(), "name", name)
-			continue
+			return err
 		} else if terminating {
-			log.Info("Pod is terminating, skipping add back", "cluster", c.namespacedName(), "name", name)
-			continue
+			log.Info("Add back node is terminating", "cluster", c.namespacedName(), "name", name)
+			r.abort("add back node is terminating")
+			return nil
 		}
 
 		err := c.verifyMemberVolumes(m)
