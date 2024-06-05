@@ -29,7 +29,7 @@ Create the following `Dockerfile`.
 ----
 FROM couchbase/admission-controller:{operator-version} as official # <1>
 FROM scratch # <2>
-COPY --from=official /usr/local/bin/couchbase-operator-admission /usr/local/bin/ # <3>
+COPY --from=official /usr/local/bin/couchbase-admission-controller /usr/local/bin/ # <3>
 COPY passwd /etc/passwd # <4>
 USER 8453 # <5>
 ----

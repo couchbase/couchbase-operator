@@ -53,7 +53,7 @@ DNS:*.<cluster>
 DNS:*.<cluster>.<namespace>
 DNS:*.<cluster>.<namespace>.svc
 DNS:*.<cluster>.<namespace>.svc.cluster.local
-DNS:<cluster>.-srv
+DNS:<cluster>-srv
 DNS:<cluster>-srv.<namespace>
 DNS:<cluster>-srv.<namespace>.svc
 DNS:*.<cluster>-srv.<namespace>.svc.cluster.local
