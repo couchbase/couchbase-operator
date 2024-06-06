@@ -2000,7 +2000,7 @@ const (
 
 type ServiceList []Service
 
-// +kubebuilder:validation:Enum=admin;xdcr;client
+// +kubebuilder:validation:Enum=admin;xdcr;client;backup
 type ExposedFeature string
 
 // Supported features
@@ -2011,6 +2011,8 @@ const (
 	FeatureXDCR ExposedFeature = "xdcr"
 	// Exposes all client ports for services
 	FeatureClient ExposedFeature = "client"
+	// Exposes all ports necessary for backup
+	FeatureBackup ExposedFeature = "backup"
 )
 
 // A list of exposed features e.g. admin,xdcr

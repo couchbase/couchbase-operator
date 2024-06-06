@@ -69,7 +69,10 @@ const (
 	eventingServicePortTLS     = tlsBasePort + eventingServicePort
 
 	// Index service constants - there are none!
-
+	indexServicePortName    = string(couchbasev2.IndexService)
+	indexServicePortNameTLS = string(couchbasev2.IndexService) + tlsPortNameSuffix
+	indexServicePort        = 9102
+	indexServicePortTLS     = 19102
 	// Data service constants.
 	dataServicePortName    = string(couchbasev2.DataService)
 	dataServicePortNameTLS = string(couchbasev2.DataService) + tlsPortNameSuffix
@@ -239,6 +242,18 @@ var (
 			{
 				Name:     viewServicePortNameTLS,
 				Port:     viewServicePortTLS,
+				Protocol: v1.ProtocolTCP,
+			},
+		},
+		couchbasev2.IndexService: {
+			{
+				Name:     indexServicePortName,
+				Port:     indexServicePort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexServicePortNameTLS,
+				Port:     indexServicePortTLS,
 				Protocol: v1.ProtocolTCP,
 			},
 		},
@@ -741,6 +756,15 @@ var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 		couchbasev2.EventingService,
 		couchbasev2.DataService,
 	},
+	couchbasev2.FeatureBackup: {
+		couchbasev2.AdminService,
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.AnalyticsService,
+		couchbasev2.EventingService,
+		couchbasev2.DataService,
+		couchbasev2.IndexService,
+	},
 }
 
 // exposedFeatureSetToServiceList takes a requested feature set and returns
@@ -1023,6 +1047,10 @@ func GetAlternateAddressExternalPorts(c *client.Client, name string) (*couchbase
 			ports.DataServicePort = port.NodePort
 		case dataServicePortNameTLS:
 			ports.DataServicePortTLS = port.NodePort
+		case indexServicePortName:
+			ports.IndexServicePort = port.NodePort
+		case indexServicePortNameTLS:
+			ports.IndexServicePortTLS = port.NodePort
 		default:
 			return nil, fmt.Errorf("%w: unexpected port name %s", errors.NewStackTracedError(errors.ErrInternalError), port.Name)
 		}

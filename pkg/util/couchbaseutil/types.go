@@ -202,6 +202,10 @@ type AlternateAddressesExternalPorts struct {
 	DataServicePort int32 `url:"kv,omitempty" json:"kv"`
 	// DataServicePortTLS is the data service K8S node port (mapped to 11207)
 	DataServicePortTLS int32 `url:"kvSSL,omitempty" json:"kvSSL"`
+	// IndexServicePort is the index service K8S node port (mapped to 9102)
+	IndexServicePort int32 `url:"indexHttp,omitempty" json:"indexHttp"`
+	// IndexServicePortTLS is the index service K8S node port (mapped to 19102)
+	IndexServicePortTLS int32 `url:"indexHttps,omitempty" json:"indexHttps"`
 }
 
 // AlternateAddresses defines a K8S node address and port mapping for

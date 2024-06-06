@@ -186,7 +186,7 @@ func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClust
 			couchbasev2.SearchService:    {8094, 18094},
 			couchbasev2.AnalyticsService: {8095, 18095},
 			couchbasev2.EventingService:  {8096, 18096},
-			couchbasev2.IndexService:     {},
+			couchbasev2.IndexService:     {9102, 19102},
 		}
 
 		// For the service, check its matching pod to confirm what type of Couchbase Service is running (data, index, etc.).
