@@ -1,6 +1,6 @@
-:operator-version: 2.5.0
+:operator-version: 2.5.2
 :operator-version-minor: 2.5
-:admission-controller-version: 2.5.0
+:admission-controller-version: 2.5.2
 :couchbase-version: 7.2.0
 :couchbase-version-upgrade-from: 6.6.4
 :couchbase-version-redhat: 7.1.3-1
@@ -11,4 +11,4 @@
 :backup-version: 1.3.2
 :sgw-version: 2.8.3-enterprise
 :helm-repo: couchbase/couchbase-operator
-:helm-branch: 2.4.x
+:helm-branch: 2.5.x
