@@ -149,7 +149,7 @@ It is highly recommended that your Couchbase clusters are deployed with some for
 
 === CPU and Memory  Requirements
 
-You can set all resource allocations yourself explicitly, however for new users to the platform we recommend using xref:resource/couchbasecluster.adoc#spec-autoresourceallocation[auto resource allocation].
+You can set all resource allocations yourself explicitly, however for new users to the platform we recommend using xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[auto resource allocation].
 Auto resource allocation will require:
 
 * 2 CPUs per Couchbase pod by default.
