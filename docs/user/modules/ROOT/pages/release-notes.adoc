@@ -47,7 +47,7 @@ Couchbase Autonomous Operator 2.6.4 was released in June 2024.
 
 ==== Pod Lifecycle
 
-The default value for the per-Pod `terminationGracePeriodSeconds` is 30 seconds see (https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination[Termination of Pods^]).
+The default value for the per-Pod `terminationGracePeriodSeconds` is 30 seconds (see https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination[Termination of Pods^]).
 From Operator 2.6.4, any new Pods will be created with `terminationGracePeriodSeconds` set to 1200 seconds (20 minutes), to allow time for Couchbase Server to quiesce all connections and cleanly shut down.
 
 [#fixed-issues-v264]
