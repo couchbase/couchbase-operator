@@ -104,10 +104,10 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.25 - 1.29
+| 1.25 - 1.30
 
 | Red Hat OpenShift Container Platform
-| 4.11 - 4.14
+| 4.12 - 4.15
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
