@@ -598,8 +598,14 @@ type CouchbaseBackupRestoreSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	Threads int `json:"threads,omitempty"`
 
-	// Forces data in the Couchbase cluster to be overwritten
-	// even if the data in the cluster is newer than the restore
+	// Forces data in the Couchbase cluster to be overwritten even if the data in the cluster is newer.
+	// By default, the system does not force updates,
+	// and all updates use Couchbase's conflict resolution mechanism to ensure
+	// that if newer data exists on the cluster,
+	// older restored data does not overwrite it.
+	// However, if `couchbasebackuprestores.spec.forceUpdates` is true,
+	// then the backup record will _always_ overwrite the cluster record,
+	// regardless of Couchbase's conflict resolution.
 	ForceUpdates bool `json:"forceUpdates,omitempty"`
 
 	// StagingVolume contains configuration related to the
