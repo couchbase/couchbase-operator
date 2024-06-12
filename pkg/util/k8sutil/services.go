@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strconv"
@@ -405,8 +406,8 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	service := &v1.Service{}
 
 	if cluster.Spec.Networking.AdminConsoleServiceTemplate != nil {
-		service.Labels = cluster.Spec.Networking.AdminConsoleServiceTemplate.Labels
-		service.Annotations = cluster.Spec.Networking.AdminConsoleServiceTemplate.Annotations
+		service.Labels = maps.Clone(cluster.Spec.Networking.AdminConsoleServiceTemplate.Labels)
+		service.Annotations = maps.Clone(cluster.Spec.Networking.AdminConsoleServiceTemplate.Annotations)
 
 		if cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec != nil {
 			service.Spec = *cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec
