@@ -1088,7 +1088,7 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure, f.SharedTestFlags.CollectedLogLevel)
 		}
 
-		// Cleanup, which is now trivial.
+		//Cleanup, which is now trivial.
 		if err := cluster.KubeClient.CoreV1().Namespaces().Delete(context.Background(), cluster.Namespace, *metav1.NewDeleteOptions(0)); err != nil {
 			logrus.Warnf("failed to delete namespace %s", cluster.Namespace)
 		}
