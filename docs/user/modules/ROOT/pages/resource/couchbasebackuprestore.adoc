@@ -43,6 +43,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-objectstore-secret,secret>>: ""
     <<couchbasebackuprestores-spec-objectstore-uri,uri>>: ""
     <<couchbasebackuprestores-spec-objectstore-useiam,useIAM>>: false
+  <<couchbasebackuprestores-spec-overwriteusers,overwriteUsers>>: false
   <<couchbasebackuprestores-spec-repo,repo>>: ""
   <<couchbasebackuprestores-spec-s3bucket,s3bucket>>: ""
   <<couchbasebackuprestores-spec-services,services>>:
@@ -56,6 +57,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-services-ftalias,ftAlias>>: True
     <<couchbasebackuprestores-spec-services-ftindex,ftIndex>>: True
     <<couchbasebackuprestores-spec-services-gsiindex,gsiIndex>>: True
+    <<couchbasebackuprestores-spec-services-users,users>>: false
     <<couchbasebackuprestores-spec-services-views,views>>: True
   <<couchbasebackuprestores-spec-stagingvolume,stagingVolume>>:
     <<couchbasebackuprestores-spec-stagingvolume-size,size>>: 20Gi
@@ -454,6 +456,21 @@ Whether to allow the backup SDK to attempt to authenticate
 using the instance metadata api.
 If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 
+=== couchbasebackuprestores.spec.overwriteUsers
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Overwrites the already existing users in the cluster when  user restoration is enabled (spec.services.users).
+The default behavior of backup/restore of users is to skip already existing users.
+This is only available for Couchbase Server 7.6 and later.
+This field defaults to `false`.
+
 === couchbasebackuprestores.spec.repo
 
 ==== Constraints
@@ -634,6 +651,21 @@ field defaults to true.
 GSIIndex restores document indexes from the backup.
 This field
 defaults to true.
+
+=== couchbasebackuprestores.spec.services.users
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Users restores cluster level users, including their roles and permissions.
+This is
+only available for Couchbase Server 7.6 and later.
+This field defaults to `false`.
 
 === couchbasebackuprestores.spec.services.views
 

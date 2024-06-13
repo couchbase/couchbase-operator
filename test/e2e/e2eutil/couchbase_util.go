@@ -1732,3 +1732,23 @@ func MustGetOrchestratorNode(t *testing.T, k8s *types.Cluster, cluster *couchbas
 
 	return clusterInfo.Orchestrator
 }
+
+func MustCreateUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, users ...*couchbaseutil.User) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	for _, user := range users {
+		if err := couchbaseutil.CreateUser(user).On(client.client, client.host); err != nil {
+			Die(t, err)
+		}
+	}
+}
+
+func MustDeleteUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, users ...*couchbaseutil.User) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	for _, user := range users {
+		if err := couchbaseutil.DeleteUser(user).On(client.client, client.host); err != nil {
+			Die(t, err)
+		}
+	}
+}

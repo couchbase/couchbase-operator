@@ -810,7 +810,7 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 	}
 
 	// These will all be set, to something due to defaulting, so the dereference is safe.
-	flags := map[string]*bool{
+	disableFlags := map[string]*bool{
 		"--disable-bucket-config":     backup.Spec.Services.BucketConfig,
 		"--disable-views":             backup.Spec.Services.Views,
 		"--disable-gsi-indexes":       backup.Spec.Services.GSIndexes,
@@ -824,8 +824,18 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		"--disable-cluster-query":     backup.Spec.Services.ClusterQuery,
 	}
 
-	for flag, value := range flags {
+	enableFlags := map[string]*bool{
+		"--enable-users": backup.Spec.Services.Users,
+	}
+
+	for flag, value := range disableFlags {
 		if !*value {
+			args = append(args, flag)
+		}
+	}
+
+	for flag, value := range enableFlags {
+		if *value {
 			args = append(args, flag)
 		}
 	}
@@ -941,6 +951,8 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 
 // generateRestoreContainer returns a container that uses the operator-backup image
 // but specifies the restore mode to the backup_script instead of the backup mode.
+//
+//nolint:gocognit
 func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupRestore, start, end string) corev1.Container {
 	var resources corev1.ResourceRequirements
 
@@ -1011,7 +1023,7 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 	}
 
 	// These will all be set, to something due to defaulting, so the dereference is safe.
-	flags := map[string]*bool{
+	disableFlags := map[string]*bool{
 		"--disable-views":             spec.Services.Views,
 		"--disable-gsi-indexes":       spec.Services.GSIIndex,
 		"--disable-ft-indexes":        spec.Services.FTIndex,
@@ -1024,8 +1036,22 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		"--disable-cluster-query":     spec.Services.ClusterQuery,
 	}
 
-	for flag, value := range flags {
+	enableFlags := map[string]*bool{
+		"--enable-users": spec.Services.Users,
+	}
+
+	if spec.OverwriteUsers && spec.Services.Users != nil && *spec.Services.Users {
+		args = append(args, "--overwrite-users")
+	}
+
+	for flag, value := range disableFlags {
 		if !*value {
+			args = append(args, flag)
+		}
+	}
+
+	for flag, value := range enableFlags {
+		if *value {
 			args = append(args, flag)
 		}
 	}

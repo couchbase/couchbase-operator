@@ -1450,3 +1450,39 @@ func StartExecCommandOnPod(k8s *types.Cluster, podName string, cmd string, outpu
 
 	return op, nil
 }
+
+func waitUntilUsersExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, users []*couchbaseutil.User, timeout time.Duration) error {
+	checkUsersExistFunc := func() error {
+		client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+		userList := couchbaseutil.UserList{}
+		if err := couchbaseutil.ListUsers(&userList).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, user := range users {
+			userFound := false
+
+			for _, u := range userList {
+				if u.ID == user.ID {
+					userFound = true
+					break
+				}
+			}
+
+			if !userFound {
+				return fmt.Errorf("user %s not found", user)
+			}
+		}
+
+		return nil
+	}
+
+	return retryutil.RetryFor(timeout, checkUsersExistFunc)
+}
+
+func MustWaitUntilUsersExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, users []*couchbaseutil.User, timeout time.Duration) {
+	if err := waitUntilUsersExist(t, k8s, couchbase, users, timeout); err != nil {
+		Die(t, err)
+	}
+}

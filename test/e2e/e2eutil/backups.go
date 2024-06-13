@@ -85,6 +85,9 @@ type Backup struct {
 
 	// cert to be used with the custom object endpoint.
 	objStoreEndpointCert *v1.Secret
+
+	// backups users
+	users bool
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -240,6 +243,12 @@ func (b *Backup) WithCustomStoreCert(secret *v1.Secret) *Backup {
 	return b
 }
 
+func (b *Backup) WithUsers(users bool) *Backup {
+	b.users = users
+
+	return b
+}
+
 // MustCreate generates the concrete backup resource and creates it in Kubernetes.
 func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackup {
 	generateName := "backup-"
@@ -331,6 +340,9 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 		backup.Spec.Services.FTSAliases = &falseRef
 	}
 
+	backupUsers := b.users
+	backup.Spec.Services.Users = &backupUsers
+
 	backup.Spec.TTLSecondsAfterFinished = b.ttlSeconds
 
 	newBackup, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackups(kubernetes.Namespace).Create(context.Background(), backup, metav1.CreateOptions{})
@@ -396,6 +408,9 @@ type Restore struct {
 
 	// use blank backup name
 	useBlankBackupName bool
+
+	// restore users
+	users bool
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -521,6 +536,13 @@ func (r *Restore) UseBlankBackupName(useBlankBackupName bool) *Restore {
 	return r
 }
 
+// WithUsers restores users.
+func (r *Restore) WithUsers(users bool) *Restore {
+	r.users = users
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -611,6 +633,9 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 			restore.Spec.Data.Map = r.mapping
 		}
 	}
+
+	restoreUsers := r.users
+	restore.Spec.Services.Users = &restoreUsers
 
 	newRestore, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackupRestores(kubernetes.Namespace).Create(context.Background(), restore, metav1.CreateOptions{})
 	if err != nil {

@@ -683,6 +683,7 @@ func registerTests() {
 		framework.NewTestDef(TestBackupAndRestoreServices).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreToSubPath).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupAndRestoreEphemeralVolume).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureBackupCloud),
+		framework.NewTestDef(TestBackupAndRestoreUsers).WithTags(TagSuiteP1, TagFeatureBackup),
 
 		// Synchronization tests.
 		framework.NewTestDef(TestDataSynchronizationBasic).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections, TagSuitePlatform),

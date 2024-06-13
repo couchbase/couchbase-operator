@@ -277,8 +277,8 @@ type CouchbaseBackupSpec struct {
 	Threads int `json:"threads,omitempty"`
 
 	// Services allows control over what services are included in the backup.
-	// By default, all service data and metadata are included.  Modifications
-	// to this field will only take effect on the next full backup.
+	// By default, all service data and metadata are included apart from users.
+	// Modifications to this field will only take effect on the next full backup.
 	// +kubebuilder:default="x-couchbase-object"
 	Services CouchbaseBackupServiceFilter `json:"services,omitempty"`
 
@@ -369,6 +369,11 @@ type CouchbaseBackupServiceFilter struct {
 	// This field defaults to `true`.
 	// +kubebuilder:default=true
 	ClusterQuery *bool `json:"clusterQuery,omitempty"`
+
+	// Users enables the backup of users including their roles and permissions. This is
+	// only available for Couchbase Server 7.6 and later. This field defaults to `false`.
+	// +kubebuilder:default=false
+	Users *bool `json:"users,omitempty"`
 }
 
 // CouchbaseBackupDataFilter allows filtering of backup data by bucket, scope or collection.
@@ -608,6 +613,13 @@ type CouchbaseBackupRestoreSpec struct {
 	// regardless of Couchbase's conflict resolution.
 	ForceUpdates bool `json:"forceUpdates,omitempty"`
 
+	// Overwrites the already existing users in the cluster when  user restoration is enabled (spec.services.users).
+	// The default behavior of backup/restore of users is to skip already existing users.
+	// This is only available for Couchbase Server 7.6 and later.
+	// This field defaults to `false`.
+	// +kubebuilder:default=false
+	OverwriteUsers bool `json:"overwriteUsers,omitempty"`
+
 	// StagingVolume contains configuration related to the
 	// ephemeral volume used as staging when restoring from a cloud backup.
 	// +kubebuilder:default={size: "20Gi"}
@@ -744,6 +756,11 @@ type CouchbaseBackupRestoreServices struct {
 	// This field defaults to `true`.
 	// +kubebuilder:default=true
 	ClusterQuery *bool `json:"clusterQuery,omitempty"`
+
+	// Users restores cluster level users, including their roles and permissions. This is
+	// only available for Couchbase Server 7.6 and later. This field defaults to `false`.
+	// +kubebuilder:default=false
+	Users *bool `json:"users,omitempty"`
 }
 
 // struct we use in CouchbaseBackupRestoreSpec to enforce type-safeness

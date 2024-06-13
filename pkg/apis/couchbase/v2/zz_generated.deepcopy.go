@@ -998,6 +998,11 @@ func (in *CouchbaseBackupRestoreServices) DeepCopyInto(out *CouchbaseBackupResto
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Users != nil {
+		in, out := &in.Users, &out.Users
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -1179,6 +1184,11 @@ func (in *CouchbaseBackupServiceFilter) DeepCopyInto(out *CouchbaseBackupService
 	}
 	if in.ClusterQuery != nil {
 		in, out := &in.ClusterQuery, &out.ClusterQuery
+		*out = new(bool)
+		**out = **in
+	}
+	if in.Users != nil {
+		in, out := &in.Users, &out.Users
 		*out = new(bool)
 		**out = **in
 	}

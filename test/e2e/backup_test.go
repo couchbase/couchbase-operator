@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -3084,6 +3085,76 @@ func TestBackupAndRestoreEphemeralVolume(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestoreUsers(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastVersion("7.6.0").AtLeastBackupVersion("1.4.0")
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Security.RBAC.Managed = false
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	users := []*couchbaseutil.User{
+		{
+			Name:     "user1",
+			ID:       "user1",
+			Domain:   "local",
+			Password: "password1",
+		},
+		{
+			Name:     "user2",
+			ID:       "user2",
+			Domain:   "local",
+			Password: "password2",
+		},
+	}
+
+	// Create the users
+	e2eutil.MustCreateUsers(t, kubernetes, cluster, users...)
+
+	e2eutil.MustWaitUntilUsersExist(t, kubernetes, cluster, users, 2*time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).WithoutFTAlias().WithUseIAM(true).WithUsers(true).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	// Expect the full backup to complete.
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// Delete after the backup has been taken.
+	e2eutil.MustDeleteUsers(t, kubernetes, cluster, users...)
+
+	e2eutil.NewRestore(backup).WithoutFTAlias().WithUsers(true).MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitUntilUsersExist(t, kubernetes, cluster, users, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 

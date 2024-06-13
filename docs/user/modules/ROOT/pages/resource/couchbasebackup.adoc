@@ -56,6 +56,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackups-spec-services-ftsaliases,ftsAliases>>: True
     <<couchbasebackups-spec-services-ftsindexes,ftsIndexes>>: True
     <<couchbasebackups-spec-services-gsindexes,gsIndexes>>: True
+    <<couchbasebackups-spec-services-users,users>>: false
     <<couchbasebackups-spec-services-views,views>>: True
   <<couchbasebackups-spec-size,size>>: 20Gi
   <<couchbasebackups-spec-storageclassname,storageClassName>>: ""
@@ -506,9 +507,8 @@ If non-empty this overrides local backup.
 ==== Description
 
 Services allows control over what services are included in the backup.
-By default, all service data and metadata are included.
-Modifications
-to this field will only take effect on the next full backup.
+By default, all service data and metadata are included apart from users.
+Modifications to this field will only take effect on the next full backup.
 
 === couchbasebackups.spec.services.analytics
 
@@ -640,6 +640,21 @@ This field defaults to `true`.
 
 GSIndexes enables the backup of global secondary index definitions for all buckets.
 This field defaults to `true`.
+
+=== couchbasebackups.spec.services.users
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Users enables the backup of users including their roles and permissions.
+This is
+only available for Couchbase Server 7.6 and later.
+This field defaults to `false`.
 
 === couchbasebackups.spec.services.views
 
