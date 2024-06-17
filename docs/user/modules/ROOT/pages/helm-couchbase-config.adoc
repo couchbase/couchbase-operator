@@ -5,7 +5,7 @@ include::partial$constants.adoc[]
 The official Couchbase Helm Chart for the Autonomous Operator comes with a default configuration that can be customized to fit your deployment needs.
 
 This page describes the parameters of the official Couchbase Helm Chart.
-In particular, this page describes the contents of the chart's https://github.com/couchbase-partners/helm-charts/blob/{helm-branch}/charts/couchbase-operator/values.yaml[values.yaml^], which contains the chart's default values.
+In particular, this page describes the contents of the chart's https://github.com/couchbase-partners/helm-charts/blob/master/charts/couchbase-operator/values.yaml[values.yaml^], which contains the chart's default values.
 Each of the deployed resources is listed and described, along with any user definable parameters.
 
 For instructions on how to install and use the chart, including how to override and customize the chart's values, refer to xref:helm-setup-guide.adoc[Helm Deployment].
