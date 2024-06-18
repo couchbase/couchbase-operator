@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pillowfight
+spec:
+  template:
+    metadata:
+      name: pillowfight
+    spec:
+      containers:
+        - name: pillowfight
+          image: couchbase:7.2.4
+          command: ["cbc-pillowfight",
+                    "-U", "couchbase://cb-example-0000.cb-example.default.svc/bucket0?select_bucket=true",
+                    "-I", "15000", "-B", "100", "-c", "10", "-t", "1", "-m", "1024", "-M", "2048", "-u",
+                    "Administrator", "-P", "password"]
+      restartPolicy: Never

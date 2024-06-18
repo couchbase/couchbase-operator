@@ -1,0 +1,34 @@
+action: "Deploy Couchbase"
+config:
+  specPath: "./test_data/couchbase_spec/single_data_couchbase.yaml"
+  validators:
+    preFlight:
+      state: "PRE"
+    couchbaseReadiness:
+      state: "POST"
+    couchbaseVersion:
+      state: "POST"
+      cbVersion: "7.2.5"
+trees:
+    - action: "Generic Workload"
+      config:
+        name: "Data Workload"
+        specPath: "./test_data/data_workload_spec/gideon.yaml"
+        preSleep: 1
+        postSleep: 3
+      trees:
+        - action: "Delta Upgrade"
+          config:
+            specPath: "./test_data/couchbase_spec/single_data_couchbase_upgrade.yaml"
+            validators:
+              couchbaseVersion:
+                state: "POST"
+                cbVersion: "7.6.1"
+              couchbaseReadiness:
+                state: "POST"
+
+
+
+
+
+

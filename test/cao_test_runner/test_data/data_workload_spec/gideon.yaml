@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gideon
+spec:
+  template:
+    metadata:
+      name: gideon_latest
+    spec:
+      containers:
+        - name: gideon-latest
+          image: docker.io/sequoiatools/gideon_latest
+          args: ["kv", "--bucket", "bucket0", "--user", "Administrator", "--password", "password", "--ops", "100", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "5", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
+      restartPolicy: Never
