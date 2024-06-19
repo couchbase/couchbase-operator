@@ -1,6 +1,6 @@
 FROM golang:1.22.1-bullseye
 
-WORKDIR /src/app
+WORKDIR /tmp/src/github.com/couchbase/couchbase-operator
 ADD go.mod go.sum ./
 
 RUN go mod download

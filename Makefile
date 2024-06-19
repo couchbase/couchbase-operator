@@ -588,11 +588,11 @@ image-artifacts: | $(ARTIFACTSDIR)
 dist-lite:
 	mkdir -p ./build/bin/kubernetes-linux-amd64
 	docker build -f ./docker/couchbase-operator-lite-build/Dockerfile . -t couchbase/build-a-bear:v1
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cao > build/bin/kubernetes-linux-amd64/cao
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cbopinfo > build/bin/kubernetes-linux-amd64/cbopinfo
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/cbopcfg > build/bin/kubernetes-linux-amd64/cbopcfg
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/couchbase-operator > build/bin/kubernetes-linux-amd64/couchbase-operator
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /src/app/build/bin/couchbase-admission-controller > build/bin/kubernetes-linux-amd64/couchbase-admission-controller
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cao > build/bin/kubernetes-linux-amd64/cao
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cbopinfo > build/bin/kubernetes-linux-amd64/cbopinfo
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cbopcfg > build/bin/kubernetes-linux-amd64/cbopcfg
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/couchbase-operator > build/bin/kubernetes-linux-amd64/couchbase-operator
+	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/couchbase-admission-controller > build/bin/kubernetes-linux-amd64/couchbase-admission-controller
 
 # Interface used by build to trigger things it needs.
 # Here's where/why the build system is totally in need of some love...
