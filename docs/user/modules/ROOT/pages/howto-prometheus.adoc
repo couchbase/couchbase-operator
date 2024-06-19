@@ -2,9 +2,10 @@
 include::partial$constants.adoc[]
 
 [abstract]
-You can set up the Autonomous Operator to use the Couchbase Server's native support for metrics collection.
-Couchbase native support for metric collection exposes an Prometheus compatible endpoint on all Pods without the use of 3rd party tools.
-Couchbase native support is available for Couchbase Server versions 7.0 or higher and is the recommended way for collecting metrics with Prometheus.
+You can set up the Autonomous Operator to use the Couchbase Server's native support for metrics collection, for Couchbase Server versions newer than Version 7.0 +
+Couchbase native support for metric collection exposes a Prometheus compatible endpoint on all Pods without the need for third party tools.
+
+IMPORTANT: Couchbase native support is available for Couchbase Server versions 7.0 or higher and is the recommended way for collecting metrics with Prometheus.
 
 == Overview
 
