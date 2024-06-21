@@ -160,7 +160,7 @@ spec:
   ports:
     - protocol: TCP
       port: 443
-      targetPort: 18098
+      targetPort: 443
 ----
 
 https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html[AWS LoadBalancers] have a number of advanced options which you may want to use for your deployment.
