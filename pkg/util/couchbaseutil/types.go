@@ -120,6 +120,7 @@ type ClusterInfo struct {
 	RebalanceStatus        RebalanceStatus `json:"rebalanceStatus"`
 	ClusterName            string          `json:"clusterName"`
 	Balanced               bool            `json:"balanced"`
+	Counters               map[string]int  `json:"counters"`
 }
 
 // GetNode returns the named node.

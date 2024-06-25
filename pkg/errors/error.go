@@ -76,6 +76,9 @@ var (
 
 	// ErrNoVolumeMounts is raised when a pod has no volume mounts specified.
 	ErrNoVolumeMounts = errors.New("pod has no persistent storage")
+
+	// ErrNodeNotAdded is raised when a node hasn't been added to the cluster.
+	ErrNodeNotAdded = errors.New("node not added")
 )
 
 // Logging errors
@@ -113,7 +116,8 @@ var (
 
 	// ErrServerClassNotFound is raised when the operator looks for a server class
 	// that doesn't exist.
-	ErrServerClassNotFound = errors.New("server class not found")
+	ErrServerClassNotFound       = errors.New("server class not found")
+	ErrImageVersionUnretrievable = errors.New("error extracting image verion")
 )
 
 // CLI errors.

@@ -677,8 +677,8 @@ func (c *Cluster) deleteXDCRReplications(requestedReplications, currentReplicati
 	return nil
 }
 
-// updateCreateXDCRReplications handles the creation and updates of replications.
-// This must be called after new remotes are added.
+// updateCreateXDCRReplications handles the creation, update and removal of replications.
+// This must be called after new remotes are added, and before old remotes are removed.
 func (c *Cluster) updateCreateXDCRReplications(requestedReplications, currentReplications couchbaseutil.ReplicationList) error {
 	// We deal with migrations first, the assumption being that these would be one-offs and they should be done
 	// first.

@@ -36,6 +36,97 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
+[#release-v263]
+== Release 2.6.3
+
+Couchbase Autonomous Operator 2.6.3 was released in April 2024.
+
+[#fixed-issues-v263]
+=== Fixed Issues
+
+[#table-fixed-issues-v263,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3430[K8S-3430^]
+a| *Summary:* Previously the Operator was not setting the correct recovery type for nodes without the Data Service.
+
+|===
+
+[#release-v262]
+== Release 2.6.2
+
+Couchbase Autonomous Operator 2.6.2 was released in March 2024.
+
+[#fixed-issues-v262]
+=== Fixed Issues
+
+[#table-fixed-issues-v262,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3391[K8S-3391^]
+a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
+
+a| https://issues.couchbase.com/browse/K8S-3392[K8S-3392^]
+a| *Summary:* Previously the Operator was not using the correct failover mechanism for nodes without the Data Service.
+
+|===
+
+[#release-v261]
+== Release 2.6.1
+
+Couchbase Autonomous Operator 2.6.1 was released in February 2024.
+
+[#changes-in-behavior-v261]
+=== New Features and Behavioral Changes
+
+==== Cloud Native Gateway
+
+The Couchbase _Cloud Native Gateway_ (CNG), a new component that allows applications to access Couchbase through a set of RPC network endpoints based on https://grpc.io/[gRPC], is now Generally Available.
+
+See xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway] for details.
+
+==== Miscellaneous Improvements
+
+* Diffs in the Operator's "Resource Updated" logs are now human readable (https://issues.couchbase.com/browse/K8S-3268[K8S-3268^]).
+* Added missing Magma-related Bucket settings (https://issues.couchbase.com/browse/K8S-3290[K8S-3290^]).
+* When performing a Rolling Upgrade, upgrade the Couchbase Server Orchestrator node last to reduce time spent waiting on orchestrator elections (https://issues.couchbase.com/browse/K8S-3305[K8S-3305^]).
+* Improved error reporting during Alternate Address setup (https://issues.couchbase.com/browse/K8S-3317[K8S-3317^]).
+
+[#fixed-issues-v261]
+=== Fixed Issues
+
+[#table-fixed-issues-v261,cols="25,66"]
+|===
+| Issue | Description
+
+a| https://issues.couchbase.com/browse/K8S-3264[K8S-3264^]
+a| *Summary:* Previously the Operator was not correctly honouring the `useVirtualPath` setting in the `CouchbaseBackup` resource.
+
+a| https://issues.couchbase.com/browse/K8S-3282[K8S-3282^]
+a| *Summary:* Previously the Operator was emitting an extraneous "unknown field" message to the logs.
+
+a| https://issues.couchbase.com/browse/K8S-3302[K8S-3302^]
+a| *Summary:* Previously the Operator would raise a nil reference exception when a Cluster was defined with logging enabled, but a Server Group is added without a default or logging mount defined.
+
+a| https://issues.couchbase.com/browse/K8S-3331[K8S-3331^]
+a| *Summary:* Previously the Operator was not performing a Graceful Failover during a Delta Recovery-based Rolling Upgrade.
+
+a| https://issues.couchbase.com/browse/K8S-3332[K8S-3332^]
+a| *Summary:* Previously the Operator was failing to rotate Encrypted Private Keys with Couchbase Server 7.2.4 and later.
+
+a| https://issues.couchbase.com/browse/K8S-3358[K8S-3358^]
+a| *Summary:* Previously there was a conflict between the Readiness Probe configurations of the Exporter and Cloud Native Gateway sidecars.
+
+a| https://issues.couchbase.com/browse/K8S-3365[K8S-3365^]
+a| *Summary:* Previously the Delta Recovery upgrade test was using invalid parameters.
+
+a| https://issues.couchbase.com/browse/K8S-3374[K8S-3374^]
+a| *Summary:* Previously the Operator was failing to pass the correct credentials to the Cloud Native Gateway sidecar.
+
+|===
+
 [#release-v260]
 == Release 2.6.0
 

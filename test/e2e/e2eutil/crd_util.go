@@ -20,8 +20,10 @@ func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couch
 
 	// Enable resource management for everything, it's far easier to see and understand
 	// scheduler errors, rather than see random OOM killing.
-	cl.Spec.AutoResourceAllocation = &couchbasev2.AutoResourceAllocation{
-		Enabled: true,
+	if !k8s.DisableResourceAllocation {
+		cl.Spec.AutoResourceAllocation = &couchbasev2.AutoResourceAllocation{
+			Enabled: true,
+		}
 	}
 
 	if k8s.IPv6 {
@@ -37,7 +39,7 @@ func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couch
 
 	// If we left the CPU requests as default, that would have some nasty side effects
 	// e.g. things failing more frequently, so set it low enough not to interfere :D
-	if !k8s.DynamicPlatform {
+	if !k8s.DynamicPlatform && !k8s.DisableResourceAllocation {
 		cpuRequest := resource.MustParse("500m")
 		cl.Spec.AutoResourceAllocation.CPURequests = &cpuRequest
 	}

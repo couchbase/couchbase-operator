@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
@@ -728,7 +729,9 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).WithTLS(ctx).MustCreate(t, kubernetes)
+	clusterOpts := clusterOptions()
+	clusterOpts.Options.AutoFailoverTimeout = e2espec.NewDurationS(90)
+	cluster := clusterOpts.WithMixedTopology(mdsGroupSize).WithTLS(ctx).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -752,7 +755,13 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+		eventschema.Optional{
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+				},
+			},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{

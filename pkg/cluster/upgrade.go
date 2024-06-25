@@ -99,6 +99,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			return nil, errors.NewStackTracedError(err)
 		}
 
+		// Ignore this field so that we don't force upgrades because we changed it.
+		requestedSpec.TerminationGracePeriodSeconds = nil
+		actualSpec.TerminationGracePeriodSeconds = nil
+
 		// We ignore ports as they aren't configurable, this also prevents a
 		// forced upgrade cycle of the cluster when upgrading the Operator
 		// from 2.4 -> 2.5+

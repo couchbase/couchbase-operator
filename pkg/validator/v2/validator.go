@@ -65,6 +65,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
 		checkoutConstraintNoServicelessClassBelow76,
+		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
 		checkConstraintDefaultAndLogVolumesMututallyExclusive,
@@ -862,6 +863,25 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 	for i, config := range cluster.Spec.Servers {
 		if len(config.Services) == 0 {
 			return fmt.Errorf("spec.servers[%d].services requires atleast one service", i)
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use delta recovery.
+func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	dataServiceNodes := 0
+
+	for _, config := range cluster.Spec.Servers {
+		if couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
+			dataServiceNodes += config.Size
+		}
+	}
+
+	if cluster.Spec.UpgradeProcess != nil {
+		if dataServiceNodes < 2 && *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+			return fmt.Errorf("cannot enable delta recovery with less than two data service nodes defined")
 		}
 	}
 

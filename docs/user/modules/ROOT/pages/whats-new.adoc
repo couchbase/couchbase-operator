@@ -36,3 +36,9 @@ Added platform specific zone labels to persistent volume claims for EKS, GKE and
 Added pod readiness delay and pod readiness period parameters to the `cao create operator` command.  These will be applied to all Couchbase Server pods created by the operator.
 
 See xref:/tools/cao.adoc#cao-create-operator[Cao Create Operator] for further details.
+
+== Cloud Native Gateway (from Couchbase Autonomous Operator 2.6.1)
+
+The Couchbase _Cloud Native Gateway_ (CNG) is a new component that allows applications to access Couchbase through a set of RPC network endpoints based on https://grpc.io/[gRPC], a https://cncf.io/[Cloud Native Computing Foundation] project.
+
+See xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway] for details.

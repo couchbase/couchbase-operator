@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,6 +85,26 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	// To get here the pod would need to be initialized and clustered, so this is
 	// safe.
 	return k8sutil.SetPodInitialized(c.k8s, m.Name())
+}
+
+// waitForPodAdded waits for a pod to be added to the cluster.
+// The pod will be inactive until rebalanced back in to the cluster.
+func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Member) error {
+	callback := func() error {
+		nodeInfo := couchbaseutil.NodeInfo{}
+
+		if err := couchbaseutil.GetNodesSelf(&nodeInfo).On(c.api, member); err != nil {
+			return err
+		}
+
+		if nodeInfo.Membership == "inactiveAdded" {
+			return nil
+		}
+
+		return errors.ErrNodeNotAdded
+	}
+
+	return retryutil.Retry(ctx, time.Second, callback)
 }
 
 // wait with context.

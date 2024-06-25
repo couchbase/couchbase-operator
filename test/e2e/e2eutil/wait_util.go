@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,55 @@ func resourceConditionExists(conditionType, conditionStatus string) resourceChec
 
 			if concreteStatus != conditionStatus {
 				return fmt.Errorf("condition status mismatch, expected %v, got %v", conditionStatus, concreteStatus)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("condition %v missing", conditionType)
+	}
+}
+
+// resourceConditionExists checks that a resource has a condition in the correct state with a message matched regex expression.
+func resourceConditionExistsWithMessage(conditionType, conditionStatus, conditionMessage string) resourceCheckFunc {
+	return func(resource *unstructured.Unstructured, lookupError error) error {
+		conditions, ok, _ := unstructured.NestedSlice(resource.Object, "status", "conditions")
+		if !ok {
+			return fmt.Errorf("resource has no conditions")
+		}
+
+		for _, c := range conditions {
+			condition, ok := c.(map[string]interface{})
+			if !ok {
+				return fmt.Errorf("malformed condition %v", c)
+			}
+
+			concreteType, ok, _ := unstructured.NestedString(condition, "type")
+			if !ok {
+				return fmt.Errorf("condition has no type %v", condition)
+			}
+
+			if concreteType != conditionType {
+				continue
+			}
+
+			concreteStatus, ok, _ := unstructured.NestedString(condition, "status")
+			if !ok {
+				return fmt.Errorf("condition has no status %v", condition)
+			}
+
+			if concreteStatus != conditionStatus {
+				return fmt.Errorf("condition status mismatch, expected %v, got %v", conditionStatus, concreteStatus)
+			}
+
+			concreteMessage, ok, _ := unstructured.NestedString(condition, "message")
+			if !ok {
+				return fmt.Errorf("condition has no message %v", condition)
+			}
+
+			re := regexp.MustCompile(conditionMessage)
+			if re.Match([]byte(concreteMessage)) {
+				return fmt.Errorf("condition message mismatch, expected %v, got %v", conditionMessage, concreteMessage)
 			}
 
 			return nil
@@ -204,6 +254,12 @@ func MustWaitForResourceDeletion(t *testing.T, k8s *types.Cluster, resource runt
 // that should be used with RetryFor().
 func ResourceCondition(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus string) func() error {
 	return ResourceConstraints(k8s, resource, resourceExists, resourceConditionExists(conditionType, conditionStatus))
+}
+
+// ResourceConditionWithMessage checks if a given resource has the given condition. This returns a closure
+// that should be used with RetryFor().
+func ResourceConditionWithMessage(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus, conditionMessage string) func() error {
+	return ResourceConstraints(k8s, resource, resourceExists, resourceConditionExistsWithMessage(conditionType, conditionStatus, conditionMessage))
 }
 
 // waitForResourceEvent watches event streams for a given resource and returns when the requested
@@ -625,6 +681,38 @@ func MustWaitClusterStatusHealthy(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
+func WaitClusterStatusHealthyWithoutError(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	// Wait for cluster to be available and balanced.
+	waitForConstraints := ResourceConstraints(k8s, cluster,
+		resourceConditionExists(string(couchbasev2.ClusterConditionAvailable), string(v1.ConditionTrue)),
+		resourceConditionExists(string(couchbasev2.ClusterConditionBalanced), string(v1.ConditionTrue)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionUpgrading)),
+	)
+
+	strictConstraints := ResourceConstraints(k8s, cluster,
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionError)),
+	)
+
+	constraintFunc := func() (error, bool) {
+		err := strictConstraints()
+		if err != nil {
+			return err, false
+		}
+
+		err = waitForConstraints()
+
+		return nil, err == nil
+	}
+
+	return retryutil.RetryUntilErrorOrSuccess(timeout, time.Second, constraintFunc)
+}
+
+func MustWaitClusterStatusHealthyWithoutError(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := WaitClusterStatusHealthyWithoutError(k8s, cluster, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // WaitUntilOperatorReady will wait until the first pod selected for couchbase-operator is ready.
 func WaitUntilOperatorReady(k8s *types.Cluster, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, ResourceCondition(k8s, k8s.OperatorDeployment, "Available", "True"))
@@ -655,6 +743,37 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev
 // waits until the provided condition type with associated status.
 func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustWaitForClusterWithErrorMessage waits until the cluster has a specific error message.
+func MustWaitForClusterWithErrorMessage(t *testing.T, k8s *types.Cluster, errMessage string, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, ResourceConditionWithMessage(k8s, cl, string(couchbasev2.ClusterConditionError), string(v1.ConditionTrue), errMessage)); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustWaitForGracefulFailoverToBeRunning waits until a graceful failover task is running.
+func MustWaitForGracefulFailoverToBeRunning(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	err := retryutil.RetryFor(timeout, func() error {
+		runningTasks := couchbaseutil.RunningTasks{}
+		err := couchbaseutil.GetRunningTasks(&runningTasks).On(client.client, client.host)
+		if err != nil {
+			return err
+		}
+
+		for _, task := range runningTasks {
+			if task.SubType == "gracefulFailover" && task.Status == "running" {
+				return nil
+			}
+		}
+		return fmt.Errorf("no graceful failover task running")
+	})
+
+	if err != nil {
 		Die(t, err)
 	}
 }
@@ -1293,4 +1412,41 @@ func MustWaitForPodVolumeSize(t *testing.T, k8s *types.Cluster, memberName strin
 	if err != nil {
 		Die(t, err)
 	}
+}
+
+type ExecOutput struct {
+	Stdout string
+	Stderr string
+}
+
+func MustStartExecCommandOnPod(t *testing.T, k8s *types.Cluster, podName string, cmd string, output *ExecOutput, timeout time.Duration) *AsyncOperation {
+	op, err := StartExecCommandOnPod(k8s, podName, cmd, output, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return op
+}
+
+// StartExecCommandOnPod returns a channel to be
+// populated with result of a pending cluster event.
+func StartExecCommandOnPod(k8s *types.Cluster, podName string, cmd string, output *ExecOutput, timeout time.Duration) (*AsyncOperation, error) {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	f := func(ctx context.Context, ready chan struct{}) error {
+		close(ready)
+
+		output.Stdout, output.Stderr, err = ExecCommandInContainerWithFullOutputAndContext(ctx, k8s, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
+
+		return err
+	}
+
+	op := NewAsyncOperationWithTimeout(timeout)
+
+	op.Run(f)
+
+	return op, nil
 }

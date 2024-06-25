@@ -61,6 +61,7 @@ const (
 	CngAdminUserSecretPrefix                  = "couchbase-cloud-native-gateway-admin-secret"
 	CngAdminUserNamePrefix                    = "cng-admin"
 	CngVolumeName                             = "couchbase-cloud-native-gateway-volume"
+	terminationGracePeriodSeconds             = 1200
 )
 
 type PodReadinessConfig struct {
@@ -70,7 +71,7 @@ type PodReadinessConfig struct {
 
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
-func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
+func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
 	// First work out what persistent volumes we need.
 	pvcState, err := GetPodVolumes(client, m, cluster, config)
 	if err != nil {
@@ -136,7 +137,7 @@ func CreateCouchbasePod(_ context.Context, client *client.Client, scheduler sche
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod, cluster.AsOwner())
 
-	return CreatePod(client, cluster.Namespace, pod)
+	return CreatePod(ctx, client, cluster.Namespace, pod)
 }
 
 func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup string, cluster *couchbasev2.CouchbaseCluster) {
@@ -889,6 +890,9 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
 	pod.Spec.Hostname = m.Name()
 	pod.Spec.Subdomain = cluster.Name
+
+	terminationGracePeriodSeconds := int64(terminationGracePeriodSeconds)
+	pod.Spec.TerminationGracePeriodSeconds = &terminationGracePeriodSeconds
 
 	if cluster.Spec.Security.PodSecurityContext != nil {
 		// both cluster.Spec.SecurityContext (if present) and cluster.Spec.Security.PodSecurityContext
@@ -2181,6 +2185,10 @@ func getPodReadyCondition(status *v1.PodStatus) *v1.PodCondition {
 	return nil
 }
 
+func IsPodTerminating(pod *v1.Pod) bool {
+	return pod.DeletionTimestamp != nil
+}
+
 // Find the PVC belonging to a member that was mounted at the specified path.
 // It's not considered an error in the case that PVC cannot be found.
 func findMemberPVC(client *client.Client, memberName, path string) (*v1.PersistentVolumeClaim, error) {
@@ -2409,7 +2417,13 @@ func FlagPodReady(client *client.Client, name string) error {
 		return errors.NewStackTracedError(err)
 	}
 
+	logPodReady(pod)
+
 	return nil
+}
+
+func logPodReady(pod *v1.Pod) {
+	log.V(1).Info("Pod marked ready by operator", "pod", pod.Name)
 }
 
 func ApplyPodAntiAffinityForCluster(clusterName string) *v1.PodAntiAffinity {

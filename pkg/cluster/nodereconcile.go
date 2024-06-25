@@ -1,7 +1,9 @@
 package cluster
 
 import (
+	goerrors "errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,8 +20,12 @@ import (
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
-var ErrNoRunningTasks = fmt.Errorf("no running tasks found")
-var ErrStatusRunning = fmt.Errorf("task is currently running")
+var ErrOrchestratorNotUpgraded = fmt.Errorf("orchestrator not upgraded yet")
+var ErrFailoverStartCounterNotIncremented = fmt.Errorf("failover start counter not incremented")
+var ErrFailoverSuccessCounterNotIncremented = fmt.Errorf("failover success counter not incremented")
+var ErrUnexpectedCounterChange = fmt.Errorf("unexpected counter change")
+var ErrNodeNotInCluster = fmt.Errorf("node not in the cluster: ")
+var ErrNodeNotActive = fmt.Errorf("node not active: ")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -583,6 +589,14 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 	r.log()
 
 	for name, m := range r.couchbase.AddBackNodes {
+		if terminating, err := c.isPodTerminating(m); err != nil {
+			return err
+		} else if terminating {
+			log.Info("Add back node is terminating", "cluster", c.namespacedName(), "name", name)
+			r.abort("add back node is terminating")
+			return nil
+		}
+
 		err := c.verifyMemberVolumes(m)
 		if err != nil {
 			log.Error(err, "Failed pod cannot be recovered, volumes unhealthy", "cluster", c.namespacedName(), "name", name)
@@ -1118,55 +1132,217 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 	return candidatesNoOrchestrator, orchestrator
 }
 
-// gracefulFailoverMember will gracefully fail over a member and watch the tasks endpoint to wait for the failover to finish.
-// Returns a bool if it's possible to perform a deltaRecovery.
-func (r *ReconcileMachine) gracefulFailoverMember(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
+func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member, c *Cluster) error {
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
+	// We can retry on 500 and 503 codes.
+	return retryutil.RetryUntilErrorOrSuccess(time.Minute, 5*time.Second, func() (error, bool) {
+		if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+			var failedReqErr couchbaseutil.FailedRequestError
+			if goerrors.As(err, &failedReqErr) {
+				switch failedReqErr.StatusCode {
+				case http.StatusServiceUnavailable, http.StatusInternalServerError:
+					fmt.Println("Retrying graceful failover")
+					fmt.Println("failedReqErr.StatusCode: ", failedReqErr.StatusCode)
+					return nil, false
+				}
+			}
+
+			return err, false
+		}
+		return nil, true
+	})
+}
+
+//nolint:gocognit
+func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member, c *Cluster) error {
+	clusterInfoInitial := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(clusterInfoInitial).On(c.api, candidate); err != nil {
+		return err
+	}
+
+	for _, node := range clusterInfoInitial.Nodes {
+		if !c.members.Contains(node.HostName.GetMemberName()) {
+			return fmt.Errorf("%w, %s", ErrNodeNotInCluster, node.HostName)
+		}
+
+		if strings.Compare("active", node.Membership) != 0 {
+			return fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+
+		if node.Membership == "inactiveFailed" || node.Membership == "inactiveAdded" {
+			return fmt.Errorf("%w %s", ErrNodeNotActive, node.HostName)
+		}
+	}
+
+	initialCounters := clusterInfoInitial.Counters
+
+	if err := r.startGracefulFailover(candidate, c); err != nil {
+		return err
+	}
+
+	// Wait for the graceful failover to complete
+	err := retryutil.RetryUntilErrorOrSuccess(30*time.Minute, time.Second, func() (error, bool) {
+		clusterInfo := couchbaseutil.ClusterInfo{}
+
+		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, candidate); err != nil {
+			return err, false
+		}
+
+		// Ensure the graceful failover start counter is incremented
+		if clusterInfo.Counters["graceful_failover_start"] != (initialCounters["graceful_failover_start"] + 1) {
+			return ErrFailoverStartCounterNotIncremented, false
+		}
+
+		// Compare the counters to see if anything has changed
+		if len(initialCounters) > len(clusterInfo.Counters) {
+			return ErrUnexpectedCounterChange, false
+		}
+
+		// We track the counters to ensure that the rebalance completes and graceful failover completes.
+		// If the rebalance status completes, but another one starts (e.g. auto-failover or user intervention)
+		// then we will fail because we detect that some other counter has changed.
+		for name, curVal := range clusterInfo.Counters {
+			oldVal := initialCounters[name]
+			switch name {
+			case "graceful_failover_start", "graceful_failover_success":
+				continue
+			// We can expect the failover counters to increment by 1 because these get incremented by server
+			// before the graceful_failover_success.
+			// The order is graceful_failover_start, failover, failover_complete, graceful_failover_success.
+			case "failover", "failover_complete":
+				if curVal > oldVal+1 {
+					return ErrUnexpectedCounterChange, false
+				}
+				continue
+			}
+
+			if curVal != oldVal {
+				return ErrUnexpectedCounterChange, false
+			}
+		}
+
+		// If the rebalance is complete check that the graceful failover success counter is incremented
+		if clusterInfo.RebalanceStatus == couchbaseutil.RebalanceStatusNone {
+			if clusterInfo.Counters["graceful_failover_success"] != (initialCounters["graceful_failover_success"] + 1) {
+				return ErrFailoverSuccessCounterNotIncremented, false
+			}
+		}
+
+		if clusterInfo.Counters["graceful_failover_success"] == (initialCounters["graceful_failover_success"] + 1) {
+			return nil, true
+		}
+
+		return nil, false
+	})
+
+	if err != nil {
+		return fmt.Errorf("graceful failover failed: %w", err)
+	}
+
+	return nil
+}
+
+// failoverNodeForDeltaRecovery will gracefully failover data nodes and hardfailover other nodes.
+func (r *ReconcileMachine) failoverNodeForDeltaRecovery(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
 	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	services := serverClass.Services
-	gracefulFailover := false
+	dataNode := false
 
 	for _, service := range services {
-		if service == couchbasev2.DataService && c.amountOfServersWithService(couchbasev2.DataService) > 1 {
-			gracefulFailover = true
+		if service == couchbasev2.DataService {
+			dataNode = true
 			break
 		}
 	}
 
-	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
-
-	if !gracefulFailover {
-		log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
-
-		if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+	if dataNode {
+		// Graceful failover for data nodes
+		if err := r.gracefullyFailoverNode(candidate, c); err != nil {
 			return false, err
 		}
 
 		return true, nil
 	}
 
-	if err := couchbaseutil.GracefulFailover(otpNodeList).On(c.api, candidate); err != nil {
+	// Hard failover for other nodes
+	log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
+
+	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
+
+	if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
 		return false, err
 	}
 
-	err := retryutil.RetryFor(5*time.Minute, func() error {
-		runningTasks := couchbaseutil.RunningTasks{}
-		err := couchbaseutil.GetRunningTasks(&runningTasks).On(c.api, c.readyMembers())
-		if err != nil {
+	return true, nil
+}
+
+func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVersion string) error {
+	callback := func() error {
+		clusterInfo := &couchbaseutil.TerseClusterInfo{}
+		if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		for _, task := range runningTasks {
-			if strings.Compare(task.SubType, "gracefulFailover") == 0 {
-				if strings.Compare(task.Status, "notRunning") == 0 {
-					return nil
-				}
-				return ErrStatusRunning
+		orchestratorName := clusterInfo.Orchestrator
+
+		var orchestratorMember couchbaseutil.Member
+
+		for name, member := range c.members {
+			if name == orchestratorName {
+				orchestratorMember = member
 			}
 		}
-		return ErrNoRunningTasks
-	})
 
-	return true, err
+		if orchestratorMember.Version() == targetVersion {
+			return nil
+		}
+
+		return ErrOrchestratorNotUpgraded
+	}
+
+	return retryutil.RetryFor(1*time.Minute, callback)
+}
+
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+	if canDeltaRecover {
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+	}
+
+	if err := c.recreatePod(candidate); err != nil {
+		return err
+	}
+
+	if err := c.waitForPodAdded(c.ctx, candidate); err != nil {
+		return err
+	}
+
+	// Rebalance failed. Time to set recovery type as full.
+	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()))
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
+			if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
+				return err
+			}
+		}
+
+		return c.rebalance(c.members, nil)
+	}
+
+	return nil
 }
 
 func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
@@ -1218,33 +1394,14 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			}
 		}
 
-		canDeltaRecover, err := r.gracefulFailoverMember(candidate, c)
+		canDeltaRecover, err := r.failoverNodeForDeltaRecovery(candidate, c)
 		if err != nil {
-			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
-
 			return err
 		}
 
 		canDeltaRecover = canDeltaRecover && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if canDeltaRecover {
-			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
-				metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-				metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
-
-				return err
-			}
-		}
-
-		if err := c.recreatePod(candidate); err != nil {
-			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
-
-			return err
-		}
-
-		if err := c.rebalance(c.members, nil); err != nil {
+		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canDeltaRecover); err != nil {
 			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
 

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -1205,6 +1208,17 @@ func TestDeltaRecovery(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.UpgradeProcess = &upgradeProcess
 
+	// This config triggers unexpected counter errors during upgrade
+	kubernetes.DisableResourceAllocation = true
+	cluster.Spec.Servers[0].Services = []couchbasev2.Service{
+		couchbasev2.DataService,
+		couchbasev2.IndexService,
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.AnalyticsService,
+		couchbasev2.EventingService,
+	}
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -1214,6 +1228,261 @@ func TestDeltaRecovery(t *testing.T) {
 
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthyWithoutError(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestDeltaRecoveryWithoutDataService(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	groupSize1 := 2
+	groupSize2 := 1
+	clusterSize := groupSize1 + groupSize2
+
+	// Create the cluster with two server classes, and exposed features.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
+		{
+			Name: "data",
+			Size: groupSize1,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				DataClaim:    "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "query",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+	}
+
+	runDeltaRecoveryTests(t, kubernetes, cluster, f, "data", 20*time.Minute)
+}
+
+func TestDeltaRecoveryWithVariousServices(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	groupSize1 := 2
+	groupSize2 := 1
+	clusterSize := groupSize1
+
+	// Create the cluster with various server classes, and exposed features.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{
+		{
+			Name: "data",
+			Size: groupSize1,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				DataClaim:    "default",
+			},
+		},
+		{
+			Name: "kvIndexQuery",
+			Size: groupSize1,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "indexQueryAnalytics",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+				couchbasev2.AnalyticsService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "queryAnalytics",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.QueryService,
+				couchbasev2.AnalyticsService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+			},
+		},
+		{
+			Name: "query",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.QueryService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+			},
+		},
+		{
+			Name: "kvIndexQueryAnalytics",
+			Size: groupSize1,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+				couchbasev2.AnalyticsService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "index",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.IndexService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "indexQuery",
+			Size: groupSize2,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.IndexService,
+				couchbasev2.QueryService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+		{
+			Name: "kvIndex",
+			Size: groupSize1,
+			Services: couchbasev2.ServiceList{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+			VolumeMounts: &couchbasev2.VolumeMounts{
+				DefaultClaim: "default",
+				IndexClaim:   "default",
+			},
+		},
+	}
+
+	runDeltaRecoveryTests(t, kubernetes, cluster, f, "data", 40*time.Minute)
+}
+
+func runDeltaRecoveryTests(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, f *framework.Framework, bucketName string, timeout time.Duration) {
+	upgradeProcess := couchbasev2.DeltaRecovery
+	numOfDocs := f.DocsCount
+	cluster.Spec.UpgradeProcess = &upgradeProcess
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	memoryQuota, err := resource.ParseQuantity("1024Mi")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = &memoryQuota
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket.SetName(bucketName)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, timeout)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestResilientDeltaRecovery(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	upgradeProcess := couchbasev2.DeltaRecovery
+	numOfDocs := f.DocsCount
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.UpgradeProcess = &upgradeProcess
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	// Get Orchestrator Node
+	orchestratorNode := e2eutil.MustGetOrchestratorNode(t, kubernetes, cluster)
+
+	index, err := couchbaseutil.GetIndexFromMemberName(strings.Split(strings.Split(orchestratorNode, "@")[1], ".")[0])
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Start upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for graceful failover to be running
+	e2eutil.MustWaitForGracefulFailoverToBeRunning(t, kubernetes, cluster, 5*time.Minute)
+
+	// Kill the orchestrator node
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, index, false)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "graceful failover failed:", cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
@@ -1262,68 +1531,4 @@ func TestPartialUpgrade(t *testing.T) {
 
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class1Name, f.CouchbaseServerImage, upgradeVersion)
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class2Name, f.CouchbaseServerImage, upgradeVersion)
-}
-
-func TestDeltaRecoveryWithoutDataService(t *testing.T) {
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	groupSize1 := 2
-	groupSize2 := 1
-	upgradeProcess := couchbasev2.DeltaRecovery
-	numOfDocs := f.DocsCount
-	clusterSize := groupSize1 + groupSize2
-
-	// Create the cluster with two server classes, and exposed features.
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
-
-	cluster.Spec.Servers = []couchbasev2.ServerConfig{
-		{
-			Name: "data",
-			Size: groupSize1,
-			Services: couchbasev2.ServiceList{
-				couchbasev2.DataService,
-				couchbasev2.IndexService,
-			},
-			VolumeMounts: &couchbasev2.VolumeMounts{
-				DefaultClaim: "default",
-				DataClaim:    "default",
-				IndexClaim:   "default",
-			},
-		},
-		{
-			Name: "query",
-			Size: groupSize2,
-			Services: couchbasev2.ServiceList{
-				couchbasev2.IndexService,
-				couchbasev2.QueryService,
-			},
-			VolumeMounts: &couchbasev2.VolumeMounts{
-				DefaultClaim: "default",
-				IndexClaim:   "default",
-			},
-		},
-	}
-
-	cluster.Spec.UpgradeProcess = &upgradeProcess
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
-
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
-	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
-
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
-	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
-
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
-	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
 }
