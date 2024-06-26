@@ -4814,16 +4814,16 @@ When enabled, the UI will alert when a Couchbase server upgrade is available.
 
 *Type*: `string`
 
-*Enumerations*: `SwapRebalance, DeltaRecovery`
+*Enumerations*: `SwapRebalance, DeltaRecovery, InPlaceUpgrade`
 
 ==== Description
 
 UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
 When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
 ImmediateUpgrade (determined by UpgradeStrategy).
-When DeltaRecovery is requested, the operator will
+When InPlaceUpgrade is requested, the operator will
 perform an in-place upgrade on a best effort basis.
-DeltaRecovery cannot be used if the UpgradeStrategy
+InPlaceUpgrade cannot be used if the UpgradeStrategy
 is set to ImmediateUpgrade.
 
 === couchbaseclusters.spec.upgradeStrategy

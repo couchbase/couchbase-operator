@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	goerrors "errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -64,6 +65,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
+		checkConstraintDeltaRecoveryDeprecated,
 		checkoutConstraintNoServicelessClassBelow76,
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintClusterSupportable,
@@ -128,7 +130,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.UpgradeProcess != nil && cluster.Spec.UpgradeStrategy != nil {
-		if *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
+		if (*cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade || *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery) && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
 			return fmt.Errorf("cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery")
 		}
 	}
@@ -869,7 +871,15 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 	return nil
 }
 
-// checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use delta recovery.
+func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.UpgradeProcess != nil && *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+		slog.Warn("DeltaRecovery is deprecated. Use InPlaceUpgrade instead.")
+	}
+
+	return nil
+}
+
+// checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
 func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	dataServiceNodes := 0
 
@@ -880,8 +890,8 @@ func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *co
 	}
 
 	if cluster.Spec.UpgradeProcess != nil {
-		if dataServiceNodes < 2 && *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
-			return fmt.Errorf("cannot enable delta recovery with less than two data service nodes defined")
+		if dataServiceNodes < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade || *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery) {
+			return fmt.Errorf("cannot enable in place upgrade with less than two data service nodes defined")
 		}
 	}
 

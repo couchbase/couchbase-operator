@@ -1244,7 +1244,7 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 }
 
 // failoverNodeForDeltaRecovery will gracefully failover data nodes and hardfailover other nodes.
-func (r *ReconcileMachine) failoverNodeForDeltaRecovery(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
+func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil.Member, c *Cluster) (bool, error) {
 	serverClass := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 	services := serverClass.Services
 	dataNode := false
@@ -1304,13 +1304,13 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
-	if canDeltaRecover {
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canInPlaceUpgrade bool) error {
+	if canInPlaceUpgrade {
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 	} else {
-		log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+		log.Info("Unable to set DeltaRecovery. Reverting to full recovery.")
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -1345,7 +1345,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 	return nil
 }
 
-func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
+func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	upgraded := len(c.members) - len(candidates)
 
 	status := &couchbasev2.UpgradeStatus{
@@ -1356,13 +1356,13 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 	// Flag that an upgrade is in action, validation will use this to control what
 	// resource modifications are allowed.
 	if err := c.reportUpgrade(status); err != nil {
-		metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 		return err
 	}
 
 	for _, candidate := range candidates {
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			return err
 		}
 
@@ -1378,7 +1378,7 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 			// Update volumes
 			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
 			if err != nil {
-				metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 				return err
 			}
 
@@ -1388,27 +1388,27 @@ func (r *ReconcileMachine) handleDeltaRecovery(c *Cluster, candidates couchbaseu
 				_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
 
 				if err != nil {
-					metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+					metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 					return err
 				}
 			}
 		}
 
-		canDeltaRecover, err := r.failoverNodeForDeltaRecovery(candidate, c)
+		canInPlaceUpgrade, err := r.failoverNodeForInPlaceUpgrade(candidate, c)
 		if err != nil {
 			return err
 		}
 
-		canDeltaRecover = canDeltaRecover && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
+		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canDeltaRecover); err != nil {
-			metrics.DeltaRecoveryFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
 
 			return err
 		}
 
-		metrics.DeltaRecoveriesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.cluster.Name).Inc()
 		metrics.PodReplacementsMetric.WithLabelValues(c.cluster.Name).Inc()
 	}
 
@@ -1453,7 +1453,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	candidates = constrained
 
-	// Is it possible to do DeltaRecovery if that's what they asked for?
+	// Is it possible to do InPlaceUpgrade if that's what they asked for?
 	pvcPresent := true
 
 	var targetVersion string
@@ -1468,15 +1468,20 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		}
 	}
 
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+		inPlaceUpgrade := couchbasev2.InPlaceUpgrade
+		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
+	}
+
 	// Carry out the move
 	// We can use the upgrade methods to do this (even though we're not changing the version)
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
-		err := r.handleDeltaRecovery(c, candidates, targetVersion)
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && pvcPresent {
+		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
 	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !pvcPresent {
 			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
@@ -1544,6 +1549,11 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+		inPlaceUpgrade := couchbasev2.InPlaceUpgrade
+		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
+	}
+
 	groupedCandidates := candidates.GroupByServerConfigs()
 	for serverConfigName, serverCandidates := range groupedCandidates {
 		serverConf := c.cluster.Spec.GetServerConfigByName(serverConfigName)
@@ -1553,12 +1563,12 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			return err
 		}
 
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && pvcPresent {
-			log.Info("Upgrading pods with DeltaRecovery", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && pvcPresent {
+			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
 
-			err = r.handleDeltaRecovery(c, serverCandidates, targetVersion)
+			err = r.handleInPlaceUpgrade(c, serverCandidates, targetVersion)
 		} else {
-			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery && !pvcPresent {
+			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !pvcPresent {
 				log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 			}
 

@@ -176,17 +176,17 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
 
-	// DeltaRecoveriesTotalMetric
-	// name: delta_recoveries_total
+	// InPlaceUpgradeTotalMetric
+	// name: in_place_upgrades_total
 	// type: counter
-	// help: Total number of delta recoveries performed by operator
+	// help: Total number of in place upgrades performed by operator
 	// unit:
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	DeltaRecoveriesTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "delta_recoveries_total",
-		Help:      "Total number of delta recoveries performed by operator",
+	InPlaceUpgradeTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "in_place_upgrades_total",
+		Help:      "Total number of in place upgrades performed by operator",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
@@ -206,17 +206,17 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
 
-	// DeltaRecoveryFailuresMetric
-	// name: delta_recovery_failures
+	// InPlaceUpgradeFailuresMetric
+	// name: in_place_upgrade_failures
 	// type: counter
-	// help: The number of times delta recoveries have failed
+	// help: The number of times in place upgrades have failed
 	// unit:
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	DeltaRecoveryFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "delta_recovery_failures",
-		Help:      "The number of times delta recoveries have failed",
+	InPlaceUpgradeFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "in_place_upgrade_failures",
+		Help:      "The number of times in place upgrades have failed",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
 	}, []string{"name"})
@@ -296,8 +296,8 @@ func init() {
 		VolumeExpansionMetric,
 		SwapRebalancesTotalMetric,
 		SwapRebalanceFailuresMetric,
-		DeltaRecoveriesTotalMetric,
-		DeltaRecoveryFailuresMetric,
+		InPlaceUpgradeTotalMetric,
+		InPlaceUpgradeFailuresMetric,
 		PodReplacementsMetric,
 		PodReplacementsFailedMetric,
 		PodRecoveriesMetric,

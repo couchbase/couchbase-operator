@@ -1201,7 +1201,7 @@ func TestDeltaRecovery(t *testing.T) {
 	defer cleanup()
 
 	clusterSize := 3
-	upgradeProcess := couchbasev2.DeltaRecovery
+	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
@@ -1409,7 +1409,7 @@ func TestDeltaRecoveryWithVariousServices(t *testing.T) {
 }
 
 func runDeltaRecoveryTests(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, f *framework.Framework, bucketName string, timeout time.Duration) {
-	upgradeProcess := couchbasev2.DeltaRecovery
+	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
 	cluster.Spec.UpgradeProcess = &upgradeProcess
 
@@ -1448,7 +1448,7 @@ func TestResilientDeltaRecovery(t *testing.T) {
 	defer cleanup()
 
 	clusterSize := 3
-	upgradeProcess := couchbasev2.DeltaRecovery
+	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)

@@ -2070,17 +2070,20 @@ const (
 )
 
 // This defines the default upgrade process for couchbase pods. Defaults to SwapRebalance.
-// +kubebuilder:validation:Enum=SwapRebalance;DeltaRecovery
+// +kubebuilder:validation:Enum=SwapRebalance;DeltaRecovery;InPlaceUpgrade
 type UpgradeProcess string
 
 const (
 	// SwapRebalance will default to upgrading one node at a time. This is much
-	// safer but will take a longer time than a DeltaRecovery.
+	// safer but will take a longer time than a InPlaceUpgrade.
 	SwapRebalance UpgradeProcess = "SwapRebalance"
 
+	// DEPRECATED - by InPlaceUpgrade
 	// DeltaRecovery will perform an in-place upgrade of the pods in the cluster.
 	// It will also update PVCs to use the new couchbase server version.
 	DeltaRecovery UpgradeProcess = "DeltaRecovery"
+
+	InPlaceUpgrade UpgradeProcess = "InPlaceUpgrade"
 )
 
 // This controls how aggressive to be with upgrades.
@@ -2179,8 +2182,8 @@ type ClusterSpec struct {
 
 	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
 	// When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
-	// ImmediateUpgrade (determined by UpgradeStrategy). When DeltaRecovery is requested, the operator will
-	// perform an in-place upgrade on a best effort basis. DeltaRecovery cannot be used if the UpgradeStrategy
+	// ImmediateUpgrade (determined by UpgradeStrategy). When InPlaceUpgrade is requested, the operator will
+	// perform an in-place upgrade on a best effort basis. InPlaceUpgrade cannot be used if the UpgradeStrategy
 	// is set to ImmediateUpgrade.
 	UpgradeProcess *UpgradeProcess `json:"upgradeProcess,omitempty"`
 

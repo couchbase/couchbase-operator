@@ -1,16 +1,16 @@
 {
-    "delta_recoveries_total": {
+    "in_place_upgrade_failures": {
         "type": "counter",
-        "help": "Total number of delta recoveries performed by operator",
+        "help": "The number of times in place upgrades have failed",
         "added": "2.7.0",
         "stability": "committed",
         "labels": [
             "name"
         ]
     },
-    "delta_recovery_failures": {
+    "in_place_upgrades_total": {
         "type": "counter",
-        "help": "The number of times delta recoveries have failed",
+        "help": "Total number of in place upgrades performed by operator",
         "added": "2.7.0",
         "stability": "committed",
         "labels": [
