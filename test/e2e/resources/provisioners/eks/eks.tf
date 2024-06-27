@@ -88,9 +88,9 @@ module "cluster" {
     default_node_group = {
       name                   = "cao-25x-pipeline"
       instance_types         = ["m5.4xlarge"]
-      min_size               = 20
-      desired_size           = 20
-      max_size               = 21
+      min_size               = 14
+      desired_size           = 14
+      max_size               = 15
       vpc_security_group_ids = [aws_security_group.securitygroup.id]
       disk_size = 1000
     }
