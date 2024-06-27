@@ -870,6 +870,8 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		Resources: resources,
 	}
 
+	c.applyContainerSecurityContext(&container)
+
 	if backup.Spec.ObjectStore != nil && backup.Spec.ObjectStore.URI != "" {
 		c.applyObjStoreConfiguration(&container, backup.Spec.ObjectStore)
 	} else if len(backup.Spec.S3Bucket) != 0 {
@@ -1076,6 +1078,8 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		Resources: resources,
 	}
 
+	c.applyContainerSecurityContext(&container)
+
 	if spec.ObjectStore != nil && spec.ObjectStore.URI != "" {
 		c.applyObjStoreConfiguration(&container, spec.ObjectStore)
 	} else if len(spec.S3Bucket) != 0 {
@@ -1126,6 +1130,12 @@ func (c *Cluster) applyObjEndpointToContainer(container *corev1.Container, objec
 		if objectEndpoint.UseVirtualPath {
 			container.Args = append(container.Args, "--s3-force-path-style", "false")
 		}
+	}
+}
+
+func (c *Cluster) applyContainerSecurityContext(container *corev1.Container) {
+	if c.cluster.Spec.Security.SecurityContext != nil {
+		container.SecurityContext = c.cluster.Spec.Security.SecurityContext
 	}
 }
 
