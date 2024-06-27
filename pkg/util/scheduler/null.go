@@ -18,7 +18,7 @@ const (
 // server deletion.
 type nullSchedulerImpl struct {
 	// A plain list of servers per server class
-	serverClasses serverGroups
+	serverClasses map[string]*serverList
 
 	// removableServerClasses is for tracking our internal state of ordered removal
 	// of pods by server classes

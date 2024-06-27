@@ -35,3 +35,4 @@ scripts/venv/
 package-lock.json
 /.vscode/
 
+tmp

@@ -180,6 +180,10 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 
 	log.Info("Running", "cluster", c.namespacedName())
 
+	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
+		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
+	}
+
 	// No reason other than it's marginally quicker than waiting for the next run!
 	c.runReconcile()
 

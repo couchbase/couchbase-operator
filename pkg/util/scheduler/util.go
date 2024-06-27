@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"fmt"
+	"hash/fnv"
+	"math/rand"
 	"sort"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -58,11 +60,124 @@ func (s *serverList) find(name string) bool {
 	return false
 }
 
+type serverGroups interface {
+	addGroup(name string)
+	addGroupIfDoesntExist(group string)
+	getMap() map[string]*serverList
+	getGroup(name string) *serverList
+	groupExists(group string) bool
+	smallestGroup() string
+	largestGroup() string
+}
+
+func newOrderedServerGroups() orderedServerGroups {
+	return orderedServerGroups{
+		groupsOrder: &[]string{},
+		groupMap:    groupMap{},
+	}
+}
+
+type orderedServerGroups struct {
+	groupsOrder *[]string
+	groupMap
+}
+
+func (s orderedServerGroups) addGroup(name string) {
+	*s.groupsOrder = append(*s.groupsOrder, name)
+	s.groupMap.addGroup(name)
+}
+
+func (s orderedServerGroups) addGroupIfDoesntExist(group string) {
+	if _, ok := s.groupMap[group]; !ok {
+		s.addGroup(group)
+	}
+}
+
+// filterGroupsOnSize returns an alphabetically sorted list of server group names
+// based on some predicate based on the list of servers in each group.
+func (s orderedServerGroups) filter(predicate filterPredicate) []string {
+	groups := []string{}
+
+	for _, group := range *s.groupsOrder {
+		if predicate(s.groupMap[group]) {
+			groups = append(groups, group)
+		}
+	}
+
+	return groups
+}
+
+// smallestGroups returns a list of the smallest server groups.
+func (s orderedServerGroups) smallestGroups() []string {
+	min := s.minSize()
+
+	return s.filter(func(servers *serverList) bool {
+		return len(servers.servers) == min
+	})
+}
+
+// smallestGroup return the smallest server group for a class. On contention,
+// the first item in the list is returned.
+func (s orderedServerGroups) smallestGroup() string {
+	return s.smallestGroups()[0]
+}
+
+// largestGroups returns a list of the largest server groups.
+func (s orderedServerGroups) largestGroups() []string {
+	max := s.maxSize()
+
+	return s.filter(func(servers *serverList) bool {
+		return len(servers.servers) == max
+	})
+}
+
+// largestGroup return the largest server group for a class. On contention,
+// the last item in the list is returned.
+func (s orderedServerGroups) largestGroup() string {
+	groups := s.largestGroups()
+	return groups[len(groups)-1]
+}
+
 // serverGroups maps server group names to a list of servers.
-type serverGroups map[string]*serverList
+type groupMap map[string]*serverList
+
+// NewLexicalServerGroups returns a new lexical server groups. This is a server group
+// that returns the smallest or largest server group based on lexical order.
+func newLexicalServerGroups() lexicalServerGroups {
+	return lexicalServerGroups{
+		groupMap: groupMap{},
+	}
+}
+
+type lexicalServerGroups struct {
+	groupMap
+}
+
+func (s groupMap) addGroup(name string) {
+	s[name] = &serverList{}
+}
+
+func (s groupMap) addGroupIfDoesntExist(group string) {
+	if _, ok := s[group]; !ok {
+		s.addGroup(group)
+	}
+}
+
+func (s groupMap) getMap() map[string]*serverList {
+	return s
+}
+
+func (s groupMap) getGroup(name string) *serverList {
+	return s[name]
+}
+
+func (s groupMap) groupExists(group string) bool {
+	_, ok := s[group]
+	return ok
+}
 
 // sizes returns a list of the size of each server group.
-func (s serverGroups) sizes() []int {
+func (s groupMap) sizes() []int {
 	// Map from from groups of pods to a list of lengths
 	sizes := []int{}
 
@@ -75,7 +190,7 @@ func (s serverGroups) sizes() []int {
 
 // minSize finds the smallest server group population in the
 // provided server group map.
-func (s serverGroups) minSize() int {
+func (s groupMap) minSize() int {
 	sizes := s.sizes()
 	min := sizes[0]
 
@@ -90,7 +205,7 @@ func (s serverGroups) minSize() int {
 
 // maxSize finds the largest server group population in the
 // provided server group map.
-func (s serverGroups) maxSize() int {
+func (s groupMap) maxSize() int {
 	sizes := s.sizes()
 	max := 0
 
@@ -106,9 +221,9 @@ func (s serverGroups) maxSize() int {
 // filterPredicate is used to filter server groups based typically on a closure.
 type filterPredicate func(*serverList) bool
 
-// filterGroupsOnSize returns an alphabetically sorted list of server group names
+// filterGroupsOnSize returns a list of server group names
 // based on some predicate based on the list of servers in each group.
-func (s serverGroups) filter(predicate filterPredicate) []string {
+func (s groupMap) filter(predicate filterPredicate) []string {
 	groups := []string{}
 
 	for group, servers := range s {
@@ -122,7 +237,7 @@ func (s serverGroups) filter(predicate filterPredicate) []string {
 
 // smallestGroups returns an alphabetically sorted list of the smallest server
 // groups for a class.
-func (s serverGroups) smallestGroups() []string {
+func (s groupMap) smallestGroups() []string {
 	min := s.minSize()
 
 	return s.filter(func(servers *serverList) bool {
@@ -132,7 +247,7 @@ func (s serverGroups) smallestGroups() []string {
 
 // smallestGroup return the smallest server group for a class, returning the
 // item with the smallest name on contention.
-func (s serverGroups) smallestGroup() string {
+func (s lexicalServerGroups) smallestGroup() string {
 	groups := s.smallestGroups()
 	sort.Strings(groups)
 
@@ -141,7 +256,7 @@ func (s serverGroups) smallestGroup() string {
 
 // largestGroups returns an alphabetically sorted list of the largest server
 // groups for a class.
-func (s serverGroups) largestGroups() []string {
+func (s groupMap) largestGroups() []string {
 	max := s.maxSize()
 
 	return s.filter(func(servers *serverList) bool {
@@ -151,7 +266,7 @@ func (s serverGroups) largestGroups() []string {
 
 // largestGroup return the largest server group for a class, returning the
 // item with the largest name on contention.
-func (s serverGroups) largestGroup() string {
+func (s lexicalServerGroups) largestGroup() string {
 	groups := s.largestGroups()
 	sort.Strings(groups)
 
@@ -186,3 +301,20 @@ func (q *serverRemovalQueue) dequeue() string {
 // serverClassServerRemovalMap maps server classes to the serverDeletionQueue FIFO queue.
 // N.B. Don't care about serverGroup.
 type serverClassServerRemovalMap map[string]*serverRemovalQueue
+
+func hashString(s string) uint64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+
+	return h.Sum64()
+}
+
+// ShuffleServerGroups shuffles the server groups in a pseudo-random manner using
+// the cluster name as the seed.
+func ShuffleServerGroups(groups []string, clusterName string) {
+	seed := hashString(clusterName)
+	randSrc := rand.NewSource(int64(seed))
+	rand.New(randSrc).Shuffle(len(groups), func(i, j int) {
+		groups[i], groups[j] = groups[j], groups[i]
+	})
+}

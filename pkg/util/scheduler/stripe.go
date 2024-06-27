@@ -60,10 +60,19 @@ func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.Couchba
 			return err
 		}
 
-		sched.serverClasses[class.Name] = serverGroups{}
+		if cluster.Spec.ShuffleServerGroups {
+			// Copy slice so we're not messing with the original
+			groups = append([]string(nil), groups...)
+
+			ShuffleServerGroups(groups, cluster.NamespacedName())
+
+			sched.serverClasses[class.Name] = newOrderedServerGroups()
+		} else {
+			sched.serverClasses[class.Name] = newLexicalServerGroups()
+		}
 
 		for _, group := range groups {
-			sched.serverClasses[class.Name][group] = &serverList{}
+			sched.serverClasses[class.Name].addGroup(group)
 		}
 	}
 
@@ -115,34 +124,28 @@ func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 		group, err := getPodServerGroup(pod)
 		if err != nil {
 			if _, ok := sched.unschedulableServerClasses[class]; !ok {
-				sched.unschedulableServerClasses[class] = serverGroups{}
+				sched.unschedulableServerClasses[class] = newLexicalServerGroups()
 			}
 
-			if _, ok := sched.unschedulableServerClasses[class][group]; !ok {
-				sched.unschedulableServerClasses[class][group] = &serverList{}
-			}
-
-			sched.unschedulableServerClasses[class][group].push(pod.Name)
+			sched.unschedulableServerClasses[class].addGroupIfDoesntExist(group)
+			sched.unschedulableServerClasses[class].getGroup(group).push(pod.Name)
 
 			continue
 		}
 
 		// Pod is not part of an active server class... we're migrating server classes.
-		if _, ok := sched.serverClasses[class][group]; !ok {
+		if !sched.serverClasses[class].groupExists(group) {
 			if _, ok := sched.unschedulableServerClasses[class]; !ok {
-				sched.unschedulableServerClasses[class] = serverGroups{}
+				sched.unschedulableServerClasses[class] = newLexicalServerGroups()
 			}
 
-			if _, ok := sched.unschedulableServerClasses[class][group]; !ok {
-				sched.unschedulableServerClasses[class][group] = &serverList{}
-			}
-
-			sched.unschedulableServerClasses[class][group].push(pod.Name)
+			sched.unschedulableServerClasses[class].addGroupIfDoesntExist(group)
+			sched.unschedulableServerClasses[class].getGroup(group).push(pod.Name)
 
 			continue
 		}
 
-		sched.serverClasses[class][group].push(pod.Name)
+		sched.serverClasses[class].getGroup(group).push(pod.Name)
 	}
 
 	return nil
@@ -156,7 +159,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 	sched := &stripeSchedulerImpl{
 		serverClasses:              serverClassGroupMap{},
 		unschedulableServerClasses: serverClassGroupMap{},
-		removableServerClasses:     map[string]*serverRemovalQueue{},
+		removableServerClasses:     serverClassServerRemovalMap{},
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {
@@ -185,7 +188,7 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 		group = sched.serverClasses[class].smallestGroup()
 	}
 
-	sched.serverClasses[class][group].push(name)
+	sched.serverClasses[class].getGroup(group).push(name)
 
 	return group, nil
 }
@@ -198,7 +201,7 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 	allServerGroupsForClass := []string{}
 
-	for s := range sched.serverClasses[class] {
+	for s := range sched.serverClasses[class].getMap() {
 		allServerGroupsForClass = append(allServerGroupsForClass, s)
 	}
 
@@ -210,7 +213,7 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 		serverGroup := sched.serverClasses[class].largestGroup()
 
 		// Select the victim server deterministically based on alphabetical order
-		server, err := sched.serverClasses[class][serverGroup].pop()
+		server, err := sched.serverClasses[class].getGroup(serverGroup).pop()
 		if err != nil {
 			return "", fmt.Errorf("%s: no server list found for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
@@ -222,8 +225,8 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 		// looks up the server name(unique pod name) in all server groups for the particular class and delete, if found.
 		for _, serverGroup := range allServerGroupsForClass {
-			if found := sched.serverClasses[class][serverGroup].find(podName); found {
-				err := sched.serverClasses[class][serverGroup].del(podName)
+			if found := sched.serverClasses[class].getGroup(serverGroup).find(podName); found {
+				err := sched.serverClasses[class].getGroup(serverGroup).del(podName)
 				if err != nil {
 					return "", fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 				}
@@ -237,14 +240,14 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
 func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
-	for serverGroup := range sched.serverClasses[class] {
-		if err := sched.serverClasses[class][serverGroup].del(name); err == nil {
+	for serverGroup := range sched.serverClasses[class].getMap() {
+		if err := sched.serverClasses[class].getGroup(serverGroup).del(name); err == nil {
 			return nil
 		}
 	}
 
-	for serverGroup := range sched.unschedulableServerClasses[class] {
-		if err := sched.unschedulableServerClasses[class][serverGroup].del(name); err == nil {
+	for serverGroup := range sched.unschedulableServerClasses[class].getMap() {
+		if err := sched.unschedulableServerClasses[class].getGroup(serverGroup).del(name); err == nil {
 			return nil
 		}
 	}
@@ -319,7 +322,7 @@ func newState(sched *stripeSchedulerImpl, class string) *state {
 	}
 
 	if groups, ok := sched.serverClasses[class]; ok {
-		for group, members := range groups {
+		for group, members := range groups.getMap() {
 			if _, ok := s.ServerGroups[group]; !ok {
 				s.ServerGroups[group] = &ServerGroup{}
 			}
@@ -335,7 +338,7 @@ func newState(sched *stripeSchedulerImpl, class string) *state {
 	}
 
 	if groups, ok := sched.unschedulableServerClasses[class]; ok {
-		for group, members := range groups {
+		for group, members := range groups.getMap() {
 			if _, ok := s.ServerGroups[group]; !ok {
 				s.ServerGroups[group] = &ServerGroup{
 					Unschedulable: true,
@@ -560,7 +563,7 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	for class, groups := range sched.serverClasses {
 		mapClass[class] = nil
 
-		for group := range groups {
+		for group := range groups.getMap() {
 			mapGroup[group] = nil
 		}
 	}
@@ -583,7 +586,7 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 		for _, group := range listGroup {
 			// The class may not contain a particular group, and that may contain no
 			// servers, but we are protected by zero values being returned.
-			servers := sched.serverClasses[class][group]
+			servers := sched.serverClasses[class].getGroup(group)
 			if servers == nil {
 				continue
 			}
@@ -597,7 +600,7 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	}
 
 	for class, groups := range sched.unschedulableServerClasses {
-		for group, servers := range groups {
+		for group, servers := range groups.getMap() {
 			for _, server := range servers.servers {
 				log.Info("Scheduler status (unschedulable)", "cluster", cluster, "name", server, "class", class, "group", group)
 			}

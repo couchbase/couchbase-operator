@@ -2240,6 +2240,11 @@ type ClusterSpec struct {
 	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
+	// ShuffleServerGroups allows the Operator to shuffle server groups before
+	// scheduling pods. This can be useful to randomly place pods across availability
+	// zones and not biasing to the first availability zones.
+	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
+
 	// DEPRECATED - by spec.security.securityContext
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set

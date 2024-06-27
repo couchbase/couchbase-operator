@@ -31,6 +31,7 @@ const (
 	serverGroup1 = "alice"
 	serverGroup2 = "bob"
 	serverGroup3 = "charlie"
+	serverGroup4 = "dionysus"
 
 	// Server classes to test configuration.
 	serverClass1 = "mickey"
@@ -392,4 +393,24 @@ func TestEnqueueRemovals(t *testing.T) {
 	}
 
 	checkDeleteScheduling(t, server1, podName3)
+}
+
+// Adds four pods to global server groups and expects them to be scheduled deterministically.
+func TestStripeOrderedCreateGlobalMultiple(t *testing.T) {
+	c := fixtureCluster
+	c.Spec.ShuffleServerGroups = true
+
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups := c.Spec.ServerGroups
+
+	shuffled := append([]string{}, groups...)
+	ShuffleServerGroups(shuffled, c.NamespacedName())
+
+	for i := 0; i < 10; i++ {
+		checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), shuffled[i%len(groups)])
+	}
 }

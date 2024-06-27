@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -682,6 +683,59 @@ func TestServersServerGroupsAddsToPodNodeSelector(t *testing.T) {
 			e2eutil.Die(t, fmt.Errorf("There were more than one pods in a node, despite anti affinity set to true"))
 		}
 	}
+}
+
+func TestServerGroupShuffling(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	// This test gets racey if we have a cluster size of more than 2
+	clusterSize := 2
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/shuffleServerGroups": "true",
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	expectedGroupsOrder := append([]string{}, availableServerGroups...)
+	scheduler.ShuffleServerGroups(expectedGroupsOrder, cluster.NamespacedName())
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	podList, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseLabel})
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	pods := podList.Items
+	sort.Slice(pods, func(i, j int) bool {
+		return pods[i].CreationTimestamp.Before(&pods[j].CreationTimestamp)
+	})
+
+	for i, pod := range pods {
+		podServerGroup := pod.Spec.NodeSelector[constants.FailureDomainZoneLabel]
+		if podServerGroup != expectedGroupsOrder[i%len(expectedGroupsOrder)] {
+			e2eutil.Die(t, fmt.Errorf("Pod %s is in sever group (%s) and not in the expected server group %s", pod.Name, podServerGroup, expectedGroupsOrder[i%len(expectedGroupsOrder)]))
+		}
+	}
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func getRegionFromNodeWithFailureDomainRegionLabel(nodes []*corev1.Node) string {
