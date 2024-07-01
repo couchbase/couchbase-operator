@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
+
+	goerrors "errors"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
@@ -17,6 +20,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// ServerGroupAvoidDelimiter is used to separate server groups in the
+// failed scheduling server groups list stored in persistent state.
+const ServerGroupAvoidDelimiter = ","
 
 // createPod is used to create EVERY Couchbase server pod, either provisioning or
 // reprovisioning them.
@@ -36,11 +43,42 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 		}
 	}()
 
+	if c.isSGReschedulingEnabled() {
+		return c.createPodWithRescheduling(ctx, m, serverSpec)
+	}
+
 	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig()); err != nil {
 		return err
 	}
 
 	return c.waitForCreatePod(ctx, m)
+}
+
+func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+	if failedSchedulingServerGroups, err := c.state.Get(persistence.FailedSchedulingServerGroups); err == nil {
+		c.scheduler.AvoidGroups(strings.Split(failedSchedulingServerGroups, ServerGroupAvoidDelimiter)...)
+
+		log.Info("Avoiding server groups", "cluster", c.namespacedName(), "serverGroups", failedSchedulingServerGroups)
+	} else if !goerrors.Is(err, persistence.ErrKeyError) {
+		log.Error(err, "Failed to get failed scheduling server groups", "cluster", c.namespacedName())
+	}
+
+	pod, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig())
+	if err != nil {
+		return err
+	}
+
+	// Pod failed to schedule, add server group to avoid list.
+	if err := c.waitForCreatePod(ctx, m); err != nil {
+		serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+		if err := c.addFailedSchedulingServerGroups(serverGroup); err != nil {
+			log.Error(err, "Failed to add server group to avoid list", "cluster", c.namespacedName(), "serverGroup", serverGroup)
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 // Remove Pod and any volumes associated with pod if requested

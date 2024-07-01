@@ -130,3 +130,5 @@ func (sched *nullSchedulerImpl) EnQueueRemovals(class string, servers []string) 
 		sched.removableServerClasses[class].enqueueAll(servers)
 	}
 }
+
+func (sched *nullSchedulerImpl) AvoidGroups(_ ...string) {}

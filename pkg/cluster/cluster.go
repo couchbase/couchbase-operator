@@ -316,6 +316,39 @@ func (c *Cluster) initializeClusterState() error {
 	return nil
 }
 
+func (c *Cluster) isSGReschedulingEnabled() bool {
+	return c.cluster.Spec.ServerGroupsEnabled() && c.cluster.Spec.RescheduleDifferentServerGroup
+}
+
+func (c *Cluster) addFailedSchedulingServerGroups(serverGroup string) error {
+	if !c.isSGReschedulingEnabled() {
+		return nil
+	}
+
+	// Add the server groups that failed to schedule to the state.
+	failedGroups := []string{}
+
+	if failedGroupsString, err := c.state.Get(persistence.FailedSchedulingServerGroups); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
+		return err
+	} else if err == nil {
+		failedGroups = strings.Split(failedGroupsString, ServerGroupAvoidDelimiter)
+	}
+
+	failedGroups = append(failedGroups, serverGroup)
+
+	return c.state.Upsert(persistence.FailedSchedulingServerGroups, strings.Join(failedGroups, ServerGroupAvoidDelimiter))
+}
+
+func (c *Cluster) clearFailedSchedulingServerGroups() {
+	if !c.isSGReschedulingEnabled() {
+		return
+	}
+
+	if err := c.state.Delete(persistence.FailedSchedulingServerGroups); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
+		log.Error(err, "Failed to clear failed scheduling server groups", "cluster", c.namespacedName())
+	}
+}
+
 // create is the main cluster creation routine.  It is called on initial cluster creation
 // and any time it is recreated (e.g. all ephemeral pods have been killed).
 func (c *Cluster) create() error {

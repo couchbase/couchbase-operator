@@ -2248,6 +2248,12 @@ type ClusterSpec struct {
 	// zones and not biasing to the first availability zones.
 	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
 
+	// RescheduleDifferentServerGroup allows the Operator to attempt to  reschedule pods
+	// to a different server group that has the same number of pods in itwhen a pod fails
+	// scheduling.
+	// +kubebuilder:default=true
+	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
+
 	// DEPRECATED - by spec.security.securityContext
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set

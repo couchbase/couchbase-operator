@@ -397,7 +397,7 @@ func TestEnqueueRemovals(t *testing.T) {
 
 // Adds four pods to global server groups and expects them to be scheduled deterministically.
 func TestStripeOrderedCreateGlobalMultiple(t *testing.T) {
-	c := fixtureCluster
+	c := fixtureCluster.DeepCopy()
 	c.Spec.ShuffleServerGroups = true
 
 	s, err := NewStripeScheduler(fixturePodsEmpty, c)
@@ -413,4 +413,38 @@ func TestStripeOrderedCreateGlobalMultiple(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), shuffled[i%len(groups)])
 	}
+}
+
+// Adds a pod to global server groups and expects it to be scheduled deterministically.
+func TestStripeCreateGlobalSingleWithAvoid(t *testing.T) {
+	c := fixtureCluster
+
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
+	s.AvoidGroups(serverGroup1)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup2)
+}
+
+// Adds four pods to global server groups and expects them to be scheduled deterministically.
+func TestStripeCreateGlobalMultipleWithAvoid(t *testing.T) {
+	c := fixtureCluster
+
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
+	s.AvoidGroups(serverGroup2)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup2)
+
+	s.AvoidGroups(serverGroup1)
+
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
 }

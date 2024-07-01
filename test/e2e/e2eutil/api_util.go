@@ -90,8 +90,18 @@ func MustUntaintAll(t *testing.T, k8s *types.Cluster) {
 	}
 }
 
+// MustTaintZoneNoSchedule taints a zone with a NoSchedule taint.
+func MustTaintZoneNoSchedule(t *testing.T, k8s *types.Cluster, zone string) {
+	MustTaintZone(t, k8s, zone, v1.TaintEffectNoSchedule)
+}
+
 // MustEvacuateZone cleans out an availability zone.
 func MustEvacuateZone(t *testing.T, k8s *types.Cluster, zone string) {
+	MustTaintZone(t, k8s, zone, v1.TaintEffectNoExecute)
+}
+
+// MustTaintZone taints a zone with a given effect.
+func MustTaintZone(t *testing.T, k8s *types.Cluster, zone string, taintEffect v1.TaintEffect) {
 	nodes, err := k8s.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		Die(t, err)
@@ -112,7 +122,7 @@ func MustEvacuateZone(t *testing.T, k8s *types.Cluster, zone string) {
 			{
 				Key:    "couchbase-qe",
 				Value:  "rocks",
-				Effect: v1.TaintEffectNoExecute,
+				Effect: taintEffect,
 			},
 		}
 

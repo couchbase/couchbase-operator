@@ -68,6 +68,9 @@ type serverGroups interface {
 	groupExists(group string) bool
 	smallestGroup() string
 	largestGroup() string
+
+	// smallestGroups returns a list of the smallest server groups is order.
+	smallestGroups() []string
 }
 
 func newOrderedServerGroups() orderedServerGroups {
@@ -240,16 +243,18 @@ func (s groupMap) filter(predicate filterPredicate) []string {
 func (s groupMap) smallestGroups() []string {
 	min := s.minSize()
 
-	return s.filter(func(servers *serverList) bool {
+	groups := s.filter(func(servers *serverList) bool {
 		return len(servers.servers) == min
 	})
+	sort.Strings(groups)
+
+	return groups
 }
 
 // smallestGroup return the smallest server group for a class, returning the
 // item with the smallest name on contention.
 func (s lexicalServerGroups) smallestGroup() string {
 	groups := s.smallestGroups()
-	sort.Strings(groups)
 
 	return groups[0]
 }

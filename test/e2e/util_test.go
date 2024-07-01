@@ -132,6 +132,7 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterRemote).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureXDCR),
 		framework.NewTestDef(TestServerGroupShuffling).WithTags(TagSuiteSanity, TagFeatureServerGroups),
+		framework.NewTestDef(TestServerGroupRescheduling).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestRzaCreateClusterWithStaticConfig).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestRzaCreateClusterWithClassBasedConfig).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestPersistentVolumeCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeaturePersistentVolumes),

@@ -60,6 +60,8 @@ const (
 	VolumeExpansion PersistentKind = "volumeExpansion"
 
 	UpgradeTime PersistentKind = "upgradeTime"
+
+	FailedSchedulingServerGroups PersistentKind = "failedSchedulingServerGroups"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

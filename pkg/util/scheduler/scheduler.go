@@ -48,6 +48,10 @@ type Scheduler interface {
 	// EnQueueRemovals enqueues the group of servers(cb nodes/pods) for prioritised
 	// removal ready for Delete() action
 	EnQueueRemovals(class string, servers []string)
+
+	// AvoidGroups is used to avoid certain groups when scheduling. Avoidance is best
+	// effort and may not be possible in all cases.
+	AvoidGroups(groups ...string)
 }
 
 // New is a factory method to return the correct scheduler type for

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sort"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -31,6 +32,9 @@ type stripeSchedulerImpl struct {
 	// removableServerClasses is for tracking our internal state of ordered removal
 	// of pods by server classes
 	removableServerClasses serverClassServerRemovalMap
+
+	// avoidGroups is a list of server groups to avoid when scheduling.
+	avoidGroups map[string]bool
 }
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
@@ -52,6 +56,8 @@ func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couch
 // initServerClasses populates the scheduler with all server classes that
 // are defined in the specification.
 func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.CouchbaseCluster) error {
+	sched.avoidGroups = map[string]bool{}
+
 	for i := range cluster.Spec.Servers {
 		class := cluster.Spec.Servers[i]
 
@@ -177,7 +183,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 // to select either server configuration specific server groups or default to the
 // global configuration.  Pods in this server configuration are listed and mapped
 // to the set of server groups.  To schedule we pick the set of server groups which
-// contain the fewest pods, then deterministically select the lexicaly smallest
+// contain the fewest pods, then deterministically select the smallest
 // before labelling the pod with this server group as a label selector.
 func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, error) {
 	if _, ok := sched.serverClasses[class]; !ok {
@@ -185,12 +191,29 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 	}
 
 	if group == "" {
-		group = sched.serverClasses[class].smallestGroup()
+		group = sched.getSmallesGroupForClass(class)
 	}
 
 	sched.serverClasses[class].getGroup(group).push(name)
 
 	return group, nil
+}
+
+func (sched *stripeSchedulerImpl) getSmallesGroupForClass(class string) string {
+	if len(sched.avoidGroups) == 0 {
+		return sched.serverClasses[class].smallestGroup()
+	}
+
+	smallestGroups := sched.serverClasses[class].smallestGroups()
+
+	for _, group := range smallestGroups {
+		if _, ok := sched.avoidGroups[group]; !ok {
+			return group
+		}
+	}
+
+	// We can't find any that we can't avoid so pick randomly
+	return smallestGroups[rand.Intn(len(smallestGroups))]
 }
 
 func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
@@ -605,5 +628,11 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 				log.Info("Scheduler status (unschedulable)", "cluster", cluster, "name", server, "class", class, "group", group)
 			}
 		}
+	}
+}
+
+func (sched *stripeSchedulerImpl) AvoidGroups(groups ...string) {
+	for _, group := range groups {
+		sched.avoidGroups[group] = true
 	}
 }
