@@ -13,14 +13,16 @@ import (
 )
 
 const (
-	cbVersionCheck       = "/items/0/status/currentVersion"
-	upgradeTotalDuration = 10 * time.Minute
-	upgradePollInterval  = 1 * time.Minute
+	cbVersionCheck              = "/items/0/status/currentVersion"
+	defaultVersionCheckDuration = 10 * 60 * time.Second
+	defaultVersionCheckInterval = 10 * time.Second
 )
 
 type CBVersion struct {
-	State     string `yaml:"state"`
-	CBVersion string `yaml:"cbVersion"`
+	State             string `yaml:"state" caoCli:"required"`
+	CBVersion         string `yaml:"cbVersion" caoCli:"required"`
+	DurationInMinutes int64  `yaml:"durationInMinutes"`
+	IntervalInMinutes int64  `yaml:"intervalInMinutes"`
 }
 
 func (c *CBVersion) Run(_ *context.Context) error {
@@ -54,12 +56,24 @@ func (c *CBVersion) Run(_ *context.Context) error {
 		return nil
 	}
 
-	err := util.RetryFunctionTillTimeout(funcCheckUpgrade, upgradeTotalDuration, upgradePollInterval)
+	// If the DurationInMinutes and IntervalInMinutes is provided then it will be used, else default values to be used
+	checkDuration := defaultVersionCheckDuration
+	checkInterval := defaultVersionCheckInterval
+
+	if c.DurationInMinutes != 0 {
+		checkDuration = time.Duration(c.DurationInMinutes) * time.Minute
+	}
+
+	if c.IntervalInMinutes != 0 {
+		checkInterval = time.Duration(c.IntervalInMinutes) * time.Minute
+	}
+
+	err := util.RetryFunctionTillTimeout(funcCheckUpgrade, checkDuration, checkInterval)
 	if err != nil {
 		return fmt.Errorf("retry function: %w", err)
 	}
 
-	logrus.Info("Couchbase version check successful:", c.CBVersion)
+	logrus.Info("Couchbase version check successful: ", c.CBVersion)
 
 	return nil
 }

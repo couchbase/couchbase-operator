@@ -1,0 +1,309 @@
+# ===================================
+# === Primary Indexes for bucket0 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket0
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket0_1 ON `bucket0`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket0_2 ON `bucket0`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket0_3 ON `bucket0`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket0_4 ON `bucket0`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket0_5 ON `bucket0`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket1 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket1
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket1_1 ON `bucket1`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket1_2 ON `bucket1`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket1_3 ON `bucket1`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket1_4 ON `bucket1`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket1_5 ON `bucket1`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket2 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket2
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket2_1 ON `bucket2`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket2_2 ON `bucket2`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket2_3 ON `bucket2`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket2_4 ON `bucket2`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket2_5 ON `bucket2`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket3 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket3
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket3_1 ON `bucket3`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket3_2 ON `bucket3`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket3_3 ON `bucket3`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket3_4 ON `bucket3`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket3_5 ON `bucket3`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket4 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket4
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket4_1 ON `bucket4`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket4_2 ON `bucket4`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket4_3 ON `bucket4`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket4_4 ON `bucket4`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket4_5 ON `bucket4`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket5 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket5
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket5_1 ON `bucket5`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket5_2 ON `bucket5`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket5_3 ON `bucket5`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket5_4 ON `bucket5`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0008.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket5_5 ON `bucket5`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket6 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket6
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket6_1 ON `bucket6`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket6_2 ON `bucket6`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket6_3 ON `bucket6`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket6_4 ON `bucket6`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket6_5 ON `bucket6`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket7 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket7
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket7_1 ON `bucket7`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket7_2 ON `bucket7`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket7_3 ON `bucket7`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket7_4 ON `bucket7`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0009.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket7_5 ON `bucket7`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket8 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket8
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket8_1 ON `bucket8`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket8_2 ON `bucket8`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket8_3 ON `bucket8`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket8_4 ON `bucket8`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0006.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket8_5 ON `bucket8`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---
+
+# ===================================
+# === Primary Indexes for bucket9 ===
+# ===================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cbq-bucket9
+spec:
+  template:
+    metadata:
+      name: cbq
+    spec:
+      containers:
+        - name: cbq
+          image: docker.io/sequoiatools/cbq
+          command: ["/bin/bash", "-c", "--"]
+          args: ["./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket9_1 ON `bucket9`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket9_2 ON `bucket9`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket9_3 ON `bucket9`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket9_4 ON `bucket9`.`_default`.`_default` WITH { \"num_replica\": 1 };';
+          ./shell/cbq/cbq -e=http://cb-example-0007.cb-example.default.svc:8093 -u=Administrator -p=password -script='CREATE PRIMARY INDEX primary_idx_bucket9_5 ON `bucket9`.`_default`.`_default` WITH { \"num_replica\": 1 };';"]
+      restartPolicy: Never
+#      tolerations:
+#        - key: "workload-node"
+#          operator: "Equal"
+#          value: "true"
+#          effect: "NoSchedule"
+      nodeSelector:
+        workload-node: "true"
+---

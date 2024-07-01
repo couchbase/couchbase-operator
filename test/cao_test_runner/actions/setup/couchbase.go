@@ -20,8 +20,10 @@ var (
 )
 
 type CouchbaseConfig struct {
-	SpecPath   string         `yaml:"specPath" caoCli:"required"`
-	Validators map[string]any `yaml:"validators,omitempty"`
+	CBClusterSpecPath string         `yaml:"cbClusterSpecPath" caoCli:"required"`
+	CBBucketsSpecPath string         `yaml:"cbBucketsSpecPath"`
+	CBSecretsSpecPath string         `yaml:"cbSecretsSpecPath"`
+	Validators        map[string]any `yaml:"validators,omitempty"`
 }
 
 func NewCouchbaseConfig(config interface{}) (actions.Action, error) {
@@ -31,7 +33,7 @@ func NewCouchbaseConfig(config interface{}) (actions.Action, error) {
 			return nil, ErrCouchbaseConfigDecode
 		}
 
-		if c.SpecPath == "" {
+		if c.CBClusterSpecPath == "" {
 			return nil, ErrMissingYaml
 		}
 
@@ -51,7 +53,7 @@ type Couchbase struct {
 
 func (s *Couchbase) Checks(ctx *context.Context, _ interface{}, state string) error {
 	c, _ := s.yamlConfig.(*CouchbaseConfig)
-	ctx.WithID(context.CouchbaseSpecPathIDKey, c.SpecPath)
+	ctx.WithID(context.CouchbaseSpecPathIDKey, c.CBClusterSpecPath)
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
@@ -66,17 +68,35 @@ func (s *Couchbase) Describe() string {
 
 func (s *Couchbase) Do(ctx *context.Context, _ interface{}) error {
 	c, _ := s.yamlConfig.(*CouchbaseConfig)
-	ctx.WithID(context.CouchbaseSpecPathIDKey, c.SpecPath)
+	ctx.WithID(context.CouchbaseSpecPathIDKey, c.CBClusterSpecPath)
+
+	logrus.Infof("Deploy Couchbase started")
 
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	err = kubectl.ApplyFiles(path.Join(dir, c.SpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+	err = kubectl.ApplyFiles(path.Join(dir, c.CBClusterSpecPath)).InNamespace("default").ExecWithoutOutputCapture()
 	if err != nil {
-		logrus.Error("kubectl apply:", err)
-		return fmt.Errorf("kubectl apply: %w", err)
+		logrus.Error("kubectl apply couchbase cluster yaml:", err)
+		return fmt.Errorf("kubectl apply couchbase cluster yaml: %w", err)
+	}
+
+	if c.CBBucketsSpecPath != "" {
+		err = kubectl.ApplyFiles(path.Join(dir, c.CBBucketsSpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+		if err != nil {
+			logrus.Error("kubectl apply couchbase buckets yaml:", err)
+			return fmt.Errorf("kubectl apply couchbase buckets yaml: %w", err)
+		}
+	}
+
+	if c.CBSecretsSpecPath != "" {
+		err = kubectl.ApplyFiles(path.Join(dir, c.CBSecretsSpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+		if err != nil {
+			logrus.Error("kubectl apply couchbase secrets yaml:", err)
+			return fmt.Errorf("kubectl apply couchbase secrets yaml: %w", err)
+		}
 	}
 
 	return nil

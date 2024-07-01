@@ -1,0 +1,17 @@
+action: "Deploy Couchbase"
+config:
+  cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+  cbBucketsSpecPath: "./test_data/cb_buckets/10-buckets-1-replica.yaml"
+  cbSecretsSpecPath: ""
+  validators:
+    preFlight:
+      state: "PRE"
+    labelTaintNodes:
+      state: "PRE"
+      numCBNodes: 11
+      numWorkloadNodes: 2
+    couchbaseReadiness:
+      state: "POST"
+    couchbaseVersion:
+      state: "POST"
+      cbVersion: "7.2.5"

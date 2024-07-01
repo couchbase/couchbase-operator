@@ -20,5 +20,6 @@ func RegisterValidators() map[string]Validator {
 		"collectLogs":        &CollectLogs{},
 		"preFlight":          &PreFlight{},
 		"couchbaseVersion":   &CBVersion{},
+		"labelTaintNodes":    &LabelTaintNodes{},
 	}
 }

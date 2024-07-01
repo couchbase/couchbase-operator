@@ -1,0 +1,90 @@
+# ====================================
+# ======= Cluster Description ========
+# 3 KV Nodes, 2 Query-Index Node
+# 2 Buckets: 500Mi & 1 Replica (Default)
+# ====================================
+
+# ====================================
+# ========== Cluster Secret ==========
+# ====================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cb-example-auth
+type: Opaque
+data:
+  username: QWRtaW5pc3RyYXRvcg== # Administrator
+  password: cGFzc3dvcmQ=         # password
+---
+
+# ====================================
+# ======== Bucket Definitions ========
+# ====================================
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+spec:
+  memoryQuota: 500Mi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 500Mi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+
+# ====================================
+# ======== Cluster Definition ========
+# ====================================
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  antiAffinity: true
+  image: couchbase/server:7.6.1
+  upgradeProcess: DeltaRecovery
+  security:
+    adminSecret: cb-example-auth
+  buckets:
+    managed: true
+  cluster:
+    autoFailoverTimeout: 5s
+    dataServiceMemoryQuota: 1Gi
+    indexServiceMemoryQuota: 1Gi
+    indexer:
+      storageMode: plasma
+  servers:
+    - size: 3
+      name: data-only
+      services:
+        - data
+      pod:
+        spec:
+          tolerations:
+            - key: "couchbase-node"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+          nodeSelector:
+            couchbase-node: "true"
+    - size: 2
+      name: index-query
+      services:
+        - index
+        - query
+      pod:
+        spec:
+          tolerations:
+            - key: "couchbase-node"
+              operator: "Equal"
+              value: "true"
+              effect: "NoSchedule"
+          nodeSelector:
+            couchbase-node: "true"

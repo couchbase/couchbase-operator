@@ -8,6 +8,8 @@ const (
 	AdmissionIDKey
 	CouchbaseSpecPathIDKey
 	CouchbaseClusterNameKey
+	K8sNodesMapKey
+	K8sPodsMapKey
 )
 
 var (
@@ -17,5 +19,7 @@ var (
 		"AdmissionImage":       AdmissionIDKey,
 		"CouchbaseSpecPath":    CouchbaseSpecPathIDKey,
 		"CouchbaseClusterName": CouchbaseClusterNameKey,
+		"K8sNodesMap":          K8sNodesMapKey,
+		"K8sPodsMap":           K8sPodsMapKey,
 	}
 )

@@ -1,0 +1,103 @@
+# ====================================
+# ======== Bucket Definitions ========
+# ====================================
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket2
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket3
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket4
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket5
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket6
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket7
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket8
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket9
+spec:
+  replicas: 1
+  memoryQuota: 4Gi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+---

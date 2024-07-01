@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	readinessTotalDuration = 5 * time.Minute
-	readinessPollInterval  = 15 * time.Second
-	cbNamespace            = "/items/0/metadata/namespace"
-	cbClusterName          = "/items/0/metadata/name"
+	defaultReadinessDuration = 10 * 60 * time.Second
+	defaultReadinessInterval = 15 * time.Second
+	cbNamespace              = "/items/0/metadata/namespace"
+	cbClusterName            = "/items/0/metadata/name"
 )
 
 var (
@@ -29,7 +29,9 @@ var (
 )
 
 type CouchbaseReadiness struct {
-	State string `yaml:"state"`
+	State          string `yaml:"state" caoCli:"required"`
+	DurationInSecs int64  `yaml:"durationInSecs"`
+	IntervalInSecs int64  `yaml:"intervalInSecs"`
 }
 
 func (c *CouchbaseReadiness) Run(_ *context.Context) error {
@@ -71,7 +73,19 @@ func (c *CouchbaseReadiness) Run(_ *context.Context) error {
 		return nil
 	}
 
-	err := util.RetryFunctionTillTimeout(funcGetStateApplyPatch, readinessTotalDuration, readinessPollInterval)
+	// If the DurationInMinutes and IntervalInMinutes is provided then it will be used, else default values to be used
+	checkDuration := defaultReadinessDuration
+	checkInterval := defaultReadinessInterval
+
+	if c.DurationInSecs != 0 {
+		checkDuration = time.Duration(c.DurationInSecs) * time.Minute
+	}
+
+	if c.IntervalInSecs != 0 {
+		checkInterval = time.Duration(c.IntervalInSecs) * time.Minute
+	}
+
+	err := util.RetryFunctionTillTimeout(funcGetStateApplyPatch, checkDuration, checkInterval)
 	if err != nil {
 		return fmt.Errorf("retry function: %w", err)
 	}

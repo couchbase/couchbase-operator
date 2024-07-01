@@ -1,11 +1,13 @@
 action: "Deploy Couchbase"
 config:
-  specPath: "./test_data/couchbase_spec/single_data_couchbase.yaml"
+  cbClusterSpecPath: "./test_data/cb_clusters/3-data-7.2.5-delta-recovery.yaml"
   validators:
     preFlight:
       state: "PRE"
     couchbaseReadiness:
       state: "POST"
+      durationInSecs: 300
+      intervalInSecs: 10
     couchbaseVersion:
       state: "POST"
       cbVersion: "7.2.5"
@@ -13,22 +15,19 @@ trees:
     - action: "Generic Workload"
       config:
         name: "Data Workload"
-        specPath: "./test_data/data_workload_spec/gideon.yaml"
-        preSleep: 1
-        postSleep: 3
+        specPath: "./test_data/data_workloads/job-gideon-1-bucket.yaml"
+        preRunWait: 1
+        postRunWait: 0
+        runDuration: 3
       trees:
         - action: "Delta Upgrade"
           config:
-            specPath: "./test_data/couchbase_spec/single_data_couchbase_upgrade.yaml"
+            specPath: "./test_data/cb_clusters/3-data-7.6.1-delta-recovery.yaml"
             validators:
               couchbaseVersion:
                 state: "POST"
                 cbVersion: "7.6.1"
               couchbaseReadiness:
                 state: "POST"
-
-
-
-
-
-
+                durationInSecs: 600
+                intervalInSecs: 10

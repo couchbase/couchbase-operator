@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8sinfo"
+
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/kubectl"
@@ -13,8 +15,8 @@ import (
 )
 
 const (
-	crdTotalDuration = 15
-	crdPollInterval  = 5
+	crdCheckDuration = 60 * time.Second
+	crdCheckInterval = 10 * time.Second
 )
 
 var (
@@ -24,14 +26,15 @@ var (
 		"couchbasememcachedbuckets.couchbase.com", "couchbasemigrationreplications.couchbase.com", "couchbasereplications.couchbase.com",
 		"couchbaserolebindings.couchbase.com", "couchbasescopegroups.couchbase.com", "couchbasescopes.couchbase.com", "couchbaseusers.couchbase.com"}
 
-	ErrAllCRDsNotPresent = errors.New("all couchbase crds not present")
+	ErrAllCRDsNotPresent  = errors.New("all couchbase crds not present")
+	ErrOperatorNotPresent = errors.New("operator and operator-admission pod not present")
 )
 
 type PreFlight struct {
-	State string `yaml:"state"`
+	State string `yaml:"state" caoCli:"required"`
 }
 
-func (c *PreFlight) Run(_ *context.Context) error {
+func (pf *PreFlight) Run(_ *context.Context) error {
 	logrus.Info("Pre-flight checks started")
 
 	// CHECK: CRDs
@@ -56,18 +59,39 @@ func (c *PreFlight) Run(_ *context.Context) error {
 		return fmt.Errorf("check couchbase crds: %w", ErrAllCRDsNotPresent)
 	}
 
-	err := util.RetryFunctionTillTimeout(funcCheckCRD, time.Duration(crdTotalDuration)*time.Second, time.Duration(crdPollInterval)*time.Second)
+	err := util.RetryFunctionTillTimeout(funcCheckCRD, crdCheckDuration, crdCheckInterval)
 	if err != nil {
 		return fmt.Errorf("retry function: %w", err)
 	}
 
-	// CHECK: Check if the Operator and Operator Admission present or not.
+	// CHECK: Operator and Operator Admission pods.
+	_, k8sPodNames, err := k8sinfo.GetK8sPodsInfo("default")
+	if err != nil {
+		return fmt.Errorf("get pods information: %w", err)
+	}
+
+	operatorAndAdmissionCheck := 2
+
+	for _, podName := range k8sPodNames {
+		if strings.Contains(podName, "couchbase-operator-admission") {
+			operatorAndAdmissionCheck--
+			continue
+		}
+
+		if strings.Contains(podName, "couchbase-operator") {
+			operatorAndAdmissionCheck--
+		}
+	}
+
+	if operatorAndAdmissionCheck != 0 {
+		return fmt.Errorf("check operator and operator-admission: %w", ErrOperatorNotPresent)
+	}
 
 	logrus.Info("Pre-flight checks successful")
 
 	return nil
 }
 
-func (c *PreFlight) GetState() string {
-	return c.State
+func (pf *PreFlight) GetState() string {
+	return pf.State
 }

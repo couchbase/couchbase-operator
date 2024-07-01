@@ -19,10 +19,12 @@ var (
 )
 
 type GenericWorkloadConfig struct {
-	Name      string `yaml:"name" caoCli:"required"`
-	SpecPath  string `yaml:"specPath" caoCli:"required"`
-	PreSleep  int    `yaml:"preSleep"`
-	PostSleep int    `yaml:"postSleep"`
+	Name               string `yaml:"name" caoCli:"required"`
+	SpecPath           string `yaml:"specPath" caoCli:"required"`
+	PreRunWait         int    `yaml:"preRunWait"`
+	PostRunWait        int    `yaml:"postRunWait"`
+	RunDuration        int    `yaml:"runDuration" caoCli:"required"`
+	CheckJobCompletion bool   `yaml:"checkJobCompletion"`
 }
 
 func NewGenericWorkloadConfig(config interface{}) (actions.Action, error) {
@@ -35,7 +37,7 @@ func NewGenericWorkloadConfig(config interface{}) (actions.Action, error) {
 		}
 
 		return &GenericWorkload{
-			desc:       "generic workload to CB in K8S",
+			desc:       "run generic workload to CB in K8S",
 			yamlConfig: c,
 		}, nil
 	}
@@ -53,11 +55,12 @@ func (g *GenericWorkload) Describe() string {
 }
 
 func (g *GenericWorkload) Do(_ *context.Context, _ interface{}) error {
-	c, _ := g.yamlConfig.(*GenericWorkloadConfig)
+	workloadConfig, _ := g.yamlConfig.(*GenericWorkloadConfig)
 
-	if c.PreSleep != 0 {
-		logrus.Infof("Started Pre Sleep before %s for %d minute", c.Name, c.PreSleep)
-		time.Sleep(time.Duration(c.PreSleep) * time.Minute)
+	// Introduce a wait before starting to run the workload.
+	if workloadConfig.PreRunWait != 0 {
+		logrus.Infof("Waiting for %d minute(s) before starting workload: %s", workloadConfig.PreRunWait, workloadConfig.Name)
+		time.Sleep(time.Duration(workloadConfig.PreRunWait) * time.Minute)
 	}
 
 	dir, err := os.Getwd()
@@ -65,17 +68,47 @@ func (g *GenericWorkload) Do(_ *context.Context, _ interface{}) error {
 		return err
 	}
 
-	err = kubectl.ApplyFiles(path.Join(dir, c.SpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+	// Apply the YAML of the workload
+	err = kubectl.ApplyFiles(path.Join(dir, workloadConfig.SpecPath)).InNamespace("default").ExecWithoutOutputCapture()
 	if err != nil {
-		logrus.Error("kubectl apply:", err)
-		return fmt.Errorf("kubectl apply: %w", err)
+		logrus.Error("kubectl apply workload yaml:", err)
+		return fmt.Errorf("kubectl apply workload yaml: %w", err)
 	}
 
-	logrus.Infof("Started  %s", c.Name)
+	logrus.Infof("Started workload: %s", workloadConfig.Name)
 
-	if c.PostSleep != 0 {
-		logrus.Infof("Started Post Sleep after %s for %d minute", c.Name, c.PostSleep)
-		time.Sleep(time.Duration(c.PostSleep) * time.Minute)
+	// Execute the workload for duration = workloadConfig.RunDuration.
+	if workloadConfig.RunDuration != 0 {
+		logrus.Infof("Running `%s` for %d minute(s)", workloadConfig.Name, workloadConfig.RunDuration)
+
+		// If workloadConfig.CheckJobCompletion is true, then the workload (job) is removed as soon as it is completed.
+		// Else, the workload (job) will run for workloadConfig.RunDuration duration even if it has not been completed.
+		if workloadConfig.CheckJobCompletion {
+			// TODO: get the name of the job and then check if it has been completed or not.
+			// checkJobCompletion()
+			// will have to implement something like context with deadline. Since this function shall not be blocking
+			logrus.Error("workloadConfig.CheckJobCompletion to be implemented")
+		} else {
+			time.Sleep(time.Duration(workloadConfig.RunDuration) * time.Minute)
+		}
+	} else {
+		logrus.Infof("Running `%s`", workloadConfig.Name)
+		return nil
+	}
+
+	// After the workload duration is over, we delete the workload
+	err = kubectl.DeleteFromFiles(path.Join(dir, workloadConfig.SpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+	if err != nil {
+		logrus.Error("kubectl delete: ", err)
+		return fmt.Errorf("kubectl delete: %w", err)
+	}
+
+	logrus.Infof("Deleted workload: %s", workloadConfig.Name)
+
+	// Introduce a wait after the workload gets completed.
+	if workloadConfig.PostRunWait != 0 {
+		logrus.Infof("Waiting for %d minute(s) after completing workload: %s", workloadConfig.PostRunWait, workloadConfig.Name)
+		time.Sleep(time.Duration(workloadConfig.PostRunWait) * time.Minute)
 	}
 
 	return nil
