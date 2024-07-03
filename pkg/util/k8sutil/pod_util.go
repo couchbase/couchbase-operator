@@ -1872,6 +1872,7 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 // shared with with the Pod's main container.
 func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image string) v1.Container {
 	initContainer := couchbaseContainer(cluster, &config, image)
+	initContainer.Ports = []v1.ContainerPort{}
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
 	// using NFS, which will return false on an EIO, say, and just end up resetting
