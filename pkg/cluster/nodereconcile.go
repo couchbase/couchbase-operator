@@ -30,18 +30,19 @@ var ErrNodeNotActive = fmt.Errorf("node not active: ")
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
 type MemberState struct {
-	NodeStateMap     NodeStateMap
-	managedNodes     couchbaseutil.MemberSet
-	ActiveNodes      couchbaseutil.MemberSet
-	PendingAddNodes  couchbaseutil.MemberSet
-	AddBackNodes     couchbaseutil.MemberSet
-	FailedAddNodes   couchbaseutil.MemberSet
-	WarmupNodes      couchbaseutil.MemberSet
-	DownNodes        couchbaseutil.MemberSet
-	FailedNodes      couchbaseutil.MemberSet
-	UnclusteredNodes couchbaseutil.MemberSet
-	IsRebalancing    bool
-	NeedsRebalance   bool
+	NodeStateMap           NodeStateMap
+	managedNodes           couchbaseutil.MemberSet
+	ActiveNodes            couchbaseutil.MemberSet
+	PendingAddNodes        couchbaseutil.MemberSet
+	AddBackNodes           couchbaseutil.MemberSet
+	FailedAddNodes         couchbaseutil.MemberSet
+	WarmupNodes            couchbaseutil.MemberSet
+	DownNodes              couchbaseutil.MemberSet
+	FailedNodes            couchbaseutil.MemberSet
+	UnclusteredNodes       couchbaseutil.MemberSet
+	IsRebalancing          bool
+	NeedsRebalance         bool
+	ServerRebalanceReasons []string
 }
 
 // nodeStatus is an intermediate data structured used to log node status information.
@@ -221,18 +222,19 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	}
 
 	state := &MemberState{
-		NodeStateMap:     status.NodeStates,
-		managedNodes:     c.members,
-		ActiveNodes:      couchbaseutil.NewMemberSet(),
-		PendingAddNodes:  couchbaseutil.NewMemberSet(),
-		AddBackNodes:     couchbaseutil.NewMemberSet(),
-		FailedAddNodes:   couchbaseutil.NewMemberSet(),
-		WarmupNodes:      couchbaseutil.NewMemberSet(),
-		DownNodes:        couchbaseutil.NewMemberSet(),
-		FailedNodes:      couchbaseutil.NewMemberSet(),
-		UnclusteredNodes: couchbaseutil.NewMemberSet(),
-		IsRebalancing:    status.Balancing,
-		NeedsRebalance:   !status.Balanced,
+		NodeStateMap:           status.NodeStates,
+		managedNodes:           c.members,
+		ActiveNodes:            couchbaseutil.NewMemberSet(),
+		PendingAddNodes:        couchbaseutil.NewMemberSet(),
+		AddBackNodes:           couchbaseutil.NewMemberSet(),
+		FailedAddNodes:         couchbaseutil.NewMemberSet(),
+		WarmupNodes:            couchbaseutil.NewMemberSet(),
+		DownNodes:              couchbaseutil.NewMemberSet(),
+		FailedNodes:            couchbaseutil.NewMemberSet(),
+		UnclusteredNodes:       couchbaseutil.NewMemberSet(),
+		IsRebalancing:          status.Balancing,
+		NeedsRebalance:         !status.Balanced,
+		ServerRebalanceReasons: status.RebalanceReasons,
 	}
 
 	for name, nodeState := range status.NodeStates {
@@ -1641,8 +1643,13 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 	return nil
 }
 
+//nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	if r.needsRebalance {
+		if len(r.couchbase.ServerRebalanceReasons) > 0 {
+			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
+		}
+
 		// Eject nodes that we want to discard.
 		eject := r.ejectMembers.OTPNodes()
 

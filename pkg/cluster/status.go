@@ -93,6 +93,10 @@ type Status struct {
 	// Unknown members are members that Couchbase knows about but
 	// we do not.
 	UnknownMembers couchbaseutil.MemberSet
+
+	// RebalanceReasons are the reasons for the rebalance being required.
+	// This is only rebalance reasons directly from CB Server.
+	RebalanceReasons []string
 }
 
 // GetStatus returns a new cluster status.
@@ -140,6 +144,15 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 		}
 
 		status.NodeStates[name] = state
+	}
+
+	status.RebalanceReasons = []string{}
+	for _, reasonCode := range info.ServicesNeedRebalance {
+		status.RebalanceReasons = append(status.RebalanceReasons, fmt.Sprintf("%s. Services: %v.", reasonCode.Description, reasonCode.Services))
+	}
+
+	for _, reasonCode := range info.BucketsNeedRebalance {
+		status.RebalanceReasons = append(status.RebalanceReasons, fmt.Sprintf("%s. Buckets: %v.", reasonCode.Description, reasonCode.Buckets))
 	}
 
 	// Couchbase reports itself as balanced correctly only when it has more

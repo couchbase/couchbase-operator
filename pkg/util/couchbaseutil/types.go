@@ -111,16 +111,33 @@ const (
 )
 
 type ClusterInfo struct {
-	SearchMemoryQuotaMB    int64           `json:"ftsMemoryQuota"`
-	IndexMemoryQuotaMB     int64           `json:"indexMemoryQuota"`
-	DataMemoryQuotaMB      int64           `json:"memoryQuota"`
-	EventingMemoryQuotaMB  int64           `json:"eventingMemoryQuota"`
-	AnalyticsMemoryQuotaMB int64           `json:"cbasMemoryQuota"`
-	Nodes                  []NodeInfo      `json:"nodes"`
-	RebalanceStatus        RebalanceStatus `json:"rebalanceStatus"`
-	ClusterName            string          `json:"clusterName"`
-	Balanced               bool            `json:"balanced"`
-	Counters               map[string]int  `json:"counters"`
+	SearchMemoryQuotaMB    int64                       `json:"ftsMemoryQuota"`
+	IndexMemoryQuotaMB     int64                       `json:"indexMemoryQuota"`
+	DataMemoryQuotaMB      int64                       `json:"memoryQuota"`
+	EventingMemoryQuotaMB  int64                       `json:"eventingMemoryQuota"`
+	AnalyticsMemoryQuotaMB int64                       `json:"cbasMemoryQuota"`
+	Nodes                  []NodeInfo                  `json:"nodes"`
+	RebalanceStatus        RebalanceStatus             `json:"rebalanceStatus"`
+	ClusterName            string                      `json:"clusterName"`
+	Balanced               bool                        `json:"balanced"`
+	Counters               map[string]int              `json:"counters"`
+	ServicesNeedRebalance  []ServicesNeedRebalanceCode `json:"servicesNeedRebalance,omitempty"`
+	BucketsNeedRebalance   []BucketNeedsRebalanceCode  `json:"bucketsNeedRebalance,omitempty"`
+}
+
+type RebalanceReasonCode struct {
+	Code        string `json:"code"`
+	Description string `json:"description"`
+}
+
+type ServicesNeedRebalanceCode struct {
+	RebalanceReasonCode
+	Services []ServiceName `json:"services"`
+}
+
+type BucketNeedsRebalanceCode struct {
+	RebalanceReasonCode
+	Buckets []string `json:"buckets"`
 }
 
 // GetNode returns the named node.
