@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -19,17 +20,14 @@ import (
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
-
 	"github.com/go-openapi/errors"
+	"github.com/robfig/cron/v3"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	cbcluster "github.com/couchbase/couchbase-operator/pkg/cluster"
-	"github.com/robfig/cron/v3"
 )
 
 const (
@@ -1295,6 +1293,12 @@ func checkConstraintPublicNetworking(_ *types.Validator, cluster *couchbasev2.Co
 		errs = append(errs, errors.Required("spec.networking.dns", "body", nil))
 	}
 
+	for _, memberConfig := range cluster.Spec.Servers {
+		if cluster.Spec.Networking.DNS != nil && memberConfig.Pod.Spec.HostNetwork {
+			errs = append(errs, fmt.Errorf("cannot enable external DNS and hostnetworking"))
+		}
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -2432,7 +2436,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		}
 	}
 
-	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed()); err != nil {
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed(), !cluster.ImproveHostNetworkEnabled()); err != nil {
 		return []error{err}
 	}
 
@@ -2450,7 +2454,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return nil
 	}
 
-	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false); err != nil {
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false, !cluster.ImproveHostNetworkEnabled()); err != nil {
 		return []error{err}
 	}
 

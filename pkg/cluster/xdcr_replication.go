@@ -483,6 +483,23 @@ func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
 		return nil, err
 	}
 
+	// check for the unique suffix "-operator-managed" to discard the rest
+	// this is necessary to rule out all remoteClusters for this cluster
+	// which were not created/added via operator
+	if len(remoteClusters) > 0 {
+		for i, remoteCluster := range remoteClusters {
+			// probably added to this cluster as remoteCluster via UI/API (not managed by operator)
+			if !strings.HasSuffix(remoteCluster.Name, RemoteClusterOperatorManagedSuffix) {
+				// delete those remote clusters via API
+				if err := couchbaseutil.DeleteRemoteCluster(&remoteCluster).On(c.api, c.readyMembers()); err != nil {
+					return nil, err
+				}
+				// remove them from the list
+				remoteClusters = append(remoteClusters[:i], remoteClusters[i+1:]...)
+			}
+		}
+	}
+
 	for i := range remoteClusters {
 		cluster := &remoteClusters[i]
 

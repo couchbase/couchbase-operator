@@ -63,7 +63,6 @@ func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
 
 	// validate whether magma block size settings are default as no related annotations where passed
 	e2eutil.MustVerifyMagmaBucketBlockSizeSettings(t, kubernetes, cluster, bucket.Name, 4096, 4096, 2*time.Minute)
-
 	// clean up.
 	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.Name, 2*time.Minute)

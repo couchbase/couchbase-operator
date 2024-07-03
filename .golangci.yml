@@ -65,6 +65,14 @@ linters:
   - depguard
   - tagalign
   - mirror
+  ## Everything that follows was disabled for go1.20 update - reenable
+  - nolintlint
+  - usestdlibvars
+  - reassign
+  - musttag
+  - loggercheck
+  - interfacebloat
+  - revive
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test

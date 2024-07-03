@@ -203,6 +203,13 @@ Operator metrics port
 +
 Operator rest port
 
+--parallel::
+*Type*: int
++
+*Default*: 5
++
+How many pods to collect logs from at the same time
+
 --request-timeout::
 *Type*: string
 +

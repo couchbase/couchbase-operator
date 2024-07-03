@@ -244,8 +244,8 @@ func extractVersion(v *version.Info) (int, int, error) {
 	return major, minor, nil
 }
 
-// versionLessThan tests if a version is less than a target.
-func versionLessThan(target, actual *version.Info) (bool, error) {
+// VersionLessThan tests if a version is less than a target.
+func VersionLessThan(target, actual *version.Info) (bool, error) {
 	// These chords play a magical unicorn tune...
 	amaj, amin, err := extractVersion(actual)
 	if err != nil {
@@ -268,8 +268,8 @@ func versionLessThan(target, actual *version.Info) (bool, error) {
 	return amin < tmin, nil
 }
 
-// versionGreaterThan tests if a version is greater than a target.
-func versionGreaterThan(target, actual *version.Info) (bool, error) {
+// VersionGreaterThan tests if a version is greater than a target.
+func VersionGreaterThan(target, actual *version.Info) (bool, error) {
 	// These chords play a magical unicorn tune...
 	amaj, amin, err := extractVersion(actual)
 	if err != nil {
@@ -305,7 +305,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// You shall not pass!!  AKA don't waste our time.
-	ok, err := versionLessThan(technicalLowerBound, v)
+	ok, err := VersionLessThan(technicalLowerBound, v)
 	if err != nil {
 		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
 		return nil
@@ -321,7 +321,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// You're doing something risky!! Do it by all means, but if support see it...
-	ok, err = versionLessThan(supportedLowerBound, v)
+	ok, err = VersionLessThan(supportedLowerBound, v)
 	if err != nil {
 		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
 		return nil
@@ -332,7 +332,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is unsupported (too old), check", matrixLink, "for current support and versioning information")
 	}
 
-	ok, err = versionGreaterThan(supportedUpperBound, v)
+	ok, err = VersionGreaterThan(supportedUpperBound, v)
 	if err != nil {
 		// Ignore errors, we don't want to stop people from doing things if it doesn't work.
 		return nil
