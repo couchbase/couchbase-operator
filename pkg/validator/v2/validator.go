@@ -65,6 +65,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintServerClassContainsDataService,
 		checkConstraintDeltaRecoveryDeprecated,
 		checkoutConstraintNoServicelessClassBelow76,
+		checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade,
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
@@ -877,8 +878,7 @@ func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchba
 	return nil
 }
 
-// checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
-func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func getNumberOfDataServiceNodes(cluster *couchbasev2.CouchbaseCluster) int {
 	dataServiceNodes := 0
 
 	for _, config := range cluster.Spec.Servers {
@@ -887,9 +887,22 @@ func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *co
 		}
 	}
 
+	return dataServiceNodes
+}
+
+func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) && (getNumberOfDataServiceNodes(cluster) < 2 && len(cluster.Spec.Servers) > 1) {
+		return fmt.Errorf("cannot enable InPlaceUpgrade with one data service node in a multi-node cluster")
+	}
+
+	return nil
+}
+
+// checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
+func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.UpgradeProcess != nil {
-		if dataServiceNodes < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
-			slog.Warn("InPlaceUpgrade is not available with less than two data service nodes defined. An offline upgrade will take place instead.")
+		if getNumberOfDataServiceNodes(cluster) < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
+			slog.Warn("It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online.")
 		}
 	}
 
