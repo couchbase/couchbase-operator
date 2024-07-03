@@ -1304,16 +1304,18 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canInPlaceUpgrade bool) error {
-	if canInPlaceUpgrade {
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-	} else {
-		log.Info("Unable to set DeltaRecovery. Reverting to full recovery.")
+func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+	if len(c.members) > 1 {
+		if canDeltaRecover {
+			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+		} else {
+			log.Info("Unable to set delta recovery type. Reverting to full recovery.")
 
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
-			return err
+			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1394,9 +1396,15 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 			}
 		}
 
-		canInPlaceUpgrade, err := r.failoverNodeForInPlaceUpgrade(candidate, c)
-		if err != nil {
-			return err
+		canInPlaceUpgrade := false
+
+		if len(c.members) > 1 {
+			var err error
+			canInPlaceUpgrade, err = r.failoverNodeForInPlaceUpgrade(candidate, c)
+
+			if err != nil {
+				return err
+			}
 		}
 
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())

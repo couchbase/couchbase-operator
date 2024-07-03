@@ -135,7 +135,7 @@ func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Memb
 			return err
 		}
 
-		if nodeInfo.Membership == "inactiveAdded" {
+		if nodeInfo.Membership == "inactiveAdded" || nodeInfo.Membership == "active" {
 			return nil
 		}
 

@@ -888,8 +888,8 @@ func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *co
 	}
 
 	if cluster.Spec.UpgradeProcess != nil {
-		if dataServiceNodes < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade || *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery) {
-			return fmt.Errorf("cannot enable in place upgrade with less than two data service nodes defined")
+		if dataServiceNodes < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
+			slog.Warn("InPlaceUpgrade is not available with less than two data service nodes defined. An offline upgrade will take place instead.")
 		}
 	}
 
