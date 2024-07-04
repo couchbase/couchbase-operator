@@ -1443,6 +1443,12 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	// Verifying the persistence of log PVs are preserved by operator
 	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 
+	atleast762, err := cbCluster.IsAtLeastVersion("7.6.2")
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for i, victim := range victims {
 		// Kills operator pod in async way
@@ -1455,12 +1461,20 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			e2eutil.MustKillPodForMember(t, kubernetes, cbCluster, victim, false)
 
 			expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, clusterSize+i)] = 1
+
+			e2eutil.MustWaitForClusterEvent(t, kubernetes, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
 		case "killServerProcess":
 			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, victim)
 			e2eutil.MustExecShellInPod(t, kubernetes, podNameToKill, "pkill beam.smp")
+
+			if !atleast762 {
+				e2eutil.MustWaitForClusterEvent(t, kubernetes, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
+			} else {
+				time.Sleep(15 * time.Second)
+			}
 		}
 
-		e2eutil.MustWaitForClusterEvent(t, kubernetes, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cbCluster, 2*time.Minute)
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
@@ -1472,7 +1486,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	case "deletePod":
 		validator = e2eutil.PodDownFailoverRecoverySequence()
 	case "killServerProcess":
-		validator = e2eutil.ServerCrashRecoverySequence()
+		validator = e2eutil.ServerCrashRecoverySequence(cbCluster)
 	default:
 		e2eutil.Die(t, fmt.Errorf("invalid murder weapon: %s", podDownMethod))
 	}
