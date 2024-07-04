@@ -891,6 +891,10 @@ func getNumberOfDataServiceNodes(cluster *couchbasev2.CouchbaseCluster) int {
 }
 
 func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.UpgradeProcess == nil {
+		return nil
+	}
+
 	if (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) && (getNumberOfDataServiceNodes(cluster) < 2 && len(cluster.Spec.Servers) > 1) {
 		return fmt.Errorf("cannot enable InPlaceUpgrade with one data service node in a multi-node cluster")
 	}
