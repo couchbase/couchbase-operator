@@ -9,6 +9,14 @@ Upgrading the Couchbase Autonomous Operator is a four-step process:
 - <<update-crd, Step 3: Update the CRDs>>
 - <<install-operator, Step 4: Install the New Operator>>
 
+[IMPORTANT]
+====
+When upgrading Couchbase Operator, you must use the uninstaller from the same version of the software you used to install it, then use the newer installer to upgrade.
+
+For example:
+
+To upgrade the Operator from 2.2 to 2.4, use  Version 2.2 to remove the older version of the software, then  use the 2.4 release package to upgrade.
+====
 == Before Upgrading
 
 Make sure to consult the xref:release-notes.adoc[Release Notes] and the xref:whats-new.adoc[What's New?] pages before upgrading, as there may be additional considerations or steps required on a per-release basis. Clusters with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-antiaffinity[`couchbaseclusters.spec.antiAffinity`] attribute enabled will require the addition of a temporary node for the upgrade — see xref:concept-sizing.adoc#rolling-upgrade[here] for further details.
