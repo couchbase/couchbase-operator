@@ -279,3 +279,4 @@ vbucket
 DeltaRecovery
 validator
 ServiceMonitor
+setuid

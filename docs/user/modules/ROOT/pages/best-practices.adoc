@@ -150,6 +150,12 @@ Transparent huge pages (THP) attempt to allocate large areas of contiguous memor
 mm.transparent_hugepage.defrag::
 Related to `mm.transparent_hugepage.enabled`, it is highly recommended that this parameter be set to `never`.
 
+kernel.core_pattern::
+The core pattern is used to specify the pattern for core dump files. It is recommended that this be set to `/bin/false` to disable core dumps.
+
+fs.suid_dumpable::
+This parameter controls the core dump of setuid binaries. It is recommended that this be set to `0` to disable core dumps.
+
 [NOTE]
 ====
 Couchbase Server recommends that `vm.swappiness` be set to zero.
@@ -193,6 +199,8 @@ spec:
           do
             sysctl -w mm.transparent_hugepage.enabled=never
             sysctl -w mm.transparent_hugepage.defrag=never
+            sysctl -w kernel.core_pattern='|/bin/false'
+            sysctl -w fs.suid_dumpable=0
             sleep 60
           done
 ----
