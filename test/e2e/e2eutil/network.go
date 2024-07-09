@@ -179,7 +179,7 @@ func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClust
 		}
 
 		// We replicate the matrix here rather than reuse the one in services.go as we want to check for errors there.
-		servicePorts := map[couchbasev2.Service][]int32{
+		allServicePorts := map[couchbasev2.Service][]int32{
 			couchbasev2.AdminService:     {8091, 18091},
 			couchbasev2.DataService:      {8092, 18092, 11210, 11207},
 			couchbasev2.QueryService:     {8093, 18093},
@@ -187,6 +187,47 @@ func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClust
 			couchbasev2.AnalyticsService: {8095, 18095},
 			couchbasev2.EventingService:  {8096, 18096},
 			couchbasev2.IndexService:     {9102, 19102},
+		}
+
+		// exposedfeatureSets is a mapping from feature name to a list of host ports to expose.
+		exposedfeatureSets := map[couchbasev2.ExposedFeature][]couchbasev2.Service{
+			couchbasev2.FeatureAdmin: {
+				couchbasev2.AdminService,
+			},
+			couchbasev2.FeatureXDCR: {
+				couchbasev2.AdminService,
+				couchbasev2.DataService,
+			},
+			couchbasev2.FeatureClient: {
+				couchbasev2.AdminService,
+				couchbasev2.QueryService,
+				couchbasev2.SearchService,
+				couchbasev2.AnalyticsService,
+				couchbasev2.EventingService,
+				couchbasev2.DataService,
+			},
+			couchbasev2.FeatureBackup: {
+				couchbasev2.AdminService,
+				couchbasev2.QueryService,
+				couchbasev2.SearchService,
+				couchbasev2.AnalyticsService,
+				couchbasev2.EventingService,
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+		}
+
+		servicePorts := map[couchbasev2.Service][]int32{}
+
+		for _, exposedFeature := range couchbase.Spec.Networking.ExposedFeatures {
+			services, exists := exposedfeatureSets[exposedFeature]
+			if !exists {
+				return fmt.Errorf("unknown exposed feature %q", exposedFeature)
+			}
+
+			for _, service := range services {
+				servicePorts[service] = allServicePorts[service]
+			}
 		}
 
 		// For the service, check its matching pod to confirm what type of Couchbase Service is running (data, index, etc.).
