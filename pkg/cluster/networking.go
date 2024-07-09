@@ -205,10 +205,10 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 }
 
 func (c *Cluster) handleHostnameAA(ctx context.Context) error {
-	shouldAddHostAA, ok := c.cluster.Annotations[constants.ImprovedHostNetworkAnnotation]
+	shouldAddHostAA, ok := c.cluster.Annotations["annotation."+constants.ImprovedHostNetworkAnnotation]
 
 	if !ok || shouldAddHostAA == "false" {
-		persistenceVar, err := c.state.Get(persistence.HostnameAAadded)
+		persistenceVar, err := c.state.Get(persistence.MembersWithHostnameAAadded)
 
 		for _, member := range c.members {
 			// If we got an error, it's because the key didn't exist for the persistence var.
@@ -219,8 +219,10 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 			}
 		}
 
-		return c.state.Update(persistence.HostnameAAadded, "false")
+		return c.state.Upsert(persistence.MembersWithHostnameAAadded, "false")
 	}
+
+	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
 
 	if ok && shouldAddHostAA == "true" {
 		for _, member := range c.members {
@@ -230,17 +232,33 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 				return nil
 			}
 
-			// We get an error if the key doesn't exist. Therefore, the hostname AA can't have been added already on an error.
-			alreadyAdded, _ := c.state.Get(persistence.HostnameAAadded)
-
-			if alreadyAdded != "true" {
+			if !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
 				if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
+					return err
+				}
+
+				var addErr error
+
+				indexes, addErr = couchbaseutil.AddMemberIndexToIndexList(indexes, member.Name())
+				if addErr != nil {
 					return err
 				}
 			}
 		}
 
-		return c.state.Update(persistence.HostnameAAadded, "true")
+		return c.state.Upsert(persistence.MembersWithHostnameAAadded, indexes)
+	}
+
+	return nil
+}
+
+func (c *Cluster) handleExposedFeatures(member couchbaseutil.Member, existingAddresses *couchbaseutil.AlternateAddressesExternal) error {
+	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
+
+	if existingAddresses != nil && !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
+		if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -256,10 +274,6 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// services will be processed in bulk.
 	delay := time.Duration(0)
 	needsReachableDelay := c.cluster.Spec.IsExposedFeatureServiceTypePublic() || c.cluster.Spec.IsAdminConsoleServiceTypePublic()
-
-	if err := c.state.Insert(persistence.HostnameAAadded, "false"); err != nil {
-		return err
-	}
 
 	if needsReachableDelay && c.cluster.Spec.Networking.WaitForAddressReachableDelay != nil {
 		delay = c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration
@@ -278,7 +292,6 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	for _, member := range c.members {
 		// Grab the current configuration
 		existingAddresses, err := c.getAlternateAddressesExternal(member)
-
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
 			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
@@ -288,11 +301,8 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		// If we don't have any exposed ports, but the node reports it is configured so
 		// then remove the configuration.
 		if !c.cluster.Spec.HasExposedFeatures() {
-			hostnameAAadded, _ := c.state.Get(persistence.HostnameAAadded)
-			if existingAddresses != nil && hostnameAAadded != "true" {
-				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
-					return err
-				}
+			if err := c.handleExposedFeatures(member, existingAddresses); err != nil {
+				return err
 			}
 
 			continue

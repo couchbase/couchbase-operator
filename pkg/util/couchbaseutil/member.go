@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -393,6 +394,32 @@ func CreateMemberName(cluster string, member int) string {
 func GetIndexFromMemberName(name string) (int, error) {
 	// its just the last 4 digits...
 	return strconv.Atoi(name[len(name)-4:])
+}
+
+func DoesMemberIndexExistInIndexes(indexes string, memberName string) bool {
+	index, err := GetIndexFromMemberName(memberName)
+
+	if err != nil {
+		return false
+	}
+
+	return slices.Contains(strings.Split(indexes, ","), strconv.Itoa(index))
+}
+
+func AddMemberIndexToIndexList(indexes string, memberName string) (string, error) {
+	index, err := GetIndexFromMemberName(memberName)
+
+	if err != nil {
+		return indexes, err
+	}
+
+	if index == 0 {
+		indexes += strconv.Itoa(index)
+	} else {
+		indexes += "," + strconv.Itoa(index)
+	}
+
+	return indexes, nil
 }
 
 // this exists to allow testing.

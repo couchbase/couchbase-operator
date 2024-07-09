@@ -64,6 +64,8 @@ const (
 	FailedSchedulingServerGroups PersistentKind = "failedSchedulingServerGroups"
 
 	HostnameAAadded = "hostnameAAadded"
+
+	MembersWithHostnameAAadded = "membersWithHostnameAAadded"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.
