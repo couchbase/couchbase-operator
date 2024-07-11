@@ -701,7 +701,7 @@ func TestServerGroupShuffling(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
 	cluster.Annotations = map[string]string{
 		"cao.couchbase.com/shuffleServerGroups": "true",
 	}
@@ -754,7 +754,7 @@ func TestServerGroupRescheduling(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ServerGroups = availableServerGroups
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
 	cluster.Annotations = map[string]string{
 		"cao.couchbase.com/rescheduleDifferentServerGroup": "true",
 	}
