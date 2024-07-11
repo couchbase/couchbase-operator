@@ -74,3 +74,36 @@ Used to force a storage backend on all buckets in a Couchbase Cluster. This conf
 When configured the Couchbase Operator will attempt to force all buckets in a cluster to a particular storage backend.
 This config is only used with Couchbase Server 7.6.0.
 Accepts either `couchstore` or `magma`.  
+
+== Cluster Scheduling
+=== Rescheduling To Different Server Groups On Failed Scheduling
+==== `cao.couchbase.com/rescheduleDifferentServerGroup`
+Used to allow Couchbase Operator to attempt to reschedule a pod to a different server group if the pod fails to schedule on the original server group.
+By default Couchbase Operator will continue to try to schedule the pod on the original server group if it fails to schedule.
+With this annotation applied to a cluster the operator will try to schedule the pod to a different server group that has the same number of Couchbase Pods in it as the original server group. This is to ensure that the cluster remains balanced across the server groups.
+This is a best effort attempt and may not always succeed. If there are no server groups with the same number of pods as the original server group the pod will be scheduled on the original server group.
+Accepts either `true` or `false`.
+
+=== Server Group Shuffling
+==== `cao.couchbase.com/shuffleServerGroups`
+Used to allow Couchbase Operator to shuffle the order that pods are scheduled to defined server groups.
+By default Couchbase Operator will schedule pods to server groups in lexical order.
+The shuffling is pseudo-random and is based on the cluster name and namespce, so the same cluster/namespace combination will always shuffle the server groups in the same order.
+Accepts either `true` or `false`.
+
+== Pod Rescheduling
+=== Individual Pod Rescheduling
+==== `cao.couchbase.com/reschedule`
+Used to force a pod to be rescheduled. When this annotation is applied to a Couchbase pod, the operator will detect it and reschedule the pod. The pods will either be Swap Rebalanced or go through a InPlaceUpgrade depending on xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradeprocess[`couchbaseclusters.spec.upgradeProcess`].
+Accepts either `true` or `false`.
+
+== Host Network 
+=== Improved Host Network Support
+==== `cao.couchbase.com/networking.improvedHostNetwork`
+Used to enable improved host network support. This annotation is used to enable improved host network support for Couchbase Server pods.
+When enabled on a cluster the operator will skip SAN validation and will add the underlying Kubernetes hostname a pod is running on to the alternate addresses list. 
+
+== Cloud Native Gateway
+=== OTLP Endpoint
+==== `cao.couchbase.com/networking.cloudNativeGateway.otlp.endpoint`
+Used to set a custom OTLP endpoint for on Cloud Native Gateway. This annotation is applied to the cluster, and takes a string value (e.g. "https://otel:1234"). The value is passed directly to the Cloud Native Gateway container.
