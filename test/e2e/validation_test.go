@@ -3271,7 +3271,8 @@ func TestCNGVersionValidation(t *testing.T) {
 			name: "TestMinimunCBVersionForCNGSupport",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
-					Image: "ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-137",
+					Image:    "ghcr.io/cb-vanilla/cloud-native-gateway:0.1.0-137",
+					LogLevel: "debug",
 				}).
 				Replace("/spec/image", "couchbase/server:7.2.0")},
 			expectedErrors: []string{"for cloud native gateway support"},
@@ -3281,7 +3282,8 @@ func TestCNGVersionValidation(t *testing.T) {
 			name: "TestRestrictedCNGVersion",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
-					Image: "ghcr.io/cb-vanilla/cloud-native-gateway:0.2.0-136",
+					Image:    "ghcr.io/cb-vanilla/cloud-native-gateway:0.2.0-136",
+					LogLevel: "debug",
 				}).
 				Replace("/spec/image", "couchbase/server:7.2.2")},
 			expectedErrors: []string{"to support cloud native gateway versio"},
