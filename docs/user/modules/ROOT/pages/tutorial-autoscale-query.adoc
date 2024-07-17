@@ -243,22 +243,6 @@ Run the `kubectl port-forward` command to forward the necessary port to the list
 Once the port has been forwarded, you can access the Couchbase Web Console at `http://localhost:8091`.
 Log in using the listed username and password.
 
-== Verify Monitoring
-
-Verify that Couchbase metrics are being collected by Metrics Server.
-The following command will return the values of the `cpu` and `memory` for each pod in the Couchbase cluster:
-
-[source,console]
-----
-$ kubectl get --raw="/apis/metrics.k8s.io/v1beta1/namespaces/default/pods/scale-couchbase-cluster-0000/"
-----
-----
-{"kind":"PodMetrics","apiVersion":"metrics.k8s.io/v1beta1",
-..."usage":{"cpu":"905682228n","memory":"304784Ki"}}]}
-----
-
-TIP: This validation is also helpful for debugging as the HPA takes the averages of these values when making auto-scaling decisions.
-
 [[create-a-horizontal-pod-autoscaler]]
 == Create a Horizontal Pod Autoscaler
 

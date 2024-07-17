@@ -51,10 +51,6 @@ cluster:
   cluster:
     dataServiceMemoryQuota: 4Gi
     indexServiceMemoryQuota: 6Gi
-  monitoring:
-    prometheus:
-      enabled: true
-      image: couchbase/exporter:{prometheus-version} <.>
   autoscaleStabilizationPeriod: 0s <.>
   name: scale-couchbase-cluster
   servers:
@@ -97,9 +93,6 @@ buckets:
     memoryQuota: 1Gi <.>
 EOF
 ----
-
-<.> Deploying the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] will allow us to start collecting Couchbase metrics.
-Later on in this tutorial we'll be passing Couchbase metrics to the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^], which will allow them to be monitored by the HPA.
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoscalestabilizationperiod[`couchbaseclusters.spec.autoscaleStabilizationPeriod`]: Setting this field to `0s` serves two purposes: 1.) It disables additional auto-scaling while the cluster is rebalancing; and 2.) it re-enables auto-scaling immediately after rebalance is complete, without any additional delay to allow for cluster stabilization.
 +
@@ -204,37 +197,8 @@ Log in using the listed username and password.
 
 == Install the Monitoring Stack
 
-When we created our Couchbase deployment, we also installed the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] to collect Couchbase-specific metrics.
-We now need to pass these metrics to the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^] so that the metrics can be monitored by the HPA.
-To do this, we'll need deploy an "adapter" API server.
-
-To make this process easier, we can use the `couchbase-monitor-stack` Helm chart to conveniently install the https://github.com/kubernetes-sigs/prometheus-adapter[Prometheus Adapter^]:
-
-[source,console]
-----
-$ helm upgrade --install --set clusterName=scale-couchbase-cluster monitor couchbase/couchbase-monitor-stack <.>
-----
-
-<.> `clusterName` is the name of the `CouchbaseCluster` resource that was created when we <<create-the-couchbase-cluster-deployment,deployed the Couchbase cluster>>.
-
-== Verify Monitoring
-
-Verify that Couchbase metrics are being collected by the custom metrics API server.
-The following command will return the value of the `cbbucketinfo_basic_quota_user_percent` (bucket memory utilization) metric being collected for the `travel-sample` bucket:
-
-[source,console]
-----
-$ kubectl get --raw="/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/*/cbbucketinfo_basic_quota_user_percent"
-----
-----
-{"kind":"MetricValueList",
-..."metricName":"cbbucketinfo_basic_quota_user_percent","value":"1385m"} <.>
-----
-
-<.> In this example output, *~1%* of the bucket memory quota is currently in use.
-(The value is reported on a scale of 1000.)
-
-TIP: This validation is also helpful for debugging as the HPA takes the average of this value when making auto-scaling decisions.
+For Couchbase server versions 7.0+, it is possible to collect metrics from the native metrics endpoint. More information on how to do this can be found
+https://docs.couchbase.com/operator/current/howto-prometheus.html[here].
 
 == Create a Horizontal Pod Autoscaler
 
@@ -438,13 +402,6 @@ Delete the HPA:
 [source,console]
 ----
 $ kubectl delete hpa data-hpa
-----
-
-Uninstall the monitoring stack by deleting the Helm release:
-
-[source,console]
-----
-$ helm delete monitor
 ----
 
 Uninstall both the Autonomous Operator and Couchbase cluster by deleting the Helm release:

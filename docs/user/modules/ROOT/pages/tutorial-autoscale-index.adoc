@@ -67,10 +67,6 @@ cluster:
   cluster:
     dataServiceMemoryQuota: 10Gi
     indexServiceMemoryQuota: 256Mi <.>
-  monitoring:
-    prometheus:
-      enabled: true
-      image: couchbase/exporter:{prometheus-version} <.>
   autoscaleStabilizationPeriod: 0s <.>
   name: scale-couchbase-cluster
   servers:
@@ -128,8 +124,6 @@ EOF
 NOTE: This cluster configuration uses the default index storage mode set by the Autonomous Operator, which is `memory_optimized`.
 This allows us to demonstrate the benefits of auto-scaling in situations when persisting to disk isn't an option.
 
-<.> Deploying the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] will allow us to start collecting Couchbase metrics.
-Later on in this tutorial we'll be passing Couchbase metrics to the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^], which will allow them to be monitored by the HPA.
 
 <.> xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoscalestabilizationperiod[`couchbaseclusters.spec.autoscaleStabilizationPeriod`]: Setting this field to `0s` serves two purposes: 1.) It disables additional auto-scaling while the cluster is rebalancing; and 2.) it re-enables auto-scaling immediately after rebalance is complete, without any additional delay to allow for cluster stabilization.
 +
@@ -229,38 +223,7 @@ Log in using the listed username and password.
 
 == Install the Monitoring Stack
 
-When we created our Couchbase deployment, we also installed the xref:howto-prometheus.adoc[Couchbase Prometheus Exporter] to collect Couchbase-specific metrics.
-We now need to pass these metrics to the Kubernetes https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#support-for-custom-metrics[custom metrics API^] so that the metrics can be monitored by the HPA.
-To do this, we'll need deploy an "adapter" API server.
-
-To make this process easier, we can use the `couchbase-monitor-stack` Helm chart to conveniently install the https://github.com/kubernetes-sigs/prometheus-adapter[Prometheus Adapter^]:
-
-[source,console]
-----
-$ helm upgrade --install --set clusterName=scale-couchbase-cluster monitor couchbase/couchbase-monitor-stack <.>
-----
-
-<.> `clusterName` is the name of the `CouchbaseCluster` resource that was created when we <<create-the-couchbase-cluster-deployment,deployed the Couchbase cluster>>.
-
-== Verify Monitoring
-
-Verify that Couchbase metrics are being collected by the custom metrics API server.
-The following command will return the value of the `cbindex_ram_percent` (index memory utilization) metric being collected from the `index` nodes:
-
-[source,console]
-----
-$ kubectl get --raw="/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/*/cbindex_ram_percent"
-----
-----
-{"kind":"MetricValueList",
-..."metricName":"cbindex_ram_percent","value":"26763m"} <.>
-----
-
-<.> In this example output, *~26%* of the index memory is currently in use.
-(The value is reported on a scale of 1000.)
-Note that the reason why initial memory usage is *26%* is because `64Mi` is already allocated just by running the Index Service, thus consuming a portion of the low memory quota (`256Mi`) that we set for the Index Service.
-
-TIP: This validation is also helpful for debugging as the HPA takes the average of this value when making auto-scaling decisions.
+For Couchbase server versions 7.0+, it is possible to collect metrics from the native metrics endpoint. More information on how to do this can be found here.
 
 == Create a Horizontal Pod Autoscaler
 
