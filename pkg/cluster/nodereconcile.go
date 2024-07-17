@@ -1736,6 +1736,11 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 }
 
 func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
+	// Something is broken, let that get fixed up first.
+	if r.needsRebalance {
+		return nil
+	}
+
 	// Let's finish upgrading before we try to migrate the buckets
 	if upgrading, err := c.isUpgrading(); upgrading && err == nil {
 		return nil
