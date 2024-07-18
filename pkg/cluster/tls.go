@@ -1004,7 +1004,7 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 		subjectAltNames = append(subjectAltNames, "*."+c.cluster.Spec.Networking.DNS.Domain)
 	}
 
-	chains, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !c.cluster.IsTLSShadowed(), !c.cluster.ImproveHostNetworkEnabled())
+	chains, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !c.cluster.IsTLSShadowed(), !c.cluster.Spec.Networking.ImprovedHostNetwork)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1092,7 +1092,7 @@ func (c *Cluster) getVerifiedTLSClientData(rootCAs [][]byte) (chain []byte, key 
 		return nil, nil, err
 	}
 
-	if _, err := util_x509.Verify(rootCAs, clientCert, clientKey, x509.ExtKeyUsageClientAuth, nil, !c.cluster.IsTLSShadowed(), !c.cluster.ImproveHostNetworkEnabled()); err != nil {
+	if _, err := util_x509.Verify(rootCAs, clientCert, clientKey, x509.ExtKeyUsageClientAuth, nil, !c.cluster.IsTLSShadowed(), !c.cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
 		return nil, nil, err
 	}
 

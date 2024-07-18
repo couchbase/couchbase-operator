@@ -48,7 +48,6 @@ var (
 	PodInitializedAnnotation      = "pod.couchbase.com/initialized"
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
-	ImprovedHostNetworkAnnotation = "cao.couchbase.com/network.improvedHostNetwork"
 
 	// Local storage annotation is used to identify a storage class
 	// that does not offer dynamic provisioning.

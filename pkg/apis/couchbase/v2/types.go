@@ -2826,6 +2826,9 @@ type CouchbaseClusterNetworkingSpec struct {
 	// CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
 	// cluster.
 	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty" annotation:"cloudNativeGateway"`
+
+	// ImprovedHostNetwork is used to set the alternate address of the pod to the node name
+	ImprovedHostNetwork bool `json:"-" annotation:"improvedHostNetwork"`
 }
 
 type CouchbaseClusterLoggingSpec struct {

@@ -10,7 +10,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
@@ -205,9 +204,7 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 }
 
 func (c *Cluster) handleHostnameAA(ctx context.Context) error {
-	shouldAddHostAA, ok := c.cluster.Annotations["annotation."+constants.ImprovedHostNetworkAnnotation]
-
-	if !ok || shouldAddHostAA == "false" {
+	if !c.cluster.Spec.Networking.ImprovedHostNetwork {
 		persistenceVar, err := c.state.Get(persistence.MembersWithHostnameAAadded)
 
 		for _, member := range c.members {
@@ -224,7 +221,7 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 
 	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
 
-	if ok && shouldAddHostAA == "true" {
+	if c.cluster.Spec.Networking.ImprovedHostNetwork {
 		for _, member := range c.members {
 			existingAddresses, err := c.getAlternateAddressesExternal(member)
 			if err != nil {

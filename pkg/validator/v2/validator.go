@@ -2453,7 +2453,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		}
 	}
 
-	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed(), !cluster.ImproveHostNetworkEnabled()); err != nil {
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageServerAuth, subjectAltNames, !cluster.IsTLSShadowed(), !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
 		return []error{err}
 	}
 
@@ -2471,7 +2471,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return nil
 	}
 
-	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false, !cluster.ImproveHostNetworkEnabled()); err != nil {
+	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false, !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
 		return []error{err}
 	}
 

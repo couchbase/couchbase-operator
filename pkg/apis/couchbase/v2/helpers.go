@@ -629,16 +629,6 @@ func (c *CouchbaseCluster) IsNativeAuditCleanupEnabled() bool {
 		int(c.Spec.Logging.Audit.Rotation.PruneAge.Duration.Seconds()) > 0
 }
 
-func (c *CouchbaseCluster) ImproveHostNetworkEnabled() bool {
-	if c.Annotations == nil {
-		return false
-	}
-
-	shouldAddHostAA, ok := c.Annotations[constants.ImprovedHostNetworkAnnotation]
-
-	return ok && shouldAddHostAA == "true"
-}
-
 // IsIndexerEnabled tells us whether any server class is running the index service.
 // This is useful as the storage mode cannot be changed on the fly.
 func (c *CouchbaseCluster) IsIndexerEnabled() bool {
