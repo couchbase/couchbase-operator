@@ -149,6 +149,17 @@ func errorResponse(err error) *admissionv1.AdmissionResponse {
 	}
 }
 
+// errorResponse takes an error and warnings and creates an admission response.
+func errorResponseWithWarnings(err error, warnings []string) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
+		Allowed: false,
+		Result: &metav1.Status{
+			Message: err.Error(),
+		},
+		Warnings: warnings,
+	}
+}
+
 // decodeObject decodes a cluster from an admission review and returns a versioned
 // structure.
 func decodeObject(ar admissionv1.AdmissionReview, raw runtime.RawExtension) (runtime.Object, error) {
@@ -229,9 +240,11 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 	}
 
 	// Check that the CouchbaseCluster is correctly configured
-	if err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient(), options), couchbaseCluster); err != nil {
+	if warnings, err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient(), options), couchbaseCluster); err != nil {
 		log.Error(err, "Rejecting resource")
-		return errorResponse(err)
+		return errorResponseWithWarnings(err, warnings)
+	} else if len(warnings) != 0 {
+		reviewResponse.Warnings = append(reviewResponse.Warnings, warnings...)
 	}
 
 	return &reviewResponse

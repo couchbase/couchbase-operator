@@ -16,37 +16,37 @@ func New(client kubernetes.Interface, couchbaseClient versioned.Interface, optio
 	return types.New(client, couchbaseClient, options)
 }
 
-func CheckConstraints(v *types.Validator, resource runtime.Object) error {
+func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, error) {
 	switch t := resource.(type) {
 	case *couchbasev2.CouchbaseCluster:
 		return validationv2.CheckConstraints(v, t)
 	case *couchbasev2.CouchbaseBucket:
-		return validationv2.CheckConstraintsBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsBucket(v, t)
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return validationv2.CheckConstraintsEphemeralBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsEphemeralBucket(v, t)
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return validationv2.CheckConstraintsMemcachedBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsMemcachedBucket(v, t)
 	case *couchbasev2.CouchbaseReplication:
-		return validationv2.CheckConstraintsReplication(v, t)
+		return []string{}, validationv2.CheckConstraintsReplication(v, t)
 	case *couchbasev2.CouchbaseUser:
-		return validationv2.CheckConstraintsCouchbaseUser(v, t)
+		return []string{}, validationv2.CheckConstraintsCouchbaseUser(v, t)
 	case *couchbasev2.CouchbaseGroup:
-		return validationv2.CheckConstraintsCouchbaseGroup(v, t)
+		return []string{}, validationv2.CheckConstraintsCouchbaseGroup(v, t)
 	case *couchbasev2.CouchbaseBackup:
-		return validationv2.CheckConstraintsBackup(v, t)
+		return []string{}, validationv2.CheckConstraintsBackup(v, t)
 	case *couchbasev2.CouchbaseBackupRestore:
-		return validationv2.CheckConstraintsBackupRestore(v, t)
+		return []string{}, validationv2.CheckConstraintsBackupRestore(v, t)
 	case *couchbasev2.CouchbaseCollection:
-		return validationv2.CheckConstraintsCollection(v, t)
+		return []string{}, validationv2.CheckConstraintsCollection(v, t)
 	case *couchbasev2.CouchbaseCollectionGroup:
-		return validationv2.CheckConstraintsCollectionGroup(v, t)
+		return []string{}, validationv2.CheckConstraintsCollectionGroup(v, t)
 	case *couchbasev2.CouchbaseScope:
-		return validationv2.CheckConstraintsScope(v, t)
+		return []string{}, validationv2.CheckConstraintsScope(v, t)
 	case *couchbasev2.CouchbaseScopeGroup:
-		return validationv2.CheckConstraintsScopeGroup(v, t)
+		return []string{}, validationv2.CheckConstraintsScopeGroup(v, t)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func CheckImmutableFields(current, updated runtime.Object) error {

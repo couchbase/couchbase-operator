@@ -3342,10 +3342,9 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 func TestAnnotationValidation(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "TestInvalidCAOClusterAnnotation",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{"cao.couchbase.com/invalidAnnotation": "v"})},
-			expectedErrors: []string{"could not find field"},
-			shouldFail:     true,
+			name:       "TestInvalidCAOClusterAnnotation",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{"cao.couchbase.com/invalidAnnotation": "v"})},
+			shouldFail: false,
 		},
 		{
 			name: "TestValidCAOClusterAnnotations",

@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	goerrors "errors"
 	"fmt"
-	"log/slog"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -39,7 +38,7 @@ const (
 // NOTE: philosophically, we shouldn't need this many, and my gut feeling is that
 // through clever API design we can cull some of them.  Obviously this is a
 // CRDv3 thing.
-func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
@@ -63,10 +62,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
-		checkConstraintDeltaRecoveryDeprecated,
 		checkoutConstraintNoServicelessClassBelow76,
 		checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade,
-		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
 		checkConstraintDefaultAndLogVolumesMututallyExclusive,
@@ -99,10 +96,19 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintBucketsAnnotations,
 	}
 
+	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
+		checkConstraintTwoDataNodesForDeltaRecovery,
+		checkConstraintDeltaRecoveryDeprecated,
+	}
+
 	var errs []error
 
+	var warnings []string
+
 	// Check that any CAO annotations are valid
-	err := annotations.Populate(&cluster.Spec, cluster.Annotations)
+	ws, err := annotations.PopulateWithWarnings(&cluster.Spec, cluster.Annotations)
+	warnings = append(warnings, ws...)
+
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -120,11 +126,29 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		}
 	}
 
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	for _, check := range warningChecks {
+		w, err := check(v, cluster)
+		if err != nil {
+			var composite *errors.CompositeError
+
+			if ok := goerrors.As(err, &composite); ok {
+				errs = append(errs, composite.Errors...)
+				continue
+			}
+
+			errs = append(errs, err)
+		}
+
+		if len(w) > 0 {
+			warnings = append(warnings, w...)
+		}
 	}
 
-	return nil
+	if errs != nil {
+		return warnings, errors.CompositeValidationError(errs...)
+	}
+
+	return warnings, nil
 }
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -870,12 +894,12 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 	return nil
 }
 
-func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.UpgradeProcess != nil && *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
-		slog.Warn("DeltaRecovery is deprecated. Use InPlaceUpgrade instead.")
+		return []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func getNumberOfDataServiceNodes(cluster *couchbasev2.CouchbaseCluster) int {
@@ -903,14 +927,14 @@ func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.
 }
 
 // checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
-func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.UpgradeProcess != nil {
 		if getNumberOfDataServiceNodes(cluster) < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
-			slog.Warn("It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online.")
+			return []string{"It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online."}, nil
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 // checkConstraintClusterSupportable checks that if you have one supportable class, they all are.

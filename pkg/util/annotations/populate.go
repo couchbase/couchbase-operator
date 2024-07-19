@@ -1,6 +1,7 @@
 package annotations
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -63,9 +64,15 @@ THIS WILL INIT A STRUCT IF REQUIRED BY THE PATH.
 Which means a struct will contain empty values, without the kubebuilder defaults.
 */
 func Populate(a interface{}, annotations map[string]string) error {
+	_, err := PopulateWithWarnings(a, annotations)
+	return err
+}
+
+// PopulateWithWarnings is the same as Populate but returns a list of warnings for each CAO annotation that could not be applied.
+func PopulateWithWarnings(a interface{}, annotations map[string]string) ([]string, error) {
 	rv := reflect.ValueOf(a)
 	if rv.Kind() != reflect.Ptr {
-		return &InvalidPopulateError{Type: reflect.TypeOf(a)}
+		return nil, &InvalidPopulateError{Type: reflect.TypeOf(a)}
 	}
 
 	failed := false
@@ -79,6 +86,8 @@ func Populate(a interface{}, annotations map[string]string) error {
 		}
 	}()
 
+	warnings := []string{}
+
 	for k, v := range annotations {
 		if !strings.HasPrefix(k, AnnotationPrefix) {
 			continue
@@ -90,16 +99,15 @@ func Populate(a interface{}, annotations map[string]string) error {
 			if field.IsValid() && field.CanSet() {
 				if err := state.setField(field, v); err != nil {
 					failed = true
-					return err
+					return warnings, err
 				}
 			}
 		} else {
-			failed = true
-			return &FieldNotFoundError{Field: k}
+			warnings = append(warnings, fmt.Sprintf("No target found for annotation '%s:%s'. Annotation will have no effect.", k, v))
 		}
 	}
 
-	return nil
+	return warnings, nil
 }
 
 func (state *PopulateState) setField(field *reflect.Value, value string) error {
