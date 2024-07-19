@@ -1775,11 +1775,12 @@ const (
 	RoleAnalyticsSelect                     RoleName = "analytics_select"
 	RoleAnalyticsAdmin                      RoleName = "analytics_admin"
 	RoleEventingAdmin                       RoleName = "eventing_admin"
+	RoleEventingManageFunctions             RoleName = "eventing_manage_functions"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;mobile_sync_gateway_application;mobile_sync_gateway_application_read_only;mobile_sync_gateway_architect;mobile_sync_gateway_dev_ops;mobile_sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;mobile_sync_gateway_application;mobile_sync_gateway_application_read_only;mobile_sync_gateway_architect;mobile_sync_gateway_dev_ops;mobile_sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader;eventing_manage_functions
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped

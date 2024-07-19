@@ -952,6 +952,7 @@ var clusterRoles = []RoleName{
 	RoleAnalyticsAdmin,
 	RoleExternalStatsReader,
 	RoleEventingAdmin,
+	RoleEventingManageFunctions,
 }
 
 // bucketRoles can be bucket scoped.
