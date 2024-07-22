@@ -20,8 +20,9 @@ var (
 )
 
 type DeltaRecoveryUpgradeConfig struct {
-	SpecPath   string         `yaml:"specPath" caoCli:"required"`
-	Validators map[string]any `yaml:"validators,omitempty"`
+	Description       []string         `yaml:"description"`
+	CBClusterSpecPath string           `yaml:"cbClusterSpecPath" caoCli:"required"`
+	Validators        []map[string]any `yaml:"validators,omitempty"`
 }
 
 func NewDeltaRecoveryUpgrade(conf interface{}) (actions.Action, error) {
@@ -68,16 +69,16 @@ func (d *DeltaRecoveryUpgrade) Do(_ *context.Context, _ interface{}) error {
 		return ErrDeltaUpgradeConfig
 	}
 
+	logrus.Infof("Couchbase Upgrade started")
 	// namespace := context.ValueID(ctxt.Context(), context.NamespaceIDKey)
 	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	err = kubectl.ApplyFiles(path.Join(dir, c.SpecPath)).InNamespace("default").ExecWithoutOutputCapture()
+	err = kubectl.ApplyFiles(path.Join(dir, c.CBClusterSpecPath)).InNamespace("default").ExecWithoutOutputCapture()
 	if err != nil {
-		logrus.Error("kubectl apply:", err)
-		return fmt.Errorf("kubectl apply: %w", err)
+		return fmt.Errorf("kubectl apply cb cluster yaml: %w", err)
 	}
 
 	return nil

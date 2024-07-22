@@ -6,7 +6,8 @@ const (
 	NamespaceIDKey = iota
 	OperatorIDKey
 	AdmissionIDKey
-	CouchbaseSpecPathIDKey
+	ClusterSpecPathIDKey
+	BucketsSpecPathIDKey
 	CouchbaseClusterNameKey
 	K8sNodesMapKey
 	K8sPodsMapKey
@@ -17,7 +18,8 @@ var (
 		"Namespace":            NamespaceIDKey,
 		"OperatorImage":        OperatorIDKey,
 		"AdmissionImage":       AdmissionIDKey,
-		"CouchbaseSpecPath":    CouchbaseSpecPathIDKey,
+		"ClusterSpecPath":      ClusterSpecPathIDKey,
+		"BucketsSpecPath":      BucketsSpecPathIDKey,
 		"CouchbaseClusterName": CouchbaseClusterNameKey,
 		"K8sNodesMap":          K8sNodesMapKey,
 		"K8sPodsMap":           K8sPodsMapKey,

@@ -51,6 +51,6 @@ type multiScenarioIn struct {
 }
 
 func scenarioNameFromPath(path FilePath) string {
-	// ./scenarios/examples/g2/setup.yaml becomes scenarios/examples/g2/setup
+	// ./scenarios/upgrade/delta_recovery/delta_recovery.yaml becomes scenarios/upgrade/delta_recovery/delta_recovery
 	return strings.TrimSuffix(strings.TrimPrefix(string(path), "./"), ".yaml")
 }

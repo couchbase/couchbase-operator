@@ -29,6 +29,7 @@ var (
 )
 
 type CouchbaseReadiness struct {
+	Name           string `yaml:"name" caoCli:"required"`
 	State          string `yaml:"state" caoCli:"required"`
 	DurationInSecs int64  `yaml:"durationInSecs"`
 	IntervalInSecs int64  `yaml:"intervalInSecs"`
@@ -78,11 +79,11 @@ func (c *CouchbaseReadiness) Run(_ *context.Context) error {
 	checkInterval := defaultReadinessInterval
 
 	if c.DurationInSecs != 0 {
-		checkDuration = time.Duration(c.DurationInSecs) * time.Minute
+		checkDuration = time.Duration(c.DurationInSecs) * time.Second
 	}
 
 	if c.IntervalInSecs != 0 {
-		checkInterval = time.Duration(c.IntervalInSecs) * time.Minute
+		checkInterval = time.Duration(c.IntervalInSecs) * time.Second
 	}
 
 	err := util.RetryFunctionTillTimeout(funcGetStateApplyPatch, checkDuration, checkInterval)

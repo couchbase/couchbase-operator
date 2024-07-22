@@ -53,7 +53,7 @@ func (c *Context) Context() context.Context {
 	return context.Background()
 }
 
-// WithID adds a value given a key. contextKey is an int and it gets its values using go enum and iota.
+// WithID adds a value given a key. contextKey is an int, and it gets its values using go enum and iota.
 func (c *Context) WithID(key contextKey, value string) {
 	c.ctx = context.WithValue(c.Context(), key, value)
 }
@@ -77,8 +77,8 @@ func ValueIDWithDefault(ctx context.Context, key contextKey, dflt string) string
 	return v
 }
 
-// WithIDInterface adds an interface value given a key. contextKey is an int
-// and it gets its values using go enum and iota.
+// WithIDInterface adds an interface value given a key.
+// contextKey is an int, and it gets its values using go enum and iota.
 func (c *Context) WithIDInterface(key contextKey, value interface{}) {
 	c.ctx = context.WithValue(c.Context(), key, value)
 }

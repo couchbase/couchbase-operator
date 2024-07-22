@@ -1,0 +1,23 @@
+# ==========================================
+# ========== Buckets Description ===========
+# 2 Buckets: 500Mi, 1 Replica, fullEviction
+# ==========================================
+
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+spec:
+  memoryQuota: 500Mi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction
+
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 500Mi
+  enableIndexReplica: true
+  evictionPolicy: fullEviction

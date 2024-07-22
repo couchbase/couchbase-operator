@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ErrUnableToMarshal       = errors.New("failed to marshal config object")
-	ErrFailedToMarshalConfig = errors.New("ailed to marshal config object")
+	ErrUnableToMarshal       = errors.New("failed to marshal")
+	ErrFailedToMarshalConfig = errors.New("failed to marshal config object")
 )
 
 func checkValidValidation(validate string) Validator {
@@ -23,13 +23,13 @@ func checkValidValidation(validate string) Validator {
 	return nil
 }
 
-func RunValidator(ctx *context.Context, validators map[string]any, state string) (bool, error) {
+func RunValidator(ctx *context.Context, validators []map[string]any, state string) (bool, error) {
 	var errs []error
 
-	for key, valueFromYaml := range validators {
-		if v := checkValidValidation(key); v != nil {
+	for _, validatorMap := range validators {
+		if v := checkValidValidation(validatorMap["name"].(string)); v != nil {
 			var encoded []byte
-			encoded, err := yaml.Marshal(valueFromYaml)
+			encoded, err := yaml.Marshal(validatorMap)
 
 			if err != nil {
 				logrus.Error(fmt.Errorf("%w: %w", ErrFailedToMarshalConfig, err))

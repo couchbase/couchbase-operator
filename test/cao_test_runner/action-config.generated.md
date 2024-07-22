@@ -18,8 +18,9 @@ Config symbol: `DeltaRecoveryUpgradeConfig`
 
 | Name | Type | YAML Tag | CAO-CLI Tag |
 | ---- | ---- | -------- | ----------- |
-| `SpecPath` | `string` | `yaml:specPath` | `caoCli:required`  |
-| `Validators` | `map` | `yaml:validators,omitempty` |  |
+| `Description` | `slice` | `yaml:description` |  |
+| `CBClusterSpecPath` | `string` | `yaml:cbClusterSpecPath` | `caoCli:required`  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Deploy Couchbase
@@ -28,8 +29,13 @@ Config symbol: `CouchbaseConfig`
 
 | Name | Type | YAML Tag | CAO-CLI Tag |
 | ---- | ---- | -------- | ----------- |
-| `SpecPath` | `string` | `yaml:specPath` | `caoCli:required`  |
-| `Validators` | `map` | `yaml:validators,omitempty` |  |
+| `Description` | `slice` | `yaml:description` |  |
+| `CBClusterSpecPath` | `string` | `yaml:cbClusterSpecPath` | `caoCli:required`  |
+| `CBBucketsSpecPath` | `string` | `yaml:cbBucketsSpecPath` |  |
+| `CBSecretsSpecPath` | `string` | `yaml:cbSecretsSpecPath` |  |
+| `ApplyClusterSpecChanges` | `map` | `yaml:applyClusterSpecChanges` |  |
+| `ApplyBucketSpecChanges` | `map` | `yaml:applyBucketSpecChanges` |  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Generic Workload
@@ -40,8 +46,10 @@ Config symbol: `GenericWorkloadConfig`
 | ---- | ---- | -------- | ----------- |
 | `Name` | `string` | `yaml:name` | `caoCli:required`  |
 | `SpecPath` | `string` | `yaml:specPath` | `caoCli:required`  |
-| `PreSleep` | `int` | `yaml:preSleep` |  |
-| `PostSleep` | `int` | `yaml:postSleep` |  |
+| `PreRunWait` | `int` | `yaml:preRunWait` |  |
+| `PostRunWait` | `int` | `yaml:postRunWait` |  |
+| `RunDuration` | `int` | `yaml:runDuration` | `caoCli:required`  |
+| `CheckJobCompletion` | `bool` | `yaml:checkJobCompletion` |  |
 
 ---
 #### Setup Operator

@@ -1,0 +1,95 @@
+# ===========================
+# ======= Description =======
+# ===========================
+# QueryApp Job for continuous queries on Hotel Template and for All Collections
+# Definition: 2 Threads, 2 Queries always running, Infinite Duration
+# Works with Gideon data workload
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queryapp-bucket0
+spec:
+  template:
+    metadata:
+      name: queryapp
+    spec:
+      containers:
+        - name: queryapp
+          image: docker.io/sequoiatools/queryapp:capella
+          args: ["-J-Xms256m", "-J-Xmx512m", "-J-cp", "/AnalyticsQueryApp/Couchbase-Java-Client-2.7.21/*", "/AnalyticsQueryApp/Query/load_queries.py", "--server_ip", "cb-example-0005.cb-example.default.svc", "--port", "8093", "--bucket", "bucket0", "--querycount", "2", "--duration", "0", "--threads", "2", "--query_file", "queries.txt", "--n1ql", "True", "--query_timeout=600", "--scan_consistency", "REQUEST_PLUS", "--dataset", "hotel", "--bucket_names", "[bucket0,bucket1]", "--print_duration", "10"]
+      restartPolicy: Never
+      nodeSelector:
+        workload-node: "true"
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queryapp-bucket1
+spec:
+  template:
+    metadata:
+      name: queryapp
+    spec:
+      containers:
+        - name: queryapp
+          image: docker.io/sequoiatools/queryapp:capella
+          args: ["-J-Xms256m", "-J-Xmx512m", "-J-cp", "/AnalyticsQueryApp/Couchbase-Java-Client-2.7.21/*", "/AnalyticsQueryApp/Query/load_queries.py", "--server_ip", "cb-example-0005.cb-example.default.svc", "--port", "8093", "--bucket", "bucket1", "--querycount", "2", "--duration", "0", "--threads", "2", "--query_file", "queries.txt", "--n1ql", "True", "--query_timeout=600", "--scan_consistency", "REQUEST_PLUS", "--dataset", "hotel", "--bucket_names", "[bucket0,bucket1]", "--print_duration", "10"]
+      restartPolicy: Never
+      nodeSelector:
+        workload-node: "true"
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queryapp-bucket2
+spec:
+  template:
+    metadata:
+      name: queryapp
+    spec:
+      containers:
+        - name: queryapp
+          image: docker.io/sequoiatools/queryapp:capella
+          args: ["-J-Xms256m", "-J-Xmx512m", "-J-cp", "/AnalyticsQueryApp/Couchbase-Java-Client-2.7.21/*", "/AnalyticsQueryApp/Query/load_queries.py", "--server_ip", "cb-example-0005.cb-example.default.svc", "--port", "8093", "--bucket", "bucket2", "--querycount", "2", "--duration", "0", "--threads", "2", "--query_file", "queries.txt", "--n1ql", "True", "--query_timeout=600", "--scan_consistency", "REQUEST_PLUS", "--dataset", "hotel", "--bucket_names", "[bucket0,bucket2]", "--print_duration", "10"]
+      restartPolicy: Never
+      nodeSelector:
+        workload-node: "true"
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queryapp-bucket3
+spec:
+  template:
+    metadata:
+      name: queryapp
+    spec:
+      containers:
+        - name: queryapp
+          image: docker.io/sequoiatools/queryapp:capella
+          args: ["-J-Xms256m", "-J-Xmx512m", "-J-cp", "/AnalyticsQueryApp/Couchbase-Java-Client-2.7.21/*", "/AnalyticsQueryApp/Query/load_queries.py", "--server_ip", "cb-example-0005.cb-example.default.svc", "--port", "8093", "--bucket", "bucket3", "--querycount", "2", "--duration", "0", "--threads", "2", "--query_file", "queries.txt", "--n1ql", "True", "--query_timeout=600", "--scan_consistency", "REQUEST_PLUS", "--dataset", "hotel", "--bucket_names", "[bucket0,bucket3]", "--print_duration", "10"]
+      restartPolicy: Never
+      nodeSelector:
+        workload-node: "true"
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: queryapp-bucket4
+spec:
+  template:
+    metadata:
+      name: queryapp
+    spec:
+      containers:
+        - name: queryapp
+          image: docker.io/sequoiatools/queryapp:capella
+          args: ["-J-Xms256m", "-J-Xmx512m", "-J-cp", "/AnalyticsQueryApp/Couchbase-Java-Client-2.7.21/*", "/AnalyticsQueryApp/Query/load_queries.py", "--server_ip", "cb-example-0005.cb-example.default.svc", "--port", "8093", "--bucket", "bucket4", "--querycount", "2", "--duration", "0", "--threads", "2", "--query_file", "queries.txt", "--n1ql", "True", "--query_timeout=600", "--scan_consistency", "REQUEST_PLUS", "--dataset", "hotel", "--bucket_names", "[bucket0,bucket4]", "--print_duration", "10"]
+      restartPolicy: Never
+      nodeSelector:
+        workload-node: "true"

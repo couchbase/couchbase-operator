@@ -19,6 +19,7 @@ const (
 )
 
 type CBVersion struct {
+	Name              string `yaml:"name" caoCli:"required"`
 	State             string `yaml:"state" caoCli:"required"`
 	CBVersion         string `yaml:"cbVersion" caoCli:"required"`
 	DurationInMinutes int64  `yaml:"durationInMinutes"`

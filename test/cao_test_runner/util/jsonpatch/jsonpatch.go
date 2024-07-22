@@ -11,6 +11,22 @@ var (
 	ErrPathNotFoundInJSON = errors.New("failed to lookup path in json document")
 )
 
+// Get returns the value for the specified path in the document. Pass the document by reference.
+// Usage:
+//
+//	yamlFile, err := os.ReadFile(pathToYAMLFile)
+//	if err != nil {
+//	return nil, fmt.Errorf("unmarshal yaml file: %w", err)
+//	}
+//
+//	unmarshalledYAML := make(map[string]interface{})
+//
+//	err = yaml.Unmarshal(yamlFile, &unmarshalledYAML)
+//	if err != nil {
+//	return nil, fmt.Errorf("unmarshal yaml file: %w", err)
+//	}
+//	_, err = jsonpatchutil.Get(&yaml, spec)
+//	// Handle the error
 func Get(document interface{}, path string) (interface{}, error) {
 	// Get a reference to the object to update
 	v, k, err := jsonpointer.LookupPath(document, path)

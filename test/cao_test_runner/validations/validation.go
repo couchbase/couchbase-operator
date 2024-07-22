@@ -16,10 +16,11 @@ type Validator interface {
 
 func RegisterValidators() map[string]Validator {
 	return map[string]Validator{
-		"couchbaseReadiness": &CouchbaseReadiness{},
-		"collectLogs":        &CollectLogs{},
-		"preFlight":          &PreFlight{},
-		"couchbaseVersion":   &CBVersion{},
-		"labelTaintNodes":    &LabelTaintNodes{},
+		"couchbaseReadiness":   &CouchbaseReadiness{},
+		"collectLogs":          &CollectLogs{},
+		"preFlight":            &PreFlight{},
+		"couchbaseVersion":     &CBVersion{},
+		"labelTaintNodes":      &LabelTaintNodes{},
+		"couchbaseClusterSize": &CouchbaseClusterSize{},
 	}
 }

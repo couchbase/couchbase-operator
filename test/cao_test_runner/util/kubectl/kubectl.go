@@ -211,6 +211,17 @@ func Taint(node string, key string, value string, effect string) Cmd {
 	return Cmd{Command: "taint", Args: args}
 }
 
+func RemoveTaint(node string, key string, value string, effect string) Cmd {
+	var args []string
+	if value != "" {
+		args = []string{"nodes", node, fmt.Sprintf("%s=%s:%s-", key, value, effect)}
+	} else {
+		args = []string{"nodes", node, fmt.Sprintf("%s:%s-", key, effect)}
+	}
+
+	return Cmd{Command: "taint", Args: args}
+}
+
 func Cordon(nodeName string) Cmd {
 	return Cmd{Command: "cordon", Args: []string{nodeName}}
 }
@@ -296,6 +307,22 @@ func Label(nodes string, key string, value string) Cmd {
 	label := fmt.Sprintf("%s=%s", key, value)
 	args = append(args, label)
 	args = append(args, "--overwrite")
+
+	return Cmd{Command: "label", Args: args}
+}
+
+func Unlabel(nodes string, key string) Cmd {
+	var args []string
+
+	tokens := strings.Split(nodes, " ")
+	for _, t := range tokens {
+		if t != "" {
+			args = append(args, "nodes/"+t)
+		}
+	}
+
+	label := "%s-" + key
+	args = append(args, label)
 
 	return Cmd{Command: "label", Args: args}
 }

@@ -31,6 +31,7 @@ var (
 )
 
 type PreFlight struct {
+	Name  string `yaml:"name" caoCli:"required"`
 	State string `yaml:"state" caoCli:"required"`
 }
 
