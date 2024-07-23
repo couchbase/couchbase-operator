@@ -235,6 +235,10 @@ func (c *Cluster) newCluster() error {
 	// Spawn the janitor process which monitors persistent log volumes.
 	go newJanitor(c).run()
 
+	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
+		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
+	}
+
 	// Load the most recent username, password and TLS data from either
 	// peristence, or the underlying secrets, and initialize a client for
 	// connection to Couchbase server.
