@@ -1503,7 +1503,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
-	if r.needsRebalance {
+	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
 		return nil
 	}
 
