@@ -1,7 +1,6 @@
 = Prerequisites and System Requirements
 
 include::partial$constants.adoc[]
-include::partial$prerequisite-diagrams.adoc[tag="diagram-colors"]
 
 [abstract]
 The Autonomous Operator supports several popular Kubernetes environments and cloud-native utilities.
@@ -27,15 +26,15 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 7.0 - 7.6^*^
+| 7.0 - 7.2^*^
 |===
 
-*: Couchbase Server 7.2 is supported with Operator 2.4;
-however, new features in 7.2 are only supported on Operator 2.4.1
+*: Couchbase Server 7.2 is supported with Operator 2.4, however new features in 7.2 are only supported on Operator 2.4.1
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
 
-include::partial$prerequisite-diagrams.adoc[tag="operator-compatibility-diagram"]
+.Couchbase Server Compatibility
+image:compatibility-server.png[]
 
 [[couchbase-backup-and-restore-compatibility]]
 === Couchbase Backup and Restore Compatibility
@@ -48,18 +47,15 @@ This release supports the following container images for xref:concept-backup.ado
 | Backup Utility
 | Backup From and Restore To
 
-a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.4.0`^]
-a| https://docs.couchbase.com/server/7.6/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.6.0`^]
-| Couchbase Server 7.0--7.6
+a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.6`^]
+a| https://docs.couchbase.com/server/7.2.3/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.2.3`^]
+| Couchbase Server 7.0--7.2
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
 
-include::partial$prerequisite-diagrams.adoc[tag="server-backup-compatibility-diagram"]
-
-This diagram depicts Operator Backup image compatibility with supported Couchbase Operator versions, you should consider this when upgrading Couchbase Operator:
-
-include::partial$prerequisite-diagrams.adoc[tag="operator-backup-compatibility-diagram"]
+.Operator Backup Compatibility
+image:compatibility-backup.png[]
 
 [[couchbase-fluent-bit-compatibility]]
 === Couchbase Fluent Bit Compatibility
@@ -86,7 +82,8 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 
 |===
 
-include::partial$prerequisite-diagrams.adoc[tag="operator-fluent-bit-compatibility-diagram"]
+.Operator Fluent Bit Compatibility
+image:compatibility-fluentbit.png[]
 
 [[couchbase-exporter-compatibility]]
 === Couchbase Exporter Compatibility
@@ -118,9 +115,8 @@ This release supports the following Kubernetes platforms:
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
 
-include::partial$prerequisite-diagrams.adoc[tag="managed-kubernetes-compatibility-diagram"]
-
-
+.Kubernetes and Red Hat OpenShift Compatibility
+image:compatibility-kubernetes.png[]
 
 [IMPORTANT]
 ====
@@ -128,7 +124,7 @@ Where an Operator release is marked as _supported_, this means it has been fully
 Couchbase Support will actively recreate and diagnose issues.
 Where relevant, fixes will be made to the affected product and patch releases made.
 
-Where an Operator release is marked as _compatible,_ however, this means it has been assessed by the development team to be technically feasible, and may have had rudimentary compatibility testing.
+Where an Operator release is marked as _compatible_ however, this means it has been assessed by the development team to be technically feasible, and may have had rudimentary compatibility testing.
 You may run the xref:concept-platform-certification.adoc[] tooling to verify the Operator will work on a compatible platform.
 Support will be provided on a best-effort basis, and any issues may not result in fixes and patch releases.
 We therefore highly encourage the use of a supported platform version.
