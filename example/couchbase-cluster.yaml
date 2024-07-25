@@ -15,7 +15,7 @@ spec:
       managed: true
   buckets:
     managed: true
-  upgradeProcess: DeltaRecovery
+  upgradeProcess: InPlaceUpgrade
   servers:
     - size: 3
       name: all_services
