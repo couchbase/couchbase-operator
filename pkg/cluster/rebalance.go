@@ -186,7 +186,14 @@ func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPN
 }
 
 // rebalanceWithRetriesOnVerifyFails will retry the rebalance if the verifyRebalance fails.
+// nolint:gocognit
 func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList, maxRetries uint) error {
+	for _, member := range c.members {
+		if err := c.waitForPodAdded(c.ctx, member, time.Minute); err != nil {
+			return err
+		}
+	}
+
 	// Ensure we have a minimum of one retry.
 	if maxRetries == 0 {
 		maxRetries = 1
