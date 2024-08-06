@@ -19,6 +19,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseusers-spec-authdomain,authDomain>>: ""
   <<couchbaseusers-spec-authsecret,authSecret>>: ""
   <<couchbaseusers-spec-fullname,fullName>>: ""
+  <<couchbaseusers-spec-name,name>>: ""
 ----
 
 == couchbaseusers.apiVersion
@@ -95,3 +96,13 @@ Name of Kubernetes secret with password for Couchbase domain.
 ==== Description
 
 Full Name of Couchbase user.
+
+=== couchbaseusers.spec.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Username of the couchbase user.

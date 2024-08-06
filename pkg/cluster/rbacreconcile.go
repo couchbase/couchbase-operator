@@ -594,10 +594,14 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		// internal user we have cached, or create a new one, then append the
 		// group (thus accumulating multiple groups for a specific user).
 		for _, subject := range subjects {
+			if subject.Spec.Name == "" {
+				subject.Spec.Name = subject.Name
+			}
+
 			user, ok := users[subject.Name]
 			if !ok {
 				user = couchbaseutil.User{
-					ID:     subject.Name,
+					ID:     subject.Spec.Name,
 					Name:   subject.Spec.FullName,
 					Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
 				}
@@ -614,7 +618,7 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 
 			user.Groups = append(user.Groups, group)
 
-			users[subject.Name] = user
+			users[subject.Spec.Name] = user
 		}
 	}
 
