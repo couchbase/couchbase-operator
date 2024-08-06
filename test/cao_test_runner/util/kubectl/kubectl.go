@@ -333,9 +333,37 @@ func Annotate(resource string, name string, key string, value string) Cmd {
 }
 
 // =============================================
-// ========== Other Kubectl Commands ===========
+// ========== Config Kubectl Commands ==========
 // =============================================
 
-func Config(args ...string) Cmd {
+func GetCurrentContext() Cmd {
+	args := []string{"current-context"}
 	return Cmd{Command: "config", Args: args}
 }
+
+func DeleteContext(args ...string) Cmd {
+	panic("Not Implemented")
+}
+
+func GetContexts() Cmd {
+	args := []string{"get-contexts", "-o", "name"}
+	return Cmd{Command: "config", Args: args}
+}
+
+func RenameContext(oldContextName, newContextName string) Cmd {
+	args := []string{"rename-context", oldContextName, newContextName}
+	return Cmd{Command: "config", Args: args}
+}
+
+func SetContext(args ...string) Cmd {
+	panic("Not Implemented")
+}
+
+func UseContext(contextName string) Cmd {
+	args := []string{"use-context", contextName}
+	return Cmd{Command: "config", Args: args}
+}
+
+// =============================================
+// ========== Other Kubectl Commands ===========
+// =============================================

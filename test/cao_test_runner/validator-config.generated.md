@@ -7,6 +7,7 @@ Each validator can be added as part of a config of an action. The validators ava
  * [couchbaseClusterSize](#couchbaseclustersize)
  * [couchbaseReadiness](#couchbasereadiness)
  * [couchbaseVersion](#couchbaseversion)
+ * [kubeconfigContext](#kubeconfigcontext)
  * [labelTaintNodes](#labeltaintnodes)
  * [preFlight](#preflight)
 
@@ -63,6 +64,19 @@ Config symbol: `CBVersion`
 | `CBVersion` | `string` | `yaml:cbVersion` | `caoCli:required`  |
 | `DurationInMinutes` | `int64` | `yaml:durationInMinutes` |  |
 | `IntervalInMinutes` | `int64` | `yaml:intervalInMinutes` |  |
+
+---
+#### kubeconfigContext
+
+Config symbol: `KubeConfigValidator`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `Name` | `string` | `yaml:name` | `caoCli:required`  |
+| `State` | `string` | `yaml:state` | `caoCli:required`  |
+| `CurrentContext` | `string` | `yaml:k8scontext` | `caoCli:required`  |
+| `DurationInSecs` | `int64` | `yaml:durationInSecs` |  |
+| `IntervalInSecs` | `int64` | `yaml:intervalInSecs` |  |
 
 ---
 #### labelTaintNodes

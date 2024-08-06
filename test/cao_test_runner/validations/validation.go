@@ -22,5 +22,6 @@ func RegisterValidators() map[string]Validator {
 		"couchbaseVersion":     &CBVersion{},
 		"labelTaintNodes":      &LabelTaintNodes{},
 		"couchbaseClusterSize": &CouchbaseClusterSize{},
+		"kubeconfigContext":    &KubeConfigValidator{},
 	}
 }

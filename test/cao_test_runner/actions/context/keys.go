@@ -11,6 +11,7 @@ const (
 	CouchbaseClusterNameKey
 	K8sNodesMapKey
 	K8sPodsMapKey
+	K8sContextKey
 )
 
 var (
@@ -23,5 +24,6 @@ var (
 		"CouchbaseClusterName": CouchbaseClusterNameKey,
 		"K8sNodesMap":          K8sNodesMapKey,
 		"K8sPodsMap":           K8sPodsMapKey,
+		"K8sContext":           K8sContextKey,
 	}
 )

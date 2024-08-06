@@ -2,7 +2,9 @@ package task
 
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup"
+	couchbasesetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/couchbase"
+	kubeconfigsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/kubeconfig"
+	operatorsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/operator"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
 )
@@ -27,10 +29,11 @@ type Register struct {
 
 func (r Register) Actions() map[string]ActionRegistration {
 	return map[string]ActionRegistration{
-		"Delta Upgrade":    {newAction: upgrade.NewDeltaRecoveryUpgrade, config: &upgrade.DeltaRecoveryUpgradeConfig{}},
-		"Setup Operator":   {newAction: setup.NewSetupOperatorConfig, config: &setup.OperatorConfig{}},
-		"Deploy Couchbase": {newAction: setup.NewCouchbaseConfig, config: &setup.CouchbaseConfig{}},
-		"Sleep":            {newAction: workloads.NewSleepActionConfig, config: &workloads.SleepActionConfig{}},
-		"Generic Workload": {newAction: workloads.NewGenericWorkloadConfig, config: &workloads.GenericWorkloadConfig{}},
+		"Delta Upgrade":             {newAction: upgrade.NewDeltaRecoveryUpgrade, config: &upgrade.DeltaRecoveryUpgradeConfig{}},
+		"Setup Operator":            {newAction: operatorsetup.NewSetupOperatorConfig, config: &operatorsetup.OperatorConfig{}},
+		"Deploy Couchbase":          {newAction: couchbasesetup.NewCouchbaseConfig, config: &couchbasesetup.CouchbaseConfig{}},
+		"Sleep":                     {newAction: workloads.NewSleepActionConfig, config: &workloads.SleepActionConfig{}},
+		"Generic Workload":          {newAction: workloads.NewGenericWorkloadConfig, config: &workloads.GenericWorkloadConfig{}},
+		"Change Kubeconfig Context": {newAction: kubeconfigsetup.NewKubernetesSetupConfig, config: &kubeconfigsetup.KubeConfigContextSetupConfig{}},
 	}
 }

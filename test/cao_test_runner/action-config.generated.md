@@ -5,11 +5,23 @@ Each action can be executed as part of a scenario. All actions inherit the
 [Global flags](README.md#global-flags) as common configuration, additional
 configuration is also available on a per-action basis:
 
+ * [Change Kubeconfig Context](#change-kubeconfig-context)
  * [Delta Upgrade](#delta-upgrade)
  * [Deploy Couchbase](#deploy-couchbase)
  * [Generic Workload](#generic-workload)
  * [Setup Operator](#setup-operator)
  * [Sleep](#sleep)
+
+---
+#### Change Kubeconfig Context
+
+Config symbol: `KubeConfigContextSetupConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `Description` | `slice` | `yaml:description` |  |
+| `K8sContext` | `string` | `yaml:k8scontext` | `caoCli:required`  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Delta Upgrade
