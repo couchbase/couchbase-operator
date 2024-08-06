@@ -2,13 +2,13 @@ action: "Deploy Couchbase"
 config:
   cbClusterSpecPath: "./test_data/cb_clusters/3-data-7.2.5-delta-recovery.yaml"
   validators:
-    preFlight:
+    - name: "preFlight"
       state: "PRE"
-    couchbaseReadiness:
+    - name: "couchbaseReadiness"
       state: "POST"
       durationInSecs: 300
       intervalInSecs: 10
-    couchbaseVersion:
+    - name: "couchbaseVersion"
       state: "POST"
       cbVersion: "7.2.5"
 trees:
@@ -24,10 +24,10 @@ trees:
           config:
             specPath: "./test_data/cb_clusters/3-data-7.6.1-delta-recovery.yaml"
             validators:
-              couchbaseVersion:
+              - name: "couchbaseVersion"
                 state: "POST"
                 cbVersion: "7.6.1"
-              couchbaseReadiness:
+              - name: "couchbaseReadiness"
                 state: "POST"
                 durationInSecs: 600
                 intervalInSecs: 10

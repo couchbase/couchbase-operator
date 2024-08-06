@@ -2,10 +2,10 @@ action: "Deploy Couchbase"
 config:
   specPath: "./test_data/couchbase_spec/single_data_couchbase.yaml"
   validators:
-    preFlight:
+    - name: "preFlight"
       state: "PRE"
-    couchbaseReadiness:
-        state: "POST"
-    couchbaseVersion:
-        state: "POST"
-        cbVersion: "7.2.5"
+    - name: "couchbaseReadiness"
+      state: "POST"
+    - name: "couchbaseVersion"
+      state: "POST"
+      cbVersion: "7.2.5"

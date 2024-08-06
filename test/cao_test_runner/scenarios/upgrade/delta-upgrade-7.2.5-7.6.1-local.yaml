@@ -4,15 +4,15 @@ config:
   cbBucketsSpecPath: ""
   cbSecretsSpecPath: ""
   validators:
-    preFlight:
+    - name: "preFlight"
       state: "PRE"
-#    labelTaintNodes:
-#      state: "PRE"
-#      numCBNodes: 6
-#      numWorkloadNodes: 2
-    couchbaseReadiness:
+#   - name : "labelTaintNodes"
+#     state: "PRE"
+#     numCBNodes: 6
+#     numWorkloadNodes: 2
+    - name: "couchbaseReadiness"
       state: "POST"
-    couchbaseVersion:
+    - name: "couchbaseVersion"
       state: "POST"
       cbVersion: "7.2.5"
 trees:
@@ -28,8 +28,8 @@ trees:
         config:
           specPath: "./test_data/cb_clusters/cb-cluster-7.2.5-simple-local-upgrade-7.6.1.yaml"
           validators:
-            couchbaseVersion:
+            - name: "couchbaseVersion"
               state: "POST"
               cbVersion: "7.6.1"
-            couchbaseReadiness:
+            - name: "couchbaseReadiness"
               state: "POST"

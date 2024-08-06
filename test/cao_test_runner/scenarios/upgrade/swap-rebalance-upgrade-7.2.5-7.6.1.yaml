@@ -4,17 +4,17 @@ config:
   cbBucketsSpecPath: "./test_data/cb_buckets/10-buckets-1-replica.yaml"
   cbSecretsSpecPath: ""
   validators:
-    preFlight:
+    - name: "preFlight"
       state: "PRE"
-#    labelTaintNodes:
-#      state: "PRE"
-#      numCBNodes: 11
-#      numWorkloadNodes: 2
-#      applyTaint: False
-#      applyLabel: True
-    couchbaseReadiness:
+#   - name: "labelTaintNodes"
+#     state: "PRE"
+#     numCBNodes: 11
+#     numWorkloadNodes: 2
+#     applyTaint: False
+#     applyLabel: True
+    - name: "couchbaseReadiness"
       state: "POST"
-    couchbaseVersion:
+    - name: "couchbaseVersion"
       state: "POST"
       cbVersion: "7.2.5"
 trees:
