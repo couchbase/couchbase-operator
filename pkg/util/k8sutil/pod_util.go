@@ -89,10 +89,6 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 	image := cluster.Spec.ServerClassCouchbaseImage(&config)
 
-	if pvcState != nil && pvcState.Image != "" {
-		image = pvcState.Image
-	}
-
 	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image)
 
 	serverGroup, err = scheduler.Create(config.Name, m.Name(), serverGroup)
