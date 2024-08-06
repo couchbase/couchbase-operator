@@ -9,7 +9,7 @@ It has the benefit of allowing running multiple clusters and each can be configu
 
 You will need the following from your favorite package manager:
 
-* go (1.17.0+)
+* go (1.22.0+)
 * git
 * git-review
 * make
@@ -33,7 +33,7 @@ Each line is intended to cover a particular aspect (e.g. code then test) to make
 ----
 $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 $ brew doctor
-$ brew install git python repo cmake ccache git-review go@1.17 make
+$ brew install git python repo cmake ccache git-review go@1.22 make
 $ brew install --cask docker
 $ brew install kind kubectl helm
 $ brew install --cask visual-studio-code
@@ -50,6 +50,7 @@ Ensure docker is allocated a decent amount of RAM as it defaults to 2GiB for som
 Ensure you have set up your SSH keys, the GitHub https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent[documentation^] covers it reasonably well.
 
 To work with the code, you will need to do the following:
+
 * Create ssh keys (used for Gerrit authentication) and add to http://review.couchbase.org/settings/#SSHKeys[Gerrit^].
 * Ensure Gerrit is http://review.couchbase.org/settings#EmailAddresses[set up with your email address^] used by git configuration.
 * Get an account on Gerrit for the `couchbase-operator` repository (raise a CBIT or contact Couchbase) - this requires addition of the user to the `NorthScale` group.
@@ -186,9 +187,14 @@ $ kind load docker-image couchbase/server:7.0.3
 
 It may be helpful to make an alias in your `bashrc` (or similar profile script - default shell on macOS seems to be ZSH so in the `.zshrc`) file:
 
+[NOTE]
+====
+Depending on your OS, you will need to change the cao path and image tags for the alias. The cao path will start with `./build/bin/...` (e.g. for a Mac, this path is `./build/bin/kubernetes-darwin-arm64/cao`). To find the correct tag, if you have built the images locally you can use `docker images` (see the `TAG` column).
+====
+
 [source,console]
 ----
-$ alias test-couchbase='./build/bin/cao certify --image couchbase/couchbase-operator-certification:v1 --clean --parallel=1 -- -operator-image couchbase/couchbase-operator:v1 -admission-image couchbase/couchbase-operator-admission:v1'
+$ alias test-couchbase='./build/bin/<cao path>/cao certify --image couchbase/couchbase-operator-certification:<certification tag> --clean --parallel=1 -- -operator-image couchbase/couchbase-operator:<operator tag> -admission-image couchbase/couchbase-admission-controller:<admission controller tag>'
 ----
 
 Then you can run some common commands to get you started:
