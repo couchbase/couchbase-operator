@@ -11,7 +11,7 @@ import (
 	icontext "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 )
 
-// Tree defines the structure used in a branching cp-cli scenario.
+// Tree defines the structure used in a branching cao testrunner scenario.
 type Tree struct {
 	Trees         []*Tree
 	Action        actions.Action
@@ -60,7 +60,11 @@ func (t *Tree) Execute(ctx context.Context) []error {
 		}
 	}
 
-	if len(t.Trees) == 0 {
+	// If the scenario has only one action but iterations > 1
+	if len(t.Trees) == 0 && t.Iterations > 1 {
+		t.Iterations -= 1
+		return t.Execute(ctx)
+	} else if len(t.Trees) == 0 {
 		return []error{}
 	}
 
