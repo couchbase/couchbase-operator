@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	defaultTimeoutMins = 120
+	defaultTimeoutMins = 10080 // 7 Days = 7 * 24 * 60
 )
 
 type FilePath string

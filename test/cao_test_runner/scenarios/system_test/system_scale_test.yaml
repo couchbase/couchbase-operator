@@ -1,0 +1,290 @@
+action: "Deploy Couchbase"
+config:
+  description:
+    - "Deploy Couchbase Cluster with 4 KV and 3 Index-Query"
+  cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+  cbBucketsSpecPath: "./test_data/cb_buckets/10-buckets-1-replica.yaml"
+  cbSecretsSpecPath: "./test_data/cb_secrets/default_cb_secrets.yaml"
+  applyClusterSpecChanges:
+    "/spec/servers/0/size": 4
+    "/spec/servers/1/size": 3
+  validators:
+    - name: "preFlight"
+      state: "PRE"
+    - name: "couchbaseReadiness"
+      state: "POST"
+    - name: "couchbaseVersion"
+      state: "POST"
+      cbVersion: "7.2.5"
+    - name: "collectLogs"
+      state: "POST"
+      logName: "before_scale_system_test"
+      cbServerLogs: true
+      operatorLogs: false
+trees:
+  - action: "Generic Workload"
+    config:
+      name: "Indexes Creation"
+      specPath: "./test_data/idx_query_workloads/job-cbq-50-primary-indexes.yaml"
+      preRunWait: 1
+      postRunWait: 0
+      runDuration: 4
+    trees:
+      - action: "Generic Workload"
+        config:
+          name: "Data Workload"
+          specPath: "./test_data/data_workloads/job-gideon-10-buckets-max-load.yaml"
+          preRunWait: 0
+          postRunWait: 1
+          runDuration: 16
+        trees:
+          - action: "Generic Workload"
+            config:
+              name: "Data Workload"
+              specPath: "./test_data/data_workloads/job-gideon-10-buckets-cont.yaml"
+              preRunWait: 1
+              postRunWait: 1
+              runDuration: 10080 # 7 Days = 7 * 24 * 60 Minutes
+          - action: "Generic Workload"
+            config:
+              name: "Query Workload"
+              specPath: "./test_data/idx_query_workloads/job-queryapp-10-buckets.yaml"
+              preRunWait: 1
+              postRunWait: 1
+              runDuration: 10080 # 7 Days = 7 * 24 * 60 Minutes
+          - action: "Deploy Couchbase"
+            config:
+              description:
+                - Scale Up Couchbase Cluster to 6 KV and 4 Index-Query
+              cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+              applyClusterSpecChanges:
+                "/spec/servers/0/size": 6
+                "/spec/servers/1/size": 4
+              validators:
+                - name: "couchbaseClusterSize"
+                  state: "POST"
+                  durationInSecs: 43200 # 12 Hours = 12 * 60 * 60 Seconds
+                  intervalInSecs: 180
+                  preRunWaitInSecs: 120
+                  mapServerNameToSize:
+                    "data-only": 6
+                    "index-query": 4
+                - name: "couchbaseReadiness"
+                  state: "POST"
+                  durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                  intervalInSecs: 120
+                - name: "collectLogs"
+                  state: "POST"
+                  logName: "k8s_log"
+                  cbServerLogs: false
+                  operatorLogs: false
+            trees:
+              - action: "Deploy Couchbase"
+                config:
+                  description:
+                    - Delta Upgrade Couchbase Cluster with 6 KV and 4 Index-Query from 7.2.5 -> 7.6.0
+                  cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                  applyClusterSpecChanges:
+                    "/spec/image": couchbase/server:7.6.0
+                  validators:
+                    - name: "couchbaseVersion"
+                      state: "POST"
+                      cbVersion: "7.6.0"
+                      durationInMinutes: 720 # 12 Hours = 12 * 60 Minutes
+                      intervalInMinutes: 5
+                    - name: "couchbaseReadiness"
+                      state: "POST"
+                      durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                      intervalInSecs: 180
+                    - name: "collectLogs"
+                      state: "POST"
+                      logName: "k8s_log"
+                      cbServerLogs: false
+                      operatorLogs: false
+                trees:
+                  - action: "Deploy Couchbase"
+                    config:
+                      description:
+                        - "Scale Down Couchbase Cluster to 5 KV and 3 Index-Query"
+                      cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                      applyClusterSpecChanges:
+                        "/spec/servers/0/size": 5
+                        "/spec/servers/1/size": 3
+                      validators:
+                        - name: "couchbaseClusterSize"
+                          state: "POST"
+                          durationInSecs: 64800 # 18 Hours = 18 * 60 * 60 Seconds
+                          intervalInSecs: 180
+                          preRunWaitInSecs: 180
+                          mapServerNameToSize:
+                            "data-only": 5
+                            "index-query": 3
+                        - name: "couchbaseReadiness"
+                          state: "POST"
+                          durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                          intervalInSecs: 120
+                        - name: "collectLogs"
+                          state: "POST"
+                          logName: "none"
+                          cbServerLogs: false
+                          operatorLogs: false
+                    trees:
+                      - action: "Deploy Couchbase"
+                        config:
+                          description:
+                            - Scale Up Couchbase Cluster to 6 KV and 4 Index-Query
+                            - Set the Upgrade Process as SwapRebalance
+                          cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                          applyClusterSpecChanges:
+                            "/spec/servers/0/size": 6
+                            "/spec/servers/1/size": 4
+                            "/spec/upgradeProcess": SwapRebalance
+                          validators:
+                            - name: "couchbaseClusterSize"
+                              state: "POST"
+                              durationInSecs: 64800 # 18 Hours = 18 * 60 * 60 Seconds
+                              intervalInSecs: 180
+                              preRunWaitInSecs: 240
+                              mapServerNameToSize:
+                                "data-only": 6
+                                "index-query": 4
+                            - name: "couchbaseReadiness"
+                              state: "POST"
+                              durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                              intervalInSecs: 120
+                            - name: "collectLogs"
+                              state: "POST"
+                              logName: "none"
+                              cbServerLogs: false
+                              operatorLogs: false
+                        trees:
+                          - action: "Deploy Couchbase"
+                            config:
+                              description:
+                                - Swap Rebalance Upgrade Couchbase Cluster with 6 KV and 4 Index-Query from 7.6.0 -> 7.6.1
+                              cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                              applyClusterSpecChanges:
+                                "/spec/image": couchbase/server:7.6.1
+                              validators:
+                                - name: "couchbaseVersion"
+                                  state: "POST"
+                                  cbVersion: "7.6.1"
+                                  durationInMinutes: 2880 # 48 Hours = 48 * 60 Minutes
+                                  intervalInMinutes: 5
+                                - name: "couchbaseReadiness"
+                                  state: "POST"
+                                  durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                                  intervalInSecs: 120
+                                - name: "collectLogs"
+                                  state: "POST"
+                                  logName: "during_scale_system_test"
+                                  cbServerLogs: true
+                                  operatorLogs: false
+                            trees:
+                              - action: "Deploy Couchbase"
+                                config:
+                                  description:
+                                    - Scale Down Couchbase Cluster to 5 KV and 3 Index-Query
+                                  cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                                  applyClusterSpecChanges:
+                                    "/spec/servers/0/size": 5
+                                    "/spec/servers/1/size": 3
+                                  validators:
+                                    - name: "couchbaseClusterSize"
+                                      state: "POST"
+                                      durationInSecs: 64800 # 18 Hours = 18 * 60 * 60 Seconds
+                                      intervalInSecs: 180
+                                      preRunWaitInSecs: 300
+                                      mapServerNameToSize:
+                                        "data-only": 5
+                                        "index-query": 3
+                                    - name: "couchbaseReadiness"
+                                      state: "POST"
+                                      durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                                      intervalInSecs: 120
+                                    - name: "collectLogs"
+                                      state: "POST"
+                                      logName: "none"
+                                      cbServerLogs: false
+                                      operatorLogs: false
+                                trees:
+                                  - action: "Deploy Couchbase"
+                                    config:
+                                      description:
+                                        - Scale Up Couchbase Cluster to 6 KV and 4 Index-Query
+                                      cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                                      applyClusterSpecChanges:
+                                        "/spec/servers/0/size": 6
+                                        "/spec/servers/1/size": 4
+                                      validators:
+                                        - name: "couchbaseClusterSize"
+                                          state: "POST"
+                                          durationInSecs: 64800 # 18 Hours = 18 * 60 * 60 Seconds
+                                          intervalInSecs: 180
+                                          preRunWaitInSecs: 300
+                                          mapServerNameToSize:
+                                            "data-only": 6
+                                            "index-query": 4
+                                        - name: "couchbaseReadiness"
+                                          state: "POST"
+                                          durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                                          intervalInSecs: 120
+                                        - name: "collectLogs"
+                                          state: "POST"
+                                          logName: "none"
+                                          cbServerLogs: false
+                                          operatorLogs: false
+                                    trees:
+                                      - action: "Deploy Couchbase"
+                                        config:
+                                          description:
+                                            - Scale Down Couchbase Cluster to 5 KV and 3 Index-Query
+                                          cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                                          applyClusterSpecChanges:
+                                            "/spec/servers/0/size": 5
+                                            "/spec/servers/1/size": 3
+                                          validators:
+                                            - name: "couchbaseClusterSize"
+                                              state: "POST"
+                                              durationInSecs: 86400 # 24 Hours = 24 * 60 * 60 Seconds
+                                              intervalInSecs: 240
+                                              preRunWaitInSecs: 300
+                                              mapServerNameToSize:
+                                                "data-only": 5
+                                                "index-query": 3
+                                            - name: "couchbaseReadiness"
+                                              state: "POST"
+                                              durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                                              intervalInSecs: 120
+                                            - name: "collectLogs"
+                                              state: "POST"
+                                              logName: "none"
+                                              cbServerLogs: false
+                                              operatorLogs: false
+                                        trees:
+                                          - action: "Deploy Couchbase"
+                                            config:
+                                              description:
+                                                - Scale Up Couchbase Cluster to 6 KV and 4 Index-Query
+                                              cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery.yaml"
+                                              applyClusterSpecChanges:
+                                                "/spec/servers/0/size": 6
+                                                "/spec/servers/1/size": 4
+                                              validators:
+                                                - name: "couchbaseClusterSize"
+                                                  state: "POST"
+                                                  durationInSecs: 86400 # 24 Hours = 24 * 60 * 60 Seconds
+                                                  intervalInSecs: 240
+                                                  preRunWaitInSecs: 300
+                                                  mapServerNameToSize:
+                                                    "data-only": 6
+                                                    "index-query": 4
+                                                - name: "couchbaseReadiness"
+                                                  state: "POST"
+                                                  durationInSecs: 7200 # 2 Hours = 2 * 60 * 60 Seconds
+                                                  intervalInSecs: 120
+                                                - name: "collectLogs"
+                                                  state: "POST"
+                                                  logName: "after_scale_system_test"
+                                                  cbServerLogs: true
+                                                  operatorLogs: false

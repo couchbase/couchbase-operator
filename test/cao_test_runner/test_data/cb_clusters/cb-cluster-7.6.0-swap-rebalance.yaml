@@ -1,14 +1,11 @@
-# ====================================
-# ======== Cluster Definition ========
-# ====================================
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
   name: cb-example
 spec:
   antiAffinity: true
-  image: couchbase/server:7.2.5
-  upgradeProcess: DeltaRecovery
+  image: couchbase/server:7.6.0
+  upgradeProcess: SwapRebalance
   security:
     adminSecret: cb-example-auth
   buckets:
@@ -19,6 +16,7 @@ spec:
     indexServiceMemoryQuota: 50Gi
     indexer:
       storageMode: plasma
+      enableShardAffinity: true
   serverGroups:
     - us-east-2a
     - us-east-2b
@@ -33,15 +31,10 @@ spec:
       services:
         - data
       volumeMounts:
-        default: couchbase
+        default: couchbase-low
         data: couchbase
       pod:
         spec:
-#          tolerations:
-#            - key: "couchbase-node"
-#              operator: "Equal"
-#              value: "true"
-#              effect: "NoSchedule"
           nodeSelector:
             couchbase-node: "true"
     - size: 4
@@ -54,15 +47,10 @@ spec:
         - index
         - query
       volumeMounts:
-        default: couchbase
-        index: couchbase
+        default: couchbase-low
+        index: couchbase-idx
       pod:
         spec:
-#          tolerations:
-#            - key: "couchbase-node"
-#              operator: "Equal"
-#              value: "true"
-#              effect: "NoSchedule"
           nodeSelector:
             couchbase-node: "true"
   securityContext:
@@ -74,3 +62,15 @@ spec:
         resources:
           requests:
             storage: 800Gi
+    - metadata:
+        name: couchbase-low
+      spec:
+        resources:
+          requests:
+            storage: 20Gi
+    - metadata:
+        name: couchbase-idx
+      spec:
+        resources:
+          requests:
+            storage: 200Gi

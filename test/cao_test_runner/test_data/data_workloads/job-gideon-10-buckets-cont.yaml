@@ -17,7 +17,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket0", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket0", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -39,7 +39,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket1", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket1", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -61,7 +61,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket2", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket2", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -83,7 +83,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket3", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket3", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -105,7 +105,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket4", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket4", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -127,7 +127,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket5", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket5", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -149,7 +149,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket6", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket6", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -171,7 +171,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket7", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket7", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -193,7 +193,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket8", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket8", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"
@@ -215,7 +215,7 @@ spec:
       containers:
         - name: gideon-latest
           image: docker.io/sequoiatools/gideon_latest
-          args: ["kv", "--bucket", "bucket9", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0005.cb-example.default.svc", "--sizes", "1024"]
+          args: ["kv", "--bucket", "bucket9", "--user", "Administrator", "--password", "password", "--ops", "2000", "--create", "100", "--get", "50", "--expire", "20", "--ttl", "10", "--delete", "98", "--hosts", "cb-example-0000.cb-example.default.svc", "--sizes", "1024"]
       restartPolicy: Never
 #      tolerations:
 #        - key: "workload-node"

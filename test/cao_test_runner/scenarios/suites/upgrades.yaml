@@ -1,5 +1,7 @@
 timeoutInMins: 120
 scenarios:
   -
-    - "./scenarios/upgrade/delta_recovery.yaml"
+    - ./scenarios/upgrade/delta_recovery.yaml:
+      applySpecChanges:
+        "config.`applyClusterSpecChanges`.`/spec/upgradeProcess`": SwapRebalance
     - "./scenarios/upgrade/swap_rebalance.yaml"
