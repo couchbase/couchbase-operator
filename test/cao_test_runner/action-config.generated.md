@@ -9,6 +9,7 @@ configuration is also available on a per-action basis:
  * [Delta Upgrade](#delta-upgrade)
  * [Deploy Couchbase](#deploy-couchbase)
  * [Generic Workload](#generic-workload)
+ * [Setup Admission Controller](#setup-admission-controller)
  * [Setup Operator](#setup-operator)
  * [Sleep](#sleep)
 
@@ -20,7 +21,7 @@ Config symbol: `KubeConfigContextSetupConfig`
 | Name | Type | YAML Tag | CAO-CLI Tag |
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
-| `K8sContext` | `string` | `yaml:k8scontext` | `caoCli:required`  |
+| `K8sContext` | `string` | `yaml:k8sContext` | `caoCli:required`  |
 | `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
@@ -64,16 +65,49 @@ Config symbol: `GenericWorkloadConfig`
 | `CheckJobCompletion` | `bool` | `yaml:checkJobCompletion` |  |
 
 ---
+#### Setup Admission Controller
+
+Config symbol: `AdmissionControllerConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `AdmissionControllerImage` | `string` | `yaml:admissionControllerImage` |  |
+| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` | `caoCli:required`  |
+| `CPULimit` | `int` | `yaml:CPULimit` |  |
+| `CPURequest` | `int` | `yaml:CPURequest` |  |
+| `ImagePullPolicy` | `string` | `yaml:imagePullPolicy` |  |
+| `ImagePullSecret` | `string` | `yaml:imagePullSecret,omitempty` |  |
+| `AdmissionControllerLogLevel` | `int` | `yaml:admissionControllerLogLevel` |  |
+| `MemoryLimit` | `int` | `yaml:memoryLimit` |  |
+| `MemoryRequest` | `int` | `yaml:memoryRequest` |  |
+| `Replicas` | `int` | `yaml:replicas` |  |
+| `Scope` | `string` | `yaml:scope` |  |
+| `ValidateSecrets` | `bool` | `yaml:validateSecrets` | `caoCli:required`  |
+| `ValidateStorageClasses` | `bool` | `yaml:validateStorageClasses` | `caoCli:required`  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
+
+---
 #### Setup Operator
 
 Config symbol: `OperatorConfig`
 
 | Name | Type | YAML Tag | CAO-CLI Tag |
 | ---- | ---- | -------- | ----------- |
-| `Namespace` | `string` | `yaml:namespace` |  |
-| `CRDS` | `string` | `yaml:CRDS` |  |
-| `OperatorImage` | `string` | `yaml:operatorVersion` |  |
-| `AdmissionControllerImage` | `string` | `yaml:admissionControllerVersion` |  |
+| `OperatorImage` | `string` | `yaml:operatorImage` |  |
+| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` | `caoCli:required`  |
+| `CPULimit` | `int` | `yaml:cpuLimit` |  |
+| `CPURequest` | `int` | `yaml:cpuRequest` |  |
+| `ImagePullPolicy` | `string` | `yaml:imagePullPolicy` |  |
+| `ImagePullSecret` | `string` | `yaml:imagePullSecret,omitempty` |  |
+| `OperatorLogLevel` | `int` | `yaml:operatorLogLevel` |  |
+| `MemoryLimit` | `int` | `yaml:memoryLimit` |  |
+| `MemoryRequest` | `int` | `yaml:memoryRequest` |  |
+| `PodCreationTimeout` | `string` | `yaml:podCreationTimeout` |  |
+| `PodDeleteDelay` | `string` | `yaml:podDeleteDelay` |  |
+| `PodReadinessDelay` | `string` | `yaml:podReadinessDelay` |  |
+| `PodReadinessPeriod` | `string` | `yaml:podReadinessPeriod` |  |
+| `Scope` | `string` | `yaml:scope` |  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Sleep

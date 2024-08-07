@@ -3,7 +3,8 @@ package context
 type contextKey int
 
 const (
-	NamespaceIDKey = iota
+	CAOBinaryPathKey = iota
+	NamespaceIDKey
 	OperatorIDKey
 	AdmissionIDKey
 	ClusterSpecPathIDKey
@@ -16,14 +17,15 @@ const (
 
 var (
 	contextUnmarshalKeys = map[string]contextKey{
-		"Namespace":            NamespaceIDKey,
-		"OperatorImage":        OperatorIDKey,
-		"AdmissionImage":       AdmissionIDKey,
-		"ClusterSpecPath":      ClusterSpecPathIDKey,
-		"BucketsSpecPath":      BucketsSpecPathIDKey,
-		"CouchbaseClusterName": CouchbaseClusterNameKey,
-		"K8sNodesMap":          K8sNodesMapKey,
-		"K8sPodsMap":           K8sPodsMapKey,
-		"K8sContext":           K8sContextKey,
+		"CAOBinaryPath":            CAOBinaryPathKey,
+		"Namespace":                NamespaceIDKey,
+		"OperatorImage":            OperatorIDKey,
+		"AdmissionControllerImage": AdmissionIDKey,
+		"ClusterSpecPath":          ClusterSpecPathIDKey,
+		"BucketsSpecPath":          BucketsSpecPathIDKey,
+		"CouchbaseClusterName":     CouchbaseClusterNameKey,
+		"K8sNodesMap":              K8sNodesMapKey,
+		"K8sPodsMap":               K8sPodsMapKey,
+		"K8sContext":               K8sContextKey,
 	}
 )

@@ -74,7 +74,7 @@ Config symbol: `KubeConfigValidator`
 | ---- | ---- | -------- | ----------- |
 | `Name` | `string` | `yaml:name` | `caoCli:required`  |
 | `State` | `string` | `yaml:state` | `caoCli:required`  |
-| `CurrentContext` | `string` | `yaml:k8scontext` | `caoCli:required`  |
+| `CurrentContext` | `string` | `yaml:k8sContext` | `caoCli:required`  |
 | `DurationInSecs` | `int64` | `yaml:durationInSecs` |  |
 | `IntervalInSecs` | `int64` | `yaml:intervalInSecs` |  |
 
