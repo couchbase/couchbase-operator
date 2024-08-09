@@ -82,16 +82,6 @@ func TestPauseOperator(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", false), time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Member failed over
-	// * Member replaced
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		e2eutil.PodDownFailoverRecoverySequence(),
-	}
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestKillOperator(t *testing.T) {

@@ -1325,7 +1325,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 		return err
 	}
 
-	if err := c.waitForPodAdded(c.ctx, candidate, time.Second); err != nil {
+	if err := c.waitForPodAdded(c.ctx, candidate); err != nil {
 		return err
 	}
 

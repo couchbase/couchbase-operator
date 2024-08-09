@@ -127,7 +127,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 
 // waitForPodAdded waits for a pod to be added to the cluster.
 // The pod will be inactive until rebalanced back in to the cluster.
-func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Member, timeout time.Duration) error {
+func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Member) error {
 	callback := func() error {
 		nodeInfo := couchbaseutil.NodeInfo{}
 
@@ -142,7 +142,7 @@ func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Memb
 		return errors.ErrNodeNotAdded
 	}
 
-	return retryutil.Retry(ctx, timeout, callback)
+	return retryutil.Retry(ctx, time.Second, callback)
 }
 
 // wait with context.
