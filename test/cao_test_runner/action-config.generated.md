@@ -6,8 +6,11 @@ Each action can be executed as part of a scenario. All actions inherit the
 configuration is also available on a per-action basis:
 
  * [Change Kubeconfig Context](#change-kubeconfig-context)
+ * [Delete CRDs](#delete-crds)
  * [Delta Upgrade](#delta-upgrade)
  * [Deploy Couchbase](#deploy-couchbase)
+ * [Destroy Admission Controller](#destroy-admission-controller)
+ * [Destroy Operator](#destroy-operator)
  * [Generic Workload](#generic-workload)
  * [Setup Admission Controller](#setup-admission-controller)
  * [Setup CAO Binary and Deploy CRDs](#setup-cao-binary-and-deploy-crds)
@@ -23,6 +26,17 @@ Config symbol: `KubeConfigContextSetupConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `K8sContext` | `string` | `yaml:k8sContext` | `caoCli:required`  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
+
+---
+#### Delete CRDs
+
+Config symbol: `CRDDestroyConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `Description` | `slice` | `yaml:description` |  |
+| `CRDPath` | `string` | `yaml:crdPath` | `caoCli:required`  |
 | `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
@@ -49,6 +63,28 @@ Config symbol: `CouchbaseConfig`
 | `CBSecretsSpecPath` | `string` | `yaml:cbSecretsSpecPath` |  |
 | `ApplyClusterSpecChanges` | `map` | `yaml:applyClusterSpecChanges` |  |
 | `ApplyBucketSpecChanges` | `map` | `yaml:applyBucketSpecChanges` |  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
+
+---
+#### Destroy Admission Controller
+
+Config symbol: `AdmissionControllerConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` | `caoCli:required`  |
+| `Scope` | `string` | `yaml:scope` |  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
+
+---
+#### Destroy Operator
+
+Config symbol: `OperatorConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` | `caoCli:required`  |
+| `Scope` | `string` | `yaml:scope` |  |
 | `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---

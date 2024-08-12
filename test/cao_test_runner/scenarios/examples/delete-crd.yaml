@@ -1,0 +1,3 @@
+action: "Delete CRDs"
+config:
+  crdPath: "./couchbase-operator/test/cao_test_runner/tmp/couchbase-autonomous-operator_2.7.0-228-kubernetes-linux-arm64/crd.yaml"
