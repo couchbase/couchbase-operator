@@ -23,7 +23,7 @@ func newScenarioCmd() *cobra.Command {
 		},
 	}
 	addStringFlag(scenarioCmd, scenarioKey, "f", "", "Scenario YAML file path")
-	addStringFlag(scenarioCmd, outputPathKey, "o", "", "CSV output path")
+	addStringFlag(scenarioCmd, outputPathKey, "o", ".", "CSV output path")
 	addStringFlag(scenarioCmd, scenarioTags, "", "", "Run only scenario with tags")
 	addBoolFlag(scenarioCmd, triggerLogCollectionKey, "l", false, "trigger log collection")
 

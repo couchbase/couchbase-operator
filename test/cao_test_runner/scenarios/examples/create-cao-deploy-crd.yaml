@@ -1,0 +1,6 @@
+action: "Setup CAO Binary and Deploy CRDs"
+config:
+  operatorVersion: "2.7.0-228"
+  platform: kubernetes
+  operatingSystem: linux
+  architecture: arm64

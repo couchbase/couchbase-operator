@@ -4,6 +4,10 @@ type contextKey int
 
 const (
 	CAOBinaryPathKey = iota
+	OperatorVersionKey
+	PlatformKey
+	OperatingSystemKey
+	ArchitectureKey
 	NamespaceIDKey
 	OperatorIDKey
 	AdmissionIDKey
@@ -18,6 +22,10 @@ const (
 var (
 	contextUnmarshalKeys = map[string]contextKey{
 		"CAOBinaryPath":            CAOBinaryPathKey,
+		"OperatorVersion":          OperatorVersionKey,
+		"Platform":                 PlatformKey,
+		"OperatingSystem":          OperatingSystemKey,
+		"Architecture":             ArchitectureKey,
 		"Namespace":                NamespaceIDKey,
 		"OperatorImage":            OperatorIDKey,
 		"AdmissionControllerImage": AdmissionIDKey,

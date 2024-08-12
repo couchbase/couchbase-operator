@@ -10,6 +10,7 @@ configuration is also available on a per-action basis:
  * [Deploy Couchbase](#deploy-couchbase)
  * [Generic Workload](#generic-workload)
  * [Setup Admission Controller](#setup-admission-controller)
+ * [Setup CAO Binary and Deploy CRDs](#setup-cao-binary-and-deploy-crds)
  * [Setup Operator](#setup-operator)
  * [Sleep](#sleep)
 
@@ -84,6 +85,20 @@ Config symbol: `AdmissionControllerConfig`
 | `Scope` | `string` | `yaml:scope` |  |
 | `ValidateSecrets` | `bool` | `yaml:validateSecrets` | `caoCli:required`  |
 | `ValidateStorageClasses` | `bool` | `yaml:validateStorageClasses` | `caoCli:required`  |
+| `Validators` | `slice` | `yaml:validators,omitempty` |  |
+
+---
+#### Setup CAO Binary and Deploy CRDs
+
+Config symbol: `CaoCrdSetupConfig`
+
+| Name | Type | YAML Tag | CAO-CLI Tag |
+| ---- | ---- | -------- | ----------- |
+| `Description` | `slice` | `yaml:description` |  |
+| `OperatorVersion` | `string` | `yaml:operatorVersion` | `caoCli:required`  |
+| `Platform` | `string` | `yaml:platform` | `caoCli:required`  |
+| `OperatingSystem` | `string` | `yaml:operatingSystem` | `caoCli:required`  |
+| `Architecture` | `string` | `yaml:architecture` | `caoCli:required`  |
 | `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---

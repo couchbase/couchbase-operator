@@ -10,6 +10,7 @@ type RootConfig struct {
 	Scenario             string
 	ScenarioTags         []string
 	TriggerLogCollection bool
+	OutputPath           string
 }
 
 var (
@@ -31,6 +32,7 @@ func buildRootConfig() (*RootConfig, error) {
 	}
 
 	cfg.TriggerLogCollection = viper.GetBool(triggerLogCollectionKey)
+	cfg.OutputPath = viper.GetString(outputPathKey)
 
 	return cfg, nil
 }
