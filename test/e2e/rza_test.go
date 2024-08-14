@@ -708,7 +708,7 @@ func TestServerGroupShuffling(t *testing.T) {
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	expectedGroupsOrder := append([]string{}, availableServerGroups...)
+	expectedGroupsOrder := append([]string{}, cluster.Spec.ServerGroups...)
 	scheduler.ShuffleServerGroups(expectedGroupsOrder, cluster.NamespacedName())
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
