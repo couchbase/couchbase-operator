@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,4 +86,23 @@ func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
 	existingAnnotations[key] = value
 
 	meta.SetAnnotations(existingAnnotations)
+}
+
+// MemberOnVersion uses the member name to find the member in a given set and returns
+// true if the members version is equal to the target version.
+func MemberOnVersion(clusterMembers MemberSet, targetMemberName, targetVersion string) bool {
+	var targetMember Member
+
+	for clusterMemberName, clusterMember := range clusterMembers {
+		if strings.Contains(targetMemberName, clusterMemberName) {
+			targetMember = clusterMember
+			break
+		}
+	}
+
+	if targetMember != nil && targetMember.Version() == targetVersion {
+		return true
+	}
+
+	return false
 }
