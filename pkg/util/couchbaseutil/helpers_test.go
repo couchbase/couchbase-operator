@@ -76,3 +76,49 @@ func TestGetIndexFromMemberName(t *testing.T) {
 		t.Fatal("expected index 0 found", index)
 	}
 }
+
+func TestMemberOnVersion(t *testing.T) {
+	t.Parallel()
+
+	type memberOnVersionTest struct {
+		targetMemberName string
+		targetVersion    string
+		expectedResult   bool
+	}
+
+	testcases := []memberOnVersionTest{
+		{
+			"ns_1@cb-example-0000.cb-example.default.svc",
+			"1.0.0",
+			false,
+		},
+		{
+			"ns_1@cb-example-0000.cb-example.default.svc",
+			"1.5.0",
+			true,
+		},
+		{
+			"non-existent-member-name",
+			"2.0.0",
+			false,
+		},
+	}
+
+	clusterMembers := NewMemberSet(
+		&memberImpl{
+			name:    "cb-example-0000",
+			version: "1.5.0"},
+		&memberImpl{
+			name:    "cb-example-0001",
+			version: "2.0.0"},
+		&memberImpl{
+			name:    "cb-example-0002",
+			version: "2.5.0"})
+
+	for _, testcase := range testcases {
+		result := MemberOnVersion(clusterMembers, testcase.targetMemberName, testcase.targetVersion)
+		if result != testcase.expectedResult {
+			t.Errorf("expected member version check to return %v, got %v", testcase.expectedResult, result)
+		}
+	}
+}

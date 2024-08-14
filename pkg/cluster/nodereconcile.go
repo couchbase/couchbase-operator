@@ -1287,17 +1287,7 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 			return err
 		}
 
-		orchestratorName := clusterInfo.Orchestrator
-
-		var orchestratorMember couchbaseutil.Member
-
-		for name, member := range c.members {
-			if name == orchestratorName {
-				orchestratorMember = member
-			}
-		}
-
-		if orchestratorMember.Version() == targetVersion {
+		if couchbaseutil.MemberOnVersion(c.members, clusterInfo.Orchestrator, targetVersion) {
 			return nil
 		}
 

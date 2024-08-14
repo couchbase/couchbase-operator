@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -71,4 +72,23 @@ func (b *Bucket) CanBeMigrated(backend CouchbaseStorageBackend) (bool, string) {
 // to not lose any resolution.
 func CouchbaseQueryDurationString(t time.Duration) string {
 	return fmt.Sprintf("%vns", t.Nanoseconds())
+}
+
+// MemberOnVersion uses the member name to find the member in a given set and returns
+// true if the members version is equal to the target version.
+func MemberOnVersion(clusterMembers MemberSet, targetMemberName, targetVersion string) bool {
+	var targetMember Member
+
+	for clusterMemberName, clusterMember := range clusterMembers {
+		if strings.Contains(targetMemberName, clusterMemberName) {
+			targetMember = clusterMember
+			break
+		}
+	}
+
+	if targetMember != nil && targetMember.Version() == targetVersion {
+		return true
+	}
+
+	return false
 }
