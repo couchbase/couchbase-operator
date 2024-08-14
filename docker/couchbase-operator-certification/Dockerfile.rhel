@@ -1,6 +1,6 @@
 # This must be kept in lockstep with the builder images due to library
 # dependencies.
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM docker.io/redhat/ubi8-minimal
 
 # ubi-minimal updates frequently and has very few packages installed,
 # so no need for a "security-only" update (which requires installing yum
