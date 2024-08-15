@@ -109,6 +109,9 @@ type generateOperatorOptions struct {
 
 	// debug sets the image to run debug config
 	debug bool
+
+	// optionalMetricLabels includes uuid or uuid and name in the prometheus metric labels.
+	optionalMetricLabels MetricLabel
 }
 
 // newGenerateOperatorOptions returns a set of options with defaults applied.
@@ -144,6 +147,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.memoryRequest, "memory-request", "Memory requested for scheduling")
 	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining")
 	cmd.Flags().BoolVar(&o.debug, debug, false, "Runs debug configuration. Not intended for external use")
+	cmd.Flags().Var(&o.optionalMetricLabels, "optional-metric-labels", "Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.")
 	_ = cmd.Flags().MarkHidden(debug)
 }
 
@@ -649,6 +653,10 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 											FieldPath: "metadata.name",
 										},
 									},
+								},
+								{
+									Name:  "additional-prometheus-labels",
+									Value: o.optionalMetricLabels.String(),
 								},
 							},
 							Ports: []corev1.ContainerPort{

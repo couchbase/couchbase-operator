@@ -3,9 +3,11 @@ package cluster
 import (
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -66,4 +68,17 @@ func (config Config) GetPodReadinessConfig() k8sutil.PodReadinessConfig {
 		PodReadinessDelay:  config.PodReadinessDelay,
 		PodReadinessPeriod: config.PodReadinessPeriod,
 	}
+}
+
+func (c *Cluster) addOptionalLabelValues(existingLabels []string) []string {
+	switch metrics.OptionalLabels {
+	case metrics.UUIDonly:
+		existingLabels = append(existingLabels, string(c.cluster.GetUID()))
+	case metrics.UUIDandName:
+		existingLabels = append(existingLabels, string(c.cluster.GetUID()), c.cluster.Spec.ClusterSettings.ClusterName)
+	default:
+		break
+	}
+
+	return existingLabels
 }

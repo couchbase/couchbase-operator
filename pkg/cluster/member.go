@@ -341,7 +341,8 @@ func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchb
 		}
 
 		class := serverSpecs[index]
-		metrics.PodReadinessDurationMetric.WithLabelValues(c.cluster.Name, class.Name).Observe(float64(time.Since(start)))
+
+		metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
 	}
 
 	return memberResults, nil

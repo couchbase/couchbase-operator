@@ -6,6 +6,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "in_place_upgrades_total": {
@@ -15,6 +19,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "pod_readiness_duration": {
@@ -26,6 +34,10 @@
         "labels": [
             "name",
             "serverClass"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "pod_recoveries_total": {
@@ -36,6 +48,10 @@
         "labels": [
             "name",
             "podName"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "pod_recovery_failures_total": {
@@ -46,6 +62,10 @@
         "labels": [
             "name",
             "podName"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "pod_replacements_failed": {
@@ -55,6 +75,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "pod_replacements_total": {
@@ -64,6 +88,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "reconcile_failures": {
@@ -74,6 +102,10 @@
         "labels": [
             "namespace",
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "reconcile_time_seconds": {
@@ -85,6 +117,10 @@
         "labels": [
             "namespace",
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "reconcile_total": {
@@ -96,6 +132,10 @@
             "namespace",
             "name",
             "result"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "server_http_request_codes_total": {
@@ -109,7 +149,8 @@
             "code",
             "service",
             "host"
-        ]
+        ],
+        "optionalLabels": null
     },
     "server_http_request_failures": {
         "type": "counter",
@@ -121,7 +162,8 @@
             "method",
             "service",
             "host"
-        ]
+        ],
+        "optionalLabels": null
     },
     "server_http_requests_time_milliseconds": {
         "type": "histogram",
@@ -134,7 +176,8 @@
             "method",
             "service",
             "host"
-        ]
+        ],
+        "optionalLabels": null
     },
     "server_http_requests_total": {
         "type": "counter",
@@ -146,7 +189,8 @@
             "method",
             "service",
             "host"
-        ]
+        ],
+        "optionalLabels": null
     },
     "swap_rebalance_failures": {
         "type": "counter",
@@ -155,6 +199,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "swap_rebalances_total": {
@@ -164,6 +212,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "upgrade_duration": {
@@ -174,6 +226,10 @@
         "stability": "committed",
         "labels": [
             "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     },
     "volume_expansions_total": {
@@ -184,6 +240,10 @@
         "labels": [
             "name",
             "volumeName"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
         ]
     }
 }

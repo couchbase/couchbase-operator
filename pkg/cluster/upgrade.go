@@ -225,7 +225,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	metrics.UpgradeDurationMSMetric.WithLabelValues(c.cluster.Name).Set(float64(time.Since(parsedStartTime)))
+	metrics.UpgradeDurationMSMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(float64(time.Since(parsedStartTime)))
 
 	return c.updateCRStatus()
 }

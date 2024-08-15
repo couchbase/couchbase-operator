@@ -14,6 +14,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/controller"
 	"github.com/couchbase/couchbase-operator/pkg/logging"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/revision"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 
@@ -73,6 +74,8 @@ func main() {
 	// * Whether this is an official or development branch
 	// * The exact commit defects are raised against
 	log.Info(version.Application, "version", version.WithBuildNumber(), "revision", revision.Revision())
+
+	metrics.InitMetrics()
 
 	if printVersion {
 		os.Exit(0)

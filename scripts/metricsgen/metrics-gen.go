@@ -9,12 +9,13 @@ import (
 )
 
 type metricMetadata struct {
-	Type      string   `json:"type"`
-	Help      string   `json:"help"`
-	Unit      string   `json:"unit,omitempty"`
-	Added     string   `json:"added"`
-	Stability string   `json:"stability"`
-	Labels    []string `json:"labels"`
+	Type           string   `json:"type"`
+	Help           string   `json:"help"`
+	Unit           string   `json:"unit,omitempty"`
+	Added          string   `json:"added"`
+	Stability      string   `json:"stability"`
+	Labels         []string `json:"labels"`
+	OptionalLabels []string `json:"optionalLabels"`
 }
 
 func main() {
@@ -52,6 +53,12 @@ func main() {
 				labels = strings.ReplaceAll(labels, " ", "")
 				s := strings.Split(labels, ",")
 				metricMetadata.Labels = s
+			}
+			if strings.Contains(c1.Text, "optionalLabels:") {
+				optionalLabels := strings.TrimLeft(c1.Text, "// optionalLabels: ")
+				optionalLabels = strings.ReplaceAll(optionalLabels, " ", "")
+				s := strings.Split(optionalLabels, ",")
+				metricMetadata.OptionalLabels = s
 			}
 		}
 		metrics[metricName] = *metricMetadata

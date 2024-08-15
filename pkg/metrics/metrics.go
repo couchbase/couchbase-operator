@@ -1,17 +1,31 @@
 package metrics
 
 import (
+	"os"
+	"strings"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/version"
+
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+type UUIDorName int
+
 const (
+	UUIDonly UUIDorName = iota
+	UUIDandName
+	None
+
 	MetricNamespace = "couchbase"
 	MetricSubsystem = "operator"
+	ClusterUUID     = "cluster_uuid"
+	ClusterName     = "cluster_name"
 )
 
 var (
+	OptionalLabels UUIDorName = None
+
 	// ReconcileTotalMetric
 	// name: reconcile_total
 	// type: counter
@@ -20,12 +34,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: namespace, name, result
-	ReconcileTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "reconcile_total",
-		Help:      "Total reconcile operations performed on a specific cluster",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"namespace", "name", "result"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	ReconcileTotalMetric = prometheus.CounterVec{}
 
 	// ReconcileFailureMetric
 	// name: reconcile_failures
@@ -35,12 +46,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: namespace, name
-	ReconcileFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "reconcile_failures",
-		Help:      "Total failed reconcile operations performed on a specific cluster",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"namespace", "name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	ReconcileFailureMetric = prometheus.CounterVec{}
 
 	// ReconcileDurationMetric
 	// name: reconcile_time_seconds
@@ -50,12 +58,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: namespace, name
-	ReconcileDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:      "reconcile_time_seconds",
-		Help:      "Length of time per reconcile for a specific cluster",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"namespace", "name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	ReconcileDurationMetric = prometheus.HistogramVec{}
 
 	// HTTPRequestTotalMetric
 	// name: server_http_requests_total
@@ -125,12 +130,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name, volumeName
-	VolumeExpansionMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "volume_expansions_total",
-		Help:      "Total number of times the size of volumes have been increased under management",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "volumeName"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	VolumeExpansionMetric = prometheus.CounterVec{}
 
 	// SwapRebalancesTotalMetric
 	// name: swap_rebalances_total
@@ -140,12 +142,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	SwapRebalancesTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "swap_rebalances_total",
-		Help:      "Total number of swap rebalances performed by the operator",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	SwapRebalancesTotalMetric = prometheus.CounterVec{}
 
 	// UpgradeDurationMSMetric
 	// name: upgrade_duration
@@ -154,12 +153,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	UpgradeDurationMSMetric = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name:      "upgrade_duration",
-		Help:      "The time taken to perform an upgrade",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	UpgradeDurationMSMetric = prometheus.GaugeVec{}
 
 	// PodReplacementsMetric
 	// name: pod_replacements_total
@@ -169,12 +165,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	PodReplacementsMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "pod_replacements_total",
-		Help:      "The amount of times operator has replaced a couchbase server pod due to a change in a couchbase cluster resources",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodReplacementsMetric = prometheus.CounterVec{}
 
 	// InPlaceUpgradeTotalMetric
 	// name: in_place_upgrades_total
@@ -184,12 +177,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	InPlaceUpgradeTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "in_place_upgrades_total",
-		Help:      "Total number of in place upgrades performed by operator",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	InPlaceUpgradeTotalMetric = prometheus.CounterVec{}
 
 	// SwapRebalanceFailuresMetric
 	// name: swap_rebalance_failures
@@ -199,12 +189,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	SwapRebalanceFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "swap_rebalance_failures",
-		Help:      "Total number of times swap rebalances have failed",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	SwapRebalanceFailuresMetric = prometheus.CounterVec{}
 
 	// InPlaceUpgradeFailuresMetric
 	// name: in_place_upgrade_failures
@@ -214,12 +201,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	InPlaceUpgradeFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "in_place_upgrade_failures",
-		Help:      "The number of times in place upgrades have failed",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	InPlaceUpgradeFailuresMetric = prometheus.CounterVec{}
 
 	// PodReplacementsFailedMetric
 	// name: pod_replacements_failed
@@ -229,12 +213,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name
-	PodReplacementsFailedMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "pod_replacements_failed",
-		Help:      "Total number of times pods have failed to be recovered by the operator",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodReplacementsFailedMetric = prometheus.CounterVec{}
 
 	// PodRecoveriesMetric
 	// name: pod_recoveries_total
@@ -244,12 +225,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name, podName
-	PodRecoveriesMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "pod_recoveries_total",
-		Help:      "Total number of times operator has recovered a pod when the pod has been down",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "podName"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodRecoveriesMetric = prometheus.CounterVec{}
 
 	// PodRecoveryFailuresMetric
 	// name: pod_recovery_failures_total
@@ -259,12 +237,9 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name, podName
-	PodRecoveryFailuresMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "pod_recovery_failures_total",
-		Help:      "Total number of times operator has failed to recover a pod",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "podName"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodRecoveryFailuresMetric = prometheus.CounterVec{}
 
 	// PodReadinessDurationMetric
 	// name: pod_readiness_duration
@@ -274,17 +249,133 @@ var (
 	// added: 2.7.0
 	// stability: committed
 	// labels: name, serverClass
-	PodReadinessDurationMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:      "pod_readiness_duration",
-		Help:      "The time it takes for a pod to enter a ready state",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "serverClass"})
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodReadinessDurationMetric = prometheus.HistogramVec{}
 
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
-func init() {
+func addOptionalLabels(existingLabels []string) []string {
+	switch OptionalLabels {
+	case UUIDonly:
+		existingLabels = append(existingLabels, ClusterUUID)
+	case UUIDandName:
+		existingLabels = append(existingLabels, ClusterUUID, ClusterName)
+	default:
+		break
+	}
+
+	return existingLabels
+}
+
+func InitMetrics() {
+	additionalLabels := os.Getenv("additional-prometheus-labels")
+
+	if strings.Compare(additionalLabels, "uuid-only") == 0 {
+		OptionalLabels = UUIDonly
+	} else if strings.Compare(additionalLabels, "uuid-and-name") == 0 {
+		OptionalLabels = UUIDandName
+	}
+
+	ReconcileTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "reconcile_total",
+		Help:      "Total reconcile operations performed on a specific cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name", "result"}))
+
+	ReconcileFailureMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "reconcile_failures",
+		Help:      "Total failed reconcile operations performed on a specific cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
+	ReconcileDurationMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "reconcile_time_seconds",
+		Help:      "Length of time per reconcile for a specific cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
+	VolumeExpansionMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "volume_expansions_total",
+		Help:      "Total number of times the size of volumes have been increased under management",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "volumeName"}))
+
+	SwapRebalancesTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "swap_rebalances_total",
+		Help:      "Total number of swap rebalances performed by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	UpgradeDurationMSMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "upgrade_duration",
+		Help:      "The time taken to perform an upgrade",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	PodReplacementsMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_replacements_total",
+		Help:      "The amount of times operator has replaced a couchbase server pod due to a change in a couchbase cluster resources",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	InPlaceUpgradeTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "in_place_upgrades_total",
+		Help:      "Total number of in place upgrades performed by operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	SwapRebalanceFailuresMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "swap_rebalance_failures",
+		Help:      "Total number of times swap rebalances have failed",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	InPlaceUpgradeFailuresMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "in_place_upgrade_failures",
+		Help:      "The number of times in place upgrades have failed",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	PodReplacementsFailedMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_replacements_failed",
+		Help:      "Total number of times pods have failed to be recovered by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	PodRecoveriesMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_recoveries_total",
+		Help:      "Total number of times operator has recovered a pod when the pod has been down",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "podName"}))
+
+	PodRecoveryFailuresMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pod_recovery_failures_total",
+		Help:      "Total number of times operator has failed to recover a pod",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "podName"}))
+
+	PodReadinessDurationMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "pod_readiness_duration",
+		Help:      "The time it takes for a pod to enter a ready state",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "serverClass"}))
+
 	metrics.Registry.MustRegister(
 		ReconcileTotalMetric,
 		ReconcileFailureMetric,

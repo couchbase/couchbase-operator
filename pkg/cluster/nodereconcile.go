@@ -460,7 +460,8 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 
 		// Timeout has expired, recreate the pod.
 		if err := c.recreatePod(m); err != nil {
-			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.cluster.Name, m.Name()).Inc()
+			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
+
 			return fmt.Errorf("pod recovery failed for member %s: %w", name, err)
 		}
 
@@ -469,7 +470,8 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 		delete(c.recoveryTime, name)
 
-		metrics.PodRecoveriesMetric.WithLabelValues(c.cluster.Name, name).Inc()
+		metrics.PodRecoveriesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, name})...).Inc()
+
 		recovered++
 	}
 
@@ -657,7 +659,8 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
-				metrics.PodRecoveryFailuresMetric.WithLabelValues(c.cluster.Name, m.Name()).Inc()
+
+				metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
 				r.abort("unable to recover pod")
 
@@ -666,7 +669,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 
-			metrics.PodRecoveriesMetric.WithLabelValues(c.cluster.Name, name).Inc()
+			metrics.PodRecoveriesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
 			return fmt.Errorf("%w: recovering node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
 		}
@@ -1012,7 +1015,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				c.raiseEvent(k8sutil.ExpandVolumeStartedEvent(pvc.Name, currentSize, requestedSize, c.cluster))
 				log.Info("Volume expanding", "cluster", c.namespacedName(), "name", pvc.Name, "current", currentSize, "requested", requestedSize)
 
-				metrics.VolumeExpansionMetric.WithLabelValues(c.cluster.Name, pvc.Name).Inc()
+				metrics.VolumeExpansionMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, pvc.Name})...).Inc()
 
 				// Done for now. Not going to upgrade all volumes at once.
 				r.abort("persistent volumes expanding")
@@ -1340,6 +1343,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 	return nil
 }
 
+// nolint:gocognit
 func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	upgraded := len(c.members) - len(candidates)
 
@@ -1351,13 +1355,15 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 	// Flag that an upgrade is in action, validation will use this to control what
 	// resource modifications are allowed.
 	if err := c.reportUpgrade(status); err != nil {
-		metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 		return err
 	}
 
 	for _, candidate := range candidates {
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 			return err
 		}
 
@@ -1373,7 +1379,8 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 			// Update volumes
 			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
 			if err != nil {
-				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 				return err
 			}
 
@@ -1383,7 +1390,8 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
 
 				if err != nil {
-					metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+					metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 					return err
 				}
 			}
@@ -1403,14 +1411,14 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
 		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
-			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 			return err
 		}
 
-		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.cluster.Name).Inc()
-		metrics.PodReplacementsMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 	}
 
 	return nil
@@ -1816,6 +1824,7 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 	return nil
 }
 
+// nolint:gocognit
 func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseutil.MemberSet) error {
 	candidatesSlice := make([]couchbaseutil.Member, 0, len(members))
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(members))
@@ -1825,8 +1834,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 
 		// Remove the candidate from the scheduler.
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 			return err
 		}
@@ -1834,8 +1843,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		// Grab the server class.
 		class := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if class == nil {
-			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+			metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
@@ -1847,8 +1856,8 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	// Add the new members.
 	memberResults, err := c.addMembers(toCreate...)
 	if err != nil {
-		metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
-		metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+		metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+		metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 		return fmt.Errorf("swap rebalance failed to add new nodes to cluster: %w", err)
 	}
@@ -1867,12 +1876,14 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		if result.Err != nil {
 			errs = append(errs, fmt.Errorf("swap rebalance failed to add new node to cluster: %w", result.Err))
 			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.cluster.Name).Inc()
+
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		} else { // Update book keeping
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
-			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.cluster.Name).Inc()
-			metrics.PodReplacementsMetric.WithLabelValues(c.cluster.Name).Inc()
+
+			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+			metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		}
 	}
 
@@ -1880,7 +1891,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		return nil
 	}
 
-	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.cluster.Name).Inc()
+	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 	return errors.Join(errs...)
 }

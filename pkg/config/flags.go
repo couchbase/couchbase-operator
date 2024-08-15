@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -8,6 +9,26 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type MetricLabel string
+
+func (m *MetricLabel) String() string {
+	return string(*m)
+}
+
+func (m *MetricLabel) Set(v string) error {
+	switch v {
+	case "uuid-only", "uuid-and-name":
+		*m = MetricLabel(v)
+		return nil
+	default:
+		return errors.New("must be one of 'uuid-only', 'uuid-and-name'")
+	}
+}
+
+func (m *MetricLabel) Type() string {
+	return "string"
+}
 
 // LabelSelectorVar allows parsing of a label selector from the CLI.
 type LabelSelectorVar struct {

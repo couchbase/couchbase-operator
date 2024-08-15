@@ -394,7 +394,7 @@ func (c *Cluster) create() error {
 
 	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
 
-	metrics.PodReadinessDurationMetric.WithLabelValues(c.cluster.Name, class.Name).Observe(float64(time.Since(start)))
+	metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
 
 	// This takes a while to get set, yawn...
 	var uuid string
@@ -477,14 +477,16 @@ func (c *Cluster) runReconcile() {
 		}
 
 		reconcileTime := time.Since(start)
-		metrics.ReconcileDurationMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Observe(reconcileTime.Seconds())
+
+		metrics.ReconcileDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Observe(reconcileTime.Seconds())
 	}()
 
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
 		c.cluster.Status.PauseControl()
 		log.Info("Operator paused, skipping", "cluster", c.namespacedName())
-		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "paused").Inc()
+
+		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
 
 		return
 	}
@@ -497,7 +499,8 @@ func (c *Cluster) runReconcile() {
 		// Pod startup might take long, e.g. pulling image. It would
 		// deterministically become running or succeeded/failed later.
 		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
-		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "pending").Inc()
+
+		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
 
 		return
 	}
@@ -508,8 +511,9 @@ func (c *Cluster) runReconcile() {
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
-		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		metrics.ReconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+
+		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
+		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
 
 		// When we call updateMembers, it's going to look at all running pods can try
 		// to dial Couchbase and get health status.  It's entirely possible that the
@@ -560,8 +564,8 @@ func (c *Cluster) runReconcile() {
 			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
-		metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "error").Inc()
-		metrics.ReconcileFailureMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name).Inc()
+		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
+		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
 
 		return
 	}
@@ -572,7 +576,7 @@ func (c *Cluster) runReconcile() {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
-	metrics.ReconcileTotalMetric.WithLabelValues(c.cluster.Namespace, c.cluster.Name, "success").Inc()
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
