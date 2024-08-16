@@ -169,7 +169,7 @@ func TestIndexerSettings(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	// Create the cluster.  Use an empty inderer settings to get the DAC to fill in
+	// Create the cluster.  Use an empty indexer settings to get the DAC to fill in
 	// the defaults for us.  Also remove the index service, the storage mode cannot be
 	// modified if any nodes are running the index service (lol really?)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -200,6 +200,17 @@ func TestIndexerSettings(t *testing.T) {
 	patchCycles := 8
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		v := true
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", v), time.Minute)
+		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnablePageBloomFilter", &v), time.Minute)
+
+		patchCycles++
+	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)

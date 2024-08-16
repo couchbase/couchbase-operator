@@ -651,6 +651,10 @@ func (c *Cluster) reconcileIndexSettings() error {
 			requested.RedistributeIndexes = apiSettings.RedistributeIndexes
 		}
 
+		if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
+			requested.EnablePageBloomFilter = &apiSettings.EnablePageBloomFilter
+		}
+
 		if ok, err := c.IsAtLeastVersion("7.6.0"); ok && err == nil {
 			requested.EnableShardAffinity = &apiSettings.EnableShardAffinity
 		}

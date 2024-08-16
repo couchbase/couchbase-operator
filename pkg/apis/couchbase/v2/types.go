@@ -3092,6 +3092,14 @@ type CouchbaseClusterIndexerSettings struct {
 	// This field is only supported on CB versions 7.6.0+.
 	// +kubebuilder:default=false
 	EnableShardAffinity bool `json:"enableShardAffinity,omitempty"`
+
+	// EnablePageBloomFilter gives Couchbase Server guidance whether
+	// bloom filters should be used when item lookups occur. These help to
+	// indicate during a lookup that an item is not on disk, and therefore
+	// prevent unnecessary on-disk searches.
+	// This field is only supported on CB versions 7.1.0+.
+	// +kubebuilder:default=false
+	EnablePageBloomFilter bool `json:"enablePageBloomFilter,omitempty"`
 }
 
 // QueryLogLevel controls the verbosity of the query service logs.

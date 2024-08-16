@@ -166,15 +166,16 @@ func (c *ClusterInfo) PoolsDefaults() *PoolsDefaults {
 }
 
 type IndexSettings struct {
-	StorageMode         IndexStorageMode `url:"storageMode" json:"storageMode"`
-	Threads             int              `url:"indexerThreads" json:"indexerThreads"`
-	MemSnapInterval     int              `url:"memorySnapshotInterval" json:"memorySnapshotInterval"`
-	StableSnapInterval  int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
-	MaxRollbackPoints   int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
-	LogLevel            IndexLogLevel    `url:"logLevel" json:"logLevel"`
-	NumberOfReplica     int              `url:"numReplica,omitempty" json:"numReplica"`
-	RedistributeIndexes bool             `url:"redistributeIndexes,omitempty" json:"redistributeIndexes"`
-	EnableShardAffinity *bool            `url:"enableShardAffinity,omitempty" json:"enableShardAffinity"`
+	StorageMode           IndexStorageMode `url:"storageMode" json:"storageMode"`
+	Threads               int              `url:"indexerThreads" json:"indexerThreads"`
+	MemSnapInterval       int              `url:"memorySnapshotInterval" json:"memorySnapshotInterval"`
+	StableSnapInterval    int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
+	MaxRollbackPoints     int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
+	LogLevel              IndexLogLevel    `url:"logLevel" json:"logLevel"`
+	NumberOfReplica       int              `url:"numReplica,omitempty" json:"numReplica"`
+	RedistributeIndexes   bool             `url:"redistributeIndexes,omitempty" json:"redistributeIndexes"`
+	EnableShardAffinity   *bool            `url:"enableShardAffinity,omitempty" json:"enableShardAffinity"`
+	EnablePageBloomFilter *bool            `url:"enablePageBloomFilter,omitempty" json:"enablePageBloomFilter"`
 }
 
 type FailoverOnDiskFailureSettings struct {

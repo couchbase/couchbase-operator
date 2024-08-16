@@ -90,6 +90,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: memory_optimized
     <<couchbaseclusters-spec-cluster-indexer,indexer>>:
+      <<couchbaseclusters-spec-cluster-indexer-enablepagebloomfilter,enablePageBloomFilter>>: false
       <<couchbaseclusters-spec-cluster-indexer-enableshardaffinity,enableShardAffinity>>: false
       <<couchbaseclusters-spec-cluster-indexer-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-cluster-indexer-maxrollbackpoints,maxRollbackPoints>>: 2
@@ -1468,6 +1469,23 @@ index service in the cluster.
 ==== Description
 
 Indexer allows the indexer to be configured.
+
+=== couchbaseclusters.spec.cluster.indexer.enablePageBloomFilter
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+EnablePageBloomFilter gives Couchbase Server guidance whether
+bloom filters should be used when item lookups occur.
+These help to
+indicate during a lookup that an item is not on disk, and therefore
+prevent unnecessary on-disk searches.
+This field is only supported on CB versions 7.1.0+.
 
 === couchbaseclusters.spec.cluster.indexer.enableShardAffinity
 
