@@ -9,6 +9,7 @@ import (
 	caocrdsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/cao_crd"
 	couchbasesetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/couchbase"
 	kubeconfigsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/kubeconfig"
+	setupkubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/kubernetes"
 	operatorsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/operator"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
@@ -35,6 +36,7 @@ type Register struct {
 func (r Register) Actions() map[string]ActionRegistration {
 	return map[string]ActionRegistration{
 		"Delta Upgrade":                    {newAction: upgrade.NewDeltaRecoveryUpgrade, config: &upgrade.DeltaRecoveryUpgradeConfig{}},
+		"Setup Kubernetes Cluster":         {newAction: setupkubernetes.NewKubernetesConfig, config: &setupkubernetes.KubernetesSetupConfig{}},
 		"Setup Operator":                   {newAction: operatorsetup.NewSetupOperatorConfig, config: &operatorsetup.OperatorConfig{}},
 		"Setup Admission Controller":       {newAction: admissioncontrollersetup.NewSetupAdmissionControllerConfig, config: &admissioncontrollersetup.AdmissionControllerConfig{}},
 		"Setup CAO Binary and Deploy CRDs": {newAction: caocrdsetup.NewCaoCrdSetupConfig, config: &caocrdsetup.CaoCrdSetupConfig{}},

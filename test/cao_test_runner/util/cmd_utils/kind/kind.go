@@ -44,11 +44,17 @@ func Create(config, image, kubeconfig, name, wait string, retain bool) *KindCmd 
 	args := []string{
 		"cluster",
 		"--config", config,
-		"--image", image,
-		"--kubeconfig", kubeconfig,
 		"--name", name,
 		"--wait", wait,
 	}
+	if image != "" {
+		args = append(args, "--image", image)
+	}
+
+	if kubeconfig != "" {
+		args = append(args, "--kubeconfig", kubeconfig)
+	}
+
 	if retain {
 		args = append(args, "--retain")
 	}
@@ -150,7 +156,9 @@ func LoadDockerImage(image, name string, nodes []string) *KindCmd {
 		"docker-image", image,
 		"--name", name,
 	}
-	args = append(args, nodes...)
+	if len(nodes) != 0 {
+		args = append(args, nodes...)
+	}
 
 	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "load", Args: args}}
 }

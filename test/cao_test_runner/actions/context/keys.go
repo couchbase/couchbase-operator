@@ -4,6 +4,7 @@ type contextKey int
 
 const (
 	CAOBinaryPathKey = iota
+	EnvironmentKey
 	OperatorVersionKey
 	PlatformKey
 	OperatingSystemKey
@@ -22,6 +23,7 @@ const (
 var (
 	contextUnmarshalKeys = map[string]contextKey{
 		"CAOBinaryPath":            CAOBinaryPathKey,
+		"Environment":              EnvironmentKey,
 		"OperatorVersion":          OperatorVersionKey,
 		"Platform":                 PlatformKey,
 		"OperatingSystem":          OperatingSystemKey,
