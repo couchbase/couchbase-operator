@@ -11,7 +11,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/kubectl"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
 	"github.com/sirupsen/logrus"
 )

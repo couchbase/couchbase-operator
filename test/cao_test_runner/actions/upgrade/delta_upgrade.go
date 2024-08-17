@@ -8,7 +8,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/kubectl"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/kubectl"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
