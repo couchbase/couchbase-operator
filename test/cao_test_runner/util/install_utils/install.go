@@ -67,9 +67,11 @@ func (installParams *InstallParams) install() error {
 		return fmt.Errorf("cannot create file: %w", err)
 	}
 
+	defer downloadFile.CloseFile()
+
 	requestParams := requestutils.NewRequestParams(url)
 
-	err = requestParams.DownloadFile(downloadFile.FilePath)
+	err = requestParams.DownloadFile(downloadFile)
 	if err != nil {
 		return fmt.Errorf("cannot download file: %w", err)
 	}

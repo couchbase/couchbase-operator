@@ -16,12 +16,16 @@ import (
 var (
 	ErrNotImplemented = errors.New("not implemented error")
 	ErrUnknownType    = errors.New("unknown type")
+	ErrFileExists     = errors.New("file already exists")
+	ErrDirExists      = errors.New("directory already exists")
+	ErrFileNotOpened  = errors.New("file not open")
 )
 
 type File struct {
 	Name      string
 	FilePath  string
 	Extension string
+	OsFile    *os.File
 }
 
 type Directory struct {
@@ -46,11 +50,41 @@ func NewDirectory(directoryPath string, permissions fs.FileMode) *Directory {
 	}
 }
 
+func (file *File) CloseFile() {
+	if file.OsFile == nil {
+		return
+	}
+
+	file.OsFile.Close()
+}
+
 func (file *File) CreateFile() error {
-	_, err := os.Create(file.FilePath)
+	if file.IsFileExists() {
+		return fmt.Errorf("file:%s already exists: %w", file.FilePath, ErrFileExists)
+	}
+
+	fileP, err := os.Create(file.FilePath)
+
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
+
+	file.OsFile = fileP
+
+	return nil
+}
+
+func (file *File) OpenFile(flag int, perm fs.FileMode) error {
+	if file.OsFile != nil {
+		defer file.OsFile.Close()
+	}
+
+	fileP, err := os.OpenFile(file.FilePath, flag, perm)
+	if err != nil {
+		return err
+	}
+
+	file.OsFile = fileP
 
 	return nil
 }
@@ -65,8 +99,7 @@ func (file *File) IsFileExists() bool {
 }
 
 func (directory *Directory) IsDirectoryExists() bool {
-	_, err := os.Stat(directory.DirectoryPath)
-	if err != nil {
+	if _, err := os.Stat(directory.DirectoryPath); err != nil {
 		return false
 	}
 
@@ -74,8 +107,11 @@ func (directory *Directory) IsDirectoryExists() bool {
 }
 
 func (dir *Directory) CreateDirectory() error {
-	err := os.MkdirAll(dir.DirectoryPath, dir.Permissions)
-	if err != nil {
+	if dir.IsDirectoryExists() {
+		return fmt.Errorf("directory:%s already exists: %w", dir.DirectoryPath, ErrDirExists)
+	}
+
+	if err := os.MkdirAll(dir.DirectoryPath, dir.Permissions); err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 
