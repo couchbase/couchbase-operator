@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -11,10 +12,30 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
+	"github.com/aws/aws-sdk-go/service/iam"
+)
+
+type AMIType string
+
+const (
+	AmazonLinux2x86       AMIType = "AL2_x86_64"
+	AmazonLinux2x86GPU    AMIType = "AL2_x86_64_GPU"
+	AmazonLinux2ARM       AMIType = "AL2_ARM_64"
+	BottleRocketx86       AMIType = "BOTTLEROCKET_x86_64"
+	BottleRocketARM       AMIType = "BOTTLEROCKET_ARM_64"
+	BottleRocketNvidiax86 AMIType = "BOTTLEROCKET_x86_64_NVIDIA"
+	BottleRocketNvidiaARM AMIType = "BOTTLEROCKET_ARM_64_NVIDIA"
+	AmazonLinux2023x86    AMIType = "AL2023_x86_64_STANDARD"
+	AmazonLinux2023ARM    AMIType = "AL2023_ARM_64_STANDARD"
+	Windows2019Core       AMIType = "WINDOWS_CORE_2019_x86_64"
+	Windows2022Core       AMIType = "WINDOWS_CORE_2022_x86_64"
+	Windows2019Full       AMIType = "WINDOWS_FULL_2019_x86_64"
+	Windows2022Full       AMIType = "WINDOWS_FULL_2022_x86_64"
 )
 
 var (
-	ErrASGNotFound = errors.New("asg not found")
+	ErrASGNotFound    = errors.New("asg not found")
+	ErrInvalidAmiType = errors.New("invalid ami type")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -37,6 +58,7 @@ type EKSSession struct {
 	EKSClient   *eks.EKS
 	ASGClient   *autoscaling.AutoScaling
 	EC2Client   *ec2.EC2
+	IAMClient   *iam.IAM
 	Cred        *ManagedServiceCredentials
 	Region      string
 	ClusterName string
@@ -57,6 +79,7 @@ func NewEKSSession(managedSvcCred *ManagedServiceCredentials) (*EKSSession, erro
 		EKSClient:   eks.New(awsSess),
 		ASGClient:   autoscaling.New(awsSess),
 		EC2Client:   ec2.New(awsSess),
+		IAMClient:   iam.New(awsSess),
 		Cred:        managedSvcCred,
 		Region:      managedSvcCred.EKS.EKSRegion,
 		ClusterName: managedSvcCred.ClusterName,
@@ -83,6 +106,17 @@ func NewEKSSessionStore() *EKSSessionStore {
 func GetKey(managedSvcCred *ManagedServiceCredentials) string {
 	key := managedSvcCred.ClusterName + ":" + managedSvcCred.EKS.EKSRegion
 	return key
+}
+
+func ValidateAMIType(ami AMIType) (bool, error) {
+	switch ami {
+	case AmazonLinux2x86, AmazonLinux2x86GPU, AmazonLinux2ARM, BottleRocketx86,
+		BottleRocketARM, BottleRocketNvidiax86, BottleRocketNvidiaARM, AmazonLinux2023x86,
+		AmazonLinux2023ARM, Windows2019Core, Windows2022Core, Windows2019Full, Windows2022Full:
+		return true, nil
+	default:
+		return false, fmt.Errorf("invalid ami type %s: %w", ami, ErrInvalidAmiType)
+	}
 }
 
 // SetSession adds an EKS cluster to the EKSSessionStore.
@@ -362,4 +396,344 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(asgName string) ([]*ec2.Ins
 	}
 
 	return resultInstances, nil
+}
+
+func (es *EKSSession) CreateVPC(cidrBlock string) (*ec2.Vpc, error) {
+	result, err := es.EC2Client.CreateVpc(&ec2.CreateVpcInput{
+		CidrBlock: aws.String(cidrBlock),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create VPC: %w", err)
+	}
+
+	return result.Vpc, nil
+}
+
+func (es *EKSSession) CreateSubnets(vpcID string, azs []string, cidrs []string) ([]*ec2.Subnet, error) {
+	var subnets []*ec2.Subnet
+
+	for i, cidr := range cidrs {
+		result, err := es.EC2Client.CreateSubnet(&ec2.CreateSubnetInput{
+			CidrBlock:        aws.String(cidr),
+			VpcId:            aws.String(vpcID),
+			AvailabilityZone: aws.String(azs[i]),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create subnet: %w", err)
+		}
+
+		subnets = append(subnets, result.Subnet)
+	}
+
+	return subnets, nil
+}
+
+func (es *EKSSession) CreateSecurityGroup(vpcID, groupName string) (*ec2.SecurityGroup, error) {
+	result, err := es.EC2Client.CreateSecurityGroup(&ec2.CreateSecurityGroupInput{
+		GroupName:   aws.String(groupName),
+		Description: aws.String("Security group for EKS cluster"),
+		VpcId:       aws.String(vpcID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create security group: %w", err)
+	}
+
+	// TODO : Take the ip permissions as params
+	_, err = es.EC2Client.AuthorizeSecurityGroupIngress(&ec2.AuthorizeSecurityGroupIngressInput{
+		GroupId: aws.String(*result.GroupId),
+		IpPermissions: []*ec2.IpPermission{
+			{
+				IpProtocol: aws.String("-1"),
+				FromPort:   aws.Int64(0),
+				ToPort:     aws.Int64(0),
+				IpRanges: []*ec2.IpRange{
+					{
+						CidrIp: aws.String("0.0.0.0/0"),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to authorize ingress: %w", err)
+	}
+
+	// TODO : Take the ip permissions as params
+	// _, err = es.EC2Client.AuthorizeSecurityGroupEgress(&ec2.AuthorizeSecurityGroupEgressInput{
+	// 	GroupId: aws.String(*result.GroupId),
+	// 	IpPermissions: []*ec2.IpPermission{
+	// 		{
+	// 			IpProtocol: aws.String("-1"),
+	// 			FromPort:   aws.Int64(0),
+	// 			ToPort:     aws.Int64(0),
+	// 			IpRanges: []*ec2.IpRange{
+	// 				{
+	// 					CidrIp: aws.String("0.0.0.0/0"),
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// })
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to authorize egress: %w", err)
+	// }
+
+	describeResult, err := es.EC2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+		GroupIds: []*string{result.GroupId},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not describe security group: %w", err)
+	}
+
+	if len(describeResult.SecurityGroups) > 0 {
+		return describeResult.SecurityGroups[0], nil
+	}
+
+	return nil, fmt.Errorf("security group not found")
+}
+
+func (es *EKSSession) GetSecurityGroupsByGroupID(groupID []*string) ([]*ec2.SecurityGroup, error) {
+	describeResult, err := es.EC2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+		GroupIds: groupID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not describe security group: %w", err)
+	}
+
+	if len(describeResult.SecurityGroups) > 0 {
+		return describeResult.SecurityGroups, nil
+	}
+
+	return nil, fmt.Errorf("security group not found")
+}
+
+func (es *EKSSession) GetSecurityGroupsByGroupNames(groupNames []*string) ([]*ec2.SecurityGroup, error) {
+	describeResult, err := es.EC2Client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
+		GroupNames: groupNames,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not describe security group: %w", err)
+	}
+
+	if len(describeResult.SecurityGroups) > 0 {
+		return describeResult.SecurityGroups, nil
+	}
+
+	return nil, fmt.Errorf("security group not found")
+}
+
+func (es *EKSSession) CreateEKSCluster(version string, subnetIDs, securityGroupIDs []string,
+	waitForClusterCreation bool) (*eks.Cluster, error) {
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": {
+					"Service": "eks.amazonaws.com"
+				},
+				"Action": "sts:AssumeRole"
+			}
+		]
+	}`
+
+	policies := []string{
+		"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+		"arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
+	}
+	roleName := es.ClusterName + "-eks-role"
+
+	role, err := es.CreateIAMRole(roleName, trustPolicy, policies)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create role %s: %w", roleName, err)
+	}
+
+	input := &eks.CreateClusterInput{
+		Name:    aws.String(es.ClusterName),
+		RoleArn: aws.String(*role.Arn),
+		ResourcesVpcConfig: &eks.VpcConfigRequest{
+			SubnetIds:        aws.StringSlice(subnetIDs),
+			SecurityGroupIds: aws.StringSlice(securityGroupIDs),
+		},
+		Version: aws.String(version),
+	}
+
+	result, err := es.EKSClient.CreateCluster(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EKS cluster: %w", err)
+	}
+
+	if !waitForClusterCreation {
+		return result.Cluster, nil
+	}
+
+	if err = es.EKSClient.WaitUntilClusterActive(&eks.DescribeClusterInput{
+		Name: aws.String(es.ClusterName),
+	}); err != nil {
+		return nil, fmt.Errorf("failed waiting for cluster to become ACTIVE: %w", err)
+	}
+
+	describeResult, err := es.EKSClient.DescribeCluster(&eks.DescribeClusterInput{
+		Name: aws.String(es.ClusterName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe EKS cluster after creation: %w", err)
+	}
+
+	return describeResult.Cluster, nil
+}
+
+func (es *EKSSession) CreateNodeGroup(instanceType, nodeGroupName, sshKey string, subnets, securityGroupIDs []string,
+	minSize, desiredSize, maxSize, diskSize int64, amiType AMIType, waitForNodeGroupCreation bool) (*eks.Nodegroup, error) {
+	if ok, err := ValidateAMIType(amiType); !ok || err != nil {
+		return nil, err
+	}
+
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Sid": "EKSNodeAssumeRole",
+				"Effect": "Allow",
+				"Principal": {
+					"Service": "ec2.amazonaws.com"
+				},
+				"Action": "sts:AssumeRole"
+			}
+		]
+	}`
+
+	policies := []string{
+		"arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+		"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
+		"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+	}
+	roleName := es.ClusterName + "-eks-node-group-role" + time.Now().Format("20060102150405.00000000000006")
+
+	role, err := es.CreateIAMRole(roleName, trustPolicy, policies)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create role %s: %w", roleName, err)
+	}
+
+	input := &eks.CreateNodegroupInput{
+		ClusterName:   aws.String(es.ClusterName),
+		NodegroupName: aws.String(nodeGroupName),
+		Subnets:       aws.StringSlice(subnets),
+		ScalingConfig: &eks.NodegroupScalingConfig{
+			MinSize:     aws.Int64(minSize),
+			DesiredSize: aws.Int64(desiredSize),
+			MaxSize:     aws.Int64(maxSize),
+		},
+		InstanceTypes: aws.StringSlice([]string{instanceType}), // TODO - Take the entire array as param
+		NodeRole:      aws.String(*role.Arn),
+		AmiType:       aws.String(string(amiType)),
+		DiskSize:      aws.Int64(diskSize),
+		RemoteAccess: &eks.RemoteAccessConfig{
+			Ec2SshKey: aws.String(sshKey),
+		},
+	}
+
+	result, err := es.EKSClient.CreateNodegroup(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create node group: %w", err)
+	}
+
+	if !waitForNodeGroupCreation {
+		return result.Nodegroup, nil
+	}
+
+	if err = es.EKSClient.WaitUntilNodegroupActive(&eks.DescribeNodegroupInput{
+		ClusterName:   aws.String(es.ClusterName),
+		NodegroupName: aws.String(nodeGroupName),
+	}); err != nil {
+		return nil, fmt.Errorf("failed waiting for node group to become ACTIVE: %w", err)
+	}
+
+	describeResult, err := es.EKSClient.DescribeNodegroup(&eks.DescribeNodegroupInput{
+		ClusterName:   aws.String(es.ClusterName),
+		NodegroupName: aws.String(nodeGroupName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe EKS cluster node group after creation: %w", err)
+	}
+
+	return describeResult.Nodegroup, nil
+}
+
+func (es *EKSSession) GetRoleArn(roleName string) (string, error) {
+	role, err := es.IAMClient.GetRole(&iam.GetRoleInput{
+		RoleName: aws.String(roleName),
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get IAM role: %w", err)
+	}
+
+	return *role.Role.Arn, nil
+}
+
+func (es *EKSSession) CreateIAMRole(roleName, trustPolicy string, policies []string) (*iam.Role, error) {
+	createRoleInput := &iam.CreateRoleInput{
+		RoleName:                 aws.String(roleName),
+		AssumeRolePolicyDocument: aws.String(trustPolicy),
+	}
+
+	role, err := es.IAMClient.CreateRole(createRoleInput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create IAM role: %w", err)
+	}
+
+	for _, policyArn := range policies {
+		_, err = es.IAMClient.AttachRolePolicy(&iam.AttachRolePolicyInput{
+			RoleName:  aws.String(roleName),
+			PolicyArn: aws.String(policyArn),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to attach policy %s: %w", policyArn, err)
+		}
+	}
+
+	return role.Role, nil
+}
+
+func (es *EKSSession) CreateAddon(addonName, addonVersion, roleArn string) (*eks.Addon, error) {
+	input := &eks.CreateAddonInput{
+		ClusterName:           aws.String(es.ClusterName),
+		AddonName:             aws.String(addonName),
+		AddonVersion:          aws.String(addonVersion),
+		ServiceAccountRoleArn: aws.String(roleArn),
+	}
+
+	result, err := es.EKSClient.CreateAddon(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create addon %s: %w", addonName, err)
+	}
+
+	return result.Addon, nil
+}
+
+func (es *EKSSession) EnableEBSCSIDriverAddon(addonVersion string) (*eks.Addon, error) {
+	addonName := "aws-ebs-csi-driver"
+	trustPolicy := `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": {
+					"Service": "eks.amazonaws.com"
+				},
+				"Action": "sts:AssumeRole"
+			}
+		]
+	}`
+	policies := []string{
+		"arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+	}
+	roleName := es.ClusterName + "-eks-ebscsidriver-role"
+
+	role, err := es.CreateIAMRole(roleName, trustPolicy, policies)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create role %s: %w", roleName, err)
+	}
+
+	return es.CreateAddon(addonName, addonVersion, *role.Arn)
 }
