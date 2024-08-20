@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -34,9 +35,11 @@ const (
 )
 
 var (
-	ErrASGNotFound           = errors.New("asg not found")
-	ErrInvalidAmiType        = errors.New("invalid ami type")
-	ErrSecurityGroupNotFound = errors.New("security group not found")
+	ErrASGNotFound              = errors.New("asg not found")
+	ErrInvalidAmiType           = errors.New("invalid ami type")
+	ErrSecurityGroupNotFound    = errors.New("security group not found")
+	ErrTimeoutClusterDeletion   = errors.New("timeout reached while waiting for cluster to be deleted")
+	ErrTimeoutNodeGroupDeletion = errors.New("timeout reached while waiting for node group to be deleted")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -748,6 +751,60 @@ func (es *EKSSession) EnableAutoAssignPublicIP(subnetID string) error {
 	return nil
 }
 
+func (es *EKSSession) DeleteNodeGroup(nodeGroupName string, waitForDeletion bool) error {
+	input := &eks.DeleteNodegroupInput{
+		ClusterName:   aws.String(es.ClusterName),
+		NodegroupName: aws.String(nodeGroupName),
+	}
+
+	if _, err := es.EKSClient.DeleteNodegroup(input); err != nil {
+		return fmt.Errorf("failed to delete node group %s: %w", nodeGroupName, err)
+	}
+
+	if !waitForDeletion {
+		return nil
+	}
+
+	timeout := time.After(30 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
+
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout reached while waiting for node group %s to be deleted: %w", nodeGroupName, ErrTimeoutNodeGroupDeletion)
+
+		case <-ticker.C:
+			_, err := es.EKSClient.DescribeNodegroup(&eks.DescribeNodegroupInput{
+				ClusterName:   aws.String(es.ClusterName),
+				NodegroupName: aws.String(nodeGroupName),
+			})
+
+			if err != nil {
+				var awsErr awserr.Error
+				if errors.As(err, &awsErr) && awsErr.Code() == eks.ErrCodeResourceNotFoundException {
+					return nil
+				}
+
+				return fmt.Errorf("failed to describe node group %s: %w", nodeGroupName, err)
+			}
+		}
+	}
+}
+
+func (es *EKSSession) DeleteSecurityGroups(groupIDs []*string) error {
+	for _, groupID := range groupIDs {
+		if _, err := es.EC2Client.DeleteSecurityGroup(&ec2.DeleteSecurityGroupInput{
+			GroupId: groupID,
+		}); err != nil {
+			return fmt.Errorf("unable to delete security group %s: %w", *groupID, err)
+		}
+	}
+
+	return nil
+}
+
 func (es *EKSSession) CreateInternetGateway() (*ec2.InternetGateway, error) {
 	result, err := es.EC2Client.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
 	if err != nil {
@@ -764,6 +821,18 @@ func (es *EKSSession) AttachInternetGateway(vpcID, igwID string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to attach Internet Gateway: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteSubnets(subnetIDs []*string) error {
+	for _, subnetID := range subnetIDs {
+		if _, err := es.EC2Client.DeleteSubnet(&ec2.DeleteSubnetInput{
+			SubnetId: subnetID,
+		}); err != nil {
+			return fmt.Errorf("unable to delete subnet %s: %w", *subnetID, err)
+		}
 	}
 
 	return nil
@@ -800,4 +869,80 @@ func (es *EKSSession) AssociateRouteTable(routeTableID string, subnetID string) 
 	}
 
 	return nil
+}
+
+func (es *EKSSession) DeleteVpc(vpcID *string) error {
+	if _, err := es.EC2Client.DeleteVpc(&ec2.DeleteVpcInput{
+		VpcId: vpcID,
+	}); err != nil {
+		return fmt.Errorf("unable to delete vpc %s: %w", *vpcID, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteIAMRole(nodeRole *string) error {
+	policiesOutput, err := es.IAMClient.ListAttachedRolePolicies(&iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String(*nodeRole),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to list attached policies for role %s: %w", *nodeRole, err)
+	}
+
+	for _, policy := range policiesOutput.AttachedPolicies {
+		detachPolicyInput := &iam.DetachRolePolicyInput{
+			RoleName:  aws.String(*nodeRole),
+			PolicyArn: policy.PolicyArn,
+		}
+
+		if _, err := es.IAMClient.DetachRolePolicy(detachPolicyInput); err != nil {
+			return fmt.Errorf("unable to detach policy %s from role %s: %w", *policy.PolicyArn, *nodeRole, err)
+		}
+	}
+
+	if _, err := es.IAMClient.DeleteRole(&iam.DeleteRoleInput{
+		RoleName: nodeRole,
+	}); err != nil {
+		return fmt.Errorf("unable to delete role %s: %w", *nodeRole, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteCluster(waitForDeletion bool) error {
+	if _, err := es.EKSClient.DeleteCluster(&eks.DeleteClusterInput{
+		Name: &es.ClusterName,
+	}); err != nil {
+		return fmt.Errorf("unable to delete cluster %s: %w", es.ClusterName, err)
+	}
+
+	if !waitForDeletion {
+		return nil
+	}
+
+	timeout := time.After(30 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
+
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timeout reached while waiting for cluster %s to be deleted: %w", es.ClusterName, ErrTimeoutClusterDeletion)
+
+		case <-ticker.C:
+			_, err := es.EKSClient.DescribeCluster(&eks.DescribeClusterInput{
+				Name: aws.String(es.ClusterName),
+			})
+
+			if err != nil {
+				var awsErr awserr.Error
+				if errors.As(err, &awsErr) && awsErr.Code() == eks.ErrCodeResourceNotFoundException {
+					return nil
+				}
+
+				return fmt.Errorf("failed to describe cluster %s: %w", es.ClusterName, err)
+			}
+		}
+	}
 }
