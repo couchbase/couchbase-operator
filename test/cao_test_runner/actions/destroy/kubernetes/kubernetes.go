@@ -13,10 +13,14 @@ import (
 )
 
 type EnvironmentType string
+type ProviderType string
 
 const (
-	Kind  EnvironmentType = "kind"
-	Cloud EnvironmentType = "cloud"
+	Kind        EnvironmentType = "kind"
+	Cloud       EnvironmentType = "cloud"
+	AWS         ProviderType    = "aws"
+	Azure       ProviderType    = "azure"
+	GoogleCloud ProviderType    = "googleCloud"
 )
 
 var (
@@ -32,6 +36,8 @@ type KubernetesDestroyConfig struct {
 	ClusterName string                    `yaml:"clusterName" caoCli:"required"`
 	Platform    installutils.PlatformType `yaml:"platform" caoCli:"required"`
 	Environment EnvironmentType           `yaml:"environment" caoCli:"required"`
+	Provider    ProviderType              `yaml:"provider"`
+	Region      string                    `yaml:"region"`
 	Validators  []map[string]any          `yaml:"validators,omitempty"`
 }
 

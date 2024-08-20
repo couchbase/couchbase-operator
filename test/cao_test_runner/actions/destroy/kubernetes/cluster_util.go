@@ -11,6 +11,7 @@ var (
 	ErrNotImplemented         = errors.New("not implemented")
 	ErrUnknownEnvironmentType = errors.New("unknown environment type")
 	ErrUnknownPlatformType    = errors.New("unknown platform type")
+	ErrUnknownProviderType    = errors.New("unknown provider type")
 )
 
 type DeleteClusterUtil interface {
@@ -28,7 +29,17 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 			}, nil
 
 		case Cloud:
-			return nil, ErrNotImplemented
+			switch p.Provider {
+			case AWS:
+				return &DeleteEKSCluster{
+					ClusterName: p.ClusterName,
+					Region:      p.Region,
+				}, nil
+			case Azure, GoogleCloud:
+				return nil, ErrNotImplemented
+			default:
+				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
+			}
 
 		default:
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
