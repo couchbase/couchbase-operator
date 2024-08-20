@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -13,10 +14,14 @@ import (
 )
 
 type EnvironmentType string
+type ProviderType string
 
 const (
-	Kind  EnvironmentType = "kind"
-	Cloud EnvironmentType = "cloud"
+	Kind        EnvironmentType = "kind"
+	Cloud       EnvironmentType = "cloud"
+	AWS         ProviderType    = "aws"
+	Azure       ProviderType    = "azure"
+	GoogleCloud ProviderType    = "googleCloud"
 )
 
 var (
@@ -25,18 +30,30 @@ var (
 	ErrIllegalPlatform        = errors.New("illegal platform")
 	ErrIllegalEnvironment     = errors.New("illegal environment")
 	ErrIllegalConfiguration   = errors.New("illegal configuration")
+	ErrIllegalProvider        = errors.New("illegal provider")
 )
 
 type KubernetesSetupConfig struct {
-	Description              []string                  `yaml:"description"`
-	ClusterName              string                    `yaml:"clusterName" caoCli:"required"`
-	Platform                 installutils.PlatformType `yaml:"platform" caoCli:"required"`
-	Environment              EnvironmentType           `yaml:"environment" caoCli:"required"`
-	NumControlPlane          int                       `yaml:"numControlPlane"`
-	NumWorkers               int                       `yaml:"numWorkers"`
-	OperatorImage            string                    `yaml:"operatorImage" caoCli:"required"`
-	AdmissionControllerImage string                    `yaml:"admissionControllerImage" caoCli:"required"`
-	Validators               []map[string]any          `yaml:"validators,omitempty"`
+	Description              []string                   `yaml:"description"`
+	ClusterName              string                     `yaml:"clusterName" caoCli:"required"`
+	Platform                 installutils.PlatformType  `yaml:"platform" caoCli:"required"`
+	Environment              EnvironmentType            `yaml:"environment" caoCli:"required"`
+	NumControlPlane          int                        `yaml:"numControlPlane"`
+	NumWorkers               int                        `yaml:"numWorkers"`
+	OperatorImage            string                     `yaml:"operatorImage" caoCli:"required"`
+	AdmissionControllerImage string                     `yaml:"admissionControllerImage" caoCli:"required"`
+	Provider                 ProviderType               `yaml:"provider"`
+	Region                   string                     `yaml:"region" env:"EKS_REGION"`
+	KubernetesVersion        string                     `yaml:"kubernetesVersion"`
+	InstanceType             string                     `yaml:"instanceType"`
+	NumNodeGroups            int                        `yaml:"numNodeGroups"`
+	MinSize                  int                        `yaml:"minSize"`
+	MaxSize                  int                        `yaml:"maxSize"`
+	DesiredSize              int                        `yaml:"desiredSize"`
+	DiskSize                 int                        `yaml:"diskSize"`
+	AMI                      managedk8sservices.AMIType `yaml:"ami"`
+	KubeConfigPath           string                     `yaml:"kubeconfigPath" env:"KUBECONFIG"`
+	Validators               []map[string]any           `yaml:"validators,omitempty"`
 }
 
 type SetupKubernetes struct {
@@ -59,8 +76,15 @@ func NewKubernetesConfig(config interface{}) (actions.Action, error) {
 		}
 
 		switch c.Environment {
-		case Kind, Cloud:
+		case Kind:
 			// No-op
+		case Cloud:
+			switch c.Provider {
+			case AWS, Azure, GoogleCloud:
+				// No-op
+			default:
+				return nil, ErrIllegalProvider
+			}
 		default:
 			return nil, ErrIllegalEnvironment
 		}

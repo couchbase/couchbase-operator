@@ -11,6 +11,7 @@ var (
 	ErrNotImplemented         = errors.New("not implemented")
 	ErrUnknownEnvironmentType = errors.New("unknown environment type")
 	ErrUnknownPlatformType    = errors.New("unknown platform type")
+	ErrUnknownProviderType    = errors.New("unknown provider type")
 )
 
 type CreateClusterUtil interface {
@@ -33,7 +34,26 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			}, nil
 
 		case Cloud:
-			return nil, ErrNotImplemented
+			switch p.Provider {
+			case AWS:
+				return &CreateEKSCluster{
+					ClusterName:       p.ClusterName,
+					Region:            p.Region,
+					KubernetesVersion: p.KubernetesVersion,
+					InstanceType:      p.InstanceType,
+					NumNodeGroups:     p.NumNodeGroups,
+					MinSize:           p.MinSize,
+					MaxSize:           p.MaxSize,
+					DesiredSize:       p.DesiredSize,
+					DiskSize:          p.DiskSize,
+					AMI:               p.AMI,
+					KubeConfigPath:    p.KubeConfigPath,
+				}, nil
+			case Azure, GoogleCloud:
+				return nil, ErrNotImplemented
+			default:
+				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
+			}
 
 		default:
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
