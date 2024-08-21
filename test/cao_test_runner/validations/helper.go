@@ -60,6 +60,6 @@ func RunValidator(ctx *context.Context, validators []map[string]any, state strin
 
 func handlePanic() {
 	if a := recover(); a != nil {
-		fmt.Println("RECOVER", a)
+		logrus.Warn("recover", a)
 	}
 }

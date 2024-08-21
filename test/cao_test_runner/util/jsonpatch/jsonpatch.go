@@ -4,6 +4,8 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpointer"
 )
 
@@ -28,6 +30,12 @@ var (
 //	_, err = jsonpatchutil.Get(&yaml, spec)
 //	// Handle the error
 func Get(document interface{}, path string) (interface{}, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Warn("recover:", r)
+		}
+	}()
+
 	// Get a reference to the object to update
 	v, k, err := jsonpointer.LookupPath(document, path)
 	if err != nil {

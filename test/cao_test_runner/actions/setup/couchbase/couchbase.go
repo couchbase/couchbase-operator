@@ -156,6 +156,7 @@ func (s *Couchbase) Config() interface{} {
  */
 func getModifiedSpecPath(specPath string) (string, error) {
 	fileDir, fileName := filepath.Split(specPath)
+	isModified := false
 
 	if !strings.Contains(fileDir, "modified_test_data") {
 		if !strings.Contains(fileDir, "test_data") {
@@ -163,6 +164,8 @@ func getModifiedSpecPath(specPath string) (string, error) {
 		}
 
 		fileDir = strings.Replace(fileDir, "test_data", "modified_test_data", 1)
+	} else {
+		isModified = true
 	}
 
 	fileNameWithoutExt := fileName[0 : len(fileName)-len(filepath.Ext(fileName))]
@@ -171,6 +174,13 @@ func getModifiedSpecPath(specPath string) (string, error) {
 	err := os.MkdirAll(fileDir, os.ModePerm)
 	if err != nil {
 		return "", fmt.Errorf("get modified spec path: %w", err)
+	}
+
+	// Removing the `-<random-8-chars>` if the spec path is modified
+	if isModified {
+		// e.g. file-name-qwerty12 changes to file-name-
+		// So, for each modification the file name changes as:  file-name, file-name-qwerty12, file-name--random34 ...
+		fileNameWithoutExt = fileNameWithoutExt[0 : len(fileNameWithoutExt)-8]
 	}
 
 	// The spec file name is renamed as <old-file-name>-<random-8-chars>.extension.

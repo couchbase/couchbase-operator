@@ -58,26 +58,25 @@ func GetEKSCredentials(clusterName, accessKey, secretKey, region string) (*Manag
 	if accessKey == "" {
 		if envValue, ok := os.LookupEnv(eksAccessKeyEnv); ok {
 			eksSvcCred.EKS.EKSAccessKey = envValue
+		} else {
+			return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksAccessKeyEnv, ErrEnvVariableMissing)
 		}
-
-		return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksAccessKeyEnv, ErrEnvVariableMissing)
 	}
 
 	if secretKey == "" {
-		envValue, ok := os.LookupEnv(eksSecretKeyEnv)
-		if ok {
+		if envValue, ok := os.LookupEnv(eksSecretKeyEnv); ok {
 			eksSvcCred.EKS.EKSSecretKey = envValue
+		} else {
+			return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksSecretKeyEnv, ErrEnvVariableMissing)
 		}
-
-		return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksSecretKeyEnv, ErrEnvVariableMissing)
 	}
 
 	if region == "" {
 		if envValue, ok := os.LookupEnv(eksRegionEnv); ok {
 			eksSvcCred.EKS.EKSRegion = envValue
+		} else {
+			return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksRegionEnv, ErrEnvVariableMissing)
 		}
-
-		return nil, fmt.Errorf("get eks credentials: lookup env variable %s: %w", eksRegionEnv, ErrEnvVariableMissing)
 	}
 
 	return &eksSvcCred, nil

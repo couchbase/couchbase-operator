@@ -9,9 +9,10 @@ type K8sNodeFindStrategy string
 
 const (
 	// Supported Managed K8s Services.
-	EKSManagedService ManagedServiceProvider = "eks"
-	AKSManagedService ManagedServiceProvider = "aks"
-	GKEManagedService ManagedServiceProvider = "gke"
+	KindManagedService ManagedServiceProvider = "kind"
+	EKSManagedService  ManagedServiceProvider = "eks"
+	AKSManagedService  ManagedServiceProvider = "aks"
+	GKEManagedService  ManagedServiceProvider = "gke"
 
 	// Environment Variables for Credentials.
 	eksAccessKeyEnv = "EKS_ACCESS_KEY"
