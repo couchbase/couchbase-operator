@@ -2,12 +2,13 @@
 :page-aliases: upgrading-the-operator
 :tabs:
 
-Upgrading the Couchbase Autonomous Operator is a four-step process:
+Upgrading the Couchbase Autonomous Operator is a five-step process:
 
 - <<download-operator, Step 1: Download the New Operator Package>>
 - <<uninstall-operator, Step 2: Uninstall the Old DAC and Operator>>
 - <<update-crd, Step 3: Update the CRDs>>
-- <<install-operator, Step 4: Install the New Operator>>
+- <<update-existing-resources, Step 4: Update Existing Resources>>
+- <<install-operator, Step 5: Install the New Operator>>
 
 [IMPORTANT]
 ====
