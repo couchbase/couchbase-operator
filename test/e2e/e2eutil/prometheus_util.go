@@ -112,6 +112,11 @@ func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCl
 	}
 
 	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"reconcile_")
+	if err != nil {
+		return err
+	}
+
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"kubernetes_api_")
 
 	return err
 }

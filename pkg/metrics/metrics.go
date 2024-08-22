@@ -253,6 +253,51 @@ var (
 	// nolint:godot
 	PodReadinessDurationMetric = prometheus.HistogramVec{}
 
+	// KubernetesAPIRequestTotalMetric
+	// name: kubernetes_api_requests_total
+	// type: counter
+	// help: Total requests made to the Kubernetes API by the operator
+	// unit:
+	// added: 2.8.0
+	// stability: committed
+	// labels: method, host, path
+	KubernetesAPIRequestTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "kubernetes_api_requests_total",
+		Help:      "Total requests made to the Kubernetes API by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"method", "host", "path"})
+
+	// KubernetesAPIRequestFailureMetric
+	// name: kubernetes_api_request_failures
+	// type: counter
+	// help: Total failed requests to the Kubernetes API by the operator
+	// unit:
+	// added: 2.8.0
+	// stability: committed
+	// labels: method, host, path
+	KubernetesAPIRequestFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "kubernetes_api_request_failures",
+		Help:      "Total failed requests to the Kubernetes API by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"method", "host", "path"})
+
+	// KubernetesAPIRequestDurationMSMetric
+	// name: kubernetes_api_requests_time_milliseconds
+	// type: histogram
+	// help: Length of time per request to the Kubernetes API
+	// unit: milliseconds
+	// added: 2.8.0
+	// stability: committed
+	// labels: method, host, path
+	KubernetesAPIRequestDurationMSMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "kubernetes_api_requests_time_milliseconds",
+		Help:      "Length of time per request to the Kubernetes API",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"method", "host", "path"})
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -395,5 +440,8 @@ func InitMetrics() {
 		PodRecoveryFailuresMetric,
 		UpgradeDurationMSMetric,
 		PodReadinessDurationMetric,
+		KubernetesAPIRequestTotalMetric,
+		KubernetesAPIRequestFailureMetric,
+		KubernetesAPIRequestDurationMSMetric,
 	)
 }

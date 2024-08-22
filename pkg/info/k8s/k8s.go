@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 	"github.com/couchbase/couchbase-operator/pkg/info/context"
@@ -40,6 +41,8 @@ func InitContext(context *context.Context) error {
 	if context.KubeConfig, err = context.KubeConfigLoader.ClientConfig(); err != nil {
 		return err
 	}
+
+	context.KubeConfig.Wrap(client.KubeAPIWrapper)
 
 	// Create Kubernetes clients
 	if context.KubeClient, err = kubernetes.NewForConfig(context.KubeConfig); err != nil {

@@ -398,7 +398,8 @@ func TestPrometheusMetricsOperator(t *testing.T) {
 	// Plaform configuration.
 	f := framework.Global
 
-	kubernetes, cleanup := f.SetupTest(t)
+	kubernetes, cleanup := f.SetupTest(t, framework.InitKubeAPIMetrics)
+
 	defer cleanup()
 
 	// Static configuration.

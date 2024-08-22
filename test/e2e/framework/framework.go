@@ -867,6 +867,7 @@ type TestOption int
 // need one for example.
 const (
 	NoOperator TestOption = 1 << iota
+	InitKubeAPIMetrics
 )
 
 // optionSet determines whether an option is defined or not.
@@ -971,6 +972,10 @@ func (f *Framework) SetupSubTest(t *testing.T) func() {
 // and namespace deletion.
 func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*types.Cluster, func()) {
 	cluster := f.ClusterSpec[index].Copy()
+
+	if optionSet(o, InitKubeAPIMetrics) {
+		cluster.Config.Wrap(client.KubeAPIWrapper)
+	}
 
 	// Create a namespace.
 	namespace := &v1.Namespace{
