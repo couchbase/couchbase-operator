@@ -191,7 +191,12 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 			}
 		}
 
-		if verBelow72 {
+		isVersionUpgrade, err := areNodesVersionUpgrading(nodes)
+		if err != nil {
+			return nil, err
+		}
+
+		if verBelow72 && isVersionUpgrade {
 			status.Balanced = status.Balanced || (!info.Balanced && info.RebalanceStatus == couchbaseutil.RebalanceStatusNone)
 		}
 	}
@@ -199,4 +204,23 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 	status.Balancing = info.RebalanceStatus == couchbaseutil.RebalanceStatusRunning
 
 	return status, nil
+}
+
+func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) (bool, error) {
+	version := ""
+
+	for _, node := range nodes {
+		nodeCurrentVersion, _, found := strings.Cut(node.Version, "-")
+		if !found {
+			return false, errors.ErrImageVersionUnretrievable
+		}
+
+		if version == "" {
+			version = nodeCurrentVersion
+		} else if version != nodeCurrentVersion {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

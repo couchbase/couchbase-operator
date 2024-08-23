@@ -25,6 +25,43 @@
             "cluster_name"
         ]
     },
+    "kubernetes_api_request_failures": {
+        "type": "counter",
+        "help": "Total failed requests to the Kubernetes API by the operator",
+        "added": "2.8.0",
+        "stability": "committed",
+        "labels": [
+            "method",
+            "host",
+            "path"
+        ],
+        "optionalLabels": null
+    },
+    "kubernetes_api_requests_time_milliseconds": {
+        "type": "histogram",
+        "help": "Length of time per request to the Kubernetes API",
+        "unit": "milliseconds",
+        "added": "2.8.0",
+        "stability": "committed",
+        "labels": [
+            "method",
+            "host",
+            "path"
+        ],
+        "optionalLabels": null
+    },
+    "kubernetes_api_requests_total": {
+        "type": "counter",
+        "help": "Total requests made to the Kubernetes API by the operator",
+        "added": "2.8.0",
+        "stability": "committed",
+        "labels": [
+            "method",
+            "host",
+            "path"
+        ],
+        "optionalLabels": null
+    },
     "pod_readiness_duration": {
         "type": "gauge",
         "help": "The time it takes for a pod to enter a ready state",

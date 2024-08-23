@@ -1319,7 +1319,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 		return err
 	}
 
-	if err := c.waitForPodAdded(c.ctx, candidate, time.Second); err != nil {
+	if err := c.waitForPodAdded(c.ctx, candidate); err != nil {
 		return err
 	}
 
@@ -1502,7 +1502,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
-	if r.needsRebalance {
+	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
 		return nil
 	}
 

@@ -1,7 +1,7 @@
 = Release Notes for Couchbase Autonomous Operator {operator-version-minor}
 include::partial$constants.adoc[]
 
-Autonomous Operator {operator-version-minor} release is primarily focused on platform updates, feature parity with Couchbase Server, improvements to Pod Management and Security, as well as a number of minor fixes.
+Autonomous Operator {operator-version-minor} release provides full support for Couchbase Server 7.6, and several improvements to Pod Scheduling and Networking, as well as a number of minor fixes.
 
 Take a look at the xref:whats-new.adoc[What's New] page for a list of new features and improvements that are available in this release.
 
@@ -22,11 +22,11 @@ There is no direct upgrade path from versions prior to 2.2.0.
 To upgrade from a 1.x, 2.0.x, or 2.1.x release, you must first upgrade to 2.4.x, paying particular attention to supported Kubernetes platforms and Couchbase Server versions.
 Refer to the xref:2.4@operator::howto-operator-upgrade.adoc[Operator 2.4 upgrade steps] if upgrading from a pre-2.2 release.
 
-=== Upgrading from 2.2, 2.3, 2.4, or 2.5
+=== Upgrading from 2.2, 2.3, 2.4, 2.5, or 2.6
 
 There are no additional upgrade steps when upgrading from these versions, and you may follow the xref:howto-operator-upgrade.adoc[standard upgrade process].
-However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from releases older than 2.5.0, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
-
+However, due to https://issues.couchbase.com/browse/K8S-3097[K8S-3097^], all users will encounter a mandatory upgrade cycle when upgrading from a release older than 2.5.0, to versions 2.5.0, 2.5.1, or 2.6.0 through 2.6.3, to expose the missing Indexer HTTPS Port (see xref:server:install:install-ports.adoc#detailed-port-description[Detailed Port Description] for network port requirements).
+This behavior has changed in versions 2.5.2, 2.6.4, and 2.7.0, and there is no mandatory upgrade cycle -- the missing port is added the next time there is a regular maintenance activity that involves Pod creation.
 [IMPORTANT]
 ====
 An upgrade cycle is a relatively heavyweight operation that requires all pods in the cluster to be replaced, and data transferred between the old and new pods.
@@ -36,155 +36,92 @@ For large, production databases, ensure an adequate maintenance window is schedu
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
 ====
 
-[#release-v263]
-== Release 2.6.3
+[#release-v270]
+== Release 2.7.0
 
-Couchbase Autonomous Operator 2.6.3 was released in April 2024.
+Couchbase Autonomous Operator 2.7.0 was released in August 2024.
 
-[#fixed-issues-v263]
+[#changes-in-behavior-v270]
+=== Changes in Behaviour
+
+==== Delta Recovery / In-Place Upgrades
+
+The `DeltaRecovery` upgrade strategy added in Operator 2.6 has been replaced by `InPlaceUpgrade`, to better reflect the actual behaviour (not every Service can be Delta Recovered), and `DeltaRecovery` is now deprecated.
+
+==== Storage Backend Migration
+
+In Server 7.6 it is now possible to migrate between the Couchstore and Magma storage backends, as described in xref:7.6@server:manage/manage-buckets/migrate-bucket.adoc[Migrate a Bucket’s Storage Backend].
+Operator will automatically start the required Rebalances if it detects an unresolved Storage backend change.
+Storage Backend can also be configured using annotations, see xref:reference-annotations.adoc#bucket-backend-configuration[Bucket Backend Configuration] for more details.
+
+==== Query Service Settings
+
+Over time, a significant gap had appeared between the Query Service settings available in Couchbase Server, and the ones exposed via the `CouchbaseCluster` CRD in Autonomous Operator.
+This has been addressed in CAO 2.7.0, and the following cluster-wide settings are now available:
+
+* Server 6.5+: `queryPipelineBatch`, `queryPipelineCap`, `queryScanCap`, `queryTimeout`, `queryPreparedLimit`, `queryCompletedLimit`, `queryCompletedThreshold`, `queryLogLevel`, `queryMaxParallelism`.
+* Server 7.0+: `queryTxTimeout`, `queryMemoryQuota`, `queryUseCBO`, `queryCleanupClientAttempts`, `queryCleanupLostAttempts`, `queryCleanupWindow`, `queryNumAtrs`.
+* Server 7.6+: `queryNodeQuota`, `queryUseReplica`, `queryNodeQuotaValPercent`, `queryNumCpus`, `queryCompletedMaxPlanSize`.
+
+Note that `queryNodeQuota` is being exposed via the existing xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-queryservicememoryquota[`spec.cluster.queryServiceMemoryQuota`].
+For Server versions prior to 7.6, this value is used to determine Pod resource requirements, and from version 7.6 onwards will also be used to set `queryNodeQuota` on the Couchbase Server cluster (see https://issues.couchbase.com/browse/K8S-3436[K8S-3436^]).
+
+Note that `queryNumCpus` requires a restart of the Query Service to take effect.
+In practice in a Kubernetes environment, this means that this will only affect Pods started after the setting has been updated.
+
+[IMPORTANT]
+====
+Prior to Operator 2.7.0, the above Query Service settings could still be set directly on the cluster.
+
+To avoid these being reset to default values during the CAO upgrade, any of the above settings that have been changed must be added to the `CouchbaseCluster` resource during the upgrade.
+
+Specifically, this needs to be done _after_ updating the CRDs, and _before_ installing the new Operator
+
+For further information see xref:howto-operator-upgrade.adoc#update-existing-resources[Update Existing Resources].
+====
+
+==== Audit Log Pruning
+
+With the addition of native pruning of rotated Audit Logs in Server 7.6, the xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-garbagecollection[`garbageCollection`] sidecar is now deprecated.
+
+==== Miscellaneous Changes
+
+* `cao collect logs` now has improved handling of larger clusters (https://issues.couchbase.com/browse/K8S-3322[K8S-3322^]).
+* xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-exposedfeatures[`couchbaseclusters.spec.networking.exposedFeatures`] now includes `backup` as an option, allowing external access for the `cbbackupmgr` tool (https://issues.couchbase.com/browse/K8S-3508[K8S-3508^]).
+* Any options specified at xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-securitycontext[`couchbaseclusters.spec.security.securityContext`] are now also applied to the Operator Backup container (https://issues.couchbase.com/browse/K8S-3417[K8S-3417^]).
+* It is possible to set a longer Termination Grace Period on the Cloud Native Gateway container with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds[`terminationGracePeriodSeconds`]  (https://issues.couchbase.com/browse/K8S-3257[K8S-3257^]).
+* A number of new metrics have been added, see xref:reference-prometheus-metrics.adoc[Prometheus Metrics Reference] for details.
+
+[#fixed-issues-v270]
 === Fixed Issues
 
-[#table-fixed-issues-v263,cols="25,66"]
+[#table-fixed-issues-v270,cols="25,66"]
 |===
 | Issue | Description
 
-a| https://issues.couchbase.com/browse/K8S-3430[K8S-3430^]
-a| *Summary:* Previously the Operator was not setting the correct recovery type for nodes without the Data Service.
-
-|===
-
-[#release-v262]
-== Release 2.6.2
-
-Couchbase Autonomous Operator 2.6.2 was released in March 2024.
-
-[#fixed-issues-v262]
-=== Fixed Issues
-
-[#table-fixed-issues-v262,cols="25,66"]
-|===
-| Issue | Description
+a| https://issues.couchbase.com/browse/K8S-3377[K8S-3377^]
+a| *Summary:* Previously the `TestTLSRotateCAKillPodAndKillOperator` test was failing with Server 7.6.
 
 a| https://issues.couchbase.com/browse/K8S-3391[K8S-3391^]
 a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
 
-a| https://issues.couchbase.com/browse/K8S-3392[K8S-3392^]
-a| *Summary:* Previously the Operator was not using the correct failover mechanism for nodes without the Data Service.
+a| https://issues.couchbase.com/browse/K8S-3452[K8S-3452^]
+a| *Summary:* Previously the Operator was triggering a mandatory upgrade cycle when upgrading from 2.4.x or earlier.
+
+a| https://issues.couchbase.com/browse/K8S-3587[K8S-3587^]
+a| *Summary:* Previously the `eventing_manage_functions` RBAC role was missing from the list of cluster roles.
 
 |===
 
-[#release-v261]
-== Release 2.6.1
+[#known-issues-v270]
+=== Known Issues
 
-Couchbase Autonomous Operator 2.6.1 was released in February 2024.
-
-[#changes-in-behavior-v261]
-=== New Features and Behavioral Changes
-
-==== Cloud Native Gateway
-
-The Couchbase _Cloud Native Gateway_ (CNG), a new component that allows applications to access Couchbase through a set of RPC network endpoints based on https://grpc.io/[gRPC], is now Generally Available.
-
-See xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway] for details.
-
-==== Miscellaneous Improvements
-
-* Diffs in the Operator's "Resource Updated" logs are now human readable (https://issues.couchbase.com/browse/K8S-3268[K8S-3268^]).
-* Added missing Magma-related Bucket settings (https://issues.couchbase.com/browse/K8S-3290[K8S-3290^]).
-* When performing a Rolling Upgrade, upgrade the Couchbase Server Orchestrator node last to reduce time spent waiting on orchestrator elections (https://issues.couchbase.com/browse/K8S-3305[K8S-3305^]).
-* Improved error reporting during Alternate Address setup (https://issues.couchbase.com/browse/K8S-3317[K8S-3317^]).
-
-[#fixed-issues-v261]
-=== Fixed Issues
-
-[#table-fixed-issues-v261,cols="25,66"]
+[#table-known-issues-v270,cols="25,66"]
 |===
 | Issue | Description
 
-a| https://issues.couchbase.com/browse/K8S-3264[K8S-3264^]
-a| *Summary:* Previously the Operator was not correctly honouring the `useVirtualPath` setting in the `CouchbaseBackup` resource.
-
-a| https://issues.couchbase.com/browse/K8S-3282[K8S-3282^]
-a| *Summary:* Previously the Operator was emitting an extraneous "unknown field" message to the logs.
-
-a| https://issues.couchbase.com/browse/K8S-3302[K8S-3302^]
-a| *Summary:* Previously the Operator would raise a nil reference exception when a Cluster was defined with logging enabled, but a Server Group is added without a default or logging mount defined.
-
-a| https://issues.couchbase.com/browse/K8S-3331[K8S-3331^]
-a| *Summary:* Previously the Operator was not performing a Graceful Failover during a Delta Recovery-based Rolling Upgrade.
-
-a| https://issues.couchbase.com/browse/K8S-3332[K8S-3332^]
-a| *Summary:* Previously the Operator was failing to rotate Encrypted Private Keys with Couchbase Server 7.2.4 and later.
-
-a| https://issues.couchbase.com/browse/K8S-3358[K8S-3358^]
-a| *Summary:* Previously there was a conflict between the Readiness Probe configurations of the Exporter and Cloud Native Gateway sidecars.
-
-a| https://issues.couchbase.com/browse/K8S-3365[K8S-3365^]
-a| *Summary:* Previously the Delta Recovery upgrade test was using invalid parameters.
-
-a| https://issues.couchbase.com/browse/K8S-3374[K8S-3374^]
-a| *Summary:* Previously the Operator was failing to pass the correct credentials to the Cloud Native Gateway sidecar.
-
-|===
-
-[#release-v260]
-== Release 2.6.0
-
-Couchbase Autonomous Operator 2.6.0 was released in December 2023.
-
-[#changes-in-behavior-v260]
-=== New Features and Behavioral Changes
-
-==== Immediate Backups
-
-The CouchbaseBackup resource now has the backup strategies of immediate_full and immediate_incremental to run a backup immediately.
-
-==== Pod Management
-
-The operator now takes into consideration index placement, data placement, and server version to identify pods to remove on scaling events.
-The operator now will perform in place upgrades using Delta Recovery rebalances on Couchbase Server version upgrades.
-
-==== Pod and Container Changes
-
-The operator now adds the prometheus.io/scheme annotation to pods.
-The operator now adds platform specific zone labels for EKS, GKE and AKS to Couchbase Server persistent volume claims.
-
-==== CRD Changes
-
-The field `couchbasebackuprestore.spec.backup` is no longer mandatory when using ephemeral volumes.
-The field `couchbasecluster.spec.onlineExpansionTimeout` has been added as an int that specifies the number of minutes between 0-30 that the operator should wait before failing over to swap rebalance for volume expansions.
-The field `couchbasecluster.spec.upgradeProcess` has been added as an enum of "DeltaRecovery" or "SwapRebalance".  Default is "SwapRebalance".
-
-==== CLI Changes
-
-Logs can now be uploaded directly to the Couchbase support portal via the `--upload-host`, `--customer`, `--upload-proxy` and `--ticket` parameters
-Pod Readiness Delay and Pod Readiness period can be set via the `cao create operator` command.  These settings will be applied to all pods created by the operator.
-
-
-[#fixed-issues-v260]
-=== Fixed Issues
-
-[#table-fixed-issues-v260,cols="25,66"]
-|===
-| Issue | Description
-
-a| https://issues.couchbase.com/browse/K8S-3216[K8S-3216^]
-a| *Summary:* Previously the operator would loop on buckets with specific settings, continuously updating and spamming logs.
-
-a| https://issues.couchbase.com/browse/K8S-3189[K8S-3189^]
-a| *Summary:* Previously the operator identified the eventing_admin role as a bucket role and not a cluster role
-
-a| https://issues.couchbase.com/browse/K8S-3179[K8S-3179^]
-a| *Summary:* Previously the operator would log a large json structure to the logs when it failed to create a pod.  
-
-a| https://issues.couchbase.com/browse/K8S-3095[K8S-3095^]
-a| *Summary:* Previously the Operator would not allow you remove the setting for readerThreads
-
-a| https://issues.couchbase.com/browse/K8S-3283[K8S-3283^]
-a| *Summary:* Previously the Operator would not use the new `couchbasecluster.spec.security.podSecurityContext` when creating backup jobs
-
-a| https://issues.couchbase.com/browse/K8S-3167[K8S-3167^]
-a| *Summary:* Previously the operator would continually update Magma Bucket settings if History Retention Annotations were missing
+a| https://issues.couchbase.com/browse/K8S-3632[K8S-3632^]
+a| *Summary:* It is not currently possible to set xref:resource/couchbasecollection.adoc#couchbasecollections-spec-maxttl[`couchbasecollections.spec.maxTTL`] to `-1` to disable expiry.
 
 |===
 

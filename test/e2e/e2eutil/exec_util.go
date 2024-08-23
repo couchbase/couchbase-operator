@@ -160,6 +160,23 @@ func MustExecCommandInPod(t *testing.T, k8s *types.Cluster, name string, cmd ...
 	return stdout, stderr
 }
 
+// ExecKillAllContainersInPod sends a kill -TERM 1 to all containers in the specified pod.
+func ExecKillAllContainersInPod(k8s *types.Cluster, name string) error {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, container := range pod.Spec.Containers {
+		_, _, err := ExecCommandInContainer(k8s, name, container.Name, "/bin/sh", "-c", "kill -TERM 1")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // ExecShellInPod executes a command in the specified pod, selecting the first container.  The command is run via the default shell.
 func ExecShellInPod(k8s *types.Cluster, name string, cmd string) (string, string, error) {
 	return ExecCommandInPod(k8s, name, "/bin/sh", "-c", cmd)

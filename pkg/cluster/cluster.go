@@ -273,8 +273,21 @@ func (c *Cluster) initializeClusterState() error {
 
 	// Clear the persistent state for a new cluster, it may be doing DR and we need
 	// to go off the spec, not what is in memory.
+
+	// The only thing we want to keep are the failed serverGroups.
+	failedGroups, err := c.state.Get(persistence.FailedSchedulingServerGroups)
+	if err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
+		return err
+	}
+
 	if err := c.state.Clear(); err != nil {
 		return err
+	}
+
+	if failedGroups != "" {
+		if err := c.state.Insert(persistence.FailedSchedulingServerGroups, failedGroups); err != nil {
+			return err
+		}
 	}
 
 	// Once cleared, initialize the clients, using the underlying secrets as the source
