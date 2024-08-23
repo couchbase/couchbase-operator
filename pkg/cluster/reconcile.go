@@ -407,10 +407,10 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		return err
 	}
 
-	failoverServerGroup := c.cluster.Spec.ClusterSettings.AutoFailoverServerGroup
-
 	// Marshal the CR spec into the same type as the existing failover settings
 	clusterSettings := c.cluster.Spec.ClusterSettings
+
+	failoverServerGroup := clusterSettings.AutoFailoverServerGroup
 
 	dataDiskFailoverTimePeriod := k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod)
 

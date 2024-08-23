@@ -118,6 +118,12 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 		return nil, err
 	}
 
+	return c.getStatusFromClusterInfo(info, members)
+}
+
+// getStatusFromClusterInfo parses the Couchbase cluster status and makes it easier
+// to use.
+func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, members couchbaseutil.MemberSet) (*Status, error) {
 	status := &Status{
 		NodeStates:     NodeStateMap{},
 		UnknownMembers: couchbaseutil.MemberSet{},

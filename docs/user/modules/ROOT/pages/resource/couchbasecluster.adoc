@@ -162,6 +162,8 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-logging-server-sidecar-configurationmountpath,configurationMountPath>>: /fluent-bit/config/
         <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.2.1
         <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
+  <<couchbaseclusters-spec-migration,migration>>:
+    <<couchbaseclusters-spec-migration-unmanagedclusterhost,unmanagedClusterHost>>: ""
   <<couchbaseclusters-spec-monitoring,monitoring>>:
     <<couchbaseclusters-spec-monitoring-prometheus,prometheus>>:
       <<couchbaseclusters-spec-monitoring-prometheus-authorizationsecret,authorizationSecret>>: ""
@@ -2516,6 +2518,29 @@ It will default to the latest supported version of Fluent Bit.
 
 Resources is the resource requirements for the sidecar container.
 Will be populated by Kubernetes defaults if not specified.
+
+=== couchbaseclusters.spec.migration
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Migration defines the specification for a CouchbaseCluster assimilation of an unmanaged
+cluster to a managed Kubernetes cluster.
+
+=== couchbaseclusters.spec.migration.unmanagedClusterHost
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated.
+This is the host
+that the operator will connecto to to start the migration process.
 
 === couchbaseclusters.spec.monitoring
 

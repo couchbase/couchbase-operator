@@ -457,3 +457,89 @@ func GetAvailableIndexes(names []string, num int) ([]int, error) {
 
 	return availableIndexes, nil
 }
+
+// NewExternalMember returns a new member that is external to the operator's control.
+func NewExternalMember(host string, config string, useTLS bool) Member {
+	return &externamMemberImpl{
+		useTLS: useTLS,
+		host:   host,
+		config: config,
+	}
+}
+
+type externamMemberImpl struct {
+	useTLS bool
+	host   string
+	config string
+}
+
+func (m *externamMemberImpl) Name() string {
+	return strings.Split(m.host, ".")[0]
+}
+
+func (m *externamMemberImpl) Config() string {
+	if m.config == "" {
+		return "unknown"
+	}
+
+	return m.config
+}
+
+func (m *externamMemberImpl) UseTLS() bool {
+	return m.useTLS
+}
+
+func (m *externamMemberImpl) SetVersion(string) {
+	return
+}
+
+func (m *externamMemberImpl) Version() string {
+	return "unknown"
+}
+
+func (m *externamMemberImpl) GetDNSName() string {
+	return m.host
+}
+
+func (m *externamMemberImpl) GetHostPort() string {
+	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
+}
+
+func (m *externamMemberImpl) GetHostPortTLS() string {
+	return fmt.Sprintf("%s:18091", m.GetDNSName())
+}
+
+func (m *externamMemberImpl) GetHostURL() string {
+	return fmt.Sprintf("%s://%s", m.clientScheme(), m.GetHostPort())
+}
+
+// GetHostURLPlaintext is for use when we need to force the use of HTTP, typically
+// during TLS reconciliation where the TLS state would usually prohibit this.
+func (m *externamMemberImpl) GetHostURLPlaintext() string {
+	return fmt.Sprintf("http://%s:8091", m.GetDNSName())
+}
+
+// GetHostName returns what Couchbase calls a host name; a combination of DNS and port.
+func (m *externamMemberImpl) GetHostName() HostName {
+	return HostName(fmt.Sprintf("%s:8091", m.GetDNSName()))
+}
+
+func (m *externamMemberImpl) GetOTPNode() OTPNode {
+	return OTPNode(fmt.Sprintf("ns_1@%s", m.GetDNSName()))
+}
+
+func (m *externamMemberImpl) clientPort() int {
+	if m.useTLS {
+		return adminPortTLS
+	}
+
+	return adminPort
+}
+
+func (m *externamMemberImpl) clientScheme() string {
+	if m.useTLS {
+		return "https"
+	}
+
+	return "http"
+}

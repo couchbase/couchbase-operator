@@ -52,6 +52,7 @@ const (
 	TagFeatureDeleteDelay       = "deletedelay"
 	TagFeatureCNG               = "cng"
 	TagFeatureBucketMigration   = "bucketmigration"
+	TagFeatureAssimilation      = "assimilation"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -708,6 +709,9 @@ func registerTests() {
 
 		// Graceful Failover test
 		framework.NewTestDef(TestGracefulShutdown).WithTags(TagSuiteP1),
+
+		// Migration tests
+		framework.NewTestDef(TestMigrateCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
 	}
 }
 

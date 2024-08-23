@@ -409,12 +409,16 @@ func (c *Cluster) create() error {
 
 	metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
 
+	return c.initalizeClusterKubernetesResources(member)
+}
+
+func (c *Cluster) initalizeClusterKubernetesResources(target any) error {
 	// This takes a while to get set, yawn...
 	var uuid string
 
 	callback := func() error {
 		info := &couchbaseutil.PoolsInfo{}
-		if err := couchbaseutil.GetPools(info).On(c.api, member); err != nil {
+		if err := couchbaseutil.GetPools(info).On(c.api, target); err != nil {
 			return err
 		}
 
@@ -555,6 +559,15 @@ func (c *Cluster) runReconcile() {
 		return
 	}
 
+	var err error
+	// If we are in migration mode handle that differently.
+	if c.cluster.IsMigrationCluster() {
+		log.Info("Cluster is in migration mode", "cluster", c.namespacedName())
+		err = c.reconcileMigrationCluster()
+	} else {
+		err = c.reconcile()
+	}
+
 	// Finally reconcile state according to the specification.
 	// Every reconcile should either set or clear the error condition.
 	// This lets us spot very easily any persistent error conditions from
@@ -562,7 +575,7 @@ func (c *Cluster) runReconcile() {
 	// if I upgrade the operator, does it break?  If I start in a broken
 	// state and take some action, does it fix itself.  The other added
 	// bonus is it will show up on dashboards like a christmas tree.
-	if err := c.reconcile(); err != nil {
+	if err != nil {
 		var stackTracedError *errors.StackTracedError
 
 		if goerrors.As(err, &stackTracedError) {

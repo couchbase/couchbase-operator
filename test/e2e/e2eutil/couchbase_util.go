@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1750,5 +1751,21 @@ func MustDeleteUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 		if err := couchbaseutil.DeleteUser(user).On(client.client, client.host); err != nil {
 			Die(t, err)
 		}
+	}
+}
+
+func MustBeUnitializedCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	err := client.client.Get(newRequest("/pools/default", nil, nil), client.host)
+
+	var failedReqErr couchbaseutil.FailedRequestError
+
+	if !errors.As(err, &failedReqErr) {
+		Die(t, fmt.Errorf("expected failed request error but succeeded"))
+	}
+
+	if failedReqErr.StatusCode != http.StatusNotFound {
+		Die(t, fmt.Errorf("expected 404, got %d", failedReqErr.StatusCode))
 	}
 }

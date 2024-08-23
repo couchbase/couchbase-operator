@@ -72,25 +72,35 @@ func ServiceListFromStringArray(arr []string) (ServiceList, error) {
 	list := []ServiceName{}
 
 	for _, svc := range arr {
-		switch svc {
-		case "kv", "data":
-			list = append(list, DataService)
-		case "index":
-			list = append(list, IndexService)
-		case "n1ql", "query":
-			list = append(list, QueryService)
-		case "fts", "search":
-			list = append(list, SearchService)
-		case "eventing":
-			list = append(list, EventingService)
-		case "cbas", "analytics":
-			list = append(list, AnalyticsService)
-		default:
-			return list, fmt.Errorf("%w: invalid service name: %s", errors.NewStackTracedError(ErrInvalidResourceName), svc)
+		serviceName, err := MapServiceNameToServerServiceName(svc)
+		if err != nil {
+			return list, err
 		}
+
+		list = append(list, serviceName)
 	}
 
 	return list, nil
+}
+
+// MapServiceNameToServerServiceName maps CRD and server service names to the server service name.
+func MapServiceNameToServerServiceName(service string) (ServiceName, error) {
+	switch service {
+	case "kv", "data":
+		return DataService, nil
+	case "index":
+		return IndexService, nil
+	case "n1ql", "query":
+		return QueryService, nil
+	case "fts", "search":
+		return SearchService, nil
+	case "eventing":
+		return EventingService, nil
+	case "cbas", "analytics":
+		return AnalyticsService, nil
+	default:
+		return "", fmt.Errorf("%w: invalid service name: %s", errors.NewStackTracedError(ErrInvalidResourceName), service)
+	}
 }
 
 func (s ServiceList) String() string {

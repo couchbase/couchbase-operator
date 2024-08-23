@@ -557,7 +557,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 		if c.isPodRecoverable(m) {
 			if err := c.recreatePod(m); err != nil {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
-				r.abort("unaable to recover pod pending addition")
+				r.abort("unable to recover pod pending addition")
 
 				return nil
 			}

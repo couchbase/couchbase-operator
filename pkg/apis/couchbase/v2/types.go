@@ -2350,6 +2350,18 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=30
 	OnlineVolumeExpansionTimeoutInMins *int `json:"onlineVolumeExpansionTimeoutInMins,omitempty"`
+
+	// Migration defines the specification for a CouchbaseCluster assimilation of an unmanaged
+	// cluster to a managed Kubernetes cluster
+	Migration *ClusterAssimilationSpec `json:"migration,omitempty"`
+}
+
+// ClusterAssimilationSpec defines the specification for a CouchbaseCluster assimilation of an unmanaged
+// cluster to a managed Kubernetes cluster
+type ClusterAssimilationSpec struct {
+	// UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated. This is the host
+	// that the operator will connecto to to start the migration process.
+	UnmanagedClusterHost string `json:"unmanagedClusterHost,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {

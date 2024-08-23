@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
@@ -714,6 +715,27 @@ func (sc *ServerConfig) IsSupportable() bool {
 	}
 
 	return false
+}
+
+// NodeMatchesConfig check if the given node can be classified in this ServerConfig.
+func (sc *ServerConfig) NodeMatchesConfig(n couchbaseutil.NodeInfo) bool {
+	// Check if the node has the correct services
+	configServices, err := SpecServicesListToServerServiceList(sc.Services)
+	if err != nil {
+		log.Error(err, "failed to parse services from node")
+		return false
+	}
+
+	servicesMatch := true
+
+	for _, nodeService := range n.Services {
+		if !util.Contains(configServices, couchbaseutil.ServiceName(nodeService)) {
+			servicesMatch = false
+			break
+		}
+	}
+
+	return servicesMatch
 }
 
 // Set ready members from list.
@@ -1431,4 +1453,28 @@ func (b CouchbaseBackup) HasCloudStore() bool {
 
 func (r CouchbaseBackupRestore) HasCloudStore() bool {
 	return r.Spec.S3Bucket != "" || (r.Spec.ObjectStore != nil && r.Spec.ObjectStore.URI != "")
+}
+
+func (c *CouchbaseCluster) IsMigrationCluster() bool {
+	return c.Spec.Migration != nil && len(c.Spec.Migration.UnmanagedClusterHost) != 0
+}
+
+func (s *ClusterAssimilationSpec) GetUnmanagedHostURL() string {
+	return fmt.Sprintf("http://%s:8091", s.UnmanagedClusterHost)
+}
+
+// SpecServicesListToServerServiceList converts a list of services with CRD names (query, data) to a list of server service names (n1ql, kv ...).
+func SpecServicesListToServerServiceList(services ServiceList) (couchbaseutil.ServiceList, error) {
+	list := couchbaseutil.ServiceList{}
+
+	for _, svc := range services {
+		serviceName, err := couchbaseutil.MapServiceNameToServerServiceName(string(svc))
+		if err != nil {
+			return list, err
+		}
+
+		list = append(list, serviceName)
+	}
+
+	return list, nil
 }

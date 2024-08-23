@@ -4,6 +4,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -119,6 +120,29 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 	}
 
 	return members
+}
+
+func nodeInfosToMemberSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.ServerConfig) (couchbaseutil.MemberSet, error) {
+	members := couchbaseutil.NewMemberSet()
+
+	configName := ""
+
+	for _, node := range nodes {
+		for _, config := range configs {
+			if config.NodeMatchesConfig(node) {
+				configName = config.Name
+				break
+			}
+		}
+
+		if configName == "" {
+			return couchbaseutil.MemberSet{}, fmt.Errorf("no matching server found for node %s: %w", node.HostName, errors.NewStackTracedError(errors.ErrNoMatchingServerClass))
+		}
+
+		members.Add(couchbaseutil.NewExternalMember(strings.Split(string(node.HostName), ":")[0], configName, false))
+	}
+
+	return members, nil
 }
 
 // logFailedMember outputs any debug information we can about a failed member creation.
@@ -293,8 +317,12 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	return c.updateCRStatus()
 }
 
-// Creates and adds a new Couchbase cluster member.
 func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) {
+	return c.addMembersToTarget(c.readyMembers(), serverSpecs...)
+}
+
+// Creates and adds a new Couchbase cluster member.
+func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) {
 	// Create the new member
 	memberResults, err := c.createMembers(serverSpecs...)
 	if err != nil {
@@ -325,7 +353,7 @@ func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchb
 
 		log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 
-		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil { // we're hitting this too hard i think so its erroring.
+		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, target); err != nil { // we're hitting this too hard i think so its erroring.
 			log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
 			memberResult.Err = err
 		}
