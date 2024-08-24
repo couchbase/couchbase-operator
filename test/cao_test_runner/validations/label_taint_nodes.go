@@ -1,196 +1,109 @@
 package validations
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
+	nodefilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/node_filter"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8sinfo"
+
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	k8sNodeLabelForCBNode          = "couchbase-node"
-	k8sNodeLabelForGenericWorkload = "workload-node"
-	defaultLabelValue              = "true"
-	taintNoSchedule                = "NoSchedule"
-)
-
 var (
-	ErrDecodeError = errors.New("unable to decode")
-	ErrNumOfNodes  = errors.New("number of nodes in k8s cluster is less than provided nodes")
+	ErrDecodeError   = errors.New("unable to decode")
+	ErrValueNotFound = errors.New("value is nil or empty")
 )
 
 type LabelTaintNodes struct {
-	Name             string `yaml:"name" caoCli:"required"`
-	State            string `yaml:"state" caoCli:"required"`
-	NumCBNodes       int64  `yaml:"numCBNodes" caoCli:"required"`
-	NumWorkloadNodes int64  `yaml:"numWorkloadNodes" caoCli:"required"`
-	ApplyTaint       bool   `yaml:"applyTaint" caoCli:"required"`
-	ApplyLabel       bool   `yaml:"applyLabel" caoCli:"required"`
-	RemoveTaint      bool   `yaml:"removeTaint"`
-	RemoveLabel      bool   `yaml:"removeLabel"`
+	Name        string                `yaml:"name" caoCli:"required"`
+	State       string                `yaml:"state" caoCli:"required"`
+	NodeFilter  nodefilter.NodeFilter `yaml:"nodeFilter" caoCli:"required"`
+	LabelKey    string                `yaml:"labelKey"`
+	LabelValue  string                `yaml:"labelValue"`
+	TaintKey    string                `yaml:"taintKey"`
+	TaintValue  string                `yaml:"taintValue"`
+	TaintEffect corev1.TaintEffect    `yaml:"taintEffect"`
+	ApplyTaint  bool                  `yaml:"applyTaint" caoCli:"required"`
+	ApplyLabel  bool                  `yaml:"applyLabel" caoCli:"required"`
+	RemoveTaint bool                  `yaml:"removeTaint"`
+	RemoveLabel bool                  `yaml:"removeLabel"`
 }
 
 func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 	defer handlePanic()
 
-	k8sNodesMap, k8sNodeNames, err := k8sinfo.GetK8sNodesInfo()
+	err := ltn.validate()
 	if err != nil {
-		return fmt.Errorf("get nodes information: %w", err)
+		return fmt.Errorf("label taint nodes: %w", err)
 	}
 
-	totalNodes := int64(len(k8sNodeNames))
-
-	k8sPodsMap, k8sPodNames, err := k8sinfo.GetK8sPodsInfo("default")
+	filterNodes, err := nodefilter.NewFilterNodesInterface(ltn.NodeFilter.ManagedSvcName)
 	if err != nil {
-		return fmt.Errorf("get pods information: %w", err)
+		return fmt.Errorf("label taint nodes: %w", err)
 	}
 
-	// Adding the pods and nodes map to context
-	ctxt.WithIDInterface(context.K8sNodesMapKey, k8sNodesMap)
-	ctxt.WithIDInterface(context.K8sPodsMapKey, k8sPodsMap)
-
-	// Get the nodes containing the Operator and Operator-Admission
-	var operatorNodeName, admissionNodeName string
-
-	for _, podName := range k8sPodNames {
-		if strings.Contains(podName, "couchbase-operator-admission") {
-			operatorNodeName, err = k8sinfo.GetNodeNameForPod(k8sPodsMap[podName])
-			if err != nil {
-				return fmt.Errorf("get node name for pod: %w", err)
-			}
-
-			continue
-		}
-
-		if strings.Contains(podName, "couchbase-operator") {
-			admissionNodeName, err = k8sinfo.GetNodeNameForPod(k8sPodsMap[podName])
-			if err != nil {
-				return fmt.Errorf("get node name for pod: %w", err)
-			}
-		}
+	filteredNodes, err := filterNodes.FilterNodesUsingStrategy(&ltn.NodeFilter)
+	if err != nil {
+		return fmt.Errorf("label taint nodes: %w", err)
 	}
 
-	// Apply Labels or Taints to K8S Nodes
-	if ltn.ApplyTaint || ltn.ApplyLabel {
-		logrus.Info("Apply label and taint to K8s nodes started")
+	if ltn.ApplyLabel {
+		logrus.Info("Apply label to K8s nodes started")
+		logrus.Info("Filtered nodes: %v", filteredNodes)
 
-		// Apply the couchbase label and taint to all the desired nodes
-		cbNodes := ltn.NumCBNodes
-		if ltn.NumCBNodes+2 < totalNodes {
-			for i := int64(0); i < cbNodes; i++ {
-				// Not applying taints or labels to nodes with Operator or Operator-Admission
-				if k8sNodeNames[i] == operatorNodeName || k8sNodeNames[i] == admissionNodeName {
-					cbNodes++
-					continue
-				}
-
-				if ltn.ApplyLabel {
-					err = kubectl.Label(k8sNodeNames[i], k8sNodeLabelForCBNode, defaultLabelValue).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("apply label to couchbase node: %w", err)
-					}
-				}
-
-				if ltn.ApplyTaint {
-					err = kubectl.Taint(k8sNodeNames[i], k8sNodeLabelForCBNode, defaultLabelValue, taintNoSchedule).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("apply taint to couchbase node: %w", err)
-					}
-				}
+		for _, nodeName := range filteredNodes {
+			err = kubectl.Label(nodeName, ltn.LabelKey, ltn.LabelValue).ExecWithoutOutputCapture()
+			if err != nil {
+				return fmt.Errorf("apply label to couchbase node: %w", err)
 			}
-		} else {
-			return fmt.Errorf("unable to apply label and taint with total nodes = %d and cb nodes = %d: %w",
-				totalNodes, ltn.NumCBNodes, ErrNumOfNodes)
 		}
-
-		// Apply the workload label and taint to all the desired nodes
-		if ltn.NumWorkloadNodes <= totalNodes-ltn.NumCBNodes {
-			for i := ltn.NumCBNodes; i < ltn.NumCBNodes+ltn.NumWorkloadNodes; i++ {
-				if ltn.ApplyLabel {
-					err = kubectl.Label(k8sNodeNames[i], k8sNodeLabelForGenericWorkload, defaultLabelValue).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("apply label to workload node: %w", err)
-					}
-				}
-
-				if ltn.ApplyTaint {
-					err = kubectl.Taint(k8sNodeNames[i], k8sNodeLabelForGenericWorkload, defaultLabelValue, taintNoSchedule).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("apply taint to workload node: %w", err)
-					}
-				}
-			}
-		} else {
-			return fmt.Errorf("unable to apply label and taint with total nodes = %d and workload nodes = %d: %w",
-				totalNodes, ltn.NumWorkloadNodes, ErrNumOfNodes)
-		}
-
-		logrus.Info("Apply label and taint to K8s nodes successful")
+		logrus.Info("Apply label to K8s nodes successful")
 	}
 
-	// Remove Labels or Taints from K8S Nodes
-	if ltn.RemoveLabel || ltn.RemoveTaint {
-		logrus.Info("Remove label and taint from K8s nodes started")
+	if ltn.ApplyTaint {
+		logrus.Info("Apply taint to K8s nodes started")
+		logrus.Info("Filtered nodes: %v", filteredNodes)
 
-		cbNodes := ltn.NumCBNodes
-		workloadNodes := ltn.NumWorkloadNodes
-
-		for _, nodeName := range k8sNodeNames {
-			exists, err := checkIfLabelExists(k8sNodesMap[nodeName], k8sNodeLabelForCBNode, defaultLabelValue)
+		for _, nodeName := range filteredNodes {
+			err = kubectl.Taint(nodeName, ltn.TaintKey, ltn.TaintValue, string(ltn.TaintEffect)).ExecWithoutOutputCapture()
 			if err != nil {
-				return err
-			}
-
-			if exists && cbNodes > 0 {
-				if ltn.RemoveLabel {
-					err = kubectl.Unlabel(nodeName, k8sNodeLabelForCBNode).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("remove label of couchbase node: %w", err)
-					}
-				}
-
-				if ltn.RemoveTaint {
-					err = kubectl.RemoveTaint(nodeName, k8sNodeLabelForCBNode, defaultLabelValue, taintNoSchedule).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("remove taint of couchbase node: %w", err)
-					}
-				}
-
-				cbNodes--
-			}
-
-			exists, err = checkIfLabelExists(k8sNodesMap[nodeName], k8sNodeLabelForGenericWorkload, defaultLabelValue)
-			if err != nil {
-				return err
-			}
-
-			if exists && workloadNodes > 0 {
-				if ltn.RemoveLabel {
-					err = kubectl.Unlabel(nodeName, k8sNodeLabelForGenericWorkload).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("remove label of workload node: %w", err)
-					}
-				}
-
-				if ltn.RemoveTaint {
-					err = kubectl.RemoveTaint(nodeName, k8sNodeLabelForGenericWorkload, defaultLabelValue, taintNoSchedule).ExecWithoutOutputCapture()
-					if err != nil {
-						return fmt.Errorf("remove taint of workload node: %w", err)
-					}
-				}
-
-				workloadNodes--
+				return fmt.Errorf("apply taint to couchbase node: %w", err)
 			}
 		}
 
-		logrus.Info("Remove label and taint from K8s nodes successful")
+		logrus.Info("Apply taint to K8s nodes successful")
+	}
+
+	if ltn.RemoveLabel {
+		logrus.Info("Remove label from K8s nodes started")
+		logrus.Info("Filtered nodes: %v", filteredNodes)
+
+		for _, nodeName := range filteredNodes {
+			err = kubectl.Unlabel(nodeName, ltn.LabelKey).ExecWithoutOutputCapture()
+			if err != nil {
+				return fmt.Errorf("remove label of couchbase node: %w", err)
+			}
+		}
+
+		logrus.Info("Remove label from K8s nodes successful")
+	}
+
+	if ltn.RemoveTaint {
+		logrus.Info("Remove taint from K8s nodes started")
+		logrus.Info("Filtered nodes: %v", filteredNodes)
+
+		for _, nodeName := range filteredNodes {
+			err = kubectl.RemoveTaint(nodeName, ltn.TaintKey, ltn.TaintValue, string(ltn.TaintEffect)).ExecWithoutOutputCapture()
+			if err != nil {
+				return fmt.Errorf("remove taint of couchbase node: %w", err)
+			}
+		}
+
+		logrus.Info("Remove taint from K8s nodes successful")
 	}
 
 	return nil
@@ -200,30 +113,33 @@ func (ltn *LabelTaintNodes) GetState() string {
 	return ltn.State
 }
 
-func checkIfLabelExists(k8sNodeInfoJSON, labelKeyName, labelValue string) (bool, error) {
-	var jsonOutput map[string]interface{}
+func (ltn *LabelTaintNodes) validate() error {
+	if ltn.ApplyLabel || ltn.RemoveLabel {
+		if ltn.LabelKey == "" {
+			return fmt.Errorf("validate label key: %w", ErrValueNotFound)
+		}
 
-	// Unmarshal the k8s node info json string into map[string]interface{}
-	err := json.Unmarshal([]byte(k8sNodeInfoJSON), &jsonOutput)
-	if err != nil {
-		return false, fmt.Errorf("check if label exists: unmarshal k8s node info: %w", err)
-	}
-
-	val, err := jsonpatch.Get(&jsonOutput, "/metadata/labels/"+labelKeyName)
-	if err != nil {
-		if !errors.Is(err, jsonpatch.ErrPathNotFoundInJSON) {
-			return false, fmt.Errorf("check if label exists: jsonpatch get: %w", err)
+		if ltn.ApplyLabel && ltn.LabelValue == "" {
+			return fmt.Errorf("validate label value: %w", ErrValueNotFound)
 		}
 	}
 
-	value, ok := val.(string)
-	if !ok {
-		return false, fmt.Errorf("decode label name as string: %w", ErrDecodeError)
+	if ltn.ApplyTaint || ltn.RemoveTaint {
+		if ltn.TaintKey == "" {
+			return fmt.Errorf("validate taint key: %w", ErrValueNotFound)
+		}
+
+		if ltn.TaintValue == "" {
+			return fmt.Errorf("validate taint value: %w", ErrValueNotFound)
+		}
+
+		switch ltn.TaintEffect {
+		case corev1.TaintEffectNoSchedule, corev1.TaintEffectNoExecute, corev1.TaintEffectPreferNoSchedule:
+			break
+		default:
+			return fmt.Errorf("validate taint effect: %w", ErrValueNotFound)
+		}
 	}
 
-	if value == labelValue {
-		return true, nil
-	}
-
-	return false, nil
+	return nil
 }
