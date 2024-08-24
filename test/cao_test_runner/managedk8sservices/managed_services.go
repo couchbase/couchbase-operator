@@ -46,6 +46,9 @@ func NewManagedService(ms ManagedServiceProvider) ManagedService {
 	case EKSManagedService:
 		eksSessStore := ConfigEKSSessionStore()
 		return eksSessStore
+	case AKSManagedService:
+		aksSessStore := ConfigAKSSessionStore()
+		return aksSessStore
 	default:
 		return nil
 	}

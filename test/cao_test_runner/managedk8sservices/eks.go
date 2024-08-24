@@ -110,7 +110,7 @@ func NewEKSSessionStore() *EKSSessionStore {
 
 // GetKey returns the key for the map EKSSessionStore.EKSSessions to retrieve the appropriate EKSSession for the cluster.
 // Key is built using ClusterName+Region. E.g. eksClusterName:us-east-2.
-func GetKey(managedSvcCred *ManagedServiceCredentials) string {
+func getEKSKey(managedSvcCred *ManagedServiceCredentials) string {
 	key := managedSvcCred.ClusterName + ":" + managedSvcCred.EKSCredentials.eksRegion
 	return key
 }
@@ -132,15 +132,13 @@ func (ess *EKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials
 	defer ess.lock.Unlock()
 	ess.lock.Lock()
 
-	if _, ok := ess.EKSSessions[GetKey(managedSvcCred)]; !ok {
+	if _, ok := ess.EKSSessions[getEKSKey(managedSvcCred)]; !ok {
 		eksSess, err := NewEKSSession(managedSvcCred)
 		if err != nil {
 			return fmt.Errorf("set eks session store: %w", err)
 		}
 
-		ess.EKSSessions[GetKey(managedSvcCred)] = eksSess
-
-		return nil
+		ess.EKSSessions[getEKSKey(managedSvcCred)] = eksSess
 	}
 
 	return nil
@@ -149,16 +147,14 @@ func (ess *EKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials
 // GetSession returns the EKSSession for an EKS Cluster.
 // If EKSSession for the cluster is not present in EKSSessionStore then it sets it.
 func (ess *EKSSessionStore) GetSession(managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
-	if _, ok := ess.EKSSessions[GetKey(managedSvcCred)]; !ok {
+	if _, ok := ess.EKSSessions[getEKSKey(managedSvcCred)]; !ok {
 		err := ess.SetSession(managedSvcCred)
 		if err != nil {
 			return nil, fmt.Errorf("get eks session: %w", err)
 		}
-
-		return ess.EKSSessions[GetKey(managedSvcCred)], nil
 	}
 
-	return ess.EKSSessions[GetKey(managedSvcCred)], nil
+	return ess.EKSSessions[getEKSKey(managedSvcCred)], nil
 }
 
 // Check checks if the k8s cluster in EKS is accessible or not.
