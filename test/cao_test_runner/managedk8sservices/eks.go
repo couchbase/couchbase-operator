@@ -74,8 +74,8 @@ type EKSSession struct {
 // NewEKSSession initializes a new EKSSession with the provided AWS credentials and region.
 func NewEKSSession(managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
 	awsSess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(managedSvcCred.EKS.EKSRegion),
-		Credentials: credentials.NewStaticCredentials(managedSvcCred.EKS.EKSAccessKey, managedSvcCred.EKS.EKSSecretKey, ""),
+		Region:      aws.String(managedSvcCred.EKSCredentials.eksRegion),
+		Credentials: credentials.NewStaticCredentials(managedSvcCred.EKSCredentials.eksAccessKey, managedSvcCred.EKSCredentials.eksSecretKey, ""),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create new EKSSession: %w", err)
@@ -88,7 +88,7 @@ func NewEKSSession(managedSvcCred *ManagedServiceCredentials) (*EKSSession, erro
 		EC2Client:   ec2.New(awsSess),
 		IAMClient:   iam.New(awsSess),
 		Cred:        managedSvcCred,
-		Region:      managedSvcCred.EKS.EKSRegion,
+		Region:      managedSvcCred.EKSCredentials.eksRegion,
 		ClusterName: managedSvcCred.ClusterName,
 	}, nil
 }
@@ -111,7 +111,7 @@ func NewEKSSessionStore() *EKSSessionStore {
 // GetKey returns the key for the map EKSSessionStore.EKSSessions to retrieve the appropriate EKSSession for the cluster.
 // Key is built using ClusterName+Region. E.g. eksClusterName:us-east-2.
 func GetKey(managedSvcCred *ManagedServiceCredentials) string {
-	key := managedSvcCred.ClusterName + ":" + managedSvcCred.EKS.EKSRegion
+	key := managedSvcCred.ClusterName + ":" + managedSvcCred.EKSCredentials.eksRegion
 	return key
 }
 

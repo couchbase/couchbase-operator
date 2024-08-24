@@ -30,7 +30,8 @@ func (dec *DeleteEKSCluster) DeleteCluster() error {
 		return err
 	}
 
-	svc, err := managedk8sservices.NewManagedServiceCredentials(managedk8sservices.EKSManagedService, dec.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -167,7 +168,8 @@ func (dec *DeleteEKSCluster) DeleteCluster() error {
 }
 
 func (dec *DeleteEKSCluster) ValidateParams() error {
-	svc, err := managedk8sservices.NewManagedServiceCredentials(managedk8sservices.EKSManagedService, dec.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

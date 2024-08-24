@@ -16,9 +16,14 @@ const (
 
 // Environment Variables for Credentials.
 const (
-	eksAccessKeyEnv = "EKS_ACCESS_KEY"
-	eksSecretKeyEnv = "EKS_SECRET_KEY"
-	eksRegionEnv    = "EKS_REGION"
+	eksAccessKeyEnv              = "EKS_ACCESS_KEY"
+	eksSecretKeyEnv              = "EKS_SECRET_KEY"
+	eksRegionEnv                 = "EKS_REGION"
+	aksRegionEnv                 = "AKS_REGION"
+	aksSubscriptionIDEnv         = "AKS_SUBSCRIPTION_ID"
+	aksServicePrincipalIDEnv     = "AKS_SERVICE_PRINCIPAL_ID"
+	aksServicePrincipalSecretEnv = "AKS_SERVICE_PRINCIPAL_SECRET_ID"
+	aksTenantIDEnv               = "AKS_TENANT_ID"
 )
 
 var (

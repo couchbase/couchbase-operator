@@ -52,7 +52,8 @@ func (cec *CreateEKSCluster) CreateCluster() error {
 		return err
 	}
 
-	svc, err := managedk8sservices.NewManagedServiceCredentials(managedk8sservices.EKSManagedService, cec.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -237,7 +238,8 @@ func (cec *CreateEKSCluster) ValidateParams() error {
 		return err
 	}
 
-	svc, err := managedk8sservices.NewManagedServiceCredentials(managedk8sservices.EKSManagedService, cec.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
