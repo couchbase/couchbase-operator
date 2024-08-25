@@ -1,0 +1,17 @@
+action: "Setup Kubernetes Cluster"
+config:
+  clusterName: test
+  platform: kubernetes
+  environment: cloud
+  provider: azure
+  aksRegion: eastus2
+  kubernetesVersion: 1.28.0
+  vmSize: Standard_B2ms
+  count: 7
+  diskSize: 100
+  osType: Linux
+  osSKU: AzureLinux
+  numNodePools: 1
+  kubeconfigPath: /root/.kube/config
+  operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
+  admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64

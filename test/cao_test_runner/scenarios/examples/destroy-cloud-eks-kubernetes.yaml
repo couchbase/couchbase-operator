@@ -4,4 +4,4 @@ config:
   platform: kubernetes
   environment: cloud
   provider: aws
-  region: us-east-2
+  eksRegion: us-east-2

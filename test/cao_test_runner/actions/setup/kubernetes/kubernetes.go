@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
 
@@ -43,7 +44,8 @@ type KubernetesSetupConfig struct {
 	OperatorImage            string                     `yaml:"operatorImage" caoCli:"required"`
 	AdmissionControllerImage string                     `yaml:"admissionControllerImage" caoCli:"required"`
 	Provider                 ProviderType               `yaml:"provider"`
-	Region                   string                     `yaml:"region" env:"EKS_REGION"`
+	EKSRegion                string                     `yaml:"eksRegion" env:"EKS_REGION"`
+	AKSRegion                string                     `yaml:"aksRegion" env:"AKS_REGION"`
 	KubernetesVersion        string                     `yaml:"kubernetesVersion"`
 	InstanceType             string                     `yaml:"instanceType"`
 	NumNodeGroups            int                        `yaml:"numNodeGroups"`
@@ -53,6 +55,11 @@ type KubernetesSetupConfig struct {
 	DiskSize                 int                        `yaml:"diskSize"`
 	AMI                      managedk8sservices.AMIType `yaml:"ami"`
 	KubeConfigPath           string                     `yaml:"kubeconfigPath" env:"KUBECONFIG"`
+	OSSKU                    armcontainerservice.OSSKU  `yaml:"osSKU"`
+	OSType                   armcontainerservice.OSType `yaml:"osType"`
+	VMSize                   string                     `yaml:"vmSize"`
+	Count                    int                        `yaml:"count"`
+	NumNodePools             int                        `yaml:"numNodePools"`
 	Validators               []map[string]any           `yaml:"validators,omitempty"`
 }
 

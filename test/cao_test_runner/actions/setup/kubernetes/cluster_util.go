@@ -39,7 +39,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			case AWS:
 				return &CreateEKSCluster{
 					ClusterName:       p.ClusterName,
-					Region:            p.Region,
+					Region:            p.EKSRegion,
 					KubernetesVersion: p.KubernetesVersion,
 					InstanceType:      p.InstanceType,
 					NumNodeGroups:     p.NumNodeGroups,
@@ -50,7 +50,20 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					AMI:               p.AMI,
 					KubeConfigPath:    p.KubeConfigPath,
 				}, nil
-			case Azure, GoogleCloud:
+			case Azure:
+				return &CreateAKSCluster{
+					ClusterName:       p.ClusterName,
+					Region:            p.AKSRegion,
+					KubernetesVersion: p.KubernetesVersion,
+					DiskSize:          int32(p.DiskSize),
+					KubeConfigPath:    p.KubeConfigPath,
+					NumNodePools:      p.NumNodePools,
+					OSSKU:             p.OSSKU,
+					OSType:            p.OSType,
+					VMSize:            p.VMSize,
+					Count:             int32(p.Count),
+				}, nil
+			case GoogleCloud:
 				return nil, ErrNotImplemented
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)

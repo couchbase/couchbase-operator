@@ -35,7 +35,7 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 			case AWS:
 				return &DeleteEKSCluster{
 					ClusterName: p.ClusterName,
-					Region:      p.Region,
+					Region:      p.EKSRegion,
 				}, nil
 			case Azure, GoogleCloud:
 				return nil, ErrNotImplemented
