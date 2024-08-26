@@ -1,0 +1,98 @@
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    timestamps()
+
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
+      )
+    )
+
+    // Concurrent builds are enabled at the moment for running many tests.
+    // disableConcurrentBuilds()
+  }
+
+  parameters {
+    string(name: 'git_cmd', defaultValue:'')
+    string(name: 'scenario_file', defaultValue: 'scenarios/deploy/data_node_couchase.yaml')
+    string(name: 'operator_image', defaultValue: 'ghcr.io/cb-vanilla/operator:latest')
+    string(name: 'admission_image', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
+    string(name: 'cao_version', defaultValue: '2.7.0-211')
+    string(name: 'kubectl_version', defaultValue: '1.27.0')
+    string(name: 'region', defaultValue: 'us-east-2')
+  }
+
+  environment {
+    GOVERSION = '1.22.5'
+    GOROOT = "${env.WORKSPACE}/go"
+    KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
+    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
+    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
+    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
+    EKS_ACCESS_KEY = credentials('couchbaseqe-aws-access-id')
+    EKS_SECRET_KEY = credentials('couchbaseqe-aws-access-secret')
+    EKS_REGION = "${params.region}"
+    CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Prerequisite Installs') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+
+        sh "wget -q https://dl.k8s.io/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
+        sh "chmod +x kubectl"
+        sh "mv kubectl ${env.WORKSPACE}/bin/"
+
+        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+        sh 'chmod +x jq-linux64'
+        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
+      }
+    }
+
+ stage('Git Operations') {
+     when {
+        expression { params.git_cmd.trim() != '' }
+    }
+    steps {
+        script {
+            sh "${params.git_cmd}"
+        }
+    }
+}
+
+    stage('Test CAO Testrunner') {
+      steps {
+        dir("./test/cao_test_runner") {
+            script {
+              try {
+                  sh "go run . scenario --scenario ${params.scenario_file}"
+              }
+              catch (e) {
+                  currentBuild.result = 'UNSTABLE'
+              }
+            }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker system prune --force' // Clean up docker - optimise disk usage
+      cleanWs()
+    }
+  }
+}
