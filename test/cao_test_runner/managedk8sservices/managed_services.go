@@ -25,6 +25,10 @@ const (
 	aksServicePrincipalIDEnv     = "AKS_SERVICE_PRINCIPAL_ID"
 	aksServicePrincipalSecretEnv = "AKS_SERVICE_PRINCIPAL_SECRET_ID"
 	aksTenantIDEnv               = "AKS_TENANT_ID"
+	gkeRegionEnv                 = "GKE_REGION"
+	gkeProjectIDEnv              = "GKE_PROJECT_ID"
+	gkeAuthAccountEnv            = "GKE_AUTH_ACCOUNT"
+	gkeCredentialsJSONPathEnv    = "GKE_CREDENTIALS_JSON"
 )
 
 var (
@@ -50,6 +54,9 @@ func NewManagedService(ms ManagedServiceProvider) ManagedService {
 	case AKSManagedService:
 		aksSessStore := ConfigAKSSessionStore()
 		return aksSessStore
+	case GKEManagedService:
+		gkeSessStore := ConfigGKESessionStore()
+		return gkeSessStore
 	default:
 		return nil
 	}

@@ -18,13 +18,19 @@ var (
 	ErrAKSSServicePrincipalSecretEmpty = errors.New("aks service principal secret empty")
 	ErrAKSRegionEmpty                  = errors.New("aks region empty")
 	ErrNotImplemented                  = errors.New("not implemnted error")
+	ErrGKERegionEmpty                  = errors.New("gke region empty")
+	ErrGKEAuthAccountEmpty             = errors.New("gke auth account empty")
+	ErrGKEProjectEmpty                 = errors.New("gke project id empty")
+	ErrGKECredentialsJSONPathEmpty     = errors.New("gke credentials json path empty")
 )
 
 var (
 	eksSvcCred *EKSCredentials
 	aksSvcCred *AKSCredentials
+	gkeSvcCred *GKECredentials
 	eksOnce    sync.Once
 	aksOnce    sync.Once
+	gkeOnce    sync.Once
 )
 
 // ManagedServiceCredentials stores all the credentials required to connect to different Managed K8S Services.
@@ -33,6 +39,7 @@ type ManagedServiceCredentials struct {
 	ClusterName    string
 	EKSCredentials *EKSCredentials
 	AKSCredentials *AKSCredentials
+	GKECredentials *GKECredentials
 }
 
 type EKSCredentials struct {
@@ -49,6 +56,13 @@ type AKSCredentials struct {
 	aksTenantID               string `env:"AKS_TENANT_ID"`
 }
 
+type GKECredentials struct {
+	gkeRegion              string `env:"GKE_REGION"`
+	gkeProjectID           string `env:"GKE_PROJECT_ID"`
+	gkeAuthAccount         string `env:"GKE_AUTH_ACCOUNT"`
+	gkeCredentialsJSONPath string `env:"GKE_CREDENTIALS_JSON_PATH"`
+}
+
 // GetManagedServiceCredentials sets up the ManagedServiceCredentials for all the ManagedServiceProviders.
 // It gets the values from environment variables.
 func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
@@ -56,6 +70,7 @@ func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName strin
 		ClusterName:    clusterName,
 		EKSCredentials: GetEKSCredentials("", "", ""),
 		AKSCredentials: GetAKSCredentials("", "", "", "", ""),
+		GKECredentials: GetGKECredentials("", "", "", ""),
 	}
 	if ok, err := ValidateManagedServiceCredentials(svc, ms); !ok || err != nil {
 		return nil, err
@@ -84,7 +99,9 @@ func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, provi
 				return ok, err
 			}
 		case GKEManagedService:
-			return false, ErrNotImplemented
+			if ok, err := ValidateGKECredentials(svcCred.GKECredentials); !ok || err != nil {
+				return ok, err
+			}
 		case KindManagedService:
 			return false, ErrNotImplemented
 		}
@@ -128,6 +145,26 @@ func ValidateAKSCredentials(aksSvcCred *AKSCredentials) (bool, error) {
 
 	if aksSvcCred.aksSubscriptionID == "" {
 		return false, fmt.Errorf("aks subscription id key is missing: %w", ErrAKSSubscriptionIDEmpty)
+	}
+
+	return true, nil
+}
+
+func ValidateGKECredentials(gkeSvcCred *GKECredentials) (bool, error) {
+	if gkeSvcCred.gkeRegion == "" {
+		return false, fmt.Errorf("gke region key is missing: %w", ErrGKERegionEmpty)
+	}
+
+	if gkeSvcCred.gkeAuthAccount == "" {
+		return false, fmt.Errorf("gke auth account key is missing: %w", ErrGKEAuthAccountEmpty)
+	}
+
+	if gkeSvcCred.gkeProjectID == "" {
+		return false, fmt.Errorf("gke project ID key is missing: %w", ErrGKEProjectEmpty)
+	}
+
+	if gkeSvcCred.gkeCredentialsJSONPath == "" {
+		return false, fmt.Errorf("gke credentials json path key is missing: %w", ErrGKECredentialsJSONPathEmpty)
 	}
 
 	return true, nil
@@ -221,4 +258,47 @@ func GetAKSCredentials(region, subscriptionID, servicePrincipalID, servicePrinci
 	})
 
 	return aksSvcCred
+}
+
+// GetGKECredentials sets the ManagedServiceCredentials with the provided credentials. If not provided then it gets
+// GKE credentials from the env variables.
+/*
+ * Recommended way to set the credentials is by calling the function NewManagedServiceCredentials (uses env variables).
+ * Use case of this function is if it is required to set ManagedServiceCredentials by directly providing the credentials.
+ */
+func GetGKECredentials(region, projectID, authAccount, credentialsJSONPath string) *GKECredentials {
+	gkeOnce.Do(func() {
+		gkeSvcCred = &GKECredentials{
+			gkeRegion:              region,
+			gkeProjectID:           projectID,
+			gkeAuthAccount:         authAccount,
+			gkeCredentialsJSONPath: credentialsJSONPath,
+		}
+
+		if region == "" {
+			if envValue, ok := os.LookupEnv(gkeRegionEnv); ok {
+				gkeSvcCred.gkeRegion = envValue
+			}
+		}
+
+		if authAccount == "" {
+			if envValue, ok := os.LookupEnv(gkeAuthAccountEnv); ok {
+				gkeSvcCred.gkeAuthAccount = envValue
+			}
+		}
+
+		if credentialsJSONPath == "" {
+			if envValue, ok := os.LookupEnv(gkeCredentialsJSONPathEnv); ok {
+				gkeSvcCred.gkeCredentialsJSONPath = envValue
+			}
+		}
+
+		if projectID == "" {
+			if envValue, ok := os.LookupEnv(gkeProjectIDEnv); ok {
+				gkeSvcCred.gkeProjectID = envValue
+			}
+		}
+	})
+
+	return gkeSvcCred
 }
