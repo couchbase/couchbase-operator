@@ -2,16 +2,431 @@ package jsonpatch
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/couchbase/couchbase-operator/pkg/util/jsonpointer"
 )
 
 var (
 	ErrPathNotFoundInJSON = errors.New("failed to lookup path in json document")
+	ErrInvalidPointer     = fmt.Errorf("invalid json pointer token")
+	ErrException          = fmt.Errorf("caught an exception")
+	ErrTypeError          = fmt.Errorf("unsupported type")
+	ErrOperationInvalid   = fmt.Errorf("invalid operation type")
 )
+
+// Operation defines valid operation types.
+type Operation string
+
+const (
+	Add     Operation = "add"
+	Remove  Operation = "remove"
+	Replace Operation = "replace"
+	Move    Operation = "move"
+	Copy    Operation = "copy"
+	Test    Operation = "test"
+)
+
+// String returns the stringified version of an Operation.
+func (op Operation) String() string {
+	return string(op)
+}
+
+// Patch defines a valid JSON patch command.  The fields are optional and
+// dependant on the operation you wish to perform.  In most cases you should
+// use the PatchSet type to set the fields for you.
+type Patch struct {
+	Op    Operation   `json:"op"`
+	Path  string      `json:"path,omitempty"`
+	From  string      `json:"from,omitempty"`
+	Value interface{} `json:"value,omitempty"`
+}
+
+// PatchList defines a list of JSON patches.
+type PatchList []Patch
+
+// add adds an element to the document.
+func add(document interface{}, path string, value interface{}) (err error) {
+	// Catch reflection errors
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: failed to add %s: %v", ErrException, path, r)
+		}
+	}()
+
+	// Get a reference to the object to add to
+	v, k, err := LookupPath(document, path)
+	if err != nil {
+		err = fmt.Errorf("failed to lookup %s in add: %w", path, err)
+		return
+	}
+
+	// Dereference pointer types
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// If it's an object we add.  The special case is structs, as the
+	// member already exists, so we just set it
+	// If it's an array we insert the element at the specified index.
+	switch kind := v.Kind(); kind {
+	case reflect.Struct:
+		v, err = LookupValue(v, k)
+		if err != nil {
+			return
+		}
+
+		v.Set(reflect.ValueOf(value))
+	case reflect.Map:
+		v.SetMapIndex(reflect.ValueOf(k), reflect.ValueOf(value))
+	case reflect.Slice:
+		var index int
+
+		switch k {
+		case "-":
+			index = v.Len()
+		default:
+			index, err = strconv.Atoi(k)
+			if err != nil {
+				return
+			}
+		}
+
+		s := reflect.MakeSlice(v.Type(), 0, 0)
+		s = reflect.AppendSlice(s, v.Slice(0, index))
+		s = reflect.Append(s, reflect.ValueOf(value))
+		s = reflect.AppendSlice(s, v.Slice(index, v.Len()))
+
+		v.Set(s)
+	default:
+		err = fmt.Errorf("%w: unexpected kind %s in add", ErrTypeError, kind)
+		return
+	}
+
+	return
+}
+
+// remove removes an element from the document.
+func remove(document interface{}, path string) (err error) {
+	// Catch reflection errors
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: failed to remove %s: %v", ErrException, path, r)
+		}
+	}()
+
+	// Get a reference to the object to delete from
+	v, k, err := LookupPath(document, path)
+	if err != nil {
+		err = fmt.Errorf("failed to lookup %s in remove: %w", path, err)
+		return
+	}
+
+	// Dereference pointer types
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	// If it's an object we delete.  The special case is structs, as we cannot
+	// delete the member we instead set it to the zero value.
+	// If it's an array we delete the element.
+	switch kind := v.Kind(); kind {
+	case reflect.Struct:
+		v, err = LookupValue(v, k)
+		if err != nil {
+			return
+		}
+
+		v.Set(reflect.Zero(v.Type()))
+	case reflect.Map:
+		v.SetMapIndex(reflect.ValueOf(k), reflect.Value{})
+	case reflect.Slice:
+		var index int
+
+		index, err = strconv.Atoi(k)
+		if err != nil {
+			return
+		}
+
+		s := reflect.MakeSlice(v.Type(), 0, 0)
+		s = reflect.AppendSlice(s, v.Slice(0, index))
+		s = reflect.AppendSlice(s, v.Slice(index+1, v.Len()))
+
+		v.Set(s)
+	default:
+		err = fmt.Errorf("%w: unexpected kind %s in remove", ErrTypeError, kind)
+		return
+	}
+
+	return nil
+}
+
+// replace changes any field in an document.
+func replace(document interface{}, path string, value interface{}) (err error) {
+	// Catch reflection errors
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: failed to replace %s: %v", ErrException, path, r)
+		}
+	}()
+
+	// Get a reference to the object to update
+	v, k, err := LookupPath(document, path)
+	if err != nil {
+		err = fmt.Errorf("failed to lookup %s in replace: %w", path, err)
+		return
+	}
+
+	// Dereference pointer types
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	v, err = LookupValue(v, k)
+	if err != nil {
+		return err
+	}
+
+	v.Set(reflect.ValueOf(value))
+
+	return nil
+}
+
+// test looks up a value and compares it with an expected value.
+func test(document interface{}, path string, value interface{}) error {
+	// Get a reference to the object to update
+	v, k, err := LookupPath(document, path)
+	if err != nil {
+		return fmt.Errorf("failed to lookup %s in test: %w", path, err)
+	}
+
+	// Dereference pointer types
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	v, err = LookupValue(v, k)
+	if err != nil {
+		return err
+	}
+
+	// If the value is nil then we need to use the type of the underlying
+	// structure element, or value has no meaning.
+	expected := reflect.ValueOf(value)
+	if expected.Kind() == reflect.Invalid {
+		expected = reflect.Zero(v.Type())
+	}
+
+	// Printing a nil map or slice interface{} will actually always display
+	// an empty map or slice.  Here we intervene by explicitly setting the
+	// interface{} to nil to show the different between a nil and empty map
+	// or slice.
+	v1 := v.Interface()
+
+	switch v.Kind() {
+	case reflect.Slice, reflect.Map:
+		if v.IsNil() {
+			v1 = nil
+		}
+	}
+
+	v2 := expected.Interface()
+
+	switch expected.Kind() {
+	case reflect.Slice, reflect.Map:
+		if expected.IsNil() {
+			v2 = nil
+		}
+	}
+
+	if !reflect.DeepEqual(v.Interface(), value) {
+		return fmt.Errorf(`%w: values for "%s" do not match: actual %v %v, required %v %v`, ErrTypeError, path, v1, v.Type().String(), v2, expected.Type().String())
+	}
+
+	return nil
+}
+
+// Apply applies a patch set to a document.  Patches are applied in order, the
+// function returns as soon as an error is detected.
+func Apply(document interface{}, patches PatchList) (err error) {
+	for _, patch := range patches {
+		switch patch.Op {
+		case Add:
+			err = add(document, patch.Path, patch.Value)
+		case Remove:
+			err = remove(document, patch.Path)
+		case Replace:
+			err = replace(document, patch.Path, patch.Value)
+		case Test:
+			err = test(document, patch.Path, patch.Value)
+		default:
+			err = fmt.Errorf("%w: %s", ErrOperationInvalid, patch.Op.String())
+		}
+
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+// PatchSet is a container for a patch set with an easy to use interface.
+type PatchSet interface {
+	// Add adds or replaces a value in an object or inserts into an array.  If the
+	// target is a struct field then it is set to the specified value.
+	Add(string, interface{}) PatchSet
+	// Remove removes a value from an object or removes from an array.  If the
+	// target is a struct field then it is set to the types zero value.
+	Remove(string) PatchSet
+	// Replace changes a pre-existing value in an object or array.
+	Replace(string, interface{}) PatchSet
+	// Test asserts that a value in an object or array matches what is expected.
+	Test(string, interface{}) PatchSet
+	// Patches returns the patch list for passing to Apply.
+	Patches() PatchList
+}
+
+// patchSetImpl implements the PatchSet interface.
+type patchSetImpl struct {
+	// patches is an ordered list of patches to apply
+	patches PatchList
+}
+
+// NewPatchSet returns a new initialized PatchSet object.
+func NewPatchSet() PatchSet {
+	return &patchSetImpl{
+		patches: PatchList{},
+	}
+}
+
+// Add adds or replaces a value in an object or inserts into an array.
+func (p *patchSetImpl) Add(path string, value interface{}) PatchSet {
+	p.patches = append(p.patches, Patch{Op: Add, Path: path, Value: value})
+	return p
+}
+
+// Remove removes a value from an object or removes from an array.
+func (p *patchSetImpl) Remove(path string) PatchSet {
+	p.patches = append(p.patches, Patch{Op: Remove, Path: path})
+	return p
+}
+
+// Replace changes a pre-existing value in an object or array.
+func (p *patchSetImpl) Replace(path string, value interface{}) PatchSet {
+	p.patches = append(p.patches, Patch{Op: Replace, Path: path, Value: value})
+	return p
+}
+
+// Test asserts that a value in an object or array matches what is expected.
+func (p *patchSetImpl) Test(path string, value interface{}) PatchSet {
+	p.patches = append(p.patches, Patch{Op: Test, Path: path, Value: value})
+	return p
+}
+
+// Patches returns the patch list for passing to Apply.
+func (p *patchSetImpl) Patches() PatchList {
+	return p.patches
+}
+
+// unescape translates escape characters back into their native form.
+func unescape(token string) string {
+	replacer := strings.NewReplacer("~1", "/", "~0", "~")
+	return replacer.Replace(token)
+}
+
+// LookupValue return a reference to the named key in the containing object.
+func LookupValue(v reflect.Value, k string) (value reflect.Value, err error) {
+	// Reflection will panic, so be sure to catch and return an error.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid token %s: %v: %w", k, r, ErrInvalidPointer)
+		}
+	}()
+
+	// Set default return values.
+	value = v
+
+	// If an interface get the underlying typed value.
+	if value.Kind() == reflect.Interface {
+		value = reflect.ValueOf(value.Interface())
+	}
+
+	// Dereference if it's a pointer.
+	if value.Kind() == reflect.Ptr {
+		value = value.Elem()
+	}
+
+	// If the type we are reflecting on is an object (a struct or map)
+	// then select the named member.
+	// If the type we are reflecting on is an array we expect a numeric
+	// index.
+	switch kind := value.Kind(); kind {
+	case reflect.Struct:
+		value = value.FieldByName(k)
+	case reflect.Map:
+		value = value.MapIndex(reflect.ValueOf(k))
+	case reflect.Slice:
+		var i int
+
+		if i, err = strconv.Atoi(k); err != nil {
+			err = fmt.Errorf("malformed array index %s: %w", k, ErrInvalidPointer)
+			return
+		}
+
+		value = value.Index(i)
+	default:
+		err = fmt.Errorf("unexpected kind %s in lookup: %w", kind, ErrInvalidPointer)
+	}
+
+	return
+}
+
+// LookupPath validates the pointer string, then iteratively descends through
+// the specified object interface.  It returns a reference to the penultimate
+// value in the pointer, and the last token so that it may be used to perform
+// specific operations e.g. add/remove on context specific types e.g. slice/map.
+func LookupPath(object interface{}, pointer string) (value reflect.Value, key string, err error) {
+	// Reflection will panic, so be sure to catch and return an error.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid pointer %s: %v: %w", pointer, r, ErrInvalidPointer)
+		}
+	}()
+
+	// Ensure the pointer is correctly specified.
+	re := regexp.MustCompile(`^(/[\w\d~-]*)+$`)
+	if !re.MatchString(pointer) {
+		err = fmt.Errorf("malformed pointer %s: %w", pointer, ErrInvalidPointer)
+		return
+	}
+
+	// Split pointer into tokens and discard the first empty element.
+	tokens := strings.Split(pointer, "/")[1:]
+
+	// Translate escape sequences.
+	for index, token := range tokens {
+		tokens[index] = unescape(token)
+	}
+
+	// Get the first value in the chain and the key to add/update/remove etc.
+	value = reflect.ValueOf(object)
+	key = tokens[len(tokens)-1]
+
+	// Iteratively descend through the structure.
+	for _, token := range tokens[:len(tokens)-1] {
+		value, err = LookupValue(value, token)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
 
 // Get returns the value for the specified path in the document. Pass the document by reference.
 // Usage:
@@ -37,7 +452,7 @@ func Get(document interface{}, path string) (interface{}, error) {
 	}()
 
 	// Get a reference to the object to update
-	v, k, err := jsonpointer.LookupPath(document, path)
+	v, k, err := LookupPath(document, path)
 	if err != nil {
 		return nil, ErrPathNotFoundInJSON
 	}
@@ -47,7 +462,7 @@ func Get(document interface{}, path string) (interface{}, error) {
 		v = v.Elem()
 	}
 
-	v, err = jsonpointer.LookupValue(v, k)
+	v, err = LookupValue(v, k)
 	if err != nil {
 		return nil, err
 	}

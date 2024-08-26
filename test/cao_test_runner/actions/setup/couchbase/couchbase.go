@@ -3,17 +3,18 @@ package couchbasesetup
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
-	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/sirupsen/logrus"
 )
 
@@ -185,7 +186,7 @@ func getModifiedSpecPath(specPath string) (string, error) {
 
 	// The spec file name is renamed as <old-file-name>-<random-8-chars>.extension.
 	modifiedSpecPath := filepath.Join(fileDir,
-		fmt.Sprintf("%s-%s%s", fileNameWithoutExt, e2eutil.RandomString(randomStringLen), filepath.Ext(fileName)))
+		fmt.Sprintf("%s-%s%s", fileNameWithoutExt, RandomString(randomStringLen), filepath.Ext(fileName)))
 
 	_, modifiedFileName := filepath.Split(modifiedSpecPath)
 	logrus.Infof("modified file name: %s", modifiedFileName)
@@ -224,4 +225,32 @@ func applySpecChanges(specChanges map[string]interface{}, specPath string) (stri
 	}
 
 	return modifiedSpecPath, nil
+}
+
+// RandomString generates an arbitrary length random string.  Not cryptographically
+// secure, but who cares, this is a test suite :D  At present this uses the dictionary
+// 0-9a-z as that is compatible with DNS names and Couchbase Server passwords.
+func RandomString(length int) string {
+	// Seed the PRNG so we get vagely random suffixes across runs
+	ranGen := rand.New(rand.New(rand.NewSource(time.Now().UnixNano())))
+
+	// Generate a random 5 character suffix for the cluster name
+	suffix := ""
+
+	for i := 0; i < length; i++ {
+		// Our alphabet is 0-9 a-z, so 36 characters
+		ordinal := ranGen.Intn(36)
+		// Less than 10 places it in the 0-9 range, otherwise in
+		// the a-z range
+		if ordinal < 10 {
+			ordinal += int('0')
+		} else {
+			ordinal += int('a') - 10
+		}
+
+		// Append to the name
+		suffix += string(rune(ordinal))
+	}
+
+	return suffix
 }
