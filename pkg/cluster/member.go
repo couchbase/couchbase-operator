@@ -343,6 +343,16 @@ func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchb
 		class := serverSpecs[index]
 
 		metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
+
+		context, cancel := context.WithTimeout(c.ctx, time.Minute)
+
+		if err := c.waitForPodAdded(context, memberResult.Member); err != nil {
+			cancel()
+
+			return nil, err
+		}
+
+		cancel()
 	}
 
 	return memberResults, nil

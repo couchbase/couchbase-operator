@@ -1154,6 +1154,11 @@ Memory limit for constraining
 +
 Memory requested for scheduling
 
+--optional-metric-labels::
+*Type*: string
++
+Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.
+
 --pod-creation-timeout::
 *Type*: string
 +
@@ -2094,6 +2099,11 @@ Memory limit for constraining
 *Default*: 200Mi
 +
 Memory requested for scheduling
+
+--optional-metric-labels::
+*Type*: string
++
+Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.
 
 --pod-creation-timeout::
 *Type*: string

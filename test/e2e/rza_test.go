@@ -708,7 +708,7 @@ func TestServerGroupShuffling(t *testing.T) {
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	expectedGroupsOrder := append([]string{}, availableServerGroups...)
+	expectedGroupsOrder := append([]string{}, cluster.Spec.ServerGroups...)
 	scheduler.ShuffleServerGroups(expectedGroupsOrder, cluster.NamespacedName())
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -774,6 +774,41 @@ func TestServerGroupRescheduling(t *testing.T) {
 	expected := rzaMap{
 		availableServerGroups[0]: 1,
 		availableServerGroups[1]: 2,
+	}
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+}
+
+func TestServerGroupReschedulingInitialNode(t *testing.T) {
+	f := framework.Global
+	f.PodCreateTimeout = 1 * time.Minute
+
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	clusterSize := 1
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Taint the cluster to force the pod to be rescheduled into the second AZ
+	defer e2eutil.MustUntaintAll(t, kubernetes)
+	e2eutil.MustTaintZoneNoSchedule(t, kubernetes, availableServerGroups[0])
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/rescheduleDifferentServerGroup": "true",
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Create a expected RZA results map for verification
+	expected := rzaMap{
+		availableServerGroups[1]: 1,
 	}
 	expected.mustValidateRzaMap(t, kubernetes, cluster)
 }

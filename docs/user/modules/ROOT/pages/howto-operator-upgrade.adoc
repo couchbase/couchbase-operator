@@ -2,12 +2,13 @@
 :page-aliases: upgrading-the-operator
 :tabs:
 
-Upgrading the Couchbase Autonomous Operator is a four-step process:
+Upgrading the Couchbase Autonomous Operator is a five-step process:
 
 - <<download-operator, Step 1: Download the New Operator Package>>
 - <<uninstall-operator, Step 2: Uninstall the Old DAC and Operator>>
 - <<update-crd, Step 3: Update the CRDs>>
-- <<install-operator, Step 4: Install the New Operator>>
+- <<update-existing-resources, Step 4: Update Existing Resources>>
+- <<install-operator, Step 5: Install the New Operator>>
 
 [IMPORTANT]
 ====
@@ -94,8 +95,17 @@ $ oc apply -f crd.yaml
 --
 ====
 
+[#update-existing-resources]
+== Step 4: Update Existing Resources
+
+Occasionally, it may be necessary to add new attributes to one or more of the CRDs that may impact your cluster if the equivalent settings have been modified from the default.
+
+For example, if a setting was omitted in CAO, then later added, there is a chance that a cluster already has that value set directly by an administrator -- if not added to the Custom Resource then the Operator will set it to its default value during reconciliation.
+
+Please refer to the Release Notes and add any new items to your existing resources if you have already set them directly.
+
 [#install-operator]
-== Step 4: Install the New Operator
+== Step 5: Install the New Operator
 
 After all the previous steps, you can move on to upgrading the Operator itself.
 Upgrading the Operator is exactly the same as the initial installation, except that you don't re-install the CRD.

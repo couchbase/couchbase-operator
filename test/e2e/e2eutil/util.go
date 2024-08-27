@@ -1667,7 +1667,7 @@ func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couc
 	for _, pod := range pods.Items {
 		// Pew pew pew!
 		// "If runsvdir receives a TERM signal, it exits with 0 immediately."
-		if _, _, err := ExecShellInPod(kubernetes, pod.Name, "kill -TERM 1"); err != nil {
+		if err := ExecKillAllContainersInPod(kubernetes, pod.Name); err != nil {
 			t.Logf("command may have failed, but that may be because the pod died: %v", err)
 		}
 	}

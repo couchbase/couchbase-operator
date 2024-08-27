@@ -1,44 +1,56 @@
 = What's New?
 include::partial$constants.adoc[]
 
-Autonomous Operator {operator-version-minor} release is primarily focused on platform updates, feature parity with Couchbase Server, improvements to Pod Management and Security, as well as a number of minor fixes. 
+Autonomous Operator {operator-version-minor} release provides full support for Couchbase Server 7.6, and several improvements to Pod Scheduling and Networking, as well as a number of minor fixes.
 
-== Immediate Backups
+== Couchbase Server 7.6
 
-It is now possible to run a CouchbaseBackup resource immediately via the new immediate_full and immediate_incremental backup strategies.
+See xref:7.6@server:introduction:whats-new.adoc[What’s New in Version 7.6] for full details, but the following new functionality is available in Operator 2.7, for clusters running Server 7.6:
 
-See xref:howto-backup.adoc#configure-backups[Configure Backups] for futher details.
+* Data Service - Minimum Replica Count: Set with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-data-minreplicascount[`couchbaseclusters.spec.cluster.data.minReplicasCount`].
+* Data Service - Bucket Rank: Set with xref:resource/couchbasebucket.adoc#couchbasebuckets-spec-rank[`couchbasebuckets.spec.rank`].
+* Index Service - File-based Rebalance: Enabled with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-cluster-indexer-enableshardaffinity[`couchbaseclusters.spec.cluster.indexer.enableShardAffinity`].
+* Auditing - Prune Rotated Logs: Set with xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-logging-audit-rotation-pruneage[`couchbaseclusters.spec.logging.audit.rotation.pruneAge`].
+* Cluster Arbiter (Serviceless) Nodes: Created by leaving xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-services[`couchbaseclusters.spec.servers.services`] empty.
+* Backup - Backup and Restore Users and Groups: Set with xref:resource/couchbasebackup.adoc#couchbasebackups-spec-services-users[`couchbasebackups.spec.services.users`] and xref:resource/couchbasebackuprestore.adoc#couchbasebackuprestores-spec-services-users[`couchbasebackuprestores.spec.services.users`].
+* Cross Data Center Replication (XDCR) - Connection Precheck: Called automatically when adding a Remote Cluster Reference.
+* Data Service - Storage backend migration: Operator will automatically start the required Rebalances if it detects an unresolved Storage backend change.
+Storage Backend can also be configured using annotations, see xref:reference-annotations.adoc#bucket-backend-configuration[Bucket Backend Configuration] for more details.
+* Authentication - LDAP Middlebox Compatibility Mode: Can now be disabled if needed via xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-security-ldap-middleboxcompmode[`couchbaseclusters.spec.security.ldap.middleboxCompMode`].
+* Data Service - Collections: xref:resource/couchbasecollection.adoc#couchbasecollections-spec-maxttl[`couchbasecollections.spec.maxTTL`] is now mutable.  However, due to https://issues.couchbase.com/browse/K8S-3632[K8S-3632^], it is not possible to set `maxTTL` to `-1` to disable expiry for that Collection.
 
-== Improved Pod Management
+== Delta Recovery / In-Place Upgrades
 
-Couchbase Operator now takes into consideration data topography and Couchbase Server version when determining which pods to scale down.  
+The `DeltaRecovery` upgrade process added in Operator 2.6 has been replaced by `InPlaceUpgrade`, to better reflect the actual behavior (not every Service can be Delta Recovered), and `DeltaRecovery` is now deprecated.
 
-== Log Uploads
+See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradeprocess[`couchbaseclusters.spec.upgradeProcess`] for more details.
 
-There are new parameters that can be passed to the `cao collect-logs` command that will automatically upload the logs to Couchbase Support.
+== Server Group Improvements
 
-See xref:tools/cao.adoc#cao-collect-logs[Cao Collect Logs] for further details.
+In public cloud providers, it is common for the Server Groups in use to match the Availability Zones, and for there to be a small number of them.
+In private data centres they are more likely to be used to represent a larger number of zones, based on racks, rows of racks, or even rooms, as well as PDUs and switches.
 
-== Delta Recovery Upgrades
+To allow a more even spread of Pods over a larger range of Server Groups, we have added the `shuffleServerGroups` annotation.
 
-Couchbase Clusters can now be configured to perform a Delta-Recovery upgrades.  This upgrade is considerably faster than the current SwapRebalance method.
+To take advantage of there being more Server Groups available during Pod rescheduling, we have added the `rescheduleDifferentServerGroup` annotation .
 
-See xref:resources/couchbasecluster.adoc#couchbaseclusters-spec-upgradeProcess[Upgrade Process] for further details
+See xref:reference-annotations.adoc#cluster-scheduling[Cluster Scheduling] for more details.
 
-== Quality of Life Improvements
+== Pod Rescheduling
 
-Added an onlineExpansionTimeout to Couchbase Cluster to specify the number of minutes operator should wait before falling back to a rolling upgrade when volume expansion fails.
-Added annotations to better help integrations with Prometheus.
-Added platform specific zone labels to persistent volume claims for EKS, GKE and AKS.
+By applying the `reschedule` annotation to a Couchbase Pod, the operator will detect it and reschedule the Pod based on the currently selected upgrade process.
+This allows Pods to be moved before any planned maintenance is performed on the Kubernetes Worker Nodes.
 
-== Pod Readiness Delay and Pod Readiness Period
+See xref:reference-annotations.adoc#pod-rescheduling[Pod Rescheduling] for more details.
 
-Added pod readiness delay and pod readiness period parameters to the `cao create operator` command.  These will be applied to all Couchbase Server pods created by the operator.
+== Improved Host Network Support
 
-See xref:/tools/cao.adoc#cao-create-operator[Cao Create Operator] for further details.
+When the new `networking.improvedHostNetwork` annotation is enabled on a cluster, the Operator will skip SAN validation and will add the underlying Kubernetes hostname a Pod is running on to the alternate addresses list.
 
-== Cloud Native Gateway (from Couchbase Autonomous Operator 2.6.1)
+See xref:reference-annotations.adoc#host-network[Host Network] for more details.
 
-The Couchbase _Cloud Native Gateway_ (CNG) is a new component that allows applications to access Couchbase through a set of RPC network endpoints based on https://grpc.io/[gRPC], a https://cncf.io/[Cloud Native Computing Foundation] project.
+== More Granular Couchbase Server Upgrades
 
-See xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway] for details.
+Previously it was only possible to set a single Couchbase Server image for the entire `CouchbaseCluster` at xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-image[`couchbaseclusters.spec.image`], triggering a cluster-wide upgrade.
+It is now possible to (optionally) set this at the Server Group/Server Class level, using xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-servers-image[`couchbaseclusters.spec.servers.image`].
+This overrides the Cluster-level setting, allowing per-Group/per-Class upgrades.
