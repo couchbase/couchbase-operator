@@ -3449,3 +3449,21 @@ func TestVersionUpgradePath(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
+
+func TestClusterChangesDuringHibernation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "ChangesDuringHibernationAreInvalid",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/size", 2)},
+			shouldFail:     true,
+			expectedErrors: []string{"cluster spec cannot be changed during hibernation"},
+		},
+		{
+			name:       "ChangesWhenDisablingHibernationAreValid",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/size", 2).Remove("/spec/hibernate")},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-hibernate.yaml"})
+}

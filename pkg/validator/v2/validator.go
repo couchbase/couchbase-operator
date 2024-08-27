@@ -1493,9 +1493,9 @@ func isTLSSecretRequired(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 
 	minimumVersionNoSecret, _ := couchbaseutil.NewVersion("7.1.0")
 
-	return (requestedVersion.Less(minimumVersionNoSecret) ||
+	return requestedVersion.Less(minimumVersionNoSecret) ||
 		(requestedVersion.GreaterEqual(minimumVersionNoSecret) &&
-			(cluster.Spec.Networking.TLS != nil && len(cluster.Spec.Networking.TLS.RootCAs) == 0))), nil
+			(cluster.Spec.Networking.TLS != nil && len(cluster.Spec.Networking.TLS.RootCAs) == 0)), nil
 }
 
 // checkConstraintLDAPConnectionTLS checks that when enabled, the encryption type and
@@ -3391,6 +3391,11 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		}
 	}
 
+	// If the cluster is in hibernation, we should prohibit any changes
+	if err := checkForClusterChangesDuringHibernation(prev, curr); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -3701,6 +3706,18 @@ func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.
 	if cluster.Spec.Security.PodSecurityContext != nil && cluster.Spec.SecurityContext != nil {
 		if !reflect.DeepEqual(cluster.Spec.Security.PodSecurityContext, cluster.Spec.SecurityContext) {
 			return fmt.Errorf("spec.Security.PodSecurityContext must be equal to spec.SecurityContext, if both present")
+		}
+	}
+
+	return nil
+}
+
+// checkForClusterChangesDuringHibernation validates whether there have been any changes to a cluster while hibernate is enabled.
+func checkForClusterChangesDuringHibernation(current, updated *couchbasev2.CouchbaseCluster) error {
+	if current.Spec.Hibernate && updated.Spec.Hibernate {
+		current.Spec.Hibernate = updated.Spec.Hibernate
+		if !reflect.DeepEqual(updated.Spec, current.Spec) {
+			return fmt.Errorf("cluster spec cannot be changed during hibernation")
 		}
 	}
 
