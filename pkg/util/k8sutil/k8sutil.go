@@ -589,3 +589,19 @@ func Bytes(quantity *resource.Quantity) int64 {
 func Seconds(duration *metav1.Duration) int64 {
 	return int64(duration.Seconds())
 }
+
+func GetTotalPVCMemoryByApp(pvcs []*v1.PersistentVolumeClaim, appLabel string) int64 {
+	var volumeSizeUnderManagement int64
+
+	for _, pvc := range pvcs {
+		if pvc.Labels[constants.LabelApp] != appLabel || pvc.Status.Phase != v1.ClaimBound {
+			continue
+		}
+
+		if pvcSize, ok := pvc.Status.Capacity[v1.ResourceStorage]; ok {
+			volumeSizeUnderManagement += pvcSize.Value()
+		}
+	}
+
+	return volumeSizeUnderManagement
+}

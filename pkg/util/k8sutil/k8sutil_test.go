@@ -3,6 +3,10 @@ package k8sutil
 import (
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
@@ -153,5 +157,93 @@ func TestNegKubernetesVersion(t *testing.T) {
 	version, err = ParseKubernetesVersion("1", "+1", "+110")
 	if err == nil || version != constants.KubernetesVersionUnknown {
 		t.Errorf("expected parse error for unknown version =%s", version)
+	}
+}
+
+func TestGetTotalPVCMemoryByApp(t *testing.T) {
+	type pvcMockData struct {
+		label  string
+		phase  v1.PersistentVolumeClaimPhase
+		memory string
+	}
+
+	type totalPVCMemoryTestCase struct {
+		appLabel string
+		pvcData  []pvcMockData
+		expected int64
+	}
+
+	testcases := []totalPVCMemoryTestCase{
+		{
+			appLabel: "couchbase",
+			pvcData: []pvcMockData{
+				{
+					label:  "couchbase",
+					phase:  v1.ClaimBound,
+					memory: "5Gi",
+				},
+				{
+					label:  "couchbase",
+					phase:  v1.ClaimBound,
+					memory: "500Mi",
+				},
+				{
+					label:  "couchbase",
+					phase:  v1.ClaimPending,
+					memory: "1Gi",
+				},
+			},
+			expected: int64(5892997120),
+		},
+		{
+			appLabel: "couchbase",
+			pvcData: []pvcMockData{
+				{
+					label:  "invalid-label",
+					phase:  v1.ClaimBound,
+					memory: "5Gi",
+				},
+			},
+			expected: 0,
+		},
+		{
+			appLabel: "invalid-app-label",
+			pvcData: []pvcMockData{
+				{
+					label:  "couchbase",
+					phase:  v1.ClaimBound,
+					memory: "5Gi",
+				},
+			},
+			expected: 0,
+		},
+		{
+			appLabel: "couchbase",
+			pvcData:  []pvcMockData{},
+			expected: 0,
+		},
+	}
+
+	for _, testcase := range testcases {
+		var pvcs []*v1.PersistentVolumeClaim
+
+		for _, mockPVCData := range testcase.pvcData {
+			pvc := v1.PersistentVolumeClaim{
+				Status: v1.PersistentVolumeClaimStatus{
+					Capacity: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceStorage: resource.MustParse(mockPVCData.memory),
+					},
+					Phase: mockPVCData.phase,
+				},
+				ObjectMeta: v12.ObjectMeta{Labels: map[string]string{constants.LabelApp: mockPVCData.label}},
+			}
+			pvcs = append(pvcs, &pvc)
+		}
+
+		result := GetTotalPVCMemoryByApp(pvcs, testcase.appLabel)
+
+		if result != testcase.expected {
+			t.Errorf("expected total PVC memory in use by %s to be %d, got %d", testcase.appLabel, testcase.expected, result)
+		}
 	}
 }

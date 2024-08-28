@@ -1718,6 +1718,8 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 		}
 	}
 
+	metrics.VolumeSizeUnderManagementBytesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(float64(k8sutil.GetTotalPVCMemoryByApp(c.k8s.PersistentVolumeClaims.List(), constants.App)))
+
 	return nil
 }
 

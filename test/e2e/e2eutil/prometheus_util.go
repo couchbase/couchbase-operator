@@ -117,6 +117,11 @@ func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCl
 	}
 
 	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"kubernetes_api_")
+	if err != nil {
+		return err
+	}
+
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"volume_size_under_management_bytes")
 
 	return err
 }

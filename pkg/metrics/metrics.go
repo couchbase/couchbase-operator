@@ -298,6 +298,17 @@ var (
 		Subsystem: MetricSubsystem,
 	}, []string{"method", "host", "path"})
 
+	// VolumeSizeUnderManagementBytesMetric
+	// name: volume_size_under_management_bytes
+	// help: Total memory claimed by volumes under management by the operator in bytes
+	// unit: bytes
+	// added: 2.8.0
+	// stability: committed
+	// labels: namespace, name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	VolumeSizeUnderManagementBytesMetric = prometheus.GaugeVec{}
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -421,6 +432,13 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"name", "serverClass"}))
 
+	VolumeSizeUnderManagementBytesMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "volume_size_under_management_bytes",
+		Help:      "Total memory claimed by volumes under management by the operator in bytes",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
 	metrics.Registry.MustRegister(
 		ReconcileTotalMetric,
 		ReconcileFailureMetric,
@@ -443,5 +461,6 @@ func InitMetrics() {
 		KubernetesAPIRequestTotalMetric,
 		KubernetesAPIRequestFailureMetric,
 		KubernetesAPIRequestDurationMSMetric,
+		VolumeSizeUnderManagementBytesMetric,
 	)
 }
