@@ -25,6 +25,7 @@ import (
 const (
 	// matrixLink help users self heal...
 	matrixLink = "https://docs.couchbase.com/operator/current/prerequisite-and-setup.html"
+	trimSet    = "+"
 )
 
 // getDynamicClient returns the bits required for dynamic client operations, the client
@@ -231,12 +232,12 @@ func normalize(s string) string {
 
 // extractVersion gets major/minor version information from the API.
 func extractVersion(v *version.Info) (int, int, error) {
-	major, err := strconv.Atoi(v.Major)
+	major, err := strconv.Atoi(strings.TrimRight(v.Major, trimSet))
 	if err != nil {
 		return 0, 0, err
 	}
 
-	minor, err := strconv.Atoi(v.Minor)
+	minor, err := strconv.Atoi(strings.TrimRight(v.Minor, trimSet))
 	if err != nil {
 		return 0, 0, err
 	}
