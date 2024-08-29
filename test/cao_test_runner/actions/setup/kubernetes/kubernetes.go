@@ -35,32 +35,37 @@ var (
 )
 
 type KubernetesSetupConfig struct {
-	Description              []string                   `yaml:"description"`
-	ClusterName              string                     `yaml:"clusterName" caoCli:"required"`
-	Platform                 installutils.PlatformType  `yaml:"platform" caoCli:"required"`
-	Environment              EnvironmentType            `yaml:"environment" caoCli:"required"`
-	NumControlPlane          int                        `yaml:"numControlPlane"`
-	NumWorkers               int                        `yaml:"numWorkers"`
-	OperatorImage            string                     `yaml:"operatorImage" caoCli:"required"`
-	AdmissionControllerImage string                     `yaml:"admissionControllerImage" caoCli:"required"`
-	Provider                 ProviderType               `yaml:"provider"`
-	EKSRegion                string                     `yaml:"eksRegion" env:"EKS_REGION"`
-	AKSRegion                string                     `yaml:"aksRegion" env:"AKS_REGION"`
-	KubernetesVersion        string                     `yaml:"kubernetesVersion"`
-	InstanceType             string                     `yaml:"instanceType"`
-	NumNodeGroups            int                        `yaml:"numNodeGroups"`
-	MinSize                  int                        `yaml:"minSize"`
-	MaxSize                  int                        `yaml:"maxSize"`
-	DesiredSize              int                        `yaml:"desiredSize"`
-	DiskSize                 int                        `yaml:"diskSize"`
-	AMI                      managedk8sservices.AMIType `yaml:"ami"`
-	KubeConfigPath           string                     `yaml:"kubeconfigPath" env:"KUBECONFIG"`
-	OSSKU                    armcontainerservice.OSSKU  `yaml:"osSKU"`
-	OSType                   armcontainerservice.OSType `yaml:"osType"`
-	VMSize                   string                     `yaml:"vmSize"`
-	Count                    int                        `yaml:"count"`
-	NumNodePools             int                        `yaml:"numNodePools"`
-	Validators               []map[string]any           `yaml:"validators,omitempty"`
+	Description              []string                          `yaml:"description"`
+	ClusterName              string                            `yaml:"clusterName" caoCli:"required"`
+	Platform                 installutils.PlatformType         `yaml:"platform" caoCli:"required"`
+	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required"`
+	NumControlPlane          int                               `yaml:"numControlPlane"`
+	NumWorkers               int                               `yaml:"numWorkers"`
+	OperatorImage            string                            `yaml:"operatorImage" caoCli:"required"`
+	AdmissionControllerImage string                            `yaml:"admissionControllerImage" caoCli:"required"`
+	Provider                 ProviderType                      `yaml:"provider"`
+	EKSRegion                string                            `yaml:"eksRegion" env:"EKS_REGION"`
+	AKSRegion                string                            `yaml:"aksRegion" env:"AKS_REGION"`
+	GKERegion                string                            `yaml:"gkeRegion" env:"GKE_REGION"`
+	KubernetesVersion        string                            `yaml:"kubernetesVersion"`
+	InstanceType             string                            `yaml:"instanceType"`
+	NumNodeGroups            int                               `yaml:"numNodeGroups"`
+	MinSize                  int                               `yaml:"minSize"`
+	MaxSize                  int                               `yaml:"maxSize"`
+	DesiredSize              int                               `yaml:"desiredSize"`
+	DiskSize                 int                               `yaml:"diskSize"`
+	AMI                      managedk8sservices.AMIType        `yaml:"ami"`
+	KubeConfigPath           string                            `yaml:"kubeconfigPath" env:"KUBECONFIG"`
+	OSSKU                    armcontainerservice.OSSKU         `yaml:"osSKU"`
+	OSType                   armcontainerservice.OSType        `yaml:"osType"`
+	VMSize                   string                            `yaml:"vmSize"`
+	Count                    int                               `yaml:"count"`
+	NumNodePools             int                               `yaml:"numNodePools"`
+	MachineType              string                            `yaml:"machineType"`
+	ImageType                string                            `yaml:"imageType"`
+	DiskType                 string                            `yaml:"diskType"`
+	ReleaseChannel           managedk8sservices.ReleaseChannel `yaml:"releaseChannel"`
+	Validators               []map[string]any                  `yaml:"validators,omitempty"`
 }
 
 type SetupKubernetes struct {

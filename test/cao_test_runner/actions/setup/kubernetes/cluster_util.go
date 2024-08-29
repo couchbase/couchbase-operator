@@ -64,7 +64,19 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					Count:             int32(p.Count),
 				}, nil
 			case GoogleCloud:
-				return nil, ErrNotImplemented
+				return &CreateGKECluster{
+					ClusterName:       p.ClusterName,
+					Region:            p.GKERegion,
+					KubernetesVersion: p.KubernetesVersion,
+					MachineType:       p.MachineType,
+					ImageType:         p.ImageType,
+					DiskType:          p.DiskType,
+					DiskSize:          p.DiskSize,
+					NumNodePools:      p.NumNodePools,
+					Count:             p.Count,
+					ReleaseChannel:    p.ReleaseChannel,
+					KubeConfigPath:    p.KubeConfigPath,
+				}, nil
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
 			}

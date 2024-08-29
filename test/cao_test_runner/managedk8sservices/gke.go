@@ -356,7 +356,7 @@ func (gks *GKESession) CreateNodePool(ctx *context.Context, nodePoolName, machin
 
 	op, err := gks.ClusterManagerClient.CreateNodePool(*ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to create node pool: %v", err)
+		return fmt.Errorf("failed to create node pool: %w", err)
 	}
 
 	if err := gks.WaitForOperation(ctx, op.Name); err != nil {

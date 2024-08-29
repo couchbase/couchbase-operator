@@ -1,0 +1,18 @@
+action: "Setup Kubernetes Cluster"
+config:
+  clusterName: test
+  platform: kubernetes
+  environment: cloud
+  provider: googleCloud
+  gkeRegion: us-central1
+  kubernetesVersion: 1.28.0
+  machineType: c4-standard-8
+  count: 7
+  diskSize: 100
+  diskType: pd-standard
+  imageType: ubuntu_containerd
+  releaseChannel: REGULAR
+  numNodePools: 1
+  kubeconfigPath: /root/.kube/config
+  operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
+  admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64

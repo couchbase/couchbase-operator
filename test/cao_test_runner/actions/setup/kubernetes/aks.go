@@ -124,7 +124,7 @@ func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
 
 	currentFile, _ := filepath.Abs(filePath)
 
-	azureStorageClassPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "test_data", "azure_storage_class", "cao-azurefile.yaml")
+	azureStorageClassPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "test_data", "cloud_storage_class", "cao-azurefile.yaml")
 
 	if err := kubectl.ApplyFiles(azureStorageClassPath).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("unable to apply azure storage class path %s: %w", azureStorageClassPath, err)
