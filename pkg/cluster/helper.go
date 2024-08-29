@@ -3,6 +3,8 @@ package cluster
 import (
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -81,4 +83,12 @@ func (c *Cluster) addOptionalLabelValues(existingLabels []string) []string {
 	}
 
 	return existingLabels
+}
+
+func (c *Cluster) GetCouchbaseCluster() *couchbasev2.CouchbaseCluster {
+	return c.cluster
+}
+
+func (c *Cluster) GetK8sClient() *client.Client {
+	return c.k8s
 }

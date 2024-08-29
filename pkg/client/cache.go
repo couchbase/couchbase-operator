@@ -377,6 +377,10 @@ func (c *CouchbaseBucketCache) List() (resources []*couchbasev2.CouchbaseBucket)
 	return
 }
 
+func (c *CouchbaseBucketCache) Update(resource *couchbasev2.CouchbaseBucket) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseBucketCache) stop() {
 	c.resourceCache.stop()
@@ -427,6 +431,10 @@ func (c *CouchbaseEphemeralBucketCache) List() (resources []*couchbasev2.Couchba
 	return
 }
 
+func (c *CouchbaseEphemeralBucketCache) Update(resource *couchbasev2.CouchbaseEphemeralBucket) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseEphemeralBucketCache) stop() {
 	c.resourceCache.stop()
@@ -475,6 +483,10 @@ func (c *CouchbaseMemcachedBucketCache) List() (resources []*couchbasev2.Couchba
 	}
 
 	return
+}
+
+func (c *CouchbaseMemcachedBucketCache) Update(resource *couchbasev2.CouchbaseMemcachedBucket) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
 }
 
 // stop stops the cache synchronization and frees resources.
@@ -577,6 +589,10 @@ func (c *CouchbaseUserCache) List() (resources []*couchbasev2.CouchbaseUser) {
 	return
 }
 
+func (c *CouchbaseUserCache) Update(resource *couchbasev2.CouchbaseUser) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseUserCache) stop() {
 	c.resourceCache.stop()
@@ -625,6 +641,10 @@ func (c *CouchbaseGroupCache) List() (resources []*couchbasev2.CouchbaseGroup) {
 	}
 
 	return
+}
+
+func (c *CouchbaseGroupCache) Update(resource *couchbasev2.CouchbaseGroup) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
 }
 
 // stop stops the cache synchronization and frees resources.
@@ -871,6 +891,10 @@ func (c *CouchbaseBackupCache) List() (resources []*couchbasev2.CouchbaseBackup)
 	return
 }
 
+func (c *CouchbaseBackupCache) Update(resource *couchbasev2.CouchbaseBackup) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseBackupCache) stop() {
 	c.resourceCache.stop()
@@ -921,6 +945,10 @@ func (c *CouchbaseBackupRestoreCache) List() (resources []*couchbasev2.Couchbase
 	return
 }
 
+func (c *CouchbaseBackupRestoreCache) Update(resource *couchbasev2.CouchbaseBackupRestore) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseBackupRestoreCache) stop() {
 	c.resourceCache.stop()
@@ -967,6 +995,10 @@ func (c *CouchbaseAutoscalerCache) List() (resources []*couchbasev2.CouchbaseAut
 	}
 
 	return
+}
+
+func (c *CouchbaseAutoscalerCache) Update(resource *couchbasev2.CouchbaseAutoscaler) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
 }
 
 // stop stops the cache synchronization and frees resources.
@@ -1019,6 +1051,10 @@ func (c *CouchbaseScopeCache) List() (resources []*couchbasev2.CouchbaseScope) {
 	return
 }
 
+func (c *CouchbaseScopeCache) Update(resource *couchbasev2.CouchbaseScope) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseScopeCache) stop() {
 	c.resourceCache.stop()
@@ -1067,6 +1103,10 @@ func (c *CouchbaseScopeGroupCache) List() (resources []*couchbasev2.CouchbaseSco
 	}
 
 	return
+}
+
+func (c *CouchbaseScopeGroupCache) Update(resource *couchbasev2.CouchbaseScopeGroup) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
 }
 
 // stop stops the cache synchronization and frees resources.
@@ -1119,6 +1159,10 @@ func (c *CouchbaseCollectionCache) List() (resources []*couchbasev2.CouchbaseCol
 	return
 }
 
+func (c *CouchbaseCollectionCache) Update(resource *couchbasev2.CouchbaseCollection) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // stop stops the cache synchronization and frees resources.
 func (c *CouchbaseCollectionCache) stop() {
 	c.resourceCache.stop()
@@ -1167,6 +1211,10 @@ func (c *CouchbaseCollectionGroupCache) List() (resources []*couchbasev2.Couchba
 	}
 
 	return
+}
+
+func (c *CouchbaseCollectionGroupCache) Update(resource *couchbasev2.CouchbaseCollectionGroup) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
 }
 
 // stop stops the cache synchronization and frees resources.

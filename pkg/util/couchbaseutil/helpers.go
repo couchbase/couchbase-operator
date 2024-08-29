@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
 // VersionAfter determines whether the configured version is greater than
@@ -91,4 +93,14 @@ func MemberOnVersion(clusterMembers MemberSet, targetMemberName, targetVersion s
 	}
 
 	return false
+}
+
+func ShouldReconcile(annotations map[string]string) bool {
+	if v, ok := annotations[constants.AnnotationUnreconcilable]; ok {
+		if v == "true" {
+			return false
+		}
+	}
+
+	return true
 }

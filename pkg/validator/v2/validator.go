@@ -39,6 +39,10 @@ const (
 // through clever API design we can cull some of them.  Obviously this is a
 // CRDv3 thing.
 func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if checkAnnotationSkipValidation(cluster.Annotations) {
+		return nil, nil
+	}
+
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
@@ -1705,6 +1709,10 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(bucket.Annotations) {
+		return nil
+	}
+
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
@@ -1782,6 +1790,10 @@ func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseB
 func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(bucket.Annotations) {
+		return nil
+	}
+
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
@@ -1816,6 +1828,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(bucket.Annotations) {
+		return nil
+	}
+
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
@@ -1843,6 +1859,10 @@ func CheckConstraintsReplication(_ *types.Validator, _ *couchbasev2.CouchbaseRep
 
 func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(user.Annotations) {
+		return nil
+	}
 
 	// only 'local' and 'ldap' auth domains accepted
 	domain := user.Spec.AuthDomain
@@ -1965,6 +1985,10 @@ func checkBucketScopeOrCollectionNamesWithDefaultSameScope(a, b couchbasev2.Buck
 
 func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBackup) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(backup.Annotations) {
+		return nil
+	}
 
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
@@ -2157,6 +2181,10 @@ func checkConstraintBackupRestoreObjStoreSecret(v *types.Validator, restore *cou
 }
 
 func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if checkAnnotationSkipValidation(restore.Annotations) {
+		return nil
+	}
+
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseBackupRestore) error{
 		checkContraintRestoreStart,
 		checkContraintRestoreEnd,
@@ -2312,6 +2340,10 @@ func checkContraintRestoreData(_ *types.Validator, restore *couchbasev2.Couchbas
 
 func CheckConstraintsCouchbaseGroup(_ *types.Validator, group *couchbasev2.CouchbaseGroup) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(group.Annotations) {
+		return nil
+	}
 
 	for index, role := range group.Spec.Roles {
 		// role itself must be valid
@@ -2857,6 +2889,10 @@ func checkMaxTTL(path string, value *metav1.Duration, allowNegOverride bool) err
 func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.CouchbaseCollection) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(collection.Annotations) {
+		return nil
+	}
+
 	if collection.Spec.MaxTTL != nil {
 		if err := checkMaxTTL("spec.maxTTL", collection.Spec.MaxTTL, true); err != nil {
 			errs = append(errs, err)
@@ -2876,6 +2912,10 @@ func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.Couc
 
 func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchbasev2.CouchbaseCollectionGroup) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(collectionGroup.Annotations) {
+		return nil
+	}
 
 	if collectionGroup.Spec.MaxTTL != nil {
 		if err := checkMaxTTL("spec.maxTTL", collectionGroup.Spec.MaxTTL, true); err != nil {
@@ -2897,6 +2937,10 @@ func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchb
 func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(scope.Annotations) {
+		return nil
+	}
+
 	if err := checkScopeCollectionsUnique(v, scope.Namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
 		errs = append(errs, err)
 	}
@@ -2914,6 +2958,10 @@ func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope
 
 func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.CouchbaseScopeGroup) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(scopeGroup.Annotations) {
+		return nil
+	}
 
 	if err := checkScopeCollectionsUnique(v, scopeGroup.Namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
 		errs = append(errs, err)
@@ -3226,6 +3274,10 @@ func checkBucketScopesUniqueImplicit(v *types.Validator, namespace, kind, resour
 // dictates that anything in here will soon not be because users will change it
 // it won't work and they will complain at you.
 func CheckImmutableFields(current, updated *couchbasev2.CouchbaseCluster) error {
+	if checkAnnotationSkipValidation(updated.GetAnnotations()) {
+		return nil
+	}
+
 	checks := []func(*couchbasev2.CouchbaseCluster, *couchbasev2.CouchbaseCluster) error{
 		checkImmutableServerClass,
 		checkImmutableIndexStorage,
@@ -3386,6 +3438,10 @@ func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseClu
 func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
@@ -3406,6 +3462,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	err = annotations.Populate(&curr.Spec, curr.Annotations)
 	if err != nil {
 		return err
+	}
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
 	}
 
 	if err := checkConstraintPerServiceClassPDB(v, curr); err != nil {
@@ -3516,6 +3576,10 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
 	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
 		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
 	}
@@ -3597,6 +3661,10 @@ func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.Couc
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
 	if prev.Spec.ConflictResolution != curr.Spec.ConflictResolution {
 		errs = append(errs, util.NewUpdateError("spec.conflictResolution", "body"))
 	}
@@ -3614,6 +3682,10 @@ func CheckImmutableFieldsMemcachedBucket(_, _ *couchbasev2.CouchbaseMemcachedBuc
 
 func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplication) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
 
 	if prev.Spec.Bucket != curr.Spec.Bucket {
 		errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
@@ -3637,6 +3709,10 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 	var errs []error
 
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
 	if prev.Spec.Strategy != curr.Spec.Strategy {
 		errs = append(errs, util.NewUpdateError("spec.strategy", "body"))
 	}
@@ -3650,6 +3726,10 @@ func CheckImmutableFieldsBackup(prev, curr *couchbasev2.CouchbaseBackup) error {
 
 func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
 
 	// Referenced server group cannot be changed
 	if prev.Spec.Servers != curr.Spec.Servers {
@@ -3665,6 +3745,10 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 
 func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollectionGroup) error {
 	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
 
 	prevTTL := &metav1.Duration{}
 
@@ -3796,4 +3880,13 @@ func checkForClusterChangesDuringHibernation(current, updated *couchbasev2.Couch
 	}
 
 	return nil
+}
+
+func checkAnnotationSkipValidation(annotations map[string]string) bool {
+	value, found := annotations[constants.AnnotationDisableAdmissionController]
+	if found {
+		return strings.EqualFold(value, "true")
+	}
+
+	return false
 }

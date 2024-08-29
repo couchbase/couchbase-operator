@@ -770,6 +770,32 @@ func (c *Cluster) checkXDCRTask(cluster *couchbaseutil.RemoteCluster, atLeast721
 	return err
 }
 
+func (c *Cluster) GatherReplicationChanges() (map[couchbaseutil.Replication]couchbaseutil.Replication, error) {
+	var updates = make(map[couchbaseutil.Replication]couchbaseutil.Replication)
+
+	current, err := c.listReplications()
+	if err != nil {
+		return nil, err
+	}
+
+	_, requested, err := c.generateXDCR()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range current {
+		for _, r := range requested {
+			if replicationKey(c) == replicationKey(r) {
+				if !reflect.DeepEqual(r, c) {
+					updates[c] = r
+				}
+			}
+		}
+	}
+
+	return updates, nil
+}
+
 // reconcileXDCR creates and deletes XDCR connections dynamically.
 func (c *Cluster) reconcileXDCR() error {
 	if !c.cluster.Spec.XDCR.Managed {

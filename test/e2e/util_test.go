@@ -53,6 +53,7 @@ const (
 	TagFeatureCNG               = "cng"
 	TagFeatureBucketMigration   = "bucketmigration"
 	TagFeatureAssimilation      = "assimilation"
+	TagFeatureAdmission         = "admission"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -499,6 +500,10 @@ func registerTests() {
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSS3).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSAzure).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSGCP).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
+		framework.NewTestDef(TestOperatorDacValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestOperatorDacValidationDisabled).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestOperatorValidationUnreconcilable).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestDisableAllValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),

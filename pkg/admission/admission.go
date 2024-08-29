@@ -50,7 +50,7 @@ func addToScheme(scheme *runtime.Scheme) error {
 }
 
 // getClient returns a new Kubernetes client.
-func getClient() kubernetes.Interface {
+func GetClient() kubernetes.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err, "Kubernetes configuration load failed")
@@ -67,7 +67,7 @@ func getClient() kubernetes.Interface {
 }
 
 // getCouchbaseClient returns a new Couchbase Kubernetes client.
-func getCouchbaseClient() versioned.Interface {
+func GetCouchbaseClient() versioned.Interface {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err, "Kubernetes configuration failed")
@@ -233,14 +233,14 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 			return errorResponse(err)
 		}
 
-		if err := validator.CheckChangeConstraints(validator.New(getClient(), getCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
+		if err := validator.CheckChangeConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
 			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
 		}
 	}
 
 	// Check that the CouchbaseCluster is correctly configured
-	if warnings, err := validator.CheckConstraints(validator.New(getClient(), getCouchbaseClient(), options), couchbaseCluster); err != nil {
+	if warnings, err := validator.CheckConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), couchbaseCluster); err != nil {
 		log.Error(err, "Rejecting resource")
 		return errorResponseWithWarnings(err, warnings)
 	} else if len(warnings) != 0 {

@@ -452,6 +452,11 @@ func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 	groups := map[string]couchbaseutil.Group{}
 
 	for _, g := range c.k8s.CouchbaseGroups.List() {
+		apiGroup, found := c.k8s.CouchbaseGroups.Get(g.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiGroup.GetAnnotations()) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(g.Labels)) {
 			continue
 		}
@@ -493,6 +498,11 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 
 	for _, group := range *existingGroups {
 		e := group
+
+		apiGroup, found := c.k8s.CouchbaseGroups.Get(e.ID)
+		if found && !couchbaseutil.ShouldReconcile(apiGroup.Annotations) {
+			continue
+		}
 
 		if r, ok := requestedGroups[e.ID]; ok {
 			// update changed group
@@ -594,6 +604,11 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		// internal user we have cached, or create a new one, then append the
 		// group (thus accumulating multiple groups for a specific user).
 		for _, subject := range subjects {
+			apiUser, found := c.k8s.CouchbaseUsers.Get(subject.Name)
+			if found && !couchbaseutil.ShouldReconcile(apiUser.GetAnnotations()) {
+				continue
+			}
+
 			if subject.Spec.Name == "" {
 				subject.Spec.Name = subject.Name
 			}
@@ -681,13 +696,16 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 				log.Info("edit CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
 		} else {
-			// delete unrequested user
-			if err := couchbaseutil.DeleteUser(&e).On(c.api, c.readyMembers()); err != nil {
-				return existingUserNames, err
-			}
+			userA, found := c.k8s.CouchbaseUsers.Get(e.Name)
+			if found && couchbaseutil.ShouldReconcile(userA.Annotations) {
+				// delete unrequested user
+				if err := couchbaseutil.DeleteUser(&e).On(c.api, c.readyMembers()); err != nil {
+					return existingUserNames, err
+				}
 
-			c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
-			log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
+				c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
+				log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
+			}
 		}
 
 		existingUserNames = append(existingUserNames, e.ID)

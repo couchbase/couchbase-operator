@@ -5,6 +5,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -119,6 +120,11 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
+		apiScope, found := c.k8s.CouchbaseScopes.Get(scope.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiScope.Annotations) {
+			continue
+		}
+
 		log.Info("Deleting scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope.Name)
 
 		if err := couchbaseutil.DeleteScope(bucket.GetCouchbaseName(), scope.Name).On(c.api, c.readyMembers()); err != nil {
@@ -131,6 +137,11 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	// Create scopes using an exhaustive search.
 	for scope := range requestedScopes {
 		if current.HasScope(scope) {
+			continue
+		}
+
+		apiScope, found := c.k8s.CouchbaseScopes.Get(scope)
+		if found && !couchbaseutil.ShouldReconcile(apiScope.Annotations) {
 			continue
 		}
 
@@ -236,6 +247,10 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 				break
 			}
 
+			if !couchbaseutil.ShouldReconcile(scope.Annotations) {
+				continue
+			}
+
 			if scope.Spec.DefaultScope {
 				*defaultScopeDefined = true
 			}
@@ -248,6 +263,10 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 			if !ok {
 				log.V(1).Info("Unable to find scope resource", "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
 				break
+			}
+
+			if !couchbaseutil.ShouldReconcile(scopeGroup.Annotations) {
+				continue
 			}
 
 			for _, name := range scopeGroup.Spec.Names {
@@ -296,8 +315,16 @@ func (c *Cluster) gatherScopesImplicit(bucket couchbasev2.AbstractBucket, scopes
 			continue
 		}
 
+		var annotations = make(map[string]string)
+		if value, ok := scopeGroup.Annotations[constants.AnnotationUnreconcilable]; ok {
+			annotations[constants.AnnotationUnreconcilable] = value
+		}
+
 		for _, name := range scopeGroup.Spec.Names {
 			*scopes = append(*scopes, &couchbasev2.CouchbaseScope{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: annotations,
+				},
 				Spec: couchbasev2.CouchbaseScopeSpec{
 					Name: name,
 					CouchbaseScopeSpecCommon: couchbasev2.CouchbaseScopeSpecCommon{
@@ -365,6 +392,29 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	return nil
 }
 
+func (c *Cluster) GatherCollectionGroupUpdates() (map[*couchbasev2.CouchbaseCollectionGroup]*couchbasev2.CouchbaseCollectionGroup, error) {
+	var collectionGroupUpdates = make(map[*couchbasev2.CouchbaseCollectionGroup]*couchbasev2.CouchbaseCollectionGroup)
+
+	currentCollectionGroups, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(c.cluster.Namespace).List(c.ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	requestedCollectionGroups := c.k8s.CouchbaseCollectionGroups.List()
+
+	for _, req := range requestedCollectionGroups {
+		for _, curr := range currentCollectionGroups.Items {
+			if req.Name == curr.Name {
+				if !reflect.DeepEqual(req, curr) {
+					collectionGroupUpdates[&curr] = req
+				}
+			}
+		}
+	}
+
+	return collectionGroupUpdates, nil
+}
+
 // reconcileCollections magaes collection state for a specific scope within
 // a specific bucket.
 func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, raiseEvent *bool) error {
@@ -382,6 +432,11 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 	// Delete collections using an exhaustive search.
 	for _, collection := range current.GetScope(scope.CouchbaseName()).Collections {
+		apiCollection, found := c.k8s.CouchbaseCollections.Get(collection.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiCollection.Annotations) {
+			continue
+		}
+
 		if _, ok := requestedCollections[collection.Name]; ok {
 			continue
 		}
@@ -397,6 +452,11 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 	// Create collections using an exhaustive search.
 	for _, collection := range collections {
+		apiCollectionSpec, found := c.k8s.CouchbaseCollections.Get(collection.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiCollectionSpec.Annotations) {
+			continue
+		}
+
 		err := annotations.Populate(&collection.Spec, collection.Annotations)
 		if err != nil {
 			log.Error(err, "failed to parse collection annotations")
@@ -473,7 +533,7 @@ func (c *Cluster) gatherCollections(scope *couchbasev2.CouchbaseScope) ([]*couch
 
 // gatherCollectionsExplicit collects all collections that are explicitly referenced by
 // the scope, and appends then to the list.  Collection groups are expanded into individual
-// collections for data cons istency.
+// collections for data consistency.
 func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, collections *[]*couchbasev2.CouchbaseCollection) {
 	if scope.Spec.Collections == nil {
 		return
@@ -490,6 +550,10 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 				continue
 			}
 
+			if !couchbaseutil.ShouldReconcile(collection.Annotations) {
+				continue
+			}
+
 			*collections = append(*collections, collection)
 		case couchbasev2.CollectionGroupCRDResourceKind:
 			// Expand groups into individual collections to make handing easier
@@ -497,6 +561,10 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 			collectionGroup, ok := c.k8s.CouchbaseCollectionGroups.Get(resource.StrName())
 			if !ok {
 				log.V(1).Info("Unable to find collection resource", "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
+				continue
+			}
+
+			if !couchbaseutil.ShouldReconcile(collectionGroup.Annotations) {
 				continue
 			}
 
@@ -528,6 +596,10 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 	}
 
 	for _, collection := range c.k8s.CouchbaseCollections.List() {
+		if !couchbaseutil.ShouldReconcile(collection.GetAnnotations()) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(collection.Labels)) {
 			continue
 		}
@@ -536,6 +608,10 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 	}
 
 	for _, collectionGroup := range c.k8s.CouchbaseCollectionGroups.List() {
+		if !couchbaseutil.ShouldReconcile(collectionGroup.GetAnnotations()) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(collectionGroup.Labels)) {
 			continue
 		}

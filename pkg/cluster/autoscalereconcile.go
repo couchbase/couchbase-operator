@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -235,6 +236,24 @@ func (c *Cluster) updateAutoscalerStatusSize(autoscaler *couchbasev2.CouchbaseAu
 	}
 
 	return autoscaler, nil
+}
+
+func (c *Cluster) GatherAutoscalerUpdates() (map[*couchbasev2.CouchbaseAutoscaler]*couchbasev2.CouchbaseAutoscaler, error) {
+	var autoScalerUpdates = make(map[*couchbasev2.CouchbaseAutoscaler]*couchbasev2.CouchbaseAutoscaler)
+
+	requestedAutoscalers := c.GetK8sClient().CouchbaseAutoscalers.List()
+	for _, autoscaler := range requestedAutoscalers {
+		currentAutoscaler, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(c.cluster.Namespace).Get(context.Background(), autoscaler.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		if !reflect.DeepEqual(autoscaler, currentAutoscaler) {
+			autoScalerUpdates[currentAutoscaler] = autoscaler
+		}
+	}
+
+	return autoScalerUpdates, nil
 }
 
 // Update existing autoscaler resources to match the set of resources being requested.

@@ -6,6 +6,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/validationrunner"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 
@@ -33,8 +34,12 @@ type CouchbaseClusterReconciler struct {
 // TODO: The reconcile.Result allows events to be requeued which *may*
 // allow us to do away with the separate go routine sitting in a loop,
 // or it may just fill up with events due to status updates...
+//
+//nolint:gocognit
 func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log.V(2).Info("Received couchbase cluster event", "cluster", request.NamespacedName)
+
+	validationFailed := false
 
 	// By using the requeue mechanism we can get a periodic and synchronous reconcile.
 	requeueResult := reconcile.Result{
@@ -65,6 +70,15 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
+	results, err := validationrunner.CheckCouchbaseClusterResource(couchbase)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if results != nil {
+		log.V(1).Info("Validation warnings.", "warnings", results)
+	}
+
 	// See if we know about the cluster already.
 	c, ok := r.clusters.Load(request.NamespacedName.String())
 	if !ok {
@@ -77,9 +91,41 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			return reconcile.Result{}, err
 		}
 
+		errs := validationrunner.CheckConstraints(c.GetK8sClient())
+
+		for _, err := range errs {
+			log.Error(err, "Validation failed", "cluster", request.NamespacedName)
+		}
+
+		c.RunReconcile()
+
 		r.clusters.Store(request.NamespacedName.String(), c)
 
 		return requeueResult, nil
+	}
+
+	if err := validationrunner.CheckCouchbaseClusterResourceImmutableFields(couchbase, c.GetCouchbaseCluster()); err != nil {
+		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+
+		validationFailed = true
+	}
+
+	if err := validationrunner.CheckCouchbaseClusterResourceUpdate(couchbase, c.GetCouchbaseCluster()); err != nil {
+		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+
+		validationFailed = true
+	}
+
+	changeErrs := validationrunner.CheckChangeConstraints(c)
+
+	for _, err := range changeErrs {
+		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+	}
+
+	immutableErrs := validationrunner.ValidateImmutableFields(c)
+
+	for _, err := range immutableErrs {
+		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 	}
 
 	// Existing cluster updated
@@ -87,7 +133,11 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	// the cluster controller and check for updates there.
 	log.V(2).Info("Updating cluster", "cluster", request.NamespacedName)
 
-	c.Update(couchbase)
+	if validationFailed {
+		c.Update(c.GetCouchbaseCluster())
+	} else {
+		c.Update(couchbase)
+	}
 
 	return requeueResult, nil
 }

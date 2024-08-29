@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -106,6 +107,11 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 
 	for i := range backups {
 		backup := &backups[i]
+
+		apiBackup, found := c.k8s.CouchbaseBackups.Get(backup.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiBackup.Annotations) {
+			continue
+		}
 
 		resource := backupResources{
 			name:   backup.Name,
@@ -1340,6 +1346,11 @@ func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	backups := []couchbasev2.CouchbaseBackup{}
 
 	for _, backup := range couchbaseBackups {
+		apiBackup, found := c.k8s.CouchbaseBackups.Get(backup.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiBackup.GetAnnotations()) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(backup.Labels)) {
 			continue
 		}
@@ -1366,6 +1377,11 @@ func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, 
 	restores := []couchbasev2.CouchbaseBackupRestore{}
 
 	for _, restore := range couchbaseBackupRestores {
+		apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(restore.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiRestore.GetAnnotations()) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(restore.Labels)) {
 			continue
 		}
@@ -1374,6 +1390,32 @@ func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, 
 	}
 
 	return restores, nil
+}
+
+func (c *Cluster) GatherBackupUpdates() (map[*couchbasev2.CouchbaseBackup]*couchbasev2.CouchbaseBackup, error) {
+	var backupUpdates = make(map[*couchbasev2.CouchbaseBackup]*couchbasev2.CouchbaseBackup)
+
+	requested, err := c.generateBackupResources()
+	if err != nil {
+		return nil, err
+	}
+
+	current, err := c.listBackupResources()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, req := range requested {
+		for _, curr := range current {
+			if curr.name == req.name {
+				if !reflect.DeepEqual(curr, req) {
+					backupUpdates[curr.backup] = req.backup
+				}
+			}
+		}
+	}
+
+	return backupUpdates, nil
 }
 
 func (c *Cluster) reconcileBackup() error {
@@ -1392,6 +1434,10 @@ func (c *Cluster) reconcileBackup() error {
 	}
 
 	for _, req := range requested {
+		apiReq, found := c.k8s.CouchbaseBackups.Get(req.name)
+		if found && !couchbaseutil.ShouldReconcile(apiReq.Annotations) {
+			continue
+		}
 		// Requested resource doesn't exist (as best we know...), so create it.
 		if !current.contains(req) {
 			if err := c.createBackupResource(req); err != nil {
@@ -1408,6 +1454,11 @@ func (c *Cluster) reconcileBackup() error {
 	}
 
 	for _, cur := range current {
+		apiCur, found := c.k8s.CouchbaseBackups.Get(cur.name)
+		if found && !couchbaseutil.ShouldReconcile(apiCur.Annotations) {
+			continue
+		}
+
 		if cur.backup != nil {
 			continue
 		}
@@ -1435,6 +1486,11 @@ func (c *Cluster) reconcileBackupRestore() error {
 	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
 	for i := range currentRestores {
 		currentRestore := &currentRestores[i]
+
+		apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(currentRestore.Name)
+		if found && !couchbaseutil.ShouldReconcile(apiRestore.Annotations) {
+			continue
+		}
 
 		requested, err := c.generateRestoreJob(currentRestore)
 		if err != nil {

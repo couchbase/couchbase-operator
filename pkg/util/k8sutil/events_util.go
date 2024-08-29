@@ -32,6 +32,7 @@ const (
 	EventReasonExpandVolumeStarted   = "ExpandVolumeStarted"
 	EventReasonExpandVolumeFallback  = "ExpandVolumeFallback"
 	EventReasonExpandVolumeSucceeded = "ExpandVolumeSucceeded"
+	EventReasonReconcileFailed       = "ReconciliationFailed"
 
 	// Bucket lifecycle.
 	EventReasonBucketCreated = "BucketCreated"
@@ -584,6 +585,15 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, name string, from int,
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventAutoscaleDown
 	event.Message = fmt.Sprintf("Autoscaling down config `%s` from %d to %d", name, from, to)
+
+	return event
+}
+
+func ReconcileFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonReconcileFailed
+	event.Message = fmt.Sprintf("Reconciliation failed")
 
 	return event
 }

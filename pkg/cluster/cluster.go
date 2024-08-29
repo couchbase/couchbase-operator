@@ -184,9 +184,6 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
 	}
 
-	// No reason other than it's marginally quicker than waiting for the next run!
-	c.runReconcile()
-
 	return c, nil
 }
 
@@ -492,14 +489,14 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 	}
 }
 
-// runReconcile gathers a list of pods in cluster from Kubernetes, optionally
+// RunReconcile gathers a list of pods in cluster from Kubernetes, optionally
 // initializes our internal member list if we need to e.g. we have been restarted and
 // have lost state or a previous error may have resulted in inconsistent state, then
 // compares reality with the specification and makes the former match it.
 //
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
-func (c *Cluster) runReconcile() {
+func (c *Cluster) RunReconcile() {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
 
@@ -545,6 +542,7 @@ func (c *Cluster) runReconcile() {
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
@@ -607,6 +605,8 @@ func (c *Cluster) runReconcile() {
 			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
+
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
 
@@ -639,7 +639,7 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 	}
 
 	c.cluster = cluster
-	c.runReconcile()
+	c.RunReconcile()
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {

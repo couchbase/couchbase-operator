@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -28,7 +29,9 @@ const (
 type SupportedFeatureMap map[SupportedFeature]bool
 
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
-func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
+//
+//nolint:gocognit
+func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
@@ -36,6 +39,13 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	supportedRank := supportedFeatures[SupportedRank]
 
 	for _, bucket := range k8sBuckets {
+		if client != nil {
+			bucketA, found := client.CouchbaseBuckets.Get(bucket.Name)
+			if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
+				continue
+			}
+		}
+
 		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 		if err != nil {
 			// we failed but its not worth stopping. log the error and continue
@@ -139,11 +149,16 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
-func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 
 	for _, bucket := range k8sEphemeralBuckets {
+		bucketA, found := client.CouchbaseEphemeralBuckets.Get(bucket.Name)
+		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
@@ -185,8 +200,13 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 }
 
 // gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
-func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket) []couchbaseutil.Bucket {
+func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
 	for _, bucket := range k8sMemcachedBuckets {
+		bucketA, found := client.CouchbaseMemcachedBuckets.Get(bucket.Name)
+		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
+			continue
+		}
+
 		if !selector.Matches(labels.Set(bucket.Labels)) {
 			continue
 		}
@@ -257,11 +277,67 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	allBuckets := []couchbaseutil.Bucket{}
 
-	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets, c.cluster)
-	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets)
-	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets)
+	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets, c.cluster, c.k8s)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets, c.k8s)
+	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
 
 	return allBuckets, nil
+}
+
+func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
+	updateBuckets := make(map[couchbaseutil.Bucket]couchbaseutil.Bucket)
+
+	requested, err := c.gatherBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	actual := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	for _, r := range requested {
+		for _, a := range actual {
+			if r.BucketName == a.BucketName {
+				if !reflect.DeepEqual(r, a) {
+					updateBuckets[a] = r
+				}
+
+				break
+			}
+		}
+	}
+
+	return updateBuckets, nil
+}
+
+func (c *Cluster) checkUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
+	var annotations = make(map[string]string)
+
+	switch bucket.BucketType {
+	case constants.BucketTypeCouchbase:
+		apiBucket, ok := c.GetK8sClient().CouchbaseBuckets.Get(bucket.BucketName)
+		if ok {
+			annotations = apiBucket.Annotations
+		}
+	case constants.BucketTypeMemcached:
+		apiBucket, ok := c.GetK8sClient().CouchbaseMemcachedBuckets.Get(bucket.BucketName)
+		if ok {
+			annotations = apiBucket.Annotations
+		}
+	case constants.BucketTypeEphemeral:
+		apiBucket, ok := c.GetK8sClient().CouchbaseEphemeralBuckets.Get(bucket.BucketName)
+		if ok {
+			annotations = apiBucket.Annotations
+		}
+	}
+
+	if !couchbaseutil.ShouldReconcile(annotations) {
+		return true
+	}
+
+	return false
 }
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
@@ -288,6 +364,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
+				if found = c.checkUnreconilableBucket(a); found {
+					continue
+				}
+
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
 					c.logUpdate(a, r)
@@ -311,6 +391,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, r := range requested {
 			if a.BucketName == r.BucketName {
+				if found = c.checkUnreconilableBucket(a); found {
+					continue
+				}
+
 				matchBackendsIfBefore76(&r, &a, c.cluster)
 
 				found = true
