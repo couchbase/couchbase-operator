@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -172,8 +173,8 @@ func getModifiedSpecPath(specPath string) (string, error) {
 	fileNameWithoutExt := fileName[0 : len(fileName)-len(filepath.Ext(fileName))]
 
 	// Making sure all the directories exist
-	err := os.MkdirAll(fileDir, os.ModePerm)
-	if err != nil {
+	err := fileutils.NewDirectory(fileDir, os.ModePerm).CreateDirectory()
+	if err != nil && !errors.Is(err, fileutils.ErrDirExists) {
 		return "", fmt.Errorf("get modified spec path: %w", err)
 	}
 
