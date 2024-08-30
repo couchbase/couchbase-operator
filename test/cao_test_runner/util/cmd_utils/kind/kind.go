@@ -4,6 +4,10 @@ import (
 	cmdutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils"
 )
 
+const (
+	kindRootCmd = "kind"
+)
+
 type KindCmd struct {
 	cmdutils.Cmd
 }
@@ -32,12 +36,12 @@ func Build(kubernetesSource, architecture, baseImage, image, buildType string) *
 		"--type", buildType,
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "build", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "build", Args: args}}
 }
 
 func Completion(shellCompletion string) *KindCmd {
 	args := []string{shellCompletion}
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "completion", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "completion", Args: args}}
 }
 
 func Create(config, image, kubeconfig, name, wait string, retain bool) *KindCmd {
@@ -59,7 +63,7 @@ func Create(config, image, kubeconfig, name, wait string, retain bool) *KindCmd 
 		args = append(args, "--retain")
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "create", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "create", Args: args}}
 }
 
 func DeleteCluster(kubeconfig, name string) *KindCmd {
@@ -69,7 +73,7 @@ func DeleteCluster(kubeconfig, name string) *KindCmd {
 		"--name", name,
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "delete", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "delete", Args: args}}
 }
 
 func DeleteClusters(kubeconfig string, all bool, clusters []string) *KindCmd {
@@ -83,7 +87,7 @@ func DeleteClusters(kubeconfig string, all bool, clusters []string) *KindCmd {
 
 	args = append(args, clusters...)
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "delete", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "delete", Args: args}}
 }
 
 func ExportKubeConfig(name, kubeconfig string, internal bool) *KindCmd {
@@ -96,7 +100,7 @@ func ExportKubeConfig(name, kubeconfig string, internal bool) *KindCmd {
 		args = append(args, "--internal")
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "export", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "export", Args: args}}
 }
 
 func ExportLogs(name, outputDir string) *KindCmd {
@@ -105,12 +109,12 @@ func ExportLogs(name, outputDir string) *KindCmd {
 		"--name", name,
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "export", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "export", Args: args}}
 }
 
 func GetClusters() *KindCmd {
 	args := []string{"clusters"}
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "get", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "get", Args: args}}
 }
 
 func GetKubeConfig(name string, internal bool) *KindCmd {
@@ -122,7 +126,7 @@ func GetKubeConfig(name string, internal bool) *KindCmd {
 		args = append(args, "--internal")
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "get", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "get", Args: args}}
 }
 
 func GetNodes(name string, allClusters bool) *KindCmd {
@@ -134,11 +138,11 @@ func GetNodes(name string, allClusters bool) *KindCmd {
 		args = append(args, "--all-clusters")
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "get", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "get", Args: args}}
 }
 
 func GetVersion() *KindCmd {
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "version"}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "version"}}
 }
 
 func LoadImageArchive(imagePath, name string, nodes []string) *KindCmd {
@@ -148,7 +152,7 @@ func LoadImageArchive(imagePath, name string, nodes []string) *KindCmd {
 	}
 	args = append(args, nodes...)
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "load", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "load", Args: args}}
 }
 
 func LoadDockerImage(image, name string, nodes []string) *KindCmd {
@@ -160,5 +164,5 @@ func LoadDockerImage(image, name string, nodes []string) *KindCmd {
 		args = append(args, nodes...)
 	}
 
-	return &KindCmd{cmdutils.Cmd{RootCommand: "kind", Command: "load", Args: args}}
+	return &KindCmd{cmdutils.Cmd{RootCommand: kindRootCmd, Command: "load", Args: args}}
 }

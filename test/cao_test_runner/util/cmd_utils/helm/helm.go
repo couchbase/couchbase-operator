@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	NumOfArgs = 12
+	NumOfArgs   = 12
+	helmRootCmd = "helm"
 )
 
 type HelmCmd struct {
@@ -52,25 +53,25 @@ func (h *HelmCmd) Edit(args ...string) *HelmCmd {
 // =============================================
 
 func List(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "list", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "list", Args: args}}
 }
 
 func Repo(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "repo", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "repo", Args: args}}
 }
 
 func Pull(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "pull", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "pull", Args: args}}
 }
 
 func Install(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "install", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "install", Args: args}}
 }
 
 func Upgrade(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "upgrade", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "upgrade", Args: args}}
 }
 
 func Uninstall(args ...string) *HelmCmd {
-	return &HelmCmd{cmdutils.Cmd{RootCommand: "helm", Command: "uninstall", Args: args}}
+	return &HelmCmd{cmdutils.Cmd{RootCommand: helmRootCmd, Command: "uninstall", Args: args}}
 }
