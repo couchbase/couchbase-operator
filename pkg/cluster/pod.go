@@ -12,12 +12,14 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -176,6 +178,10 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 // here is that topology changes, e.g upgrades, have been detected and done before this call.
 // If that dodesn't hold, then we risk updating the pod spec annotation and ignoring changes.
 func (c *Cluster) reconcilePods() error {
+	var memoryUnderManagement resource.Quantity
+
+	var cpuUnderManagement resource.Quantity
+
 	for name, member := range c.members {
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
@@ -229,7 +235,13 @@ func (c *Cluster) reconcilePods() error {
 		if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(context.Background(), updated, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
+
+		memoryUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceMemory))
+		cpuUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceCPU))
 	}
+
+	metrics.MemoryUnderManagementBytesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(memoryUnderManagement.AsApproximateFloat64())
+	metrics.CPUUnderManagementMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(cpuUnderManagement.AsApproximateFloat64())
 
 	return nil
 }

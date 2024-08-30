@@ -300,6 +300,7 @@ var (
 
 	// VolumeSizeUnderManagementBytesMetric
 	// name: volume_size_under_management_bytes
+	// type: gauge
 	// help: Total memory claimed by volumes under management by the operator in bytes
 	// unit: bytes
 	// added: 2.8.0
@@ -308,6 +309,30 @@ var (
 	// optionalLabels: cluster_uuid, cluster_name
 	// nolint:godot
 	VolumeSizeUnderManagementBytesMetric = prometheus.GaugeVec{}
+
+	// MemoryUnderManagementBytesMetric
+	// name: memory_under_management_bytes
+	// type: gauge
+	// help: Total memory requests for operator managed pods in bytes
+	// unit: bytes
+	// added: 2.8.0
+	// stability: committed
+	// labels: namespace, name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	MemoryUnderManagementBytesMetric = prometheus.GaugeVec{}
+
+	// CPUUnderManagementMetric
+	// name: cpu_under_management
+	// type: gauge
+	// help: Total cpu requests for operator managed pods in k8s cpu units
+	// unit:
+	// added: 2.8.0
+	// stability: committed
+	// labels: namespace, name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	CPUUnderManagementMetric = prometheus.GaugeVec{}
 
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
@@ -439,6 +464,20 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"namespace", "name"}))
 
+	MemoryUnderManagementBytesMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "memory_under_management_bytes",
+		Help:      "Total memory requests by operator managed pods in bytes",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
+	CPUUnderManagementMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "cpu_under_management",
+		Help:      "Total cpu requests by operator managed pods in k8s cpu units",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
 	metrics.Registry.MustRegister(
 		ReconcileTotalMetric,
 		ReconcileFailureMetric,
@@ -462,5 +501,7 @@ func InitMetrics() {
 		KubernetesAPIRequestFailureMetric,
 		KubernetesAPIRequestDurationMSMetric,
 		VolumeSizeUnderManagementBytesMetric,
+		MemoryUnderManagementBytesMetric,
+		CPUUnderManagementMetric,
 	)
 }

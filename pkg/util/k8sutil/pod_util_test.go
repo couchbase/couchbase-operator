@@ -10,6 +10,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func (l volumeMountList) getVolumeMount(t *testing.T, name volumeMountName) volumeMount {
@@ -194,5 +195,71 @@ func TestAddServerGroupAnnotations(t *testing.T) {
 
 	if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
 		t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
+	}
+}
+
+func TestGetResourceRequestQuantity(t *testing.T) {
+	type totalRequestedMemoryTestCase struct {
+		podContainers []v1.Container
+		resource      v1.ResourceName
+		expected      resource.Quantity
+	}
+
+	testcases := []totalRequestedMemoryTestCase{
+		{
+			podContainers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceMemory: resource.MustParse("5Gi"),
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourcePods:   resource.MustParse("1"),
+					},
+				},
+			},
+			},
+			resource: v1.ResourceMemory,
+			expected: resource.MustParse("5Gi"),
+		},
+		{
+			podContainers: []v1.Container{{
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{
+						v1.ResourceMemory: resource.MustParse("256Mi"),
+						v1.ResourcePods:   resource.MustParse("2"),
+						v1.ResourceCPU:    resource.MustParse("500m"),
+					},
+				},
+			},
+				{
+					Resources: v1.ResourceRequirements{
+						Requests: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceMemory: resource.MustParse("1Gi"),
+							v1.ResourceCPU:    resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			resource: v1.ResourceMemory,
+			expected: resource.MustParse("1.25Gi"),
+		},
+		{
+			podContainers: []v1.Container{},
+			resource:      v1.ResourceMemory,
+			expected:      resource.MustParse("0"),
+		},
+	}
+
+	for _, testcase := range testcases {
+		pod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Containers: testcase.podContainers,
+			},
+		}
+
+		result := GetResourceRequestQuantity(pod, testcase.resource)
+
+		if !result.Equal(testcase.expected) {
+			t.Errorf("expected resource %s by pod to be %s, got %s", testcase.resource.String(), testcase.expected.String(), result.String())
+		}
 	}
 }

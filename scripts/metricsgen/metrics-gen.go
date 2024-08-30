@@ -30,32 +30,32 @@ func main() {
 		var metricMetadata = new(metricMetadata)
 		var metricName string
 		for _, c1 := range c.List {
-			if strings.Contains(c1.Text, "name:") {
-				metricName = strings.TrimLeft(c1.Text, "// name: ")
+			if strings.Contains(c1.Text, "name: ") {
+				metricName = strings.TrimPrefix(c1.Text, "// name: ")
 			}
-			if strings.Contains(c1.Text, "type:") {
-				metricMetadata.Type = strings.TrimLeft(c1.Text, "// type: ")
+			if strings.Contains(c1.Text, "type: ") {
+				metricMetadata.Type = strings.TrimPrefix(c1.Text, "// type: ")
 			}
-			if strings.Contains(c1.Text, "help:") {
-				metricMetadata.Help = strings.TrimLeft(c1.Text, "// help: ")
+			if strings.Contains(c1.Text, "help: ") {
+				metricMetadata.Help = strings.TrimPrefix(c1.Text, "// help: ")
 			}
-			if strings.Contains(c1.Text, "unit:") {
-				metricMetadata.Unit = strings.TrimLeft(c1.Text, "// unit: ")
+			if strings.Contains(c1.Text, "unit: ") {
+				metricMetadata.Unit = strings.TrimPrefix(c1.Text, "// unit: ")
 			}
-			if strings.Contains(c1.Text, "added:") {
-				metricMetadata.Added = strings.TrimLeft(c1.Text, "// added: ")
+			if strings.Contains(c1.Text, "added: ") {
+				metricMetadata.Added = strings.TrimPrefix(c1.Text, "// added: ")
 			}
-			if strings.Contains(c1.Text, "stability:") {
-				metricMetadata.Stability = strings.TrimLeft(c1.Text, "// stability: ")
+			if strings.Contains(c1.Text, "stability: ") {
+				metricMetadata.Stability = strings.TrimPrefix(c1.Text, "// stability: ")
 			}
-			if strings.Contains(c1.Text, "labels:") {
-				labels := strings.TrimLeft(c1.Text, "// labels: ")
+			if strings.Contains(c1.Text, "labels: ") {
+				labels := strings.TrimPrefix(c1.Text, "// labels: ")
 				labels = strings.ReplaceAll(labels, " ", "")
 				s := strings.Split(labels, ",")
 				metricMetadata.Labels = s
 			}
-			if strings.Contains(c1.Text, "optionalLabels:") {
-				optionalLabels := strings.TrimLeft(c1.Text, "// optionalLabels: ")
+			if strings.Contains(c1.Text, "optionalLabels: ") {
+				optionalLabels := strings.TrimPrefix(c1.Text, "// optionalLabels: ")
 				optionalLabels = strings.ReplaceAll(optionalLabels, " ", "")
 				s := strings.Split(optionalLabels, ",")
 				metricMetadata.OptionalLabels = s

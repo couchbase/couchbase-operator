@@ -2471,3 +2471,16 @@ func SetPodInitialized(client *client.Client, name string) error {
 
 	return retryutil.Retry(ctx, time.Second, callback)
 }
+
+// GetResourceRequestQuantity returns the total quantity of a given resource type that is currently requested by the pod.
+func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
+	var resourceQuantity resource.Quantity
+
+	for _, container := range pod.Spec.Containers {
+		if resourceRequest, ok := container.Resources.Requests[resourceName]; ok {
+			resourceQuantity.Add(resourceRequest)
+		}
+	}
+
+	return resourceQuantity
+}
