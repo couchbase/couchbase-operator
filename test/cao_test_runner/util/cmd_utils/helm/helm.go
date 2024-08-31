@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	NumOfArgs   = 12
 	helmRootCmd = "helm"
 )
 

@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	NumOfArgs  = 12
 	caoRootCmd = "cao"
 )
 
