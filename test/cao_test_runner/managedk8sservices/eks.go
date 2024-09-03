@@ -208,11 +208,6 @@ func (ess *EKSSessionStore) GetInstancesByK8sNodeName(managedSvcCred *ManagedSer
 	return instanceIDs, nil
 }
 
-func (ess *EKSSessionStore) GetInstancesByStrategy(managedSvcCred *ManagedServiceCredentials, strategy K8sNodeFindStrategy) ([]string, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
 // ================================================
 // ====== Methods implemented by EKSSession ======
 // ================================================

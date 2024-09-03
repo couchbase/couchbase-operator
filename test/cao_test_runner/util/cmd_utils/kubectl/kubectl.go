@@ -195,7 +195,11 @@ func Describe(args ...string) *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "describe", Args: args}}
 }
 
-func Exec(args ...string) *KubectlCmd {
+func Exec(podName, containerName string, commandArgs ...string) *KubectlCmd {
+	args := []string{podName, "-c", containerName, "--"}
+
+	args = append(args, commandArgs...)
+
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "exec", Args: args}}
 }
 
