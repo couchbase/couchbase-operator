@@ -30,8 +30,8 @@ This release supports the deployment of the following Couchbase software:
 | 7.0 - 7.6^*^
 |===
 
-*: Couchbase Server 7.2 is supported with Operator 2.4;
-however, new features in 7.2 are only supported on Operator 2.4.1
+*: Couchbase Server 7.6 is supported with Operator 2.6;
+however, new features in 7.6 are only supported on Operator 2.7.0
 
 The following diagram depicts Couchbase Server compatibility with the Operator for this, and previous releases, and can be used to calculate upgrade paths:
 
@@ -72,9 +72,6 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 | Couchbase Operator Version
 | Supported Couchbase Fluent Bit Versions
 
-| 2.3.0
-| 1.0.4, 1.1.0 - 1.1.3, 1.2.0
-
 | 2.4.0
 | 1.1.0 - 1.1.3, 1.2.0 - 1.2.7
 
@@ -83,6 +80,9 @@ This release supports the following versions of the Couchbase Fluent Bit image f
 
 | 2.6.0
 | 1.2.0 - 1.2.7
+
+| 2.7.0
+| 1.2.0 - 1.2.8
 
 |===
 
@@ -110,10 +110,10 @@ This release supports the following Kubernetes platforms:
 | Platform | Version
 
 | Open Source Kubernetes
-| 1.25 - 1.29
+| 1.26 - 1.30
 
 | Red Hat OpenShift Container Platform
-| 4.11 - 4.14
+| 4.13 - 4.16
 |===
 
 The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
