@@ -186,6 +186,10 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 	}, nil
 }
 
+func (r *MigrationReconcileMachine) getManagedK8sMembers() couchbaseutil.MemberSet {
+	return r.clusteredMembers.Diff(r.externalMembers)
+}
+
 func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 	reconcileFunctions := []func(*MigrationReconcileMachine, *Cluster) error{
 		(*MigrationReconcileMachine).handleRebalanceCheck,
@@ -194,9 +198,9 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleFailedAddNodes,
 		(*MigrationReconcileMachine).handleAddBackNodes,
 		(*MigrationReconcileMachine).handleFailedNodes,
-		(*MigrationReconcileMachine).handleMigrateNodes,
 		(*MigrationReconcileMachine).handleRemoveNode,
 		(*MigrationReconcileMachine).handleAddNode,
+		(*MigrationReconcileMachine).handleMigrateNodes,
 		(*MigrationReconcileMachine).handleNodeServices,
 		(*MigrationReconcileMachine).handleRebalance,
 		(*MigrationReconcileMachine).handleMarkReady,
@@ -219,6 +223,57 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
+	var deletions []couchbasev2.ServerConfig
+
+	var scheduledScaling couchbasev2.ScalingMessageList
+
+	allManagedMembers := r.getManagedK8sMembers()
+
+	for _, serverSpec := range c.cluster.Spec.Servers {
+		// Check to see if we need to remove anything
+		members := r.clusteredMembers.GroupByServerConfig(serverSpec.Name)
+
+		existingNodes := members.Size()
+		nodesToRemove := existingNodes - serverSpec.Size
+
+		if nodesToRemove <= 0 {
+			continue
+		}
+
+		managedMembers := allManagedMembers.GroupByServerConfig(serverSpec.Name)
+
+		if managedMembers.Size() < nodesToRemove {
+			nodesToRemove = managedMembers.Size()
+		}
+
+		for i := 0; i < nodesToRemove; i++ {
+			deletions = append(deletions, serverSpec)
+		}
+
+		scheduledScaling = append(scheduledScaling, couchbasev2.ScalingMessage{Server: serverSpec.Name, From: existingNodes, To: serverSpec.Size})
+	}
+
+	if len(deletions) == 0 {
+		return nil
+	}
+
+	r.log()
+
+	c.cluster.Status.SetScalingDownCondition(scheduledScaling.BuildMessage())
+
+	for _, serverSpec := range deletions {
+		server, err := c.scheduler.Delete(serverSpec.Name)
+		if err != nil {
+			return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
+		}
+
+		r.removeMemberUser(c.members[server])
+	}
+
+	return nil
 }
 
 // handleMigrateNodes handles migration of nodes from the externalMembers set to the cluster.
@@ -255,7 +310,19 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 }
 
 func (r *MigrationReconcileMachine) getMigrationCandidates() couchbaseutil.MemberSet {
-	return r.externalMembers
+	numToMigrate := r.externalMembers.Size() - r.c.cluster.Spec.Migration.NumUnmanagedNodes
+
+	migrationCandidates := couchbaseutil.NewMemberSet()
+
+	for _, member := range r.externalMembers {
+		if migrationCandidates.Size() >= numToMigrate {
+			break
+		}
+
+		migrationCandidates.Add(member)
+	}
+
+	return migrationCandidates
 }
 
 func (r *MigrationReconcileMachine) migrateNode(m couchbaseutil.Member) error {

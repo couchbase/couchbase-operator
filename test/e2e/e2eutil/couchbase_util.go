@@ -1769,3 +1769,14 @@ func MustBeUnitializedCluster(t *testing.T, k8s *types.Cluster, couchbase *couch
 		Die(t, fmt.Errorf("expected 404, got %d", failedReqErr.StatusCode))
 	}
 }
+
+func MustGetClusterSize(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) int {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	return len(info.Nodes)
+}

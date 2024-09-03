@@ -2362,6 +2362,13 @@ type ClusterAssimilationSpec struct {
 	// UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated. This is the host
 	// that the operator will connecto to to start the migration process.
 	UnmanagedClusterHost string `json:"unmanagedClusterHost,omitempty"`
+
+	// NumUnmanagedNodes is the number of nodes the operator will leave in the cluster unmigrated.
+	// This is useful for constrolling how much of the cluster to mgirate over at a time. If not specified
+	// the operator will migrate all nodes.
+	// e.g. if the unmanaged cluster has 10 nodes and NumUnmanagedNodes is set to 2, then the operator will
+	// migrate 8 nodes to Kubernetes and leave 2 nodes.
+	NumUnmanagedNodes int `json:"numUnmanagedNodes,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {
