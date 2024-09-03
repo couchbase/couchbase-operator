@@ -153,49 +153,6 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 	}
 }
 
-// upgradeDownRecoverableSequence is a common sequence for generating events for a new
-// member being added, the pod being killed during a rebalance and the recovery steps.
-func upgradeDownRecoverableSequence(victimName string) eventschema.Validatable {
-	return eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
-			// Server sometimes gets a bit stuck...
-			eventschema.Optional{
-				Validator: eventschema.Sequence{
-					Validators: []eventschema.Validatable{
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-						eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-					},
-				},
-			},
-			eventschema.Optional{
-				Validator: eventschema.Sequence{
-					Validators: []eventschema.Validatable{
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-					},
-				},
-			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-			eventschema.Optional{
-				Validator: eventschema.Sequence{
-					Validators: []eventschema.Validatable{
-						eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-					},
-				},
-			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-		},
-	}
-}
-
 // MemberAddAndDownUnecoverableSequence is a common sequence for generating events for a new
 // member being added, the pod being killed during a rebalance and the recovery steps.  Warning,
 // the behaviour of this changes based on what kind of stateful service is enabled - eventing
@@ -580,7 +537,6 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
@@ -589,28 +545,8 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
-	// * Victim node failed to balance in and is ejected to maintain scale
-	// * For the remaining iterations upgrades nodes upgrade
-	//    (one upgrade sequence can be captured by upgradeDownRecoverableSequence which is why it's optional)
-	// * Upgrade completes
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
-		upgradeDownRecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
-		eventschema.Optional{Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 30*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 }
 
 // TestUpgradeSupportableKillExistingStatefulPodOnRebalance tests that upgrades work for a

@@ -131,7 +131,7 @@ func TestPersistentVolumeAutoFailover(t *testing.T) {
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(120)
 	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
 	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,

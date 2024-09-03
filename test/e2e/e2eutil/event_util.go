@@ -61,6 +61,10 @@ func NewMemberAddEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event
 	return k8sutil.MemberAddEvent(name, cl)
 }
 
+func NewUpgradeFinishedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	return k8sutil.UpgradeFinishedEvent(cl)
+}
+
 func NewMemberRemoveEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberRemoveEvent(name, cl)
