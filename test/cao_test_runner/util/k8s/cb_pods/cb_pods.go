@@ -89,3 +89,9 @@ func GetCBPodsMap(namespace string) (map[string]*pods.Pod, error) {
 
 	return cbPodsMap, nil
 }
+
+// GetCBPodHostname returns the k8s hostname for the CB pod.
+func GetCBPodHostname(cbPodName, namespace string) string {
+	// pod=cb-example-0001 in namespace=default and cluster=cb-example has hostname=cb-example-0001.cb-example.default.svc.
+	return fmt.Sprintf("%s.%s.%s.svc", cbPodName, cbPodName[0:len(cbPodName)-5], namespace)
+}
