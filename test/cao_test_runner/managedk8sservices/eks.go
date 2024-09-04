@@ -732,3 +732,71 @@ func (es *EKSSession) EnableEBSCSIDriverAddon(addonVersion string) (*eks.Addon, 
 
 	return es.CreateAddon(addonName, addonVersion, *role.Arn)
 }
+
+func (es *EKSSession) EnableAutoAssignPublicIP(subnetID string) error {
+	_, err := es.EC2Client.ModifySubnetAttribute(&ec2.ModifySubnetAttributeInput{
+		SubnetId: aws.String(subnetID),
+		MapPublicIpOnLaunch: &ec2.AttributeBooleanValue{
+			Value: aws.Bool(true),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to enable auto-assign public IP for subnet %s: %w", subnetID, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) CreateInternetGateway() (*ec2.InternetGateway, error) {
+	result, err := es.EC2Client.CreateInternetGateway(&ec2.CreateInternetGatewayInput{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Internet Gateway: %w", err)
+	}
+
+	return result.InternetGateway, nil
+}
+
+func (es *EKSSession) AttachInternetGateway(vpcID, igwID string) error {
+	_, err := es.EC2Client.AttachInternetGateway(&ec2.AttachInternetGatewayInput{
+		VpcId:             aws.String(vpcID),
+		InternetGatewayId: aws.String(igwID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to attach Internet Gateway: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) CreateRouteTable(vpcID, igwID string) (*ec2.RouteTable, error) {
+	result, err := es.EC2Client.CreateRouteTable(&ec2.CreateRouteTableInput{
+		VpcId: aws.String(vpcID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Route Table: %w", err)
+	}
+
+	// TODO: Take the routes as params
+	_, err = es.EC2Client.CreateRoute(&ec2.CreateRouteInput{
+		RouteTableId:         result.RouteTable.RouteTableId,
+		DestinationCidrBlock: aws.String("0.0.0.0/0"),
+		GatewayId:            aws.String(igwID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create route in Route Table: %w", err)
+	}
+
+	return result.RouteTable, nil
+}
+
+func (es *EKSSession) AssociateRouteTable(routeTableID string, subnetID string) error {
+	_, err := es.EC2Client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+		RouteTableId: aws.String(routeTableID),
+		SubnetId:     aws.String(subnetID),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to associate Route Table with Subnet: %w", err)
+	}
+
+	return nil
+}
