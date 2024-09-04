@@ -14,6 +14,7 @@ import (
 	operatorsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/operator"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
+	dataworkloads "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads/data_workloads"
 )
 
 const (
@@ -49,5 +50,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Destroy Admission Controller":     {newAction: destroyadmissioncontroller.NewDestroyAdmissionControllerConfig, config: &destroyadmissioncontroller.AdmissionControllerConfig{}},
 		"Delete CRDs":                      {newAction: destroycrd.NewCRDDestroyConfig, config: &destroycrd.CRDDestroyConfig{}},
 		"Destroy Kubernetes Cluster":       {newAction: destroykubernetes.NewKubernetesConfig, config: &destroykubernetes.KubernetesDestroyConfig{}},
+		"Data Workload":                    {newAction: dataworkloads.NewDataWorkloadConfig, config: &dataworkloads.DataWorkloadConfig{}},
 	}
 }

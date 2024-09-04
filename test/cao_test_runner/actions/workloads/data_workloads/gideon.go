@@ -1,0 +1,189 @@
+package dataworkloads
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+
+	cbpods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pods"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/jobs"
+	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
+	v1 "k8s.io/api/core/v1"
+)
+
+const (
+	// Template.
+	gideonTemplateName = "gideon_latest"
+
+	// Container.
+	gideonContainerImage = "docker.io/sequoiatools/gideon_latest"
+	gideonContainerName  = "gideon-latest"
+)
+
+type Gideon struct {
+	Jobs      []*jobs.Job
+	FilePaths []string
+}
+
+type GideonArgs struct {
+	NodeSelector map[string]string
+
+	Ops      string `args:"--ops"`
+	Create   string `args:"--create"`
+	Get      string `args:"--get"`
+	Sizes    string `args:"--sizes"`
+	Expire   string `args:"--expire"`
+	TTL      string `args:"--ttl"`
+	Hosts    string `args:"--hosts"`
+	User     string `args:"--user"`
+	Password string `args:"--password"`
+	Bucket   string `args:"--bucket"`
+}
+
+func ConfigGideonDataWorkload() *Gideon {
+	return &Gideon{
+		Jobs:      make([]*jobs.Job, 0),
+		FilePaths: make([]string, 0),
+	}
+}
+
+func (gideon *Gideon) CreateJobs(config *DataWorkloadConfig) error {
+	gideonStructs := populateGideonArgs(config)
+	for i := range gideonStructs {
+		job, err := createJob(gideonStructs[i])
+		if err != nil {
+			return err
+		}
+
+		gideon.Jobs = append(gideon.Jobs, job)
+	}
+
+	return nil
+}
+
+func (gideon *Gideon) MarshalJobYAMLs() error {
+	dir := fileutils.NewDirectory(dataWorkloadYAMLDir, os.ModePerm)
+	if !dir.IsDirectoryExists() {
+		err := dir.CreateDirectory()
+		if err != nil {
+			return fmt.Errorf("marshal job yamls: %w", err)
+		}
+	}
+
+	for i := range gideon.Jobs {
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, gideon.Jobs[i].Metadata.Name, GetRandomString(4), "yaml")
+
+		gideon.FilePaths = append(gideon.FilePaths, filePath)
+
+		err := jobs.MarshalJobYAML(gideon.Jobs[i], filePath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (gideon *Gideon) ExecuteJobs() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("execute jobs: %w", err)
+	}
+
+	for _, filePath := range gideon.FilePaths {
+		err := executeJob(filepath.Join(dir, filePath))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (gideon *Gideon) DeleteJobs() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("delete jobs: %w", err)
+	}
+
+	for _, filePath := range gideon.FilePaths {
+		err := deleteJob(filepath.Join(dir, filePath))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func createJob(gideonArgs *GideonArgs) (*jobs.Job, error) {
+	gideonJobName := "gideon-" + gideonArgs.Bucket
+
+	gideonJob := jobs.CreateBasicJob(gideonJobName)
+
+	gideonJob.AddTemplateName(gideonTemplateName)
+	gideonJob.AddRestartPolicy(v1.RestartPolicyNever)
+
+	for key, val := range gideonArgs.NodeSelector {
+		gideonJob.AddNodeSelector(key, val)
+	}
+
+	gideonArgsList := []string{"kv"}
+
+	argsList, err := BuildArgsList(gideonArgs)
+	if err != nil {
+		return nil, fmt.Errorf("create gideon job: %w", err)
+	}
+
+	gideonArgsList = append(gideonArgsList, argsList...)
+
+	gideonJob.AddContainer(gideonContainerName, gideonContainerImage, nil, gideonArgsList)
+
+	return gideonJob, nil
+}
+
+func executeJob(filePath string) error {
+	err := kubectl.ApplyFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+	if err != nil {
+		return fmt.Errorf("execute job %s: %w", filepath.Base(filePath), err)
+	}
+
+	return nil
+}
+
+func deleteJob(filePath string) error {
+	err := kubectl.DeleteFromFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+	if err != nil {
+		return fmt.Errorf("delete job %s: %w", filepath.Base(filePath), err)
+	}
+
+	return nil
+}
+
+func populateGideonArgs(config *DataWorkloadConfig) []*GideonArgs {
+	cbClusterAuth := requestutils.GetDefaultCBClusterAuth("", "")
+
+	var gideonArgs []*GideonArgs
+
+	for _, bucketConfig := range config.Buckets {
+		gideonArgs = append(gideonArgs, &GideonArgs{
+			NodeSelector: config.NodeSelector,
+			Ops:          strconv.Itoa(config.OpsRate),
+			Create:       strconv.Itoa(config.Creates),
+			Get:          strconv.Itoa(config.Reads),
+			Sizes:        strconv.FormatInt(config.DocSize, 10),
+			Expire:       strconv.Itoa(config.Expires),
+			TTL:          strconv.Itoa(config.TTL),
+			Hosts:        cbpods.GetCBPodHostname(config.FilteredPods[0], "default"),
+			User:         cbClusterAuth.Username,
+			Password:     cbClusterAuth.Password,
+			Bucket:       bucketConfig.Bucket,
+		})
+	}
+
+	return gideonArgs
+}
