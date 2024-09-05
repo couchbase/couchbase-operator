@@ -40,6 +40,9 @@ var (
 	ErrSecurityGroupNotFound    = errors.New("security group not found")
 	ErrTimeoutClusterDeletion   = errors.New("timeout reached while waiting for cluster to be deleted")
 	ErrTimeoutNodeGroupDeletion = errors.New("timeout reached while waiting for node group to be deleted")
+	ErrNoInternetGatewaysFound  = errors.New("no internet gateways found for vpc")
+	ErrNoRouteTablesFound       = errors.New("no route tables found for subnet")
+	ErrNoAssociationsFound      = errors.New("no associations between subnet and route table found")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -945,4 +948,126 @@ func (es *EKSSession) DeleteCluster(waitForDeletion bool) error {
 			}
 		}
 	}
+}
+
+func (es *EKSSession) DissociateRouteTable(associationID *string) error {
+	_, err := es.EC2Client.DisassociateRouteTable(&ec2.DisassociateRouteTableInput{
+		AssociationId: associationID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to dissociate Route Table with Subnet: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteRouteTable(routeTableID *string) error {
+	if _, err := es.EC2Client.DeleteRouteTable(&ec2.DeleteRouteTableInput{
+		RouteTableId: routeTableID,
+	}); err != nil {
+		return fmt.Errorf("unable to delete route table: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DetachInternetGateway(vpcID, igwID *string) error {
+	if _, err := es.EC2Client.DetachInternetGateway(&ec2.DetachInternetGatewayInput{
+		InternetGatewayId: igwID,
+		VpcId:             vpcID,
+	}); err != nil {
+		return fmt.Errorf("unable to detach internet gateway: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteInternetGateway(igwID *string) error {
+	if _, err := es.EC2Client.DeleteInternetGateway(&ec2.DeleteInternetGatewayInput{
+		InternetGatewayId: igwID,
+	}); err != nil {
+		return fmt.Errorf("unable to delete internet gateway: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) GetInternetGatewayForVPC(vpcID *string) (*ec2.InternetGateway, error) {
+	filter := ec2.Filter{
+		Name:   aws.String("attachment.vpc-id"),
+		Values: []*string{vpcID},
+	}
+
+	resp, err := es.EC2Client.DescribeInternetGateways(
+		&ec2.DescribeInternetGatewaysInput{
+			Filters: []*ec2.Filter{
+				&filter,
+			},
+		})
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch internet gateways for vpc: %w", err)
+	}
+
+	if len(resp.InternetGateways) > 0 {
+		return resp.InternetGateways[0], nil
+	}
+
+	return nil, fmt.Errorf("unable to find any internet gateways for vpc: %w", ErrNoInternetGatewaysFound)
+}
+
+func (es *EKSSession) GetRouteTablesForSubnet(subnetID *string) ([]*ec2.RouteTable, error) {
+	filter := ec2.Filter{
+		Name:   aws.String("association.subnet-id"),
+		Values: []*string{subnetID},
+	}
+
+	resp, err := es.EC2Client.DescribeRouteTables(
+		&ec2.DescribeRouteTablesInput{
+			Filters: []*ec2.Filter{
+				&filter,
+			},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch route table for the subnet: %w", err)
+	}
+
+	if len(resp.RouteTables) > 0 {
+		return resp.RouteTables, nil
+	}
+
+	return nil, fmt.Errorf("no route tables found for the subnet: %w", ErrNoRouteTablesFound)
+}
+
+func (es *EKSSession) GetRouteTableAssociation(routeTableID, subnetID *string) (*ec2.RouteTableAssociation, error) {
+	resp, err := es.EC2Client.DescribeRouteTables(
+		&ec2.DescribeRouteTablesInput{
+			RouteTableIds: []*string{routeTableID},
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch route table info: %w", err)
+	}
+
+	for _, rt := range resp.RouteTables {
+		for _, assoc := range rt.Associations {
+			if *assoc.SubnetId == *subnetID {
+				return assoc, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no associations found between subnet and routeTable: %w", ErrNoAssociationsFound)
+}
+
+func (es *EKSSession) DeleteRoute(routeTableID *string) error {
+	// TODO : Take destination cidr block as param
+	if _, err := es.EC2Client.DeleteRoute(&ec2.DeleteRouteInput{
+		RouteTableId:         routeTableID,
+		DestinationCidrBlock: aws.String("0.0.0.0/0"),
+	}); err != nil {
+		return fmt.Errorf("unable to detach route: %w", err)
+	}
+
+	return nil
 }
