@@ -410,6 +410,10 @@ func TestPrometheusMetricsOperator(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
+	// Create a scheduled backup that will not run during the test but will trigger job creation
+	backup := e2eutil.NewFullBackup(e2eutil.ScheduleIn(1*time.Hour)).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
 	// Confirm we can scrape various metrics from the endpoint
 	e2eutil.MustCheckOperatorMetrics(t, kubernetes, cluster, nil)
 
@@ -417,6 +421,7 @@ func TestPrometheusMetricsOperator(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

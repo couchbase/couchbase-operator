@@ -127,6 +127,11 @@ func checkOperatorMetrics(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCl
 	}
 
 	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"memory_under_management_bytes")
+	if err != nil {
+		return err
+	}
+
+	_, err = checkAllPodMetrics(k8s, couchbase, ctx, operatorMetricsPort, operatorPodSelector, metricPrefix+"backup_jobs_created_total")
 
 	return err
 }

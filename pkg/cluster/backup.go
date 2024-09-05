@@ -10,6 +10,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -319,18 +320,24 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		if _, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), resource.immediateBackupJob, metav1.CreateOptions{}); err != nil {
 			return err
 		}
+
+		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, string(resource.backup.Spec.Strategy)})...).Inc()
 	}
 
 	if resource.fullCronJob != nil {
 		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.fullCronJob, metav1.CreateOptions{}); err != nil {
 			return err
 		}
+
+		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, "scheduled_full"})...).Inc()
 	}
 
 	if resource.incrementalCronJob != nil {
 		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.incrementalCronJob, metav1.CreateOptions{}); err != nil {
 			return err
 		}
+
+		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, "scheduled_incremental"})...).Inc()
 	}
 
 	log.Info("Backup created", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)

@@ -334,6 +334,18 @@ var (
 	// nolint:godot
 	CPUUnderManagementMetric = prometheus.GaugeVec{}
 
+	// BackupJobsCreatedTotalMetric
+	// name: backup_jobs_created_total
+	// type: counter
+	// help: Total number of backup jobs that have been created by the operator
+	// unit:
+	// added: 2.8.0
+	// stability: committed
+	// labels: namespace, backup_type
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	BackupJobsCreatedTotalMetric = prometheus.CounterVec{}
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -478,6 +490,13 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"namespace", "name"}))
 
+	BackupJobsCreatedTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "backup_jobs_created_total",
+		Help:      "Total number of backup jobs that have been created by the operator",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "backup_type"}))
+
 	metrics.Registry.MustRegister(
 		ReconcileTotalMetric,
 		ReconcileFailureMetric,
@@ -503,5 +522,6 @@ func InitMetrics() {
 		VolumeSizeUnderManagementBytesMetric,
 		MemoryUnderManagementBytesMetric,
 		CPUUnderManagementMetric,
+		BackupJobsCreatedTotalMetric,
 	)
 }

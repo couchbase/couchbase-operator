@@ -1,4 +1,18 @@
 {
+    "backup_jobs_created_total": {
+        "type": "counter",
+        "help": "Total number of backup jobs that have been created by the operator",
+        "added": "2.8.0",
+        "stability": "committed",
+        "labels": [
+            "namespace",
+            "backup_type"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
     "cpu_under_management": {
         "type": "gauge",
         "help": "Total cpu requests for operator managed pods in k8s cpu units",
