@@ -148,6 +148,11 @@ func NewVolumeExpandStartedEvent(volumeName string, from string, to string, cl *
 	return k8sutil.ExpandVolumeStartedEvent(volumeName, from, to, cl)
 }
 
+func NewMemberAddedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
+	return k8sutil.MemberAddEvent(name, cl)
+}
+
 // VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
 func VolumeExpansionSuccessSequence() eventschema.Validatable {
 	return eventschema.Sequence{

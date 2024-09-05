@@ -10,7 +10,7 @@ import (
 )
 
 func (c *Cluster) getMigratingReadyTarget() interface{} {
-	if c.readyMembers().Empty() {
+	if c.cluster.IsMigrationCluster() && c.readyMembers().Empty() {
 		return c.cluster.Spec.Migration.GetUnmanagedHostURL()
 	}
 

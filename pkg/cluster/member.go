@@ -318,7 +318,7 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 }
 
 func (c *Cluster) addMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*couchbaseutil.PodCreationResult, error) {
-	return c.addMembersToTarget(c.readyMembers(), serverSpecs...)
+	return c.addMembersToTarget(c.getMigratingReadyTarget(), serverSpecs...)
 }
 
 // Creates and adds a new Couchbase cluster member.
@@ -401,7 +401,7 @@ func (c *Cluster) destroyMember(name string, removeVolumes bool) error {
 
 // Cancel a node addition.
 func (c *Cluster) cancelAddMember(member couchbaseutil.Member) error {
-	if err := couchbaseutil.CancelAddNode(member.GetOTPNode()).RetryFor(extendedRetryPeriod).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.CancelAddNode(member.GetOTPNode()).RetryFor(extendedRetryPeriod).On(c.api, c.getMigratingReadyTarget()); err != nil {
 		return err
 	}
 
@@ -559,7 +559,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 
 	// For some utterly bizarre reason the default is TLS1.0, screw that!
 	securitySettings := &couchbaseutil.SecuritySettings{}
-	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.readyMembers()); err != nil {
+	if err := couchbaseutil.GetSecuritySettings(securitySettings).On(c.api, c.getMigratingReadyTarget()); err != nil {
 		return err
 	}
 
@@ -567,7 +567,7 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 
 	// This needs a retry, server doesn't gracefully shutdown and give us a response,
 	// it may just slam the door shut and give us an EOF.
-	return couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.readyMembers())
+	return couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.getMigratingReadyTarget())
 }
 
 // Initialize a member with TLS certificates.

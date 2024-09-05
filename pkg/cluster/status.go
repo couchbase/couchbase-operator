@@ -101,7 +101,13 @@ type Status struct {
 
 // GetStatus returns a new cluster status.
 func (c *Cluster) GetStatus() (*Status, error) {
-	return c.getStatus(c.callableMembers)
+	target := c.getMigratingReadyTarget()
+
+	if _, ok := target.(couchbaseutil.MemberSet); ok {
+		return c.getStatus(c.callableMembers)
+	}
+
+	return c.getStatusFromTarget(target, c.members)
 }
 
 // GetStatusUnsafe returns a new cluster status from an untrusted
@@ -113,8 +119,14 @@ func (c *Cluster) GetStatusUnsafe(members couchbaseutil.MemberSet) (*Status, err
 // getStatus parses the Couchbase cluster status and makes it easier
 // to use.
 func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
+	return c.getStatusFromTarget(members, members)
+}
+
+// getStatusFromTarget parses the Couchbase cluster status and makes it easier
+// to use.
+func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.MemberSet) (*Status, error) {
 	info := &couchbaseutil.ClusterInfo{}
-	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, members); err != nil {
+	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, target); err != nil {
 		return nil, err
 	}
 

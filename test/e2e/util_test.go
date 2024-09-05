@@ -714,6 +714,7 @@ func registerTests() {
 		// Migration tests
 		framework.NewTestDef(TestMigrateCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateLeaveUnmanagedCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestPremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
 	}
 }
 
