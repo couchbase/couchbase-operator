@@ -3445,6 +3445,12 @@ func TestVersionUpgradePath(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"cannot upgrade"},
 		},
+		{
+			name:           "InvalidUpgradePathDowngrade",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:6.6.0")},
+			shouldFail:     true,
+			expectedErrors: []string{"Downgrades are not supported"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})

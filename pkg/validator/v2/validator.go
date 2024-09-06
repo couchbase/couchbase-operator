@@ -3428,6 +3428,11 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 	if validUpgrade, err := couchbaseutil.ValidUpgrade(oldVersion, newVersion); err != nil {
 		return err
 	} else if !validUpgrade {
+		if isDowngrade, err := couchbaseutil.VersionBefore(newVersion, oldVersion); err != nil {
+			return err
+		} else if isDowngrade {
+			return fmt.Errorf("cannot upgrade from %s to %s. Downgrades are not supported", oldVersion, newVersion)
+		}
 		upperboundVersion, err := couchbaseutil.GetUpgradeUpperbound(oldVersion)
 		if err != nil {
 			return err
