@@ -157,6 +157,11 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 		resource.fullCronJob = fullCronJob
 
 		if backup.Spec.Strategy == couchbasev2.FullIncremental {
+			// it's possible we don't have a incremental backup schedule, if the DAC is disabled
+			if backup.Spec.Incremental == nil || len(backup.Spec.Incremental.Schedule) == 0 {
+				return nil, fmt.Errorf("%w: no valid incremental backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
+			}
+
 			incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
 			if err != nil {
 				return nil, err
