@@ -602,7 +602,7 @@ func (c *Cluster) runReconcile() {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
-	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Inc()
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
