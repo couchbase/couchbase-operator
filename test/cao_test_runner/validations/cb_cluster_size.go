@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
 	jsonpatchutil "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
 	"github.com/sirupsen/logrus"
 )
@@ -107,10 +106,10 @@ func (c *CouchbaseClusterSize) Run(_ *context.Context) error {
 
 				if serverNameString, ok := serverName.(string); ok {
 					requiredServerSize := c.MapServerNameToSize[serverNameString]
-					patchSet := jsonpatch.NewPatchSet().
+					patchSet := jsonpatchutil.NewPatchSet().
 						Test(fmt.Sprintf(specServerSizeYAMLPath, j), requiredServerSize)
 
-					err = jsonpatch.Apply(&jsonOutput, patchSet.Patches())
+					err = jsonpatchutil.Apply(&jsonOutput, patchSet.Patches())
 					if err != nil {
 						return fmt.Errorf("server size apply patch: %w", err)
 					}

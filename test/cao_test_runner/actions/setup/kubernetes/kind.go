@@ -22,7 +22,9 @@ nodes:
 `
 
 var (
-	ErrClusterAlreadyExists = errors.New("cluster already exists")
+	ErrClusterAlreadyExists   = errors.New("cluster already exists")
+	ErrNumControlPlaneMissing = errors.New("for environment type 'kind', numControlPlane must be present in the YAML configuration")
+	ErrNumWorkersMissing      = errors.New("for environment type 'kind', numWorker must be present in the YAML configuration")
 )
 
 type CreateKindCluster struct {
@@ -101,11 +103,11 @@ func (ckc *CreateKindCluster) CreateCluster() error {
 
 func (ckc *CreateKindCluster) ValidateParams() error {
 	if ckc.NumControlPlane < 0 {
-		return fmt.Errorf("for environment type 'kind', numControlPlane must be present in the YAML configuration")
+		return ErrNumControlPlaneMissing
 	}
 
 	if ckc.NumWorkers < 0 {
-		return fmt.Errorf("for environment type 'kind', numWorker must be present in the YAML configuration")
+		return ErrNumWorkersMissing
 	}
 	// if _, err := os.Stat(ckc.ConfigDirectory); err != nil {
 	// 	return fmt.Errorf("the directory %s cannot be accessed: %w", ckc.ConfigDirectory, err)

@@ -34,8 +34,9 @@ const (
 )
 
 var (
-	ErrASGNotFound    = errors.New("asg not found")
-	ErrInvalidAmiType = errors.New("invalid ami type")
+	ErrASGNotFound           = errors.New("asg not found")
+	ErrInvalidAmiType        = errors.New("invalid ami type")
+	ErrSecurityGroupNotFound = errors.New("security group not found")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -484,7 +485,7 @@ func (es *EKSSession) CreateSecurityGroup(vpcID, groupName string) (*ec2.Securit
 		return describeResult.SecurityGroups[0], nil
 	}
 
-	return nil, fmt.Errorf("security group not found")
+	return nil, ErrSecurityGroupNotFound
 }
 
 func (es *EKSSession) GetSecurityGroupsByGroupID(groupID []*string) ([]*ec2.SecurityGroup, error) {
@@ -499,7 +500,7 @@ func (es *EKSSession) GetSecurityGroupsByGroupID(groupID []*string) ([]*ec2.Secu
 		return describeResult.SecurityGroups, nil
 	}
 
-	return nil, fmt.Errorf("security group not found")
+	return nil, ErrSecurityGroupNotFound
 }
 
 func (es *EKSSession) GetSecurityGroupsByGroupNames(groupNames []*string) ([]*ec2.SecurityGroup, error) {
@@ -514,7 +515,7 @@ func (es *EKSSession) GetSecurityGroupsByGroupNames(groupNames []*string) ([]*ec
 		return describeResult.SecurityGroups, nil
 	}
 
-	return nil, fmt.Errorf("security group not found")
+	return nil, ErrSecurityGroupNotFound
 }
 
 func (es *EKSSession) CreateEKSCluster(version string, subnetIDs, securityGroupIDs []string,

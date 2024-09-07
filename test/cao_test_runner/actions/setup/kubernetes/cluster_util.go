@@ -8,7 +8,9 @@ import (
 )
 
 var (
-	ErrNotImplemented = errors.New("not implemented")
+	ErrNotImplemented         = errors.New("not implemented")
+	ErrUnknownEnvironmentType = errors.New("unknown environment type")
+	ErrUnknownPlatformType    = errors.New("unknown platform type")
 )
 
 type CreateClusterUtil interface {
@@ -34,13 +36,13 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			return nil, ErrNotImplemented
 
 		default:
-			return nil, fmt.Errorf("unknown environment type: %s", p.Environment)
+			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}
 
 	case installutils.Openshift:
 		return nil, ErrNotImplemented
 
 	default:
-		return nil, fmt.Errorf("unknown platform type: %s", p.Platform)
+		return nil, fmt.Errorf("unknown platform type %s: %w", p.Platform, ErrUnknownPlatformType)
 	}
 }

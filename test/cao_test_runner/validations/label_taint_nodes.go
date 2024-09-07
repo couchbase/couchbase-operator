@@ -53,7 +53,7 @@ func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 
 	if ltn.ApplyLabel {
 		logrus.Info("Apply label to K8s nodes started")
-		logrus.Info("Filtered nodes: %v", filteredNodes)
+		logrus.Info(fmt.Sprintf("Filtered nodes: %v", filteredNodes))
 
 		for _, nodeName := range filteredNodes {
 			err = kubectl.Label(nodeName, ltn.LabelKey, ltn.LabelValue).ExecWithoutOutputCapture()
@@ -61,12 +61,13 @@ func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 				return fmt.Errorf("apply label to couchbase node: %w", err)
 			}
 		}
+
 		logrus.Info("Apply label to K8s nodes successful")
 	}
 
 	if ltn.ApplyTaint {
 		logrus.Info("Apply taint to K8s nodes started")
-		logrus.Info("Filtered nodes: %v", filteredNodes)
+		logrus.Info(fmt.Sprintf("Filtered nodes: %v", filteredNodes))
 
 		for _, nodeName := range filteredNodes {
 			err = kubectl.Taint(nodeName, ltn.TaintKey, ltn.TaintValue, string(ltn.TaintEffect)).ExecWithoutOutputCapture()
@@ -80,7 +81,7 @@ func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 
 	if ltn.RemoveLabel {
 		logrus.Info("Remove label from K8s nodes started")
-		logrus.Info("Filtered nodes: %v", filteredNodes)
+		logrus.Info(fmt.Sprintf("Filtered nodes: %v", filteredNodes))
 
 		for _, nodeName := range filteredNodes {
 			err = kubectl.Unlabel(nodeName, ltn.LabelKey).ExecWithoutOutputCapture()
@@ -94,7 +95,7 @@ func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 
 	if ltn.RemoveTaint {
 		logrus.Info("Remove taint from K8s nodes started")
-		logrus.Info("Filtered nodes: %v", filteredNodes)
+		logrus.Info(fmt.Sprintf("Filtered nodes: %v", filteredNodes))
 
 		for _, nodeName := range filteredNodes {
 			err = kubectl.RemoveTaint(nodeName, ltn.TaintKey, ltn.TaintValue, string(ltn.TaintEffect)).ExecWithoutOutputCapture()
