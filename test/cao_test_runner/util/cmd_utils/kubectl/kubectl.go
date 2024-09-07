@@ -294,8 +294,9 @@ func GetCurrentContext() *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
 }
 
-func DeleteContext(args ...string) *KubectlCmd {
-	panic("Not Implemented")
+func DeleteContext(contextName string) *KubectlCmd {
+	args := []string{"delete-context", contextName}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
 }
 
 func GetContexts() *KubectlCmd {
