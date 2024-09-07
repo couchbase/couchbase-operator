@@ -91,11 +91,15 @@ func (file *File) OpenFile(flag int, perm fs.FileMode) error {
 
 func (file *File) IsFileExists() bool {
 	_, err := os.Stat(file.FilePath)
-	if err != nil {
-		return false
+	return err == nil
+}
+
+func (file *File) ChangePermissions(newPermissions fs.FileMode) error {
+	if err := os.Chmod(file.FilePath, newPermissions); err != nil {
+		return fmt.Errorf("error changing permissions of file %s: %w", file.FilePath, err)
 	}
 
-	return true
+	return nil
 }
 
 func (directory *Directory) IsDirectoryExists() bool {

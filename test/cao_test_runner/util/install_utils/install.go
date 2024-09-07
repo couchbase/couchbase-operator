@@ -100,6 +100,14 @@ func (installParams *InstallParams) InstallCaoCrd() (string, string, error) {
 	caoPath := filepath.Join(generateDownloadedDirectory(installParams), "bin", "cao")
 	crdPath := filepath.Join(generateDownloadedDirectory(installParams), "crd.yaml")
 
+	if err := fileutils.NewFile(caoPath).ChangePermissions(0777); err != nil {
+		return "", "", fmt.Errorf("unable to change cao file permissions: %w", err)
+	}
+
+	if err := fileutils.NewFile(crdPath).ChangePermissions(0777); err != nil {
+		return "", "", fmt.Errorf("unable to change crd file permissions: %w", err)
+	}
+
 	return caoPath, crdPath, nil
 }
 
