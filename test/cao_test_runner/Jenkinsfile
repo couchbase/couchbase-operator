@@ -26,7 +26,8 @@ pipeline {
     string(name: 'admission_image', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
     string(name: 'cao_version', defaultValue: '2.7.0-211')
     string(name: 'kubectl_version', defaultValue: '1.27.0')
-    string(name: 'region', defaultValue: 'us-east-2')
+    string(name: 'eks_region', defaultValue: 'us-east-2')
+    string(name: 'aks_region', defaultValue: 'eastus')
   }
 
   environment {
@@ -41,11 +42,16 @@ pipeline {
     S3_SECRET_ID = credentials('cbqe-s3-secret-id')
     EKS_ACCESS_KEY = credentials('couchbaseqe-aws-access-id')
     EKS_SECRET_KEY = credentials('couchbaseqe-aws-access-secret')
-    EKS_REGION = "${params.region}"
+    EKS_REGION = "${params.eks_region}"
+    AKS_REGION = "${params.aks_region}"
+    AKS_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+    AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
+    AKS_TENANT_ID = credentials('azure-tenant-id')
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
   }
 
   stages {
+    
     stage('Prerequisite Installs') {
       steps {
         sh "mkdir -p ${env.WORKSPACE}/bin"
@@ -77,6 +83,9 @@ pipeline {
       steps {
         dir("./test/cao_test_runner") {
             script {
+              // Set Azure credentials here
+              env.AKS_SERVICE_PRINCIPAL_ID = AZURE_CREDENTIALS_USR
+              env.AKS_SERVICE_PRINCIPAL_SECRET_ID = AZURE_CREDENTIALS_PSW
               try {
                   sh "go run . scenario --scenario ${params.scenario_file}"
               }
