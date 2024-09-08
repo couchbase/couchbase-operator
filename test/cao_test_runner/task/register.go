@@ -2,6 +2,7 @@ package task
 
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/chaos"
 	destroyadmissioncontroller "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/admission_controller"
 	destroycrd "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/crd"
 	destroykubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/kubernetes"
@@ -51,5 +52,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Delete CRDs":                      {newAction: destroycrd.NewCRDDestroyConfig, config: &destroycrd.CRDDestroyConfig{}},
 		"Destroy Kubernetes Cluster":       {newAction: destroykubernetes.NewKubernetesConfig, config: &destroykubernetes.KubernetesDestroyConfig{}},
 		"Data Workload":                    {newAction: dataworkloads.NewDataWorkloadConfig, config: &dataworkloads.DataWorkloadConfig{}},
+		"Chaos":                            {newAction: chaos.NewChaosConfig, config: &chaos.ChaosConfig{}},
 	}
 }

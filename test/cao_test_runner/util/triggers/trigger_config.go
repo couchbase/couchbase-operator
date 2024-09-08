@@ -40,6 +40,6 @@ func SetCBSwapRebPodName(tc *TriggerConfig, cbSwapRebPodName string) {
 	tc.CBInfo.CBSwapRebPodName = cbSwapRebPodName
 }
 
-func SetCBNodesAfterScaling(tc *TriggerConfig, cbNodes int) {
-	tc.CBInfo.cbPodsAfterScaling = cbNodes
+func SetCBPodsAfterScaling(tc *TriggerConfig, cbPods int) {
+	tc.CBInfo.cbPodsAfterScaling = cbPods
 }
