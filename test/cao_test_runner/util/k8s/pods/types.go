@@ -56,14 +56,14 @@ type SpecVolumes struct {
 }
 
 type ContainerStatuses struct {
-	ContainerID  string                       `json:"containerID"`
-	Image        string                       `json:"image"`
-	ImageID      string                       `json:"imageID"`
-	Name         string                       `json:"name"`
-	Ready        bool                         `json:"ready"`
-	RestartCount int                          `json:"restartCount"`
-	Started      bool                         `json:"started"`
-	State        map[string]map[string]string `json:"state"`
+	ContainerID  string `json:"containerID"`
+	Image        string `json:"image"`
+	ImageID      string `json:"imageID"`
+	Name         string `json:"name"`
+	Ready        bool   `json:"ready"`
+	RestartCount int    `json:"restartCount"`
+	Started      bool   `json:"started"`
+	// State        map[string]map[string]string `json:"state"`
 }
 
 type StatusConditions struct {

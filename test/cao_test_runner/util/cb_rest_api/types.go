@@ -1,7 +1,5 @@
 package cbrestapi
 
-import "time"
-
 // =============================================
 // ============== /pools/default ===============
 // =============================================
@@ -130,31 +128,31 @@ type TaskList []Task
 type StageInfoData struct {
 	TotalProgress   float64            `json:"totalProgress"`
 	PerNodeProgress map[string]float64 `json:"perNodeProgress"`
-	StartTime       time.Time          `json:"startTime"`
-	CompletedTime   bool               `json:"completedTime"`
-	TimeTaken       int                `json:"timeTaken"`
+	StartTime       interface{}        `json:"startTime"`     // It is either false or the time of completion (string or time.Time)
+	CompletedTime   interface{}        `json:"completedTime"` // It is either false or the time of completion (string or time.Time)
+	TimeTaken       interface{}        `json:"timeTaken"`     // It is either false or the time taken (int)
 
 	SubStages struct {
 		DeltaRecovery struct {
 			TotalProgress   int                `json:"totalProgress"`
 			PerNodeProgress map[string]float64 `json:"perNodeProgress"`
-			StartTime       string             `json:"startTime"`
-			CompletedTime   string             `json:"completedTime"`
-			TimeTaken       int                `json:"timeTaken"`
+			StartTime       interface{}        `json:"startTime"`     // It is either false or the time of completion (string or time.Time)
+			CompletedTime   interface{}        `json:"completedTime"` // It is either false or the time of completion (string or time.Time)
+			TimeTaken       interface{}        `json:"timeTaken"`     // It is either false or the time taken (int)
 		} `json:"deltaRecovery"`
 	} `json:"subStages"`
 }
 
 type StageInfoIndex struct {
-	StartTime     time.Time `json:"startTime"`
-	CompletedTime bool      `json:"completedTime"`
-	TimeTaken     int       `json:"timeTaken"`
+	StartTime     interface{} `json:"startTime"`     // It is either false or the time of completion (string or time.Time)
+	CompletedTime interface{} `json:"completedTime"` // It is either false or the time of completion (string or time.Time)
+	TimeTaken     interface{} `json:"timeTaken"`     // It is either false or the time taken (int)
 }
 
 type StageInfoQuery struct {
-	StartTime     time.Time `json:"startTime"`
-	CompletedTime bool      `json:"completedTime"`
-	TimeTaken     int       `json:"timeTaken"`
+	StartTime     interface{} `json:"startTime"`     // It is either false or the time of completion (string or time.Time)
+	CompletedTime interface{} `json:"completedTime"` // It is either false or the time of completion (string or time.Time)
+	TimeTaken     interface{} `json:"timeTaken"`     // It is either false or the time taken (int)
 }
 
 // =============================================

@@ -52,7 +52,11 @@ func ConfigGideonDataWorkload() *Gideon {
 }
 
 func (gideon *Gideon) CreateJobs(config *DataWorkloadConfig) error {
-	gideonStructs := populateGideonArgs(config)
+	gideonStructs, err := populateGideonArgs(config)
+	if err != nil {
+		return fmt.Errorf("create jobs gideon: %w", err)
+	}
+
 	for i := range gideonStructs {
 		job, err := createJob(gideonStructs[i])
 		if err != nil {
@@ -164,8 +168,11 @@ func deleteJob(filePath string) error {
 	return nil
 }
 
-func populateGideonArgs(config *DataWorkloadConfig) []*GideonArgs {
-	cbClusterAuth := requestutils.GetDefaultCBClusterAuth("", "")
+func populateGideonArgs(config *DataWorkloadConfig) ([]*GideonArgs, error) {
+	cbClusterAuth, err := requestutils.GetCBClusterAuth("cb-example-auth", "default")
+	if err != nil {
+		return nil, fmt.Errorf("populate gideon args: %w", err)
+	}
 
 	var gideonArgs []*GideonArgs
 
@@ -185,5 +192,5 @@ func populateGideonArgs(config *DataWorkloadConfig) []*GideonArgs {
 		})
 	}
 
-	return gideonArgs
+	return gideonArgs, nil
 }

@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	ErrHTTPRequestIsNil  = errors.New("http request is nil")
 	ErrHTTPRequestFailed = errors.New("http request failed")
 	ErrUnableToDecode    = errors.New("unable to decode")
 )
@@ -47,6 +48,10 @@ func (c *Client) SetHTTPAuth(username, password string) {
 
 // Do perform the API request.
 func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) error {
+	if req == nil {
+		return fmt.Errorf("perform request: %w", ErrHTTPRequestIsNil)
+	}
+
 	err := ValidateHTTPRequest(req)
 	if err != nil {
 		return fmt.Errorf("perform request: %w", err)
@@ -121,7 +126,7 @@ func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("handle http response: body `%s` andstatus code %d: %w", string(body), resp.StatusCode, ErrHTTPRequestFailed)
+		return fmt.Errorf("handle http response from url %s: body `%s` and status code %d: %w", resp.Request.URL, string(body), resp.StatusCode, ErrHTTPRequestFailed)
 	}
 
 	if result == nil {
@@ -133,12 +138,14 @@ func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
 	case "application/json":
 		{
 			if err := json.Unmarshal(body, result); err != nil {
+				logrus.Errorf("handle http response for content-type %s, response:\n%s\n", contentType, string(body))
 				return fmt.Errorf("handle http response for content-type %s: %w", contentType, err)
 			}
 		}
 	case "application/xml":
 		{
 			if err := xml.Unmarshal(body, result); err != nil {
+				logrus.Errorf("handle http response for content-type %s, response:\n%s\n", contentType, string(body))
 				return fmt.Errorf("handle http response for content-type %s: %w", contentType, err)
 			}
 		}
@@ -146,14 +153,14 @@ func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
 		{
 			plaintext, ok := result.(*[]byte)
 			if !ok {
-				return fmt.Errorf("handle http response for content-type %s: f: %w", contentType, ErrUnableToDecode)
+				return fmt.Errorf("handle http response for content-type %s: %w", contentType, ErrUnableToDecode)
 			}
 
 			*plaintext = body
 		}
 	default:
 		{
-			return fmt.Errorf("handle http response for content-type %s: f: %w", contentType, ErrInvalidHeaderContentType)
+			return fmt.Errorf("handle http response for content-type %s: %w", contentType, ErrInvalidHeaderContentType)
 		}
 	}
 
