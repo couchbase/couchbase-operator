@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"context"
+
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
 )
 
@@ -15,8 +17,8 @@ var (
 )
 
 type DeleteClusterUtil interface {
-	DeleteCluster() error
-	ValidateParams() error
+	DeleteCluster(ctx *context.Context) error
+	ValidateParams(ctx *context.Context) error
 }
 
 func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error) {

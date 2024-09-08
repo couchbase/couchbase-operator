@@ -1,6 +1,7 @@
 package setupkubernetes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -15,8 +16,8 @@ var (
 )
 
 type CreateClusterUtil interface {
-	CreateCluster() error
-	ValidateParams() error
+	CreateCluster(ctx *context.Context) error
+	ValidateParams(ctx *context.Context) error
 }
 
 func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {

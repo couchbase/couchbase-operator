@@ -1,6 +1,7 @@
 package setupkubernetes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -57,8 +58,8 @@ func contains(array []string, str string) bool {
 	return false
 }
 
-func (ckc *CreateKindCluster) CreateCluster() error {
-	if err := ckc.ValidateParams(); err != nil {
+func (ckc *CreateKindCluster) CreateCluster(ctx *context.Context) error {
+	if err := ckc.ValidateParams(ctx); err != nil {
 		return err
 	}
 
@@ -101,7 +102,7 @@ func (ckc *CreateKindCluster) CreateCluster() error {
 	return nil
 }
 
-func (ckc *CreateKindCluster) ValidateParams() error {
+func (ckc *CreateKindCluster) ValidateParams(_ *context.Context) error {
 	if ckc.NumControlPlane < 0 {
 		return ErrNumControlPlaneMissing
 	}

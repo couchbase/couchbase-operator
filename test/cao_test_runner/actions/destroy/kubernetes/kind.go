@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"context"
+
 	kind "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kind"
 )
 
@@ -26,8 +28,8 @@ func contains(array []string, str string) bool {
 	return false
 }
 
-func (dkc *DeleteKindCluster) DeleteCluster() error {
-	if err := dkc.ValidateParams(); err != nil {
+func (dkc *DeleteKindCluster) DeleteCluster(ctx *context.Context) error {
+	if err := dkc.ValidateParams(ctx); err != nil {
 		return err
 	}
 
@@ -38,7 +40,7 @@ func (dkc *DeleteKindCluster) DeleteCluster() error {
 	return nil
 }
 
-func (dkc *DeleteKindCluster) ValidateParams() error {
+func (dkc *DeleteKindCluster) ValidateParams(_ *context.Context) error {
 	out, _, err := kind.GetClusters().ExecWithOutputCapture()
 	if err != nil {
 		return fmt.Errorf("cannot fetch clusters in kind environment: %w", err)

@@ -1,6 +1,7 @@
 package setupkubernetes
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -47,8 +48,8 @@ type CreateEKSCluster struct {
 	KubeConfigPath    string
 }
 
-func (cec *CreateEKSCluster) CreateCluster() error {
-	if err := cec.ValidateParams(); err != nil {
+func (cec *CreateEKSCluster) CreateCluster(ctx *context.Context) error {
+	if err := cec.ValidateParams(ctx); err != nil {
 		return err
 	}
 
@@ -213,7 +214,7 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 	return nil
 }
 
-func (cec *CreateEKSCluster) ValidateParams() error {
+func (cec *CreateEKSCluster) ValidateParams(_ *context.Context) error {
 	if cec.NumNodeGroups <= 0 {
 		return ErrNumNodeGroupsInvalid
 	}

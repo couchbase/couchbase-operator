@@ -92,16 +92,18 @@ func (action *DestroyKubernetes) Do(ctx *context.Context, config interface{}) er
 
 	logrus.Infof("Kubernetes Destroy started")
 
-	createClusterUtil, err := NewDeleteClusterUtil(c)
+	deleteClusterUtil, err := NewDeleteClusterUtil(c)
 	if err != nil {
 		return err
 	}
 
-	if err = createClusterUtil.ValidateParams(); err != nil {
+	ctxContext := ctx.Context()
+
+	if err = deleteClusterUtil.ValidateParams(&ctxContext); err != nil {
 		return err
 	}
 
-	if err = createClusterUtil.DeleteCluster(); err != nil {
+	if err = deleteClusterUtil.DeleteCluster(&ctxContext); err != nil {
 		return err
 	}
 

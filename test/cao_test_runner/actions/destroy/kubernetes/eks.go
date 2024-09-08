@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"context"
+
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -25,8 +27,8 @@ func containsRoute(routeTables []*ec2.RouteTable, routeID string) bool {
 	return false
 }
 
-func (dec *DeleteEKSCluster) DeleteCluster() error {
-	if err := dec.ValidateParams(); err != nil {
+func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
+	if err := dec.ValidateParams(ctx); err != nil {
 		return err
 	}
 
@@ -167,7 +169,7 @@ func (dec *DeleteEKSCluster) DeleteCluster() error {
 	return nil
 }
 
-func (dec *DeleteEKSCluster) ValidateParams() error {
+func (dec *DeleteEKSCluster) ValidateParams(_ *context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
 		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
 	if err != nil {
