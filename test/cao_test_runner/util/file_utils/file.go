@@ -50,6 +50,10 @@ func NewDirectory(directoryPath string, permissions fs.FileMode) *Directory {
 	}
 }
 
+// ==============================================
+// =============== File functions ===============
+// ==============================================
+
 func (file *File) CloseFile() {
 	if file.OsFile == nil {
 		return
@@ -97,26 +101,6 @@ func (file *File) IsFileExists() bool {
 func (file *File) ChangePermissions(newPermissions fs.FileMode) error {
 	if err := os.Chmod(file.FilePath, newPermissions); err != nil {
 		return fmt.Errorf("error changing permissions of file %s: %w", file.FilePath, err)
-	}
-
-	return nil
-}
-
-func (directory *Directory) IsDirectoryExists() bool {
-	if _, err := os.Stat(directory.DirectoryPath); err != nil {
-		return false
-	}
-
-	return true
-}
-
-func (dir *Directory) CreateDirectory() error {
-	if dir.IsDirectoryExists() {
-		return fmt.Errorf("directory:%s already exists: %w", dir.DirectoryPath, ErrDirExists)
-	}
-
-	if err := os.MkdirAll(dir.DirectoryPath, dir.Permissions); err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
 	}
 
 	return nil
@@ -240,4 +224,45 @@ func (file *File) ExtractFile(outputDir string) error {
 	default:
 		return ErrNotImplemented
 	}
+}
+
+func (file *File) ReadFile() ([]byte, error) {
+	res, err := os.ReadFile(file.FilePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file %s: %w", file.FilePath, err)
+	}
+
+	return res, nil
+}
+
+func (file *File) WriteFile(data []byte, perm os.FileMode) error {
+	if err := os.WriteFile(file.FilePath, data, perm); err != nil {
+		return fmt.Errorf("error writing to file %s: %w", file.FilePath, err)
+	}
+
+	return nil
+}
+
+// ===================================================
+// =============== Directory Functions ===============
+// ===================================================
+
+func (directory *Directory) IsDirectoryExists() bool {
+	if _, err := os.Stat(directory.DirectoryPath); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (dir *Directory) CreateDirectory() error {
+	if dir.IsDirectoryExists() {
+		return fmt.Errorf("directory:%s already exists: %w", dir.DirectoryPath, ErrDirExists)
+	}
+
+	if err := os.MkdirAll(dir.DirectoryPath, dir.Permissions); err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+
+	return nil
 }
