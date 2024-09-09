@@ -15,8 +15,8 @@ pipeline {
       )
     )
 
-    // Concurrent builds are enabled at the moment for running many tests.
-    // disableConcurrentBuilds()
+    // Concurrent builds are disabled because multiple tests use the same kubectl.
+    disableConcurrentBuilds()
   }
 
   parameters {
