@@ -346,3 +346,105 @@ func (aksSession *AKSSession) CreateNodePool(ctx *context.Context, resourceGroup
 
 	return nil
 }
+
+func (aksSession *AKSSession) DeleteNodePool(ctx *context.Context, resourceGroupName, nodePoolName string, waitForNodePoolDeletion bool) error {
+	poller, err := aksSession.NodePoolClient.BeginDelete(*ctx, resourceGroupName, aksSession.ClusterName, nodePoolName, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting node pool %s: %w", nodePoolName, err)
+	}
+
+	if !waitForNodePoolDeletion {
+		return nil
+	}
+
+	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+		return fmt.Errorf("failed to wait for kubernetes node pool deletion to complete: %w", err)
+	}
+
+	return nil
+}
+
+func (aksSession *AKSSession) DeleteCluster(ctx *context.Context, resourceGroupName string, waitForClusterDeletion bool) error {
+	poller, err := aksSession.AKSClient.BeginDelete(*ctx, resourceGroupName, aksSession.ClusterName, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting cluster %s: %w", aksSession.ClusterName, err)
+	}
+
+	if !waitForClusterDeletion {
+		return nil
+	}
+
+	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+		return fmt.Errorf("failed to wait for aks cluster deletion to complete: %w", err)
+	}
+
+	return nil
+}
+
+func (aksSession *AKSSession) ListNodePools(ctx *context.Context, resourceGroupName string) ([]*armcontainerservice.AgentPool, error) {
+	nodePoolsPager := aksSession.NodePoolClient.NewListPager(resourceGroupName, aksSession.ClusterName, nil)
+
+	var nodePools []*armcontainerservice.AgentPool
+
+	for nodePoolsPager.More() {
+		resp, err := nodePoolsPager.NextPage(*ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to list node pools: %w", err)
+		}
+
+		nodePools = append(nodePools, resp.Value...)
+	}
+
+	return nodePools, nil
+}
+
+func (aksSession *AKSSession) DeleteSubnet(ctx *context.Context, resourceGroupName, virtualNetworkName, subnetName string, waitForDeletion bool) error {
+	poller, err := aksSession.SubnetsClient.BeginDelete(*ctx, resourceGroupName, virtualNetworkName, subnetName, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting subnet: %w", err)
+	}
+
+	if !waitForDeletion {
+		return nil
+	}
+
+	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+		return fmt.Errorf("failed to wait for subnet deletion to complete: %w", err)
+	}
+
+	return nil
+}
+
+func (aksSession *AKSSession) DeleteVirtualNetwork(ctx *context.Context, resourceGroupName, virtualNetworkName string, waitForDeletion bool) error {
+	poller, err := aksSession.VirtualNetworksClient.BeginDelete(*ctx, resourceGroupName, virtualNetworkName, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting virtual network: %w", err)
+	}
+
+	if !waitForDeletion {
+		return nil
+	}
+
+	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+		return fmt.Errorf("failed to wait for virtual network deletion to complete: %w", err)
+	}
+
+	return nil
+}
+
+func (aksSession *AKSSession) DeleteResourceGroup(ctx *context.Context, resourceGroupName string, waitForDeletion bool) error {
+	poller, err := aksSession.ResourceGroupClient.BeginDelete(*ctx, resourceGroupName, nil)
+	if err != nil {
+		return fmt.Errorf("error deleting resource group: %w", err)
+	}
+
+	if !waitForDeletion {
+		return nil
+	}
+
+	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+		return fmt.Errorf("failed to wait for resource group deletion to complete: %w", err)
+	}
+
+	return nil
+}
