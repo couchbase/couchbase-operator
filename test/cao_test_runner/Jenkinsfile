@@ -28,6 +28,7 @@ pipeline {
     string(name: 'kubectl_version', defaultValue: '1.27.0')
     string(name: 'eks_region', defaultValue: 'us-east-2')
     string(name: 'aks_region', defaultValue: 'eastus')
+    string(name: 'gke_region', defaultValue: '')
   }
 
   environment {
@@ -44,9 +45,13 @@ pipeline {
     EKS_SECRET_KEY = credentials('couchbaseqe-aws-access-secret')
     EKS_REGION = "${params.eks_region}"
     AKS_REGION = "${params.aks_region}"
+    GKE_REGION = "${params.gke_region}"
     AKS_SUBSCRIPTION_ID = credentials('azure-subscription-id')
     AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
     AKS_TENANT_ID = credentials('azure-tenant-id')
+    GKE_CREDENTIALS_JSON = credentials('couchbaseqe-gcp')
+    GKE_AUTH_ACCOUNT = "couchbase-operator@couchbase-qe.iam.gserviceaccount.com"
+    GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
   }
 
@@ -86,6 +91,11 @@ pipeline {
               // Set Azure credentials here
               env.AKS_SERVICE_PRINCIPAL_ID = AZURE_CREDENTIALS_USR
               env.AKS_SERVICE_PRINCIPAL_SECRET_ID = AZURE_CREDENTIALS_PSW
+
+              // Set google credentials here
+              sh "echo ${env.GKE_CREDENTIALS_JSON} > credentials.json"
+              env.GKE_CREDENTIALS_JSON_PATH = "${env.WORKSPACE}/test/cao_test_runner/credentials.json"
+
               try {
                   sh "go run . scenario --scenario ${params.scenario_file}"
               }
