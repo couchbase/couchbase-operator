@@ -4281,7 +4281,7 @@ type CouchbaseClusterLogRotationSpec struct {
 }
 
 type CouchbaseClusterAuditGarbageCollectionSpec struct {
-	// DEPRECATED - by spec.logging.audit.nativePruning for Couchbase Server 7.2.4+
+	// DEPRECATED - by spec.logging.audit.rotation for Couchbase Server 7.2.4+
 	// Provide the sidecar configuration required (if so desired) to automatically clean up audit logs.
 	Sidecar *CouchbaseClusterAuditCleanupSidecarSpec `json:"sidecar,omitempty"`
 }
