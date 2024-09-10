@@ -9,11 +9,14 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 func TestMigrateCluster(t *testing.T) {
@@ -108,6 +111,49 @@ func TestPremigrationNodes(t *testing.T) {
 	if actualSize := e2eutil.MustGetClusterSize(t, kubernetes, dstCluster); actualSize != clusterSize+preMigrationSize {
 		e2eutil.Die(t, fmt.Errorf("expected %d nodes in the cluster, got %d", clusterSize+preMigrationSize, actualSize))
 	}
+}
+
+func TestStabilizationPeriod(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	stabilizationPeriodS := uint64(60)
+
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+		StabilizationPeriod:  e2espec.NewDurationS(stabilizationPeriodS),
+	}
+
+	dstCluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, dstCluster, -1)
+
+	// Chcek that the cluster goes into the waiting state the right number of times
+	for i := 0; i < clusterSize-1; i++ {
+		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, dstCluster, 10*time.Minute)
+
+		// Validate that it stays in the waiting state for the right amount of time (minus 10 seconds so not too flakey)
+		e2eutil.AssertClusterConditionFor(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, dstCluster, time.Duration(stabilizationPeriodS-10)*time.Second)
+
+		if i < clusterSize-2 {
+			e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenMigrations, v1.ConditionFalse, dstCluster, 10*time.Minute)
+		}
+	}
+
+	// Check that the cluster goes to healthy
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 3*time.Minute)
+
+	// Check that all nodes from the initial cluster have been ejected
+	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
 }
 
 func MustGetNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) int {

@@ -2369,6 +2369,10 @@ type ClusterAssimilationSpec struct {
 	// e.g. if the unmanaged cluster has 10 nodes and NumUnmanagedNodes is set to 2, then the operator will
 	// migrate 8 nodes to Kubernetes and leave 2 nodes.
 	NumUnmanagedNodes int `json:"numUnmanagedNodes,omitempty"`
+
+	// StabilizationPeriod is the time the operator will wait after a migration before starting the next migration.
+	// If not specified the operator will start the next migration immediately.
+	StabilizationPeriod *metav1.Duration `json:"stabilizationPeriod,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {
@@ -3955,21 +3959,22 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;
 type ClusterConditionType string
 
 const (
-	ClusterConditionAvailable      ClusterConditionType = "Available"
-	ClusterConditionBalanced       ClusterConditionType = "Balanced"
-	ClusterConditionManageConfig   ClusterConditionType = "ManageConfig"
-	ClusterConditionScaling        ClusterConditionType = "Scaling"
-	ClusterConditionScalingUp      ClusterConditionType = "ScalingUp"
-	ClusterConditionScalingDown    ClusterConditionType = "ScalingDown"
-	ClusterConditionUpgrading      ClusterConditionType = "Upgrading"
-	ClusterConditionHibernating    ClusterConditionType = "Hibernating"
-	ClusterConditionError          ClusterConditionType = "Error"
-	ClusterConditionAutoscaleReady ClusterConditionType = "AutoscaleReady"
-	ClusterConditionSynchronized   ClusterConditionType = "Synchronized"
+	ClusterConditionAvailable                ClusterConditionType = "Available"
+	ClusterConditionBalanced                 ClusterConditionType = "Balanced"
+	ClusterConditionManageConfig             ClusterConditionType = "ManageConfig"
+	ClusterConditionScaling                  ClusterConditionType = "Scaling"
+	ClusterConditionScalingUp                ClusterConditionType = "ScalingUp"
+	ClusterConditionScalingDown              ClusterConditionType = "ScalingDown"
+	ClusterConditionUpgrading                ClusterConditionType = "Upgrading"
+	ClusterConditionHibernating              ClusterConditionType = "Hibernating"
+	ClusterConditionError                    ClusterConditionType = "Error"
+	ClusterConditionAutoscaleReady           ClusterConditionType = "AutoscaleReady"
+	ClusterConditionSynchronized             ClusterConditionType = "Synchronized"
+	ClusterConditionWaitingBetweenMigrations ClusterConditionType = "WaitingBetweenMigrations"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

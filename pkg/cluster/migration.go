@@ -2,11 +2,13 @@ package cluster
 
 import (
 	"fmt"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
+	v1 "k8s.io/api/core/v1"
 )
 
 func (c *Cluster) getMigratingReadyTarget() interface{} {
@@ -93,6 +95,8 @@ func (c *Cluster) reconcileMigrationCluster() error {
 
 type MigrationReconcileMachine struct {
 	ReconcileMachine
+
+	createdMigrationNode bool
 
 	// externalMembers are the members that are part of the cluster and need to be migrated.
 	externalMembers couchbaseutil.MemberSet
@@ -204,6 +208,7 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleNodeServices,
 		(*MigrationReconcileMachine).handleRebalance,
 		(*MigrationReconcileMachine).handleMarkReady,
+		(*MigrationReconcileMachine).handleMigrateCondition,
 		(*MigrationReconcileMachine).handleNotifyFinished,
 	}
 
@@ -276,10 +281,66 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 	return nil
 }
 
+func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
+	// null checks for migration
+	if c.cluster.Spec.Migration == nil {
+		return nil
+	}
+
+	if c.cluster.Spec.Migration.UnmanagedClusterHost == "" {
+		return nil
+	}
+
+	if c.cluster.Spec.Migration.StabilizationPeriod == nil {
+		return nil
+	}
+
+	// If we've created a migration node, we start the stabilization period.
+	if r.createdMigrationNode {
+		c.cluster.Status.SetWaitingBetweenMigrations()
+		return nil
+	}
+
+	cond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenMigrations)
+
+	// Initialize the condition if it doesn't exist.
+	if cond == nil {
+		c.cluster.Status.SetNotWaitingBetweenMigrations()
+		return nil
+	}
+
+	// If we are waiting then check if the stabilization period has passed.
+	if cond.Status == v1.ConditionTrue {
+		lastTransitionTime, err := time.Parse(time.RFC3339, cond.LastTransitionTime)
+
+		if err != nil {
+			// This can happen if someone has messed with the status fields.
+			// We'll just assume that we don't need to wait.
+			log.Info("[WARN]]: failed to parse last update time for node migration condition", "error", err)
+			c.cluster.Status.SetNotWaitingBetweenMigrations()
+
+			return nil
+		}
+
+		stabilizationPeriodFinished := time.Since(lastTransitionTime) > r.c.cluster.Spec.Migration.StabilizationPeriod.Duration
+
+		if stabilizationPeriodFinished {
+			c.cluster.Status.SetNotWaitingBetweenMigrations()
+		}
+	}
+
+	return nil
+}
+
 // handleMigrateNodes handles migration of nodes from the externalMembers set to the cluster.
 func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 	if r.needsRebalance {
 		log.Info("Rebalance required, skipping node migration", "cluster", c.namespacedName())
+		return nil
+	}
+
+	if !c.cluster.IsReadyToAttemptMigration() {
+		log.Info("Cluster not ready to start migration", "cluster", c.namespacedName())
 		return nil
 	}
 
@@ -300,6 +361,8 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 			log.Error(err, "Failed to migrate node", "cluster", c.namespacedName(), "node", member.Name())
 			return err
 		}
+
+		r.createdMigrationNode = true
 
 		log.Info("Node migrated", "cluster", c.namespacedName(), "node", member.Name())
 	}

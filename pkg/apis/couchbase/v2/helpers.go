@@ -893,6 +893,16 @@ func (cs *ClusterStatus) SetSynchronizationFailedCondition() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetWaitingBetweenMigrations() {
+	c := newClusterCondition(ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, "Waiting", "Waiting before starting next migration")
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetNotWaitingBetweenMigrations() {
+	c := newClusterCondition(ClusterConditionWaitingBetweenMigrations, v1.ConditionFalse, "Waiting", "Waiting before starting next migration")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {
@@ -1477,4 +1487,14 @@ func SpecServicesListToServerServiceList(services ServiceList) (couchbaseutil.Se
 	}
 
 	return list, nil
+}
+
+func (c *CouchbaseCluster) IsReadyToAttemptMigration() bool {
+	cond := c.Status.GetCondition(ClusterConditionWaitingBetweenMigrations)
+
+	if cond == nil {
+		return true
+	}
+
+	return cond.Status != v1.ConditionTrue
 }
