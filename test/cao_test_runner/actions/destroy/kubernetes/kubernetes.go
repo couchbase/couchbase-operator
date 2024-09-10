@@ -38,6 +38,7 @@ type KubernetesDestroyConfig struct {
 	Environment EnvironmentType           `yaml:"environment" caoCli:"required"`
 	Provider    ProviderType              `yaml:"provider"`
 	EKSRegion   string                    `yaml:"eksRegion"`
+	AKSRegion   string                    `yaml:"aksRegion"`
 	Validators  []map[string]any          `yaml:"validators,omitempty"`
 }
 
