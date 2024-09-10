@@ -39,6 +39,7 @@ type KubernetesDestroyConfig struct {
 	Provider    ProviderType              `yaml:"provider"`
 	EKSRegion   string                    `yaml:"eksRegion"`
 	AKSRegion   string                    `yaml:"aksRegion"`
+	GKERegion   string                    `yaml:"gkeRegion"`
 	Validators  []map[string]any          `yaml:"validators,omitempty"`
 }
 

@@ -43,7 +43,10 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 					Region:      p.AKSRegion,
 				}, nil
 			case GoogleCloud:
-				return nil, ErrNotImplemented
+				return &DeleteGKECluster{
+					ClusterName: p.ClusterName,
+					Region:      p.GKERegion,
+				}, nil
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
 			}
