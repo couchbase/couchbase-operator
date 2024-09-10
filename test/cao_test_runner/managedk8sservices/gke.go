@@ -378,3 +378,105 @@ func (gks *GKESession) GetCluster(ctx *context.Context) (*containerpb.Cluster, e
 
 	return cluster, nil
 }
+
+func (gks *GKESession) ListNodePools(ctx *context.Context) (*containerpb.ListNodePoolsResponse, error) {
+	req := &containerpb.ListNodePoolsRequest{
+		Parent: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+	}
+
+	resp, err := gks.ClusterManagerClient.ListNodePools(*ctx, req, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error listing node pools: %w", err)
+	}
+
+	return resp, err
+}
+
+func (gks *GKESession) DeleteNodePool(ctx *context.Context, nodePoolName string) error {
+	req := &containerpb.DeleteNodePoolRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s/nodePools/%s", gks.ProjectID, gks.Region, gks.ClusterName, nodePoolName),
+	}
+
+	operation, err := gks.ClusterManagerClient.DeleteNodePool(*ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete node pool: %w", err)
+	}
+
+	if err = gks.WaitForOperation(ctx, operation.Name); err != nil {
+		return fmt.Errorf("node pool %s deletion operation failed: %w", nodePoolName, err)
+	}
+
+	return nil
+}
+
+func (gks *GKESession) DeleteCluster(ctx *context.Context) error {
+	req := &containerpb.DeleteClusterRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+	}
+
+	operation, err := gks.ClusterManagerClient.DeleteCluster(*ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete cluster: %w", err)
+	}
+
+	if err := gks.WaitForOperation(ctx, operation.Name); err != nil {
+		return fmt.Errorf("cluster %s deletion operation failed: %w", gks.ClusterName, err)
+	}
+
+	return nil
+}
+
+func (gks *GKESession) DeleteSubnet(ctx *context.Context, subnetName string) error {
+	req := &computepb.DeleteSubnetworkRequest{
+		Project:    gks.ProjectID,
+		Region:     gks.Region,
+		Subnetwork: subnetName,
+	}
+
+	operation, err := gks.SubnetClient.Delete(*ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete subnet: %w", err)
+	}
+
+	if err := gks.WaitForOperation(ctx, operation.Name()); err != nil {
+		return fmt.Errorf("subnet %s deletion operation failed: %w", subnetName, err)
+	}
+
+	return nil
+}
+
+func (gks *GKESession) DeleteFirewallRule(ctx *context.Context, firewallRuleName string) error {
+	req := &computepb.DeleteFirewallRequest{
+		Firewall: firewallRuleName,
+		Project:  gks.ProjectID,
+	}
+
+	operation, err := gks.FirewallsClient.Delete(*ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete firewall rule: %w", err)
+	}
+
+	if err := gks.WaitForOperation(ctx, operation.Name()); err != nil {
+		return fmt.Errorf("firewall rule %s deletion operation failed: %w", firewallRuleName, err)
+	}
+
+	return nil
+}
+
+func (gks *GKESession) DeleteVirtualNetwork(ctx *context.Context, virtualNetworkName string) error {
+	req := &computepb.DeleteNetworkRequest{
+		Network: virtualNetworkName,
+		Project: gks.ProjectID,
+	}
+
+	operation, err := gks.NetworksCLient.Delete(*ctx, req, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete virtual network: %w", err)
+	}
+
+	if err := gks.WaitForOperation(ctx, operation.Name()); err != nil {
+		return fmt.Errorf("virtual network %s deletion operation failed: %w", virtualNetworkName, err)
+	}
+
+	return nil
+}
