@@ -39,11 +39,11 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 	}
 
 	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
-	if err = eksSessionStore.SetSession(svc); err != nil {
+	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
 
-	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(svc)
+	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
@@ -169,7 +169,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (dec *DeleteEKSCluster) ValidateParams(_ *context.Context) error {
+func (dec *DeleteEKSCluster) ValidateParams(ctx *context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
 		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
 	if err != nil {
@@ -177,11 +177,11 @@ func (dec *DeleteEKSCluster) ValidateParams(_ *context.Context) error {
 	}
 
 	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
-	if err = eksSessionStore.SetSession(svc); err != nil {
+	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
 
-	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(svc)
+	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}

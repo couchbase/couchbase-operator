@@ -115,7 +115,7 @@ func getAKSKey(managedSvcCred *ManagedServiceCredentials) string {
 	return key
 }
 
-func (ass *AKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials) error {
+func (ass *AKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	defer ass.lock.Unlock()
 	ass.lock.Lock()
 
@@ -131,9 +131,9 @@ func (ass *AKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials
 	return nil
 }
 
-func (ass *AKSSessionStore) GetSession(managedSvcCred *ManagedServiceCredentials) (*AKSSession, error) {
+func (ass *AKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) (*AKSSession, error) {
 	if _, ok := ass.AKSSessions[getAKSKey(managedSvcCred)]; !ok {
-		err := ass.SetSession(managedSvcCred)
+		err := ass.SetSession(ctx, managedSvcCred)
 		if err != nil {
 			return nil, fmt.Errorf("get aks session: %w", err)
 		}
@@ -142,12 +142,12 @@ func (ass *AKSSessionStore) GetSession(managedSvcCred *ManagedServiceCredentials
 	return ass.AKSSessions[getAKSKey(managedSvcCred)], nil
 }
 
-func (ass *AKSSessionStore) Check(managedSvcCred *ManagedServiceCredentials) error {
+func (ass *AKSSessionStore) Check(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (ass *AKSSessionStore) GetInstancesByK8sNodeName(managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
+func (ass *AKSSessionStore) GetInstancesByK8sNodeName(ctx *context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
 	// TODO implement me
 	panic("implement me")
 }

@@ -1,6 +1,7 @@
 package managedk8sservices
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -128,7 +129,7 @@ func ValidateAMIType(ami AMIType) (bool, error) {
 
 // SetSession adds an EKS cluster to the EKSSessionStore.
 // It creates a new EKSSession for the provided EKS cluster.
-func (ess *EKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials) error {
+func (ess *EKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	defer ess.lock.Unlock()
 	ess.lock.Lock()
 
@@ -146,9 +147,9 @@ func (ess *EKSSessionStore) SetSession(managedSvcCred *ManagedServiceCredentials
 
 // GetSession returns the EKSSession for an EKS Cluster.
 // If EKSSession for the cluster is not present in EKSSessionStore then it sets it.
-func (ess *EKSSessionStore) GetSession(managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
+func (ess *EKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
 	if _, ok := ess.EKSSessions[getEKSKey(managedSvcCred)]; !ok {
-		err := ess.SetSession(managedSvcCred)
+		err := ess.SetSession(ctx, managedSvcCred)
 		if err != nil {
 			return nil, fmt.Errorf("get eks session: %w", err)
 		}
@@ -158,8 +159,8 @@ func (ess *EKSSessionStore) GetSession(managedSvcCred *ManagedServiceCredentials
 }
 
 // Check checks if the k8s cluster in EKS is accessible or not.
-func (ess *EKSSessionStore) Check(managedSvcCred *ManagedServiceCredentials) error {
-	eksSession, err := ess.GetSession(managedSvcCred)
+func (ess *EKSSessionStore) Check(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
+	eksSession, err := ess.GetSession(ctx, managedSvcCred)
 	if err != nil {
 		return fmt.Errorf("check eks cluster accessibility: %w", err)
 	}
@@ -175,8 +176,8 @@ func (ess *EKSSessionStore) Check(managedSvcCred *ManagedServiceCredentials) err
 }
 
 // GetInstancesByK8sNodeName gets the ec2 instance ids for the provided kubernetes node names.
-func (ess *EKSSessionStore) GetInstancesByK8sNodeName(managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
-	eksSession, err := ess.GetSession(managedSvcCred)
+func (ess *EKSSessionStore) GetInstancesByK8sNodeName(ctx *context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
+	eksSession, err := ess.GetSession(ctx, managedSvcCred)
 	if err != nil {
 		return []string{}, fmt.Errorf("get ec2 instance by k8s node name: %w", err)
 	}
@@ -388,9 +389,7 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(asgName string) ([]*ec2.Ins
 	var resultInstances []*ec2.Instance
 
 	for _, reservation := range ec2Result.Reservations {
-		for _, instance := range reservation.Instances {
-			resultInstances = append(resultInstances, instance)
-		}
+		resultInstances = append(resultInstances, reservation.Instances...)
 	}
 
 	return resultInstances, nil

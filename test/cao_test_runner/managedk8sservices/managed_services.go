@@ -1,6 +1,7 @@
 package managedk8sservices
 
 import (
+	"context"
 	"errors"
 )
 
@@ -32,13 +33,13 @@ var (
 
 type ManagedService interface {
 	// SetSession adds an K8S cluster Session to the respective ManagedServiceProvider SessionStore.
-	SetSession(managedSvcCred *ManagedServiceCredentials) error
+	SetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error
 
 	// Check verifies if the k8s cluster in the ManagedServiceProvider is accessible or not.
-	Check(managedSvcCred *ManagedServiceCredentials) error
+	Check(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error
 
 	// GetInstancesByK8sNodeName gets the instance / VM ids for the provided k8s node names.
-	GetInstancesByK8sNodeName(managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error)
+	GetInstancesByK8sNodeName(ctx *context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error)
 }
 
 func NewManagedService(ms ManagedServiceProvider) ManagedService {

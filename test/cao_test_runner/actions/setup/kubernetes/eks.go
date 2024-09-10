@@ -60,11 +60,11 @@ func (cec *CreateEKSCluster) CreateCluster(ctx *context.Context) error {
 	}
 
 	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
-	if err = eksSessionStore.SetSession(svc); err != nil {
+	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
 
-	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(svc)
+	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
@@ -214,7 +214,7 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 	return nil
 }
 
-func (cec *CreateEKSCluster) ValidateParams(_ *context.Context) error {
+func (cec *CreateEKSCluster) ValidateParams(ctx *context.Context) error {
 	if cec.NumNodeGroups <= 0 {
 		return ErrNumNodeGroupsInvalid
 	}
@@ -246,11 +246,11 @@ func (cec *CreateEKSCluster) ValidateParams(_ *context.Context) error {
 	}
 
 	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
-	if err = eksSessionStore.SetSession(svc); err != nil {
+	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
 
-	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(svc)
+	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}

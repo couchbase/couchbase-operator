@@ -28,11 +28,11 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 
 	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
 
-	if err = aksSessionStore.SetSession(svc); err != nil {
+	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}
 
-	aksSession, err := aksSessionStore.(*managedk8sservices.AKSSessionStore).GetSession(svc)
+	aksSession, err := aksSessionStore.(*managedk8sservices.AKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get aks session: %w", err)
 	}
@@ -102,11 +102,11 @@ func (dac *DeleteAKSCluster) ValidateParams(ctx *context.Context) error {
 
 	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
 
-	if err = aksSessionStore.SetSession(svc); err != nil {
+	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}
 
-	aksSession, err := aksSessionStore.(*managedk8sservices.AKSSessionStore).GetSession(svc)
+	aksSession, err := aksSessionStore.(*managedk8sservices.AKSSessionStore).GetSession(ctx, svc)
 	if err != nil {
 		return fmt.Errorf("unable to get aks session: %w", err)
 	}
