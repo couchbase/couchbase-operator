@@ -20,7 +20,7 @@ var (
 
 type KubeConfigContextSetupConfig struct {
 	Description []string         `yaml:"description"`
-	K8sContext  string           `yaml:"k8sContext" caoCli:"required"`
+	K8sContext  string           `yaml:"k8sContext" caoCli:"required,context"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
 }
 
