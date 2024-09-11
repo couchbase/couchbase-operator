@@ -7,6 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ var (
 	ErrNoAdmissionConfigFound        = errors.New("no config found for creating admission pod")
 	ErrIllegalImagePullPolicy        = errors.New("illegal image pull policy")
 	ErrIllegalScope                  = errors.New("illegal scope")
+	ErrCAOBinaryPathInvalid          = errors.New("cao binary path does not exist")
 )
 
 type ImagePullPolicyType string
@@ -60,10 +62,11 @@ const (
 )
 
 type AdmissionControllerConfig struct {
-	AdmissionControllerImage    string              `yaml:"admissionControllerImage"`
-	CAOBinaryPath               string              `yaml:"caoBinaryPath" caoCli:"required"`
-	CPULimit                    int                 `yaml:"CPULimit"`
-	CPURequest                  int                 `yaml:"CPURequest"`
+	Description                 []string            `yaml:"description"`
+	AdmissionControllerImage    string              `yaml:"admissionControllerImage" caoCli:"context" env:"ADMISSION_CONTROLLER_IMAGE"`
+	CAOBinaryPath               string              `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
+	CPULimit                    int                 `yaml:"cpuLimit"`
+	CPURequest                  int                 `yaml:"cpuRequest"`
 	ImagePullPolicy             ImagePullPolicyType `yaml:"imagePullPolicy"`
 	ImagePullSecret             string              `yaml:"imagePullSecret,omitempty"`
 	AdmissionControllerLogLevel int                 `yaml:"admissionControllerLogLevel"`
@@ -81,52 +84,6 @@ func NewSetupAdmissionControllerConfig(config interface{}) (actions.Action, erro
 		c, ok := config.(*AdmissionControllerConfig)
 		if !ok {
 			return nil, ErrUnableToDecodeAdmissionConfig
-		}
-
-		if c.AdmissionControllerImage == "" {
-			c.AdmissionControllerImage = DefaultAdmissionImage
-		}
-
-		if c.CPULimit == 0 {
-			c.CPULimit = DefaultCPULimit
-		}
-
-		if c.CPURequest == 0 {
-			c.CPURequest = DefaultCPURequest
-		}
-
-		switch c.ImagePullPolicy {
-		case BlankImagePullPolicy:
-			c.ImagePullPolicy = DefaultImagePullPolicy
-		case Always, IfNotPresent, Never:
-			// No-op
-		default:
-			return nil, ErrIllegalImagePullPolicy
-		}
-
-		switch c.Scope {
-		case BlankScope:
-			c.Scope = DefaultScope
-		case Namespace, Cluster:
-			// No-op
-		default:
-			return nil, ErrIllegalScope
-		}
-
-		if c.AdmissionControllerLogLevel == 0 {
-			c.AdmissionControllerLogLevel = DefaultLogLevl
-		}
-
-		if c.MemoryLimit == 0 {
-			c.MemoryLimit = DefaultMemoryLimit
-		}
-
-		if c.MemoryRequest == 0 {
-			c.MemoryRequest = DefaultMemoryRequest
-		}
-
-		if c.Replicas == 0 {
-			c.Replicas = DefaultReplicas
 		}
 
 		return &SetupAdmissionController{
@@ -151,6 +108,56 @@ func (action *SetupAdmissionController) Checks(ctx *context.Context, config inte
 	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
 	if !ok {
 		return ErrNoAdmissionConfigFound
+	}
+
+	if c.AdmissionControllerImage == "" {
+		c.AdmissionControllerImage = DefaultAdmissionImage
+	}
+
+	if c.CPULimit == 0 {
+		c.CPULimit = DefaultCPULimit
+	}
+
+	if c.CPURequest == 0 {
+		c.CPURequest = DefaultCPURequest
+	}
+
+	switch c.ImagePullPolicy {
+	case BlankImagePullPolicy:
+		c.ImagePullPolicy = DefaultImagePullPolicy
+	case Always, IfNotPresent, Never:
+		// No-op
+	default:
+		return ErrIllegalImagePullPolicy
+	}
+
+	switch c.Scope {
+	case BlankScope:
+		c.Scope = DefaultScope
+	case Namespace, Cluster:
+		// No-op
+	default:
+		return ErrIllegalScope
+	}
+
+	if c.AdmissionControllerLogLevel == 0 {
+		c.AdmissionControllerLogLevel = DefaultLogLevl
+	}
+
+	if c.MemoryLimit == 0 {
+		c.MemoryLimit = DefaultMemoryLimit
+	}
+
+	if c.MemoryRequest == 0 {
+		c.MemoryRequest = DefaultMemoryRequest
+	}
+
+	if c.Replicas == 0 {
+		c.Replicas = DefaultReplicas
+	}
+
+	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
+		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
