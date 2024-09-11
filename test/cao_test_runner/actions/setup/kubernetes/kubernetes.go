@@ -36,17 +36,17 @@ var (
 
 type KubernetesSetupConfig struct {
 	Description              []string                          `yaml:"description"`
-	ClusterName              string                            `yaml:"clusterName" caoCli:"required"`
-	Platform                 installutils.PlatformType         `yaml:"platform" caoCli:"required"`
-	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required"`
+	ClusterName              string                            `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Platform                 installutils.PlatformType         `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
 	NumControlPlane          int                               `yaml:"numControlPlane"`
 	NumWorkers               int                               `yaml:"numWorkers"`
-	OperatorImage            string                            `yaml:"operatorImage" caoCli:"required"`
-	AdmissionControllerImage string                            `yaml:"admissionControllerImage" caoCli:"required"`
-	Provider                 ProviderType                      `yaml:"provider"`
-	EKSRegion                string                            `yaml:"eksRegion" env:"EKS_REGION"`
-	AKSRegion                string                            `yaml:"aksRegion" env:"AKS_REGION"`
-	GKERegion                string                            `yaml:"gkeRegion" env:"GKE_REGION"`
+	OperatorImage            string                            `yaml:"operatorImage" caoCli:"required,context" env:"OPERATOR_IMAGE"`
+	AdmissionControllerImage string                            `yaml:"admissionControllerImage" caoCli:"required,context" env:"ADMISSION_CONTROLLER_IMAGE"`
+	Provider                 ProviderType                      `yaml:"provider" caoCli:"context" env:"PROVIDER"`
+	EKSRegion                string                            `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion                string                            `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion                string                            `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
 	KubernetesVersion        string                            `yaml:"kubernetesVersion"`
 	InstanceType             string                            `yaml:"instanceType"`
 	NumNodeGroups            int                               `yaml:"numNodeGroups"`
@@ -55,7 +55,7 @@ type KubernetesSetupConfig struct {
 	DesiredSize              int                               `yaml:"desiredSize"`
 	DiskSize                 int                               `yaml:"diskSize"`
 	AMI                      managedk8sservices.AMIType        `yaml:"ami"`
-	KubeConfigPath           string                            `yaml:"kubeconfigPath" env:"KUBECONFIG"`
+	KubeConfigPath           string                            `yaml:"kubeconfigPath" caoCli:"context" env:"KUBECONFIG"`
 	OSSKU                    armcontainerservice.OSSKU         `yaml:"osSKU"`
 	OSType                   armcontainerservice.OSType        `yaml:"osType"`
 	VMSize                   string                            `yaml:"vmSize"`
@@ -78,31 +78,6 @@ func NewKubernetesConfig(config interface{}) (actions.Action, error) {
 		c, ok := config.(*KubernetesSetupConfig)
 		if !ok {
 			return nil, ErrDecodeKubernetesConfig
-		}
-
-		switch c.Platform {
-		case installutils.Kubernetes, installutils.Openshift:
-			// No-op
-		default:
-			return nil, ErrIllegalPlatform
-		}
-
-		switch c.Environment {
-		case Kind:
-			// No-op
-		case Cloud:
-			switch c.Provider {
-			case AWS, Azure, GoogleCloud:
-				// No-op
-			default:
-				return nil, ErrIllegalProvider
-			}
-		default:
-			return nil, ErrIllegalEnvironment
-		}
-
-		if c.Environment == Kind && c.Platform == installutils.Openshift {
-			return nil, ErrIllegalConfiguration
 		}
 
 		return &SetupKubernetes{
@@ -157,6 +132,31 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 	c, ok := action.yamlConfig.(*KubernetesSetupConfig)
 	if !ok {
 		return ErrNoConfigFound
+	}
+
+	switch c.Platform {
+	case installutils.Kubernetes, installutils.Openshift:
+		// No-op
+	default:
+		return ErrIllegalPlatform
+	}
+
+	switch c.Environment {
+	case Kind:
+		// No-op
+	case Cloud:
+		switch c.Provider {
+		case AWS, Azure, GoogleCloud:
+			// No-op
+		default:
+			return ErrIllegalProvider
+		}
+	default:
+		return ErrIllegalEnvironment
+	}
+
+	if c.Environment == Kind && c.Platform == installutils.Openshift {
+		return ErrIllegalConfiguration
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
