@@ -216,3 +216,15 @@ Where:
 
 To execute a multi-scenario file just pass it in as you would with a regular scenario.
 
+
+### Context and Env
+
+Action config fields can be set in context and used by subsequent actions without redefining it.
+Action config fields can also be fetched from env.
+
+When fields are present in yaml, context and env the yaml takes first precedence. If the yaml is empty, context takes
+precedence over env.
+
+The first time a field is encountered with a context tag, it will be set to context as well(post field value fetch from yaml/env).
+If the field is overriden in subsequent actions(from yaml), the context field will not be overriden. The onus falls onto the action to set it.
+

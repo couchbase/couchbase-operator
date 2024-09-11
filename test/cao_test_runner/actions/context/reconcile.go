@@ -102,11 +102,24 @@ func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 
 			ctxVal := ValueIDInterface(c.ctx, key)
 
+			// If context value is nil and value already present in field (from yaml), the context will be set with fieldValue
+
+			// If the context value is not nil and field value is nil, then the field value will be set from context
+
+			// If the context value is not nil and field value is not nil, then the field value takes precedence.
+			// Also this does not override the context value. The previous context value remains.
+			// The override of the context value has to be taken care of by the action
+			// What this implies is that the context value will be set the first time a fieldValue is encountered.
+			// Further, the context value will not be overriden by the new fieldValues and that has to be taken care by the action.
+
 			if ctxVal == nil {
 				// nothing is set in the context so we should put our config value in there.
 				if !fieldValue.IsZero() {
 					c.WithIDInterface(key, fieldValue.Interface())
+					takeFromEnv = false
 				}
+			} else if !fieldValue.IsZero() {
+				takeFromEnv = false
 			} else {
 				// values set via context take precedent over env vars.
 				takeFromEnv = false
