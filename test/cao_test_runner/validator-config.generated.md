@@ -24,7 +24,7 @@ Config symbol: `CollectLogs`
 | `OperatorLogs` | `bool` | `yaml:operatorLogs` | `caoCli:required`  |
 | `LogSpecPath` | `string` | `yaml:logSpecPath` |  |
 | `LogName` | `string` | `yaml:logName` | `caoCli:required`  |
-| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` |  |
+| `CAOBinaryPath` | `string` | `yaml:caoBinaryPath` | `caoCli:context`  |
 
 ---
 #### couchbaseClusterSize
@@ -87,8 +87,12 @@ Config symbol: `LabelTaintNodes`
 | ---- | ---- | -------- | ----------- |
 | `Name` | `string` | `yaml:name` | `caoCli:required`  |
 | `State` | `string` | `yaml:state` | `caoCli:required`  |
-| `NumCBNodes` | `int64` | `yaml:numCBNodes` | `caoCli:required`  |
-| `NumWorkloadNodes` | `int64` | `yaml:numWorkloadNodes` | `caoCli:required`  |
+| `NodeFilter` | `struct` | `yaml:nodeFilter` | `caoCli:required`  |
+| `LabelKey` | `string` | `yaml:labelKey` |  |
+| `LabelValue` | `string` | `yaml:labelValue` |  |
+| `TaintKey` | `string` | `yaml:taintKey` |  |
+| `TaintValue` | `string` | `yaml:taintValue` |  |
+| `TaintEffect` | `string` | `yaml:taintEffect` |  |
 | `ApplyTaint` | `bool` | `yaml:applyTaint` | `caoCli:required`  |
 | `ApplyLabel` | `bool` | `yaml:applyLabel` | `caoCli:required`  |
 | `RemoveTaint` | `bool` | `yaml:removeTaint` |  |
