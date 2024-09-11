@@ -93,6 +93,7 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, config interface{}) error {
 	ctx.WithID(context.PlatformKey, string(c.Platform))
 	ctx.WithID(context.ArchitectureKey, string(c.Architecture))
 	ctx.WithID(context.OperatorVersionKey, c.OperatorVersion)
+	ctx.WithID(context.CRDPathKey, crdPath)
 	ctx.WithID(context.CAOBinaryPathKey, caoBinaryPath)
 
 	return nil

@@ -28,7 +28,7 @@ pipeline {
     string(name: 'kubectl_version', defaultValue: '1.27.0')
     string(name: 'eks_region', defaultValue: 'us-east-2')
     string(name: 'aks_region', defaultValue: 'eastus')
-    string(name: 'gke_region', defaultValue: '')
+    string(name: 'gke_region', defaultValue: 'us-central1')
   }
 
   environment {
@@ -48,15 +48,22 @@ pipeline {
     GKE_REGION = "${params.gke_region}"
     AKS_SUBSCRIPTION_ID = credentials('azure-subscription-id')
     AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
+    AKS_SERVICE_PRINCIPAL_ID = "${env.AZURE_CREDENTIALS_USR}"
+    AKS_SERVICE_PRINCIPAL_SECRET_ID = "${env.AZURE_CREDENTIALS_PSW}"
     AKS_TENANT_ID = credentials('azure-tenant-id')
     GKE_CREDENTIALS_JSON = credentials('couchbaseqe-gcp')
     GKE_AUTH_ACCOUNT = "couchbase-operator@couchbase-qe.iam.gserviceaccount.com"
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+    OPERATOR_IMAGE = "${params.operator_image}"
+    ADMISSION_CONTROLLER_IMAGE = "${params.admission_image}"
+    OPERATOR_VERSION = "${params.cao_version}"
+    OPERATING_SYSTEM = "linux"
+    ARCHITECTURE= "amd64"
   }
 
   stages {
-    
+
     stage('Prerequisite Installs') {
       steps {
         sh "mkdir -p ${env.WORKSPACE}/bin"
@@ -88,10 +95,6 @@ pipeline {
       steps {
         dir("./test/cao_test_runner") {
             script {
-              // Set Azure credentials here
-              env.AKS_SERVICE_PRINCIPAL_ID = AZURE_CREDENTIALS_USR
-              env.AKS_SERVICE_PRINCIPAL_SECRET_ID = AZURE_CREDENTIALS_PSW
-
               // Set google credentials here
               sh "echo ${env.GKE_CREDENTIALS_JSON} > credentials.json"
               env.GKE_CREDENTIALS_JSON_PATH = "${env.WORKSPACE}/test/cao_test_runner/credentials.json"

@@ -1,0 +1,42 @@
+# This yaml requires following fields to be set in env / context
+# CLUSTER_NAME / ClusterName
+# OPERATOR_IMAGE / OperatorImage
+# ADMISSION_CONTROLLER_IMAGE / AdmissionControllerImage
+# OPERATOR_VERSION / OperatorVersion
+# OPERATING_SYSTEM / OperatingSystem
+# ARCHITECTURE / Architecture
+# EKS_REGION / EKSRegion
+# KUBECONFIG / KubeConfigPath
+
+action: "Setup Kubernetes Cluster"
+config:
+  description:
+    - "setup kubernetes cluster on cloud environment on AWS (EKS cluster)"
+  platform: kubernetes
+  environment: cloud
+  provider: aws
+  kubernetesVersion: 1.28
+  instanceType: m5.xlarge
+  numNodeGroups: 1
+  minSize: 5
+  maxSize: 7
+  desiredSize: 6
+  diskSize: 50
+  ami: BOTTLEROCKET_x86_64
+trees:
+  - action: "Setup CAO Binary and Deploy CRDs"
+    config:
+      description:
+        - "setup cao binary and deploying crds for EKS cluster"
+    trees:
+      - action: "Setup Operator"
+        config:
+          description:
+            - "setup operator in EKS cluster"
+        trees:
+          - action: "Setup Admission Controller"
+            config:
+              description:
+                - "setup admission controller in EKS cluster"
+              validateSecrets: true
+              validateStorageClasses: true

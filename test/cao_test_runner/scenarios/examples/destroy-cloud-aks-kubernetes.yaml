@@ -5,4 +5,3 @@ config:
   environment: cloud
   provider: azure
   aksRegion: eastus2
-            

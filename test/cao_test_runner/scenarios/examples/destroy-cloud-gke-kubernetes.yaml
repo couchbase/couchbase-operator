@@ -5,4 +5,3 @@ config:
   environment: cloud
   provider: googleCloud
   gkeRegion: us-central1
-            

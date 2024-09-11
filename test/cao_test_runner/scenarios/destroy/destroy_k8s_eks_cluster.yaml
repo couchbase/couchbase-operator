@@ -1,0 +1,28 @@
+# The following fields need to be set in env / context
+# CAO_BINARY_PATH / CAOBinaryPath
+# CRD_PATH / CRDPath
+# CLUSTER_NAME / ClusterName
+# PLATFORM / Platform
+# ENVIRONMENT / Environment
+# PROVIDER / Provider
+# EKS_REGION / EKSRegion
+
+action: "Destroy Admission Controller"
+config:
+  description:
+    - "destroy admission controller in EKS cluster"
+trees:
+  - action: "Destroy Operator"
+    config:
+        description:
+          - "destroy operator in EKS cluster"
+    trees:
+      - action: "Delete CRDs"
+        config:
+          description:
+            - "delete crds from EKS cluster"
+        trees:
+          - action: "Destroy Kubernetes Cluster"
+            config:
+              description:
+                - "destroy the EKS cluster"

@@ -1,0 +1,41 @@
+# This yaml requires following fields to be set in env / context
+# CLUSTER_NAME / ClusterName
+# OPERATOR_IMAGE / OperatorImage
+# ADMISSION_CONTROLLER_IMAGE / AdmissionControllerImage
+# OPERATOR_VERSION / OperatorVersion
+# OPERATING_SYSTEM / OperatingSystem
+# ARCHITECTURE / Architecture
+# AKS_REGION / AKSRegion
+# KUBECONFIG / KubeConfigPath
+
+action: "Setup Kubernetes Cluster"
+config:
+  description:
+    - "setup kubernetes cluster on cloud environment on Azure (AKS cluster)"
+  platform: kubernetes
+  environment: cloud
+  provider: azure
+  kubernetesVersion: 1.28.0
+  vmSize: Standard_B2ms
+  count: 7
+  diskSize: 100
+  osType: Linux
+  osSKU: AzureLinux
+  numNodePools: 1
+trees:
+  - action: "Setup CAO Binary and Deploy CRDs"
+    config:
+      description:
+        - "setup cao binary and deploying crds for AKS cluster"
+    trees:
+      - action: "Setup Operator"
+        config:
+          description:
+            - "setup operator in AKS cluster"
+        trees:
+          - action: "Setup Admission Controller"
+            config:
+              description:
+                - "setup admission controller in AKS cluster"
+              validateSecrets: true
+              validateStorageClasses: true

@@ -1,0 +1,33 @@
+# This yaml requires following fields to be set in env / context
+# CLUSTER_NAME / ClusterName
+# OPERATOR_IMAGE / OperatorImage
+# ADMISSION_CONTROLLER_IMAGE / AdmissionControllerImage
+# OPERATOR_VERSION / OperatorVersion
+# OPERATING_SYSTEM / OperatingSystem
+# ARCHITECTURE / Architecture
+
+action: "Setup Kubernetes Cluster"
+config:
+  description:
+    - "setup kubernetes cluster on kind environment"
+  platform: kubernetes
+  environment: kind
+  numControlPlane: 1
+  numWorkers: 2
+trees:
+  - action: "Setup CAO Binary and Deploy CRDs"
+    config:
+      description:
+        - "setup cao binary and deploying crds for kind"
+    trees:
+      - action: "Setup Operator"
+        config:
+          description:
+            - "setup operator in kind cluster"
+        trees:
+          - action: "Setup Admission Controller"
+            config:
+              description:
+                - "setup admission controller in kind cluster"
+              validateSecrets: true
+              validateStorageClasses: true
