@@ -4,6 +4,7 @@ type contextKey int
 
 const (
 	CAOBinaryPathKey = iota
+	CRDPathKey
 	EnvironmentKey
 	OperatorVersionKey
 	PlatformKey
@@ -18,24 +19,37 @@ const (
 	K8sNodesMapKey
 	K8sPodsMapKey
 	K8sContextKey
+	ClusterNameKey
+	ProviderKey
+	EKSRegionKey
+	AKSRegionKey
+	GKERegionKey
+	KubeConfigPathKey
 )
 
 var (
 	contextUnmarshalKeys = map[string]contextKey{
 		"CAOBinaryPath":            CAOBinaryPathKey,
+		"CRDPath":                  CRDPathKey,
 		"Environment":              EnvironmentKey,
 		"OperatorVersion":          OperatorVersionKey,
 		"Platform":                 PlatformKey,
+		"Provider":                 ProviderKey,
 		"OperatingSystem":          OperatingSystemKey,
 		"Architecture":             ArchitectureKey,
 		"Namespace":                NamespaceIDKey,
 		"OperatorImage":            OperatorIDKey,
 		"AdmissionControllerImage": AdmissionIDKey,
+		"ClusterName":              ClusterNameKey,
 		"ClusterSpecPath":          ClusterSpecPathIDKey,
 		"BucketsSpecPath":          BucketsSpecPathIDKey,
 		"CouchbaseClusterName":     CouchbaseClusterNameKey,
 		"K8sNodesMap":              K8sNodesMapKey,
 		"K8sPodsMap":               K8sPodsMapKey,
 		"K8sContext":               K8sContextKey,
+		"EKSRegion":                EKSRegionKey,
+		"AKSRegion":                AKSRegionKey,
+		"GKERegion":                GKERegionKey,
+		"KubeConfigPath":           KubeConfigPathKey,
 	}
 )
