@@ -7,6 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,7 @@ var (
 	ErrUnableToDecodeOperatorConfig = errors.New("unable to decode OperatorConfig in Do()")
 	ErrNoOperatorConfigFound        = errors.New("no config found for deleting operator pod")
 	ErrIllegalScope                 = errors.New("illegal scope")
+	ErrCAOBinaryPathInvalid         = errors.New("cao binary path does not exist")
 )
 
 type ScopeType string
@@ -35,7 +37,8 @@ const (
 )
 
 type OperatorConfig struct {
-	CAOBinaryPath string           `yaml:"caoBinaryPath" caoCli:"required"`
+	Description   []string         `yaml:"description"`
+	CAOBinaryPath string           `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
 	Scope         ScopeType        `yaml:"scope"`
 	Validators    []map[string]any `yaml:"validators,omitempty"`
 }
@@ -45,15 +48,6 @@ func NewDeleteOperatorConfig(config interface{}) (actions.Action, error) {
 		c, ok := config.(*OperatorConfig)
 		if !ok {
 			return nil, ErrUnableToDecodeOperatorConfig
-		}
-
-		switch c.Scope {
-		case BlankScope:
-			c.Scope = DefaultScope
-		case Namespace, Cluster:
-			// No-op
-		default:
-			return nil, ErrIllegalScope
 		}
 
 		return &DeleteOperator{
@@ -78,6 +72,19 @@ func (action *DeleteOperator) Checks(ctx *context.Context, config interface{}, s
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
 		return ErrNoOperatorConfigFound
+	}
+
+	switch c.Scope {
+	case BlankScope:
+		c.Scope = DefaultScope
+	case Namespace, Cluster:
+		// No-op
+	default:
+		return ErrIllegalScope
+	}
+
+	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
+		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
