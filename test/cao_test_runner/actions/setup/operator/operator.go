@@ -7,6 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,7 @@ var (
 	ErrNoOperatorConfigFound        = errors.New("no config found for creating operator pod")
 	ErrIllegalImagePullPolicy       = errors.New("illegal image pull policy")
 	ErrIllegalScope                 = errors.New("illegal scope")
+	ErrCAOBinaryPathInvalid         = errors.New("cao binary path does not exist")
 )
 
 type ImagePullPolicyType string
@@ -64,8 +66,9 @@ const (
 )
 
 type OperatorConfig struct {
-	OperatorImage      string              `yaml:"operatorImage"`
-	CAOBinaryPath      string              `yaml:"caoBinaryPath" caoCli:"required"`
+	Description        []string            `yaml:"description"`
+	OperatorImage      string              `yaml:"operatorImage" caoCli:"context" env:"OPERATOR_IMAGE"`
+	CAOBinaryPath      string              `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
 	CPULimit           int                 `yaml:"cpuLimit"`
 	CPURequest         int                 `yaml:"cpuRequest"`
 	ImagePullPolicy    ImagePullPolicyType `yaml:"imagePullPolicy"`
@@ -86,64 +89,6 @@ func NewSetupOperatorConfig(config interface{}) (actions.Action, error) {
 		c, ok := config.(*OperatorConfig)
 		if !ok {
 			return nil, ErrUnableToDecodeOperatorConfig
-		}
-
-		if c.OperatorImage == "" {
-			c.OperatorImage = DefaultOperatorImage
-		}
-
-		if c.CPULimit == 0 {
-			c.CPULimit = DefaultCPULimit
-		}
-
-		if c.CPURequest == 0 {
-			c.CPURequest = DefaultCPURequest
-		}
-
-		switch c.ImagePullPolicy {
-		case BlankImagePullPolicy:
-			c.ImagePullPolicy = DefaultImagePullPolicy
-		case Always, IfNotPresent, Never:
-			// No-op
-		default:
-			return nil, ErrIllegalImagePullPolicy
-		}
-
-		switch c.Scope {
-		case BlankScope:
-			c.Scope = DefaultScope
-		case Namespace, Cluster:
-			// No-op
-		default:
-			return nil, ErrIllegalScope
-		}
-
-		if c.OperatorLogLevel == 0 {
-			c.OperatorLogLevel = DefaultLogLevl
-		}
-
-		if c.MemoryLimit == 0 {
-			c.MemoryLimit = DefaultMemoryLimit
-		}
-
-		if c.MemoryRequest == 0 {
-			c.MemoryRequest = DefaultMemoryRequest
-		}
-
-		if c.PodCreationTimeout == "" {
-			c.PodCreationTimeout = DefaultPodCreationTimeout
-		}
-
-		if c.PodDeleteDelay == "" {
-			c.PodDeleteDelay = DefaultPodDeleteDelay
-		}
-
-		if c.PodReadinessDelay == "" {
-			c.PodReadinessDelay = DefaultPodReadinessDelay
-		}
-
-		if c.PodReadinessPeriod == "" {
-			c.PodReadinessPeriod = DefaultPodReadinessPeriod
 		}
 
 		return &SetupOperator{
@@ -168,6 +113,68 @@ func (action *SetupOperator) Checks(ctx *context.Context, config interface{}, st
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
 		return ErrNoOperatorConfigFound
+	}
+
+	if c.OperatorImage == "" {
+		c.OperatorImage = DefaultOperatorImage
+	}
+
+	if c.CPULimit == 0 {
+		c.CPULimit = DefaultCPULimit
+	}
+
+	if c.CPURequest == 0 {
+		c.CPURequest = DefaultCPURequest
+	}
+
+	switch c.ImagePullPolicy {
+	case BlankImagePullPolicy:
+		c.ImagePullPolicy = DefaultImagePullPolicy
+	case Always, IfNotPresent, Never:
+		// No-op
+	default:
+		return ErrIllegalImagePullPolicy
+	}
+
+	switch c.Scope {
+	case BlankScope:
+		c.Scope = DefaultScope
+	case Namespace, Cluster:
+		// No-op
+	default:
+		return ErrIllegalScope
+	}
+
+	if c.OperatorLogLevel == 0 {
+		c.OperatorLogLevel = DefaultLogLevl
+	}
+
+	if c.MemoryLimit == 0 {
+		c.MemoryLimit = DefaultMemoryLimit
+	}
+
+	if c.MemoryRequest == 0 {
+		c.MemoryRequest = DefaultMemoryRequest
+	}
+
+	if c.PodCreationTimeout == "" {
+		c.PodCreationTimeout = DefaultPodCreationTimeout
+	}
+
+	if c.PodDeleteDelay == "" {
+		c.PodDeleteDelay = DefaultPodDeleteDelay
+	}
+
+	if c.PodReadinessDelay == "" {
+		c.PodReadinessDelay = DefaultPodReadinessDelay
+	}
+
+	if c.PodReadinessPeriod == "" {
+		c.PodReadinessPeriod = DefaultPodReadinessPeriod
+	}
+
+	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
+		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
