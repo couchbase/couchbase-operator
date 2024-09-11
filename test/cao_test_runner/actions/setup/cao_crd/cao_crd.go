@@ -25,10 +25,10 @@ var (
 
 type CaoCrdSetupConfig struct {
 	Description     []string                         `yaml:"description"`
-	OperatorVersion string                           `yaml:"operatorVersion" caoCli:"required"`
-	Platform        installutils.PlatformType        `yaml:"platform" caoCli:"required"`
-	OperatingSystem installutils.OperatingSystemType `yaml:"operatingSystem" caoCli:"required"`
-	Architecture    installutils.ArchitectureType    `yaml:"architecture" caoCli:"required"`
+	OperatorVersion string                           `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
+	Platform        installutils.PlatformType        `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	OperatingSystem installutils.OperatingSystemType `yaml:"operatingSystem" caoCli:"required,context" env:"OPERATING_SYSTEM"`
+	Architecture    installutils.ArchitectureType    `yaml:"architecture" caoCli:"required,context" env:"ARCHITECTURE"`
 	Validators      []map[string]any                 `yaml:"validators,omitempty"`
 }
 
@@ -42,27 +42,6 @@ func NewCaoCrdSetupConfig(config interface{}) (actions.Action, error) {
 		c, ok := config.(*CaoCrdSetupConfig)
 		if !ok {
 			return nil, ErrDecodeCAOSetupConfig
-		}
-
-		switch c.Platform {
-		case installutils.Kubernetes, installutils.Openshift:
-			// No-op
-		default:
-			return nil, ErrIllegalPlatform
-		}
-
-		switch c.OperatingSystem {
-		case installutils.Linux, installutils.Windows, installutils.MacOs:
-			// No-op
-		default:
-			return nil, ErrIllegalOperatingSystem
-		}
-
-		switch c.Architecture {
-		case installutils.Amd64, installutils.Arm64:
-			// No-op
-		default:
-			return nil, ErrIllegalArchitecture
 		}
 
 		return &SetupCaoCrd{
@@ -127,6 +106,27 @@ func (action *SetupCaoCrd) Checks(ctx *context.Context, config interface{}, stat
 	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
 	if !ok {
 		return ErrNoConfigFound
+	}
+
+	switch c.Platform {
+	case installutils.Kubernetes, installutils.Openshift:
+		// No-op
+	default:
+		return ErrIllegalPlatform
+	}
+
+	switch c.OperatingSystem {
+	case installutils.Linux, installutils.Windows, installutils.MacOs:
+		// No-op
+	default:
+		return ErrIllegalOperatingSystem
+	}
+
+	switch c.Architecture {
+	case installutils.Amd64, installutils.Arm64:
+		// No-op
+	default:
+		return ErrIllegalArchitecture
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
