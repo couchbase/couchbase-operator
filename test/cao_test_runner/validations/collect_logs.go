@@ -23,7 +23,7 @@ type CollectLogs struct {
 	OperatorLogs  bool   `yaml:"operatorLogs" caoCli:"required"`
 	LogSpecPath   string `yaml:"logSpecPath"`
 	LogName       string `yaml:"logName" caoCli:"required"`
-	CAOBinaryPath string `yaml:"caoBinaryPath"`
+	CAOBinaryPath string `yaml:"caoBinaryPath" caoCli:"context" env:"CAO_BINARY_PATH"`
 }
 
 const (
