@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -16,11 +17,12 @@ var (
 	ErrDecodeCRDSetupConfig = errors.New("unable to decode CRDSetupConfig")
 	ErrNoConfigFound        = errors.New("no config found for setting up crds")
 	ErrNoAvailableContexts  = errors.New("no such available contexts")
+	ErrCRDFileNoExist       = errors.New("crd file does not exist")
 )
 
 type CRDDestroyConfig struct {
 	Description []string         `yaml:"description"`
-	CRDPath     string           `yaml:"crdPath" caoCli:"required"`
+	CRDPath     string           `yaml:"crdPath" caoCli:"required,context" env:"CRD_PATH"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
 }
 
@@ -73,6 +75,10 @@ func (action *DestroyCRD) Checks(ctx *context.Context, config interface{}, state
 	c, ok := action.yamlConfig.(*CRDDestroyConfig)
 	if !ok {
 		return ErrNoConfigFound
+	}
+
+	if ok = fileutils.NewFile(c.CRDPath).IsFileExists(); !ok {
+		return fmt.Errorf("crd file %s does not exist : %w", c.CRDPath, ErrCRDFileNoExist)
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
