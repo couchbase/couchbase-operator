@@ -27,7 +27,7 @@ func containsRoute(routeTables []*ec2.RouteTable, routeID string) bool {
 	return false
 }
 
-func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
+func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 	if err := dec.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (dec *DeleteEKSCluster) ValidateParams(ctx *context.Context) error {
+func (dec *DeleteEKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
 		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
 	if err != nil {

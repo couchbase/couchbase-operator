@@ -83,11 +83,11 @@ func (action *DestroyKubernetes) Do(ctx *context.Context, config interface{}) er
 
 	ctxContext := ctx.Context()
 
-	if err = deleteClusterUtil.ValidateParams(&ctxContext); err != nil {
+	if err = deleteClusterUtil.ValidateParams(ctxContext); err != nil {
 		return err
 	}
 
-	if err = deleteClusterUtil.DeleteCluster(&ctxContext); err != nil {
+	if err = deleteClusterUtil.DeleteCluster(ctxContext); err != nil {
 		return err
 	}
 

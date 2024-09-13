@@ -16,8 +16,8 @@ var (
 )
 
 type CreateClusterUtil interface {
-	CreateCluster(ctx *context.Context) error
-	ValidateParams(ctx *context.Context) error
+	CreateCluster(ctx context.Context) error
+	ValidateParams(ctx context.Context) error
 }
 
 func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {

@@ -14,7 +14,7 @@ type DeleteGKECluster struct {
 	Region      string
 }
 
-func (dgc *DeleteGKECluster) DeleteCluster(ctx *context.Context) error {
+func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	if err := dgc.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (dgc *DeleteGKECluster) ValidateParams(ctx *context.Context) error {
+func (dgc *DeleteGKECluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
 		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, dgc.ClusterName)
 	if err != nil {

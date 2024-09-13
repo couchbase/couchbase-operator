@@ -10,6 +10,7 @@ import (
 )
 
 // CBServiceName stores the process name of the couchbase service.
+// Update MapCBServiceName() and validateCBServiceChaos() whenever adding new CBServiceName.
 type CBServiceName string
 
 const (
@@ -25,6 +26,7 @@ var (
 )
 
 // ServiceChaosAction defines the name for the various chaos actions for services (processes).
+// Update ExecuteCBServiceChaos() and validateChaosAction() whenever adding new ServiceChaosAction.
 type ServiceChaosAction string
 
 const (

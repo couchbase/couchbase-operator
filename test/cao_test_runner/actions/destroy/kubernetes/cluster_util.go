@@ -17,8 +17,8 @@ var (
 )
 
 type DeleteClusterUtil interface {
-	DeleteCluster(ctx *context.Context) error
-	ValidateParams(ctx *context.Context) error
+	DeleteCluster(ctx context.Context) error
+	ValidateParams(ctx context.Context) error
 }
 
 func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error) {

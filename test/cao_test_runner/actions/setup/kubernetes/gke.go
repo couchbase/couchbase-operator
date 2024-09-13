@@ -44,7 +44,7 @@ var (
 	ErrInvalidKubernetesVersion = errors.New("for environment type 'cloud' and provider 'gcp', kubernetes version is invalid")
 )
 
-func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
+func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
@@ -128,7 +128,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (cgc *CreateGKECluster) ValidateParams(ctx *context.Context) error {
+func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 	if cgc.NumNodePools <= 0 {
 		return ErrGKENumNodePoolsInvalid
 	}

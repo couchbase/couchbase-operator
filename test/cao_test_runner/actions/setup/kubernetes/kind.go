@@ -58,7 +58,7 @@ func contains(array []string, str string) bool {
 	return false
 }
 
-func (ckc *CreateKindCluster) CreateCluster(ctx *context.Context) error {
+func (ckc *CreateKindCluster) CreateCluster(ctx context.Context) error {
 	if err := ckc.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (ckc *CreateKindCluster) CreateCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (ckc *CreateKindCluster) ValidateParams(_ *context.Context) error {
+func (ckc *CreateKindCluster) ValidateParams(_ context.Context) error {
 	if ckc.NumControlPlane < 0 {
 		return ErrNumControlPlaneMissing
 	}

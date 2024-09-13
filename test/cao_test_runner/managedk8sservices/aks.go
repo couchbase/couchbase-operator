@@ -115,7 +115,7 @@ func getAKSKey(managedSvcCred *ManagedServiceCredentials) string {
 	return key
 }
 
-func (ass *AKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
+func (ass *AKSSessionStore) SetSession(ctx context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	defer ass.lock.Unlock()
 	ass.lock.Lock()
 
@@ -131,7 +131,7 @@ func (ass *AKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *Man
 	return nil
 }
 
-func (ass *AKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) (*AKSSession, error) {
+func (ass *AKSSessionStore) GetSession(ctx context.Context, managedSvcCred *ManagedServiceCredentials) (*AKSSession, error) {
 	if _, ok := ass.AKSSessions[getAKSKey(managedSvcCred)]; !ok {
 		err := ass.SetSession(ctx, managedSvcCred)
 		if err != nil {
@@ -142,12 +142,12 @@ func (ass *AKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *Man
 	return ass.AKSSessions[getAKSKey(managedSvcCred)], nil
 }
 
-func (ass *AKSSessionStore) Check(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
+func (ass *AKSSessionStore) Check(ctx context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (ass *AKSSessionStore) GetInstancesByK8sNodeName(ctx *context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
+func (ass *AKSSessionStore) GetInstancesByK8sNodeName(ctx context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
 	// TODO implement me
 	panic("implement me")
 }
@@ -156,8 +156,8 @@ func (ass *AKSSessionStore) GetInstancesByK8sNodeName(ctx *context.Context, mana
 // ====== Methods implemented by AKSSession ======
 // ================================================
 
-func (aksSession *AKSSession) ListClusterUserCredentials(ctx *context.Context, resourceGroupName string) (*armcontainerservice.ManagedClustersClientListClusterUserCredentialsResponse, error) {
-	resp, err := aksSession.AKSClient.ListClusterUserCredentials(*ctx, resourceGroupName, aksSession.ClusterName, nil)
+func (aksSession *AKSSession) ListClusterUserCredentials(ctx context.Context, resourceGroupName string) (*armcontainerservice.ManagedClustersClientListClusterUserCredentialsResponse, error) {
+	resp, err := aksSession.AKSClient.ListClusterUserCredentials(ctx, resourceGroupName, aksSession.ClusterName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster credentials: %w", err)
 	}
@@ -165,8 +165,8 @@ func (aksSession *AKSSession) ListClusterUserCredentials(ctx *context.Context, r
 	return &resp, nil
 }
 
-func (aksSession *AKSSession) GetResourceGroup(ctx *context.Context, resourceGroupName string) (*armresources.ResourceGroupsClientGetResponse, error) {
-	resp, err := aksSession.ResourceGroupClient.Get(*ctx, resourceGroupName, nil)
+func (aksSession *AKSSession) GetResourceGroup(ctx context.Context, resourceGroupName string) (*armresources.ResourceGroupsClientGetResponse, error) {
+	resp, err := aksSession.ResourceGroupClient.Get(ctx, resourceGroupName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get resource group: %w", err)
 	}
@@ -174,8 +174,8 @@ func (aksSession *AKSSession) GetResourceGroup(ctx *context.Context, resourceGro
 	return &resp, nil
 }
 
-func (aksSession *AKSSession) GetCluster(ctx *context.Context, resourceGroupName string) (*armcontainerservice.ManagedClustersClientGetResponse, error) {
-	cluster, err := aksSession.AKSClient.Get(*ctx, resourceGroupName, aksSession.ClusterName, nil)
+func (aksSession *AKSSession) GetCluster(ctx context.Context, resourceGroupName string) (*armcontainerservice.ManagedClustersClientGetResponse, error) {
+	cluster, err := aksSession.AKSClient.Get(ctx, resourceGroupName, aksSession.ClusterName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Kubernetes cluster: %w", err)
 	}
@@ -183,8 +183,8 @@ func (aksSession *AKSSession) GetCluster(ctx *context.Context, resourceGroupName
 	return &cluster, nil
 }
 
-func (aksSession *AKSSession) GetSubnet(ctx *context.Context, resourceGroupName, virtualNetworkName, subnetName string) (*armnetwork.SubnetsClientGetResponse, error) {
-	subnet, err := aksSession.SubnetsClient.Get(*ctx, resourceGroupName, virtualNetworkName, subnetName, nil)
+func (aksSession *AKSSession) GetSubnet(ctx context.Context, resourceGroupName, virtualNetworkName, subnetName string) (*armnetwork.SubnetsClientGetResponse, error) {
+	subnet, err := aksSession.SubnetsClient.Get(ctx, resourceGroupName, virtualNetworkName, subnetName, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get subnet: %w", err)
 	}
@@ -192,19 +192,19 @@ func (aksSession *AKSSession) GetSubnet(ctx *context.Context, resourceGroupName,
 	return &subnet, nil
 }
 
-func (aksSession *AKSSession) CreateResourceGroup(ctx *context.Context, resourceGroupName string) error {
+func (aksSession *AKSSession) CreateResourceGroup(ctx context.Context, resourceGroupName string) error {
 	parameters := armresources.ResourceGroup{
 		Location: &aksSession.Region,
 	}
 
-	if _, err := aksSession.ResourceGroupClient.CreateOrUpdate(*ctx, resourceGroupName, parameters, nil); err != nil {
+	if _, err := aksSession.ResourceGroupClient.CreateOrUpdate(ctx, resourceGroupName, parameters, nil); err != nil {
 		return fmt.Errorf("failed to create resource group: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) CreateVirtualNetwork(ctx *context.Context, resourceGroupName, virtualNetworkName string) error {
+func (aksSession *AKSSession) CreateVirtualNetwork(ctx context.Context, resourceGroupName, virtualNetworkName string) error {
 	// TODO : Take address prefixes as parameter
 	vnetParams := armnetwork.VirtualNetwork{
 		Location: &aksSession.Region,
@@ -217,14 +217,14 @@ func (aksSession *AKSSession) CreateVirtualNetwork(ctx *context.Context, resourc
 		},
 	}
 
-	if _, err := aksSession.VirtualNetworksClient.BeginCreateOrUpdate(*ctx, resourceGroupName, virtualNetworkName, vnetParams, nil); err != nil {
+	if _, err := aksSession.VirtualNetworksClient.BeginCreateOrUpdate(ctx, resourceGroupName, virtualNetworkName, vnetParams, nil); err != nil {
 		return fmt.Errorf("failed to create virtual network: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) CreateSubnet(ctx *context.Context, resourceGroupName, virtualNetworkName, subnetName string) error {
+func (aksSession *AKSSession) CreateSubnet(ctx context.Context, resourceGroupName, virtualNetworkName, subnetName string) error {
 	// TODO : Take address prefix as parameter
 	subnetParams := armnetwork.Subnet{
 		Properties: &armnetwork.SubnetPropertiesFormat{
@@ -232,14 +232,14 @@ func (aksSession *AKSSession) CreateSubnet(ctx *context.Context, resourceGroupNa
 		},
 	}
 
-	if _, err := aksSession.SubnetsClient.BeginCreateOrUpdate(*ctx, resourceGroupName, virtualNetworkName, subnetName, subnetParams, nil); err != nil {
+	if _, err := aksSession.SubnetsClient.BeginCreateOrUpdate(ctx, resourceGroupName, virtualNetworkName, subnetName, subnetParams, nil); err != nil {
 		return fmt.Errorf("failed to create subnet: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) CreateCluster(ctx *context.Context, kubernetesVersion, resourceGroupName, subnetID, vmSize string,
+func (aksSession *AKSSession) CreateCluster(ctx context.Context, kubernetesVersion, resourceGroupName, subnetID, vmSize string,
 	osType *armcontainerservice.OSType, osSKU *armcontainerservice.OSSKU, waitForClusterCreation bool) error {
 	// TODO : Take all IPs as params
 	clusterParams := armcontainerservice.ManagedCluster{
@@ -283,7 +283,7 @@ func (aksSession *AKSSession) CreateCluster(ctx *context.Context, kubernetesVers
 		},
 	}
 
-	poller, err := aksSession.AKSClient.BeginCreateOrUpdate(*ctx, resourceGroupName, aksSession.ClusterName, clusterParams, nil)
+	poller, err := aksSession.AKSClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.ClusterName, clusterParams, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes cluster: %w", err)
 	}
@@ -292,14 +292,14 @@ func (aksSession *AKSSession) CreateCluster(ctx *context.Context, kubernetesVers
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for Kubernetes cluster creation to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) CreateNodePool(ctx *context.Context, resourceGroupName, nodePoolName, subnetID, vmSize string,
+func (aksSession *AKSSession) CreateNodePool(ctx context.Context, resourceGroupName, nodePoolName, subnetID, vmSize string,
 	count, diskSize int32, osType *armcontainerservice.OSType, osSKU *armcontainerservice.OSSKU, waitForNodeGroupCreation bool) error {
 	if err := ValidateOSType(osType); err != nil {
 		return fmt.Errorf("invalid os type: %w", err)
@@ -331,7 +331,7 @@ func (aksSession *AKSSession) CreateNodePool(ctx *context.Context, resourceGroup
 		},
 	}
 
-	poller, err := aksSession.NodePoolClient.BeginCreateOrUpdate(*ctx, resourceGroupName, aksSession.ClusterName, nodePoolName, nodePoolParams, nil)
+	poller, err := aksSession.NodePoolClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.ClusterName, nodePoolName, nodePoolParams, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create node pool: %w", err)
 	}
@@ -340,15 +340,15 @@ func (aksSession *AKSSession) CreateNodePool(ctx *context.Context, resourceGroup
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for Kubernetes node pool creation to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) DeleteNodePool(ctx *context.Context, resourceGroupName, nodePoolName string, waitForNodePoolDeletion bool) error {
-	poller, err := aksSession.NodePoolClient.BeginDelete(*ctx, resourceGroupName, aksSession.ClusterName, nodePoolName, nil)
+func (aksSession *AKSSession) DeleteNodePool(ctx context.Context, resourceGroupName, nodePoolName string, waitForNodePoolDeletion bool) error {
+	poller, err := aksSession.NodePoolClient.BeginDelete(ctx, resourceGroupName, aksSession.ClusterName, nodePoolName, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting node pool %s: %w", nodePoolName, err)
 	}
@@ -357,15 +357,15 @@ func (aksSession *AKSSession) DeleteNodePool(ctx *context.Context, resourceGroup
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for kubernetes node pool deletion to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) DeleteCluster(ctx *context.Context, resourceGroupName string, waitForClusterDeletion bool) error {
-	poller, err := aksSession.AKSClient.BeginDelete(*ctx, resourceGroupName, aksSession.ClusterName, nil)
+func (aksSession *AKSSession) DeleteCluster(ctx context.Context, resourceGroupName string, waitForClusterDeletion bool) error {
+	poller, err := aksSession.AKSClient.BeginDelete(ctx, resourceGroupName, aksSession.ClusterName, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting cluster %s: %w", aksSession.ClusterName, err)
 	}
@@ -374,20 +374,20 @@ func (aksSession *AKSSession) DeleteCluster(ctx *context.Context, resourceGroupN
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for aks cluster deletion to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) ListNodePools(ctx *context.Context, resourceGroupName string) ([]*armcontainerservice.AgentPool, error) {
+func (aksSession *AKSSession) ListNodePools(ctx context.Context, resourceGroupName string) ([]*armcontainerservice.AgentPool, error) {
 	nodePoolsPager := aksSession.NodePoolClient.NewListPager(resourceGroupName, aksSession.ClusterName, nil)
 
 	var nodePools []*armcontainerservice.AgentPool
 
 	for nodePoolsPager.More() {
-		resp, err := nodePoolsPager.NextPage(*ctx)
+		resp, err := nodePoolsPager.NextPage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to list node pools: %w", err)
 		}
@@ -398,8 +398,8 @@ func (aksSession *AKSSession) ListNodePools(ctx *context.Context, resourceGroupN
 	return nodePools, nil
 }
 
-func (aksSession *AKSSession) DeleteSubnet(ctx *context.Context, resourceGroupName, virtualNetworkName, subnetName string, waitForDeletion bool) error {
-	poller, err := aksSession.SubnetsClient.BeginDelete(*ctx, resourceGroupName, virtualNetworkName, subnetName, nil)
+func (aksSession *AKSSession) DeleteSubnet(ctx context.Context, resourceGroupName, virtualNetworkName, subnetName string, waitForDeletion bool) error {
+	poller, err := aksSession.SubnetsClient.BeginDelete(ctx, resourceGroupName, virtualNetworkName, subnetName, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting subnet: %w", err)
 	}
@@ -408,15 +408,15 @@ func (aksSession *AKSSession) DeleteSubnet(ctx *context.Context, resourceGroupNa
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for subnet deletion to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) DeleteVirtualNetwork(ctx *context.Context, resourceGroupName, virtualNetworkName string, waitForDeletion bool) error {
-	poller, err := aksSession.VirtualNetworksClient.BeginDelete(*ctx, resourceGroupName, virtualNetworkName, nil)
+func (aksSession *AKSSession) DeleteVirtualNetwork(ctx context.Context, resourceGroupName, virtualNetworkName string, waitForDeletion bool) error {
+	poller, err := aksSession.VirtualNetworksClient.BeginDelete(ctx, resourceGroupName, virtualNetworkName, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting virtual network: %w", err)
 	}
@@ -425,15 +425,15 @@ func (aksSession *AKSSession) DeleteVirtualNetwork(ctx *context.Context, resourc
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for virtual network deletion to complete: %w", err)
 	}
 
 	return nil
 }
 
-func (aksSession *AKSSession) DeleteResourceGroup(ctx *context.Context, resourceGroupName string, waitForDeletion bool) error {
-	poller, err := aksSession.ResourceGroupClient.BeginDelete(*ctx, resourceGroupName, nil)
+func (aksSession *AKSSession) DeleteResourceGroup(ctx context.Context, resourceGroupName string, waitForDeletion bool) error {
+	poller, err := aksSession.ResourceGroupClient.BeginDelete(ctx, resourceGroupName, nil)
 	if err != nil {
 		return fmt.Errorf("error deleting resource group: %w", err)
 	}
@@ -442,7 +442,7 @@ func (aksSession *AKSSession) DeleteResourceGroup(ctx *context.Context, resource
 		return nil
 	}
 
-	if _, err := poller.PollUntilDone(*ctx, nil); err != nil {
+	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
 		return fmt.Errorf("failed to wait for resource group deletion to complete: %w", err)
 	}
 

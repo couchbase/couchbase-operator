@@ -22,8 +22,8 @@ type EKSChaos struct {
 }
 
 // NewEKSChaos returns an instance of EKSChaos to perform chaos actions on EKS cluster.
-func NewEKSChaos(clusterName string) (*EKSChaos, error) {
-	eksCred, err := managedsvc.NewManagedServiceCredentials(managedsvc.EKSManagedService, clusterName)
+func NewEKSChaos(ctxt *context.Context, clusterName string) (*EKSChaos, error) {
+	eksCred, err := managedsvc.NewManagedServiceCredentials([]managedsvc.ManagedServiceProvider{managedsvc.EKSManagedService}, clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("new eks chaos: %w", err)
 	}
@@ -32,7 +32,7 @@ func NewEKSChaos(clusterName string) (*EKSChaos, error) {
 
 	eksSessStore := managedsvc.NewEKSSessionStore()
 
-	eksSess, err := eksSessStore.GetSession(eksCred)
+	eksSess, err := eksSessStore.GetSession(ctxt.Context(), eksCred)
 	if err != nil {
 		return nil, fmt.Errorf("new eks chaos: %w", err)
 	}
@@ -44,14 +44,14 @@ func NewEKSChaos(clusterName string) (*EKSChaos, error) {
 	}, nil
 }
 
-// RestartNodes reboots the ec2 instance (k8s node of EKS).
-func (ec *EKSChaos) RestartNodes(context *context.Context, chaosConfig *CBPodChaosConfig) error {
+// RestartNodes reboots the ec2 instance (i.e. k8s node of EKS).
+func (ec *EKSChaos) RestartNodes(ctxt *context.Context, chaosConfig *CBPodChaosConfig) error {
 	k8sNodeName, err := pods.GetNodeNameForPod(chaosConfig.CBPod, "default")
 	if err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
 
-	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(ec.EKSCred, []string{k8sNodeName})
+	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(ctxt.Context(), ec.EKSCred, []string{k8sNodeName})
 	if err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
@@ -85,7 +85,7 @@ func (ec *EKSChaos) DeleteNodes(context *context.Context, chaosConfig *CBPodChao
 		return fmt.Errorf("terminate ec2 instance: %w", err)
 	}
 
-	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(ec.EKSCred, []string{k8sNodeName})
+	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(context.Context(), ec.EKSCred, []string{k8sNodeName})
 	if err != nil {
 		return fmt.Errorf("terminate ec2 instance: %w", err)
 	}

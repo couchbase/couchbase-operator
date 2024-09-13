@@ -39,7 +39,7 @@ var (
 	ErrCurrentFileFetchFail          = errors.New("current file fetch failed")
 )
 
-func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
+func (cac *CreateAKSCluster) CreateCluster(ctx context.Context) error {
 	if err := cac.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
 	return nil
 }
 
-func (cac *CreateAKSCluster) ValidateParams(ctx *context.Context) error {
+func (cac *CreateAKSCluster) ValidateParams(ctx context.Context) error {
 	if cac.Count <= 0 {
 		return ErrCountInvalid
 	}

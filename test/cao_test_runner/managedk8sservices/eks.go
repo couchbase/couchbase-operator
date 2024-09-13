@@ -129,7 +129,7 @@ func ValidateAMIType(ami AMIType) (bool, error) {
 
 // SetSession adds an EKS cluster to the EKSSessionStore.
 // It creates a new EKSSession for the provided EKS cluster.
-func (ess *EKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
+func (ess *EKSSessionStore) SetSession(ctx context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	defer ess.lock.Unlock()
 	ess.lock.Lock()
 
@@ -147,7 +147,7 @@ func (ess *EKSSessionStore) SetSession(ctx *context.Context, managedSvcCred *Man
 
 // GetSession returns the EKSSession for an EKS Cluster.
 // If EKSSession for the cluster is not present in EKSSessionStore then it sets it.
-func (ess *EKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
+func (ess *EKSSessionStore) GetSession(ctx context.Context, managedSvcCred *ManagedServiceCredentials) (*EKSSession, error) {
 	if _, ok := ess.EKSSessions[getEKSKey(managedSvcCred)]; !ok {
 		err := ess.SetSession(ctx, managedSvcCred)
 		if err != nil {
@@ -159,7 +159,7 @@ func (ess *EKSSessionStore) GetSession(ctx *context.Context, managedSvcCred *Man
 }
 
 // Check checks if the k8s cluster in EKS is accessible or not.
-func (ess *EKSSessionStore) Check(ctx *context.Context, managedSvcCred *ManagedServiceCredentials) error {
+func (ess *EKSSessionStore) Check(ctx context.Context, managedSvcCred *ManagedServiceCredentials) error {
 	eksSession, err := ess.GetSession(ctx, managedSvcCred)
 	if err != nil {
 		return fmt.Errorf("check eks cluster accessibility: %w", err)
@@ -176,7 +176,7 @@ func (ess *EKSSessionStore) Check(ctx *context.Context, managedSvcCred *ManagedS
 }
 
 // GetInstancesByK8sNodeName gets the ec2 instance ids for the provided kubernetes node names.
-func (ess *EKSSessionStore) GetInstancesByK8sNodeName(ctx *context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
+func (ess *EKSSessionStore) GetInstancesByK8sNodeName(ctx context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error) {
 	eksSession, err := ess.GetSession(ctx, managedSvcCred)
 	if err != nil {
 		return []string{}, fmt.Errorf("get ec2 instance by k8s node name: %w", err)

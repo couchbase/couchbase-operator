@@ -50,7 +50,7 @@ type CreateEKSCluster struct {
 	KubeConfigPath    string
 }
 
-func (cec *CreateEKSCluster) CreateCluster(ctx *context.Context) error {
+func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	if err := cec.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 	return nil
 }
 
-func (cec *CreateEKSCluster) ValidateParams(ctx *context.Context) error {
+func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 	if cec.NumNodeGroups <= 0 {
 		return ErrNumNodeGroupsInvalid
 	}

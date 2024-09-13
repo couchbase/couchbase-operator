@@ -15,7 +15,7 @@ type DeleteAKSCluster struct {
 	Region      string
 }
 
-func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
+func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
 	if err := dac.ValidateParams(ctx); err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 
 	return nil
 }
-func (dac *DeleteAKSCluster) ValidateParams(ctx *context.Context) error {
+func (dac *DeleteAKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
 		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, dac.ClusterName)
 	if err != nil {

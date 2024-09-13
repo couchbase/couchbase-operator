@@ -108,11 +108,11 @@ func (action *SetupKubernetes) Do(ctx *context.Context, config interface{}) erro
 
 	ctxContext := ctx.Context()
 
-	if err = createClusterUtil.ValidateParams(&ctxContext); err != nil {
+	if err = createClusterUtil.ValidateParams(ctxContext); err != nil {
 		return err
 	}
 
-	if err = createClusterUtil.CreateCluster(&ctxContext); err != nil {
+	if err = createClusterUtil.CreateCluster(ctxContext); err != nil {
 		return err
 	}
 

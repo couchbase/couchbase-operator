@@ -61,11 +61,11 @@ type ChaosActionsInterface interface {
 }
 
 // NewChaosAction initializes ChaosActionsInterface for the provided managed service.
-func NewChaosAction(managedService managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
+func NewChaosAction(context *context.Context, managedService managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
 	switch managedService {
 	case managedsvcs.EKSManagedService:
 		{
-			return NewEKSChaos(clusterName)
+			return NewEKSChaos(context, clusterName)
 		}
 	case managedsvcs.KindManagedService:
 		{
@@ -81,7 +81,7 @@ func NewChaosAction(managedService managedsvcs.ManagedServiceProvider, clusterNa
 // ExecuteChaosAction executes the required chaos action for the ActionName.
 func ExecuteChaosAction(context *context.Context, chaosConfig *CBPodChaosConfig) error {
 	// TODO get the cluster name and managed service from the context
-	chaos, err := NewChaosAction(chaosConfig.ManagedSvcName, chaosConfig.ClusterName)
+	chaos, err := NewChaosAction(context, chaosConfig.ManagedSvcName, chaosConfig.ClusterName)
 	if err != nil {
 		return fmt.Errorf("execute chaos action %s: %w", chaosConfig.ChaosAction, err)
 	}
