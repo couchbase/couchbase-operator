@@ -163,6 +163,7 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.2.1
         <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
   <<couchbaseclusters-spec-migration,migration>>:
+    <<couchbaseclusters-spec-migration-maxconcurrentmigrations,maxConcurrentMigrations>>: 1
     <<couchbaseclusters-spec-migration-numunmanagednodes,numUnmanagedNodes>>: 0
     <<couchbaseclusters-spec-migration-stabilizationperiod,stabilizationPeriod>>: ""
     <<couchbaseclusters-spec-migration-unmanagedclusterhost,unmanagedClusterHost>>: ""
@@ -2531,6 +2532,20 @@ Will be populated by Kubernetes defaults if not specified.
 
 Migration defines the specification for a CouchbaseCluster assimilation of an unmanaged
 cluster to a managed Kubernetes cluster.
+
+=== couchbaseclusters.spec.migration.maxConcurrentMigrations
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `1`
+
+*Minimum*: `1`
+
+==== Description
+
+MaxConcurrentMigrations is the maximum number of nodes migrations the operator will run concurrently.
 
 === couchbaseclusters.spec.migration.numUnmanagedNodes
 

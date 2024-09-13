@@ -2373,6 +2373,11 @@ type ClusterAssimilationSpec struct {
 	// StabilizationPeriod is the time the operator will wait after a migration before starting the next migration.
 	// If not specified the operator will start the next migration immediately.
 	StabilizationPeriod *metav1.Duration `json:"stabilizationPeriod,omitempty"`
+
+	// MaxConcurrentMigrations is the maximum number of nodes migrations the operator will run concurrently.
+	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	MaxConcurrentMigrations int `json:"maxConcurrentMigrations,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {

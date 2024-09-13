@@ -716,6 +716,7 @@ func registerTests() {
 		framework.NewTestDef(TestMigrateLeaveUnmanagedCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestPremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
 	}
 }
 

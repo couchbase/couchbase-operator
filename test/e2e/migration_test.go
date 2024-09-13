@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
@@ -137,7 +138,7 @@ func TestStabilizationPeriod(t *testing.T) {
 
 	dstCluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, dstCluster, -1)
 
-	// Chcek that the cluster goes into the waiting state the right number of times
+	// Check that the cluster goes into the waiting state the right number of times
 	for i := 0; i < clusterSize-1; i++ {
 		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, dstCluster, 10*time.Minute)
 
@@ -154,6 +155,42 @@ func TestStabilizationPeriod(t *testing.T) {
 
 	// Check that all nodes from the initial cluster have been ejected
 	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+}
+
+func TestMaxConcurrency(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost:    fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+		MaxConcurrentMigrations: 2,
+	}
+
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	// Check that all nodes from the initial cluster have been ejected
+	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.MultiNodeSwapRebalanceSequence(2),
+		e2eutil.MultiNodeSwapRebalanceSequence(1),
+	}
+
+	ValidateEvents(t, kubernetes, dstCluster, expectedEvents)
 }
 
 func MustGetNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) int {

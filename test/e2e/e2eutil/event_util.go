@@ -548,3 +548,20 @@ func PodDownEphemeralWithForcedFailover(t *testing.T, victims int, serverImage s
 		},
 	}
 }
+
+func MultiNodeSwapRebalanceSequence(nodes int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Repeat{
+				Times:     nodes,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Repeat{
+				Times:     nodes,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}

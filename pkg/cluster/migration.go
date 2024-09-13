@@ -344,7 +344,11 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 		return nil
 	}
 
-	maxNodes := 1
+	maxNodes := c.cluster.Spec.Migration.MaxConcurrentMigrations
+
+	if maxNodes <= 0 {
+		maxNodes = 1
+	}
 
 	migrationCandidates := couchbaseutil.NewMemberSet()
 
