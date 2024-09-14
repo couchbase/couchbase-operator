@@ -2,11 +2,12 @@ package setupkubernetes
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 
 	"cloud.google.com/go/container/apiv1/containerpb"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
@@ -14,7 +15,6 @@ import (
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
-	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 type CreateGKECluster struct {
@@ -32,22 +32,19 @@ type CreateGKECluster struct {
 }
 
 const (
-	ipCidrRange = "10.0.0.0/8"
+	ipCidrRange = "10.16.0.0/12"
 )
 
 var (
-	ErrKubeConfigFileInvalid   = errors.New("kubeconfig file does not exist")
-	ErrGKECountInvalid         = errors.New("for environment type 'cloud' and provider 'googleCloud', Count must be greater than 0")
-	ErrGKENumNodePoolsInvalid  = errors.New("for environment type 'cloud' and provider 'googleCloud', NumNodePools must be greater than 0")
-	ErrGKEDiskSizeInvalid      = errors.New("for environment type 'cloud' and provider 'googleCloud', DiskSize must be greater than 0")
-	ErrGKEClusterAlreadyExists = errors.New("aks cluster already exists")
+	ErrKubeConfigFileInvalid    = errors.New("kubeconfig file does not exist")
+	ErrGKECountInvalid          = errors.New("for environment type 'cloud' and provider 'googleCloud', Count must be greater than 0")
+	ErrGKENumNodePoolsInvalid   = errors.New("for environment type 'cloud' and provider 'googleCloud', NumNodePools must be greater than 0")
+	ErrGKEDiskSizeInvalid       = errors.New("for environment type 'cloud' and provider 'googleCloud', DiskSize must be greater than 0")
+	ErrGKEClusterAlreadyExists  = errors.New("aks cluster already exists")
+	ErrInvalidKubernetesVersion = errors.New("for environment type 'cloud' and provider 'googleCloud', kubernetes version is invalid")
 )
 
 func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
-	if err := cgc.ValidateParams(ctx); err != nil {
-		return err
-	}
-
 	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
@@ -113,12 +110,15 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 
 	logrus.Info(fmt.Sprintf("Updated kubeconfig with cluster %s details", cgc.ClusterName))
 
-	currentFile, err := os.Executable()
-	if err != nil {
-		return err
+	_, filePath, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("unable to fetch current file path: %w", ErrCurrentFileFetchFail)
 	}
 
+	currentFile, _ := filepath.Abs(filePath)
+
 	googleStorageClassPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "test_data", "cloud_storage_class", "cao-googlefile.yaml")
+
 	if err := kubectl.ApplyFiles(googleStorageClassPath).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("unable to apply google storage class path %s: %w", googleStorageClassPath, err)
 	}
@@ -164,68 +164,120 @@ func (cgc *CreateGKECluster) ValidateParams(ctx *context.Context) error {
 		return fmt.Errorf("cluster already exists: %w", ErrGKEClusterAlreadyExists)
 	}
 
+	validKubernetesVersions, err := gkeSession.ListAvailableKubernetesVersions(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to fetch valid kubernetes versions: %w", err)
+	}
+
+	var possibleVersions []string
+
+	for _, version := range validKubernetesVersions {
+		if strings.Split(version, "-")[0] == cgc.KubernetesVersion {
+			possibleVersions = append(possibleVersions, version)
+		}
+	}
+
+	if len(possibleVersions) == 0 {
+		return fmt.Errorf("invalid kubernetes version, not available in GKE: %w", ErrInvalidKubernetesVersion)
+	}
+
+	highestBuild := 0
+	var highestVersion string
+
+	for _, version := range possibleVersions {
+		build := strings.Split(strings.Split(version, "-")[1], ".")[1]
+
+		buildNumber, err := strconv.Atoi(build)
+		if err != nil {
+			return fmt.Errorf("unable to convert %s to int: %w", build, err)
+		}
+
+		if buildNumber > highestBuild {
+			highestBuild = buildNumber
+			highestVersion = version
+		}
+
+	}
+
+	cgc.KubernetesVersion = highestVersion
+
 	return nil
 }
 
 func (cgc *CreateGKECluster) updateKubeconfig(cluster *containerpb.Cluster) error {
 	apiServer := cluster.Endpoint
 	caCertificate := cluster.MasterAuth.ClusterCaCertificate
-	clientCertificate := cluster.MasterAuth.ClientCertificate
-	clientKey := cluster.MasterAuth.ClientKey
 
-	caCertBytes, err := base64.StdEncoding.DecodeString(caCertificate)
-	if err != nil {
-		return fmt.Errorf("failed to decode CA certificate: %w", err)
-	}
+	var kubeconfig map[string]interface{}
 
-	clientCertBytes, err := base64.StdEncoding.DecodeString(clientCertificate)
-	if err != nil {
-		return fmt.Errorf("failed to decode client certificate: %w", err)
-	}
+	kubeconfigFile := fileutils.NewFile(cgc.KubeConfigPath)
 
-	clientKeyBytes, err := base64.StdEncoding.DecodeString(clientKey)
-	if err != nil {
-		return fmt.Errorf("failed to decode client key: %w", err)
-	}
-
-	var kubeconfig api.Config
-
-	kubeConfigFile := fileutils.NewFile(cgc.KubeConfigPath)
-
-	if ok := kubeConfigFile.IsFileExists(); !ok {
-		return fmt.Errorf("kubeconfig file %s does not exist: %w", cgc.KubeConfigPath, ErrKubeConfigFileInvalid)
-	}
-
-	data, err := kubeConfigFile.ReadFile()
+	kubeconfigBytes, err := kubeconfigFile.ReadFile()
 	if err != nil {
 		return fmt.Errorf("unable to read kubeconfig file %s: %w", cgc.KubeConfigPath, err)
 	}
 
-	if err := yaml.Unmarshal(data, &kubeconfig); err != nil {
+	if err := yaml.Unmarshal(kubeconfigBytes, &kubeconfig); err != nil {
 		return fmt.Errorf("failed to unmarshal existing kubeconfig: %w", err)
 	}
 
 	contextName := fmt.Sprintf("gke_%s_%s", cgc.Region, cgc.ClusterName)
-	kubeconfig.Clusters[contextName] = &api.Cluster{
-		Server:                   fmt.Sprintf("https://%s", apiServer),
-		CertificateAuthorityData: caCertBytes,
-	}
-	kubeconfig.Contexts[contextName] = &api.Context{
-		Cluster:  contextName,
-		AuthInfo: contextName,
-	}
-	kubeconfig.AuthInfos[contextName] = &api.AuthInfo{
-		ClientCertificateData: clientCertBytes,
-		ClientKeyData:         clientKeyBytes,
-	}
-	kubeconfig.CurrentContext = contextName
 
-	data, err = yaml.Marshal(&kubeconfig)
+	clusters, ok := kubeconfig["clusters"].([]interface{})
+	if !ok {
+		clusters = make([]interface{}, 0)
+	}
+
+	contexts, ok := kubeconfig["contexts"].([]interface{})
+	if !ok {
+		contexts = make([]interface{}, 0)
+	}
+
+	users, ok := kubeconfig["users"].([]interface{})
+	if !ok {
+		users = make([]interface{}, 0)
+	}
+
+	clusters = append(clusters, map[interface{}]interface{}{
+		"name": contextName,
+		"cluster": map[interface{}]interface{}{
+			"server":                     fmt.Sprintf("https://%s", apiServer),
+			"certificate-authority-data": caCertificate,
+		},
+	})
+
+	contexts = append(contexts, map[interface{}]interface{}{
+		"name": contextName,
+		"context": map[interface{}]interface{}{
+			"cluster": contextName,
+			"user":    contextName,
+		},
+	})
+
+	users = append(users, map[interface{}]interface{}{
+		"name": contextName,
+		"user": map[interface{}]interface{}{
+			"exec": map[interface{}]interface{}{
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"command":    "gke-gcloud-auth-plugin",
+				"installHint": "Install gke-gcloud-auth-plugin for use with kubectl by following " +
+					"https://cloud.google.com/blog/products/containers-kubernetes/kubectl-auth-changes-in-gke",
+				"provideClusterInfo": true,
+			},
+		},
+	})
+
+	kubeconfig["clusters"] = clusters
+	kubeconfig["contexts"] = contexts
+	kubeconfig["users"] = users
+	kubeconfig["current-context"] = contextName
+
+	data, err := yaml.Marshal(kubeconfig)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated kubeconfig: %w", err)
 	}
 
-	if err := kubeConfigFile.WriteFile(data, 0600); err != nil {
+	if err := kubeconfigFile.WriteFile(data, 0600); err != nil {
 		return fmt.Errorf("failed to write to kubeconfig file: %w", err)
 	}
 

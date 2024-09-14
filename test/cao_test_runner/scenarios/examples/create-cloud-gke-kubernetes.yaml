@@ -5,8 +5,8 @@ config:
   environment: cloud
   provider: googleCloud
   gkeRegion: us-central1
-  kubernetesVersion: 1.28.0
-  machineType: c4-standard-8
+  kubernetesVersion: 1.28.13
+  machineType: n1-standard-16
   count: 7
   diskSize: 100
   diskType: pd-standard
@@ -14,5 +14,5 @@ config:
   releaseChannel: REGULAR
   numNodePools: 1
   kubeconfigPath: /root/.kube/config
-  operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
-  admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64
+  operatorImage: couchbase/admission-controller:2.7.0
+  admissionControllerImage: couchbase/operator:2.7.0

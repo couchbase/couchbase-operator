@@ -1,0 +1,42 @@
+# This yaml requires following fields to be set in env / context
+# CLUSTER_NAME / ClusterName
+# OPERATOR_IMAGE / OperatorImage
+# ADMISSION_CONTROLLER_IMAGE / AdmissionControllerImage
+# OPERATOR_VERSION / OperatorVersion
+# OPERATING_SYSTEM / OperatingSystem
+# ARCHITECTURE / Architecture
+# GKE_REGION / GKERegion
+# KUBECONFIG / KubeConfigPath
+
+action: "Setup Kubernetes Cluster"
+config:
+  description:
+    - "setup kubernetes cluster on cloud environment on Google Cloud (GKE cluster)"
+  platform: kubernetes
+  environment: cloud
+  provider: googleCloud
+  kubernetesVersion: 1.28.13
+  machineType: n1-standard-16
+  count: 7
+  diskSize: 100
+  diskType: pd-standard
+  imageType: ubuntu_containerd
+  releaseChannel: REGULAR
+  numNodePools: 1
+trees:
+  - action: "Setup CAO Binary and Deploy CRDs"
+    config:
+      description:
+        - "setup cao binary and deploying crds for GKE cluster"
+    trees:
+      - action: "Setup Operator"
+        config:
+          description:
+            - "setup operator in GKE cluster"
+        trees:
+          - action: "Setup Admission Controller"
+            config:
+              description:
+                - "setup admission controller in GKE cluster"
+              validateSecrets: true
+              validateStorageClasses: true

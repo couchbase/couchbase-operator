@@ -188,6 +188,27 @@ func (gks *GKESession) WaitForOperation(ctx *context.Context, operationName stri
 	return nil
 }
 
+func (gks *GKESession) WaitForClusterOperation(ctx *context.Context, operationName string) error {
+	for {
+		opStatus, err := gks.ClusterManagerClient.GetOperation(*ctx, &containerpb.GetOperationRequest{
+			Name: fmt.Sprintf("projects/%s/locations/%s/operations/%s", gks.ProjectID, gks.Region, operationName),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get operation status: %w", err)
+		}
+
+		if opStatus.Status == containerpb.Operation_DONE {
+			if opStatus.Error != nil {
+				return fmt.Errorf("operation failed: %v", opStatus.Error)
+			}
+
+			return nil
+		}
+
+		time.Sleep(30 * time.Second)
+	}
+}
+
 func (gks *GKESession) CreateVirtualNetwork(ctx *context.Context, networkName string, autoCreateSubnet bool) error {
 	network := &computepb.Network{
 		Name:                  &networkName,
@@ -315,6 +336,11 @@ func (gks *GKESession) CreateCluster(ctx *context.Context, networkName, subnetwo
 		EnableKubernetesAlpha: false,
 		LoggingService:        "none",
 		MonitoringService:     "none",
+		MasterAuth: &containerpb.MasterAuth{
+			ClientCertificateConfig: &containerpb.ClientCertificateConfig{
+				IssueClientCertificate: true,
+			},
+		},
 	}
 
 	req := &containerpb.CreateClusterRequest{
@@ -322,12 +348,12 @@ func (gks *GKESession) CreateCluster(ctx *context.Context, networkName, subnetwo
 		Cluster: cluster,
 	}
 
-	operation, err := gks.ClusterManagerClient.CreateCluster(*ctx, req, nil)
+	operation, err := gks.ClusterManagerClient.CreateCluster(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	if err = gks.WaitForOperation(ctx, operation.Name); err != nil {
+	if err = gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
 		return fmt.Errorf("cluster %s creation operation failed: %w", gks.ClusterName, err)
 	}
 
@@ -371,7 +397,7 @@ func (gks *GKESession) GetCluster(ctx *context.Context) (*containerpb.Cluster, e
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
 	}
 
-	cluster, err := gks.ClusterManagerClient.GetCluster(*ctx, req, nil)
+	cluster, err := gks.ClusterManagerClient.GetCluster(*ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching cluster details: %w", err)
 	}
@@ -384,7 +410,7 @@ func (gks *GKESession) ListNodePools(ctx *context.Context) (*containerpb.ListNod
 		Parent: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
 	}
 
-	resp, err := gks.ClusterManagerClient.ListNodePools(*ctx, req, nil)
+	resp, err := gks.ClusterManagerClient.ListNodePools(*ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error listing node pools: %w", err)
 	}
@@ -397,12 +423,12 @@ func (gks *GKESession) DeleteNodePool(ctx *context.Context, nodePoolName string)
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s/nodePools/%s", gks.ProjectID, gks.Region, gks.ClusterName, nodePoolName),
 	}
 
-	operation, err := gks.ClusterManagerClient.DeleteNodePool(*ctx, req, nil)
+	operation, err := gks.ClusterManagerClient.DeleteNodePool(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete node pool: %w", err)
 	}
 
-	if err = gks.WaitForOperation(ctx, operation.Name); err != nil {
+	if err = gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
 		return fmt.Errorf("node pool %s deletion operation failed: %w", nodePoolName, err)
 	}
 
@@ -414,12 +440,12 @@ func (gks *GKESession) DeleteCluster(ctx *context.Context) error {
 		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
 	}
 
-	operation, err := gks.ClusterManagerClient.DeleteCluster(*ctx, req, nil)
+	operation, err := gks.ClusterManagerClient.DeleteCluster(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete cluster: %w", err)
 	}
 
-	if err := gks.WaitForOperation(ctx, operation.Name); err != nil {
+	if err := gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
 		return fmt.Errorf("cluster %s deletion operation failed: %w", gks.ClusterName, err)
 	}
 
@@ -433,14 +459,14 @@ func (gks *GKESession) DeleteSubnet(ctx *context.Context, subnetName string) err
 		Subnetwork: subnetName,
 	}
 
-	operation, err := gks.SubnetClient.Delete(*ctx, req, nil)
+	_, err := gks.SubnetClient.Delete(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete subnet: %w", err)
 	}
 
-	if err := gks.WaitForOperation(ctx, operation.Name()); err != nil {
-		return fmt.Errorf("subnet %s deletion operation failed: %w", subnetName, err)
-	}
+	// if err := gks.WaitForOperation(ctx, operation.Name()); err != nil {
+	// 	return fmt.Errorf("subnet %s deletion operation failed: %w", subnetName, err)
+	// }
 
 	return nil
 }
@@ -451,7 +477,7 @@ func (gks *GKESession) DeleteFirewallRule(ctx *context.Context, firewallRuleName
 		Project:  gks.ProjectID,
 	}
 
-	operation, err := gks.FirewallsClient.Delete(*ctx, req, nil)
+	operation, err := gks.FirewallsClient.Delete(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete firewall rule: %w", err)
 	}
@@ -469,7 +495,7 @@ func (gks *GKESession) DeleteVirtualNetwork(ctx *context.Context, virtualNetwork
 		Project: gks.ProjectID,
 	}
 
-	operation, err := gks.NetworksCLient.Delete(*ctx, req, nil)
+	operation, err := gks.NetworksCLient.Delete(*ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete virtual network: %w", err)
 	}
@@ -479,4 +505,17 @@ func (gks *GKESession) DeleteVirtualNetwork(ctx *context.Context, virtualNetwork
 	}
 
 	return nil
+}
+
+func (gks *GKESession) ListAvailableKubernetesVersions(ctx *context.Context) ([]string, error) {
+	req := &containerpb.GetServerConfigRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s", gks.ProjectID, gks.Region),
+	}
+
+	resp, err := gks.ClusterManagerClient.GetServerConfig(*ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get server configuration: %w", err)
+	}
+
+	return resp.ValidMasterVersions, nil
 }
