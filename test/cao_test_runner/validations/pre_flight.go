@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8sinfo"
-
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	caopods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cao_pods"
 	"github.com/sirupsen/logrus"
 )
 
@@ -66,26 +65,9 @@ func (pf *PreFlight) Run(_ *context.Context) error {
 	}
 
 	// CHECK: Operator and Operator Admission pods.
-	_, k8sPodNames, err := k8sinfo.GetK8sPodsInfo("default")
+	_, _, err = caopods.GetOperatorAdmissionPodNames("default")
 	if err != nil {
-		return fmt.Errorf("get pods information: %w", err)
-	}
-
-	operatorAndAdmissionCheck := 2
-
-	for _, podName := range k8sPodNames {
-		if strings.Contains(podName, "couchbase-operator-admission") {
-			operatorAndAdmissionCheck--
-			continue
-		}
-
-		if strings.Contains(podName, "couchbase-operator") {
-			operatorAndAdmissionCheck--
-		}
-	}
-
-	if operatorAndAdmissionCheck != 0 {
-		return fmt.Errorf("check operator and operator-admission: %w", ErrOperatorNotPresent)
+		return fmt.Errorf("pre flight check: %w", err)
 	}
 
 	logrus.Info("Pre-flight checks successful")
