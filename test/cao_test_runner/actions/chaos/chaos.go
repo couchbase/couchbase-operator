@@ -15,11 +15,8 @@ import (
 )
 
 var (
-	ErrChaosConfigDecode     = errors.New("unable to decode config into ChaosConfig")
-	ErrCountNotMatchTriggers = errors.New("the count in CBPodFilter is not matching the number of triggers")
-	ErrCountNotMatchSvcChaos = errors.New("the count in CBPodFilter is not matching the number of cb service chaos")
-	ErrConfigChaos           = errors.New("no config found for chaos action")
-	ErrChaosActionNotFound   = errors.New("provided chaos action not found")
+	ErrChaosConfigDecode   = errors.New("unable to decode config into ChaosConfig")
+	ErrChaosConfigNotFound = errors.New("no config found for chaos action")
 )
 
 type ChaosConfig struct {
@@ -57,7 +54,7 @@ type Chaos struct {
 
 func NewChaosConfig(config interface{}) (actions.Action, error) {
 	if config == nil {
-		return nil, fmt.Errorf("new chaos config: %w", ErrConfigChaos)
+		return nil, fmt.Errorf("new chaos config: %w", ErrChaosConfigNotFound)
 	}
 
 	chaosConfig, ok := config.(*ChaosConfig)
@@ -65,33 +62,15 @@ func NewChaosConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new chaos config: %w", ErrChaosConfigDecode)
 	}
 
-	// Validating the ChaosConfig.
 	if !managedsvcs.ValidateManagedServices(chaosConfig.ManagedSvcName) {
 		return nil, fmt.Errorf("new chaos config: %w", managedsvcs.ErrManagedServiceNotFound)
 	}
 
 	// Validating the ChaosList.
-	for i, chaos := range chaosConfig.ChaosList {
-		if chaos.ChaosActions == nil {
-			return nil, fmt.Errorf("new chaos config: %w", ErrChaosActionNotFound)
-		}
-
-		if chaos.ChaosIterations == 0 {
-			chaosConfig.ChaosList[i].ChaosIterations = 1
-		}
-
-		if chaos.CBPodFilter.Count != len(chaos.Trigger) {
-			return nil, fmt.Errorf("new chaos config: cb pod filter `%s`: %w", chaos.CBPodFilter.FilterType, ErrCountNotMatchTriggers)
-		}
-
-		if chaos.CBServiceChaos != nil {
-			if chaos.CBPodFilter.Count != len(chaos.CBServiceChaos) {
-				return nil, fmt.Errorf("new chaos config: cb pod filter `%s`: %w", chaos.CBPodFilter.FilterType, ErrCountNotMatchSvcChaos)
-			}
-		} else {
-			for range chaos.CBPodFilter.Count {
-				chaosConfig.ChaosList[i].CBServiceChaos = append(chaosConfig.ChaosList[i].CBServiceChaos, CBService{})
-			}
+	for i := range chaosConfig.ChaosList {
+		err := validateChaosList(&chaosConfig.ChaosList[i])
+		if err != nil {
+			return nil, fmt.Errorf("new chaos config: %w", err)
 		}
 	}
 
