@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -23,6 +24,7 @@ var (
 	ErrMinSizeInvalid                = errors.New("for environment type 'cloud' and provider 'aws', MinSize must be greater than 0")
 	ErrMaxSizeInvalid                = errors.New("for environment type 'cloud' and provider 'aws', MaxSize must be greater than 0")
 	ErrDiskSizeInvalid               = errors.New("for environment type 'cloud' and provider 'aws', DiskSize must be greater than 0")
+	ErrKubeconfigFileInvalid         = errors.New("kubeconfig file does not exist")
 )
 
 const (
@@ -176,6 +178,15 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 			 chmod +x ./aws-iam-authenticator
 		     sudo mv ./aws-iam-authenticator /usr/local/bin/
 	*/
+	if !fileutils.NewFile(cec.KubeConfigPath).IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath, ErrKubeconfigFileInvalid)
+	}
+
+	kubeconfig, err := clientcmd.LoadFromFile(cec.KubeConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load existing kubeconfig file: %w", err)
+	}
+
 	caData, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
 	if err != nil {
 		return fmt.Errorf("failed to decode certificate authority data: %w", err)
@@ -201,13 +212,22 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 		},
 	}
 
-	config := api.NewConfig()
-	config.Clusters[clusterName] = clusterConfig
-	config.Contexts[contextName] = contextConfig
-	config.AuthInfos[clusterName] = userConfig
-	config.CurrentContext = contextName
+	if kubeconfig.Clusters == nil {
+		kubeconfig.Clusters = make(map[string]*api.Cluster)
+	}
+	if kubeconfig.Contexts == nil {
+		kubeconfig.Contexts = make(map[string]*api.Context)
+	}
+	if kubeconfig.AuthInfos == nil {
+		kubeconfig.AuthInfos = make(map[string]*api.AuthInfo)
+	}
 
-	if err = clientcmd.WriteToFile(*config, cec.KubeConfigPath); err != nil {
+	kubeconfig.Clusters[clusterName] = clusterConfig
+	kubeconfig.Contexts[contextName] = contextConfig
+	kubeconfig.AuthInfos[clusterName] = userConfig
+	kubeconfig.CurrentContext = contextName
+
+	if err = clientcmd.WriteToFile(*kubeconfig, cec.KubeConfigPath); err != nil {
 		return fmt.Errorf("failed to write kubeconfig file: %w", err)
 	}
 
