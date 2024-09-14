@@ -84,12 +84,25 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 	logrus.Info(fmt.Sprintf("Deleted resource group %s", resourceGroupName))
 
 	contextName := dac.ClusterName
+	userName := "clusterUser_" + resourceGroupName + "_" + dac.ClusterName
 
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("error deleting context %s from kubectl: %w", contextName, err)
 	}
 
 	logrus.Info(fmt.Sprintf("Deleted kubectl context %s", contextName))
+
+	if err := kubectl.DeleteCluster(dac.ClusterName).ExecWithoutOutputCapture(); err != nil {
+		return fmt.Errorf("error deleting cluster %s from kubectl: %w", dac.ClusterName, err)
+	}
+
+	logrus.Info(fmt.Sprintf("Deleted kubectl cluster %s", dac.ClusterName))
+
+	if err := kubectl.DeleteUser(userName).ExecWithoutOutputCapture(); err != nil {
+		return fmt.Errorf("error deleting user %s from kubectl: %w", userName, err)
+	}
+
+	logrus.Info(fmt.Sprintf("Deleted kubectl user %s", userName))
 
 	return nil
 }

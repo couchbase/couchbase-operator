@@ -166,6 +166,20 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("unable to delete context from kubectl %s: %w", contextName, err)
 	}
 
+	logrus.Infof("Deleted context %s from kubectl contexts", contextName)
+
+	if err := kubectl.DeleteCluster(dec.ClusterName).ExecWithoutOutputCapture(); err != nil {
+		return fmt.Errorf("unable to delete cluster from kubectl %s: %w", dec.ClusterName, err)
+	}
+
+	logrus.Infof("Deleted cluster %s from kubectl clusters", dec.ClusterName)
+
+	if err := kubectl.DeleteUser(dec.ClusterName).ExecWithoutOutputCapture(); err != nil {
+		return fmt.Errorf("unable to delete user from kubectl %s: %w", dec.ClusterName, err)
+	}
+
+	logrus.Infof("Deleted user %s from kubectl users", dec.ClusterName)
+
 	return nil
 }
 

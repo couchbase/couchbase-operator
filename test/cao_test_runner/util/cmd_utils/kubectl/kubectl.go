@@ -318,6 +318,16 @@ func UseContext(contextName string) *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
 }
 
+func DeleteUser(userName string) *KubectlCmd {
+	args := []string{"delete-user", userName}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+}
+
+func DeleteCluster(clusterName string) *KubectlCmd {
+	args := []string{"delete-cluster", clusterName}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+}
+
 // =============================================
 // ========== Other Kubectl Commands ===========
 // =============================================
