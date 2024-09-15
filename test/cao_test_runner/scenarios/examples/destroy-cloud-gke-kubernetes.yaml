@@ -3,5 +3,5 @@ config:
   clusterName: testing
   platform: kubernetes
   environment: cloud
-  provider: googleCloud
+  provider: gcp
   gkeRegion: us-central1

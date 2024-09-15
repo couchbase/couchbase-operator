@@ -3,7 +3,7 @@ config:
   clusterName: test
   platform: kubernetes
   environment: cloud
-  provider: googleCloud
+  provider: gcp
   gkeRegion: us-central1
   kubernetesVersion: 1.28.13
   machineType: n1-standard-16

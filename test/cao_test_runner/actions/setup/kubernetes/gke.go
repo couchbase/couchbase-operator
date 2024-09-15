@@ -37,11 +37,11 @@ const (
 
 var (
 	ErrKubeConfigFileInvalid    = errors.New("kubeconfig file does not exist")
-	ErrGKECountInvalid          = errors.New("for environment type 'cloud' and provider 'googleCloud', Count must be greater than 0")
-	ErrGKENumNodePoolsInvalid   = errors.New("for environment type 'cloud' and provider 'googleCloud', NumNodePools must be greater than 0")
-	ErrGKEDiskSizeInvalid       = errors.New("for environment type 'cloud' and provider 'googleCloud', DiskSize must be greater than 0")
+	ErrGKECountInvalid          = errors.New("for environment type 'cloud' and provider 'gcp', Count must be greater than 0")
+	ErrGKENumNodePoolsInvalid   = errors.New("for environment type 'cloud' and provider 'gcp', NumNodePools must be greater than 0")
+	ErrGKEDiskSizeInvalid       = errors.New("for environment type 'cloud' and provider 'gcp', DiskSize must be greater than 0")
 	ErrGKEClusterAlreadyExists  = errors.New("aks cluster already exists")
-	ErrInvalidKubernetesVersion = errors.New("for environment type 'cloud' and provider 'googleCloud', kubernetes version is invalid")
+	ErrInvalidKubernetesVersion = errors.New("for environment type 'cloud' and provider 'gcp', kubernetes version is invalid")
 )
 
 func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {

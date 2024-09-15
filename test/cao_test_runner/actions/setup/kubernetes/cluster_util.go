@@ -63,7 +63,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					VMSize:            p.VMSize,
 					Count:             int32(p.Count),
 				}, nil
-			case GoogleCloud:
+			case GCP:
 				return &CreateGKECluster{
 					ClusterName:       p.ClusterName,
 					Region:            p.GKERegion,

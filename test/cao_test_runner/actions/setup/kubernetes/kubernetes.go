@@ -18,11 +18,11 @@ type EnvironmentType string
 type ProviderType string
 
 const (
-	Kind        EnvironmentType = "kind"
-	Cloud       EnvironmentType = "cloud"
-	AWS         ProviderType    = "aws"
-	Azure       ProviderType    = "azure"
-	GoogleCloud ProviderType    = "googleCloud"
+	Kind  EnvironmentType = "kind"
+	Cloud EnvironmentType = "cloud"
+	AWS   ProviderType    = "aws"
+	Azure ProviderType    = "azure"
+	GCP   ProviderType    = "gcp"
 )
 
 var (
@@ -146,7 +146,7 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 		// No-op
 	case Cloud:
 		switch c.Provider {
-		case AWS, Azure, GoogleCloud:
+		case AWS, Azure, GCP:
 			// No-op
 		default:
 			return ErrIllegalProvider

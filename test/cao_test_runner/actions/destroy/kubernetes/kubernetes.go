@@ -20,7 +20,7 @@ const (
 	Cloud       EnvironmentType = "cloud"
 	AWS         ProviderType    = "aws"
 	Azure       ProviderType    = "azure"
-	GoogleCloud ProviderType    = "googleCloud"
+	GoogleCloud ProviderType    = "gcp"
 )
 
 var (

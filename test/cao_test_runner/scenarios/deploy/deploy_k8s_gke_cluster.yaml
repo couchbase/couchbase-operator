@@ -14,7 +14,7 @@ config:
     - "setup kubernetes cluster on cloud environment on Google Cloud (GKE cluster)"
   platform: kubernetes
   environment: cloud
-  provider: googleCloud
+  provider: gcp
   kubernetesVersion: 1.28.13
   machineType: n1-standard-16
   count: 7
