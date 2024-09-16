@@ -232,6 +232,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-waitforaddressreachabledelay,waitForAddressReachableDelay>>: 2m
   <<couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins,onlineVolumeExpansionTimeoutInMins>>: 0
   <<couchbaseclusters-spec-paused,paused>>: false
+  <<couchbaseclusters-spec-perserviceclasspdb,perServiceClassPDB>>: false
   <<couchbaseclusters-spec-platform,platform>>: ""
   <<couchbaseclusters-spec-recoverypolicy,recoveryPolicy>>: ""
   <<couchbaseclusters-spec-rollingupgrade,rollingUpgrade>>:
@@ -3494,6 +3495,19 @@ If no value is provided, then it defaults to 10 minutes.
 Paused is to pause the control of the operator for the Couchbase cluster.
 This does not pause the cluster itself, instead stopping the operator from
 taking any action.
+
+=== couchbaseclusters.spec.perServiceClassPDB
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+PerServiceClassPDB allows pod disruption budgets to be created on a
+per-serviceClass basis.
 
 === couchbaseclusters.spec.platform
 

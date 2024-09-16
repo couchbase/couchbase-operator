@@ -47,6 +47,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintSearchServiceMemoryQuota,
 		checkConstraintEventingServiceMemoryQuota,
 		checkConstraintAnalyticsServiceMemoryQuota,
+		checkConstraintPerServiceClassPDB,
 		checkConstraintQueryTemporarySpace,
 		checkConstraintAutoFailoverTimeout,
 		checkConstraintAutoFailoverMaxCount,
@@ -149,6 +150,58 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintPerServiceClassPDB(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.PerServiceClassPDB {
+		return nil
+	}
+
+	var totalMinAvailable float32
+
+	var totalIndexPodsMinAvailable int
+
+	var totalKVPodsMinAvailable int
+
+	if cluster.Spec.TotalSize() < 2*len(cluster.Spec.Servers)+1 {
+		return fmt.Errorf("not enough nodes compared to serverclasses to enable per-service pdbs")
+	}
+
+	for _, serverClass := range cluster.Spec.Servers {
+		if serverClass.Size < 2 {
+			return fmt.Errorf("server class %s does not contain enough nodes to enable per-service pdbs", serverClass.Name)
+		}
+
+		totalMinAvailable += float32(serverClass.Size) - 1
+
+		for _, service := range serverClass.Services {
+			if service == couchbasev2.IndexService {
+				totalIndexPodsMinAvailable += serverClass.Size - 1
+			}
+
+			if service == couchbasev2.DataService {
+				totalKVPodsMinAvailable += serverClass.Size - 1
+			}
+		}
+	}
+
+	if cluster.Spec.ClusterSettings.Indexer != nil {
+		if totalIndexPodsMinAvailable < cluster.Spec.ClusterSettings.Indexer.NumberOfReplica {
+			return fmt.Errorf("cofiguration violates maximum index disruption of %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica)
+		}
+	}
+
+	if cluster.Spec.ClusterSettings.Data != nil {
+		if totalKVPodsMinAvailable < cluster.Spec.ClusterSettings.Data.MinReplicasCount {
+			return fmt.Errorf("cofiguration violates maximum data disruption of %d", cluster.Spec.ClusterSettings.Data.MinReplicasCount)
+		}
+	}
+
+	if totalMinAvailable < float32(cluster.Spec.TotalSize())/2 {
+		return fmt.Errorf("pod disruption budgets cannot disrupt more than 50 percent of the total server size")
+	}
+
+	return nil
 }
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -3352,6 +3405,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 
 	err = annotations.Populate(&curr.Spec, curr.Annotations)
 	if err != nil {
+		return err
+	}
+
+	if err := checkConstraintPerServiceClassPDB(v, curr); err != nil {
 		return err
 	}
 

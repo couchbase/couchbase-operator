@@ -2297,6 +2297,11 @@ type ClusterSpec struct {
 	// +listType=set
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
+	// PerServiceClassPDB allows pod disruption budgets to be created on a
+	// per-serviceClass basis.
+	// +kubebuilder:default=false
+	PerServiceClassPDB bool `json:"perServiceClassPDB,omitempty"`
+
 	// ShuffleServerGroups allows the Operator to shuffle server groups before
 	// scheduling pods. This can be useful to randomly place pods across availability
 	// zones and not biasing to the first availability zones.

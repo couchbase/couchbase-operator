@@ -182,6 +182,39 @@ func LabelsForNodeResource(cluster *couchbasev2.CouchbaseCluster, name string) m
 	return labels
 }
 
+func LabelsForServerClass(cluster *couchbasev2.CouchbaseCluster, serverClass string) map[string]string {
+	labels := LabelsForCluster(cluster)
+
+	labels[constants.LabelNodeConf] = serverClass
+
+	return labels
+}
+
+func LabelsForService(cluster *couchbasev2.CouchbaseCluster, service couchbasev2.Service) map[string]string {
+	labels := LabelsForCluster(cluster)
+
+	switch service {
+	case couchbasev2.AdminService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.AdminService)] = constants.EnabledValue
+	case couchbasev2.DataService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.DataService)] = constants.EnabledValue
+	case couchbasev2.IndexService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.IndexService)] = constants.EnabledValue
+	case couchbasev2.QueryService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.QueryService)] = constants.EnabledValue
+	case couchbasev2.EventingService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.EventingService)] = constants.EnabledValue
+	case couchbasev2.SearchService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.SearchService)] = constants.EnabledValue
+	case couchbasev2.AnalyticsService:
+		labels[constants.LabelServicePrefix+string(couchbasev2.AnalyticsService)] = constants.EnabledValue
+	default:
+		break
+	}
+
+	return labels
+}
+
 func LabelsForClusterResource(cluster *couchbasev2.CouchbaseCluster) map[string]string {
 	labels := LabelsForCluster(cluster)
 	labels[constants.ResourceVersionAnnotation] = version.Version
