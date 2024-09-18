@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/ghodss/yaml"
 )
 
@@ -39,8 +40,7 @@ func MarshalYAMLIntoFile(pathToYAMLFile string, unmarshalledYAML map[string]inte
 		return fmt.Errorf("marshal yaml into file: %w", err)
 	}
 
-	err = os.WriteFile(pathToYAMLFile, marshalYAML, os.ModePerm)
-	if err != nil {
+	if err = fileutils.NewFile(pathToYAMLFile).WriteFile(marshalYAML, os.ModePerm); err != nil {
 		return fmt.Errorf("marshal yaml into file: %w", err)
 	}
 

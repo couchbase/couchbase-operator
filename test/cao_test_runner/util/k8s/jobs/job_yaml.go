@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,13 +23,11 @@ func MarshalJobsIntoSingleYAML(jobs []*Job, filePath string) error {
 		yamlFileBytes = append(yamlFileBytes, "---\n"...)
 	}
 
-	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
-	if err != nil {
+	if err := fileutils.NewDirectory(filepath.Dir(filePath), os.ModePerm).CreateDirectory(); err != nil {
 		return fmt.Errorf("create jobs yaml: %w", err)
 	}
 
-	err = os.WriteFile(filePath, yamlFileBytes, os.ModePerm)
-	if err != nil {
+	if err := fileutils.NewFile(filePath).WriteFile(yamlFileBytes, os.ModePerm); err != nil {
 		return fmt.Errorf("create jobs yaml: %w", err)
 	}
 
@@ -42,13 +41,11 @@ func MarshalJobYAML(job *Job, filePath string) error {
 		return fmt.Errorf("marshal job yamls: %w", err)
 	}
 
-	err = os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
-	if err != nil {
+	if err := fileutils.NewDirectory(filepath.Dir(filePath), os.ModePerm).CreateDirectory(); err != nil {
 		return fmt.Errorf("create jobs yaml: %w", err)
 	}
 
-	err = os.WriteFile(filePath, marshal, os.ModePerm)
-	if err != nil {
+	if err = fileutils.NewFile(filePath).WriteFile(marshal, os.ModePerm); err != nil {
 		return fmt.Errorf("marshal job yamls: %w", err)
 	}
 
