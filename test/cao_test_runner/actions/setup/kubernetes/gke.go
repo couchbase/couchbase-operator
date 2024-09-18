@@ -182,6 +182,7 @@ func (cgc *CreateGKECluster) ValidateParams(ctx *context.Context) error {
 	}
 
 	highestBuild := 0
+
 	var highestVersion string
 
 	for _, version := range possibleVersions {
@@ -196,7 +197,6 @@ func (cgc *CreateGKECluster) ValidateParams(ctx *context.Context) error {
 			highestBuild = buildNumber
 			highestVersion = version
 		}
-
 	}
 
 	cgc.KubernetesVersion = highestVersion

@@ -226,5 +226,5 @@ When fields are present in yaml, context and env the yaml takes first precedence
 precedence over env.
 
 The first time a field is encountered with a context tag, it will be set to context as well(post field value fetch from yaml/env).
-If the field is overriden in subsequent actions(from yaml), the context field will not be overriden. The onus falls onto the action to set it.
+If the field is overridden in subsequent actions(from yaml), the context field will not be overridden. The onus falls onto the action to set it.
 

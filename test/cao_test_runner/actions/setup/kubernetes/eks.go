@@ -215,9 +215,11 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 	if kubeconfig.Clusters == nil {
 		kubeconfig.Clusters = make(map[string]*api.Cluster)
 	}
+
 	if kubeconfig.Contexts == nil {
 		kubeconfig.Contexts = make(map[string]*api.Context)
 	}
+
 	if kubeconfig.AuthInfos == nil {
 		kubeconfig.AuthInfos = make(map[string]*api.AuthInfo)
 	}

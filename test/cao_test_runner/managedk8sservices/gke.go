@@ -199,7 +199,7 @@ func (gks *GKESession) WaitForClusterOperation(ctx *context.Context, operationNa
 
 		if opStatus.Status == containerpb.Operation_DONE {
 			if opStatus.Error != nil {
-				return fmt.Errorf("operation failed: %v", opStatus.Error)
+				return fmt.Errorf("operation failed %v: %w", opStatus.Error, ErrOperationError)
 			}
 
 			return nil
