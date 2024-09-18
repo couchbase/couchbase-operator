@@ -45,14 +45,14 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx *context.Context) error {
 			return fmt.Errorf("failed to delete node pool %s of cluster %s: %w", nodePool.Name, dgc.ClusterName, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Node pool %s of cluster %s deleted", nodePool.Name, dgc.ClusterName))
+		logrus.Infof("Node pool %s of cluster %s deleted", nodePool.Name, dgc.ClusterName)
 	}
 
 	if err := gkeSession.DeleteCluster(ctx); err != nil {
 		return fmt.Errorf("failed to delete cluster %s: %w", dgc.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted GKE Cluster %s", dgc.ClusterName))
+	logrus.Infof("Deleted GKE Cluster %s", dgc.ClusterName)
 
 	subnetName := dgc.ClusterName + "-subnet"
 	networkName := dgc.ClusterName + "-network"
@@ -65,19 +65,19 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("failed to delete subnet %s of virtual network %s: %w", subnetName, networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted subnet %s of virtual network %s", subnetName, networkName))
+	logrus.Infof("Deleted subnet %s of virtual network %s", subnetName, networkName)
 
 	if err := gkeSession.DeleteFirewallRule(ctx, firewallRuleName); err != nil {
 		return fmt.Errorf("failed to delete firewall rule %s of virtual network %s: %w", firewallRuleName, networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted firewall rule %s of virtual network %s", firewallRuleName, networkName))
+	logrus.Infof("Deleted firewall rule %s of virtual network %s", firewallRuleName, networkName)
 
 	if err := gkeSession.DeleteVirtualNetwork(ctx, networkName); err != nil {
 		return fmt.Errorf("failed to delete virtual network %s: %w", networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted virtual network %s", networkName))
+	logrus.Infof("Deleted virtual network %s", networkName)
 
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to delete context %s from kube config: %w", contextName, err)
@@ -87,13 +87,13 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("error deleting cluster %s from kubectl: %w", kubeconfigClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted kubectl cluster %s", kubeconfigClusterName))
+	logrus.Infof("Deleted kubectl cluster %s", kubeconfigClusterName)
 
 	if err := kubectl.DeleteUser(userName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("error deleting user %s from kubectl: %w", userName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted kubectl user %s", userName))
+	logrus.Infof("Deleted kubectl user %s", userName)
 
 	return nil
 }

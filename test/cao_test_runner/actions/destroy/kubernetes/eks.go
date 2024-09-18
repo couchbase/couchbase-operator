@@ -63,7 +63,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 			return fmt.Errorf("unable to delete node group %s of cluster %s: %w", *nodeGroup.NodegroupName, dec.ClusterName, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Deleted node group %s from cluster %s", *nodeGroup.NodegroupName, dec.ClusterName))
+		logrus.Infof("Deleted node group %s from cluster %s", *nodeGroup.NodegroupName, dec.ClusterName)
 
 		parts := strings.Split(*nodeGroup.NodeRole, "/")
 		roleName := &parts[len(parts)-1]
@@ -72,20 +72,20 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 			return fmt.Errorf("unable to delete iam %s for node group %s of cluster %s: %w", *nodeGroup.NodeRole, *nodeGroup.NodegroupName, dec.ClusterName, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Deleted IAM role %s of node group %s from cluster %s", *nodeGroup.NodeRole, *nodeGroup.NodegroupName, dec.ClusterName))
+		logrus.Infof("Deleted IAM role %s of node group %s from cluster %s", *nodeGroup.NodeRole, *nodeGroup.NodegroupName, dec.ClusterName)
 	}
 
 	if err = eksSession.DeleteCluster(true); err != nil {
 		return fmt.Errorf("unable to delete cluster %s: %w", dec.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted cluster %s", dec.ClusterName))
+	logrus.Infof("Deleted cluster %s", dec.ClusterName)
 
 	if err = eksSession.DeleteSecurityGroups(cluster.ResourcesVpcConfig.SecurityGroupIds); err != nil {
 		return fmt.Errorf("unable to delete security group for cluster %s: %w", dec.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted security groups from cluster %s", dec.ClusterName))
+	logrus.Infof("Deleted security groups from cluster %s", dec.ClusterName)
 
 	igw, err := eksSession.GetInternetGatewayForVPC(cluster.ResourcesVpcConfig.VpcId)
 	if err != nil {
@@ -144,13 +144,13 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("unable to delete subnets for cluster %s: %w", dec.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted subnets from cluster %s", dec.ClusterName))
+	logrus.Infof("Deleted subnets from cluster %s", dec.ClusterName)
 
 	if err = eksSession.DeleteVpc(cluster.ResourcesVpcConfig.VpcId); err != nil {
 		return fmt.Errorf("unable to delete vpc for cluster %s: %w", dec.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted vpc from cluster %s", dec.ClusterName))
+	logrus.Infof("Deleted vpc from cluster %s", dec.ClusterName)
 
 	rolesToDelete := []string{dec.ClusterName + "-eks-role", dec.ClusterName + "-eks-ebscsidriver-role"}
 	for _, roleName := range rolesToDelete {
@@ -158,7 +158,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx *context.Context) error {
 			return fmt.Errorf("unable to delete iam role %s: %w", roleName, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Deleted IAM role %s", roleName))
+		logrus.Infof("Deleted IAM role %s", roleName)
 	}
 
 	contextName := fmt.Sprintf("eks-%s@%s", dec.ClusterName, dec.Region)

@@ -53,14 +53,14 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 			return fmt.Errorf("error deleting node pool %s: %w", *nodePool.Name, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Deleted node pool %s from cluster %s", *nodePool.Name, dac.ClusterName))
+		logrus.Infof("Deleted node pool %s from cluster %s", *nodePool.Name, dac.ClusterName)
 	}
 
 	if err := aksSession.DeleteCluster(ctx, resourceGroupName, true); err != nil {
 		return fmt.Errorf("error deleting cluster %s: %w", dac.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted AKS cluster %s", dac.ClusterName))
+	logrus.Infof("Deleted AKS cluster %s", dac.ClusterName)
 
 	virtualNetworkName := dac.ClusterName + "-vnet"
 	subnetName := dac.ClusterName + "-subnet"
@@ -69,19 +69,19 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("error deleting subnet %s: %w", subnetName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted subnet %s from virtual network %s", subnetName, virtualNetworkName))
+	logrus.Infof("Deleted subnet %s from virtual network %s", subnetName, virtualNetworkName)
 
 	if err := aksSession.DeleteVirtualNetwork(ctx, resourceGroupName, virtualNetworkName, true); err != nil {
 		return fmt.Errorf("error deleting virtual network %s: %w", virtualNetworkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted virtual network %s from resource group %s", virtualNetworkName, resourceGroupName))
+	logrus.Infof("Deleted virtual network %s from resource group %s", virtualNetworkName, resourceGroupName)
 
 	if err := aksSession.DeleteResourceGroup(ctx, resourceGroupName, true); err != nil {
 		return fmt.Errorf("error deleting resource group %s: %w", resourceGroupName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted resource group %s", resourceGroupName))
+	logrus.Infof("Deleted resource group %s", resourceGroupName)
 
 	contextName := dac.ClusterName
 	userName := "clusterUser_" + resourceGroupName + "_" + dac.ClusterName
@@ -90,19 +90,19 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx *context.Context) error {
 		return fmt.Errorf("error deleting context %s from kubectl: %w", contextName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted kubectl context %s", contextName))
+	logrus.Infof("Deleted kubectl context %s", contextName)
 
 	if err := kubectl.DeleteCluster(dac.ClusterName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("error deleting cluster %s from kubectl: %w", dac.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted kubectl cluster %s", dac.ClusterName))
+	logrus.Infof("Deleted kubectl cluster %s", dac.ClusterName)
 
 	if err := kubectl.DeleteUser(userName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("error deleting user %s from kubectl: %w", userName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Deleted kubectl user %s", userName))
+	logrus.Infof("Deleted kubectl user %s", userName)
 
 	return nil
 }

@@ -65,21 +65,21 @@ func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
 		return fmt.Errorf("unable to create resource group %s: %w", resourceGroupName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Resource group %s created", resourceGroupName))
+	logrus.Infof("Resource group %s created", resourceGroupName)
 
 	virtualNetworkName := cac.ClusterName + "-vnet"
 	if err := aksSession.CreateVirtualNetwork(ctx, resourceGroupName, virtualNetworkName); err != nil {
 		return fmt.Errorf("unable to create virtual network %s: %w", virtualNetworkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Virtual Network %s created", virtualNetworkName))
+	logrus.Infof("Virtual Network %s created", virtualNetworkName)
 
 	subnetName := cac.ClusterName + "-subnet"
 	if err := aksSession.CreateSubnet(ctx, resourceGroupName, virtualNetworkName, subnetName); err != nil {
 		return fmt.Errorf("unable to create subnet %s: %w", subnetName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Subnet %s created", subnetName))
+	logrus.Infof("Subnet %s created", subnetName)
 
 	subnet, err := aksSession.GetSubnet(ctx, resourceGroupName, virtualNetworkName, subnetName)
 	if err != nil {
@@ -91,7 +91,7 @@ func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
 		return fmt.Errorf("unable to create k8s cluster %s: %w", cac.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("AKS Cluster %s created", cac.ClusterName))
+	logrus.Infof("AKS Cluster %s created", cac.ClusterName)
 
 	// One node group is already created during cluster creation
 	// Create remaining node groups here
@@ -104,7 +104,7 @@ func (cac *CreateAKSCluster) CreateCluster(ctx *context.Context) error {
 		}
 	}
 
-	logrus.Info(fmt.Sprintf("All node pools for cluster %s created", cac.ClusterName))
+	logrus.Infof("All node pools for cluster %s created", cac.ClusterName)
 
 	creds, err := aksSession.ListClusterUserCredentials(ctx, resourceGroupName)
 	if err != nil {

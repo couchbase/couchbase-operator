@@ -65,21 +65,21 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 		return fmt.Errorf("error creating virtual network %s: %w", networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Created virtual network %s", networkName))
+	logrus.Infof("Created virtual network %s", networkName)
 
 	firewallRuleName := cgc.ClusterName + "-firewall"
 	if err := gkeSession.CreateFirewallRule(ctx, firewallRuleName, networkName); err != nil {
 		return fmt.Errorf("error creating firewall rule %s in network %s: %w", firewallRuleName, networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Created firewall rule %s in virtual network %s", firewallRuleName, networkName))
+	logrus.Infof("Created firewall rule %s in virtual network %s", firewallRuleName, networkName)
 
 	subnetName := cgc.ClusterName + "-subnet"
 	if err := gkeSession.CreateSubnet(ctx, subnetName, networkName, ipCidrRange); err != nil {
 		return fmt.Errorf("error creating subnet %s in network %s: %w", subnetName, networkName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Created subnet %s in virtual network %s", subnetName, networkName))
+	logrus.Infof("Created subnet %s in virtual network %s", subnetName, networkName)
 
 	nodePoolName := cgc.ClusterName + "nodepool-0"
 	if err := gkeSession.CreateCluster(ctx, networkName, subnetName, cgc.MachineType, cgc.ImageType,
@@ -87,7 +87,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 		return fmt.Errorf("error creating cluster %s: %w", cgc.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Created cluster %s with 1 node pool %s", cgc.ClusterName, nodePoolName))
+	logrus.Infof("Created cluster %s with 1 node pool %s", cgc.ClusterName, nodePoolName)
 
 	for i := 1; i < cgc.NumNodePools; i++ {
 		nodePoolName = fmt.Sprintf("%s-nodepool-%d", cgc.ClusterName, i)
@@ -96,7 +96,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 			return fmt.Errorf("error creating node pool %s: %w", nodePoolName, err)
 		}
 
-		logrus.Info(fmt.Sprintf("Created node pool %s for cluster %s", nodePoolName, cgc.ClusterName))
+		logrus.Infof("Created node pool %s for cluster %s", nodePoolName, cgc.ClusterName)
 	}
 
 	cluster, err := gkeSession.GetCluster(ctx)
@@ -108,7 +108,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx *context.Context) error {
 		return fmt.Errorf("error updating kubeconfig of cluster %s: %w", cgc.ClusterName, err)
 	}
 
-	logrus.Info(fmt.Sprintf("Updated kubeconfig with cluster %s details", cgc.ClusterName))
+	logrus.Infof("Updated kubeconfig with cluster %s details", cgc.ClusterName)
 
 	_, filePath, _, ok := runtime.Caller(0)
 	if !ok {
