@@ -88,8 +88,10 @@ removed by Couchbase, after they have expired, when either accessed, the expiry
 pager is run, or the bucket is compacted.
 When set to 0, then documents are not
 expired by default.
-This field must be a duration in the range 0-2147483648s,
+This field must either be a duration in the range 0-2147483648s or "-1",
 defaulting to 0.
+If set to "-1", the collection's bucket will be prevented from setting a
+default expiration on the collection's documents.
 More info:
 https://golang.org/pkg/time/#ParseDuration.
 

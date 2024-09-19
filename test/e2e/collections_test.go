@@ -933,12 +933,18 @@ func TestUpdateCollection(t *testing.T) {
 		collection.Spec.MaxTTL = e2espec.NewDurationS(1000)
 		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
 		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+
+		collection.Spec.MaxTTL = e2espec.NewDurationS(-1)
+		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
+		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
 	}
 
 	// Expect there to be a scopes & collections updated event.
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
 	}
 

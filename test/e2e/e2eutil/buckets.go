@@ -210,7 +210,7 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 		}
 
 		if b.maxTTL != 0 {
-			bucket.Spec.MaxTTL = e2espec.NewDurationS(uint64(b.maxTTL))
+			bucket.Spec.MaxTTL = e2espec.NewDurationS(int64(b.maxTTL))
 		}
 
 		if b.storageBackend != "" {
@@ -286,7 +286,7 @@ func (b *Bucket) MustCreate(t *testing.T, kubernetes *types.Cluster) metav1.Obje
 		}
 
 		if b.maxTTL != 0 {
-			bucket.Spec.MaxTTL = e2espec.NewDurationS(uint64(b.maxTTL))
+			bucket.Spec.MaxTTL = e2espec.NewDurationS(int64(b.maxTTL))
 		}
 
 		if b.scopes != nil {

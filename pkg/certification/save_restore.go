@@ -2850,7 +2850,7 @@ func (o *restoreOptions) compact(merged TreeNode) (TreeNode, error) {
 					Spec: couchbasev2.CouchbaseCollectionGroupSpec{
 						Names: names,
 						CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
-							MaxTTL: collection.resource.Spec.MaxTTL,
+							MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collection.resource.Spec.MaxTTL},
 						},
 					},
 				},

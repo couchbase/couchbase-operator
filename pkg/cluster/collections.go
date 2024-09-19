@@ -311,7 +311,7 @@ func (c *Cluster) gatherScopesImplicit(bucket couchbasev2.AbstractBucket, scopes
 	return nil
 }
 
-func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, collection *couchbasev2.CouchbaseCollection) error {
+func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, collection *couchbasev2.CouchbaseCollection, raiseEvent *bool) error {
 	ok, err := c.IsAtLeastVersion("7.2.0")
 	if err != nil {
 		return err
@@ -358,6 +358,8 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 		if err := couchbaseutil.PatchCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), requestedCollection).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
+
+		*raiseEvent = true
 	}
 
 	return nil
@@ -402,7 +404,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 		if current.GetScope(scope.CouchbaseName()).HasCollection(collection.CouchbaseName()) {
 			// scope already exists, check if it's different.
-			if err := c.reconcileCollectionSettings(bucket, scope, current, collection); err != nil {
+			if err := c.reconcileCollectionSettings(bucket, scope, current, collection, raiseEvent); err != nil {
 				return err
 			}
 
@@ -503,7 +505,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 					Spec: couchbasev2.CouchbaseCollectionSpec{
 						Name: name,
 						CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
-							MaxTTL: collectionGroup.Spec.MaxTTL,
+							MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collectionGroup.Spec.MaxTTL},
 						},
 					},
 				})
@@ -543,7 +545,7 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 				Spec: couchbasev2.CouchbaseCollectionSpec{
 					Name: name,
 					CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
-						MaxTTL: collectionGroup.Spec.MaxTTL,
+						MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collectionGroup.Spec.MaxTTL},
 					},
 				},
 			})

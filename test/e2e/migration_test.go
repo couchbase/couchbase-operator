@@ -121,7 +121,7 @@ func TestStabilizationPeriod(t *testing.T) {
 	defer cleanup()
 
 	clusterSize := 3
-	stabilizationPeriodS := uint64(60)
+	stabilizationPeriodS := int64(60)
 
 	// Create the source cluster.
 	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)

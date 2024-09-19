@@ -375,7 +375,7 @@ func NewResourceQuantityGi(value int64) *resource.Quantity {
 	return NewResourceQuantityMi(value * 1024)
 }
 
-func NewDurationS(value uint64) *metav1.Duration {
+func NewDurationS(value int64) *metav1.Duration {
 	return &metav1.Duration{Duration: time.Duration(value) * time.Second}
 }
 

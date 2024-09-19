@@ -1671,7 +1671,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if bucket.Spec.MaxTTL != nil {
-		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
+		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -1736,7 +1736,7 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if bucket.Spec.MaxTTL != nil {
-		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL); err != nil {
+		if err := checkMaxTTL("spec.maxTTL", bucket.Spec.MaxTTL, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -2777,16 +2777,21 @@ func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name s
 	return nil
 }
 
-// checkMaxTTL is a generic check for document TTL, shared across buckets and collections.
-func checkMaxTTL(path string, value *metav1.Duration) error {
+// checkMaxTTL is a generic check for document TTL, shared across buckets and collections. Setting allowNegOverride to true will allow "-1s" to be the given duration.
+func checkMaxTTL(path string, value *metav1.Duration, allowNegOverride bool) error {
 	if value == nil {
 		return nil
 	}
 
 	timeout := int(value.Duration.Seconds())
 
-	if timeout < 0 {
-		return errors.ExceedsMinimumInt(path, "body", 0, false, nil)
+	minValue := 0
+	if allowNegOverride {
+		minValue = -1
+	}
+
+	if timeout < minValue {
+		return errors.ExceedsMinimumInt(path, "body", int64(minValue), false, nil)
 	}
 
 	if timeout > bucketTTLMax {
@@ -2800,7 +2805,7 @@ func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.Couc
 	var errs []error
 
 	if collection.Spec.MaxTTL != nil {
-		if err := checkMaxTTL("spec.maxTTL", collection.Spec.MaxTTL); err != nil {
+		if err := checkMaxTTL("spec.maxTTL", collection.Spec.MaxTTL, true); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -2820,7 +2825,7 @@ func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchb
 	var errs []error
 
 	if collectionGroup.Spec.MaxTTL != nil {
-		if err := checkMaxTTL("spec.maxTTL", collectionGroup.Spec.MaxTTL); err != nil {
+		if err := checkMaxTTL("spec.maxTTL", collectionGroup.Spec.MaxTTL, true); err != nil {
 			errs = append(errs, err)
 		}
 	}

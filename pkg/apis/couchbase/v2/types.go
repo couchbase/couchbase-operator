@@ -3,6 +3,7 @@ package v2
 
 import (
 	"encoding/json"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -867,6 +868,15 @@ type CouchbaseCollection struct {
 // CouchbaseCollectionSpecCommon is a set of common parameters for all collections,
 // be they part of a single collection or a group.
 type CouchbaseCollectionSpecCommon struct {
+	MaxTTLWithNegativeOverride `json:",inline" annotation:",inline"`
+
+	// History controls whether history retention is enabled for a collection.
+	// pointer bool because if it hasn't been set it should default to true server side
+	History *bool `json:"-" annotation:"history"`
+}
+
+// MaxTTLWithNegativeOverride acts as a field for maxTTL values that can either be set as a duration or "-1", which will set the duration to -1 seconds
+type MaxTTLWithNegativeOverride struct {
 	// MaxTTL defines how long a document is permitted to exist for, without
 	// modification, until it is automatically deleted.  This field takes precedence over
 	// any TTL defined at the bucket level.  This is a default, and maximum
@@ -874,14 +884,54 @@ type CouchbaseCollectionSpecCommon struct {
 	// a higher value, then it is truncated to the maximum durability.  Documents are
 	// removed by Couchbase, after they have expired, when either accessed, the expiry
 	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
-	// expired by default.  This field must be a duration in the range 0-2147483648s,
-	// defaulting to 0.  More info:
+	// expired by default.  This field must either be a duration in the range 0-2147483648s or "-1",
+	// defaulting to 0. If set to "-1", the collection's bucket will be prevented from setting a
+	// default expiration on the collection's documents. More info:
 	// https://golang.org/pkg/time/#ParseDuration
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
+}
 
-	// History controls whether history retention is enabled for a collection.
-	// pointer bool because if it hasn't been set it should default to true server side
-	History *bool `json:"-" annotation:"history"`
+func (d *MaxTTLWithNegativeOverride) UnmarshalJSON(data []byte) error {
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal(data, &jsonData); err != nil {
+		return err
+	}
+
+	maxTTL, exists := jsonData["maxTTL"]
+	if !exists {
+		d.MaxTTL = &metav1.Duration{Duration: 0}
+		return nil
+	}
+
+	val, _ := maxTTL.(string)
+
+	if val == "-1" {
+		d.MaxTTL = &metav1.Duration{Duration: -1 * time.Second}
+		return nil
+	}
+
+	duration, err := time.ParseDuration(val)
+	if err != nil {
+		return err
+	}
+
+	d.MaxTTL = &metav1.Duration{Duration: duration}
+
+	return nil
+}
+
+func (d *MaxTTLWithNegativeOverride) MarshalJSON() ([]byte, error) {
+	if d.MaxTTL != nil && d.MaxTTL.Duration == -1*time.Second {
+		return json.Marshal(struct {
+			MaxTTL string `json:"maxTTL"`
+		}{
+			MaxTTL: "-1",
+		})
+	}
+
+	type alias MaxTTLWithNegativeOverride
+
+	return json.Marshal(alias(*d))
 }
 
 type CouchbaseCollectionSpec struct {
