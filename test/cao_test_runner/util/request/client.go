@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -49,12 +50,12 @@ func (c *Client) SetHTTPAuth(username, password string) {
 // Do perform the API request.
 func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) error {
 	if req == nil {
-		return fmt.Errorf("perform request: %w", ErrHTTPRequestIsNil)
+		return fmt.Errorf("perform %s request %s%s: %w", req.Method, req.Host, req.Path, ErrHTTPRequestIsNil)
 	}
 
 	err := ValidateHTTPRequest(req)
 	if err != nil {
-		return fmt.Errorf("perform request: %w", err)
+		return fmt.Errorf("perform %s request %s%s: %w", req.Method, req.Host, req.Path, err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -65,7 +66,7 @@ func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) err
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("perform request timed out after %v: %w", timeout, err)
+			return fmt.Errorf("perform %s request %s%s timed out after %v: %w", req.Method, req.Host, req.Path, timeout, err)
 		default:
 			resp, err = c.makeRequest(req)
 			if err == nil {
@@ -79,22 +80,40 @@ func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) err
 
 // makeRequest creates and sends an HTTP request.
 func (c *Client) makeRequest(req *Request) (*http.Response, error) {
-	url := fmt.Sprintf("%s%s", req.Host, req.Path)
+	reqURL := fmt.Sprintf("%s%s", req.Host, req.Path)
 
 	var bodyReader *bytes.Reader
 
+	// Marshal the contents of the body based on the `Content-Type` header.
 	if req.Body != nil {
-		bodyBytes, err := json.Marshal(req.Body)
-		if err != nil {
-			return nil, fmt.Errorf("make http request: marshal request body: %w", err)
-		}
+		switch req.Headers["Content-Type"] {
+		case "application/json":
+			{
+				bodyBytes, err := json.Marshal(req.Body)
+				if err != nil {
+					return nil, fmt.Errorf("make http request: marshal request body: %w", err)
+				}
 
-		bodyReader = bytes.NewReader(bodyBytes)
+				bodyReader = bytes.NewReader(bodyBytes)
+			}
+		case "application/x-www-form-urlencoded":
+			{
+				if formData, ok := req.Body.(url.Values); ok {
+					bodyReader = bytes.NewReader([]byte(formData.Encode()))
+				} else if formData, ok := req.Body.(string); ok {
+					bodyReader = bytes.NewReader([]byte(formData))
+				} else {
+					return nil, fmt.Errorf("make http request body: decode body `%v` for application/x-www-form-urlencoded: %w", req.Body, ErrUnableToDecode)
+				}
+			}
+		default:
+			return nil, fmt.Errorf("make http request with content-type=%s: %w", req.Headers["Content-Type"], ErrInvalidHeaderContentType)
+		}
 	} else {
 		bodyReader = bytes.NewReader([]byte{})
 	}
 
-	httpReq, err := http.NewRequest(req.Method, url, bodyReader)
+	httpReq, err := http.NewRequest(req.Method, reqURL, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("make http request: %w", err)
 	}

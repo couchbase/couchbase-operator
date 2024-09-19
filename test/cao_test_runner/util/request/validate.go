@@ -45,6 +45,10 @@ func validateHTTPMethod(method string) error {
 
 // validateHeaders checks if the headers are valid.
 func validateHeaders(headers map[string]string) error {
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+
 	for key, value := range headers {
 		switch key {
 		case "Content-Type":
@@ -64,9 +68,10 @@ func validateHeaders(headers map[string]string) error {
 // validateContentType checks if the Content-Type header value is valid.
 func validateContentType(contentType string) error {
 	validContentTypes := map[string]bool{
-		"application/json": true,
-		"application/xml":  true,
-		"text/plain":       true,
+		"application/json":                  true,
+		"application/xml":                   true,
+		"application/x-www-form-urlencoded": true,
+		"text/plain":                        true,
 	}
 
 	if val, ok := validContentTypes[contentType]; ok && val {
