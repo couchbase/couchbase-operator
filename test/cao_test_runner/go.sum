@@ -17,6 +17,8 @@ github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0 h1:tfLQ34V6F7tVSwoTf/4lH
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0/go.mod h1:9kIvujWAA58nmPmWB1m23fyWic1kYZMxD9CxaWn4Qpg=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 h1:ywEEhmNahHBihViHepv3xPBn1663uRv2t2q/ESv9seY=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0/go.mod h1:iZDifYGJTIgIIkYRNWPENUnqx6bJ2xnSDFI2tjwZNuY=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute v1.0.0 h1:/Di3vB4sNeQ+7A8efjUVENvyB945Wruvstucqp7ZArg=
+github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute v1.0.0/go.mod h1:gM3K25LQlsET3QR+4V74zxCsFAy0r6xMNN9n80SZn+4=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice v1.0.0 h1:figxyQZXzZQIcP3njhC68bYUiTw45J8/SsHaLW8Ax0M=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice v1.0.0/go.mod h1:TmlMW4W5OvXOmOyKNnor8nlMMiO1ctIyzmHme/VHsrA=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/internal v1.0.0 h1:lMW1lD/17LUA5z1XTURo7LcVG2ICBPlyMHjIUrcFZNQ=

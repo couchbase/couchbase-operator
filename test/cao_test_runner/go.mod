@@ -7,6 +7,7 @@ require (
 	cloud.google.com/go/container v1.39.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.7.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute v1.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice v1.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork v1.1.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.2.0
@@ -16,6 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
+	golang.org/x/crypto v0.26.0
 	golang.org/x/sync v0.8.0
 	google.golang.org/api v0.193.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -75,7 +77,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect

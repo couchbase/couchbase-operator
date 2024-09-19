@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
@@ -29,6 +30,7 @@ type AKSSession struct {
 	SubnetsClient         *armnetwork.SubnetsClient
 	AKSClient             *armcontainerservice.ManagedClustersClient
 	NodePoolClient        *armcontainerservice.AgentPoolsClient
+	VMClient              *armcompute.VirtualMachinesClient
 	Cred                  *ManagedServiceCredentials
 	Region                string
 	ClusterName           string
@@ -66,12 +68,18 @@ func NewAKSSession(managedSvcCred *ManagedServiceCredentials) (*AKSSession, erro
 		return nil, fmt.Errorf("failed to create node pool client: %w", err)
 	}
 
+	vmClient, err := armcompute.NewVirtualMachinesClient(managedSvcCred.AKSCredentials.aksSubscriptionID, cred, nil)
+	if err != nil {
+		return nil, fmt.Errorf("new aks session: get vm client: %w", err)
+	}
+
 	return &AKSSession{
 		ResourceGroupClient:   resourceGroupClient,
 		VirtualNetworksClient: vnetClient,
 		SubnetsClient:         subnetClient,
 		AKSClient:             aksClient,
 		NodePoolClient:        nodePoolClient,
+		VMClient:              vmClient,
 		Cred:                  managedSvcCred,
 		Region:                managedSvcCred.AKSCredentials.aksRegion,
 		ClusterName:           managedSvcCred.ClusterName,
