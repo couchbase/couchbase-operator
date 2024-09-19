@@ -16,8 +16,6 @@ const (
 	ClusterSpecPathIDKey
 	BucketsSpecPathIDKey
 	CouchbaseClusterNameKey
-	K8sNodesMapKey
-	K8sPodsMapKey
 	K8sContextKey
 	ClusterNameKey
 	ProviderKey
@@ -25,6 +23,7 @@ const (
 	AKSRegionKey
 	GKERegionKey
 	KubeConfigPathKey
+	CBBackupRestoreKey
 )
 
 var (
@@ -44,12 +43,11 @@ var (
 		"ClusterSpecPath":          ClusterSpecPathIDKey,
 		"BucketsSpecPath":          BucketsSpecPathIDKey,
 		"CouchbaseClusterName":     CouchbaseClusterNameKey,
-		"K8sNodesMap":              K8sNodesMapKey,
-		"K8sPodsMap":               K8sPodsMapKey,
 		"K8sContext":               K8sContextKey,
 		"EKSRegion":                EKSRegionKey,
 		"AKSRegion":                AKSRegionKey,
 		"GKERegion":                GKERegionKey,
 		"KubeConfigPath":           KubeConfigPathKey,
+		"CBBackupRestore":          CBBackupRestoreKey,
 	}
 )
