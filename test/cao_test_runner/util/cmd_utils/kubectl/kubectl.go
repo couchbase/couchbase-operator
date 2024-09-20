@@ -7,12 +7,17 @@ import (
 	cmdutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils"
 )
 
-const (
+var (
 	kubectlRootCmd = "kubectl"
 )
 
 type KubectlCmd struct {
 	cmdutils.Cmd
+}
+
+// If the path of the kubectl binary is not in env, then we can use this function to explicitly set the path
+func WithBinaryPath(path string) {
+	kubectlRootCmd = path
 }
 
 func (k *KubectlCmd) WithLabel(label string) *KubectlCmd {

@@ -8,12 +8,17 @@ import (
 	cmdutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils"
 )
 
-const (
+var (
 	caoRootCmd = "cao"
 )
 
 type CaoCmd struct {
 	cmdutils.Cmd
+}
+
+// If the path of the cao binary is not in env, then we can use this function to explicitly set the path
+func WithBinaryPath(path string) {
+	caoRootCmd = path
 }
 
 // WithFlag adds a flag to the cao command. Flags are appended just after "cao" like: "cao --flag command".
