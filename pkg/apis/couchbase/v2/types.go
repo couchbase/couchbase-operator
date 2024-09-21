@@ -295,6 +295,12 @@ type CouchbaseBackupSpec struct {
 
 	// DefaultRecoveryMethod specifies how cbbackupmgr should
 	// recover from broken backup/restore attempts.
+	//
+	// NOTE: To use the `resume` or `purge` parameters, you will need to install
+	// `couchbasebackup` version `1.3.5` or greater.
+	//
+	// For `couchbasebackup` versions earlier than `1.3.5` only the `none` parameter
+	// is supported.
 	// +kubebuilder:default="none"
 	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryMethod,omitempty"`
 }
