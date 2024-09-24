@@ -476,6 +476,21 @@ func (c *Cluster) podInitialized(pod *v1.Pod) bool {
 
 	return false
 }
+func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
+	for _, pod := range pods {
+		podAge := time.Since(pod.GetCreationTimestamp().Time)
+		if podAge > c.config.PodCreateTimeout {
+			log.Info("Pod creation timeout exceeded", "cluster", c.namespacedName(), "pod", pod.Name)
+
+			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, c.config.GetDeleteOptions()); err != nil {
+				log.Error(err, "Failed to delete pod", "cluster", c.namespacedName(), "pod", pod.Name)
+				continue
+			}
+
+			c.raiseEventCached(k8sutil.MemberCreationFailedEvent(pod.Name, c.cluster))
+		}
+	}
+}
 
 // runReconcile gathers a list of pods in cluster from Kubernetes, optionally
 // initializes our internal member list if we need to e.g. we have been restarted and
@@ -518,6 +533,8 @@ func (c *Cluster) runReconcile() {
 		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
+
+		c.handlePendingPods(pending)
 
 		return
 	}
