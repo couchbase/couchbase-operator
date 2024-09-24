@@ -2834,6 +2834,11 @@ func TestValidationApply(t *testing.T) {
 			mutations:  patchMap{"collection0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
 			shouldFail: false,
 		},
+		{
+			name:       "TestValidateUpdateBucketMemoryQuota",
+			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "200Mi")},
+			shouldFail: false,
+		},
 	}
 
 	// Cases to verify supported time units for Spec.LogRetentionTime
@@ -2886,6 +2891,12 @@ func TestNegValidationApply(t *testing.T) {
 			mutations:      patchMap{"collectiongroup0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.maxTTL"},
+		},
+		{
+			name:           "TestValidateUpdateBucketMemoryQuotaOverflow",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 	}
 

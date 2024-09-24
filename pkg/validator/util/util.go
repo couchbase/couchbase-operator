@@ -2,6 +2,8 @@ package util
 
 import (
 	"fmt"
+
+	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
 func UniqueString(strList []string) bool {
@@ -52,4 +54,23 @@ func NewUpdateError(field, in string) error {
 
 func (e *UpdateError) Error() string {
 	return fmt.Sprintf("%s in %s cannot be updated", e.field, e.in)
+}
+
+// MergeAbstractBucketLists two lists of abstract bucket structs and joins them, with the l1 taking priority and overriding any buckets from l2 that share the same name.
+func MergeAbstractBucketLists(l1, l2 []v2.AbstractBucket) []v2.AbstractBucket {
+	names := make(map[string]struct{})
+
+	for _, bucket := range l1 {
+		names[bucket.GetCouchbaseName()] = struct{}{}
+	}
+
+	result := append([]v2.AbstractBucket{}, l1...)
+
+	for _, bucket := range l2 {
+		if _, exists := names[bucket.GetCouchbaseName()]; !exists {
+			result = append(result, bucket)
+		}
+	}
+
+	return result
 }

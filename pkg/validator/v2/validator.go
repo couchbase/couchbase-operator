@@ -2647,15 +2647,20 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object) er
 func validateMemoryConstraints(v *types.Validator, object runtime.Object) error {
 	var namespace string
 
+	var bucket couchbasev2.AbstractBucket
+
 	switch t := object.(type) {
 	case *couchbasev2.CouchbaseCluster:
 		return validateClusterMemoryConstraints(v, t)
 	case *couchbasev2.CouchbaseBucket:
 		namespace = t.Namespace
+		bucket = t
 	case *couchbasev2.CouchbaseEphemeralBucket:
 		namespace = t.Namespace
+		bucket = t
 	case *couchbasev2.CouchbaseMemcachedBucket:
 		namespace = t.Namespace
+		bucket = t
 	default:
 		return fmt.Errorf("validate memory constraints: unsupported type")
 	}
@@ -2668,7 +2673,7 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object) error 
 	for i := range clusters.Items {
 		cluster := clusters.Items[i]
 
-		if err := validateClusterMemoryConstraints(v, &cluster); err != nil {
+		if err := validateClusterMemoryConstraints(v, &cluster, bucket); err != nil {
 			return err
 		}
 	}
@@ -2678,8 +2683,9 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object) error 
 
 // validateClusterMemoryConstraints given a cluster loads all buckets associated with it and
 // validates that the allocated memory does not exceed the memory allocated for the
-// data service.
-func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// data service. If validating against new/edited buckets, the memory quota from these buckets will replace any
+// quotas from existing buckets with the same name.
+func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, newBuckets ...couchbasev2.AbstractBucket) error {
 	if !cluster.Spec.Buckets.Managed {
 		return nil
 	}
@@ -2695,6 +2701,7 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	// that defined for the data service.
 	allocated := resource.NewQuantity(0, resource.BinarySI)
 
+	buckets = util.MergeAbstractBucketLists(newBuckets, buckets)
 	for _, bucket := range buckets {
 		allocated.Add(*bucket.GetMemoryQuota())
 	}
