@@ -1,0 +1,191 @@
+/**
+ * One pipeline to rule them all...
+ * Reegardless of the platform all run the same, the test framework accepts
+ * configuration for two clusters, and it runs the tests against them.  This
+ * should not be run by itself as it provides no locking around the use of
+ * configuration.
+ */
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    timestamps()
+
+    // Don't use all the disk, these servers aren't monitored with Nagios or anything.
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
+      )
+    )
+
+    // We only have a single cluster for now.
+    disableConcurrentBuilds()
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'operator_image', defaultValue: 'ghcr.io/cb-vanilla/operator:latest')
+    string(name: 'admission_image', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
+    string(name: 'certification_image', defaultValue: 'ghcr.io/cb-vanilla/operator-certification:latest')
+    string(name: 'server_image', defaultValue: 'ghcr.io/cb-vanilla/server:7.6.0')
+    string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:7.2.0')
+    string(name: 'backup_image', defaultValue: 'couchbase/operator-backup:1.3.5')
+    string(name: 'exporter_image', defaultValue: 'couchbase/exporter:1.0.9')
+    string(name: 'exporter_image_upgrade', defaultValue: 'couchbase/exporter:1.0.5')
+    string(name: 'logging_image', defaultValue: 'couchbase/fluent-bit:1.2.6')
+    string(name: 'logging_image_upgrade', defaultValue: 'couchbase/fluent-bit:1.1.1')
+    string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-vanilla/sync-gateway:3.0.5-enterprise')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-vanilla/cloud-native-gateway:latest')
+    string(name: 'kubernetes_version', defaultValue: '1.27')
+    string(name: 'storage_class', defaultValue: 'gp2')
+    booleanParam(name: 'lpv', defaultValue: false)
+    string(name: 'bucket_type', defaultValue: 'couchbase')
+    string(name: 'compression_mode', defaultValue: 'passive')
+    string(name: 'kubectl_version', defaultValue: '1.26.7')
+    string(name: 's3_region', defaultValue: 'us-west-2')
+    string(name: 'docs', defaultValue: '100')
+    string(name: 'terraform_version', defaultValue: '1.4.6')
+    booleanParam(name: 'enable_istio', defaultValue: false)
+    string(name: 'istio_version', defaultValue: '1.18.2')
+    string(name: 'istio_mode', defaultValue: 'strict')
+    string(name: 'machine', defaultValue: 'x86_64')
+    booleanParam(name: 'destroy_setup', defaultValue: true)
+  }
+
+  environment {
+    GOVERSION = '1.22.1'
+    GOROOT = "${env.WORKSPACE}/go"
+    KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
+    PATH = "${env.WORKSPACE}/bin:${env.WORKSPACE}/kubectl:${env.WORKSPACE}/go/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
+    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
+    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
+    AWS_ACCESS_KEY_ID = credentials('couchbaseqe-aws-access-id')
+    AWS_SECRET_ACCESS_KEY = credentials('couchbaseqe-aws-access-secret')
+    LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+    TF_IN_AUTOMATION = 'TRUE'
+  }
+
+  stages {
+    stage('Prerequisite Installs') {
+      steps {
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+
+        sh "wget -q https://dl.k8s.io/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
+        sh 'chmod +x kubectl'
+        sh "mv kubectl ${env.WORKSPACE}/bin/"
+
+        sh "wget -q https://releases.hashicorp.com/terraform/${params.terraform_version}/terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "unzip -o terraform_${params.terraform_version}_linux_amd64.zip"
+        sh "mv terraform ${env.WORKSPACE}/bin"
+
+        sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
+        sh "tar xfv istioctl-${params.istio_version}-linux-amd64.tar.gz"
+        sh 'chmod +x istioctl'
+        sh "mv istioctl ${env.WORKSPACE}/bin/"
+      }
+    }
+
+    stage('EKS Provisioning') {
+      steps {
+        script {
+          tfdir = './test/cao_test_runner/test_data/jenkins/eks'
+          if (params.machine == 'arm') {
+            tfdir = './test/e2e/resources/provisioners/arm'
+          }
+          sh 'aws configure set default.region us-east-2'
+          sh 'aws configure set default.output json'
+          dir(tfdir) {
+            sh "${env.WORKSPACE}/bin/terraform init -no-color -input=false"
+            sh "${env.WORKSPACE}/bin/terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
+            sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 kubectl create secret docker-registry registry-credential \
+            --docker-server=https://ghcr.io/ \
+            --docker-username=${env.GHCR_CREDENTIALS_USR} \
+            --docker-password=${env.GHCR_CREDENTIALS_PSW}"
+          }
+        }
+      }
+    }
+
+    stage('Build') {
+      steps {
+        script {
+          currentBuild.description = "refspec:${params.refspec}, operator_version:${params.operator_image}, server_version:${params.server_image}, upgrade_version:${params.server_image_upgrade}, kubernetes_version:${params.kubernetes_version}"
+        }
+        sh 'make touch-generated tools'
+      }
+    }
+
+    stage('Install Istio') {
+      when {
+        expression {
+          params.enable_istio
+        }
+      }
+      steps {
+        script {
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+        }
+      }
+    }
+
+    stage('Intall Rancher') {
+      when {
+        expression {
+          params.lpv
+        }
+      }
+      steps {
+        script {
+          sh 'kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml'
+        }
+      }
+    }
+
+    stage('Setup operator') {
+      steps {
+        script {
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create operator \
+            --image ${params.operator_image} \
+            --image-pull-secret registry-credential \
+            --kubeconfig ${env.WORKSPACE}/config1"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+            echo "failed to load operator"
+          }
+
+        }
+      }
+    }
+    stage('Setup admission controller') {
+      steps {
+        script {
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao create admission \
+            --image ${params.admission_image} \
+            --image-pull-secret registry-credential \
+            --kubeconfig ${env.WORKSPACE}/config1"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+            echo "failed to load admission controller"
+          }
+
+        }
+      }
+    }
+  }
+}
