@@ -12,8 +12,12 @@ import (
 var (
 	ErrPodNameNotProvided   = errors.New("pod name is not provided")
 	ErrNamespaceNotProvided = errors.New("namespace is not provided")
+	ErrPodDoesNotExist      = errors.New("pod does not exist")
+	ErrNoPodsInNamespace    = errors.New("no pods in namespace")
 )
 
+// GetPodNames returns a slice of strings containing names of all pods in the given namespace.
+// Defined errors returned: ErrNoPodsInNamespace.
 func GetPodNames(namespace string) ([]string, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("get pod names: %w", ErrNamespaceNotProvided)
@@ -22,6 +26,10 @@ func GetPodNames(namespace string) ([]string, error) {
 	podNamesOutput, err := kubectl.Get("pods").FormatOutput("name").InNamespace(namespace).Output()
 	if err != nil {
 		return nil, fmt.Errorf("get pod names: %w", err)
+	}
+
+	if podNamesOutput == "" {
+		return nil, fmt.Errorf("get pod names: %w", ErrNoPodsInNamespace)
 	}
 
 	podNames := strings.Split(podNamesOutput, "\n")
@@ -34,6 +42,7 @@ func GetPodNames(namespace string) ([]string, error) {
 }
 
 // GetPod gets the pod information of the pod in the given namespace and returns *Pod.
+// Defined errors returned: ErrPodDoesNotExist.
 func GetPod(podName string, namespace string) (*Pod, error) {
 	if podName == "" {
 		return nil, fmt.Errorf("get pod: %w", ErrPodNameNotProvided)
@@ -43,8 +52,12 @@ func GetPod(podName string, namespace string) (*Pod, error) {
 		return nil, fmt.Errorf("get pod: %w", ErrNamespaceNotProvided)
 	}
 
-	podJSON, err := kubectl.GetByTypeAndName("pods", podName).FormatOutput("json").InNamespace(namespace).Output()
+	podJSON, stderr, err := kubectl.GetByTypeAndName("pods", podName).FormatOutput("json").InNamespace(namespace).Exec(true, false)
 	if err != nil {
+		if strings.TrimSpace(stderr) == fmt.Sprintf("Error from server (NotFound): pods \"%s\" not found", podName) {
+			return nil, fmt.Errorf("get pod: %w", ErrPodDoesNotExist)
+		}
+
 		return nil, fmt.Errorf("get pod: %w", err)
 	}
 
@@ -60,6 +73,7 @@ func GetPod(podName string, namespace string) (*Pod, error) {
 
 // GetPods gets the pod information and returns the *PodList containing the list of Pods.
 // If podNames = nil, then all the pods in the namespace are taken into account.
+// Defined errors returned: ErrPodDoesNotExist.
 func GetPods(podNames []string, namespace string) (*PodList, error) {
 	if namespace == "" {
 		return nil, fmt.Errorf("get pods: %w", ErrNamespaceNotProvided)
@@ -88,8 +102,12 @@ func GetPods(podNames []string, namespace string) (*PodList, error) {
 		return &podList, nil
 	}
 
-	podsJSON, err := kubectl.GetByTypeAndName("pods", podNames...).FormatOutput("json").InNamespace(namespace).Output()
+	podsJSON, stderr, err := kubectl.GetByTypeAndName("pods", podNames...).FormatOutput("json").InNamespace(namespace).Exec(true, false)
 	if err != nil {
+		if strings.Contains(stderr, "Error from server (NotFound)") {
+			return nil, fmt.Errorf("get pods: %w", ErrPodDoesNotExist)
+		}
+
 		return nil, fmt.Errorf("get pods: %w", err)
 	}
 
@@ -119,18 +137,19 @@ func GetPodsMap(podNames []string, namespace string) (map[string]*Pod, error) {
 
 	podMap := make(map[string]*Pod)
 
-	for _, podName := range podNames {
-		pod, err := GetPod(podName, namespace)
-		if err != nil {
-			return nil, fmt.Errorf("get pods map: %w", err)
-		}
+	podsList, err := GetPods(podNames, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("get pods map: %w", err)
+	}
 
-		podMap[podName] = pod
+	for i := range podsList.Pods {
+		podMap[podNames[i]] = &podsList.Pods[i]
 	}
 
 	return podMap, nil
 }
 
+// GetNodeNameForPod returns the k8s node name on which the pod resides.
 func GetNodeNameForPod(podName, namespace string) (string, error) {
 	pod, err := GetPod(podName, namespace)
 	if err != nil {
