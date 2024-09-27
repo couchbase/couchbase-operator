@@ -11,12 +11,18 @@ import (
 
 var (
 	ErrNodeNameNotProvided = errors.New("node name is not provided")
+	ErrNodeNotFound        = errors.New("node not found")
+	ErrNoNodesFound        = errors.New("no nodes found")
 )
 
 func GetNodeNames() ([]string, error) {
 	nodeNamesOutput, err := kubectl.Get("nodes").FormatOutput("name").Output()
 	if err != nil {
 		return nil, fmt.Errorf("get node names: %w", err)
+	}
+
+	if nodeNamesOutput == "" {
+		return nil, fmt.Errorf("get node names: %w", ErrNoNodesFound)
 	}
 
 	nodeNames := strings.Split(nodeNamesOutput, "\n")
@@ -29,13 +35,18 @@ func GetNodeNames() ([]string, error) {
 }
 
 // GetNode gets the node information of the node and returns *Node.
+// Defined errors returned: ErrNodeNotFound.
 func GetNode(nodeName string) (*Node, error) {
 	if nodeName == "" {
 		return nil, fmt.Errorf("get node: %w", ErrNodeNameNotProvided)
 	}
 
-	nodeJSON, err := kubectl.GetByTypeAndName("nodes", nodeName).FormatOutput("json").Output()
+	nodeJSON, stderr, err := kubectl.GetByTypeAndName("nodes", nodeName).FormatOutput("json").Exec(true, false)
 	if err != nil {
+		if strings.TrimSpace(stderr) == fmt.Sprintf("Error from server (NotFound): nodes \"%s\" not found", nodeName) {
+			return nil, fmt.Errorf("get node: %w", ErrNodeNotFound)
+		}
+
 		return nil, fmt.Errorf("get node: %w", err)
 	}
 
@@ -51,6 +62,7 @@ func GetNode(nodeName string) (*Node, error) {
 
 // GetNodes gets the node information and returns the *NodeList containing the list of Node.
 // If nodeNames = nil, then all the nodes are taken into account.
+// Defined errors returned: ErrNodeNotFound.
 func GetNodes(nodeNames []string) (*NodeList, error) {
 	if nodeNames == nil {
 		nodeList, err := GetNodeNames()
@@ -75,8 +87,12 @@ func GetNodes(nodeNames []string) (*NodeList, error) {
 		return &nodeList, nil
 	}
 
-	nodesJSON, err := kubectl.GetByTypeAndName("nodes", nodeNames...).FormatOutput("json").Output()
+	nodesJSON, stderr, err := kubectl.GetByTypeAndName("nodes", nodeNames...).FormatOutput("json").Exec(true, false)
 	if err != nil {
+		if strings.Contains(stderr, "Error from server (NotFound)") {
+			return nil, fmt.Errorf("get nodes: %w", ErrNodeNotFound)
+		}
+
 		return nil, fmt.Errorf("get nodes: %w", err)
 	}
 
@@ -102,13 +118,13 @@ func GetNodesMap(nodeNames []string) (map[string]*Node, error) {
 
 	nodeMap := make(map[string]*Node)
 
-	for _, nodeName := range nodeNames {
-		node, err := GetNode(nodeName)
-		if err != nil {
-			return nil, fmt.Errorf("get nodes map: %w", err)
-		}
+	nodesList, err := GetNodes(nodeNames)
+	if err != nil {
+		return nil, fmt.Errorf("get nodes map: %w", err)
+	}
 
-		nodeMap[nodeName] = node
+	for i := range nodesList.Nodes {
+		nodeMap[nodeNames[i]] = &nodesList.Nodes[i]
 	}
 
 	return nodeMap, nil
