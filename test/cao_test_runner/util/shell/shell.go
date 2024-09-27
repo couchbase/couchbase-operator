@@ -48,6 +48,47 @@ func Output(cmd string, args ...string) (string, error) {
 	return strings.TrimSuffix(buf.String(), "\n"), err
 }
 
+// RunWithOptions executes the command and provides options to capture or print the outputs.
+// If captureOutput = true then it captures and returns the output as (stdout, stderr).
+// If printOutput = true then it prints the output.
+func RunWithOptions(captureOutput, printOutput bool, cmd string, args ...string) (string, string, error) {
+	switch {
+	case captureOutput == true && printOutput == true:
+		{
+			captureOut := new(bytes.Buffer)
+			captureErr := new(bytes.Buffer)
+
+			multiOut := io.MultiWriter(captureOut, os.Stdout)
+			multiErr := io.MultiWriter(captureErr, os.Stderr)
+
+			_, err := Exec(multiOut, multiErr, cmd, args...)
+
+			return captureOut.String(), captureErr.String(), err
+		}
+	case captureOutput == true && printOutput == false:
+		{
+			captureOut := new(bytes.Buffer)
+			captureErr := new(bytes.Buffer)
+
+			_, err := Exec(captureOut, captureErr, cmd, args...)
+
+			return captureOut.String(), captureErr.String(), err
+		}
+	case captureOutput == false && printOutput == true:
+		{
+			_, err := Exec(os.Stdout, os.Stderr, cmd, args...)
+
+			return "", "", err
+		}
+	default:
+		{
+			_, err := Exec(new(bytes.Buffer), new(bytes.Buffer), cmd, args...)
+
+			return "", "", err
+		}
+	}
+}
+
 func Exec(stdout, stderr io.Writer, cmd string, args ...string) (bool, error) {
 	ran, code, err := run(stdout, stderr, cmd, args...)
 	if err == nil {
