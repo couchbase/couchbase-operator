@@ -63,6 +63,33 @@ const (
 	analyticsServicePort        = 8095
 	analyticsServicePortTLS     = tlsBasePort + analyticsServicePort
 
+	analyticsAdminPortName            = "analytics-admin"
+	analyticsAdminPort                = 9110
+	analyticsHTTPSPortName            = "analytics-https"
+	analyticsHTTPSPort                = 9111
+	analyticsCCClusterPortName        = "analytics-cc-cluster"
+	analyticsCCClusterPort            = 9112
+	analyticsClientPortName           = "analytics-client"
+	analyticsClientPort               = 9113
+	analyticsConsolePortName          = "analytics-console"
+	analyticsConsolePort              = 9114
+	analyticsClusterPortName          = "analytics-cluster"
+	analyticsClusterPort              = 9115
+	analyticsDataPortName             = "analytics-data"
+	analyticsDataPort                 = 9116
+	analyticsResultPortName           = "analytics-result"
+	analyticsResultPort               = 9117
+	analyticsMessagingPortName        = "analytics-messaging"
+	analyticsMessagingPort            = 9118
+	analyticsAuthPortName             = "analytics-auth"
+	analyticsAuthPort                 = 9119
+	analyticsReplicationPortName      = "analytics-replication"
+	analyticsReplicationPort          = 9120
+	analyticsMetadataPortName         = "analytics-metadata"
+	analyticsMetadataPort             = 9121
+	analyticsMetadataCallbackPortName = "analytics-metadata-callback"
+	analyticsMetadataCallbackPort     = 9122
+
 	// Eventing service constants.
 	eventingServicePortName    = string(couchbasev2.EventingService)
 	eventingServicePortNameTLS = string(couchbasev2.EventingService) + tlsPortNameSuffix
@@ -74,11 +101,30 @@ const (
 	indexServicePortNameTLS = string(couchbasev2.IndexService) + tlsPortNameSuffix
 	indexServicePort        = 9102
 	indexServicePortTLS     = 19102
+
+	indexAdminPortName     = "index-admin"
+	indexAdminPort         = 9100
+	indexScanPortName      = "index-scan"
+	indexScanPort          = 9101
+	indexSTinitPortName    = "index-stinit"
+	indexSTinitPort        = 9103
+	indexSTCatchupPortName = "index-stcatchup"
+	indexSTCatchupPort     = 9104
+	indexSTMaintPortName   = "index-stmaint"
+	indexSTMaintPort       = 9105
+	indexProjectorPortName = "index-projector"
+	indexProjectorPort     = 9999
+
 	// Data service constants.
 	dataServicePortName    = string(couchbasev2.DataService)
 	dataServicePortNameTLS = string(couchbasev2.DataService) + tlsPortNameSuffix
 	dataServicePort        = 11210
 	dataServicePortTLS     = 11207
+
+	memcachedDedicatedPort        = 11209
+	memcachedDedicatedPortName    = "memcached-dedicated-not-tls"
+	memcachedDedicatedPortTLS     = 11206
+	memcachedDedicatedPortNameTLS = "memcached-dedicated-tls"
 
 	// View service constants: part of the data service and not index service.
 	viewService            = "view"
@@ -91,6 +137,12 @@ const (
 	snWebapiPort = 9095
 	snDataPort   = 18098
 	snSdPort     = 18099
+
+	// Management Exchange constants.
+	managementExchangePort        = 21100
+	managementExchangePortName    = "management-exchange"
+	managementExchangePortTLS     = 21150
+	managementExchangePortNameTLS = "management-exchange-tls"
 )
 
 var (
@@ -255,6 +307,132 @@ var (
 			{
 				Name:     indexServicePortNameTLS,
 				Port:     indexServicePortTLS,
+				Protocol: v1.ProtocolTCP,
+			},
+		},
+		couchbasev2.N2NService: {
+			{
+				Name:     managementExchangePortNameTLS,
+				Port:     managementExchangePortTLS,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     managementExchangePortName,
+				Port:     managementExchangePort,
+				Protocol: v1.ProtocolTCP,
+			},
+		},
+	}
+
+	servicePortsN2N = map[couchbasev2.Service][]v1.ServicePort{
+		couchbasev2.DataService: {
+			{
+				Name:     memcachedDedicatedPortName,
+				Port:     memcachedDedicatedPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     memcachedDedicatedPortNameTLS,
+				Port:     memcachedDedicatedPortTLS,
+				Protocol: v1.ProtocolTCP,
+			},
+		},
+		couchbasev2.AnalyticsService: {
+			{
+				Name:     analyticsAdminPortName,
+				Port:     analyticsAdminPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsHTTPSPortName,
+				Port:     analyticsHTTPSPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsCCClusterPortName,
+				Port:     analyticsCCClusterPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsClientPortName,
+				Port:     analyticsClientPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsConsolePortName,
+				Port:     analyticsConsolePort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsClusterPortName,
+				Port:     analyticsClusterPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsDataPortName,
+				Port:     analyticsDataPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsResultPortName,
+				Port:     analyticsResultPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsMessagingPortName,
+				Port:     analyticsMessagingPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsAuthPortName,
+				Port:     analyticsAuthPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsReplicationPortName,
+				Port:     analyticsReplicationPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsMetadataPortName,
+				Port:     analyticsMetadataPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     analyticsMetadataCallbackPortName,
+				Port:     analyticsMetadataCallbackPort,
+				Protocol: v1.ProtocolTCP,
+			},
+		},
+		couchbasev2.IndexService: {
+			{
+				Name:     indexAdminPortName,
+				Port:     indexAdminPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexScanPortName,
+				Port:     indexScanPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexSTinitPortName,
+				Port:     indexSTinitPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexSTCatchupPortName,
+				Port:     indexSTCatchupPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexSTMaintPortName,
+				Port:     indexSTMaintPort,
+				Protocol: v1.ProtocolTCP,
+			},
+			{
+				Name:     indexProjectorPortName,
+				Port:     indexProjectorPort,
 				Protocol: v1.ProtocolTCP,
 			},
 		},
@@ -766,6 +944,16 @@ var exposedfeatureSets = map[couchbasev2.ExposedFeature][]couchbasev2.Service{
 		couchbasev2.DataService,
 		couchbasev2.IndexService,
 	},
+	couchbasev2.FeatureExternalConnection: {
+		couchbasev2.AdminService,
+		couchbasev2.QueryService,
+		couchbasev2.SearchService,
+		couchbasev2.AnalyticsService,
+		couchbasev2.EventingService,
+		couchbasev2.DataService,
+		couchbasev2.IndexService,
+		couchbasev2.N2NService,
+	},
 }
 
 // exposedFeatureSetToServiceList takes a requested feature set and returns
@@ -891,10 +1079,11 @@ func memberServices(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.
 		return nil, fmt.Errorf("%w: server class %s missing for member %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), member.Config(), member.Name())
 	}
 
-	// Always allow the admin service, this is not explicitly enabled
+	// Always allow the admin and management service, this is not explicitly enabled
 	// per server class.
 	services := couchbasev2.ServiceList{
 		couchbasev2.AdminService,
+		couchbasev2.N2NService,
 	}
 
 	// Build up the node services based on enabled services, but don't duplicate,
@@ -934,7 +1123,12 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 
 	ports := listRequestedPorts(serviceNames)
 	ports = filterConfiguredPorts(ports, enabledServices)
-	ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
+
+	if serviceNames.Contains(couchbasev2.N2NService) {
+		ports = append(ports, servicesToN2NPorts(enabledServices)...)
+	} else {
+		ports = filterInsecurePorts(ports, cluster.Spec.IsExposedFeatureServiceTypePublic())
+	}
 
 	// Use either a blank service or the user specified template.
 	service := &v1.Service{}
@@ -989,6 +1183,16 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 	}
 
 	return service, nil
+}
+
+func servicesToN2NPorts(services couchbasev2.ServiceList) []v1.ServicePort {
+	ports := []v1.ServicePort{}
+
+	for _, service := range services {
+		ports = append(ports, servicePortsN2N[service]...)
+	}
+
+	return ports
 }
 
 func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) error {

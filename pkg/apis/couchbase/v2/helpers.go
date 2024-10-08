@@ -1470,6 +1470,10 @@ func (c *CouchbaseCluster) IsMigrationCluster() bool {
 	return c.Spec.Migration != nil && len(c.Spec.Migration.UnmanagedClusterHost) != 0
 }
 
+func (c *CouchbaseCluster) IsExternalMigrationCluster() bool {
+	return c.IsMigrationCluster() && c.Spec.Networking.DNS != nil
+}
+
 func (s *ClusterAssimilationSpec) GetUnmanagedHostURL() string {
 	return fmt.Sprintf("http://%s:8091", s.UnmanagedClusterHost)
 }

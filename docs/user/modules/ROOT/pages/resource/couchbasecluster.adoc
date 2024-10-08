@@ -2982,7 +2982,7 @@ must be either "Cluster" or "Local", defaulting to "Local",.
 
 *Type*: `[]string`
 
-*Enumerations*: `admin, xdcr, client, backup`
+*Enumerations*: `admin, xdcr, client, backup, external-cluster-connection`
 
 ==== Description
 

@@ -215,6 +215,15 @@ func checkServicePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClust
 				couchbasev2.DataService,
 				couchbasev2.IndexService,
 			},
+			couchbasev2.FeatureExternalConnection: {
+				couchbasev2.AdminService,
+				couchbasev2.QueryService,
+				couchbasev2.SearchService,
+				couchbasev2.AnalyticsService,
+				couchbasev2.EventingService,
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
 		}
 
 		servicePorts := map[couchbasev2.Service][]int32{}

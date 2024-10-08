@@ -30,6 +30,11 @@ const (
 	// API operations to report success.
 	extendedRetryPeriod = 3 * time.Minute
 
+	// externalConnectionRetryPeriod is an even longer amount of time to wait for
+	// operations that are known to take a very long time.
+	// For example operations that need to wait for DNS caches to update.
+	externalConnectionRetryPeriod = 20 * time.Minute
+
 	// secretSyncTimePeriod is approximately how long it takes for secret
 	// updates to take effect in pod file systems.  Note, there is a race
 	// because TLS updates aren't atomic.  It's possible for the shadow
@@ -201,14 +206,14 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileTLSPostTopologyChange,
 		(*Cluster).reconcilePods,
 		(*Cluster).reconcileClusterSettings,
-		(*Cluster).reconcileBuckets,
-		(*Cluster).reconcileUnmanagedBucketsBackends,
 		(*Cluster).reconcileScopesAndCollections,
 		(*Cluster).reconcileSynchronizeBuckets,
 		(*Cluster).reconcileXDCR,
 		(*Cluster).reconcileReadiness,
 		(*Cluster).reconcileAdminService,
 		(*Cluster).reconcilePodServices,
+		(*Cluster).reconcileBuckets,
+		(*Cluster).reconcileUnmanagedBucketsBackends,
 		(*Cluster).reconcileMemberAlternateAddresses,
 		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcileBackup,

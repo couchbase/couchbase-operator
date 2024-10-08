@@ -86,6 +86,17 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (couchbaseutil
 
 	name := couchbaseutil.CreateMemberName(c.cluster.Name, id)
 
+	if c.cluster.IsExternalMigrationCluster() {
+		return couchbaseutil.NewExtConnectedMember(
+			c.cluster.Namespace,
+			c.cluster.Name,
+			name,
+			version,
+			serverSpecName,
+			c.cluster.IsTLSEnabled(),
+			k8sutil.GetDNSName(c.cluster, name)), nil
+	}
+
 	return couchbaseutil.NewMember(c.cluster.Namespace, c.cluster.Name, name, version, serverSpecName, c.cluster.IsTLSEnabled()), nil
 }
 
@@ -116,7 +127,21 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 
 		_, secure := pod.Annotations[constants.PodTLSAnnotation]
 
-		members.Add(couchbaseutil.NewMember(pod.Namespace, cluster, pod.Name, version, config, secure))
+		// Externally connected members that were created as part of migration
+		// will have a  different hostname than the default. The hostname annotation
+		// on the pod allows us to detect the non-default hostname.
+		hostname := ""
+		if val, ok := pod.Annotations[constants.CouchbaseHostnameAnnotation]; ok {
+			hostname = val
+		}
+
+		m := couchbaseutil.NewMember(pod.Namespace, cluster, pod.Name, version, config, secure)
+
+		if hostname != "" && hostname != m.GetDNSName() {
+			m = couchbaseutil.NewExtConnectedMember(pod.Namespace, cluster, pod.Name, version, config, secure, hostname)
+		}
+
+		members.Add(m)
 	}
 
 	return members
@@ -351,11 +376,31 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 			url = memberResult.Member.GetHostURLPlaintext()
 		}
 
+		retryPeriod := extendedRetryPeriod
+
+		// For externally connected migrated clusters we need to first create a service for the pod
+		// so that it can be accessed by the outside world. It also needs a longer retry period
+		// to wait for DNS propagation to the source cluster.
+		if c.cluster.IsExternalMigrationCluster() && c.cluster.Spec.HasExposedFeatures() {
+			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member); err != nil {
+				if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
+					log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
+					continue
+				}
+
+				return nil, err
+			}
+
+			retryPeriod = externalConnectionRetryPeriod
+		}
+
 		log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 
-		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(extendedRetryPeriod).On(c.api, target); err != nil { // we're hitting this too hard i think so its erroring.
+		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(retryPeriod).On(c.api, target); err != nil { // we're hitting this too hard i think so its erroring.
 			log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
 			memberResult.Err = err
+
+			continue
 		}
 
 		// Notify that we have added a new member, this makes it callable.

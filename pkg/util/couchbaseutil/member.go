@@ -95,6 +95,9 @@ type memberImpl struct {
 
 	// version is the Couchbase server version this member is using.
 	version string
+
+	// dnsHostName is the DNS name of the member if the default isn't used.
+	dnsHostName string
 }
 
 // NewMember returns a new member that is created or managed by the operator
@@ -121,6 +124,20 @@ func NewPartialMember(namespace, cluster, name string) Member {
 	}
 }
 
+// NewMember returns a new member that is created or managed by the operator
+// as we are in possession of all the metadata that entails.
+func NewExtConnectedMember(namespace, cluster, name, version, config string, useTLS bool, hostname string) Member {
+	return &memberImpl{
+		namespace:   namespace,
+		cluster:     cluster,
+		name:        name,
+		version:     version,
+		config:      config,
+		useTLS:      useTLS,
+		dnsHostName: hostname,
+	}
+}
+
 // SetVersion is used when a member has been created,
 // but it's version has not yet been realised.
 // i.e unknown SHA256 but we've queried the pod
@@ -132,19 +149,27 @@ func (m *memberImpl) SetVersion(version string) {
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
 // associated with a cluster-wide headless service.
 func (m *memberImpl) GetDNSName() string {
+	if m.dnsHostName != "" {
+		return m.dnsHostName
+	}
+
+	return m.GetLocalDNSName()
+}
+
+func (m *memberImpl) GetLocalDNSName() string {
 	return fmt.Sprintf("%s.%s.%s.svc", m.name, m.cluster, m.namespace)
 }
 
 // GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
 // configuration, if TLS is enabled, we will use the TLS admin port.
 func (m *memberImpl) GetHostPort() string {
-	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
+	return fmt.Sprintf("%s:%d", m.GetLocalDNSName(), m.clientPort())
 }
 
 // GetHostPortTLS is used to force the use of TLS, in particular for probing the TLS
 // state before upgrading client connections.
 func (m *memberImpl) GetHostPortTLS() string {
-	return fmt.Sprintf("%s:18091", m.GetDNSName())
+	return fmt.Sprintf("%s:18091", m.GetLocalDNSName())
 }
 
 // GetHostURL return the member's host URL (without a path).  The scheme and port are
@@ -157,7 +182,7 @@ func (m *memberImpl) GetHostURL() string {
 // GetHostURLPlaintext is for use when we need to force the use of HTTP, typically
 // during TLS reconciliation where the TLS state would usually prohibit this.
 func (m *memberImpl) GetHostURLPlaintext() string {
-	return fmt.Sprintf("http://%s:8091", m.GetDNSName())
+	return fmt.Sprintf("http://%s:8091", m.GetLocalDNSName())
 }
 
 // GetHostName returns what Couchbase calls a host name; a combination of DNS and port.

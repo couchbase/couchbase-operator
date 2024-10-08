@@ -1012,6 +1012,28 @@ func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serv
 
 // applyPodNetworking adds any network specific hacks required to work.
 func applyPodNetworking(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, m couchbaseutil.Member) {
+	if cluster.IsExternalMigrationCluster() {
+		if pod.Spec.HostAliases == nil {
+			pod.Spec.HostAliases = []v1.HostAlias{}
+		}
+
+		// Add host alias to allow us to map the DNS name to the pod IP
+		pod.Spec.HostAliases = append(pod.Spec.HostAliases, v1.HostAlias{
+			IP: "127.0.0.1",
+			Hostnames: []string{
+				GetDNSName(cluster, m.Name()),
+			},
+		})
+
+		// Annotate with the pod DNS name.
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+
+		pod.Annotations[constants.CouchbaseHostnameAnnotation] = GetDNSName(cluster, m.Name())
+		pod.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
+	}
+
 	// If we are in istio mode, add in DNS configuration to avoid hairpinning
 	// which causes death with mTLS enabled.  Also note that Analytics is broke
 	// with this until 6.5.1.

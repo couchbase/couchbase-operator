@@ -109,6 +109,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
 		actualSpec.Containers[0].Ports = []v1.ContainerPort{}
 
+		// Don't force upgrades when we switch from migration mode to normal
+		// reconciliation.
+		ignoreMigratedHostnameAlias(actual, requestedSpec)
+
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
@@ -130,6 +134,20 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	}
 
 	return candidates, nil
+}
+
+func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {
+	hostname, ok := actual.Annotations[constants.CouchbaseHostnameAnnotation]
+	if !ok {
+		return
+	}
+
+	requested.HostAliases = append(requested.HostAliases, v1.HostAlias{
+		IP: "127.0.0.1",
+		Hostnames: []string{
+			hostname,
+		},
+	})
 }
 
 // reportUpgrade looks at the current state and any existing upgrade status

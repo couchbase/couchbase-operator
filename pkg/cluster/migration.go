@@ -236,6 +236,7 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 	var scheduledScaling couchbasev2.ScalingMessageList
 
 	allManagedMembers := r.getManagedK8sMembers()
+	allManagedClustedMembers := r.clusteredMembers.Intersect(allManagedMembers)
 
 	for _, serverSpec := range c.cluster.Spec.Servers {
 		// Check to see if we need to remove anything
@@ -248,7 +249,7 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 			continue
 		}
 
-		managedMembers := allManagedMembers.GroupByServerConfig(serverSpec.Name)
+		managedMembers := allManagedClustedMembers.GroupByServerConfig(serverSpec.Name)
 
 		if managedMembers.Size() < nodesToRemove {
 			nodesToRemove = managedMembers.Size()

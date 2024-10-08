@@ -2074,11 +2074,13 @@ const (
 	SearchService    Service = "search"
 	EventingService  Service = "eventing"
 	AnalyticsService Service = "analytics"
+	// Internal services for connection to external CB clusters
+	N2NService Service = "management"
 )
 
 type ServiceList []Service
 
-// +kubebuilder:validation:Enum=admin;xdcr;client;backup
+// +kubebuilder:validation:Enum=admin;xdcr;client;backup;external-cluster-connection
 type ExposedFeature string
 
 // Supported features
@@ -2091,6 +2093,8 @@ const (
 	FeatureClient ExposedFeature = "client"
 	// Exposes all ports necessary for backup
 	FeatureBackup ExposedFeature = "backup"
+	// Exposes all ports necessary for connections to external clusters
+	FeatureExternalConnection ExposedFeature = "external-cluster-connection"
 )
 
 // A list of exposed features e.g. admin,xdcr
