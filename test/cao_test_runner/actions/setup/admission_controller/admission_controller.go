@@ -10,6 +10,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -174,7 +175,8 @@ func (action *SetupAdmissionController) CheckConfig() error {
 	return nil
 }
 
-func (action *SetupAdmissionController) RunValidators(ctx *context.Context, state string) error {
+func (action *SetupAdmissionController) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoAdmissionConfigFound
 	}
@@ -191,7 +193,7 @@ func (action *SetupAdmissionController) RunValidators(ctx *context.Context, stat
 	return nil
 }
 
-func (action *SetupAdmissionController) Do(ctx *context.Context) error {
+func (action *SetupAdmissionController) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoAdmissionConfigFound
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 	"github.com/sirupsen/logrus"
 )
@@ -77,7 +78,7 @@ func (d *QueryWorkload) Describe() string {
 	return d.desc
 }
 
-func (d *QueryWorkload) Do(_ *context.Context) error {
+func (d *QueryWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter) error {
 	if d.yamlConfig == nil {
 		return workloads.ErrConfigWorkload
 	}
@@ -208,6 +209,6 @@ func (d *QueryWorkload) CheckConfig() error {
 	return nil
 }
 
-func (d *QueryWorkload) RunValidators(_ *context.Context, _ string) error {
+func (d *QueryWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
@@ -73,7 +74,8 @@ func (s *Couchbase) CheckConfig() error {
 	return nil
 }
 
-func (s *Couchbase) RunValidators(ctx *context.Context, state string) error {
+func (s *Couchbase) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if s.yamlConfig == nil {
 		return ErrConfigCouchbase
 	}
@@ -94,7 +96,7 @@ func (s *Couchbase) Describe() string {
 	return s.desc
 }
 
-func (s *Couchbase) Do(ctx *context.Context) error {
+func (s *Couchbase) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if s.yamlConfig == nil {
 		return ErrConfigCouchbase
 	}

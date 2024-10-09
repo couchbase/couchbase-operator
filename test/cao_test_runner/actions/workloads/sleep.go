@@ -8,6 +8,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -47,7 +48,7 @@ func (s *SleepAction) Describe() string {
 	return s.desc
 }
 
-func (s *SleepAction) Do(_ *context.Context) error {
+func (s *SleepAction) Do(_ *context.Context, testAssets assets.TestAssetGetter) error {
 	if s.yamlConfig == nil {
 		return ErrConfigSleep
 	}
@@ -87,6 +88,6 @@ func (s *SleepAction) CheckConfig() error {
 	return nil
 }
 
-func (s *SleepAction) RunValidators(_ *context.Context, _ string) error {
+func (s *SleepAction) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
 	return nil
 }

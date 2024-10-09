@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
@@ -57,7 +58,7 @@ func (action *SetupCaoCrd) Describe() string {
 	return action.desc
 }
 
-func (action *SetupCaoCrd) Do(ctx *context.Context) error {
+func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}
@@ -143,7 +144,8 @@ func (action *SetupCaoCrd) CheckConfig() error {
 	return nil
 }
 
-func (action *SetupCaoCrd) RunValidators(ctx *context.Context, state string) error {
+func (action *SetupCaoCrd) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}

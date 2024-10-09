@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
@@ -75,11 +74,11 @@ func NewChaosAction(context *context.Context, managedService *managedsvcs.Manage
 	switch managedService.Platform {
 	case caoinstallutils.Kubernetes:
 		switch managedService.Environment {
-		case managedk8sservices.Kind:
+		case managedsvcs.Kind:
 			return NewKindChaos()
-		case managedk8sservices.Cloud:
+		case managedsvcs.Cloud:
 			switch managedService.Provider {
-			case managedk8sservices.AWS:
+			case managedsvcs.AWS:
 				return NewEKSChaos(context, clusterName, managedService)
 			case managedsvcs.Azure:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)

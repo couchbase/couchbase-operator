@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,7 +16,7 @@ var (
 	ErrTimeout = errors.New("timeout")
 )
 
-func RunScenario(f FilePath, read FileReaderFunc) []error {
+func RunScenario(f FilePath, read FileReaderFunc, testAssets *assets.TestAssets) []error {
 	var errs []error
 
 	r := Register{}
@@ -27,7 +28,7 @@ func RunScenario(f FilePath, read FileReaderFunc) []error {
 	}
 
 	for _, s := range scenarios {
-		e := runner(s)
+		e := runner(s, testAssets)
 		if e != nil {
 			errs = append(errs, e...)
 		}
@@ -36,7 +37,7 @@ func RunScenario(f FilePath, read FileReaderFunc) []error {
 	return errs
 }
 
-func runner(s *ScenarioRunner) []error {
+func runner(s *ScenarioRunner, testAssets *assets.TestAssets) []error {
 	ctx, cancel := context.WithTimeout(s.Ctx, s.Tree.Timeout)
 	ctxExec, cancelExec := context.WithCancel(context.Background())
 	c := make(chan os.Signal, 1)
@@ -51,7 +52,7 @@ func runner(s *ScenarioRunner) []error {
 	errorsChan := make(chan []error)
 
 	go func() {
-		errorsChan <- s.Tree.Execute(ctx)
+		errorsChan <- s.Tree.Execute(ctx, testAssets)
 		close(errorsChan)
 		cancelExec()
 	}()

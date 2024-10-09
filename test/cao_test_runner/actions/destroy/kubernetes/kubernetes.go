@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
@@ -56,7 +57,7 @@ func (action *DestroyKubernetes) Describe() string {
 	return action.desc
 }
 
-func (action *DestroyKubernetes) Do(ctx *context.Context) error {
+func (action *DestroyKubernetes) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}
@@ -113,7 +114,8 @@ func (action *DestroyKubernetes) CheckConfig() error {
 	return nil
 }
 
-func (action *DestroyKubernetes) RunValidators(ctx *context.Context, state string) error {
+func (action *DestroyKubernetes) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}

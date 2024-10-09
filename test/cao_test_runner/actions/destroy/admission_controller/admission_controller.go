@@ -7,6 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
@@ -90,7 +91,7 @@ func (action *DeleteAdmissionController) CheckConfig() error {
 	return nil
 }
 
-func (action *DeleteAdmissionController) RunValidators(ctx *context.Context, state string) error {
+func (action *DeleteAdmissionController) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoAdmissionConfigFound
 	}
@@ -107,7 +108,7 @@ func (action *DeleteAdmissionController) RunValidators(ctx *context.Context, sta
 	return nil
 }
 
-func (action *DeleteAdmissionController) Do(ctx *context.Context) error {
+func (action *DeleteAdmissionController) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoAdmissionConfigFound
 	}

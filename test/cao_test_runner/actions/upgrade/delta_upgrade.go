@@ -8,6 +8,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -59,7 +60,8 @@ func (d *DeltaRecoveryUpgrade) CheckConfig() error {
 	return nil
 }
 
-func (d *DeltaRecoveryUpgrade) RunValidators(ctx *context.Context, state string) error {
+func (d *DeltaRecoveryUpgrade) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if d.yamlConfig == nil {
 		return ErrDeltaUpgradeConfig
 	}
@@ -80,7 +82,7 @@ func (d *DeltaRecoveryUpgrade) Describe() string {
 	return d.desc
 }
 
-func (d *DeltaRecoveryUpgrade) Do(_ *context.Context) error {
+func (d *DeltaRecoveryUpgrade) Do(_ *context.Context, testAssets assets.TestAssetGetter) error {
 	if d.yamlConfig == nil {
 		return ErrDeltaUpgradeConfig
 	}

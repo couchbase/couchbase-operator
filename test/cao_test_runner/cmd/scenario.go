@@ -38,7 +38,12 @@ func RunScenario() error {
 
 	f := task.FilePath(rootCfg.Scenario)
 
-	errs := task.RunScenario(f, task.FileRead)
+	testAssets, err := buildTestAssets(rootCfg.OutputPath)
+	if err != nil {
+		return err
+	}
+
+	errs := task.RunScenario(f, task.FileRead, testAssets)
 
 	if len(errs) != 0 {
 		var errorStr []string

@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/spf13/viper"
 )
 
@@ -32,7 +34,25 @@ func buildRootConfig() (*RootConfig, error) {
 	}
 
 	cfg.TriggerLogCollection = viper.GetBool(triggerLogCollectionKey)
-	cfg.OutputPath = viper.GetString(outputPathKey)
+
+	var err error
+	cfg.OutputPath, err = makeOutputPath()
+	if err != nil {
+		return nil, fmt.Errorf("build root config: %w", err)
+	}
 
 	return cfg, nil
+}
+
+func makeOutputPath() (string, error) {
+	outputPath := viper.GetString(outputPathKey)
+
+	dir := fileutils.NewDirectory(outputPath, 0777)
+	if !dir.IsDirectoryExists() {
+		if err := dir.CreateDirectory(); err != nil {
+			return "", fmt.Errorf("make output path: %w", err)
+		}
+	}
+
+	return outputPath, nil
 }

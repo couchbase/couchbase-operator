@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
@@ -71,7 +72,7 @@ func (action *KubernetesUpgrade) Describe() string {
 	return action.desc
 }
 
-func (action *KubernetesUpgrade) Do(ctx *context.Context) error {
+func (action *KubernetesUpgrade) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}
@@ -105,7 +106,8 @@ func (action *KubernetesUpgrade) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *KubernetesUpgrade) RunValidators(ctx *context.Context, state string) error {
+func (action *KubernetesUpgrade) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}

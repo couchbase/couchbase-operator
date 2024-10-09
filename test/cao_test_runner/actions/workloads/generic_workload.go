@@ -9,6 +9,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
 )
@@ -54,7 +55,7 @@ func (g *GenericWorkload) Describe() string {
 	return g.desc
 }
 
-func (g *GenericWorkload) Do(_ *context.Context) error {
+func (g *GenericWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter) error {
 	if g.yamlConfig == nil {
 		return ErrConfigWorkload
 	}
@@ -138,6 +139,6 @@ func (g *GenericWorkload) CheckConfig() error {
 	return nil
 }
 
-func (g *GenericWorkload) RunValidators(_ *context.Context, _ string) error {
+func (g *GenericWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
 	return nil
 }

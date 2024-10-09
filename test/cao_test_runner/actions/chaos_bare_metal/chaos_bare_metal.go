@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	baremetal "github.com/couchbase/couchbase-operator/test/cao_test_runner/bare_metal_sdks"
 	cbbaremetalfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_bare_metal_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
@@ -69,7 +70,7 @@ func NewChaosBareMetalConfig(config interface{}) (actions.Action, error) {
 	}, nil
 }
 
-func (c *ChaosBareMetal) RunValidators(ctx *context.Context, state string) error {
+func (c *ChaosBareMetal) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
 	if c.yamlConfig == nil {
 		return ErrChaosBareMetalConfigNotFound
 	}
@@ -111,7 +112,7 @@ func (c *ChaosBareMetal) CheckConfig() error {
 	return nil
 }
 
-func (c *ChaosBareMetal) Do(ctx *context.Context) error {
+func (c *ChaosBareMetal) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if c.yamlConfig == nil {
 		return ErrChaosBareMetalConfigNotFound
 	}

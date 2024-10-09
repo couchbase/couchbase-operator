@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
@@ -106,7 +107,7 @@ func (c *Chaos) CheckConfig() error {
 	return nil
 }
 
-func (c *Chaos) RunValidators(ctx *context.Context, state string) error {
+func (c *Chaos) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
 	if c.yamlConfig == nil {
 		return ErrChaosConfigNotFound
 	}
@@ -127,7 +128,7 @@ func (c *Chaos) RunValidators(ctx *context.Context, state string) error {
 	return nil
 }
 
-func (c *Chaos) Do(ctx *context.Context) error {
+func (c *Chaos) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if c.yamlConfig == nil {
 		return ErrChaosConfigNotFound
 	}

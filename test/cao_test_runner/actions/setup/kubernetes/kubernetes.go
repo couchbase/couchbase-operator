@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -85,7 +86,7 @@ func (action *SetupKubernetes) Describe() string {
 	return action.desc
 }
 
-func (action *SetupKubernetes) Do(ctx *context.Context) error {
+func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}
@@ -157,7 +158,8 @@ func (action *SetupKubernetes) CheckConfig() error {
 	return nil
 }
 
-func (action *SetupKubernetes) RunValidators(ctx *context.Context, state string) error {
+func (action *SetupKubernetes) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}

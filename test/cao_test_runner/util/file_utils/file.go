@@ -94,8 +94,12 @@ func (file *File) OpenFile(flag int, perm fs.FileMode) error {
 }
 
 func (file *File) IsFileExists() bool {
-	_, err := os.Stat(file.FilePath)
-	return err == nil
+	fileInfo, err := os.Stat(file.FilePath)
+	if err != nil {
+		return false
+	}
+
+	return !fileInfo.IsDir()
 }
 
 func (file *File) ChangePermissions(newPermissions fs.FileMode) error {
@@ -248,11 +252,12 @@ func (file *File) WriteFile(data []byte, perm os.FileMode) error {
 // ===================================================
 
 func (directory *Directory) IsDirectoryExists() bool {
-	if _, err := os.Stat(directory.DirectoryPath); err != nil {
+	fileInfo, err := os.Stat(directory.DirectoryPath)
+	if err != nil {
 		return false
 	}
 
-	return true
+	return fileInfo.IsDir()
 }
 
 func (dir *Directory) CreateDirectory() error {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
@@ -90,7 +91,8 @@ func (action *DeleteOperator) CheckConfig() error {
 	return nil
 }
 
-func (action *DeleteOperator) RunValidators(ctx *context.Context, state string) error {
+func (action *DeleteOperator) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoOperatorConfigFound
 	}
@@ -107,7 +109,7 @@ func (action *DeleteOperator) RunValidators(ctx *context.Context, state string) 
 	return nil
 }
 
-func (action *DeleteOperator) Do(ctx *context.Context) error {
+func (action *DeleteOperator) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoOperatorConfigFound
 	}

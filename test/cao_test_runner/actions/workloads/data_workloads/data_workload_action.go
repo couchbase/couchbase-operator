@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -76,7 +77,7 @@ func (d *DataWorkload) Describe() string {
 	return d.desc
 }
 
-func (d *DataWorkload) Do(_ *context.Context) error {
+func (d *DataWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter) error {
 	if d.yamlConfig == nil {
 		return workloads.ErrConfigWorkload
 	}
@@ -198,6 +199,6 @@ func (d *DataWorkload) CheckConfig() error {
 	return nil
 }
 
-func (d *DataWorkload) RunValidators(_ *context.Context, _ string) error {
+func (d *DataWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
 	return nil
 }

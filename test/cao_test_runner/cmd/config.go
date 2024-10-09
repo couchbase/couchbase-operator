@@ -1,5 +1,7 @@
 package cmd
 
+import "github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+
 const (
 	scenarioKey             = "scenario"
 	outputPathKey           = "output"
@@ -14,4 +16,12 @@ func buildConfigurator() (*RootConfig, error) {
 	}
 
 	return rootCfg, err
+}
+
+func buildTestAssets(resultsDirectory string) (*assets.TestAssets, error) {
+	testAssets := assets.NewTestAssets()
+
+	testAssets.SetResultsDirectory(resultsDirectory)
+
+	return testAssets, nil
 }

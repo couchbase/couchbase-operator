@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -36,7 +37,7 @@ func newTree() *Tree {
 }
 
 // Execute runs through the tasks in the Tree.
-func (t *Tree) Execute(ctx context.Context) []error {
+func (t *Tree) Execute(ctx context.Context, testAssets *assets.TestAssets) []error {
 	tCtx := icontext.NewContext(ctx)
 	if t.Action != nil {
 		if _, err := tCtx.ReconcileConfig(t.Action.Config()); err != nil {
@@ -47,15 +48,15 @@ func (t *Tree) Execute(ctx context.Context) []error {
 			return []error{err}
 		}
 
-		if err := t.Action.RunValidators(tCtx, validations.Pre); err != nil {
+		if err := t.Action.RunValidators(tCtx, validations.Pre, testAssets); err != nil {
 			return []error{err}
 		}
 
-		if err := t.Action.Do(tCtx); err != nil {
+		if err := t.Action.Do(tCtx, testAssets); err != nil {
 			return []error{err}
 		}
 
-		if err := t.Action.RunValidators(tCtx, validations.Post); err != nil {
+		if err := t.Action.RunValidators(tCtx, validations.Post, testAssets); err != nil {
 			return []error{err}
 		}
 	}
@@ -63,15 +64,15 @@ func (t *Tree) Execute(ctx context.Context) []error {
 	// If the scenario has only one action but iterations > 1
 	if len(t.Trees) == 0 && t.Iterations > 1 {
 		t.Iterations -= 1
-		return t.Execute(ctx)
+		return t.Execute(ctx, testAssets)
 	} else if len(t.Trees) == 0 {
 		return []error{}
 	}
 
-	return t.do(tCtx.Context())
+	return t.do(tCtx.Context(), testAssets)
 }
 
-func (t *Tree) do(ctx context.Context) []error {
+func (t *Tree) do(ctx context.Context, testAssets *assets.TestAssets) []error {
 	work := make(chan struct{})
 	done := make(chan struct{})
 	errorsChan := make(chan []error)
@@ -96,7 +97,7 @@ func (t *Tree) do(ctx context.Context) []error {
 						if t.Blocking {
 							defer childCancel()
 
-							errors := v.Execute(childCtx)
+							errors := v.Execute(childCtx, testAssets)
 							errorsChan <- errors
 
 							wg.Done()
@@ -104,7 +105,7 @@ func (t *Tree) do(ctx context.Context) []error {
 							go func(v *Tree) {
 								defer childCancel()
 
-								errors := v.Execute(childCtx)
+								errors := v.Execute(childCtx, testAssets)
 								errorsChan <- errors
 
 								wg.Done()

@@ -6,6 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
@@ -63,7 +64,8 @@ func (action *SetupNamespace) CheckConfig() error {
 	return nil
 }
 
-func (action *SetupNamespace) RunValidators(ctx *context.Context, state string) error {
+func (action *SetupNamespace) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoSetupNamespaceConfigFound
 	}
@@ -80,7 +82,7 @@ func (action *SetupNamespace) RunValidators(ctx *context.Context, state string) 
 	return nil
 }
 
-func (action *SetupNamespace) Do(ctx *context.Context) error {
+func (action *SetupNamespace) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoSetupNamespaceConfigFound
 	}

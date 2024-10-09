@@ -10,6 +10,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -115,7 +116,8 @@ func (action *SetupOperator) Describe() string {
 	return action.desc
 }
 
-func (action *SetupOperator) RunValidators(ctx *context.Context, state string) error {
+func (action *SetupOperator) RunValidators(ctx *context.Context,
+	state string, testAssets assets.TestAssetGetterSetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoOperatorConfigFound
 	}
@@ -207,7 +209,7 @@ func (action *SetupOperator) CheckConfig() error {
 	return nil
 }
 
-func (action *SetupOperator) Do(ctx *context.Context) error {
+func (action *SetupOperator) Do(ctx *context.Context, testAssets assets.TestAssetGetter) error {
 	if action.yamlConfig == nil {
 		return ErrNoOperatorConfigFound
 	}
