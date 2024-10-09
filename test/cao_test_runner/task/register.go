@@ -2,6 +2,7 @@ package task
 
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
+	changekubeconfig "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/change_config/kubeconfig"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/chaos"
 	destroyadmissioncontroller "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/admission_controller"
 	destroycrd "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/crd"
@@ -10,7 +11,6 @@ import (
 	admissioncontrollersetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/admission_controller"
 	caocrdsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/cao_crd"
 	couchbasesetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/couchbase"
-	kubeconfigsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/kubeconfig"
 	setupkubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/kubernetes"
 	operatorsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/operator"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade"
@@ -46,7 +46,7 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Deploy Couchbase":                 {newAction: couchbasesetup.NewCouchbaseConfig, config: &couchbasesetup.CouchbaseConfig{}},
 		"Sleep":                            {newAction: workloads.NewSleepActionConfig, config: &workloads.SleepActionConfig{}},
 		"Generic Workload":                 {newAction: workloads.NewGenericWorkloadConfig, config: &workloads.GenericWorkloadConfig{}},
-		"Change Kubeconfig Context":        {newAction: kubeconfigsetup.NewKubernetesSetupConfig, config: &kubeconfigsetup.KubeConfigContextSetupConfig{}},
+		"Change Kubeconfig Context":        {newAction: changekubeconfig.NewKubeConfigSetupConfig, config: &changekubeconfig.KubeConfigContextChangeConfig{}},
 		"Destroy Operator":                 {newAction: destoryoperator.NewDeleteOperatorConfig, config: &destoryoperator.OperatorConfig{}},
 		"Destroy Admission Controller":     {newAction: destroyadmissioncontroller.NewDestroyAdmissionControllerConfig, config: &destroyadmissioncontroller.AdmissionControllerConfig{}},
 		"Delete CRDs":                      {newAction: destroycrd.NewCRDDestroyConfig, config: &destroycrd.CRDDestroyConfig{}},

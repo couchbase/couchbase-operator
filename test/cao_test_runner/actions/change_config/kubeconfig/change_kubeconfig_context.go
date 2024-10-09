@@ -1,4 +1,4 @@
-package kubeconfigsetup
+package changekubeconfig
 
 import (
 	"errors"
@@ -18,7 +18,7 @@ var (
 	ErrNoAvailableContexts                = errors.New("no such available contexts")
 )
 
-type KubeConfigContextSetupConfig struct {
+type KubeConfigContextChangeConfig struct {
 	Description []string         `yaml:"description"`
 	K8sContext  string           `yaml:"k8sContext" caoCli:"required,context"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
@@ -39,9 +39,9 @@ func contains(array []string, str string) bool {
 	return false
 }
 
-func NewKubernetesSetupConfig(config interface{}) (actions.Action, error) {
+func NewKubeConfigSetupConfig(config interface{}) (actions.Action, error) {
 	if config != nil {
-		c, ok := config.(*KubeConfigContextSetupConfig)
+		c, ok := config.(*KubeConfigContextChangeConfig)
 		if !ok {
 			return nil, ErrDecodeKubeConfigContextSetupConfig
 		}
@@ -60,7 +60,7 @@ func (action *ChangeKubeConfigContext) Describe() string {
 }
 
 func (action *ChangeKubeConfigContext) Do(ctx *context.Context, config interface{}) error {
-	c, ok := action.yamlConfig.(*KubeConfigContextSetupConfig)
+	c, ok := action.yamlConfig.(*KubeConfigContextChangeConfig)
 	if !ok {
 		return ErrNoConfigFound
 	}
@@ -100,7 +100,7 @@ func (action *ChangeKubeConfigContext) Config() interface{} {
 }
 
 func (action *ChangeKubeConfigContext) Checks(ctx *context.Context, config interface{}, state string) error {
-	c, ok := action.yamlConfig.(*KubeConfigContextSetupConfig)
+	c, ok := action.yamlConfig.(*KubeConfigContextChangeConfig)
 	if !ok {
 		return ErrNoConfigFound
 	}
