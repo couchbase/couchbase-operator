@@ -111,6 +111,6 @@ type Pod struct {
 
 type PodList struct {
 	APIVersion string `json:"apiVersion"`
-	Pods       []Pod  `json:"items"`
+	Pods       []*Pod `json:"items"`
 	Kind       string `json:"kind"`
 }

@@ -97,7 +97,7 @@ func GetPods(podNames []string, namespace string) (*PodList, error) {
 			return nil, fmt.Errorf("get pods: %w", err)
 		}
 
-		podList.Pods = append(podList.Pods, *pod)
+		podList.Pods = append(podList.Pods, pod)
 
 		return &podList, nil
 	}
@@ -143,7 +143,7 @@ func GetPodsMap(podNames []string, namespace string) (map[string]*Pod, error) {
 	}
 
 	for i := range podsList.Pods {
-		podMap[podNames[i]] = &podsList.Pods[i]
+		podMap[podNames[i]] = podsList.Pods[i]
 	}
 
 	return podMap, nil

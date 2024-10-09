@@ -53,7 +53,7 @@ func GetCBPods(namespace string) ([]*pods.Pod, error) {
 
 	for i, pod := range podList.Pods {
 		if value, ok := pod.Metadata.Labels["couchbase_server"]; ok && value == "true" {
-			cbPods = append(cbPods, &podList.Pods[i])
+			cbPods = append(cbPods, podList.Pods[i])
 		}
 	}
 
@@ -79,7 +79,7 @@ func GetCBPodsMap(namespace string) (map[string]*pods.Pod, error) {
 
 	for i, pod := range podList.Pods {
 		if value, ok := pod.Metadata.Labels["couchbase_server"]; ok && value == "true" {
-			cbPodsMap[pod.Metadata.Name] = &podList.Pods[i]
+			cbPodsMap[pod.Metadata.Name] = podList.Pods[i]
 		}
 	}
 
