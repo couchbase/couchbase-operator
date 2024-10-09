@@ -2,41 +2,38 @@ package nodefilter
 
 import (
 	"fmt"
-	"strings"
 
+	caopods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cao_pods"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
 )
 
 // GetOperatorAdmissionNodeNames retrieves the k8s node names which has the operator and admission pod respectively.
-func GetOperatorAdmissionNodeNames(namespace string) (string, string, error) {
-	podNames, err := pods.GetPodNames(namespace)
+func GetOperatorAdmissionNodeNames(namespace string) (string, []string, error) {
+	operatorPodName, admissionPodNames, err := caopods.GetOperatorAdmissionPodNames(namespace)
 	if err != nil {
-		return "", "", fmt.Errorf("get operator admission node names: %w", err)
+		return "", nil, fmt.Errorf("get operator admission node names: %w", err)
 	}
 
 	// Get the nodes containing the Operator and Operator-Admission
-	var operatorNodeName, admissionNodeName string
+	var operatorNodeName string
+	var admissionNodeNames []string
 
-	for _, podName := range podNames {
-		if strings.Contains(podName, "couchbase-operator-admission") {
-			operatorNodeName, err = pods.GetNodeNameForPod(podName, namespace)
-			if err != nil {
-				return "", "", fmt.Errorf("get operator admission node names: %w", err)
-			}
-
-			continue
-		}
-
-		if strings.Contains(podName, "couchbase-operator") {
-			admissionNodeName, err = pods.GetNodeNameForPod(podName, namespace)
-			if err != nil {
-				return "", "", fmt.Errorf("get operator admission node names: %w", err)
-			}
-		}
+	operatorNodeName, err = pods.GetNodeNameForPod(operatorPodName, namespace)
+	if err != nil {
+		return "", nil, fmt.Errorf("get operator admission node names: %w", err)
 	}
 
-	return operatorNodeName, admissionNodeName, nil
+	for _, admissionPodName := range admissionPodNames {
+		admissionNodeName, err := pods.GetNodeNameForPod(admissionPodName, namespace)
+		if err != nil {
+			return "", nil, fmt.Errorf("get operator admission node names: %w", err)
+		}
+
+		admissionNodeNames = append(admissionNodeNames, admissionNodeName)
+	}
+
+	return operatorNodeName, admissionNodeNames, nil
 }
 
 // LabelExists checks if the label (labelKeyName and labelValue both) is present on the node or not.

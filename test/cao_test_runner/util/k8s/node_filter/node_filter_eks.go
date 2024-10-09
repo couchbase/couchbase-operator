@@ -33,7 +33,7 @@ func (n *NodeFilterEKS) FilterOutNodes(nodeFilter *NodeFilter) ([]string, error)
 		return nil, fmt.Errorf("filter out nodes `eks`: %w", err)
 	}
 
-	operatorNodeName, admissionNodeName, err := GetOperatorAdmissionNodeNames("default")
+	operatorNodeName, admissionNodeNames, err := GetOperatorAdmissionNodeNames("default")
 	if err != nil {
 		return nil, fmt.Errorf("filter out nodes `eks`: %w", err)
 	}
@@ -44,7 +44,7 @@ func (n *NodeFilterEKS) FilterOutNodes(nodeFilter *NodeFilter) ([]string, error)
 			continue
 		}
 
-		if nodeFilter.SkipAdmission && nodeNames[i] == admissionNodeName {
+		if nodeFilter.SkipAdmission && slices.Contains(admissionNodeNames, nodeNames[i]) {
 			nodeNames[i] = ""
 			continue
 		}
