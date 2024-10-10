@@ -3,6 +3,7 @@ package changekubeconfig
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -27,16 +28,6 @@ type KubeConfigContextChangeConfig struct {
 type ChangeKubeConfigContext struct {
 	desc       string
 	yamlConfig interface{}
-}
-
-func contains(array []string, str string) bool {
-	for _, item := range array {
-		if item == str {
-			return true
-		}
-	}
-
-	return false
 }
 
 func NewKubeConfigSetupConfig(config interface{}) (actions.Action, error) {
@@ -80,7 +71,7 @@ func (action *ChangeKubeConfigContext) Do(ctx *context.Context, config interface
 
 		availableContexts := strings.Split(output, "\n")
 
-		if contains(availableContexts, c.K8sContext) {
+		if slices.Contains(availableContexts, c.K8sContext) {
 			err = kubectl.UseContext(c.K8sContext).ExecWithoutOutputCapture()
 			if err != nil {
 				return fmt.Errorf("kubectl cannot fetch current context: %w", err)
