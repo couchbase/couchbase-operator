@@ -127,6 +127,11 @@ func Get(args ...string) *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
 }
 
+func GetNamespaces() *KubectlCmd {
+	args := []string{"namespaces", "-o", "name"}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+}
+
 func GetByTypeAndName(resourceType string, names ...string) *KubectlCmd {
 	var args []string
 	for _, n := range names {

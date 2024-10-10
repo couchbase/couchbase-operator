@@ -3,6 +3,7 @@ package task
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	changekubeconfig "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/change_config/kubeconfig"
+	changenamespace "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/change_config/namespace"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/chaos"
 	destroyadmissioncontroller "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/admission_controller"
 	destroycrd "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/crd"
@@ -47,6 +48,7 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Sleep":                            {newAction: workloads.NewSleepActionConfig, config: &workloads.SleepActionConfig{}},
 		"Generic Workload":                 {newAction: workloads.NewGenericWorkloadConfig, config: &workloads.GenericWorkloadConfig{}},
 		"Change Kubeconfig Context":        {newAction: changekubeconfig.NewKubeConfigContextChangeConfig, config: &changekubeconfig.KubeConfigContextChangeConfig{}},
+		"Change Current Namespace":         {newAction: changenamespace.NewNamespaceChangeConfig, config: &changenamespace.NamespaceChangeConfig{}},
 		"Destroy Operator":                 {newAction: destoryoperator.NewDeleteOperatorConfig, config: &destoryoperator.OperatorConfig{}},
 		"Destroy Admission Controller":     {newAction: destroyadmissioncontroller.NewDestroyAdmissionControllerConfig, config: &destroyadmissioncontroller.AdmissionControllerConfig{}},
 		"Delete CRDs":                      {newAction: destroycrd.NewCRDDestroyConfig, config: &destroycrd.CRDDestroyConfig{}},
