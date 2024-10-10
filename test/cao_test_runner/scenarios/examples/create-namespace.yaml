@@ -1,0 +1,3 @@
+action: "Create Namespace"
+config:
+  namespace: abc
