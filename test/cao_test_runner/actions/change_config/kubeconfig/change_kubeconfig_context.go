@@ -14,14 +14,14 @@ import (
 )
 
 var (
-	ErrDecodeKubeConfigContextSetupConfig = errors.New("unable to decode KubeConfigContextSetupConfig")
-	ErrNoConfigFound                      = errors.New("no config found for changing kubeconfig context")
-	ErrNoAvailableContexts                = errors.New("no such available contexts")
+	ErrDecodeKubeConfigContextChangeConfig = errors.New("unable to decode KubeConfigContextChangeConfig")
+	ErrNoConfigFound                       = errors.New("no config found for changing kubeconfig context")
+	ErrNoAvailableContexts                 = errors.New("no such available contexts")
 )
 
 type KubeConfigContextChangeConfig struct {
 	Description []string         `yaml:"description"`
-	K8sContext  string           `yaml:"k8sContext" caoCli:"required,context"`
+	K8SContext  string           `yaml:"k8sContext" caoCli:"required,context"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
 }
 
@@ -30,11 +30,11 @@ type ChangeKubeConfigContext struct {
 	yamlConfig interface{}
 }
 
-func NewKubeConfigSetupConfig(config interface{}) (actions.Action, error) {
+func NewKubeConfigContextChangeConfig(config interface{}) (actions.Action, error) {
 	if config != nil {
 		c, ok := config.(*KubeConfigContextChangeConfig)
 		if !ok {
-			return nil, ErrDecodeKubeConfigContextSetupConfig
+			return nil, ErrDecodeKubeConfigContextChangeConfig
 		}
 
 		return &ChangeKubeConfigContext{
@@ -63,7 +63,7 @@ func (action *ChangeKubeConfigContext) Do(ctx *context.Context, config interface
 		return fmt.Errorf("kubectl cannot fetch current context: %w", err)
 	}
 
-	if currK8sContext != c.K8sContext {
+	if currK8sContext != c.K8SContext {
 		output, err := kubectl.GetContexts().Output()
 		if err != nil {
 			return fmt.Errorf("kubectl cannot fetch all available contexts: %w", err)
@@ -71,17 +71,17 @@ func (action *ChangeKubeConfigContext) Do(ctx *context.Context, config interface
 
 		availableContexts := strings.Split(output, "\n")
 
-		if slices.Contains(availableContexts, c.K8sContext) {
-			err = kubectl.UseContext(c.K8sContext).ExecWithoutOutputCapture()
+		if slices.Contains(availableContexts, c.K8SContext) {
+			err = kubectl.UseContext(c.K8SContext).ExecWithoutOutputCapture()
 			if err != nil {
 				return fmt.Errorf("kubectl cannot fetch current context: %w", err)
 			}
 		} else {
-			return fmt.Errorf("cannot change context to %s: %w", c.K8sContext, ErrNoAvailableContexts)
+			return fmt.Errorf("cannot change context to %s: %w", c.K8SContext, ErrNoAvailableContexts)
 		}
 	}
 
-	ctx.WithID(context.K8sContextKey, c.K8sContext)
+	ctx.WithID(context.K8sContextKey, c.K8SContext)
 
 	return nil
 }
