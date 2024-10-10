@@ -1027,6 +1027,7 @@ var collectionRoles = []RoleName{
 	RoleSyncGatewayArchitect,
 	RoleSyncDevOps,
 	RoleSyncReplicator,
+	RoleQueryUseSequentialScans,
 }
 
 func ValidRolePattern() string {
