@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
 
@@ -54,7 +55,7 @@ type KubernetesSetupConfig struct {
 	MaxSize                  int                               `yaml:"maxSize"`
 	DesiredSize              int                               `yaml:"desiredSize"`
 	DiskSize                 int                               `yaml:"diskSize"`
-	AMI                      managedk8sservices.AMIType        `yaml:"ami"`
+	AMI                      ekstypes.AMITypes                 `yaml:"ami"`
 	KubeConfigPath           string                            `yaml:"kubeconfigPath" caoCli:"context" env:"KUBECONFIG"`
 	OSSKU                    armcontainerservice.OSSKU         `yaml:"osSKU"`
 	OSType                   armcontainerservice.OSType        `yaml:"osType"`

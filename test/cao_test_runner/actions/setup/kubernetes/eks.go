@@ -6,8 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/eks"
+	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/sirupsen/logrus"
@@ -46,7 +45,7 @@ type CreateEKSCluster struct {
 	MaxSize           int
 	DesiredSize       int
 	DiskSize          int
-	AMI               managedk8sservices.AMIType
+	AMI               ekstypes.AMITypes
 	KubeConfigPath    string
 }
 
@@ -71,7 +70,7 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
 
-	vpc, err := eksSession.CreateVPC(vpcCIDR)
+	vpc, err := eksSession.CreateVPC(ctx, vpcCIDR)
 	if err != nil {
 		return fmt.Errorf("error creating vpc: %w", err)
 	}
@@ -81,27 +80,27 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	azs := []string{cec.Region + "a", cec.Region + "b", cec.Region + "c"}
 	cidrs := []string{subnetCIDR1, subnetCIDR2, subnetCIDR3}
 
-	subnets, err := eksSession.CreateSubnets(*vpc.VpcId, azs, cidrs)
+	subnets, err := eksSession.CreateSubnets(ctx, *vpc.VpcId, azs, cidrs)
 	if err != nil {
 		return fmt.Errorf("error creating subnets in the vpc: %w", err)
 	}
 
 	logrus.Info("Created subnets for the cluster")
 
-	igw, err := eksSession.CreateInternetGateway()
+	igw, err := eksSession.CreateInternetGateway(ctx)
 	if err != nil {
 		return fmt.Errorf("error trying to create internet gateway: %w", err)
 	}
 
 	logrus.Info("Created Internet Gateway for the VPC")
 
-	if err := eksSession.AttachInternetGateway(*vpc.VpcId, *igw.InternetGatewayId); err != nil {
+	if err := eksSession.AttachInternetGateway(ctx, *vpc.VpcId, *igw.InternetGatewayId); err != nil {
 		return fmt.Errorf("error trying to attach internet gateway to vpc: %w", err)
 	}
 
 	logrus.Info("Attached Internet gateway to VPC")
 
-	rt, err := eksSession.CreateRouteTable(*vpc.VpcId, *igw.InternetGatewayId)
+	rt, err := eksSession.CreateRouteTable(ctx, *vpc.VpcId, *igw.InternetGatewayId)
 	if err != nil {
 		return fmt.Errorf("error trying to create route table with route to internet gateway: %w", err)
 	}
@@ -111,11 +110,11 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	subnetIds := make([]string, len(subnets))
 	for i, subnet := range subnets {
 		subnetIds[i] = *subnet.SubnetId
-		if err := eksSession.EnableAutoAssignPublicIP(subnetIds[i]); err != nil {
+		if err := eksSession.EnableAutoAssignPublicIP(ctx, subnetIds[i]); err != nil {
 			return fmt.Errorf("error enabling auto assign public ip: %w", err)
 		}
 
-		if err := eksSession.AssociateRouteTable(*rt.RouteTableId, subnetIds[i]); err != nil {
+		if err := eksSession.AssociateRouteTable(ctx, *rt.RouteTableId, subnetIds[i]); err != nil {
 			return fmt.Errorf("error trying to associate route table to subnet: %w", err)
 		}
 	}
@@ -124,14 +123,14 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 
 	securityGroupName := cec.ClusterName + "-security-group"
 
-	securityGroup, err := eksSession.CreateSecurityGroup(*vpc.VpcId, securityGroupName)
+	securityGroup, err := eksSession.CreateSecurityGroup(ctx, *vpc.VpcId, securityGroupName)
 	if err != nil {
 		return fmt.Errorf("error creating security group %s: %w", securityGroupName, err)
 	}
 
 	logrus.Info("Created Security groups for the cluster")
 
-	cluster, err := eksSession.CreateEKSCluster(cec.KubernetesVersion, subnetIds,
+	cluster, err := eksSession.CreateEKSCluster(ctx, cec.KubernetesVersion, subnetIds,
 		[]string{*securityGroup.GroupId}, true)
 	if err != nil {
 		return fmt.Errorf("unable to create eks cluster %s: %w", cec.ClusterName, err)
@@ -141,16 +140,16 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 
 	for i := 0; i < cec.NumNodeGroups; i++ {
 		nodeGroupName := fmt.Sprintf("%s-node-group-%d", cec.ClusterName, i)
-		if _, err = eksSession.CreateNodeGroup(cec.InstanceType, nodeGroupName,
-			sshKey, subnetIds, []string{*securityGroup.GroupId}, int64(cec.MinSize), int64(cec.DesiredSize),
-			int64(cec.MaxSize), int64(cec.DiskSize), cec.AMI, true); err != nil {
+		if _, err = eksSession.CreateNodeGroup(ctx, cec.InstanceType, nodeGroupName,
+			sshKey, subnetIds, []string{*securityGroup.GroupId}, int32(cec.MinSize), int32(cec.DesiredSize),
+			int32(cec.MaxSize), int32(cec.DiskSize), cec.AMI, true); err != nil {
 			return fmt.Errorf("unable to create node group %s: %w", nodeGroupName, err)
 		}
 	}
 
 	logrus.Info("Created Node groups for the cluster")
 
-	if _, err = eksSession.EnableEBSCSIDriverAddon(ebscsidriverVersion); err != nil {
+	if _, err = eksSession.EnableEBSCSIDriverAddon(ctx, ebscsidriverVersion); err != nil {
 		return fmt.Errorf("unable to create ebs csi drive add on for eks cluster %s: %w",
 			cec.ClusterName, err)
 	}
@@ -166,7 +165,7 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	return nil
 }
 
-func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region string) error {
+func (cec *CreateEKSCluster) updateKubeconfig(cluster *ekstypes.Cluster, region string) error {
 	/*
 			 requirement for this to work
 
@@ -187,28 +186,27 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 		return fmt.Errorf("failed to load existing kubeconfig file: %w", err)
 	}
 
-	caData, err := base64.StdEncoding.DecodeString(aws.StringValue(cluster.CertificateAuthority.Data))
+	caData, err := base64.StdEncoding.DecodeString(*cluster.CertificateAuthority.Data)
 	if err != nil {
 		return fmt.Errorf("failed to decode certificate authority data: %w", err)
 	}
 
-	clusterName := aws.StringValue(cluster.Name)
 	clusterConfig := &api.Cluster{
-		Server:                   aws.StringValue(cluster.Endpoint),
+		Server:                   *cluster.Endpoint,
 		CertificateAuthorityData: caData,
 	}
 
-	contextName := fmt.Sprintf("eks-%s@%s", clusterName, region)
+	contextName := fmt.Sprintf("eks-%s@%s", *cluster.Name, region)
 	contextConfig := &api.Context{
-		Cluster:  clusterName,
-		AuthInfo: clusterName,
+		Cluster:  *cluster.Name,
+		AuthInfo: *cluster.Name,
 	}
 
 	userConfig := &api.AuthInfo{
 		Exec: &api.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1beta1",
 			Command:    "aws-iam-authenticator",
-			Args:       []string{"token", "-i", clusterName},
+			Args:       []string{"token", "-i", *cluster.Name},
 		},
 	}
 
@@ -224,9 +222,9 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *eks.Cluster, region strin
 		kubeconfig.AuthInfos = make(map[string]*api.AuthInfo)
 	}
 
-	kubeconfig.Clusters[clusterName] = clusterConfig
+	kubeconfig.Clusters[*cluster.Name] = clusterConfig
 	kubeconfig.Contexts[contextName] = contextConfig
-	kubeconfig.AuthInfos[clusterName] = userConfig
+	kubeconfig.AuthInfos[*cluster.Name] = userConfig
 	kubeconfig.CurrentContext = contextName
 
 	if err = clientcmd.WriteToFile(*kubeconfig, cec.KubeConfigPath); err != nil {
@@ -278,11 +276,11 @@ func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 	}
 
 	securityGroupName := cec.ClusterName + "-security-group"
-	if _, err := eksSession.GetSecurityGroupsByGroupNames([]*string{&securityGroupName}); err == nil {
+	if _, err := eksSession.GetSecurityGroupsByGroupNames(ctx, []string{securityGroupName}); err == nil {
 		return fmt.Errorf("security group %s already exists: %w", securityGroupName, ErrEKSSecurityGroupAlreadyExists)
 	}
 
-	if _, err := eksSession.GetEKSCluster(); err == nil {
+	if _, err := eksSession.GetEKSCluster(ctx); err == nil {
 		return fmt.Errorf("eks cluster %s already exists: %w", cec.ClusterName, ErrEKSClusterAlreadyExists)
 	}
 

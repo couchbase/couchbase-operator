@@ -5,8 +5,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -45,13 +44,13 @@ func NewEKSChaos(ctxt *context.Context, clusterName string) (*EKSChaos, error) {
 }
 
 // RestartNodes reboots the ec2 instance (i.e. k8s node of EKS).
-func (ec *EKSChaos) RestartNodes(ctxt *context.Context, chaosConfig *CBPodChaosConfig) error {
+func (ec *EKSChaos) RestartNodes(context *context.Context, chaosConfig *CBPodChaosConfig) error {
 	k8sNodeName, err := pods.GetNodeNameForPod(chaosConfig.CBPod, "default")
 	if err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
 
-	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(ctxt.Context(), ec.EKSCred, []string{k8sNodeName})
+	instanceIds, err := ec.EKSSvc.GetInstancesByK8sNodeName(context.Context(), ec.EKSCred, []string{k8sNodeName})
 	if err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
@@ -66,9 +65,11 @@ func (ec *EKSChaos) RestartNodes(ctxt *context.Context, chaosConfig *CBPodChaosC
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
 
-	_, err = ec.EKSSess.EC2Client.RebootInstances(&ec2.RebootInstancesInput{
-		InstanceIds: aws.StringSlice(instanceIds),
-	})
+	_, err = ec.EKSSess.EC2Client.RebootInstances(
+		context.Context(),
+		&ec2.RebootInstancesInput{
+			InstanceIds: instanceIds,
+		})
 	if err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
@@ -101,9 +102,11 @@ func (ec *EKSChaos) DeleteNodes(context *context.Context, chaosConfig *CBPodChao
 	}
 
 	// Terminating the instance
-	_, err = ec.EKSSess.EC2Client.TerminateInstances(&ec2.TerminateInstancesInput{
-		InstanceIds: aws.StringSlice(instanceIds),
-	})
+	_, err = ec.EKSSess.EC2Client.TerminateInstances(
+		context.Context(),
+		&ec2.TerminateInstancesInput{
+			InstanceIds: instanceIds,
+		})
 	if err != nil {
 		return fmt.Errorf("terminate ec2 instance: %w", err)
 	}

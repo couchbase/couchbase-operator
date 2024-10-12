@@ -6,7 +6,7 @@ import (
 
 	"context"
 
-	"github.com/aws/aws-sdk-go/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
@@ -17,7 +17,7 @@ type DeleteEKSCluster struct {
 	Region      string
 }
 
-func containsRoute(routeTables []*ec2.RouteTable, routeID string) bool {
+func containsRoute(routeTables []ec2types.RouteTable, routeID string) bool {
 	for _, routeTable := range routeTables {
 		if *routeTable.RouteTableId == routeID {
 			return true
@@ -48,18 +48,18 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
 
-	cluster, err := eksSession.GetEKSCluster()
+	cluster, err := eksSession.GetEKSCluster(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to fetch cluster details %s: %w", dec.ClusterName, err)
 	}
 
-	nodeGroups, err := eksSession.GetNodegroupsForCluster()
+	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to fetch node groups for cluster %s: %w", dec.ClusterName, err)
 	}
 
 	for _, nodeGroup := range nodeGroups {
-		if err = eksSession.DeleteNodeGroup(*nodeGroup.NodegroupName, true); err != nil {
+		if err = eksSession.DeleteNodeGroup(ctx, *nodeGroup.NodegroupName, true); err != nil {
 			return fmt.Errorf("unable to delete node group %s of cluster %s: %w", *nodeGroup.NodegroupName, dec.ClusterName, err)
 		}
 
@@ -68,46 +68,46 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 		parts := strings.Split(*nodeGroup.NodeRole, "/")
 		roleName := &parts[len(parts)-1]
 
-		if err = eksSession.DeleteIAMRole(roleName); err != nil {
+		if err = eksSession.DeleteIAMRole(ctx, roleName); err != nil {
 			return fmt.Errorf("unable to delete iam %s for node group %s of cluster %s: %w", *nodeGroup.NodeRole, *nodeGroup.NodegroupName, dec.ClusterName, err)
 		}
 
 		logrus.Infof("Deleted IAM role %s of node group %s from cluster %s", *nodeGroup.NodeRole, *nodeGroup.NodegroupName, dec.ClusterName)
 	}
 
-	if err = eksSession.DeleteCluster(true); err != nil {
+	if err = eksSession.DeleteCluster(ctx, true); err != nil {
 		return fmt.Errorf("unable to delete cluster %s: %w", dec.ClusterName, err)
 	}
 
 	logrus.Infof("Deleted cluster %s", dec.ClusterName)
 
-	if err = eksSession.DeleteSecurityGroups(cluster.ResourcesVpcConfig.SecurityGroupIds); err != nil {
+	if err = eksSession.DeleteSecurityGroups(ctx, cluster.ResourcesVpcConfig.SecurityGroupIds); err != nil {
 		return fmt.Errorf("unable to delete security group for cluster %s: %w", dec.ClusterName, err)
 	}
 
 	logrus.Infof("Deleted security groups from cluster %s", dec.ClusterName)
 
-	igw, err := eksSession.GetInternetGatewayForVPC(cluster.ResourcesVpcConfig.VpcId)
+	igw, err := eksSession.GetInternetGatewayForVPC(ctx, cluster.ResourcesVpcConfig.VpcId)
 	if err != nil {
 		return fmt.Errorf("unable to find internet gateway attached to vpc: %w", err)
 	}
 
-	if err := eksSession.DetachInternetGateway(cluster.ResourcesVpcConfig.VpcId, igw.InternetGatewayId); err != nil {
+	if err := eksSession.DetachInternetGateway(ctx, cluster.ResourcesVpcConfig.VpcId, igw.InternetGatewayId); err != nil {
 		return fmt.Errorf("unable to detach internet gateway: %w", err)
 	}
 
 	logrus.Info("Detached Internet Gateway from vpc")
 
-	if err := eksSession.DeleteInternetGateway(igw.InternetGatewayId); err != nil {
+	if err := eksSession.DeleteInternetGateway(ctx, igw.InternetGatewayId); err != nil {
 		return fmt.Errorf("unable to delete internet gateway: %w", err)
 	}
 
 	logrus.Info("Deleted Internet Gateway")
 
-	var routes []*ec2.RouteTable
+	var routes []ec2types.RouteTable
 
 	for _, subnetID := range cluster.ResourcesVpcConfig.SubnetIds {
-		routeTables, err := eksSession.GetRouteTablesForSubnet(subnetID)
+		routeTables, err := eksSession.GetRouteTablesForSubnet(ctx, &subnetID)
 		if err != nil {
 			return fmt.Errorf("unable to find route tables for subnet: %w", err)
 		}
@@ -117,36 +117,36 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 				routes = append(routes, routeTable)
 			}
 
-			association, err := eksSession.GetRouteTableAssociation(routeTable.RouteTableId, subnetID)
+			association, err := eksSession.GetRouteTableAssociation(ctx, routeTable.RouteTableId, &subnetID)
 			if err != nil {
 				return fmt.Errorf("unable to find association with route table and subnet: %w", err)
 			}
 
-			if err := eksSession.DissociateRouteTable(association.RouteTableAssociationId); err != nil {
+			if err := eksSession.DissociateRouteTable(ctx, association.RouteTableAssociationId); err != nil {
 				return fmt.Errorf("unable to find association with route table and subnet: %w", err)
 			}
 		}
 	}
 
 	for _, routeTable := range routes {
-		if err = eksSession.DeleteRoute(routeTable.RouteTableId); err != nil {
+		if err = eksSession.DeleteRoute(ctx, routeTable.RouteTableId); err != nil {
 			return fmt.Errorf("unable to delete route table and subnet: %w", err)
 		}
 
-		if err := eksSession.DeleteRouteTable(routeTable.RouteTableId); err != nil {
+		if err := eksSession.DeleteRouteTable(ctx, routeTable.RouteTableId); err != nil {
 			return fmt.Errorf("unable to delete route table: %w", err)
 		}
 	}
 
 	logrus.Info("Dissociated route tables from subnets and deleted route tables")
 
-	if err = eksSession.DeleteSubnets(cluster.ResourcesVpcConfig.SubnetIds); err != nil {
+	if err = eksSession.DeleteSubnets(ctx, cluster.ResourcesVpcConfig.SubnetIds); err != nil {
 		return fmt.Errorf("unable to delete subnets for cluster %s: %w", dec.ClusterName, err)
 	}
 
 	logrus.Infof("Deleted subnets from cluster %s", dec.ClusterName)
 
-	if err = eksSession.DeleteVpc(cluster.ResourcesVpcConfig.VpcId); err != nil {
+	if err = eksSession.DeleteVpc(ctx, cluster.ResourcesVpcConfig.VpcId); err != nil {
 		return fmt.Errorf("unable to delete vpc for cluster %s: %w", dec.ClusterName, err)
 	}
 
@@ -154,7 +154,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 
 	rolesToDelete := []string{dec.ClusterName + "-eks-role", dec.ClusterName + "-eks-ebscsidriver-role"}
 	for _, roleName := range rolesToDelete {
-		if err = eksSession.DeleteIAMRole(&roleName); err != nil {
+		if err = eksSession.DeleteIAMRole(ctx, &roleName); err != nil {
 			return fmt.Errorf("unable to delete iam role %s: %w", roleName, err)
 		}
 
@@ -200,7 +200,7 @@ func (dec *DeleteEKSCluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
 
-	if _, err := eksSession.GetEKSCluster(); err != nil {
+	if _, err := eksSession.GetEKSCluster(ctx); err != nil {
 		return fmt.Errorf("unable to fetch cluster details %s: %w", dec.ClusterName, err)
 	}
 
