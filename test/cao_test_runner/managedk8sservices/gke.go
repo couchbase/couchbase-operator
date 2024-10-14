@@ -43,15 +43,15 @@ type GKESessionStore struct {
 }
 
 type GKESession struct {
-	GlobalOperationsClient *compute.GlobalOperationsClient
-	NetworksCLient         *compute.NetworksClient
-	FirewallsClient        *compute.FirewallsClient
-	SubnetClient           *compute.SubnetworksClient
-	ClusterManagerClient   *container.ClusterManagerClient
-	Cred                   *ManagedServiceCredentials
-	Region                 string
-	ClusterName            string
-	ProjectID              string
+	globalOperationsClient *compute.GlobalOperationsClient
+	networksCLient         *compute.NetworksClient
+	firewallsClient        *compute.FirewallsClient
+	subnetClient           *compute.SubnetworksClient
+	clusterManagerClient   *container.ClusterManagerClient
+	cred                   *ManagedServiceCredentials
+	region                 string
+	clusterName            string
+	projectID              string
 }
 
 func ValidateReleaseChannel(rc ReleaseChannel) (bool, error) {
@@ -92,15 +92,15 @@ func NewGKESession(ctx context.Context, managedSvcCred *ManagedServiceCredential
 	}
 
 	return &GKESession{
-		GlobalOperationsClient: globalOperationsClient,
-		NetworksCLient:         networksClient,
-		FirewallsClient:        firewallClient,
-		SubnetClient:           subnetClient,
-		ClusterManagerClient:   clusterManagerClient,
-		Cred:                   managedSvcCred,
-		Region:                 managedSvcCred.GKECredentials.gkeRegion,
-		ClusterName:            managedSvcCred.ClusterName,
-		ProjectID:              managedSvcCred.GKECredentials.gkeProjectID,
+		globalOperationsClient: globalOperationsClient,
+		networksCLient:         networksClient,
+		firewallsClient:        firewallClient,
+		subnetClient:           subnetClient,
+		clusterManagerClient:   clusterManagerClient,
+		cred:                   managedSvcCred,
+		region:                 managedSvcCred.GKECredentials.gkeRegion,
+		clusterName:            managedSvcCred.ClusterName,
+		projectID:              managedSvcCred.GKECredentials.gkeProjectID,
 	}, nil
 }
 
@@ -166,8 +166,8 @@ func (gss *GKESessionStore) GetInstancesByK8sNodeName(ctx context.Context, manag
 
 func (gks *GKESession) WaitForOperation(ctx context.Context, operationName string) error {
 	for {
-		op, err := gks.GlobalOperationsClient.Get(ctx, &computepb.GetGlobalOperationRequest{
-			Project:   gks.ProjectID,
+		op, err := gks.globalOperationsClient.Get(ctx, &computepb.GetGlobalOperationRequest{
+			Project:   gks.projectID,
 			Operation: operationName,
 		})
 		if err != nil {
@@ -190,8 +190,8 @@ func (gks *GKESession) WaitForOperation(ctx context.Context, operationName strin
 
 func (gks *GKESession) WaitForClusterOperation(ctx context.Context, operationName string) error {
 	for {
-		opStatus, err := gks.ClusterManagerClient.GetOperation(ctx, &containerpb.GetOperationRequest{
-			Name: fmt.Sprintf("projects/%s/locations/%s/operations/%s", gks.ProjectID, gks.Region, operationName),
+		opStatus, err := gks.clusterManagerClient.GetOperation(ctx, &containerpb.GetOperationRequest{
+			Name: fmt.Sprintf("projects/%s/locations/%s/operations/%s", gks.projectID, gks.region, operationName),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to get operation status: %w", err)
@@ -216,11 +216,11 @@ func (gks *GKESession) CreateVirtualNetwork(ctx context.Context, networkName str
 	}
 
 	req := &computepb.InsertNetworkRequest{
-		Project:         gks.ProjectID,
+		Project:         gks.projectID,
 		NetworkResource: network,
 	}
 
-	op, err := gks.NetworksCLient.Insert(ctx, req)
+	op, err := gks.networksCLient.Insert(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
@@ -234,7 +234,7 @@ func (gks *GKESession) CreateVirtualNetwork(ctx context.Context, networkName str
 }
 
 func (gks *GKESession) CreateFirewallRule(ctx context.Context, firewallRuleName, networkName string) error {
-	network := fmt.Sprintf("projects/%s/global/networks/%s", gks.ProjectID, networkName)
+	network := fmt.Sprintf("projects/%s/global/networks/%s", gks.projectID, networkName)
 	ipProtocol := "all"
 	direction := "INGRESS"
 
@@ -252,11 +252,11 @@ func (gks *GKESession) CreateFirewallRule(ctx context.Context, firewallRuleName,
 	}
 
 	firewallReq := &computepb.InsertFirewallRequest{
-		Project:          gks.ProjectID,
+		Project:          gks.projectID,
 		FirewallResource: firewallRule,
 	}
 
-	firewallOp, err := gks.FirewallsClient.Insert(ctx, firewallReq)
+	firewallOp, err := gks.firewallsClient.Insert(ctx, firewallReq)
 	if err != nil {
 		return fmt.Errorf("failed to create firewall rule: %w", err)
 	}
@@ -269,8 +269,8 @@ func (gks *GKESession) CreateFirewallRule(ctx context.Context, firewallRuleName,
 }
 
 func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName, ipCidrRange string) error {
-	network := fmt.Sprintf("projects/%s/global/networks/%s", gks.ProjectID, networkName)
-	region := fmt.Sprintf("projects/%s/regions/%s", gks.ProjectID, gks.Region)
+	network := fmt.Sprintf("projects/%s/global/networks/%s", gks.projectID, networkName)
+	region := fmt.Sprintf("projects/%s/regions/%s", gks.projectID, gks.region)
 
 	subnetwork := &computepb.Subnetwork{
 		Name:        &subnetName,
@@ -280,12 +280,12 @@ func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName
 	}
 
 	subnetReq := &computepb.InsertSubnetworkRequest{
-		Project:            gks.ProjectID,
-		Region:             gks.Region,
+		Project:            gks.projectID,
+		Region:             gks.region,
 		SubnetworkResource: subnetwork,
 	}
 
-	_, err := gks.SubnetClient.Insert(ctx, subnetReq)
+	_, err := gks.subnetClient.Insert(ctx, subnetReq)
 	if err != nil {
 		return fmt.Errorf("failed to create subnet %s: %w", subnetName, err)
 	}
@@ -304,8 +304,8 @@ func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetwor
 	}
 
 	cluster := &containerpb.Cluster{
-		Name:     gks.ClusterName,
-		Location: gks.Region,
+		Name:     gks.clusterName,
+		Location: gks.region,
 		ReleaseChannel: &containerpb.ReleaseChannel{
 			Channel: containerpb.ReleaseChannel_Channel(releaseChannelMap[releaseChannel]),
 		},
@@ -344,17 +344,17 @@ func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetwor
 	}
 
 	req := &containerpb.CreateClusterRequest{
-		Parent:  fmt.Sprintf("projects/%s/locations/%s", gks.ProjectID, gks.Region),
+		Parent:  fmt.Sprintf("projects/%s/locations/%s", gks.projectID, gks.region),
 		Cluster: cluster,
 	}
 
-	operation, err := gks.ClusterManagerClient.CreateCluster(ctx, req)
+	operation, err := gks.clusterManagerClient.CreateCluster(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
 
 	if err = gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
-		return fmt.Errorf("cluster %s creation operation failed: %w", gks.ClusterName, err)
+		return fmt.Errorf("cluster %s creation operation failed: %w", gks.clusterName, err)
 	}
 
 	return nil
@@ -376,11 +376,11 @@ func (gks *GKESession) CreateNodePool(ctx context.Context, nodePoolName, machine
 	}
 
 	req := &containerpb.CreateNodePoolRequest{
-		Parent:   fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+		Parent:   fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
 		NodePool: nodePool,
 	}
 
-	op, err := gks.ClusterManagerClient.CreateNodePool(ctx, req)
+	op, err := gks.clusterManagerClient.CreateNodePool(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create node pool: %w", err)
 	}
@@ -394,10 +394,10 @@ func (gks *GKESession) CreateNodePool(ctx context.Context, nodePoolName, machine
 
 func (gks *GKESession) GetCluster(ctx context.Context) (*containerpb.Cluster, error) {
 	req := &containerpb.GetClusterRequest{
-		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
 	}
 
-	cluster, err := gks.ClusterManagerClient.GetCluster(ctx, req)
+	cluster, err := gks.clusterManagerClient.GetCluster(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching cluster details: %w", err)
 	}
@@ -407,10 +407,10 @@ func (gks *GKESession) GetCluster(ctx context.Context) (*containerpb.Cluster, er
 
 func (gks *GKESession) ListNodePools(ctx context.Context) (*containerpb.ListNodePoolsResponse, error) {
 	req := &containerpb.ListNodePoolsRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+		Parent: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
 	}
 
-	resp, err := gks.ClusterManagerClient.ListNodePools(ctx, req)
+	resp, err := gks.clusterManagerClient.ListNodePools(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error listing node pools: %w", err)
 	}
@@ -420,10 +420,10 @@ func (gks *GKESession) ListNodePools(ctx context.Context) (*containerpb.ListNode
 
 func (gks *GKESession) DeleteNodePool(ctx context.Context, nodePoolName string) error {
 	req := &containerpb.DeleteNodePoolRequest{
-		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s/nodePools/%s", gks.ProjectID, gks.Region, gks.ClusterName, nodePoolName),
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s/nodePools/%s", gks.projectID, gks.region, gks.clusterName, nodePoolName),
 	}
 
-	operation, err := gks.ClusterManagerClient.DeleteNodePool(ctx, req)
+	operation, err := gks.clusterManagerClient.DeleteNodePool(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete node pool: %w", err)
 	}
@@ -437,16 +437,16 @@ func (gks *GKESession) DeleteNodePool(ctx context.Context, nodePoolName string) 
 
 func (gks *GKESession) DeleteCluster(ctx context.Context) error {
 	req := &containerpb.DeleteClusterRequest{
-		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.ProjectID, gks.Region, gks.ClusterName),
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
 	}
 
-	operation, err := gks.ClusterManagerClient.DeleteCluster(ctx, req)
+	operation, err := gks.clusterManagerClient.DeleteCluster(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete cluster: %w", err)
 	}
 
 	if err := gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
-		return fmt.Errorf("cluster %s deletion operation failed: %w", gks.ClusterName, err)
+		return fmt.Errorf("cluster %s deletion operation failed: %w", gks.clusterName, err)
 	}
 
 	return nil
@@ -454,12 +454,12 @@ func (gks *GKESession) DeleteCluster(ctx context.Context) error {
 
 func (gks *GKESession) DeleteSubnet(ctx context.Context, subnetName string) error {
 	req := &computepb.DeleteSubnetworkRequest{
-		Project:    gks.ProjectID,
-		Region:     gks.Region,
+		Project:    gks.projectID,
+		Region:     gks.region,
 		Subnetwork: subnetName,
 	}
 
-	_, err := gks.SubnetClient.Delete(ctx, req)
+	_, err := gks.subnetClient.Delete(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete subnet: %w", err)
 	}
@@ -474,10 +474,10 @@ func (gks *GKESession) DeleteSubnet(ctx context.Context, subnetName string) erro
 func (gks *GKESession) DeleteFirewallRule(ctx context.Context, firewallRuleName string) error {
 	req := &computepb.DeleteFirewallRequest{
 		Firewall: firewallRuleName,
-		Project:  gks.ProjectID,
+		Project:  gks.projectID,
 	}
 
-	operation, err := gks.FirewallsClient.Delete(ctx, req)
+	operation, err := gks.firewallsClient.Delete(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete firewall rule: %w", err)
 	}
@@ -492,10 +492,10 @@ func (gks *GKESession) DeleteFirewallRule(ctx context.Context, firewallRuleName 
 func (gks *GKESession) DeleteVirtualNetwork(ctx context.Context, virtualNetworkName string) error {
 	req := &computepb.DeleteNetworkRequest{
 		Network: virtualNetworkName,
-		Project: gks.ProjectID,
+		Project: gks.projectID,
 	}
 
-	operation, err := gks.NetworksCLient.Delete(ctx, req)
+	operation, err := gks.networksCLient.Delete(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete virtual network: %w", err)
 	}
@@ -509,10 +509,10 @@ func (gks *GKESession) DeleteVirtualNetwork(ctx context.Context, virtualNetworkN
 
 func (gks *GKESession) ListAvailableKubernetesVersions(ctx context.Context) ([]string, error) {
 	req := &containerpb.GetServerConfigRequest{
-		Name: fmt.Sprintf("projects/%s/locations/%s", gks.ProjectID, gks.Region),
+		Name: fmt.Sprintf("projects/%s/locations/%s", gks.projectID, gks.region),
 	}
 
-	resp, err := gks.ClusterManagerClient.GetServerConfig(ctx, req)
+	resp, err := gks.clusterManagerClient.GetServerConfig(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get server configuration: %w", err)
 	}

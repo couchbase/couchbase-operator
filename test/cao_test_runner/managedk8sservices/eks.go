@@ -48,13 +48,13 @@ type EKSSessionStore struct {
  * EKSSession holds the information for one EKS Cluster.
  */
 type EKSSession struct {
-	EKSClient   *eks.Client
-	ASGClient   *autoscaling.Client
-	EC2Client   *ec2.Client
-	IAMClient   *iam.Client
-	Cred        *ManagedServiceCredentials
-	Region      string
-	ClusterName string
+	eksClient   *eks.Client
+	asgClient   *autoscaling.Client
+	ec2Client   *ec2.Client
+	iamClient   *iam.Client
+	cred        *ManagedServiceCredentials
+	region      string
+	clusterName string
 }
 
 // NewEKSSession initializes a new EKSSession with the provided AWS credentials and region.
@@ -66,13 +66,13 @@ func NewEKSSession(ctx context.Context, managedSvcCred *ManagedServiceCredential
 	}
 
 	return &EKSSession{
-		EKSClient:   eks.NewFromConfig(cfg),
-		ASGClient:   autoscaling.NewFromConfig(cfg),
-		EC2Client:   ec2.NewFromConfig(cfg),
-		IAMClient:   iam.NewFromConfig(cfg),
-		Cred:        managedSvcCred,
-		Region:      managedSvcCred.EKSCredentials.eksRegion,
-		ClusterName: managedSvcCred.ClusterName,
+		eksClient:   eks.NewFromConfig(cfg),
+		asgClient:   autoscaling.NewFromConfig(cfg),
+		ec2Client:   ec2.NewFromConfig(cfg),
+		iamClient:   iam.NewFromConfig(cfg),
+		cred:        managedSvcCred,
+		region:      managedSvcCred.EKSCredentials.eksRegion,
+		clusterName: managedSvcCred.ClusterName,
 	}, nil
 }
 
@@ -143,8 +143,8 @@ func (ess *EKSSessionStore) Check(ctx context.Context, managedSvcCred *ManagedSe
 		return fmt.Errorf("check eks cluster accessibility: %w", err)
 	}
 
-	_, err = eksSession.EKSClient.DescribeCluster(ctx, &eks.DescribeClusterInput{
-		Name: aws.String(eksSession.ClusterName),
+	_, err = eksSession.eksClient.DescribeCluster(ctx, &eks.DescribeClusterInput{
+		Name: aws.String(eksSession.clusterName),
 	})
 	if err != nil {
 		return fmt.Errorf("check eks cluster accessibility: %w", err)
@@ -197,10 +197,10 @@ func (ess *EKSSessionStore) GetInstancesByK8sNodeName(ctx context.Context, manag
 // GetEKSCluster returns *eks.Cluster which can be used to retrieve information about a specific EKS cluster.
 func (es *EKSSession) GetEKSCluster(ctx context.Context) (*ekstypes.Cluster, error) {
 	input := &eks.DescribeClusterInput{
-		Name: aws.String(es.ClusterName),
+		Name: aws.String(es.clusterName),
 	}
 
-	result, err := es.EKSClient.DescribeCluster(ctx, input)
+	result, err := es.eksClient.DescribeCluster(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("get eks cluster: %w", err)
 	}
@@ -211,10 +211,10 @@ func (es *EKSSession) GetEKSCluster(ctx context.Context) (*ekstypes.Cluster, err
 // GetNodegroupsForCluster retrieves the nodegroups for an EKS cluster.
 func (es *EKSSession) GetNodegroupsForCluster(ctx context.Context) ([]*ekstypes.Nodegroup, error) {
 	input := &eks.ListNodegroupsInput{
-		ClusterName: aws.String(es.ClusterName),
+		ClusterName: aws.String(es.clusterName),
 	}
 
-	result, err := es.EKSClient.ListNodegroups(ctx, input)
+	result, err := es.eksClient.ListNodegroups(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("get nodegroups: %w", err)
 	}
@@ -222,8 +222,8 @@ func (es *EKSSession) GetNodegroupsForCluster(ctx context.Context) ([]*ekstypes.
 	nodegroups := make([]*ekstypes.Nodegroup, 0)
 
 	for _, ngName := range result.Nodegroups {
-		ng, err := es.EKSClient.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
-			ClusterName:   aws.String(es.ClusterName),
+		ng, err := es.eksClient.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
+			ClusterName:   aws.String(es.clusterName),
 			NodegroupName: &ngName,
 		})
 		if err != nil {
@@ -240,7 +240,7 @@ func (es *EKSSession) GetNodegroupsForCluster(ctx context.Context) ([]*ekstypes.
 func (es *EKSSession) ModifyNodegroup(ctx context.Context,
 	nodegroupName string, minSize, maxSize, desiredSize int32) error {
 	input := &eks.UpdateNodegroupConfigInput{
-		ClusterName:   aws.String(es.ClusterName),
+		ClusterName:   aws.String(es.clusterName),
 		NodegroupName: aws.String(nodegroupName),
 		ScalingConfig: &ekstypes.NodegroupScalingConfig{
 			MinSize:     &minSize,
@@ -249,7 +249,7 @@ func (es *EKSSession) ModifyNodegroup(ctx context.Context,
 		},
 	}
 
-	_, err := es.EKSClient.UpdateNodegroupConfig(ctx, input)
+	_, err := es.eksClient.UpdateNodegroupConfig(ctx, input)
 	if err != nil {
 		return fmt.Errorf("update nodegroup %s: %w", nodegroupName, err)
 	}
@@ -286,7 +286,7 @@ func (es *EKSSession) GetAutoscalingGroupsForCluster(ctx context.Context) ([]aut
 		AutoScalingGroupNames: asgNames,
 	}
 
-	result, err := es.ASGClient.DescribeAutoScalingGroups(ctx, input)
+	result, err := es.asgClient.DescribeAutoScalingGroups(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("describe autoscaling groups: %w", err)
 	}
@@ -298,11 +298,11 @@ func (es *EKSSession) GetAutoscalingGroupsForCluster(ctx context.Context) ([]aut
 func (es *EKSSession) GetAutoscalingGroupsForNodegroup(ctx context.Context, nodegroupName string) ([]autoscalingtypes.AutoScalingGroup, error) {
 	// First, get the nodegroup details
 	ngInput := &eks.DescribeNodegroupInput{
-		ClusterName:   aws.String(es.ClusterName),
+		ClusterName:   aws.String(es.clusterName),
 		NodegroupName: aws.String(nodegroupName),
 	}
 
-	ngResult, err := es.EKSClient.DescribeNodegroup(ctx, ngInput)
+	ngResult, err := es.eksClient.DescribeNodegroup(ctx, ngInput)
 	if err != nil {
 		return nil, fmt.Errorf("get asg for nodegroup: describe nodegroup %s: %w", nodegroupName, err)
 	}
@@ -318,7 +318,7 @@ func (es *EKSSession) GetAutoscalingGroupsForNodegroup(ctx context.Context, node
 		AutoScalingGroupNames: asgNames,
 	}
 
-	asgResult, err := es.ASGClient.DescribeAutoScalingGroups(ctx, asgInput)
+	asgResult, err := es.asgClient.DescribeAutoScalingGroups(ctx, asgInput)
 	if err != nil {
 		return nil, fmt.Errorf("describe autoscaling groups: %w", err)
 	}
@@ -333,7 +333,7 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(ctx context.Context, asgNam
 		AutoScalingGroupNames: []string{asgName},
 	}
 
-	asgResult, err := es.ASGClient.DescribeAutoScalingGroups(ctx, asgInput)
+	asgResult, err := es.asgClient.DescribeAutoScalingGroups(ctx, asgInput)
 	if err != nil {
 		return nil, fmt.Errorf("describe autoscaling group %s: %w", asgName, err)
 	}
@@ -360,7 +360,7 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(ctx context.Context, asgNam
 		InstanceIds: instanceIds,
 	}
 
-	ec2Result, err := es.EC2Client.DescribeInstances(ctx, ec2Input)
+	ec2Result, err := es.ec2Client.DescribeInstances(ctx, ec2Input)
 	if err != nil {
 		return nil, fmt.Errorf("describe EC2 instances: %w", err)
 	}
@@ -375,7 +375,7 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(ctx context.Context, asgNam
 }
 
 func (es *EKSSession) CreateVPC(ctx context.Context, cidrBlock string) (*ec2types.Vpc, error) {
-	result, err := es.EC2Client.CreateVpc(
+	result, err := es.ec2Client.CreateVpc(
 		ctx,
 		&ec2.CreateVpcInput{
 			CidrBlock: aws.String(cidrBlock),
@@ -391,7 +391,7 @@ func (es *EKSSession) CreateSubnets(ctx context.Context, vpcID string, azs []str
 	var subnets []*ec2types.Subnet
 
 	for i, cidr := range cidrs {
-		result, err := es.EC2Client.CreateSubnet(
+		result, err := es.ec2Client.CreateSubnet(
 			ctx,
 			&ec2.CreateSubnetInput{
 				CidrBlock:        aws.String(cidr),
@@ -409,7 +409,7 @@ func (es *EKSSession) CreateSubnets(ctx context.Context, vpcID string, azs []str
 }
 
 func (es *EKSSession) CreateSecurityGroup(ctx context.Context, vpcID, groupName string) (*ec2types.SecurityGroup, error) {
-	result, err := es.EC2Client.CreateSecurityGroup(
+	result, err := es.ec2Client.CreateSecurityGroup(
 		ctx,
 		&ec2.CreateSecurityGroupInput{
 			GroupName:   aws.String(groupName),
@@ -421,7 +421,7 @@ func (es *EKSSession) CreateSecurityGroup(ctx context.Context, vpcID, groupName 
 	}
 
 	// TODO : Take the ip permissions as params
-	_, err = es.EC2Client.AuthorizeSecurityGroupIngress(
+	_, err = es.ec2Client.AuthorizeSecurityGroupIngress(
 		ctx,
 		&ec2.AuthorizeSecurityGroupIngressInput{
 			GroupId: aws.String(*result.GroupId),
@@ -462,7 +462,7 @@ func (es *EKSSession) CreateSecurityGroup(ctx context.Context, vpcID, groupName 
 	// 	return nil, fmt.Errorf("failed to authorize egress: %w", err)
 	// }
 
-	describeResult, err := es.EC2Client.DescribeSecurityGroups(
+	describeResult, err := es.ec2Client.DescribeSecurityGroups(
 		ctx,
 		&ec2.DescribeSecurityGroupsInput{
 			GroupIds: []string{*result.GroupId},
@@ -479,7 +479,7 @@ func (es *EKSSession) CreateSecurityGroup(ctx context.Context, vpcID, groupName 
 }
 
 func (es *EKSSession) GetSecurityGroupsByGroupID(ctx context.Context, groupID []string) ([]ec2types.SecurityGroup, error) {
-	describeResult, err := es.EC2Client.DescribeSecurityGroups(
+	describeResult, err := es.ec2Client.DescribeSecurityGroups(
 		ctx,
 		&ec2.DescribeSecurityGroupsInput{
 			GroupIds: groupID,
@@ -496,7 +496,7 @@ func (es *EKSSession) GetSecurityGroupsByGroupID(ctx context.Context, groupID []
 }
 
 func (es *EKSSession) GetSecurityGroupsByGroupNames(ctx context.Context, groupNames []string) ([]ec2types.SecurityGroup, error) {
-	describeResult, err := es.EC2Client.DescribeSecurityGroups(
+	describeResult, err := es.ec2Client.DescribeSecurityGroups(
 		ctx,
 		&ec2.DescribeSecurityGroupsInput{
 			GroupNames: groupNames,
@@ -531,7 +531,7 @@ func (es *EKSSession) CreateEKSCluster(ctx context.Context, version string, subn
 		"arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
 		"arn:aws:iam::aws:policy/AmazonEKSVPCResourceController",
 	}
-	roleName := es.ClusterName + "-eks-role"
+	roleName := es.clusterName + "-eks-role"
 
 	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, policies)
 	if err != nil {
@@ -539,7 +539,7 @@ func (es *EKSSession) CreateEKSCluster(ctx context.Context, version string, subn
 	}
 
 	input := &eks.CreateClusterInput{
-		Name:    aws.String(es.ClusterName),
+		Name:    aws.String(es.clusterName),
 		RoleArn: aws.String(*role.Arn),
 		ResourcesVpcConfig: &ekstypes.VpcConfigRequest{
 			SubnetIds:        subnetIDs,
@@ -548,7 +548,7 @@ func (es *EKSSession) CreateEKSCluster(ctx context.Context, version string, subn
 		Version: aws.String(version),
 	}
 
-	result, err := es.EKSClient.CreateCluster(ctx, input)
+	result, err := es.eksClient.CreateCluster(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EKS cluster: %w", err)
 	}
@@ -561,10 +561,10 @@ func (es *EKSSession) CreateEKSCluster(ctx context.Context, version string, subn
 		return nil, fmt.Errorf("failed waiting for cluster to become ACTIVE: %w", err)
 	}
 
-	describeResult, err := es.EKSClient.DescribeCluster(
+	describeResult, err := es.eksClient.DescribeCluster(
 		ctx,
 		&eks.DescribeClusterInput{
-			Name: aws.String(es.ClusterName),
+			Name: aws.String(es.clusterName),
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe EKS cluster after creation: %w", err)
@@ -582,10 +582,10 @@ func (es *EKSSession) waitForClusterActive(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			output, err := es.EKSClient.DescribeCluster(
+			output, err := es.eksClient.DescribeCluster(
 				ctx,
 				&eks.DescribeClusterInput{
-					Name: aws.String(es.ClusterName),
+					Name: aws.String(es.clusterName),
 				})
 			if err != nil {
 				return fmt.Errorf("failed to describe cluster: %w", err)
@@ -607,10 +607,10 @@ func (es *EKSSession) waitForNodeGroupActive(ctx context.Context, nodeGroupName 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			output, err := es.EKSClient.DescribeNodegroup(
+			output, err := es.eksClient.DescribeNodegroup(
 				ctx,
 				&eks.DescribeNodegroupInput{
-					ClusterName:   aws.String(es.ClusterName),
+					ClusterName:   aws.String(es.clusterName),
 					NodegroupName: aws.String(nodeGroupName),
 				})
 			if err != nil {
@@ -649,7 +649,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 		"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
 		"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
 	}
-	roleName := es.ClusterName + "-eks-node-group-role" + time.Now().Format("20060102150405.00000000000006")
+	roleName := es.clusterName + "-eks-node-group-role" + time.Now().Format("20060102150405.00000000000006")
 
 	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, policies)
 	if err != nil {
@@ -657,7 +657,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 	}
 
 	input := &eks.CreateNodegroupInput{
-		ClusterName:   aws.String(es.ClusterName),
+		ClusterName:   aws.String(es.clusterName),
 		NodegroupName: aws.String(nodeGroupName),
 		Subnets:       subnets,
 		ScalingConfig: &ekstypes.NodegroupScalingConfig{
@@ -674,7 +674,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 		},
 	}
 
-	result, err := es.EKSClient.CreateNodegroup(ctx, input)
+	result, err := es.eksClient.CreateNodegroup(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node group: %w", err)
 	}
@@ -687,10 +687,10 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 		return nil, fmt.Errorf("failed waiting for node group to become ACTIVE: %w", err)
 	}
 
-	describeResult, err := es.EKSClient.DescribeNodegroup(
+	describeResult, err := es.eksClient.DescribeNodegroup(
 		ctx,
 		&eks.DescribeNodegroupInput{
-			ClusterName:   aws.String(es.ClusterName),
+			ClusterName:   aws.String(es.clusterName),
 			NodegroupName: aws.String(nodeGroupName),
 		})
 	if err != nil {
@@ -701,7 +701,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 }
 
 func (es *EKSSession) GetRoleArn(ctx context.Context, roleName string) (string, error) {
-	role, err := es.IAMClient.GetRole(
+	role, err := es.iamClient.GetRole(
 		ctx,
 		&iam.GetRoleInput{
 			RoleName: aws.String(roleName),
@@ -719,13 +719,13 @@ func (es *EKSSession) CreateIAMRole(ctx context.Context, roleName, trustPolicy s
 		AssumeRolePolicyDocument: aws.String(trustPolicy),
 	}
 
-	role, err := es.IAMClient.CreateRole(ctx, createRoleInput)
+	role, err := es.iamClient.CreateRole(ctx, createRoleInput)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create IAM role: %w", err)
 	}
 
 	for _, policyArn := range policies {
-		_, err = es.IAMClient.AttachRolePolicy(
+		_, err = es.iamClient.AttachRolePolicy(
 			ctx,
 			&iam.AttachRolePolicyInput{
 				RoleName:  aws.String(roleName),
@@ -741,13 +741,13 @@ func (es *EKSSession) CreateIAMRole(ctx context.Context, roleName, trustPolicy s
 
 func (es *EKSSession) CreateAddon(ctx context.Context, addonName, addonVersion, roleArn string) (*ekstypes.Addon, error) {
 	input := &eks.CreateAddonInput{
-		ClusterName:           aws.String(es.ClusterName),
+		ClusterName:           aws.String(es.clusterName),
 		AddonName:             aws.String(addonName),
 		AddonVersion:          aws.String(addonVersion),
 		ServiceAccountRoleArn: aws.String(roleArn),
 	}
 
-	result, err := es.EKSClient.CreateAddon(ctx, input)
+	result, err := es.eksClient.CreateAddon(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create addon %s: %w", addonName, err)
 	}
@@ -772,7 +772,7 @@ func (es *EKSSession) EnableEBSCSIDriverAddon(ctx context.Context, addonVersion 
 	policies := []string{
 		"arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
 	}
-	roleName := es.ClusterName + "-eks-ebscsidriver-role"
+	roleName := es.clusterName + "-eks-ebscsidriver-role"
 
 	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, policies)
 	if err != nil {
@@ -783,7 +783,7 @@ func (es *EKSSession) EnableEBSCSIDriverAddon(ctx context.Context, addonVersion 
 }
 
 func (es *EKSSession) EnableAutoAssignPublicIP(ctx context.Context, subnetID string) error {
-	if _, err := es.EC2Client.ModifySubnetAttribute(
+	if _, err := es.ec2Client.ModifySubnetAttribute(
 		ctx,
 		&ec2.ModifySubnetAttributeInput{
 			SubnetId: aws.String(subnetID),
@@ -799,11 +799,11 @@ func (es *EKSSession) EnableAutoAssignPublicIP(ctx context.Context, subnetID str
 
 func (es *EKSSession) DeleteNodeGroup(ctx context.Context, nodeGroupName string, waitForDeletion bool) error {
 	input := &eks.DeleteNodegroupInput{
-		ClusterName:   aws.String(es.ClusterName),
+		ClusterName:   aws.String(es.clusterName),
 		NodegroupName: aws.String(nodeGroupName),
 	}
 
-	if _, err := es.EKSClient.DeleteNodegroup(ctx, input); err != nil {
+	if _, err := es.eksClient.DeleteNodegroup(ctx, input); err != nil {
 		return fmt.Errorf("failed to delete node group %s: %w", nodeGroupName, err)
 	}
 
@@ -822,10 +822,10 @@ func (es *EKSSession) DeleteNodeGroup(ctx context.Context, nodeGroupName string,
 			return fmt.Errorf("timeout reached while waiting for node group %s to be deleted: %w", nodeGroupName, ErrTimeoutNodeGroupDeletion)
 
 		case <-ticker.C:
-			_, err := es.EKSClient.DescribeNodegroup(
+			_, err := es.eksClient.DescribeNodegroup(
 				ctx,
 				&eks.DescribeNodegroupInput{
-					ClusterName:   aws.String(es.ClusterName),
+					ClusterName:   aws.String(es.clusterName),
 					NodegroupName: aws.String(nodeGroupName),
 				})
 
@@ -843,7 +843,7 @@ func (es *EKSSession) DeleteNodeGroup(ctx context.Context, nodeGroupName string,
 
 func (es *EKSSession) DeleteSecurityGroups(ctx context.Context, groupIDs []string) error {
 	for _, groupID := range groupIDs {
-		if _, err := es.EC2Client.DeleteSecurityGroup(
+		if _, err := es.ec2Client.DeleteSecurityGroup(
 			ctx,
 			&ec2.DeleteSecurityGroupInput{
 				GroupId: &groupID,
@@ -856,7 +856,7 @@ func (es *EKSSession) DeleteSecurityGroups(ctx context.Context, groupIDs []strin
 }
 
 func (es *EKSSession) CreateInternetGateway(ctx context.Context) (*ec2types.InternetGateway, error) {
-	result, err := es.EC2Client.CreateInternetGateway(ctx, &ec2.CreateInternetGatewayInput{})
+	result, err := es.ec2Client.CreateInternetGateway(ctx, &ec2.CreateInternetGatewayInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Internet Gateway: %w", err)
 	}
@@ -865,7 +865,7 @@ func (es *EKSSession) CreateInternetGateway(ctx context.Context) (*ec2types.Inte
 }
 
 func (es *EKSSession) AttachInternetGateway(ctx context.Context, vpcID, igwID string) error {
-	if _, err := es.EC2Client.AttachInternetGateway(
+	if _, err := es.ec2Client.AttachInternetGateway(
 		ctx,
 		&ec2.AttachInternetGatewayInput{
 			VpcId:             aws.String(vpcID),
@@ -879,7 +879,7 @@ func (es *EKSSession) AttachInternetGateway(ctx context.Context, vpcID, igwID st
 
 func (es *EKSSession) DeleteSubnets(ctx context.Context, subnetIDs []string) error {
 	for _, subnetID := range subnetIDs {
-		if _, err := es.EC2Client.DeleteSubnet(
+		if _, err := es.ec2Client.DeleteSubnet(
 			ctx,
 			&ec2.DeleteSubnetInput{
 				SubnetId: &subnetID,
@@ -892,7 +892,7 @@ func (es *EKSSession) DeleteSubnets(ctx context.Context, subnetIDs []string) err
 }
 
 func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID string) (*ec2types.RouteTable, error) {
-	result, err := es.EC2Client.CreateRouteTable(
+	result, err := es.ec2Client.CreateRouteTable(
 		ctx,
 		&ec2.CreateRouteTableInput{
 			VpcId: aws.String(vpcID),
@@ -902,7 +902,7 @@ func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID string)
 	}
 
 	// TODO: Take the routes as params
-	if _, err = es.EC2Client.CreateRoute(
+	if _, err = es.ec2Client.CreateRoute(
 		ctx,
 		&ec2.CreateRouteInput{
 			RouteTableId:         result.RouteTable.RouteTableId,
@@ -916,7 +916,7 @@ func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID string)
 }
 
 func (es *EKSSession) AssociateRouteTable(ctx context.Context, routeTableID string, subnetID string) error {
-	if _, err := es.EC2Client.AssociateRouteTable(
+	if _, err := es.ec2Client.AssociateRouteTable(
 		ctx,
 		&ec2.AssociateRouteTableInput{
 			RouteTableId: aws.String(routeTableID),
@@ -929,7 +929,7 @@ func (es *EKSSession) AssociateRouteTable(ctx context.Context, routeTableID stri
 }
 
 func (es *EKSSession) DeleteVpc(ctx context.Context, vpcID *string) error {
-	if _, err := es.EC2Client.DeleteVpc(
+	if _, err := es.ec2Client.DeleteVpc(
 		ctx,
 		&ec2.DeleteVpcInput{
 			VpcId: vpcID,
@@ -941,7 +941,7 @@ func (es *EKSSession) DeleteVpc(ctx context.Context, vpcID *string) error {
 }
 
 func (es *EKSSession) DeleteIAMRole(ctx context.Context, nodeRole *string) error {
-	policiesOutput, err := es.IAMClient.ListAttachedRolePolicies(
+	policiesOutput, err := es.iamClient.ListAttachedRolePolicies(
 		ctx,
 		&iam.ListAttachedRolePoliciesInput{
 			RoleName: aws.String(*nodeRole),
@@ -956,12 +956,12 @@ func (es *EKSSession) DeleteIAMRole(ctx context.Context, nodeRole *string) error
 			PolicyArn: policy.PolicyArn,
 		}
 
-		if _, err := es.IAMClient.DetachRolePolicy(ctx, detachPolicyInput); err != nil {
+		if _, err := es.iamClient.DetachRolePolicy(ctx, detachPolicyInput); err != nil {
 			return fmt.Errorf("unable to detach policy %s from role %s: %w", *policy.PolicyArn, *nodeRole, err)
 		}
 	}
 
-	if _, err := es.IAMClient.DeleteRole(
+	if _, err := es.iamClient.DeleteRole(
 		ctx,
 		&iam.DeleteRoleInput{
 			RoleName: nodeRole,
@@ -973,12 +973,12 @@ func (es *EKSSession) DeleteIAMRole(ctx context.Context, nodeRole *string) error
 }
 
 func (es *EKSSession) DeleteCluster(ctx context.Context, waitForDeletion bool) error {
-	if _, err := es.EKSClient.DeleteCluster(
+	if _, err := es.eksClient.DeleteCluster(
 		ctx,
 		&eks.DeleteClusterInput{
-			Name: &es.ClusterName,
+			Name: &es.clusterName,
 		}); err != nil {
-		return fmt.Errorf("unable to delete cluster %s: %w", es.ClusterName, err)
+		return fmt.Errorf("unable to delete cluster %s: %w", es.clusterName, err)
 	}
 
 	if !waitForDeletion {
@@ -993,13 +993,13 @@ func (es *EKSSession) DeleteCluster(ctx context.Context, waitForDeletion bool) e
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("timeout reached while waiting for cluster %s to be deleted: %w", es.ClusterName, ErrTimeoutClusterDeletion)
+			return fmt.Errorf("timeout reached while waiting for cluster %s to be deleted: %w", es.clusterName, ErrTimeoutClusterDeletion)
 
 		case <-ticker.C:
-			_, err := es.EKSClient.DescribeCluster(
+			_, err := es.eksClient.DescribeCluster(
 				ctx,
 				&eks.DescribeClusterInput{
-					Name: aws.String(es.ClusterName),
+					Name: aws.String(es.clusterName),
 				})
 
 			if err != nil {
@@ -1008,14 +1008,14 @@ func (es *EKSSession) DeleteCluster(ctx context.Context, waitForDeletion bool) e
 					return nil
 				}
 
-				return fmt.Errorf("failed to describe cluster %s: %w", es.ClusterName, err)
+				return fmt.Errorf("failed to describe cluster %s: %w", es.clusterName, err)
 			}
 		}
 	}
 }
 
 func (es *EKSSession) DissociateRouteTable(ctx context.Context, associationID *string) error {
-	if _, err := es.EC2Client.DisassociateRouteTable(
+	if _, err := es.ec2Client.DisassociateRouteTable(
 		ctx,
 		&ec2.DisassociateRouteTableInput{
 			AssociationId: associationID,
@@ -1027,7 +1027,7 @@ func (es *EKSSession) DissociateRouteTable(ctx context.Context, associationID *s
 }
 
 func (es *EKSSession) DeleteRouteTable(ctx context.Context, routeTableID *string) error {
-	if _, err := es.EC2Client.DeleteRouteTable(
+	if _, err := es.ec2Client.DeleteRouteTable(
 		ctx,
 		&ec2.DeleteRouteTableInput{
 			RouteTableId: routeTableID,
@@ -1039,7 +1039,7 @@ func (es *EKSSession) DeleteRouteTable(ctx context.Context, routeTableID *string
 }
 
 func (es *EKSSession) DetachInternetGateway(ctx context.Context, vpcID, igwID *string) error {
-	if _, err := es.EC2Client.DetachInternetGateway(
+	if _, err := es.ec2Client.DetachInternetGateway(
 		ctx,
 		&ec2.DetachInternetGatewayInput{
 			InternetGatewayId: igwID,
@@ -1052,7 +1052,7 @@ func (es *EKSSession) DetachInternetGateway(ctx context.Context, vpcID, igwID *s
 }
 
 func (es *EKSSession) DeleteInternetGateway(ctx context.Context, igwID *string) error {
-	if _, err := es.EC2Client.DeleteInternetGateway(
+	if _, err := es.ec2Client.DeleteInternetGateway(
 		ctx,
 		&ec2.DeleteInternetGatewayInput{
 			InternetGatewayId: igwID,
@@ -1069,7 +1069,7 @@ func (es *EKSSession) GetInternetGatewayForVPC(ctx context.Context, vpcID *strin
 		Values: []string{*vpcID},
 	}
 
-	resp, err := es.EC2Client.DescribeInternetGateways(
+	resp, err := es.ec2Client.DescribeInternetGateways(
 		ctx,
 		&ec2.DescribeInternetGatewaysInput{
 			Filters: []ec2types.Filter{
@@ -1093,7 +1093,7 @@ func (es *EKSSession) GetRouteTablesForSubnet(ctx context.Context, subnetID *str
 		Values: []string{*subnetID},
 	}
 
-	resp, err := es.EC2Client.DescribeRouteTables(
+	resp, err := es.ec2Client.DescribeRouteTables(
 		ctx,
 		&ec2.DescribeRouteTablesInput{
 			Filters: []ec2types.Filter{
@@ -1113,7 +1113,7 @@ func (es *EKSSession) GetRouteTablesForSubnet(ctx context.Context, subnetID *str
 }
 
 func (es *EKSSession) GetRouteTableAssociation(ctx context.Context, routeTableID, subnetID *string) (*ec2types.RouteTableAssociation, error) {
-	resp, err := es.EC2Client.DescribeRouteTables(
+	resp, err := es.ec2Client.DescribeRouteTables(
 		ctx,
 		&ec2.DescribeRouteTablesInput{
 			RouteTableIds: []string{*routeTableID},
@@ -1136,7 +1136,7 @@ func (es *EKSSession) GetRouteTableAssociation(ctx context.Context, routeTableID
 
 func (es *EKSSession) DeleteRoute(ctx context.Context, routeTableID *string) error {
 	// TODO : Take destination cidr block as param
-	if _, err := es.EC2Client.DeleteRoute(
+	if _, err := es.ec2Client.DeleteRoute(
 		ctx,
 		&ec2.DeleteRouteInput{
 			RouteTableId:         routeTableID,
@@ -1149,7 +1149,7 @@ func (es *EKSSession) DeleteRoute(ctx context.Context, routeTableID *string) err
 }
 
 func (es *EKSSession) TerminateInstances(ctx context.Context, instanceIds []string) error {
-	if _, err := es.EC2Client.TerminateInstances(
+	if _, err := es.ec2Client.TerminateInstances(
 		ctx,
 		&ec2.TerminateInstancesInput{
 			InstanceIds: instanceIds,
@@ -1161,7 +1161,7 @@ func (es *EKSSession) TerminateInstances(ctx context.Context, instanceIds []stri
 }
 
 func (es *EKSSession) RebootInstances(ctx context.Context, instanceIds []string) error {
-	if _, err := es.EC2Client.RebootInstances(
+	if _, err := es.ec2Client.RebootInstances(
 		ctx,
 		&ec2.RebootInstancesInput{
 			InstanceIds: instanceIds,
