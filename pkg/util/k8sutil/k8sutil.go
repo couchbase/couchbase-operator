@@ -602,6 +602,12 @@ func NewResourceQuantityMi(value int64) *resource.Quantity {
 	return resource.NewQuantity(value<<20, resource.BinarySI)
 }
 
+// NewResourceQuantityMi accepts an integral value representing megabytes (2^20)
+// and returns a quantity.
+func NewResourceQuantityByte(value int64) *resource.Quantity {
+	return resource.NewQuantity(value, resource.BinarySI)
+}
+
 // NewDurationS accepts an integral value representing seconds and returns
 // a duration.
 func NewDurationS(value int64) *metav1.Duration {

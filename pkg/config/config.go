@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/couchbase/couchbase-operator/pkg/specgen"
 	"github.com/couchbase/couchbase-operator/pkg/version"
+	"github.com/ghodss/yaml"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
@@ -16,6 +18,7 @@ const (
 	CreateCmd   = "create"
 	DeleteCmd   = "delete"
 	UpdateCmd   = "update"
+	GenSpecCmd  = "genspec"
 )
 
 // ApplySubCommands attaches the configuration (create/delete/generate) sub commands to
@@ -71,10 +74,41 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 
 	updateCmd.AddCommand(getUpdateAdmissionCommand(root.UseLine(), flags))
 
+	oGenSpec := specgen.SpecGeneratorOptions{}
+
+	genSpecCmd := &cobra.Command{
+		Use:   GenSpecCmd,
+		Short: "Generates a spec file for a running Couchbase cluster",
+		Long:  "Generates a spec file for a running Couchbase cluster",
+		Run: func(cmd *cobra.Command, args []string) {
+			generator := specgen.NewSpecGenerator(oGenSpec)
+
+			spec, err := generator.Generate()
+			if err != nil {
+				fmt.Println("ERROR: ", err)
+				return
+			}
+
+			d, err := yaml.Marshal(spec)
+
+			if err != nil {
+				fmt.Println("ERROR: ", err)
+				return
+			}
+
+			fmt.Println(string(d))
+		},
+	}
+
+	genSpecCmd.Flags().StringVarP(&oGenSpec.Cluster, "cluster", "c", "", "The cluster hostname")
+	genSpecCmd.Flags().StringVarP(&oGenSpec.Username, "username", "u", "", "Cluster admin username")
+	genSpecCmd.Flags().StringVarP(&oGenSpec.Password, "password", "p", "", "Cluster admin password")
+
 	root.AddCommand(generate)
 	root.AddCommand(create)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(genSpecCmd)
 }
 
 func GenerateCommand() *cobra.Command {

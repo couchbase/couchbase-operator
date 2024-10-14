@@ -1490,6 +1490,42 @@ func SpecServicesListToServerServiceList(services ServiceList) (couchbaseutil.Se
 	return list, nil
 }
 
+// ServerServiceListToSpecServiceList maps a server service names (n1ql, kv ...) to a CRD service names (query, data).
+func MapServerServiceNameToServiceName(service string) (Service, error) {
+	switch service {
+	case "kv":
+		return DataService, nil
+	case "index":
+		return IndexService, nil
+	case "n1ql":
+		return QueryService, nil
+	case "fts":
+		return SearchService, nil
+	case "eventing":
+		return EventingService, nil
+	case "cbas":
+		return AnalyticsService, nil
+	default:
+		return "", fmt.Errorf("%w: invalid service name: %s", errors.NewStackTracedError(couchbaseutil.ErrInvalidResourceName), service)
+	}
+}
+
+// ServerServiceListToSpecServiceList converts a list of server service names (n1ql, kv ...) to a list of services with CRD names (query, data).
+func ServerServiceListToSpecServiceList(services []string) (ServiceList, error) {
+	list := ServiceList{}
+
+	for _, svc := range services {
+		serviceName, err := MapServerServiceNameToServiceName(svc)
+		if err != nil {
+			return list, err
+		}
+
+		list = append(list, serviceName)
+	}
+
+	return list, nil
+}
+
 func (c *CouchbaseCluster) IsReadyToAttemptMigration() bool {
 	cond := c.Status.GetCondition(ClusterConditionWaitingBetweenMigrations)
 
