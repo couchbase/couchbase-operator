@@ -3,9 +3,47 @@ package clusternodes
 import (
 	"net/url"
 	"strconv"
+	"strings"
 
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
+
+// RebalanceStart starts a rebalance.
+/*
+ * POST :: /controller/rebalance.
+ * docs.couchbase.com/server/current/rest-api/rest-cluster-rebalance.html.
+ * Unmarshal into the map[string]interface{}.
+ * NOTE: The CB node names shall be otp node names. E.g. ns_1@<cb-node-name>.
+ * NOTE: To eject an active node, add it to the ejectedNodes.
+ */
+func RebalanceStart(hostname string, knownNodes, ejectedNodes, deltaRecoveryBuckets []string) *requestutils.Request {
+	formData := url.Values{}
+
+	knownNodes = ConvertToOTPNames(knownNodes)
+
+	formData.Set("knownNodes", url.PathEscape(strings.Join(knownNodes, ",")))
+
+	if ejectedNodes != nil {
+		ejectedNodes = ConvertToOTPNames(ejectedNodes)
+		formData.Set("ejectedNodes", url.PathEscape(strings.Join(ejectedNodes, ",")))
+	}
+
+	if deltaRecoveryBuckets != nil {
+		formData.Set("deltaRecoveryBuckets", url.PathEscape(strings.Join(deltaRecoveryBuckets, ",")))
+	}
+
+	// TODO `topology` to be added later. Valid from Morpheus release to update services dynamically
+
+	return &requestutils.Request{
+		Host:   hostname,
+		Path:   "/controller/rebalance",
+		Method: "POST",
+		Headers: map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		Body: formData.Encode(),
+	}
+}
 
 // RebalanceProgress retrieves the rebalance progress.
 /*
