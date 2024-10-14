@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,8 @@ var (
 	ErrNoInternetGatewaysFound  = errors.New("no internet gateways found for vpc")
 	ErrNoRouteTablesFound       = errors.New("no route tables found for subnet")
 	ErrNoAssociationsFound      = errors.New("no associations between subnet and route table found")
+	ErrInvalidOIDURL            = errors.New("invalid oid url")
+	ErrInvalidPolicy            = errors.New("invalid policy")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -755,28 +758,161 @@ func (es *EKSSession) CreateAddon(ctx context.Context, addonName, addonVersion, 
 	return result.Addon, nil
 }
 
-func (es *EKSSession) EnableEBSCSIDriverAddon(ctx context.Context, addonVersion string) (*ekstypes.Addon, error) {
-	addonName := "aws-ebs-csi-driver"
-	trustPolicy := `{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Effect": "Allow",
-				"Principal": {
-					"Service": "eks.amazonaws.com"
-				},
-				"Action": "sts:AssumeRole"
-			}
-		]
-	}`
-	policies := []string{
-		"arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy",
+func (es *EKSSession) CreatePolicy(ctx context.Context, policyName, policyDocument string) (*string, error) {
+	result, err := es.iamClient.CreatePolicy(ctx, &iam.CreatePolicyInput{
+		PolicyName:     &policyName,
+		PolicyDocument: &policyDocument,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create policy %s: %w", policyName, err)
 	}
+
+	return result.Policy.Arn, nil
+}
+
+func (es *EKSSession) AttachPolicyToRole(ctx context.Context, policyArn, roleName *string) error {
+	if _, err := es.iamClient.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
+		PolicyArn: policyArn,
+		RoleName:  roleName,
+	}); err != nil {
+		return fmt.Errorf("unable to attach policy %s to role %s: %w", *policyArn, *roleName, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) EnableEBSCSIDriverAddon(ctx context.Context, addonVersion, oidURL string) (*ekstypes.Addon, error) {
+	addonName := "aws-ebs-csi-driver"
+
+	oidURLTokens := strings.Split(oidURL, "/")
+
+	var oidCID string
+	if len(oidURLTokens) > 0 {
+		oidCID = oidURLTokens[len(oidURLTokens)-1]
+	} else {
+		return nil, fmt.Errorf("oid url is invalid %s: %w", oidURL, ErrInvalidOIDURL)
+	}
+
+	trustPolicy := fmt.Sprintf(`{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Principal": {
+                    "Federated": "arn:aws:iam::%s:oidc-provider/oidc.eks.%s.amazonaws.com/id/%s"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                    "StringLike": {
+                        "oidc.eks.%s.amazonaws.com/id/%s:aud": "sts.amazonaws.com",
+                        "oidc.eks.%s.amazonaws.com/id/%s:sub": "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+                    }
+                }
+            }
+        ]
+    }`, es.cred.EKSCredentials.eksAccountID, es.region, oidCID, es.region, oidCID, es.region, oidCID)
+
+	policyName := es.clusterName + "-ebs-csi-driver-policy"
+	policyDocument := `{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": [
+                    "ec2:ModifyVolume",
+                    "ec2:DetachVolume",
+                    "ec2:DescribeVolumesModifications",
+                    "ec2:DescribeVolumes",
+                    "ec2:DescribeTags",
+                    "ec2:DescribeSnapshots",
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeAvailabilityZones",
+                    "ec2:CreateSnapshot",
+                    "ec2:AttachVolume"
+                ],
+                "Effect": "Allow",
+                "Resource": "*"
+            },
+            {
+                "Action": "ec2:CreateTags",
+                "Condition": {
+                    "StringEquals": {
+                        "ec2:CreateAction": [
+                            "CreateVolume",
+                            "CreateSnapshot"
+                        ]
+                    }
+                },
+                "Effect": "Allow",
+                "Resource": [
+                    "arn:aws:ec2:*:*:volume/*",
+                    "arn:aws:ec2:*:*:snapshot/*"
+                ]
+            },
+            {
+                "Action": "ec2:DeleteTags",
+                "Effect": "Allow",
+                "Resource": [
+                    "arn:aws:ec2:*:*:volume/*",
+                    "arn:aws:ec2:*:*:snapshot/*"
+                ]
+            },
+            {
+                "Action": "ec2:CreateVolume",
+                "Condition": {
+                    "StringLike": {
+                        "aws:RequestTag/ebs.csi.aws.com/cluster": "true"
+                    }
+                },
+                "Effect": "Allow",
+                "Resource": "*"
+            },
+            {
+                "Action": "ec2:DeleteVolume",
+                "Condition": {
+                    "StringLike": {
+                        "ec2:ResourceTag/ebs.csi.aws.com/cluster": "true"
+                    }
+                },
+                "Effect": "Allow",
+                "Resource": "*"
+            },
+            {
+                "Action": "ec2:DeleteSnapshot",
+                "Condition": {
+                    "StringLike": {
+                        "ec2:ResourceTag/CSIVolumeSnapshotName": "*"
+                    }
+                },
+                "Effect": "Allow",
+                "Resource": "*"
+            },
+            {
+                "Action": "ec2:DeleteSnapshot",
+                "Condition": {
+                    "StringLike": {
+                        "ec2:ResourceTag/ebs.csi.aws.com/cluster": "true"
+                    }
+                },
+                "Effect": "Allow",
+                "Resource": "*"
+            }
+        ]
+    }`
+
+	policyArn, err := es.CreatePolicy(ctx, policyName, policyDocument)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create managed policy %s: %w", policyName, err)
+	}
+
 	roleName := es.clusterName + "-eks-ebscsidriver-role"
 
-	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, policies)
+	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create role %s: %w", roleName, err)
+	}
+
+	if err := es.AttachPolicyToRole(ctx, policyArn, &roleName); err != nil {
+		return nil, fmt.Errorf("cannot attach policy %s to role %s: %w", policyName, roleName, err)
 	}
 
 	return es.CreateAddon(ctx, addonName, addonVersion, *role.Arn)
@@ -935,6 +1071,36 @@ func (es *EKSSession) DeleteVpc(ctx context.Context, vpcID *string) error {
 			VpcId: vpcID,
 		}); err != nil {
 		return fmt.Errorf("unable to delete vpc %s: %w", *vpcID, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeletePolicy(ctx context.Context, policyName *string) error {
+	result, err := es.iamClient.ListPolicies(ctx, &iam.ListPoliciesInput{})
+	if err != nil {
+		return fmt.Errorf("unable to list policies: %w", err)
+	}
+
+	var policyArn *string
+	for _, policy := range result.Policies {
+		fmt.Println(*policy.PolicyName)
+		if *policy.PolicyName == *policyName {
+			policyArn = policy.Arn
+		}
+	}
+
+	if policyArn == nil {
+		return fmt.Errorf("unable to find policy %s: %w", *policyName, ErrInvalidPolicy)
+	}
+
+	if _, err := es.iamClient.DeletePolicy(
+		ctx,
+		&iam.DeletePolicyInput{
+			PolicyArn: policyArn,
+		},
+	); err != nil {
+		return fmt.Errorf("unable to delete policy %s: %w", *policyName, err)
 	}
 
 	return nil
@@ -1170,4 +1336,57 @@ func (es *EKSSession) RebootInstances(ctx context.Context, instanceIds []string)
 	}
 
 	return nil
+}
+
+func (es *EKSSession) CreateOidcProvider(ctx context.Context, url *string, clientIDList []string) error {
+	if _, err := es.iamClient.CreateOpenIDConnectProvider(
+		ctx,
+		&iam.CreateOpenIDConnectProviderInput{
+			Url:          url,
+			ClientIDList: clientIDList,
+		},
+	); err != nil {
+		return fmt.Errorf("unable to create oidc provider %s: %w", *url, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) DeleteOidcProvider(ctx context.Context, openIDConnectProviderArn *string) error {
+	if _, err := es.iamClient.DeleteOpenIDConnectProvider(
+		ctx,
+		&iam.DeleteOpenIDConnectProviderInput{
+			OpenIDConnectProviderArn: openIDConnectProviderArn,
+		},
+	); err != nil {
+		return fmt.Errorf("unable to delete oidc provider %s: %w", *openIDConnectProviderArn, err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) ListOidcProviders(ctx context.Context) ([]iamtypes.OpenIDConnectProviderListEntry, error) {
+	result, err := es.iamClient.ListOpenIDConnectProviders(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to list open id connect providers: %w", err)
+	}
+
+	return result.OpenIDConnectProviderList, nil
+}
+
+func (es *EKSSession) FetchOidcArnFromURL(ctx context.Context, oidcURL *string) (*string, error) {
+	oidcARNs, err := es.ListOidcProviders(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list open id connect providers: %w", err)
+	}
+
+	oidcURLToken := strings.Split(*oidcURL, "https://")[1]
+
+	for _, oidcARN := range oidcARNs {
+		if strings.Contains(*oidcARN.Arn, oidcURLToken) {
+			return oidcARN.Arn, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no OIDC provider found for url %s: %w", *oidcURL, ErrInvalidOIDURL)
 }

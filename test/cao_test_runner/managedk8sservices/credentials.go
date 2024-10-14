@@ -12,6 +12,7 @@ var (
 	ErrEKSAccessKeyEmpty               = errors.New("eks access key empty")
 	ErrEKSSecretKeyEmpty               = errors.New("eks secret key empty")
 	ErrEKSRegionEmpty                  = errors.New("eks region empty")
+	ErrEKSAccountID                    = errors.New("eks account ID key empty")
 	ErrAKSSubscriptionIDEmpty          = errors.New("aks subscription ID empty")
 	ErrAKSTenantIDEmpty                = errors.New("aks tenant ID empty")
 	ErrAKSServicePrincipalIDEmpty      = errors.New("aks service principal ID empty")
@@ -46,6 +47,7 @@ type EKSCredentials struct {
 	eksRegion    string `env:"EKS_REGION"`
 	eksAccessKey string `env:"EKS_ACCESS_KEY"`
 	eksSecretKey string `env:"EKS_SECRET_KEY"`
+	eksAccountID string `env:"EKS_ACCOUNT_ID"`
 }
 
 type AKSCredentials struct {
@@ -68,7 +70,7 @@ type GKECredentials struct {
 func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
 	svc := &ManagedServiceCredentials{
 		ClusterName:    clusterName,
-		EKSCredentials: GetEKSCredentials("", "", ""),
+		EKSCredentials: GetEKSCredentials("", "", "", ""),
 		AKSCredentials: GetAKSCredentials("", "", "", "", ""),
 		GKECredentials: GetGKECredentials("", "", "", ""),
 	}
@@ -121,6 +123,10 @@ func ValidateEKSCredentials(eksSvcCred *EKSCredentials) (bool, error) {
 
 	if eksSvcCred.eksSecretKey == "" {
 		return false, fmt.Errorf("eks secret key is missing: %w", ErrEKSSecretKeyEmpty)
+	}
+
+	if eksSvcCred.eksAccountID == "" {
+		return false, fmt.Errorf("eks account ID key is missing: %w", ErrEKSAccountID)
 	}
 
 	return true, nil
@@ -180,12 +186,13 @@ func ValidateGKECredentials(gkeSvcCred *GKECredentials) (bool, error) {
  * Recommended way to set the credentials is by calling the function NewManagedServiceCredentials (uses env variables).
  * Use case of this function is if it is required to set ManagedServiceCredentials by directly providing the credentials.
  */
-func GetEKSCredentials(accessKey, secretKey, region string) *EKSCredentials {
+func GetEKSCredentials(accessKey, secretKey, region, accountID string) *EKSCredentials {
 	eksOnce.Do(func() {
 		eksSvcCred = &EKSCredentials{
 			eksRegion:    region,
 			eksAccessKey: accessKey,
 			eksSecretKey: secretKey,
+			eksAccountID: accountID,
 		}
 
 		if accessKey == "" {
@@ -203,6 +210,12 @@ func GetEKSCredentials(accessKey, secretKey, region string) *EKSCredentials {
 		if region == "" {
 			if envValue, ok := os.LookupEnv(eksRegionEnv); ok {
 				eksSvcCred.eksRegion = envValue
+			}
+		}
+
+		if accountID == "" {
+			if envValue, ok := os.LookupEnv(eksAccountID); ok {
+				eksSvcCred.eksAccountID = envValue
 			}
 		}
 	})

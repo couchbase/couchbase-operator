@@ -20,6 +20,7 @@ const (
 	eksAccessKeyEnv              = "EKS_ACCESS_KEY"
 	eksSecretKeyEnv              = "EKS_SECRET_KEY"
 	eksRegionEnv                 = "EKS_REGION"
+	eksAccountID                 = "EKS_ACCOUNT_ID"
 	aksRegionEnv                 = "AKS_REGION"
 	aksSubscriptionIDEnv         = "AKS_SUBSCRIPTION_ID"
 	aksServicePrincipalIDEnv     = "AKS_SERVICE_PRINCIPAL_ID"

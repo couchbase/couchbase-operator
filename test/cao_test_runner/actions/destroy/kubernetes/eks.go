@@ -53,6 +53,17 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 		return fmt.Errorf("unable to fetch cluster details %s: %w", dec.ClusterName, err)
 	}
 
+	oidcARN, err := eksSession.FetchOidcArnFromURL(ctx, cluster.Identity.Oidc.Issuer)
+	if err != nil {
+		return fmt.Errorf("unable to fetch oidc arn from url: %w", err)
+	}
+
+	if err := eksSession.DeleteOidcProvider(ctx, oidcARN); err != nil {
+		return fmt.Errorf("unable to delete oidc provider: %w", err)
+	}
+
+	logrus.Infof("Deleted oidc provider %s from cluster %s", *cluster.Identity.Oidc.Issuer, dec.ClusterName)
+
 	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to fetch node groups for cluster %s: %w", dec.ClusterName, err)

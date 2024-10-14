@@ -32,7 +32,7 @@ const (
 	subnetCIDR2         = "10.0.2.0/24"
 	subnetCIDR3         = "10.0.3.0/24"
 	sshKey              = "qe-cao-testrunner"
-	ebscsidriverVersion = "v1.17.0-eksbuild.1"
+	ebscsidriverVersion = "v1.35.0-eksbuild.1"
 )
 
 type CreateEKSCluster struct {
@@ -149,7 +149,13 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 
 	logrus.Info("Created Node groups for the cluster")
 
-	if _, err = eksSession.EnableEBSCSIDriverAddon(ctx, ebscsidriverVersion); err != nil {
+	if err := eksSession.CreateOidcProvider(ctx, cluster.Identity.Oidc.Issuer, []string{"sts.amazonaws.com"}); err != nil {
+		return fmt.Errorf("unable to create oidc provider: %w", err)
+	}
+
+	logrus.Info("Created OIDC Provider for the cluster")
+
+	if _, err = eksSession.EnableEBSCSIDriverAddon(ctx, ebscsidriverVersion, *cluster.Identity.Oidc.Issuer); err != nil {
 		return fmt.Errorf("unable to create ebs csi drive add on for eks cluster %s: %w",
 			cec.ClusterName, err)
 	}
