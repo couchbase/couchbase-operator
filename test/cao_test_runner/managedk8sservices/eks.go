@@ -1147,3 +1147,27 @@ func (es *EKSSession) DeleteRoute(ctx context.Context, routeTableID *string) err
 
 	return nil
 }
+
+func (es *EKSSession) TerminateInstances(ctx context.Context, instanceIds []string) error {
+	if _, err := es.EC2Client.TerminateInstances(
+		ctx,
+		&ec2.TerminateInstancesInput{
+			InstanceIds: instanceIds,
+		}); err != nil {
+		return fmt.Errorf("terminate ec2 instance: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EKSSession) RebootInstances(ctx context.Context, instanceIds []string) error {
+	if _, err := es.EC2Client.RebootInstances(
+		ctx,
+		&ec2.RebootInstancesInput{
+			InstanceIds: instanceIds,
+		}); err != nil {
+		return fmt.Errorf("reboot ec2 instance: %w", err)
+	}
+
+	return nil
+}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
 
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -65,12 +64,7 @@ func (ec *EKSChaos) RestartNodes(context *context.Context, chaosConfig *CBPodCha
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
 
-	_, err = ec.EKSSess.EC2Client.RebootInstances(
-		context.Context(),
-		&ec2.RebootInstancesInput{
-			InstanceIds: instanceIds,
-		})
-	if err != nil {
+	if err = ec.EKSSess.RebootInstances(context.Context(), instanceIds); err != nil {
 		return fmt.Errorf("reboot ec2 instance: %w", err)
 	}
 
@@ -102,12 +96,7 @@ func (ec *EKSChaos) DeleteNodes(context *context.Context, chaosConfig *CBPodChao
 	}
 
 	// Terminating the instance
-	_, err = ec.EKSSess.EC2Client.TerminateInstances(
-		context.Context(),
-		&ec2.TerminateInstancesInput{
-			InstanceIds: instanceIds,
-		})
-	if err != nil {
+	if err = ec.EKSSess.TerminateInstances(context.Context(), instanceIds); err != nil {
 		return fmt.Errorf("terminate ec2 instance: %w", err)
 	}
 
