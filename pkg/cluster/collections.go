@@ -362,7 +362,7 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
 		requestedCollection.History = nil
 		existingCollection.History = nil
-	} else {
+	} else if collection.Spec.History != nil {
 		requestedCollection.History = collection.Spec.History
 	}
 
@@ -376,7 +376,6 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 		requestedCollection.MaxTTL = &maxTTL
 	} else if !canEditTTL {
 		requestedCollection.MaxTTL = nil
-		existingCollection.History = nil
 	}
 
 	if !reflect.DeepEqual(existingCollection, requestedCollection) {
@@ -574,6 +573,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 						Name: name,
 						CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
 							MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collectionGroup.Spec.MaxTTL},
+							History:                    collectionGroup.Spec.History,
 						},
 					},
 				})
@@ -622,6 +622,7 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 					Name: name,
 					CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
 						MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collectionGroup.Spec.MaxTTL},
+						History:                    collectionGroup.Spec.History,
 					},
 				},
 			})

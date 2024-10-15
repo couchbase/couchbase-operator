@@ -2851,6 +2851,7 @@ func (o *restoreOptions) compact(merged TreeNode) (TreeNode, error) {
 						Names: names,
 						CouchbaseCollectionSpecCommon: couchbasev2.CouchbaseCollectionSpecCommon{
 							MaxTTLWithNegativeOverride: couchbasev2.MaxTTLWithNegativeOverride{MaxTTL: collection.resource.Spec.MaxTTL},
+							History:                    collection.resource.Spec.History,
 						},
 					},
 				},

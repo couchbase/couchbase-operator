@@ -22,6 +22,7 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasecollections-metadata,metadata>>:
   <<couchbasecollections-metadata-name,name>>: ""
 <<couchbasecollections-spec,spec>>:
+  <<couchbasecollections-spec-history,history>>: false
   <<couchbasecollections-spec-maxttl,maxTTL>>: ""
   <<couchbasecollections-spec-name,name>>: ""
 ----
@@ -66,6 +67,18 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasecollection]
 === Description
 
 Spec defines the desired state of the resource.
+
+=== couchbasecollections.spec.history
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+History defines whether change history is retained for the collection.
+If this field is set, it will override the historyRetention.collectionDefault bucket level value.
+This is only supported with storageBackend=magma at the bucket level.
 
 === couchbasecollections.spec.maxTTL
 

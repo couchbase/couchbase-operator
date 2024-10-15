@@ -1676,15 +1676,31 @@ func checkStringToBool(val string) error {
 	return err
 }
 
-func checkHistoryRetentionBytes(val string) error {
+func checkHistoryRetentionBytesAnnotation(val string) error {
 	bytes, err := strconv.ParseUint(val, 10, 64)
 	if err != nil {
 		return err
 	}
 
+	return checkHistoryRetentionBytes(bytes)
+}
+
+func checkHistoryRetentionBytes(bytes uint64) error {
 	minExpected := uint64(2 * 1024 * 1024 * 1024)
-	if bytes < minExpected {
-		return fmt.Errorf("value %d is less than %d", bytes, minExpected)
+	if bytes > 0 && bytes < minExpected {
+		return fmt.Errorf("historyRetention.bytes value %d is less than minimum working value of %d", bytes, minExpected)
+	}
+
+	return nil
+}
+
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket) error {
+	if bucket.Spec.HistoryRetentionSettings != nil {
+		if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+			return fmt.Errorf("spec.historyRetentionSettings can only be used with magma storage backend")
+		}
+
+		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
 	return nil
@@ -1709,7 +1725,7 @@ func checkMagmaDataBlockSize(val string) error {
 func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	cdcAnnotations := map[string]func(string) error{
 		"cao.couchbase.com/historyRetention.seconds":                  checkStringToUint,
-		"cao.couchbase.com/historyRetention.bytes":                    checkHistoryRetentionBytes,
+		"cao.couchbase.com/historyRetention.bytes":                    checkHistoryRetentionBytesAnnotation,
 		"cao.couchbase.com/historyRetention.collectionHistoryDefault": checkStringToBool,
 		"cao.couchbase.com/magmaSeqTreeDataBlockSize":                 checkMagmaDataBlockSize,
 		"cao.couchbase.com/magmaKeyTreeDataBlockSize":                 checkMagmaDataBlockSize,
@@ -1778,6 +1794,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketReplicasCount(v, bucket, cluster); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketHistoryRetentionSettings(bucket); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -3665,6 +3685,15 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 }
 
 func CheckBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
+	// History retention labels have been deprecated, bucket.Spec.HistoryRetentionSettings resource object should be used instead
+	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil {
+		if *bucket.Spec.HistoryRetentionSettings.CollectionDefault {
+			return fmt.Errorf("bucket doesn't have spec.historyRetention.collectionHistoryDefault set to false")
+		} else {
+			return nil
+		}
+	}
+
 	if bucket.Annotations == nil {
 		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
 	}

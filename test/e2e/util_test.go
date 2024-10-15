@@ -166,7 +166,7 @@ func registerTests() {
 
 		// High priority tests.
 		framework.NewTestDef(TestBucketHistoryRetentionWithAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
-		framework.NewTestDef(TestBucketHistoryRetentionWithoutAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestBucketHistoryRetentionRetentionSettingsInCRD).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestResizeClusterWithBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestBasicMDSScaling).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDenyCommunityEdition).WithTags(TagSuiteP0),

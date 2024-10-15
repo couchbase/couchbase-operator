@@ -2021,7 +2021,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			name:           "TestValidateBucketQuotaOverflow",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
+			expectedErrors: []string{`bucket memory allocation \(2025Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
@@ -2094,6 +2094,12 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.storageBackend`},
+		},
+		{
+			name:           "TestValidateHistoryRetentionBytesBelowWorkingRange",
+			mutations:      patchMap{"historyretentionbucket": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Add("/spec/historyRetention/bytes", uint64(2147483647))},
+			shouldFail:     true,
+			expectedErrors: []string{`historyRetention.bytes`},
 		},
 	}
 

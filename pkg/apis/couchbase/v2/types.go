@@ -868,11 +868,12 @@ type CouchbaseCollection struct {
 // CouchbaseCollectionSpecCommon is a set of common parameters for all collections,
 // be they part of a single collection or a group.
 type CouchbaseCollectionSpecCommon struct {
-	MaxTTLWithNegativeOverride `json:",inline" annotation:",inline"`
+	// History defines whether change history is retained for the collection.
+	// If this field is set, it will override the historyRetention.collectionDefault bucket level value.
+	// This is only supported with storageBackend=magma at the bucket level.
+	History *bool `json:"history,omitempty" annotation:"history"`
 
-	// History controls whether history retention is enabled for a collection.
-	// pointer bool because if it hasn't been set it should default to true server side
-	History *bool `json:"-" annotation:"history"`
+	MaxTTLWithNegativeOverride `json:",inline"`
 }
 
 // MaxTTLWithNegativeOverride acts as a field for maxTTL values that can either be set as a duration or "-1", which will set the duration to -1 seconds
@@ -891,7 +892,7 @@ type MaxTTLWithNegativeOverride struct {
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
 }
 
-func (d *MaxTTLWithNegativeOverride) UnmarshalJSON(data []byte) error {
+func (d *MaxTTLWithNegativeOverride) UnmarshalMaxTTLWithNegativeOverride(data []byte) error {
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return err
@@ -920,20 +921,6 @@ func (d *MaxTTLWithNegativeOverride) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (d *MaxTTLWithNegativeOverride) MarshalJSON() ([]byte, error) {
-	if d.MaxTTL != nil && d.MaxTTL.Duration == -1*time.Second {
-		return json.Marshal(struct {
-			MaxTTL string `json:"maxTTL"`
-		}{
-			MaxTTL: "-1",
-		})
-	}
-
-	type alias MaxTTLWithNegativeOverride
-
-	return json.Marshal(alias(*d))
-}
-
 type CouchbaseCollectionSpec struct {
 	CouchbaseCollectionSpecCommon `json:",inline" annotation:",inline"`
 
@@ -945,6 +932,47 @@ type CouchbaseCollectionSpec struct {
 	// Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 	// and not start with either _ or %.
 	Name ScopeOrCollectionName `json:"name,omitempty"`
+}
+
+func (p *CouchbaseCollectionSpec) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Name    ScopeOrCollectionName `json:"name,omitempty"`
+		History *bool                 `json:"history,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	p.Name = temp.Name
+	p.History = temp.History
+
+	if err := p.UnmarshalMaxTTLWithNegativeOverride(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *CouchbaseCollectionSpec) MarshalJSON() ([]byte, error) {
+	temp := struct {
+		Name    ScopeOrCollectionName `json:"name,omitempty"`
+		History *bool                 `json:"history,omitempty"`
+		MaxTTL  string                `json:"maxTTL,omitempty"`
+	}{
+		Name:    p.Name,
+		History: p.History,
+	}
+
+	if p.MaxTTL != nil {
+		if p.MaxTTL.Duration == -1*time.Second {
+			temp.MaxTTL = "-1"
+		} else {
+			temp.MaxTTL = p.MaxTTL.Duration.String()
+		}
+	}
+
+	return json.Marshal(temp)
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -986,6 +1014,47 @@ type CouchbaseCollectionGroupSpec struct {
 	// +kubebuilder:validation:MinimumItems=1
 	// +listType=set
 	Names []ScopeOrCollectionName `json:"names"`
+}
+
+func (p *CouchbaseCollectionGroupSpec) UnmarshalJSON(data []byte) error {
+	var temp struct {
+		Names   []ScopeOrCollectionName `json:"names"`
+		History *bool                   `json:"history,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	p.Names = temp.Names
+	p.History = temp.History
+
+	if err := p.UnmarshalMaxTTLWithNegativeOverride(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *CouchbaseCollectionGroupSpec) MarshalJSON() ([]byte, error) {
+	temp := struct {
+		Names   []ScopeOrCollectionName `json:"names"`
+		History *bool                   `json:"history,omitempty"`
+		MaxTTL  string                  `json:"maxTTL,omitempty"`
+	}{
+		Names:   p.Names,
+		History: p.History,
+	}
+
+	if p.MaxTTL != nil {
+		if p.MaxTTL.Duration == -1*time.Second {
+			temp.MaxTTL = "-1"
+		} else {
+			temp.MaxTTL = p.MaxTTL.Duration.String()
+		}
+	}
+
+	return json.Marshal(temp)
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1325,7 +1394,8 @@ type CouchbaseBucketSpec struct {
 	// the set of scopes defined for the bucket.
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
 
-	HistoryRetentionSettings *HistoryRetentionSettings `json:"-" annotation:"historyRetention"`
+	// HistoryRetention configures settings for bucket history retention and default values for associated collections.
+	HistoryRetentionSettings *HistoryRetentionSettings `json:"historyRetention,omitempty" annotation:"historyRetention"`
 
 	// MagmaSeqTreeDataBlockSize is the block size, in bytes, for Magma seqIndex blocks.
 	MagmaSeqTreeDataBlockSize *uint64 `json:"-" annotation:"magmaSeqTreeDataBlockSize"`
@@ -1346,12 +1416,16 @@ type CouchbaseBucketSpec struct {
 }
 
 type HistoryRetentionSettings struct {
-	// history retention in bytes
-	Seconds uint64 `json:"-" annotation:"seconds"`
-	// history retention in seconds
-	Bytes uint64 `json:"-" annotation:"bytes"`
-	// whether collections have history enabled by default
-	CollectionDefault *bool `json:"-" annotation:"collectionHistoryDefault"`
+	// Seconds defines how many seconds of history an individual vbucket should aim to retain on disk. This field defaults to 0.
+	// This is only supported on buckets with storageBackend=magma.
+	Seconds uint64 `json:"seconds,omitempty" annotation:"seconds"`
+	// Bytes defines how much history an individual vbucket should aim to retain on disk in bytes. This field defaults to 0 and has a minimum working value of 2147483648.
+	// This is only supported on buckets with storageBackend=magma.
+	Bytes uint64 `json:"bytes,omitempty" annotation:"bytes"`
+	// CollectionHistoryDefault determines whether history retention is enabled for newly created collections by default. This field defaults to true.
+	// This is only supported on buckets with storageBackend=magma.
+	// +kubebuilder:default=true
+	CollectionDefault *bool `json:"collectionHistoryDefault,omitempty" annotation:"collectionHistoryDefault"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

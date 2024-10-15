@@ -19,9 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestBucketHistoryRetentionWithoutAnnotations tests the history retention settings for buckets
-// which has no corresponding annotations provided.
-func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
+// TestBucketHistoryRetentionDefaultValues tests the default history retention settings for buckets.
+func TestBucketHistoryRetentionRetentionSettingsInCRD(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -47,6 +46,11 @@ func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
 			EnableIndexReplica: true,
 			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
+			HistoryRetentionSettings: &couchbasev2.HistoryRetentionSettings{
+				Seconds:           uint64(10),
+				Bytes:             uint64(2147483648),
+				CollectionDefault: &[]bool{false}[0],
+			},
 		},
 	}
 
@@ -59,7 +63,7 @@ func TestBucketHistoryRetentionWithoutAnnotations(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// check if mutation setting exists.
-	e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, bucket.Name, 0, 0, true, 2*time.Minute)
+	e2eutil.MustVerifyBucketHistoryRetentionSettings(t, kubernetes, cluster, bucket.Name, 10, uint64(2147483648), false, 2*time.Minute)
 
 	// validate whether magma block size settings are default as no related annotations where passed
 	e2eutil.MustVerifyMagmaBucketBlockSizeSettings(t, kubernetes, cluster, bucket.Name, 4096, 4096, 2*time.Minute)

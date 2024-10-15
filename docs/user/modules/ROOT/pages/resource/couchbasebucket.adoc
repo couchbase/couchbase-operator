@@ -24,6 +24,10 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
   <<couchbasebuckets-spec-enableindexreplica,enableIndexReplica>>: false
   <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
+  <<couchbasebuckets-spec-historyretention,historyRetention>>:
+    <<couchbasebuckets-spec-historyretention-bytes,bytes>>: 0
+    <<couchbasebuckets-spec-historyretention-collectionhistorydefault,collectionHistoryDefault>>: True
+    <<couchbasebuckets-spec-historyretention-seconds,seconds>>: 0
   <<couchbasebuckets-spec-iopriority,ioPriority>>: low
   <<couchbasebuckets-spec-maxttl,maxTTL>>: ""
   <<couchbasebuckets-spec-memoryquota,memoryQuota>>: 100Mi
@@ -168,6 +172,54 @@ Full eviction removes all data from memory after the document is
 flushed to disk.
 This field must be "valueOnly" or "fullEviction", defaulting to
 "valueOnly".
+
+=== couchbasebuckets.spec.historyRetention
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+HistoryRetention configures settings for bucket history retention and default values for associated collections.
+
+=== couchbasebuckets.spec.historyRetention.bytes
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+Bytes defines how much history an individual vbucket should aim to retain on disk in bytes.
+This field defaults to 0 and has a minimum working value of 2147483648.
+This is only supported on buckets with storageBackend=magma.
+
+=== couchbasebuckets.spec.historyRetention.collectionHistoryDefault
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+CollectionHistoryDefault determines whether history retention is enabled for newly created collections by default.
+This field defaults to true.
+This is only supported on buckets with storageBackend=magma.
+
+=== couchbasebuckets.spec.historyRetention.seconds
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+Seconds defines how many seconds of history an individual vbucket should aim to retain on disk.
+This field defaults to 0.
+This is only supported on buckets with storageBackend=magma.
 
 === couchbasebuckets.spec.ioPriority
 
