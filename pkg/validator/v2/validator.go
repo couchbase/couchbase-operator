@@ -99,6 +99,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
+		checkMigrationConstraints,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -262,6 +263,18 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Migration == nil {
+		return nil
+	}
+
+	if cluster.Spec.Migration.NumUnmanagedNodes >= cluster.Spec.TotalSize() {
+		return fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
 	}
 
 	return nil
@@ -3525,6 +3538,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		return err
 	}
 
+	if err := checkForMigrationAdded(prev, curr); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -3889,4 +3906,12 @@ func checkAnnotationSkipValidation(annotations map[string]string) bool {
 	}
 
 	return false
+}
+
+func checkForMigrationAdded(current, updated *couchbasev2.CouchbaseCluster) error {
+	if current.Spec.Migration == nil && updated.Spec.Migration != nil {
+		return fmt.Errorf("spec.migration cannot be added to a pre-existing cluster")
+	}
+
+	return nil
 }

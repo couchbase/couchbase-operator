@@ -3484,3 +3484,34 @@ func TestClusterChangesDuringHibernation(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-hibernate.yaml"})
 }
+
+func TestClusterMigrationAddition(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "AddingMigrationToExistingCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.migration cannot be added"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply})
+}
+
+func TestClusterMigrationInvalidMigration(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "AddingMigrationToExistingCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+				NumUnmanagedNodes:    199,
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.migration.numUnmanagedNodes must be less than"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
