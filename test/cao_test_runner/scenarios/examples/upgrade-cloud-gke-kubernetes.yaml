@@ -1,0 +1,18 @@
+action: "Upgrade Kubernetes Cluster"
+config:
+  clusterName: test
+  platform: kubernetes
+  environment: cloud
+  provider: gcp
+  gkeRegion: us-central1
+  kubernetesVersion: 1.29.9-gke.1177000
+  upgradeClusterVersion: true
+  waitForClusterUpgrade: true
+  upgradeGKEMaster: true
+  waitForGKEMasterUpgrade: true
+  upgradeGKENodePool: true
+  gkeNodePoolsToUpgrade:
+    - nodePoolName: testnodepool-0
+      waitForNodePoolUpgrade: true
+    - nodePoolName: testnodepool-1
+      waitForNodePoolUpgrade: true

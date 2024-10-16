@@ -456,3 +456,46 @@ func (aksSession *AKSSession) DeleteResourceGroup(ctx context.Context, resourceG
 
 	return nil
 }
+
+func (aksSession *AKSSession) UpdateClusterKubernetesVersion(ctx context.Context, resourceGroupName, k8sVersion string, waitForUpdate bool) error {
+	upgradeParams := armcontainerservice.ManagedCluster{
+		Location: to.Ptr(aksSession.region),
+		Properties: &armcontainerservice.ManagedClusterProperties{
+			KubernetesVersion: to.Ptr(k8sVersion),
+		},
+	}
+
+	poller, err := aksSession.aksClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.clusterName, upgradeParams, nil)
+	if err != nil {
+		return fmt.Errorf("failed to initiate upgrade: %v", err)
+	}
+
+	if waitForUpdate {
+		if _, err := poller.PollUntilDone(ctx, nil); err != nil {
+			return fmt.Errorf("failed to wait for Kubernetes cluster update to complete: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (aksSession *AKSSession) UpdateNodePoolKubernetesVersion(ctx context.Context, resourceGroupName, agentPoolName, k8sVersion string, waitForUpdate bool) error {
+	upgradeParams := armcontainerservice.AgentPool{
+		Properties: &armcontainerservice.ManagedClusterAgentPoolProfileProperties{
+			OrchestratorVersion: &k8sVersion,
+		},
+	}
+
+	poller, err := aksSession.nodePoolClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.clusterName, agentPoolName, upgradeParams, nil)
+	if err != nil {
+		return fmt.Errorf("failed to initiate upgrade: %v", err)
+	}
+
+	if waitForUpdate {
+		if _, err := poller.PollUntilDone(ctx, nil); err != nil {
+			return fmt.Errorf("failed to wait for Kubernetes node pool update to complete: %w", err)
+		}
+	}
+
+	return nil
+}

@@ -519,3 +519,61 @@ func (gks *GKESession) ListAvailableKubernetesVersions(ctx context.Context) ([]s
 
 	return resp.ValidMasterVersions, nil
 }
+
+func (gks *GKESession) UpdateClusterKubernetesVersion(ctx context.Context, k8sVersion string,
+	waitForUpdate bool) error {
+	operation, err := gks.clusterManagerClient.UpdateCluster(ctx, &containerpb.UpdateClusterRequest{
+		Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
+		Update: &containerpb.ClusterUpdate{
+			DesiredMasterVersion: k8sVersion,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update cluster version: %w", err)
+	}
+
+	if waitForUpdate {
+		if err := gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
+			return fmt.Errorf("cluster %s kubernetes version upgrade operation failed: %w", gks.clusterName, err)
+		}
+	}
+
+	return nil
+}
+
+func (gks *GKESession) UpdateMasterKubernetesVersion(ctx context.Context, k8sVersion string, waitForUpdate bool) error {
+	operation, err := gks.clusterManagerClient.UpdateMaster(ctx, &containerpb.UpdateMasterRequest{
+		Name:          fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gks.projectID, gks.region, gks.clusterName),
+		MasterVersion: k8sVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to master kubernetes version: %w", err)
+	}
+
+	if waitForUpdate {
+		if err := gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
+			return fmt.Errorf("cluster master %s kubernetes version upgrade operation failed: %w", gks.clusterName, err)
+		}
+	}
+
+	return nil
+}
+
+func (gks *GKESession) UpdateNodePoolKubernetesVersion(ctx context.Context, nodePoolName, k8sVersion string,
+	waitForUpdate bool) error {
+	operation, err := gks.clusterManagerClient.UpdateNodePool(ctx, &containerpb.UpdateNodePoolRequest{
+		Name:        fmt.Sprintf("projects/%s/locations/%s/clusters/%s/nodePools/%s", gks.projectID, gks.region, gks.clusterName, nodePoolName),
+		NodeVersion: k8sVersion,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update node pool %s version: %w", nodePoolName, err)
+	}
+
+	if waitForUpdate {
+		if err := gks.WaitForClusterOperation(ctx, operation.Name); err != nil {
+			return fmt.Errorf("node pool %s kubernetes version upgrade operation failed: %w", nodePoolName, err)
+		}
+	}
+
+	return nil
+}

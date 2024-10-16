@@ -16,6 +16,7 @@ import (
 	namespacesetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/namespace"
 	operatorsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/operator"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade"
+	upgradekubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade/kubernetes"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
 	dataworkloads "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads/data_workloads"
 )
@@ -57,5 +58,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Destroy Kubernetes Cluster":       {newAction: destroykubernetes.NewKubernetesConfig, config: &destroykubernetes.KubernetesDestroyConfig{}},
 		"Data Workload":                    {newAction: dataworkloads.NewDataWorkloadConfig, config: &dataworkloads.DataWorkloadConfig{}},
 		"Chaos":                            {newAction: chaos.NewChaosConfig, config: &chaos.ChaosConfig{}},
+		"Upgrade Kubernetes Cluster":       {newAction: upgradekubernetes.NewKubernetesUpgradeConfig, config: &upgradekubernetes.KubernetesUpgradeConfig{}},
 	}
 }

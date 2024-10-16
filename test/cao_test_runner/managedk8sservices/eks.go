@@ -1390,3 +1390,40 @@ func (es *EKSSession) FetchOidcArnFromURL(ctx context.Context, oidcURL *string) 
 
 	return nil, fmt.Errorf("no OIDC provider found for url %s: %w", *oidcURL, ErrInvalidOIDURL)
 }
+
+func (es *EKSSession) UpdateClusterKubernetesVersion(ctx context.Context, k8sVersion *string,
+	waitForClusterUpdate bool) error {
+	if _, err := es.eksClient.UpdateClusterVersion(ctx, &eks.UpdateClusterVersionInput{
+		Name:    &es.clusterName,
+		Version: k8sVersion,
+	}); err != nil {
+		return fmt.Errorf("unable to update k8s cluster version: %w", err)
+	}
+
+	if waitForClusterUpdate {
+		if err := es.waitForClusterActive(ctx); err != nil {
+			return fmt.Errorf("failed waiting for cluster to become ACTIVE: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (es *EKSSession) UpdateNodeGroupKubernetesVersion(ctx context.Context, nodeGroupName, k8sVersion *string,
+	waitForNodeGroupUpdate bool) error {
+	if _, err := es.eksClient.UpdateNodegroupVersion(ctx, &eks.UpdateNodegroupVersionInput{
+		ClusterName:   &es.clusterName,
+		NodegroupName: nodeGroupName,
+		Version:       k8sVersion,
+	}); err != nil {
+		return fmt.Errorf("unable to update k8s node group version: %w", err)
+	}
+
+	if waitForNodeGroupUpdate {
+		if err := es.waitForNodeGroupActive(ctx, *nodeGroupName); err != nil {
+			return fmt.Errorf("failed waiting for node group to become ACTIVE: %w", err)
+		}
+	}
+
+	return nil
+}

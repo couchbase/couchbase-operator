@@ -1,0 +1,16 @@
+action: "Upgrade Kubernetes Cluster"
+config:
+  clusterName: test
+  platform: kubernetes
+  environment: cloud
+  provider: aws
+  eksRegion: us-east-2
+  kubernetesVersion: "1.30"
+  upgradeClusterVersion: true
+  waitForClusterUpgrade: true
+  upgradeEKSNodeGroups: true
+  eksNodeGroupsToUpgrade:
+    - nodeGroupName: test-node-group-0
+      waitForNodeGroupUpgrade: true
+    - nodeGroupName: test-node-group-1
+      waitForNodeGroupUpgrade: true

@@ -1,0 +1,16 @@
+action: "Upgrade Kubernetes Cluster"
+config:
+  clusterName: test
+  platform: kubernetes
+  environment: cloud
+  provider: azure
+  aksRegion: eastus2
+  kubernetesVersion: 1.30.0
+  upgradeClusterVersion: true
+  waitForClusterUpgrade: true
+  upgradeAKSNodePools: true
+  aksNodePoolsToUpgrade:
+    - nodePoolName: systempool0
+      waitForNodePoolUpgrade: true
+    - nodePoolName: nodepool0
+      waitForNodePoolUpgrade: true

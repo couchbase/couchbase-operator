@@ -15,7 +15,7 @@ config:
   platform: kubernetes
   environment: cloud
   provider: gcp
-  kubernetesVersion: 1.28.13
+  kubernetesVersion: 1.28.14
   machineType: n1-standard-16
   count: 7
   diskSize: 100
