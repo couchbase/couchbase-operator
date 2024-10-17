@@ -21,11 +21,11 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 	case *couchbasev2.CouchbaseCluster:
 		return validationv2.CheckConstraints(v, t)
 	case *couchbasev2.CouchbaseBucket:
-		return []string{}, validationv2.CheckConstraintsBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsBucket(v, t, nil)
 	case *couchbasev2.CouchbaseEphemeralBucket:
-		return []string{}, validationv2.CheckConstraintsEphemeralBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsEphemeralBucket(v, t, nil)
 	case *couchbasev2.CouchbaseMemcachedBucket:
-		return []string{}, validationv2.CheckConstraintsMemcachedBucket(v, t)
+		return []string{}, validationv2.CheckConstraintsMemcachedBucket(v, t, nil)
 	case *couchbasev2.CouchbaseReplication:
 		return []string{}, validationv2.CheckConstraintsReplication(v, t)
 	case *couchbasev2.CouchbaseUser:
@@ -100,7 +100,7 @@ func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object)
 		}
 	case *couchbasev2.CouchbaseBucket:
 		if t2, ok := updated.(*couchbasev2.CouchbaseBucket); ok {
-			return validationv2.CheckChangeConstraintsBucket(v, t, t2)
+			return validationv2.CheckChangeConstraintsBucket(v, t, t2, nil)
 		}
 	}
 

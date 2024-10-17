@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -40,6 +41,8 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	log.V(2).Info("Received couchbase cluster event", "cluster", request.NamespacedName)
 
 	validationFailed := false
+
+	var validationErrors []string
 
 	// By using the requeue mechanism we can get a periodic and synchronous reconcile.
 	requeueResult := reconcile.Result{
@@ -91,10 +94,11 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			return reconcile.Result{}, err
 		}
 
-		errs := validationrunner.CheckConstraints(c.GetK8sClient())
+		errs := validationrunner.CheckConstraints(c)
 
 		for _, err := range errs {
 			log.Error(err, "Validation failed", "cluster", request.NamespacedName)
+			validationErrors = append(validationErrors, err.Error())
 		}
 
 		c.RunReconcile()
@@ -107,12 +111,14 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	if err := validationrunner.CheckCouchbaseClusterResourceImmutableFields(couchbase, c.GetCouchbaseCluster()); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
+		validationErrors = append(validationErrors, err.Error())
 		validationFailed = true
 	}
 
 	if err := validationrunner.CheckCouchbaseClusterResourceUpdate(couchbase, c.GetCouchbaseCluster()); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
+		validationErrors = append(validationErrors, err.Error())
 		validationFailed = true
 	}
 
@@ -120,18 +126,28 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 	for _, err := range changeErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+
+		validationErrors = append(validationErrors, err.Error())
 	}
 
 	immutableErrs := validationrunner.ValidateImmutableFields(c)
 
 	for _, err := range immutableErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+
+		validationErrors = append(validationErrors, err.Error())
 	}
 
 	// Existing cluster updated
 	// TODO: We should just reload the cluster and aggregate other resources in
 	// the cluster controller and check for updates there.
 	log.V(2).Info("Updating cluster", "cluster", request.NamespacedName)
+
+	if len(validationErrors) != 0 {
+		c.GetCouchbaseCluster().Status.SetErrorCondition(strings.Join(validationErrors, "; "))
+	} else {
+		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterConditionError)
+	}
 
 	if validationFailed {
 		c.Update(c.GetCouchbaseCluster())

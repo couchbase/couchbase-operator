@@ -1424,7 +1424,7 @@ func checkConstraintPublicNetworking(_ *types.Validator, cluster *couchbasev2.Co
 // checkConstraintBucketNames checks that all buckets referenced by this cluster have
 // unique names.
 func checkConstraintBucketNames(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	return validateBucketNameConstraints(v, cluster)
+	return validateBucketNameConstraints(v, cluster, nil)
 }
 
 // checkConstraintBucketSynchronization checks that when synchronization is enabled,
@@ -1448,7 +1448,7 @@ func checkConstraintBucketSynchronization(_ *types.Validator, cluster *couchbase
 // checkConstraintMemoryAllocations checks that all buckets referenced by this cluster
 // have total memory requirements less than or equal to the data service memory quota.
 func checkConstraintMemoryAllocations(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	return validateMemoryConstraints(v, cluster)
+	return validateMemoryConstraints(v, cluster, nil)
 }
 
 // checkConstraintMTLSPaths checks that when mTLS is enabled, then paths are specified
@@ -1719,7 +1719,7 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	return errs
 }
 
-func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
@@ -1750,11 +1750,11 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		}
 	}
 
-	if err := validateBucketNameConstraints(v, bucket); err != nil {
+	if err := validateBucketNameConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket); err != nil {
+	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1762,7 +1762,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketReplicasCount(v, bucket); err != nil {
+	if err := checkBucketReplicasCount(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1775,10 +1775,18 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	return nil
 }
 
-func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
-	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
-	if err != nil {
-		return err
+func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	var clusters = new(couchbasev2.CouchbaseClusterList)
+
+	if cluster != nil {
+		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+	} else {
+		allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+		if err != nil {
+			return err
+		}
+
+		clusters = allClusters
 	}
 
 	for _, cluster := range clusters.Items {
@@ -1800,7 +1808,7 @@ func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseB
 	return nil
 }
 
-func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
+func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
@@ -1819,11 +1827,11 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		}
 	}
 
-	if err := validateBucketNameConstraints(v, bucket); err != nil {
+	if err := validateBucketNameConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket); err != nil {
+	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -1838,7 +1846,7 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return nil
 }
 
-func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket) error {
+func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
@@ -1851,11 +1859,11 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 		}
 	}
 
-	if err := validateBucketNameConstraints(v, bucket); err != nil {
+	if err := validateBucketNameConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket); err != nil {
+	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2679,7 +2687,7 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 // validateBucketNameConstraints takes a cluster and finds all buckets, or
 // a bucket and finds all clusters referencing it, checking that bucket names
 // are not reused.
-func validateBucketNameConstraints(v *types.Validator, object runtime.Object) error {
+func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cluster *couchbasev2.CouchbaseCluster) error {
 	// Gather the clusters affected by this change (either adding a cluster or
 	// a bucket -- bucket names are immutable).
 	clusters := []*couchbasev2.CouchbaseCluster{}
@@ -2691,9 +2699,17 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object) er
 			return fmt.Errorf("failed to type assert bucket to meta object")
 		}
 
-		namespacedClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.GetNamespace())
-		if err != nil {
-			return err
+		var namespacedClusters = new(couchbasev2.CouchbaseClusterList)
+
+		if cluster != nil {
+			namespacedClusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+		} else {
+			allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.GetNamespace())
+			if err != nil {
+				return err
+			}
+
+			namespacedClusters = allClusters
 		}
 
 		for i := range namespacedClusters.Items {
@@ -2742,7 +2758,7 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object) er
 // * If a bucket is specified then a bucket is being created or updated.  Look up all clusters that
 // may select the bucket and ensure the total memory requirements do not surpass the data service memory
 // quota for each cluster.
-func validateMemoryConstraints(v *types.Validator, object runtime.Object) error {
+func validateMemoryConstraints(v *types.Validator, object runtime.Object, cluster *couchbasev2.CouchbaseCluster) error {
 	var namespace string
 
 	var bucket couchbasev2.AbstractBucket
@@ -2763,9 +2779,17 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object) error 
 		return fmt.Errorf("validate memory constraints: unsupported type")
 	}
 
-	clusters, err := v.Abstraction.GetCouchbaseClusters(namespace)
-	if err != nil {
-		return err
+	var clusters = new(couchbasev2.CouchbaseClusterList)
+
+	if cluster != nil {
+		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+	} else {
+		allClusters, err := v.Abstraction.GetCouchbaseClusters(namespace)
+		if err != nil {
+			return err
+		}
+
+		clusters = allClusters
 	}
 
 	for i := range clusters.Items {
@@ -3590,7 +3614,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 	return nil
 }
 
-func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket) error {
+func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
 	if checkAnnotationSkipValidation(curr.Annotations) {
@@ -3602,8 +3626,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	}
 
 	if prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
-		allClustersAtleast76, err := areAllBucketsClustersAtleast76(v, curr)
-
+		allClustersAtleast76, err := areAllBucketsClustersAtleast76(v, curr, cluster)
 		if err != nil {
 			return err
 		}
@@ -3613,7 +3636,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		}
 
 		if allClustersAtleast76 && prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "couchstore" {
-			if err := checkBucketHistoryDisabled(prev); err != nil {
+			if err := CheckBucketHistoryDisabled(prev); err != nil {
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
 		}
@@ -3626,7 +3649,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	return nil
 }
 
-func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
+func CheckBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	if bucket.Annotations == nil {
 		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
 	}
@@ -3642,10 +3665,18 @@ func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	return nil
 }
 
-func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) (bool, error) {
-	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
-	if err != nil {
-		return false, err
+func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) (bool, error) {
+	var clusters = new(couchbasev2.CouchbaseClusterList)
+
+	if cluster != nil {
+		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+	} else {
+		allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+		if err != nil {
+			return false, err
+		}
+
+		clusters = allClusters
 	}
 
 	for _, cluster := range clusters.Items {

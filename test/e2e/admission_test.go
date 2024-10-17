@@ -12,6 +12,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -65,7 +66,7 @@ func TestOperatorValidationUnreconcilable(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster.
-	_ = clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Create an invalid bucket.
 	bucket := &couchbasev2.CouchbaseBucket{
@@ -98,6 +99,8 @@ func TestOperatorValidationUnreconcilable(t *testing.T) {
 			t.FailNow()
 		}
 	}
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionError, v1.ConditionTrue, cluster, 5*time.Minute)
 }
 
 func TestDisableAllValidation(t *testing.T) {
@@ -136,4 +139,5 @@ func TestDisableAllValidation(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.ReconcileFailedEvent(cluster), 2*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionError, v1.ConditionTrue, cluster, 5*time.Minute)
 }
