@@ -7,6 +7,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -33,10 +35,12 @@ var (
 	ErrIllegalEnvironment     = errors.New("illegal environment")
 	ErrIllegalConfiguration   = errors.New("illegal configuration")
 	ErrIllegalProvider        = errors.New("illegal provider")
+	ErrIllegalKubectlPath     = errors.New("illegal kubectl path")
 )
 
 type KubernetesSetupConfig struct {
 	Description              []string                          `yaml:"description"`
+	KubectlPath              string                            `yaml:"kubectlPath" env:"KUBECTL_PATH"`
 	ClusterName              string                            `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 	Platform                 installutils.PlatformType         `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
 	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
@@ -102,6 +106,10 @@ func (action *SetupKubernetes) Do(ctx *context.Context, config interface{}) erro
 
 	logrus.Infof("Kubernetes Setup started")
 
+	if c.KubectlPath != "" {
+		kubectl.WithBinaryPath(c.KubectlPath)
+	}
+
 	createClusterUtil, err := NewCreateClusterUtil(c)
 	if err != nil {
 		return err
@@ -158,6 +166,11 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 
 	if c.Environment == Kind && c.Platform == installutils.Openshift {
 		return ErrIllegalConfiguration
+	}
+	if c.KubectlPath != "" {
+		if !fileutils.NewFile(c.KubectlPath).IsFileExists() {
+			return ErrIllegalKubectlPath
+		}
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {

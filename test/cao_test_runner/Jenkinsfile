@@ -15,8 +15,8 @@ pipeline {
       )
     )
 
-    // Concurrent builds are disabled because multiple tests use the same kubectl.
-    disableConcurrentBuilds()
+    // Concurrent builds are enabled because each test creates its own kubectl in its workspace.
+    // disableConcurrentBuilds()
   }
 
   parameters {
@@ -34,7 +34,7 @@ pipeline {
   environment {
     GOVERSION = '1.22.5'
     GOROOT = "${env.WORKSPACE}/go"
-    KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
+    KUBECTL_PATH = "${env.WORKSPACE}/kubectl"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
