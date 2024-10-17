@@ -50,7 +50,7 @@ func (c *Client) SetHTTPAuth(username, password string) {
 // Do perform the API request.
 func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) error {
 	if req == nil {
-		return fmt.Errorf("perform %s request %s%s: %w", req.Method, req.Host, req.Path, ErrHTTPRequestIsNil)
+		return fmt.Errorf("perform request: %w", ErrHTTPRequestIsNil)
 	}
 
 	err := ValidateHTTPRequest(req)
