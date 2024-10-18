@@ -172,6 +172,15 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 		logrus.Infof("Deleted IAM role %s", roleName)
 	}
 
+	policiesToDelete := []string{dec.ClusterName + "-ebs-csi-driver-policy"}
+	for _, policyName := range policiesToDelete {
+		if err = eksSession.DeletePolicy(ctx, &policyName); err != nil {
+			return fmt.Errorf("unable to delete iam policy %s: %w", policyName, err)
+		}
+
+		logrus.Infof("Deleted IAM policy %s", policyName)
+	}
+
 	contextName := fmt.Sprintf("eks-%s@%s", dec.ClusterName, dec.Region)
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("unable to delete context from kubectl %s: %w", contextName, err)
