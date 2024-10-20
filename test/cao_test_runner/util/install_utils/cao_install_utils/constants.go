@@ -1,4 +1,4 @@
-package installutils
+package caoinstallutils
 
 type PlatformType string
 type OperatingSystemType string

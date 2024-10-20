@@ -6,7 +6,7 @@ import (
 
 	"context"
 
-	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
 var (
@@ -23,7 +23,7 @@ type DeleteClusterUtil interface {
 
 func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error) {
 	switch p.Platform {
-	case installutils.Kubernetes:
+	case caoinstallutils.Kubernetes:
 		switch p.Environment {
 		case Kind:
 			return &DeleteKindCluster{
@@ -55,7 +55,7 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}
 
-	case installutils.Openshift:
+	case caoinstallutils.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

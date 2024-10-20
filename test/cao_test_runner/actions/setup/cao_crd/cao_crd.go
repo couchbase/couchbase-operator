@@ -6,7 +6,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -24,12 +24,12 @@ var (
 )
 
 type CaoCrdSetupConfig struct {
-	Description     []string                         `yaml:"description"`
-	OperatorVersion string                           `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
-	Platform        installutils.PlatformType        `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	OperatingSystem installutils.OperatingSystemType `yaml:"operatingSystem" caoCli:"required,context" env:"OPERATING_SYSTEM"`
-	Architecture    installutils.ArchitectureType    `yaml:"architecture" caoCli:"required,context" env:"ARCHITECTURE"`
-	Validators      []map[string]any                 `yaml:"validators,omitempty"`
+	Description     []string                            `yaml:"description"`
+	OperatorVersion string                              `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
+	Platform        caoinstallutils.PlatformType        `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	OperatingSystem caoinstallutils.OperatingSystemType `yaml:"operatingSystem" caoCli:"required,context" env:"OPERATING_SYSTEM"`
+	Architecture    caoinstallutils.ArchitectureType    `yaml:"architecture" caoCli:"required,context" env:"ARCHITECTURE"`
+	Validators      []map[string]any                    `yaml:"validators,omitempty"`
 }
 
 type SetupCaoCrd struct {
@@ -74,12 +74,14 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, config interface{}) error {
 		}
 	}
 
-	installParams, err := installutils.NewInstallParams(c.OperatorVersion, c.Platform, c.OperatingSystem, c.Architecture, directory.DirectoryPath)
+	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform, c.OperatingSystem, c.Architecture, directory.DirectoryPath)
 	if err != nil {
 		return fmt.Errorf("error creating cao crd install setup: %w", err)
 	}
 
-	caoBinaryPath, crdPath, err := installParams.InstallCaoCrd()
+	installClient := caoinstallutils.NewInstallClient()
+
+	caoBinaryPath, crdPath, err := installClient.InstallCaoCrd(installParams)
 	if err != nil {
 		return fmt.Errorf("error installing cao crd: %w", err)
 	}
@@ -110,21 +112,21 @@ func (action *SetupCaoCrd) Checks(ctx *context.Context, config interface{}, stat
 	}
 
 	switch c.Platform {
-	case installutils.Kubernetes, installutils.Openshift:
+	case caoinstallutils.Kubernetes, caoinstallutils.Openshift:
 		// No-op
 	default:
 		return ErrIllegalPlatform
 	}
 
 	switch c.OperatingSystem {
-	case installutils.Linux, installutils.Windows, installutils.MacOs:
+	case caoinstallutils.Linux, caoinstallutils.Windows, caoinstallutils.MacOs:
 		// No-op
 	default:
 		return ErrIllegalOperatingSystem
 	}
 
 	switch c.Architecture {
-	case installutils.Amd64, installutils.Arm64:
+	case caoinstallutils.Amd64, caoinstallutils.Arm64:
 		// No-op
 	default:
 		return ErrIllegalArchitecture

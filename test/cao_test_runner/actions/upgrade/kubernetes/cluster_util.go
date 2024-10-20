@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
 var (
@@ -22,7 +22,7 @@ type UpgradeClusterUtil interface {
 
 func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, error) {
 	switch p.Platform {
-	case installutils.Kubernetes:
+	case caoinstallutils.Kubernetes:
 		switch p.Environment {
 		case Kind:
 			return nil, ErrNotImplemented
@@ -69,7 +69,7 @@ func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, erro
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}
 
-	case installutils.Openshift:
+	case caoinstallutils.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

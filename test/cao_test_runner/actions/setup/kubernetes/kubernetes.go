@@ -9,7 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -42,7 +42,7 @@ type KubernetesSetupConfig struct {
 	Description              []string                          `yaml:"description"`
 	KubectlPath              string                            `yaml:"kubectlPath" env:"KUBECTL_PATH"`
 	ClusterName              string                            `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform                 installutils.PlatformType         `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Platform                 caoinstallutils.PlatformType      `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
 	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
 	NumControlPlane          int                               `yaml:"numControlPlane"`
 	NumWorkers               int                               `yaml:"numWorkers"`
@@ -144,7 +144,7 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 	}
 
 	switch c.Platform {
-	case installutils.Kubernetes, installutils.Openshift:
+	case caoinstallutils.Kubernetes, caoinstallutils.Openshift:
 		// No-op
 	default:
 		return ErrIllegalPlatform
@@ -164,7 +164,7 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 		return ErrIllegalEnvironment
 	}
 
-	if c.Environment == Kind && c.Platform == installutils.Openshift {
+	if c.Environment == Kind && c.Platform == caoinstallutils.Openshift {
 		return ErrIllegalConfiguration
 	}
 	if c.KubectlPath != "" {

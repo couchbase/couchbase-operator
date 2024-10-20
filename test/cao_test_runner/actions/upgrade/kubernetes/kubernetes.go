@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	installutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -33,26 +33,26 @@ var (
 )
 
 type KubernetesUpgradeConfig struct {
-	Description             []string                    `yaml:"description"`
-	ClusterName             string                      `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform                installutils.PlatformType   `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Environment             EnvironmentType             `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
-	Provider                ProviderType                `yaml:"provider" caoCli:"context" env:"PROVIDER"`
-	EKSRegion               string                      `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
-	AKSRegion               string                      `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
-	GKERegion               string                      `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
-	KubernetesVersion       string                      `yaml:"kubernetesVersion"`
-	UpgradeClusterVersion   bool                        `yaml:"upgradeClusterVersion"`
-	WaitForClusterUpgrade   bool                        `yaml:"waitForClusterUpgrade"`
-	UpgradeAKSNodePools     bool                        `yaml:"upgradeAKSNodePools"`
-	AKSNodePoolsToUpgrade   []AKSNodePoolUpgradeConfig  `yaml:"aksNodePoolsToUpgrade"`
-	UpgradeEKSNodeGroups    bool                        `yaml:"upgradeEKSNodeGroups"`
-	EKSNodeGroupsToUpgrade  []EKSNodeGroupUpgradeConfig `yaml:"eksNodeGroupsToUpgrade"`
-	UpgradeGKEMaster        bool                        `yaml:"upgradeGKEMaster"`
-	WaitForGKEMasterUpgrade bool                        `yaml:"waitForGKEMasterUpgrade"`
-	UpgradeGKENodePool      bool                        `yaml:"upgradeGKENodePool"`
-	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig  `yaml:"gkeNodePoolsToUpgrade"`
-	Validators              []map[string]any            `yaml:"validators,omitempty"`
+	Description             []string                     `yaml:"description"`
+	ClusterName             string                       `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Platform                caoinstallutils.PlatformType `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Environment             EnvironmentType              `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
+	Provider                ProviderType                 `yaml:"provider" caoCli:"context" env:"PROVIDER"`
+	EKSRegion               string                       `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion               string                       `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion               string                       `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
+	KubernetesVersion       string                       `yaml:"kubernetesVersion"`
+	UpgradeClusterVersion   bool                         `yaml:"upgradeClusterVersion"`
+	WaitForClusterUpgrade   bool                         `yaml:"waitForClusterUpgrade"`
+	UpgradeAKSNodePools     bool                         `yaml:"upgradeAKSNodePools"`
+	AKSNodePoolsToUpgrade   []AKSNodePoolUpgradeConfig   `yaml:"aksNodePoolsToUpgrade"`
+	UpgradeEKSNodeGroups    bool                         `yaml:"upgradeEKSNodeGroups"`
+	EKSNodeGroupsToUpgrade  []EKSNodeGroupUpgradeConfig  `yaml:"eksNodeGroupsToUpgrade"`
+	UpgradeGKEMaster        bool                         `yaml:"upgradeGKEMaster"`
+	WaitForGKEMasterUpgrade bool                         `yaml:"waitForGKEMasterUpgrade"`
+	UpgradeGKENodePool      bool                         `yaml:"upgradeGKENodePool"`
+	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig   `yaml:"gkeNodePoolsToUpgrade"`
+	Validators              []map[string]any             `yaml:"validators,omitempty"`
 }
 
 type KubernetesUpgrade struct {
@@ -117,7 +117,7 @@ func (action *KubernetesUpgrade) Checks(ctx *context.Context, config interface{}
 	}
 
 	switch c.Platform {
-	case installutils.Kubernetes, installutils.Openshift:
+	case caoinstallutils.Kubernetes, caoinstallutils.Openshift:
 		// No-op
 	default:
 		return ErrIllegalPlatform
@@ -137,7 +137,7 @@ func (action *KubernetesUpgrade) Checks(ctx *context.Context, config interface{}
 		return ErrIllegalEnvironment
 	}
 
-	if c.Environment == Kind && c.Platform == installutils.Openshift {
+	if c.Environment == Kind && c.Platform == caoinstallutils.Openshift {
 		return ErrIllegalConfiguration
 	}
 

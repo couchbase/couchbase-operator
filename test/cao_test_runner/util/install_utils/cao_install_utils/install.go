@@ -1,4 +1,4 @@
-package installutils
+package caoinstallutils
 
 import (
 	"errors"
@@ -18,11 +18,18 @@ var (
 )
 
 type InstallParams struct {
-	BuildVersion      string
-	Platform          PlatformType
-	OperatingSystem   OperatingSystemType
-	Architecture      ArchitectureType
-	DownloadDirectory string
+	buildVersion      string
+	platform          PlatformType
+	operatingSystem   OperatingSystemType
+	architecture      ArchitectureType
+	downloadDirectory string
+}
+
+type CAOInstallClient struct {
+}
+
+func NewInstallClient() *CAOInstallClient {
+	return &CAOInstallClient{}
 }
 
 func NewInstallParams(buildVersion string, platform PlatformType, os OperatingSystemType, arch ArchitectureType, downloadDir string) (*InstallParams, error) {
@@ -48,17 +55,17 @@ func NewInstallParams(buildVersion string, platform PlatformType, os OperatingSy
 	}
 
 	return &InstallParams{
-		BuildVersion:      buildVersion,
-		Platform:          platform,
-		OperatingSystem:   os,
-		Architecture:      arch,
-		DownloadDirectory: downloadDir,
+		buildVersion:      buildVersion,
+		platform:          platform,
+		operatingSystem:   os,
+		architecture:      arch,
+		downloadDirectory: downloadDir,
 	}, nil
 }
 
-func (installParams *InstallParams) install() error {
-	url := generateURL(installParams)
-	filePath := generateDownloadPath(installParams)
+func (client *CAOInstallClient) install(installParams *InstallParams) error {
+	url := client.generateURL(installParams)
+	filePath := client.generateDownloadPath(installParams)
 
 	downloadFile := fileutils.NewFile(filePath)
 
@@ -76,7 +83,7 @@ func (installParams *InstallParams) install() error {
 		return fmt.Errorf("cannot download file: %w", err)
 	}
 
-	err = downloadFile.ExtractFile(installParams.DownloadDirectory)
+	err = downloadFile.ExtractFile(installParams.downloadDirectory)
 	if err != nil {
 		return fmt.Errorf("cannot extract file: %w", err)
 	}
@@ -84,21 +91,21 @@ func (installParams *InstallParams) install() error {
 	return nil
 }
 
-func (installParams *InstallParams) InstallCaoCrd() (string, string, error) {
-	isInstallExist, err := isInstallAlreadyExists(installParams)
+func (client *CAOInstallClient) InstallCaoCrd(installParams *InstallParams) (string, string, error) {
+	isInstallExist, err := client.isInstallAlreadyExists(installParams)
 	if err != nil {
 		return "", "", err
 	}
 
 	if !isInstallExist {
-		err = installParams.install()
+		err = client.install(installParams)
 		if err != nil {
 			return "", "", err
 		}
 	}
 
-	caoPath := filepath.Join(generateDownloadedDirectory(installParams), "bin", "cao")
-	crdPath := filepath.Join(generateDownloadedDirectory(installParams), "crd.yaml")
+	caoPath := filepath.Join(client.generateDownloadedDirectory(installParams), "bin", "cao")
+	crdPath := filepath.Join(client.generateDownloadedDirectory(installParams), "crd.yaml")
 
 	if err := fileutils.NewFile(caoPath).ChangePermissions(0777); err != nil {
 		return "", "", fmt.Errorf("unable to change cao file permissions: %w", err)
@@ -111,15 +118,15 @@ func (installParams *InstallParams) InstallCaoCrd() (string, string, error) {
 	return caoPath, crdPath, nil
 }
 
-func isInstallAlreadyExists(installParams *InstallParams) (bool, error) {
-	fileName := generateFileName(installParams)
-	filePath := filepath.Join(installParams.DownloadDirectory, fileName)
+func (client *CAOInstallClient) isInstallAlreadyExists(installParams *InstallParams) (bool, error) {
+	fileName := client.generateFileName(installParams)
+	filePath := filepath.Join(installParams.downloadDirectory, fileName)
 
 	var isCompressedFilePresent, isDirectoryPresent bool
 
 	isCompressedFilePresent = fileutils.NewFile(filePath).IsFileExists()
 
-	filePath = generateDownloadedDirectory(installParams)
+	filePath = client.generateDownloadedDirectory(installParams)
 	isDirectoryPresent = fileutils.NewDirectory(filePath, 0777).IsDirectoryExists()
 
 	if isCompressedFilePresent != isDirectoryPresent {
@@ -129,36 +136,36 @@ func isInstallAlreadyExists(installParams *InstallParams) (bool, error) {
 	}
 }
 
-func generateDownloadPath(installParams *InstallParams) string {
-	fileName := generateFileName(installParams)
-	filePath := filepath.Join(installParams.DownloadDirectory, fileName)
+func (client *CAOInstallClient) generateDownloadPath(installParams *InstallParams) string {
+	fileName := client.generateFileName(installParams)
+	filePath := filepath.Join(installParams.downloadDirectory, fileName)
 
 	return filePath
 }
 
-func generateDownloadedDirectory(installParams *InstallParams) string {
-	build := strings.Split(installParams.BuildVersion, "-")[1]
-	version := strings.Split(installParams.BuildVersion, "-")[0]
+func (client *CAOInstallClient) generateDownloadedDirectory(installParams *InstallParams) string {
+	build := strings.Split(installParams.buildVersion, "-")[1]
+	version := strings.Split(installParams.buildVersion, "-")[0]
 	fileName := fmt.Sprintf(operatorPath,
-		version, build, installParams.Platform, installParams.OperatingSystem, installParams.Architecture, "")
-	filePath := filepath.Join(installParams.DownloadDirectory, fileName)
+		version, build, installParams.platform, installParams.operatingSystem, installParams.architecture, "")
+	filePath := filepath.Join(installParams.downloadDirectory, fileName)
 
 	return filePath
 }
 
-func generateFileName(installParams *InstallParams) string {
-	build := strings.Split(installParams.BuildVersion, "-")[1]
-	version := strings.Split(installParams.BuildVersion, "-")[0]
+func (client *CAOInstallClient) generateFileName(installParams *InstallParams) string {
+	build := strings.Split(installParams.buildVersion, "-")[1]
+	version := strings.Split(installParams.buildVersion, "-")[0]
 
 	return fmt.Sprintf(operatorPath,
-		version, build, installParams.Platform, installParams.OperatingSystem, installParams.Architecture, ext[installParams.OperatingSystem])
+		version, build, installParams.platform, installParams.operatingSystem, installParams.architecture, ext[installParams.operatingSystem])
 }
 
-func generateURL(installParams *InstallParams) string {
-	build := strings.Split(installParams.BuildVersion, "-")[1]
-	version := strings.Split(installParams.BuildVersion, "-")[0]
+func (client *CAOInstallClient) generateURL(installParams *InstallParams) string {
+	build := strings.Split(installParams.buildVersion, "-")[1]
+	version := strings.Split(installParams.buildVersion, "-")[0]
 
-	fileName := generateFileName(installParams)
+	fileName := client.generateFileName(installParams)
 
 	var url string
 
