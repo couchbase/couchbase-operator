@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // VersionAfter determines whether the configured version is greater than
@@ -103,4 +105,10 @@ func ShouldReconcile(annotations map[string]string) bool {
 	}
 
 	return true
+}
+
+func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
+	existingAnnotations := meta.GetAnnotations()
+	existingAnnotations[key] = value
+	meta.SetAnnotations(existingAnnotations)
 }
