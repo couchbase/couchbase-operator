@@ -1227,6 +1227,10 @@ type CouchbaseBucketSpec struct {
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Name BucketName `json:"name,omitempty"`
 
+	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
+	// The bucket name will define the sample bucket used.
+	SampleBucket bool `json:"-" annotation:"sampleBucket"`
+
 	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
 	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
@@ -1390,6 +1394,10 @@ type CouchbaseEphemeralBucketSpec struct {
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Name BucketName `json:"name,omitempty"`
 
+	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
+	// The bucket name will define the sample bucket used.
+	SampleBucket bool `json:"-" annotation:"sampleBucket"`
+
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
 	// documents will be evicted from memory defined by the eviction policy.  The memory quota
 	// is defined per Couchbase pod running the data service.  This field defaults to, and must
@@ -1516,6 +1524,10 @@ type CouchbaseMemcachedBucketSpec struct {
 	// field overrides `metadata.name`.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Name BucketName `json:"name,omitempty"`
+
+	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
+	// The bucket name will define the sample bucket used.
+	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// MemoryQuota is a memory limit to the size of a bucket. The memory quota
 	// is defined per Couchbase pod running the data service.  This field defaults to, and must

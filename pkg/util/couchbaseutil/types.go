@@ -466,6 +466,7 @@ const (
 
 // Bucket is a canonical representation of the parameters used for creating/editing buckets with the REST API.
 type Bucket struct {
+	SampleBucket                      bool
 	BucketName                        string                  `json:"name"`
 	BucketType                        string                  `json:"type"`
 	BucketStorageBackend              CouchbaseStorageBackend `json:"storageBackend"`

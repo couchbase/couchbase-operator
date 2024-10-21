@@ -670,3 +670,28 @@ func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *tes
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestSampleBucket(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Static configuration
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "beer-sample",
+			Annotations: map[string]string{"cao.couchbase.com/sampleBucket": "true"},
+		},
+	}
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+}

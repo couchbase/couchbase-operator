@@ -109,6 +109,12 @@ func ShouldReconcile(annotations map[string]string) bool {
 
 func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
 	existingAnnotations := meta.GetAnnotations()
+
+	if existingAnnotations == nil {
+		existingAnnotations = make(map[string]string)
+	}
+
 	existingAnnotations[key] = value
+
 	meta.SetAnnotations(existingAnnotations)
 }

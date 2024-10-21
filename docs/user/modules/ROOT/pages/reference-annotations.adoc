@@ -73,7 +73,12 @@ Defaults to `couchstore`, accepts either `couchstore` or `magma`.
 Used to force a storage backend on all buckets in a Couchbase Cluster. This configuration only takes action if bucket management is disabled
 When configured the Couchbase Operator will attempt to force all buckets in a cluster to a particular storage backend.
 This config is only used with Couchbase Server 7.6.0.
-Accepts either `couchstore` or `magma`.  
+Accepts either `couchstore` or `magma`.
+
+== Sample buckets
+==== `cao.couchbase.com/sampleBucket`
+SampleBucket indicates whether the bucket should be treated as a sample bucket.
+If set to "true", the bucket name will define the sample bucket used.
 
 == Cluster Scheduling
 === Rescheduling To Different Server Groups On Failed Scheduling

@@ -359,6 +359,15 @@ func GetRebalanceProgress(progress *RebalanceProgress) *Request {
 	return NewRequest((*Client).Get, "/pools/default/rebalanceProgress", nil, progress)
 }
 
+func CreateSampleBucket(bucketName string) *Request {
+	marshalledName, err := json.Marshal([]string{bucketName})
+	if err != nil {
+		return nil
+	}
+
+	return NewRequest((*Client).Post, "/sampleBuckets/install", marshalledName, nil)
+}
+
 // CreateBucket creates a new bucket.
 func CreateBucket(bucket *Bucket) *Request {
 	params := bucket.FormEncode(false)

@@ -64,6 +64,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		b := couchbaseutil.Bucket{
 			BucketName:         name,
+			SampleBucket:       bucket.Spec.SampleBucket,
 			BucketType:         constants.BucketTypeCouchbase,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -171,6 +172,7 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		b := couchbaseutil.Bucket{
 			BucketName:         name,
+			SampleBucket:       bucket.Spec.SampleBucket,
 			BucketType:         constants.BucketTypeEphemeral,
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
@@ -219,6 +221,7 @@ func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*cou
 
 		b := couchbaseutil.Bucket{
 			BucketName:        name,
+			SampleBucket:      bucket.Spec.SampleBucket,
 			BucketType:        constants.BucketTypeMemcached,
 			BucketMemoryQuota: k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			EnableFlush:       bucket.Spec.EnableFlush,
@@ -440,6 +443,17 @@ func (c *Cluster) reconcileBuckets() error {
 
 	for i := range create {
 		bucket := &create[i]
+
+		if bucket.SampleBucket == true {
+			if err := couchbaseutil.CreateSampleBucket(bucket.BucketName).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+
+			log.Info("Bucket created", "cluster", c.namespacedName(), "name", bucket.BucketName)
+			c.raiseEvent(k8sutil.BucketCreateEvent(bucket.BucketName, c.cluster))
+
+			continue
+		}
 
 		if err := couchbaseutil.CreateBucket(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err

@@ -177,6 +177,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketWithExplicitName).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithSameExplicitNameAndDifferentType).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestSampleBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDeltaRecovery).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestPartialUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestDeltaRecoveryWithoutDataService).WithTags(TagSuiteP0),
