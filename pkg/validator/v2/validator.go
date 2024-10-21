@@ -247,9 +247,20 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 
 		return checkValidStorageBackend(backend, annotation)
 	}
+
+	checkStringToBoolBucketAnnotation := func(backend, _ string) error {
+		return checkStringToBool(backend)
+	}
+
+	checkStringToUintBucketAnnotation := func(backend, _ string) error {
+		return checkStringToUint(backend)
+	}
+
 	bucketAnnotations := map[string]func(string, string) error{
 		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       checkStringToBoolBucketAnnotation,
+		"cao.couchbase.com/buckets.maxMigratableBuckets":                checkStringToUintBucketAnnotation,
 	}
 
 	for k, v := range cluster.Annotations {

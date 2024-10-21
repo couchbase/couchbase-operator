@@ -1777,8 +1777,8 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	// We can only migrate the nodes if CB server is >= 7.6
-	if !atleast76 {
+	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
+	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
 		return nil
 	}
 
@@ -1805,22 +1805,29 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	var migrateCandidate couchbaseutil.Member
+	migrationCandidates := couchbaseutil.MemberSet{}
 
-	if len(candidatesNoOrchestrator) != 0 {
-		migrateCandidate = candidatesNoOrchestrator[candidatesNoOrchestrator.Names()[0]]
-	} else if orchestrator != nil {
-		migrateCandidate = orchestrator
+	explicitNumber := min(max(1, int(c.cluster.Spec.Buckets.MaxMigratableBuckets)), len(candidatesNoOrchestrator))
+
+	// Add candidates up to the explicitNumber or the orchestrator if no others are available.
+	for _, candidateName := range candidatesNoOrchestrator.Names()[:explicitNumber] {
+		migrationCandidates.Add(candidatesNoOrchestrator[candidateName])
 	}
 
-	if len(candidatesNoOrchestrator) != 0 || orchestrator != nil {
-		log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", migrateCandidate.Name())
+	if (migrationCandidates.Size() == 0) && orchestrator != nil {
+		migrationCandidates.Add(orchestrator)
+	}
 
-		if err := c.scheduler.Upgrade(migrateCandidate.Config(), migrateCandidate.Name()); err != nil {
-			return err
+	if migrationCandidates.Size() > 0 {
+		for _, candidate := range migrationCandidates {
+			log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", candidate.Name())
+
+			if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
+				return err
+			}
 		}
 
-		return r.swapRebalanceMembers(c, couchbaseutil.NewMemberSet(migrateCandidate))
+		return r.swapRebalanceMembers(c, migrationCandidates)
 	}
 
 	return nil

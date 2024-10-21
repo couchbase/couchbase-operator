@@ -5,6 +5,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -48,12 +49,15 @@ func TestMagmaBucketToCouchstoreMigration(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
+
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
-	bucket.Annotations = map[string]string{
-		"cao.couchbase.com/historyRetention.collectionHistoryDefault": "false",
-	}
+
+	couchbaseutil.AddAnnotation(&bucket.ObjectMeta, "cao.couchbase.com/historyRetention.collectionHistoryDefault", "false")
+
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -92,6 +96,9 @@ func TestMultipleCouchstoreBucketsToMagmaMigration(t *testing.T) {
 
 	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
+
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket1 := testCouchstoreBucket("bucket1")
@@ -122,6 +129,98 @@ func TestMultipleCouchstoreBucketsToMagmaMigration(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 		eventschema.Repeat{Times: clusterSize, Validator: e2eutil.SwapRebalanceSequence},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// This test validates that disabling bucket migration routines with the enableBucketMigrationRoutines annotation
+// will correctly stop rebalances taking place when the bucket is changed from couchstore/magma.
+func TestCouchstoreBucketsToMagmaMigrationRoutineDisabled(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0").CouchbaseBucket()
+
+	clusterSize := 2
+
+	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
+
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "false")
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := testCouchstoreBucket("bucket")
+
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/spec/storageBackend", couchbasev2.CouchbaseStorageBackendMagma),
+		time.Minute)
+
+	// Make sure the bucket has been edited but we haven't observed a swap rebalanced
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Repeat{Times: 0, Validator: e2eutil.SwapRebalanceSequence},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// This test validates that the maxMigratableBuckets annotation will be used to determine the number of pods
+// that should be migrated each swap-rebalance, excl. the orchestrator.
+func TestCouchstoreBucketsToMagmaMigrationWithMultiMigration(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0").CouchbaseBucket()
+
+	clusterSize := 3
+
+	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
+
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.maxMigratableBuckets", "2")
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := testCouchstoreBucket("bucket")
+
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/spec/storageBackend", couchbasev2.CouchbaseStorageBackendMagma),
+		time.Minute)
+
+	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
+
+	// With a cluster size of 3 and maxMigratableBuckets set to 2, we should
+	// only see 2 rebalances where the non-orchestrator pods are rebalanced at the same time, followed by the orchestrator
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Repeat{Times: 1, Validator: e2eutil.SwapRebalanceSequence},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -179,20 +278,15 @@ func TestCouchstoreBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
-	if cluster.Annotations == nil {
-		cluster.Annotations = make(map[string]string)
-	}
 
-	cluster.Annotations["cao.couchbase.com/buckets.defaultStorageBackend"] = "couchstore"
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.defaultStorageBackend", "couchstore")
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
 
-	if bucket.Annotations == nil {
-		bucket.Annotations = make(map[string]string)
-	}
-
-	bucket.Annotations["cao.couchbase.com/historyRetention.collectionHistoryDefault"] = "false"
+	couchbaseutil.AddAnnotation(&bucket.ObjectMeta, "cao.couchbase.com/historyRetention.collectionHistoryDefault", "false")
 
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
