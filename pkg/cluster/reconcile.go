@@ -197,6 +197,9 @@ func (c *Cluster) reconcile() error {
 		return nil
 	}
 
+	//  If wer're not upgrading, then we can clear the upgrading condition.
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+
 	// Run post-topology reconcilers.  These typically manage Couchbase
 	// features, and we are guaranteed that the cluster is in a stable
 	// and happy state (most of the time, races can still occur).
