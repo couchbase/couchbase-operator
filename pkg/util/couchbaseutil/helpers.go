@@ -3,6 +3,8 @@ package couchbaseutil
 import (
 	"fmt"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // VersionAfter determines whether the configured version is greater than
@@ -71,4 +73,16 @@ func (b *Bucket) CanBeMigrated(backend CouchbaseStorageBackend) (bool, string) {
 // to not lose any resolution.
 func CouchbaseQueryDurationString(t time.Duration) string {
 	return fmt.Sprintf("%vns", t.Nanoseconds())
+}
+
+func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
+	existingAnnotations := meta.GetAnnotations()
+
+	if existingAnnotations == nil {
+		existingAnnotations = make(map[string]string)
+	}
+
+	existingAnnotations[key] = value
+
+	meta.SetAnnotations(existingAnnotations)
 }

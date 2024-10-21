@@ -3522,6 +3522,16 @@ type Buckets struct {
 	// Allows the operator to reconcile the storage backend for unmanaged buckets to match
 	// this value.
 	TargetUnmanagedBucketStorageBackend *CouchbaseStorageBackend `json:"-" annotation:"targetUnmanagedBucketStorageBackend"`
+
+	// Used to define whether managed bucket storage backend migration routines should be enabled.
+	// This value defaults to false.
+	EnableBucketMigrationRoutines bool `json:"-" annotation:"enableBucketMigrationRoutines"`
+
+	// MaxMigratableBuckets allows the number of pods affected by a bucket migration at any
+	// one time to be increased.
+	// By default a migration will affect one pod at a time.
+	// This field must be greater than zero.
+	MaxMigratableBuckets uint64 `json:"-" annotation:"maxMigratableBuckets"`
 }
 
 type RBAC struct {

@@ -3371,6 +3371,24 @@ func TestAnnotationValidation(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"must be a valid storage backend"},
 		},
+		{
+			name: "TestClusterAnnotationsEnableBucketMigrationRoutinesInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "NaN",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"invalid syntax"},
+		},
+		{
+			name: "TestClusterAnnotationsMaxMigratableBucketsInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.maxMigratableBuckets": "NaN",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"invalid syntax"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-migration-76.yaml"})
