@@ -1199,6 +1199,10 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 
 	var errs []error
 
+	if (cluster.Spec.VolumeClaimTemplates == nil || len(cluster.Spec.VolumeClaimTemplates) == 0) && cluster.Spec.EnableOnlineVolumeExpansion {
+		errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since no volume claim templates have been definied"))
+	}
+
 	for _, template := range cluster.Spec.VolumeClaimTemplates {
 		if template.Spec.StorageClassName == nil {
 			// Not so fast skippy, you can lookup the default storage class

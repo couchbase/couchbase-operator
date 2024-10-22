@@ -3000,6 +3000,14 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.volumeClaimTemplates.resources.requests"},
 		},
+		{
+			name: "TestEnableOnlineVolumeClaimExpansionRejectedNoTemplates",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/enableOnlineVolumeExpansion", true).
+				Remove("/spec/volumeClaimTemplates")},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.cluster.enableOnlineVolumeExpansion cannot be enabled since no volume claim templates have been definied"},
+		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
