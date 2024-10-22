@@ -4,7 +4,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1651,24 +1650,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 		// Eject nodes that we want to discard.
 		eject := r.ejectMembers.OTPNodes()
-
-		clusterInfo := couchbaseutil.ClusterInfo{}
-		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		for _, nodeInfo := range clusterInfo.Nodes {
-			if nodeInfo.Membership != "inactiveFailed" {
-				if slices.Contains(r.ejectMembers.OTPNodes(), nodeInfo.OTPNode) {
-					list := couchbaseutil.OTPNodeList{}
-					list = append(list, nodeInfo.OTPNode)
-
-					if err := couchbaseutil.Failover(list, false).On(c.api, c.readyMembers()); err != nil {
-						return err
-					}
-				}
-			}
-		}
 
 		if err := c.rebalance(r.clusteredMembers, eject); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
