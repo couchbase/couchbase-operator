@@ -970,6 +970,8 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return err
+		} else if pvcState == nil {
+			continue
 		}
 
 		for _, pvc := range pvcState.List() {
@@ -1381,17 +1383,17 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 				return err
-			}
+			} else if pvcState != nil {
+				for _, volume := range pvcState.List() {
+					volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
+					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
+					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
 
-			for _, volume := range pvcState.List() {
-				volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
-				volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
-				_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
+					if err != nil {
+						metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
-				if err != nil {
-					metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-
-					return err
+						return err
+					}
 				}
 			}
 		}
