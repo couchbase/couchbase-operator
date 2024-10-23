@@ -30,9 +30,9 @@ type bucketNamer struct {
 
 var (
 	options = types.ValidatorOptions{
-		ValidateSecrets:        true,
-		ValidateStorageClasses: true,
-		DefaultFileSystemGroup: true,
+		ValidateSecrets:        false,
+		ValidateStorageClasses: false,
+		DefaultFileSystemGroup: false,
 	}
 
 	v = validator.New(admission.GetClient(), admission.GetCouchbaseClient(), &options)
