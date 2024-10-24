@@ -1,4 +1,4 @@
-package cbnodefilter
+package cbbaremetalfilter
 
 import (
 	"errors"
@@ -10,9 +10,9 @@ var (
 	ErrCBHostnameNotFound = errors.New("cb hostname not found")
 )
 
-// ValidateCBNodeFilter validates the basic requirements of CBNodeFilter.
-// Conditional validation for CBNodeFilter is handled in the implementation of its methods.
-func ValidateCBNodeFilter(cbNodeFilter *CBNodeFilter) error {
+// ValidateCBNodeFilter validates the basic requirements of CBBareMetalFilter.
+// Conditional validation for CBBareMetalFilter is handled in the implementation of its methods.
+func ValidateCBNodeFilter(cbNodeFilter *CBBareMetalFilter) error {
 	if cbNodeFilter.Count <= 0 {
 		return fmt.Errorf("validate cb node filter: %w", ErrCountInvalid)
 	}
@@ -34,7 +34,7 @@ func ValidateCBNodeFilter(cbNodeFilter *CBNodeFilter) error {
 	return nil
 }
 
-func validateFilterType(cbNodeFilter *CBNodeFilter) error {
+func validateFilterType(cbNodeFilter *CBBareMetalFilter) error {
 	switch cbNodeFilter.FilterType {
 	case FilterAll, FilterByServices, FilterByServerGroups:
 		return nil
@@ -43,7 +43,7 @@ func validateFilterType(cbNodeFilter *CBNodeFilter) error {
 	}
 }
 
-func validateCBNodeSelectStrategy(cbNodeFilter *CBNodeFilter) error {
+func validateCBNodeSelectStrategy(cbNodeFilter *CBBareMetalFilter) error {
 	switch cbNodeFilter.SelectionStrategy {
 	case SelectSorted, SelectRandom:
 		{

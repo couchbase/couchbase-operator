@@ -1,4 +1,4 @@
-package cbnodefilter
+package cbbaremetalfilter
 
 import (
 	"errors"
@@ -27,20 +27,20 @@ var (
 	ErrServerGroupsNotFound  = errors.New("could not find cb nodes with the given server groups")
 )
 
-// CBNodeFilter is used to set the parameters based on which the CB nodes will be filtered.
-type CBNodeFilter struct {
+// CBBareMetalFilter is used to set the parameters based on which the bare metal CB nodes will be filtered.
+type CBBareMetalFilter struct {
 	// FilterType determines which CB nodes to filter.
 	FilterType CBNodeFilterType `yaml:"filterType" caoCli:"required"`
 
-	// SelectionStrategy determines which cb nodes to select after we have identified and filtered the cb nodes based on CBNodeFilter.FilterType.
+	// SelectionStrategy determines which cb nodes to select after we have identified and filtered the cb nodes based on CBBareMetalFilter.FilterType.
 	SelectionStrategy CBNodeSelectStrategy `yaml:"selectionStrategy" caoCli:"required"`
 
 	// Services filters the CB nodes by which services are present. It finds the `spec.servers[i].name` which has all the
 	// services (strict checking) provided by the user and then filters by server name. Services slice is sorted and then used.
 	Services []string `yaml:"services"`
 
-	// ServicesNotStrict if set to true, then the checking of CBNodeFilter.Services will not be strict.
-	// So if CBNodeFilter.Services = ["data"] then it will match the lists: ["data", "index"], ["data", "query", "analytics"] etc.
+	// ServicesNotStrict if set to true, then the checking of CBBareMetalFilter.Services will not be strict.
+	// So if CBBareMetalFilter.Services = ["data"] then it will match the lists: ["data", "index"], ["data", "query", "analytics"] etc.
 	ServicesNotStrict bool `yaml:"servicesNotStrict"`
 
 	// ServerGroups filters the CB nodes by the Server Groups as defined in the CB cluster.
@@ -56,8 +56,8 @@ type CBNodeFilter struct {
 	CBHostname string `yaml:"cbHostname"`
 }
 
-func NewCBNodeFilter(filterType CBNodeFilterType, strategy CBNodeSelectStrategy, services []string, strict bool, count int) *CBNodeFilter {
-	return &CBNodeFilter{
+func NewCBBareMetalFilter(filterType CBNodeFilterType, strategy CBNodeSelectStrategy, services []string, strict bool, count int) *CBBareMetalFilter {
+	return &CBBareMetalFilter{
 		FilterType:        filterType,
 		SelectionStrategy: strategy,
 		Services:          services,
@@ -66,9 +66,9 @@ func NewCBNodeFilter(filterType CBNodeFilterType, strategy CBNodeSelectStrategy,
 	}
 }
 
-// FilterCBNodes filters the cb nodes based on the CBNodeFilter provided. It finds all the cb nodes matching CBNodeFilter and then
+// FilterCBNodes filters the cb nodes based on the CBBareMetalFilter provided. It finds all the cb nodes matching CBBareMetalFilter and then
 // based on the CBNodeSelectStrategy it finally returns the cb node names.
-func (cpf *CBNodeFilter) FilterCBNodes() ([]string, error) {
+func (cpf *CBBareMetalFilter) FilterCBNodes() ([]string, error) {
 	var filteredCBNodes []string
 
 	var err error
@@ -126,7 +126,7 @@ func (cpf *CBNodeFilter) FilterCBNodes() ([]string, error) {
 }
 
 // filterAll returns all the cb nodes in the namespace.
-func (cpf *CBNodeFilter) filterAll() ([]string, error) {
+func (cpf *CBBareMetalFilter) filterAll() ([]string, error) {
 	var cbNodeNames []string
 
 	var err error
@@ -160,10 +160,10 @@ func (cpf *CBNodeFilter) filterAll() ([]string, error) {
 
 // filterByServicesCB filters the cb nodes based on the CB services using /pools/default information.
 /*
- * By default, CB nodes which have all the services (strict matching) listed in CBNodeFilter.Services will be selected.
- * If ServicesNotStrict is set to true, then the checking of CBNodeFilter.Services will not be strict.
+ * By default, CB nodes which have all the services (strict matching) listed in CBBareMetalFilter.Services will be selected.
+ * If ServicesNotStrict is set to true, then the checking of CBBareMetalFilter.Services will not be strict.
  */
-func (cpf *CBNodeFilter) filterByServicesCB() ([]string, error) {
+func (cpf *CBBareMetalFilter) filterByServicesCB() ([]string, error) {
 	hostname := "localhost" // TODO take from TestAsset
 	if cpf.CBHostname != "" {
 		hostname = cpf.CBHostname
@@ -209,7 +209,7 @@ func (cpf *CBNodeFilter) filterByServicesCB() ([]string, error) {
 }
 
 // filterByServerGroups filters the CB nodes according to the specified server groups.
-func (cpf *CBNodeFilter) filterByServerGroups() ([]string, error) {
+func (cpf *CBBareMetalFilter) filterByServerGroups() ([]string, error) {
 	hostname := "localhost" // TODO take from TestAsset
 	if cpf.CBHostname != "" {
 		hostname = cpf.CBHostname
