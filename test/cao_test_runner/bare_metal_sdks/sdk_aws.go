@@ -115,8 +115,28 @@ func (awsSessStore *AWSSessionStore) Check(ctx context.Context, providerCred *Cl
 // ====== Methods implemented by AWSSession ======
 // ================================================
 
-// DescribeInstances EC2 Instance IDs by searching EC2 instances using filters.
-func (as *AWSSession) DescribeInstances(ctx context.Context, awsValueName string, awsValues []string) ([]string, error) {
+// DescribeInstances returns the ec2 Instance information for the provided instances IDs.
+func (as *AWSSession) DescribeInstances(ctx context.Context, instanceIds []string) ([]ec2types.Instance, error) {
+	input := &ec2.DescribeInstancesInput{
+		InstanceIds: instanceIds,
+	}
+
+	describeInstancesOutput, err := as.ec2Client.DescribeInstances(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("describe instances: %w", err)
+	}
+
+	var instances []ec2types.Instance
+
+	for _, reservation := range describeInstancesOutput.Reservations {
+		instances = append(instances, reservation.Instances...)
+	}
+
+	return instances, nil
+}
+
+// DescribeInstancesWithFilter gets the EC2 Instance IDs by searching EC2 instances using ec2 filters.
+func (as *AWSSession) DescribeInstancesWithFilter(ctx context.Context, awsValueName string, awsValues []string) ([]string, error) {
 	input := &ec2.DescribeInstancesInput{
 		Filters: []ec2types.Filter{
 			{
