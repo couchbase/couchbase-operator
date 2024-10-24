@@ -230,7 +230,10 @@
             "service",
             "host"
         ],
-        "optionalLabels": null
+        "optionalLabels": [
+            "name",
+            "namespace"
+        ]
     },
     "server_http_request_failures": {
         "type": "counter",
@@ -243,7 +246,10 @@
             "service",
             "host"
         ],
-        "optionalLabels": null
+        "optionalLabels": [
+            "name",
+            "namespace"
+        ]
     },
     "server_http_requests_time_milliseconds": {
         "type": "histogram",
@@ -257,7 +263,10 @@
             "service",
             "host"
         ],
-        "optionalLabels": null
+        "optionalLabels": [
+            "name",
+            "namespace"
+        ]
     },
     "server_http_requests_total": {
         "type": "counter",
@@ -270,7 +279,10 @@
             "service",
             "host"
         ],
-        "optionalLabels": null
+        "optionalLabels": [
+            "name",
+            "namespace"
+        ]
     },
     "swap_rebalance_failures": {
         "type": "counter",

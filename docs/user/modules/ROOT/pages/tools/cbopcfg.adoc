@@ -495,6 +495,13 @@ How long to wait between readiness probes on server pods.
 +
 Whether to scope the Operator to a 'namespace' or to the 'cluster'.
 
+--separate-cluster-namespace-and-name::
+*Type*: bool
++
+*Default*: true
++
+Separates cluster name and namespace from certain metrics.
+
 --with-resources::
 *Type*: bool
 +
@@ -1440,6 +1447,13 @@ How long to wait between readiness probes on server pods.
 *Default*: namespace
 +
 Whether to scope the Operator to a 'namespace' or to the 'cluster'.
+
+--separate-cluster-namespace-and-name::
+*Type*: bool
++
+*Default*: true
++
+Separates cluster name and namespace from certain metrics.
 
 --with-resources::
 *Type*: bool

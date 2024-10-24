@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	OptionalLabels UUIDorName = None
+	SeparateNameAndNamespace = true
 
+	OptionalLabels UUIDorName = None
 	// ReconcileTotalMetric
 	// name: reconcile_total
 	// type: counter
@@ -70,12 +71,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: name, method, service, host
-	HTTPRequestTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_requests_total",
-		Help:      "Total HTTP requests to Couchbase Server for a specific cluster.",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "method", "service", "host"})
+	// optionalLabels: name, namespace
+	// nolint:godot
+	HTTPRequestTotalMetric = prometheus.CounterVec{}
 
 	// HTTPRequestTotalCodeMetric
 	// name: server_http_request_codes_total
@@ -85,12 +83,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: name, method, code, service, host
-	HTTPRequestTotalCodeMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_request_codes_total",
-		Help:      "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "method", "code", "service", "host"})
+	// optionalLabels: name, namespace
+	// nolint:godot
+	HTTPRequestTotalCodeMetric = prometheus.CounterVec{}
 
 	// HTTPRequestFailureMetric
 	// name: server_http_request_failures
@@ -100,12 +95,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: name, method, service, host
-	HTTPRequestFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_request_failures",
-		Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "method", "service", "host"})
+	// optionalLabels: name, namespace
+	// nolint:godot
+	HTTPRequestFailureMetric = prometheus.CounterVec{}
 
 	// HTTPRequestDurationMSMetric
 	// name: server_http_requests_time_milliseconds
@@ -115,12 +107,9 @@ var (
 	// added: 2.3.0
 	// stability: committed
 	// labels: name, method, service, host
-	HTTPRequestDurationMSMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:      "server_http_requests_time_milliseconds",
-		Help:      "Length of time per request for a specific cluster",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, []string{"name", "method", "service", "host"})
+	// optionalLabels: name, namespace
+	// nolint:godot
+	HTTPRequestDurationMSMetric = prometheus.HistogramVec{}
 
 	// VolumeExpansionMetric
 	// name: volume_expansions_total
@@ -362,14 +351,57 @@ func addOptionalLabels(existingLabels []string) []string {
 	return existingLabels
 }
 
+func separateNameAndNamespaceLabels(existingLabels []string) []string {
+	if SeparateNameAndNamespace {
+		return append(existingLabels, "namespace", "name")
+	}
+
+	return append(existingLabels, "name")
+}
+
 func InitMetrics() {
 	additionalLabels := os.Getenv("additional-prometheus-labels")
+
+	separateNameAndNamespace := os.Getenv("separate-cluster-name-and-namespace")
+	if strings.EqualFold(separateNameAndNamespace, "true") {
+		SeparateNameAndNamespace = true
+	} else {
+		SeparateNameAndNamespace = false
+	}
 
 	if strings.Compare(additionalLabels, "uuid-only") == 0 {
 		OptionalLabels = UUIDonly
 	} else if strings.Compare(additionalLabels, "uuid-and-name") == 0 {
 		OptionalLabels = UUIDandName
 	}
+
+	HTTPRequestTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "server_http_requests_total",
+		Help:      "Total HTTP requests to Couchbase Server for a specific cluster.",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
+
+	HTTPRequestTotalCodeMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "server_http_request_codes_total",
+		Help:      "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, separateNameAndNamespaceLabels([]string{"method", "code", "service", "host"}))
+
+	HTTPRequestFailureMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "server_http_request_failures",
+		Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, []string{"name", "method", "service", "host"})
+
+	HTTPRequestDurationMSMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:      "server_http_requests_time_milliseconds",
+		Help:      "Length of time per request for a specific cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
 
 	ReconcileTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "reconcile_total",

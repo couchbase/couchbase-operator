@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,4 +118,13 @@ func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
 	existingAnnotations[key] = value
 
 	meta.SetAnnotations(existingAnnotations)
+}
+
+func ShouldSeparateNameAndNamespaceLabels(existingLables []string, joinedString string) []string {
+	if metrics.SeparateNameAndNamespace {
+		splitString := strings.Split(joinedString, "/")
+		return append(existingLables, splitString[0], splitString[1])
+	}
+
+	return append(existingLables, joinedString)
 }
