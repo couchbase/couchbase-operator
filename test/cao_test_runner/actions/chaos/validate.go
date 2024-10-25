@@ -9,10 +9,11 @@ import (
 )
 
 var (
-	ErrInsufficientTriggers     = errors.New("insufficient Triggers provided, doesn't match CBPodFilter.Count")
-	ErrInsufficientChaosActions = errors.New("insufficient ChaosActions provided, doesn't match CBPodFilter.Count")
-	ErrInsufficientCBSvcChaos   = errors.New("insufficient CBServiceChaos' provided, doesn't match CBPodFilter.Count")
-	ErrChaosActionNotFound      = errors.New("provided chaos action not found")
+	ErrInsufficientTriggers       = errors.New("insufficient Triggers provided, doesn't match CBPodFilter.Count")
+	ErrInsufficientChaosActions   = errors.New("insufficient ChaosActions provided, doesn't match CBPodFilter.Count")
+	ErrInsufficientCBSvcChaos     = errors.New("insufficient CBServiceChaos' provided, doesn't match CBPodFilter.Count")
+	ErrChaosActionNotFound        = errors.New("provided chaos action not found")
+	ErrInsufficientCBClusterChaos = errors.New("insufficient CBClusterChaos' provided, doesn't match CBPodFilter.Count")
 )
 
 // validateChaosList validates the fields of ChaosList.
@@ -68,6 +69,24 @@ func validateChaosList(chaosList *ChaosList) error {
 		}
 	}
 
+	// Validating CBClusterChaos. If not provided, we just create a slice to avoid panic for accessing nil slice.
+	if chaosList.CBClusterChaos != nil {
+		if len(chaosList.CBClusterChaos) != cbPodsCount {
+			return fmt.Errorf("validate chaos list: %w", ErrInsufficientCBClusterChaos)
+		}
+
+		for i := range chaosList.CBClusterChaos {
+			err := validateCBClusterChaos(&chaosList.CBClusterChaos[i])
+			if err != nil {
+				return fmt.Errorf("validate chaos list: %w", err)
+			}
+		}
+	} else {
+		for range cbPodsCount {
+			chaosList.CBClusterChaos = append(chaosList.CBClusterChaos, CBClusterChaosConfig{})
+		}
+	}
+
 	return nil
 }
 
@@ -96,4 +115,13 @@ func validateCBServiceChaos(cbServiceChaos *CBService) error {
 	}
 
 	return nil
+}
+
+func validateCBClusterChaos(cbClusterChaos *CBClusterChaosConfig) error {
+	switch cbClusterChaos.ClusterChaosAction {
+	case StopRebalance:
+		return nil
+	default:
+		return fmt.Errorf("validate cb service chaos: %w", ErrCBClusterChaosInvalid)
+	}
 }

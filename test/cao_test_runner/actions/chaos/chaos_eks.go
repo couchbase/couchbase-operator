@@ -133,10 +133,26 @@ func (ec *EKSChaos) CBServiceChaos(context *context.Context, chaosConfig *CBPodC
 		return fmt.Errorf("cb service chaos eks: %w", err)
 	}
 
-	// Executing CB service chaos
 	err = ExecuteCBServiceChaos(context, chaosConfig, chaosConfig.CBPod)
 	if err != nil {
 		return fmt.Errorf("cb service chaos eks: %w", err)
+	}
+
+	return nil
+}
+
+func (ec *EKSChaos) CBClusterChaos(context *context.Context, chaosConfig *CBPodChaosConfig) error {
+	// TriggerConfig checks
+	populateCBInfoUsingChaosConfig(&chaosConfig.TriggerConfig, chaosConfig)
+
+	err := triggers.ApplyTrigger(&chaosConfig.TriggerConfig)
+	if err != nil {
+		return fmt.Errorf("cb cluster chaos eks: %w", err)
+	}
+
+	err = ExecuteCBClusterChaos(context, chaosConfig)
+	if err != nil {
+		return fmt.Errorf("cb cluster chaos eks: %w", err)
 	}
 
 	return nil

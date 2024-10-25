@@ -98,3 +98,20 @@ func (k *KindChaos) CBServiceChaos(context *context.Context, chaosConfig *CBPodC
 
 	return nil
 }
+
+func (k *KindChaos) CBClusterChaos(context *context.Context, chaosConfig *CBPodChaosConfig) error {
+	// TriggerConfig checks
+	populateCBInfoUsingChaosConfig(&chaosConfig.TriggerConfig, chaosConfig)
+
+	err := triggers.ApplyTrigger(&chaosConfig.TriggerConfig)
+	if err != nil {
+		return fmt.Errorf("cb cluster chaos kind: %w", err)
+	}
+
+	err = ExecuteCBClusterChaos(context, chaosConfig)
+	if err != nil {
+		return fmt.Errorf("cb cluster chaos kind: %w", err)
+	}
+
+	return nil
+}

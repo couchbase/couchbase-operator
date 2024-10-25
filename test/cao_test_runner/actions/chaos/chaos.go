@@ -36,6 +36,8 @@ type ChaosList struct {
 	ChaosActions []ActionName `yaml:"chaosActions" caoCli:"required"`
 	// CBServiceChaos is a list of CBService which determines the CB service chaos (if ChaosAction = "CBServiceChaos") for all the filtered pods.
 	CBServiceChaos []CBService `yaml:"cbServiceChaos"`
+	// CBClusterChaos is a list of CBClusterChaosConfig which determines the CB chaos (if ChaosAction = CBClusterChaosActionName) for all the filtered pods.
+	CBClusterChaos []CBClusterChaosConfig `yaml:"cbClusterChaosConfig"`
 	// Trigger is a list of TriggerConfig which determines the triggers for all the filtered pods.
 	Trigger []triggers.TriggerConfig `yaml:"triggerConfig" caoCli:"required"`
 

@@ -24,6 +24,9 @@ const (
 
 	// CBServiceChaos performs a service / process related chaos action for a CB pod.
 	CBServiceChaos ActionName = "CBServiceChaos"
+
+	// CBClusterChaosActionName performs a CB Cluster related chaos action for a CB pod.
+	CBClusterChaosActionName ActionName = "CBClusterChaos"
 )
 
 // CBPodChaosConfig contains the chaos config for one CB pod.
@@ -34,15 +37,16 @@ const (
  * Finally the chaos config for each CB pod is stored in CBPodChaosConfig.
  */
 type CBPodChaosConfig struct {
-	ChaosAction        ActionName
-	ManagedSvcName     managedsvcs.ManagedServiceProvider
-	ChaosIterations    int64
-	CBPod              string
-	TriggerConfig      triggers.TriggerConfig
-	CBServiceChaos     CBService
-	CBUpgradeVersion   string
-	CBPodsAfterScaling int
-	ClusterName        string // TODO to be removed. K8S Cluster Name to be taken from context
+	ChaosAction          ActionName
+	ManagedSvcName       managedsvcs.ManagedServiceProvider
+	ChaosIterations      int64
+	CBPod                string
+	TriggerConfig        triggers.TriggerConfig
+	CBServiceChaos       CBService
+	CBClusterChaosConfig CBClusterChaosConfig
+	CBUpgradeVersion     string
+	CBPodsAfterScaling   int
+	ClusterName          string // TODO to be removed. K8S Cluster Name to be taken from context
 }
 
 // ChaosActionsInterface contains all the methods for executing chaos actions.
@@ -58,6 +62,9 @@ type ChaosActionsInterface interface {
 
 	// CBServiceChaos performs chaos actions on CB services.
 	CBServiceChaos(context *context.Context, chaosConfig *CBPodChaosConfig) error
+
+	// CBClusterChaos performs CB Cluster chaos actions.
+	CBClusterChaos(context *context.Context, chaosConfig *CBPodChaosConfig) error
 }
 
 // NewChaosAction initializes ChaosActionsInterface for the provided managed service.
@@ -128,6 +135,15 @@ func ExecuteChaosAction(context *context.Context, chaosConfig *CBPodChaosConfig)
 
 				return nil
 			}
+		case CBClusterChaosActionName:
+			{
+				err := chaos.CBClusterChaos(context, chaosConfig)
+				if err != nil {
+					return fmt.Errorf("execute chaos action %s: %w", chaosConfig.ChaosAction, err)
+				}
+
+				return nil
+			}
 		}
 	}
 
@@ -140,15 +156,16 @@ func populateCBPodChaos(chaosConfig *ChaosConfig, chaosAction *ChaosList, cbPodN
 
 	for i, cbPodName := range cbPodNames {
 		cbPodChaos := &CBPodChaosConfig{
-			ChaosAction:        chaosAction.ChaosActions[i],
-			ManagedSvcName:     chaosConfig.ManagedSvcName,
-			ChaosIterations:    chaosAction.ChaosIterations,
-			CBPod:              cbPodName,
-			TriggerConfig:      chaosAction.Trigger[i],
-			CBServiceChaos:     chaosAction.CBServiceChaos[i],
-			ClusterName:        chaosConfig.ClusterName,
-			CBUpgradeVersion:   chaosAction.CBUpgradeVersion,
-			CBPodsAfterScaling: chaosAction.CBPodsAfterScaling,
+			ChaosAction:          chaosAction.ChaosActions[i],
+			ManagedSvcName:       chaosConfig.ManagedSvcName,
+			ChaosIterations:      chaosAction.ChaosIterations,
+			CBPod:                cbPodName,
+			TriggerConfig:        chaosAction.Trigger[i],
+			CBServiceChaos:       chaosAction.CBServiceChaos[i],
+			CBClusterChaosConfig: chaosAction.CBClusterChaos[i],
+			ClusterName:          chaosConfig.ClusterName,
+			CBUpgradeVersion:     chaosAction.CBUpgradeVersion,
+			CBPodsAfterScaling:   chaosAction.CBPodsAfterScaling,
 		}
 
 		cbPodChaosConfigs = append(cbPodChaosConfigs, cbPodChaos)
