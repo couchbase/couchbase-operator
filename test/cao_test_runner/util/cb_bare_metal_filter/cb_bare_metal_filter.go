@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
+	cbrestapicall "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_call"
 	"github.com/sirupsen/logrus"
 )
 
@@ -141,7 +143,12 @@ func (cpf *CBBareMetalFilter) filterAll() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	poolsDefault, err := GetClusterDetails("default", hostname, secretName)
+	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	if err != nil {
+		return nil, err
+	}
+
+	poolsDefault, err := clusterNodesAPI.PoolsDefault()
 	if err != nil {
 		return nil, fmt.Errorf("filter all: %w", err)
 	}
@@ -174,9 +181,14 @@ func (cpf *CBBareMetalFilter) filterByServicesCB() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	poolsDefault, err := GetClusterDetails("default", hostname, secretName)
+	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
 	if err != nil {
-		return nil, fmt.Errorf("filter by services cb: %w", err)
+		return nil, err
+	}
+
+	poolsDefault, err := clusterNodesAPI.PoolsDefault()
+	if err != nil {
+		return nil, fmt.Errorf("filter all: %w", err)
 	}
 
 	var requiredCBNodes []string
@@ -220,9 +232,14 @@ func (cpf *CBBareMetalFilter) filterByServerGroups() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	poolsDefault, err := GetClusterDetails("default", hostname, secretName)
+	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
 	if err != nil {
-		return nil, fmt.Errorf("filter by server groups: %w", err)
+		return nil, err
+	}
+
+	poolsDefault, err := clusterNodesAPI.PoolsDefault()
+	if err != nil {
+		return nil, fmt.Errorf("filter all: %w", err)
 	}
 
 	var requiredCBNodes []string
