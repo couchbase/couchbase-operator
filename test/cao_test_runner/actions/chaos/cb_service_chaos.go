@@ -3,6 +3,7 @@ package chaos
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -10,14 +11,34 @@ import (
 )
 
 // CBServiceName stores the process name of the couchbase service.
-// Update MapCBServiceName() and validateCBServiceChaos() whenever adding new CBServiceName.
+// Update MapCBServiceName() and ValidateCBServiceChaos() whenever adding new CBServiceName.
+// Reference: docs.couchbase.com/server/current/install/server-processes.html.
 type CBServiceName string
 
 const (
-	Memcached  CBServiceName = "memcached"
-	Babysitter CBServiceName = "babysitter"
-	BeamSMP    CBServiceName = "beam.smp"
-	Index      CBServiceName = "indexer"
+	// Data Service.
+	Memcached CBServiceName = "memcached"
+	Projector CBServiceName = "projector"
+	XDCR      CBServiceName = "goxdcr"
+	BeamSMP   CBServiceName = "beam.smp"
+	GoSecrets CBServiceName = "gosecrets"
+
+	// Index Service.
+	Index CBServiceName = "indexer"
+
+	// Query Service.
+	Query  CBServiceName = "cbq-engine"
+	GoPort CBServiceName = "goport"
+
+	// Analytics Service.
+	Analytics CBServiceName = "cbas"
+
+	// FTS Service.
+	FTS CBServiceName = "cbft"
+
+	// Eventing Service.
+	EventingProducer CBServiceName = "eventing-producer"
+	EventingConsumer CBServiceName = "eventing-consumer"
 )
 
 var (
@@ -80,15 +101,31 @@ func ExecuteCBServiceChaos(context *context.Context, chaosConfig *CBPodChaosConf
 
 // MapCBServiceName maps various CB service names to CBServiceName. E.g. kv or memcached both will refer to Memcached.
 func MapCBServiceName(service string) (CBServiceName, error) {
-	switch service {
+	switch strings.ToLower(service) {
 	case "kv", "memcached":
 		return Memcached, nil
-	case "babysitter":
-		return Babysitter, nil
+	case "projector":
+		return Projector, nil
+	case "xdcr":
+		return XDCR, nil
 	case "beam", "beamsmp", "beam.smp":
 		return BeamSMP, nil
-	case "index", "indexer":
+	case "gosecrets":
+		return GoSecrets, nil
+	case "index", "indexer", "indexing":
 		return Index, nil
+	case "query", "cbq-engine", "cbq":
+		return Query, nil
+	case "goport":
+		return GoPort, nil
+	case "analytics":
+		return Analytics, nil
+	case "fts":
+		return FTS, nil
+	case "eventing-producer", "eventing":
+		return EventingProducer, nil
+	case "eventing-consumer":
+		return EventingConsumer, nil
 	default:
 		return "", fmt.Errorf("map service name `%s`: %w", service, ErrCBServiceNameNotDefined)
 	}
