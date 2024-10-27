@@ -79,6 +79,17 @@ func CreateSecretLiteral(name string, user string, pw string) *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args, Flags: flags}}
 }
 
+func CreateSecretDockerRegistry(secretName, dockerServer, dockerUsername, dockerPassword, dockerEmail string) *KubectlCmd {
+	args := []string{
+		"secret", "docker-registry", secretName,
+		"--docker-server", dockerServer,
+		"--docker-username", dockerUsername,
+		"--docker-password", dockerPassword,
+		"--docker-email", dockerEmail,
+	}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args}}
+}
+
 func CreateFromFiles(paths ...string) *KubectlCmd {
 	var args []string
 	for _, p := range paths {
