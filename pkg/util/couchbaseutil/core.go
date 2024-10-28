@@ -10,8 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -30,10 +28,9 @@ const (
 )
 
 var (
-	ErrCertificateError      = fmt.Errorf("certificate error")
-	ErrStatusError           = fmt.Errorf("unexpected status code")
-	ErrUUIDError             = fmt.Errorf("cluster UUID error")
-	separateNameAndNamespace = os.Getenv("separate-cluster-name-and-namespace")
+	ErrCertificateError = fmt.Errorf("certificate error")
+	ErrStatusError      = fmt.Errorf("unexpected status code")
+	ErrUUIDError        = fmt.Errorf("cluster UUID error")
 )
 
 type FailedRequestError struct {
@@ -198,15 +195,13 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	metricPath := request.URL.Path
 	metricHostname := request.URL.Hostname()
 
-	if strings.EqualFold(separateNameAndNamespace, "true") {
-		metrics.HTTPRequestTotalMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, metricPath, metricHostname}, c.cluster)...).Inc()
-	}
+	metrics.HTTPRequestTotalMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Inc()
 
 	// Logs are always emitted regardless of status.  Context is added to the log labels
 	// depending on the path taken.
 	defer func() {
 		delta := time.Since(start)
-		metrics.HTTPRequestDurationMSMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, metricPath, metricHostname}, c.cluster)...).Observe(float64(delta.Milliseconds()))
+		metrics.HTTPRequestDurationMSMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Observe(float64(delta.Milliseconds()))
 
 		logLabels = append(logLabels, "time_ms", float64(delta.Nanoseconds())/1000000.0)
 
@@ -218,13 +213,13 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	if err != nil {
 		logLabels = append(logLabels, "error", err)
 
-		metrics.HTTPRequestFailureMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, metricPath, metricHostname}, c.cluster)...).Inc()
+		metrics.HTTPRequestFailureMetric.WithLabelValues(c.cluster, request.Method, metricPath, metricHostname).Inc()
 
 		return errors.NewStackTracedError(err)
 	}
 
 	logLabels = append(logLabels, "status", response.Status)
-	metrics.HTTPRequestTotalCodeMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, IntToStr(response.StatusCode), metricPath, metricHostname}, c.cluster)...).Inc()
+	metrics.HTTPRequestTotalCodeMetric.WithLabelValues(c.cluster, request.Method, IntToStr(response.StatusCode), metricPath, metricHostname).Inc()
 
 	// Read the body so we can display it for really verbose debugging.
 	defer response.Body.Close()

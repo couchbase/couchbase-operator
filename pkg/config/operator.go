@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -113,9 +112,6 @@ type generateOperatorOptions struct {
 
 	// optionalMetricLabels includes uuid or uuid and name in the prometheus metric labels.
 	optionalMetricLabels MetricLabel
-
-	// separateMetricClusternameAndNamespace allows you to separate cluster name and namespace from certain metrics.
-	separateMetricClusternameAndNamespace bool
 }
 
 // newGenerateOperatorOptions returns a set of options with defaults applied.
@@ -152,7 +148,6 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.memoryLimit, "memory-limit", "Memory limit for constraining")
 	cmd.Flags().BoolVar(&o.debug, debug, false, "Runs debug configuration. Not intended for external use")
 	cmd.Flags().Var(&o.optionalMetricLabels, "optional-metric-labels", "Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.")
-	cmd.Flags().BoolVar(&o.separateMetricClusternameAndNamespace, "separate-cluster-namespace-and-name", false, "Separates cluster name and namespace from certain metrics.")
 	_ = cmd.Flags().MarkHidden(debug)
 }
 
@@ -662,10 +657,6 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 								{
 									Name:  "additional-prometheus-labels",
 									Value: o.optionalMetricLabels.String(),
-								},
-								{
-									Name:  "separate-cluster-name-and-namespace",
-									Value: strconv.FormatBool(o.separateMetricClusternameAndNamespace),
 								},
 							},
 							Ports: []corev1.ContainerPort{
