@@ -1,4 +1,4 @@
-package cbrestapi
+package clusternodes
 
 // =============================================
 // ============== /pools/default ===============

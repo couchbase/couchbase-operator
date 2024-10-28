@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
-	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api"
-	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api/cluster_nodes"
+	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
 
@@ -31,7 +30,7 @@ func WaitForScaling(trigger *TriggerConfig) error {
 	}
 
 	checkScalingFunc := func() error {
-		var clusterTaskResults []cbrestapi.Task
+		var clusterTaskResults []clusternodesapi.Task
 
 		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTaskResults, defaultRequestTimeout)
 		if err != nil {
@@ -39,8 +38,8 @@ func WaitForScaling(trigger *TriggerConfig) error {
 		}
 
 		for _, clusterTaskResult := range clusterTaskResults {
-			if clusterTaskResult.Type == cbrestapi.TaskTypeRebalance {
-				if clusterTaskResult.Status == cbrestapi.TaskStatusRunning {
+			if clusterTaskResult.Type == clusternodesapi.TaskTypeRebalance {
+				if clusterTaskResult.Status == clusternodesapi.TaskStatusRunning {
 					// Active Nodes - Eject Nodes = Final Number of Nodes to have.
 					activeNodes := len(clusterTaskResult.NodesInfo.ActiveNodes)
 					ejectNodes := len(clusterTaskResult.NodesInfo.EjectNodes)

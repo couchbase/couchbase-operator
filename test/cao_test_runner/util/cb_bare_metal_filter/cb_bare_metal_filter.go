@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	cbrestapicall "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_call"
+	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -143,7 +143,7 @@ func (cpf *CBBareMetalFilter) filterAll() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (cpf *CBBareMetalFilter) filterByServicesCB() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (cpf *CBBareMetalFilter) filterByServerGroups() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapicall.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	cbrestapicall "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_call"
+	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api"
 )
 
 var (
@@ -40,7 +40,7 @@ func ExecuteCBClusterChaos(ctx *context.Context, chaosConfig *CBPodChaosConfig) 
 }
 
 func (c *CBClusterChaosConfig) StopRebalance(ctx *context.Context) error {
-	cbAPIClient, err := cbrestapicall.NewClusterNodesAPI("localhost", 8091, "", "", "cb-example-auth", "default", 5*time.Second, false)
+	cbAPIClient, err := cbrestapi.NewClusterNodesAPI("localhost", 8091, "", "", "cb-example-auth", "default", 5*time.Second, false)
 	if err != nil {
 		return fmt.Errorf("chaos stop rebalance: %w", err)
 	}

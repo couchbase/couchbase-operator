@@ -6,7 +6,7 @@ import requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runne
 /*
  * GET :: /nodes/self.
  * docs.couchbase.com/server/current/rest-api/rest-getting-storage-information.html.
- * Unmarshal into the struct cbrestapi.Nodes.
+ * Unmarshal into the struct clusternodesapi.Nodes.
  */
 func NodeDetails(hostname string) *requestutils.Request {
 	return &requestutils.Request{
@@ -23,7 +23,7 @@ func NodeDetails(hostname string) *requestutils.Request {
 /*
  * GET :: /nodeStatuses.
  * Not documented in CB docs.
- * Unmarshal into the struct cbrestapi.NodeStatuses.
+ * Unmarshal into the struct clusternodesapi.NodeStatuses.
  */
 func GetNodeStatuses(hostname string) *requestutils.Request {
 	return &requestutils.Request{

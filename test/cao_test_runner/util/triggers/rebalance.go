@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
-	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api"
-	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api/cluster_nodes"
+	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 	"github.com/sirupsen/logrus"
 )
@@ -41,7 +40,7 @@ func WaitForRebalance(trigger *TriggerConfig) error {
 	}
 
 	checkRebalanceFunc := func() error {
-		var clusterTasks []cbrestapi.Task
+		var clusterTasks []clusternodesapi.Task
 
 		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
 		if err != nil {
@@ -52,8 +51,8 @@ func WaitForRebalance(trigger *TriggerConfig) error {
 		logrus.Debugf("tasks: %v\n", clusterTasks)
 
 		for _, task := range clusterTasks {
-			if task.Type == cbrestapi.TaskTypeRebalance {
-				if task.Status == cbrestapi.TaskStatusRunning {
+			if task.Type == clusternodesapi.TaskTypeRebalance {
+				if task.Status == clusternodesapi.TaskStatusRunning {
 					return nil
 				} else {
 					return ErrRebalanceNotStarted
@@ -89,7 +88,7 @@ func WaitForDeltaRecoveryRebalance(trigger *TriggerConfig) error {
 	}
 
 	checkDeltaRecovery := func() error {
-		var clusterTasks []cbrestapi.Task
+		var clusterTasks []clusternodesapi.Task
 
 		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
 		if err != nil {
@@ -100,8 +99,8 @@ func WaitForDeltaRecoveryRebalance(trigger *TriggerConfig) error {
 		logrus.Debugf("tasks: %v\n", clusterTasks)
 
 		for _, task := range clusterTasks {
-			if task.Type == cbrestapi.TaskTypeRebalance && task.Subtype == RebalanceSubTypeRebalance {
-				if task.Status == cbrestapi.TaskStatusRunning {
+			if task.Type == clusternodesapi.TaskTypeRebalance && task.Subtype == RebalanceSubTypeRebalance {
+				if task.Status == clusternodesapi.TaskStatusRunning {
 					// Rebalance started, we check if the required cb pod is in delta_nodes
 					for _, cbPod := range task.NodesInfo.DeltaNodes {
 						if strings.Contains(cbPod, trigger.CBInfo.cbPodName) {
@@ -142,7 +141,7 @@ func WaitForSwapRebalanceOut(trigger *TriggerConfig) error {
 	}
 
 	checkSwapRebalance := func() error {
-		var clusterTasks []cbrestapi.Task
+		var clusterTasks []clusternodesapi.Task
 
 		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
 		if err != nil {
@@ -150,8 +149,8 @@ func WaitForSwapRebalanceOut(trigger *TriggerConfig) error {
 		}
 
 		for _, task := range clusterTasks {
-			if task.Type == cbrestapi.TaskTypeRebalance {
-				if task.Status == cbrestapi.TaskStatusRunning {
+			if task.Type == clusternodesapi.TaskTypeRebalance {
+				if task.Status == clusternodesapi.TaskStatusRunning {
 					// Check if the eject nodes is the one we want
 					for _, ejectCBPod := range task.NodesInfo.EjectNodes {
 						if strings.Contains(ejectCBPod, trigger.CBInfo.cbPodName) {

@@ -154,7 +154,7 @@ func (c *Client) handleResponse(resp *http.Response, result interface{}) error {
 
 	// Handle the content types we expect.
 	switch contentType := resp.Header.Get("Content-Type"); contentType {
-	case "application/json":
+	case "application/json", "application/json;charset=utf-8":
 		{
 			if err := json.Unmarshal(body, result); err != nil {
 				logrus.Errorf("handle http response for content-type %s, response:\n%s\n", contentType, string(body))

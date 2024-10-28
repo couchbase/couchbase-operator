@@ -7,8 +7,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
-	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api"
-	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api/cluster_nodes"
+	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
 
@@ -39,7 +38,7 @@ func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
 	}
 
 	checkDeltaUpgradeWarmup := func() error {
-		var poolsDefault cbrestapi.PoolsDefault
+		var poolsDefault clusternodesapi.PoolsDefault
 
 		checkCBPodVersion := false
 
@@ -68,7 +67,7 @@ func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
 
 		// If the required cbPod is in the delta nodes, we just confirm the version of the cbPod
 		if checkCBPodVersion {
-			var poolsDefault cbrestapi.PoolsDefault
+			var poolsDefault clusternodesapi.PoolsDefault
 
 			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
 			if err != nil {
@@ -115,7 +114,7 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 	}
 
 	checkDeltaUpgrade := func() error {
-		var clusterTasks []cbrestapi.Task
+		var clusterTasks []clusternodesapi.Task
 
 		checkCBPodVersion := false
 
@@ -126,7 +125,7 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 
 		for _, task := range clusterTasks {
 			// Finding the task rebalance from the list of tasks and checking if the rebalance is running
-			if task.Type == cbrestapi.TaskTypeRebalance && task.Status == cbrestapi.TaskStatusRunning {
+			if task.Type == clusternodesapi.TaskTypeRebalance && task.Status == clusternodesapi.TaskStatusRunning {
 				// Checking if the delta nodes is the one we want
 				for _, deltaCBPod := range task.NodesInfo.DeltaNodes {
 					if strings.Contains(deltaCBPod, trigger.CBInfo.cbPodName) {
@@ -143,7 +142,7 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 
 		// If the required cbPod is in the delta nodes, we just confirm the version of the cbPod
 		if checkCBPodVersion {
-			var poolsDefault cbrestapi.PoolsDefault
+			var poolsDefault clusternodesapi.PoolsDefault
 
 			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
 			if err != nil {
@@ -191,9 +190,9 @@ func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
 	}
 
 	checkSwapRebalance := func() error {
-		var clusterTasks []cbrestapi.Task
+		var clusterTasks []clusternodesapi.Task
 
-		var reqRebalanceTask cbrestapi.Task
+		var reqRebalanceTask clusternodesapi.Task
 
 		getSwapInPod := false
 
@@ -204,8 +203,8 @@ func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
 
 		// First checking if Swap Rebalance upgrade has started.
 		for _, task := range clusterTasks {
-			if task.Type == cbrestapi.TaskTypeRebalance {
-				if task.Status == cbrestapi.TaskStatusRunning {
+			if task.Type == clusternodesapi.TaskTypeRebalance {
+				if task.Status == clusternodesapi.TaskStatusRunning {
 					// Check if the eject nodes is the one we want
 					for _, ejectCBPod := range task.NodesInfo.EjectNodes {
 						if strings.Contains(ejectCBPod, trigger.CBInfo.cbPodName) {
@@ -234,7 +233,7 @@ func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
 			// swapInPod is the latest pod with updated count in the name.
 			swapInPod := keepNodes[len(keepNodes)-1]
 
-			var poolsDefault cbrestapi.PoolsDefault
+			var poolsDefault clusternodesapi.PoolsDefault
 
 			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
 			if err != nil {

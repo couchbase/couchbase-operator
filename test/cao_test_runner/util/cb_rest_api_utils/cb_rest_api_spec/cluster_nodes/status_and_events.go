@@ -8,7 +8,7 @@ import (
 /*
  * GET :: /pools/default.
  * docs.couchbase.com/server/current/rest-api/rest-cluster-details.html.
- * Unmarshal into the struct cbrestapi.PoolsDefault.
+ * Unmarshal into the struct clusternodesapi.PoolsDefault.
  */
 func ClusterDetails(hostname string) *requestutils.Request {
 	return &requestutils.Request{
@@ -25,7 +25,7 @@ func ClusterDetails(hostname string) *requestutils.Request {
 /*
  * GET :: /pools/default/tasks.
  * docs.couchbase.com/server/current/rest-api/rest-get-cluster-tasks.html.
- * Unmarshal into the struct cbrestapi.TaskList.
+ * Unmarshal into the struct clusternodesapi.TaskList.
  */
 func ClusterTasks(hostname string) *requestutils.Request {
 	return &requestutils.Request{
@@ -59,7 +59,7 @@ func ClusterInfo(hostname string) *requestutils.Request {
 /*
  * GET :: /pools/default/terseClusterInfo.
  * docs.couchbase.com/server/current/rest-api/rest-cluster-get.html.
- * Unmarshal into the struct cbrestapi.TerseClusterInfo.
+ * Unmarshal into the struct clusternodesapi.TerseClusterInfo.
  */
 func GetTerseClusterInfo(hostname string) *requestutils.Request {
 	return &requestutils.Request{

@@ -1,12 +1,11 @@
-package cbrestapicall
+package cbrestapi
 
 import (
 	"errors"
 	"fmt"
 	"time"
 
-	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api"
-	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api/cluster_nodes"
+	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
 
@@ -21,7 +20,7 @@ var (
 
 type ClusterNodesAPI interface {
 	// CB Cluster Information APIs.
-	PoolsDefault() (*cbrestapi.PoolsDefault, error)
+	PoolsDefault() (*clusternodesapi.PoolsDefault, error)
 
 	// Rebalance APIs.
 	StopRebalance() error
@@ -103,8 +102,8 @@ func NewClusterNodesAPI(hostname string, port int, username, password, secretNam
 // ================= CB Cluster Information APIs =================
 // ===============================================================
 
-func (cn *ClusterNodes) PoolsDefault() (*cbrestapi.PoolsDefault, error) {
-	var poolsDefault cbrestapi.PoolsDefault
+func (cn *ClusterNodes) PoolsDefault() (*clusternodesapi.PoolsDefault, error) {
+	var poolsDefault clusternodesapi.PoolsDefault
 
 	err := cn.reqClient.Do(clusternodesapi.ClusterDetails(cn.hostname), &poolsDefault, cn.reqTimeout)
 	if err != nil {

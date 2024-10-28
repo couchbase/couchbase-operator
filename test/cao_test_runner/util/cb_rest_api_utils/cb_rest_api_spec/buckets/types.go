@@ -1,29 +1,31 @@
 package buckets
 
-import cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api"
+import (
+	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
+)
 
 // ======================================================
 // =============== /pools/default/buckets ===============
 // ======================================================
 
 type BucketInfo struct {
-	Name                   string            `json:"name"`
-	NodeLocator            string            `json:"nodeLocator"`
-	BucketType             string            `json:"bucketType"`
-	StorageBackend         string            `json:"storageBackend"`
-	UUID                   string            `json:"uuid"`
-	URI                    string            `json:"uri"`
-	StreamingURI           string            `json:"streamingUri"`
-	NumVBuckets            int               `json:"numVBuckets"`
-	BucketCapabilitiesVer  string            `json:"bucketCapabilitiesVer"`
-	BucketCapabilities     []string          `json:"bucketCapabilities"`
-	CollectionsManifestUID string            `json:"collectionsManifestUid"`
-	VBucketServerMap       VBucketServerMap  `json:"vBucketServerMap"`
-	Nodes                  []cbrestapi.Nodes `json:"nodes"`
-	AuthType               string            `json:"authType"`
-	AutoCompactionSettings bool              `json:"autoCompactionSettings"`
-	ReplicaIndex           bool              `json:"replicaIndex"`
-	Rank                   int               `json:"rank"`
+	Name                   string                  `json:"name"`
+	NodeLocator            string                  `json:"nodeLocator"`
+	BucketType             string                  `json:"bucketType"`
+	StorageBackend         string                  `json:"storageBackend"`
+	UUID                   string                  `json:"uuid"`
+	URI                    string                  `json:"uri"`
+	StreamingURI           string                  `json:"streamingUri"`
+	NumVBuckets            int                     `json:"numVBuckets"`
+	BucketCapabilitiesVer  string                  `json:"bucketCapabilitiesVer"`
+	BucketCapabilities     []string                `json:"bucketCapabilities"`
+	CollectionsManifestUID string                  `json:"collectionsManifestUid"`
+	VBucketServerMap       VBucketServerMap        `json:"vBucketServerMap"`
+	Nodes                  []clusternodesapi.Nodes `json:"nodes"`
+	AuthType               string                  `json:"authType"`
+	AutoCompactionSettings bool                    `json:"autoCompactionSettings"`
+	ReplicaIndex           bool                    `json:"replicaIndex"`
+	Rank                   int                     `json:"rank"`
 
 	EnableCrossClusterVersioning bool `json:"enableCrossClusterVersioning"`
 	VersionPruningWindowHrs      int  `json:"versionPruningWindowHrs"`
@@ -51,7 +53,7 @@ type VBucketServerMap struct {
 
 type BucketBasicStats struct {
 	// StorageTotals is only present when /pools/default/buckets/bucket1?basic_stats=true
-	StorageTotals cbrestapi.StorageTotals `json:"storageTotals"`
+	StorageTotals clusternodesapi.StorageTotals `json:"storageTotals"`
 
 	QuotaPercentUsed       float64 `json:"quotaPercentUsed"`
 	OpsPerSec              int64   `json:"opsPerSec"`   // TODO not sure if int64 or float64
