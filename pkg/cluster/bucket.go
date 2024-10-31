@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
@@ -119,6 +121,22 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 		if supportedRank {
 			b.Rank = &bucket.Spec.Rank
 		}
+
+		autoCompactionSettings := couchbaseutil.BucketAutoCompactionSettings{
+			Enabled:  bucket.Spec.AutoCompaction != nil,
+			Settings: nil,
+		}
+
+		if bucket.Spec.AutoCompaction != nil {
+			autoCompactionSettings.Settings = gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, cluster)
+
+			if bucket.Spec.AutoCompaction.TombstonePurgeInterval != nil {
+				val := bucket.Spec.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0
+				b.PurgeInterval = &val
+			}
+		}
+
+		b.AutoCompactionSettings = autoCompactionSettings
 
 		outputBuckets = append(outputBuckets, b)
 	}
@@ -303,6 +321,8 @@ func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.B
 	for _, r := range requested {
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
+				equalizeBucketAutoCompactionSettings(&r, &a)
+
 				if !reflect.DeepEqual(r, a) {
 					updateBuckets[a] = r
 				}
@@ -370,6 +390,8 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				if found = c.checkUnreconilableBucket(a); found {
 					continue
 				}
+
+				equalizeBucketAutoCompactionSettings(&r, &a)
 
 				if !reflect.DeepEqual(r, a) {
 					update = append(update, r)
@@ -585,4 +607,73 @@ func (c *Cluster) canBucketBeMigrated(b couchbaseutil.Bucket, backend couchbaseu
 	}
 
 	return true, ""
+}
+
+// equalizeBucketAutoCompactionSettings compares the auto-compaction settings in the requested bucket to those in the actual bucket.
+// If values for the purge interval and/or threshold percentages have not been set on the requested bucket, those values will be set to the
+// current value in the actual bucket in order to avoid unnecessary updates when the values don't need updating.
+func equalizeBucketAutoCompactionSettings(requested, actual *couchbaseutil.Bucket) {
+	if !requested.AutoCompactionSettings.Enabled {
+		return
+	}
+
+	if requested.PurgeInterval == nil {
+		requested.PurgeInterval = actual.PurgeInterval
+	}
+
+	if requested.AutoCompactionSettings.Settings != nil && actual.AutoCompactionSettings.Settings != nil {
+		if requested.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage == 0 {
+			requested.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage = actual.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage
+		}
+
+		if requested.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage == 0 {
+			requested.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage = actual.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage
+		}
+	}
+}
+
+// gatherBucketAutoCompactionSettings will convert auto-compaction settings defined on bucket CRD's into auto-compaction settings that can be recognised
+// and mapped to by the couchbase server. This method assumes that at least one auto-compaction setting has been configured
+// on the k8s bucket.
+func gatherBucketAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionSpecBucket, cluster *couchbasev2.CouchbaseCluster) *couchbaseutil.AutoCompactionAutoCompactionSettings {
+	settings := couchbaseutil.AutoCompactionAutoCompactionSettings{
+		// ParallelDBAndViewCompaction is a global settings and required for setting bucket level auto-compaction settings, so we should just use the cluster level value
+		ParallelDBAndViewCompaction: cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
+	}
+
+	if crdSettings.DatabaseFragmentationThreshold != nil {
+		if crdSettings.DatabaseFragmentationThreshold.Percent != nil {
+			settings.DatabaseFragmentationThreshold.Percentage = *crdSettings.DatabaseFragmentationThreshold.Percent
+		}
+
+		if crdSettings.DatabaseFragmentationThreshold.Size != nil {
+			settings.DatabaseFragmentationThreshold.Size = crdSettings.DatabaseFragmentationThreshold.Size.Value()
+		}
+	}
+
+	if crdSettings.ViewFragmentationThreshold != nil {
+		if crdSettings.ViewFragmentationThreshold.Percent != nil {
+			settings.ViewFragmentationThreshold.Percentage = *crdSettings.ViewFragmentationThreshold.Percent
+		}
+
+		if crdSettings.ViewFragmentationThreshold.Size != nil {
+			settings.ViewFragmentationThreshold.Size = crdSettings.ViewFragmentationThreshold.Size.Value()
+		}
+	}
+
+	// Time window should only be provided if fully specified by a user
+	if crdSettings.TimeWindow != nil && crdSettings.TimeWindow.Start != nil && crdSettings.TimeWindow.End != nil {
+		autoCompactionTimePeriod := couchbaseutil.AutoCompactionAllowedTimePeriod{
+			AbortOutside: crdSettings.TimeWindow.AbortCompactionOutsideWindow,
+		}
+		parts := strings.Split(*crdSettings.TimeWindow.Start, ":")
+		autoCompactionTimePeriod.FromHour, _ = strconv.Atoi(parts[0])
+		autoCompactionTimePeriod.FromMinute, _ = strconv.Atoi(parts[1])
+		parts = strings.Split(*crdSettings.TimeWindow.End, ":")
+		autoCompactionTimePeriod.ToHour, _ = strconv.Atoi(parts[0])
+		autoCompactionTimePeriod.ToMinute, _ = strconv.Atoi(parts[1])
+		settings.AllowedTimePeriod = &autoCompactionTimePeriod
+	}
+
+	return &settings
 }

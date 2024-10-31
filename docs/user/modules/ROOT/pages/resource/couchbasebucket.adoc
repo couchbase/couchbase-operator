@@ -19,6 +19,18 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasebuckets-metadata,metadata>>:
   <<couchbasebuckets-metadata-name,name>>: ""
 <<couchbasebuckets-spec,spec>>:
+  <<couchbasebuckets-spec-autocompaction,autoCompaction>>:
+    <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
+      <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold-percent,percent>>: 0
+      <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold-size,size>>: ""
+    <<couchbasebuckets-spec-autocompaction-timewindow,timeWindow>>:
+      <<couchbasebuckets-spec-autocompaction-timewindow-abortcompactionoutsidewindow,abortCompactionOutsideWindow>>: false
+      <<couchbasebuckets-spec-autocompaction-timewindow-end,end>>: ""
+      <<couchbasebuckets-spec-autocompaction-timewindow-start,start>>: ""
+    <<couchbasebuckets-spec-autocompaction-tombstonepurgeinterval,tombstonePurgeInterval>>: ""
+    <<couchbasebuckets-spec-autocompaction-viewfragmentationthreshold,viewFragmentationThreshold>>:
+      <<couchbasebuckets-spec-autocompaction-viewfragmentationthreshold-percent,percent>>: 0
+      <<couchbasebuckets-spec-autocompaction-viewfragmentationthreshold-size,size>>: ""
   <<couchbasebuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbasebuckets-spec-conflictresolution,conflictResolution>>: seqno
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
@@ -85,6 +97,154 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasebucket]
 
 CouchbaseBucketSpec is the specification for a Couchbase bucket resource, and
 allows the bucket to be customized.
+
+=== couchbasebuckets.spec.autoCompaction
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+AutoCompaction allows the configuration of auto-compaction settings, including on what
+conditions disk space is reclaimed and when it is allowed to run, on a per-bucket basis.
+If any of these fields are configured, those that are not configured here will take the value set at the cluster level.
+Excluding this field (which is the default), will set the autoCompactionSettings to false and the bucket will use cluster defaults.
+
+=== couchbasebuckets.spec.autoCompaction.databaseFragmentationThreshold
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+DatabaseFragmentationThreshold defines triggers for when database compaction should start.
+
+=== couchbasebuckets.spec.autoCompaction.databaseFragmentationThreshold.percent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `100`
+
+==== Description
+
+Percent specifies the level of view fragmentation that must be reached for View compaction to be automatically triggered.
+This field must be in the range 0-100, defaulting to the cluster level value.
+
+=== couchbasebuckets.spec.autoCompaction.databaseFragmentationThreshold.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size the level of database fragmentation that must be reached for data compaction to be automatically triggered on the bucket.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbasebuckets.spec.autoCompaction.timeWindow
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+TimeWindow allows restriction of when compaction can occur.
+
+=== couchbasebuckets.spec.autoCompaction.timeWindow.abortCompactionOutsideWindow
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AbortCompactionOutsideWindow stops compaction processes when the
+process moves outside the window, defaulting to false.
+
+=== couchbasebuckets.spec.autoCompaction.timeWindow.end
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
+
+==== Description
+
+End is a wallclock time, in the form HH:MM, when a compaction should stop.
+
+=== couchbasebuckets.spec.autoCompaction.timeWindow.start
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(2[0-3]|[01]?[0-9]):([0-5]?[0-9])$`
+
+==== Description
+
+Start is a wallclock time, in the form HH:MM, when a compaction is permitted to start.
+
+=== couchbasebuckets.spec.autoCompaction.tombstonePurgeInterval
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+TombstonePurgeInterval controls how long to wait before purging tombstones.
+This field must be in the range 1h-1440h, defaulting to the cluster level value.
+More info:  https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbasebuckets.spec.autoCompaction.viewFragmentationThreshold
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ViewFragmentationThreshold defines triggers for when view compaction should start.
+
+=== couchbasebuckets.spec.autoCompaction.viewFragmentationThreshold.percent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `100`
+
+==== Description
+
+Percent specifies the percentage level of View fragmentation that must be reached for View compaction to be automatically triggered on the bucket
+This field must be in the range 0-100, defaulting to the cluster level value.
+
+=== couchbasebuckets.spec.autoCompaction.viewFragmentationThreshold.size
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+Size is the level of View fragmentation that must be reached for view compaction to be automatically triggered on the bucket.
+More info:
+https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
 
 === couchbasebuckets.spec.compressionMode
 

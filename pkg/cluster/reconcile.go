@@ -907,7 +907,7 @@ func (c *Cluster) reconcileAuditSettings() error {
 	return nil
 }
 
-// reconcileAutoCompactionSettings sets up disk defragmentation.
+// reconcileAutoCompactionSettings sets up the global auto-compaction settings for a cluster.
 func (c *Cluster) reconcileAutoCompactionSettings() error {
 	// Read
 	current := &couchbaseutil.AutoCompactionSettings{}

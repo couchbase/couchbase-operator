@@ -1833,3 +1833,7 @@ func GetPvcName(lpv bool) string {
 
 	return "couchbase"
 }
+
+func MiToByteQuantity(mi int) int64 {
+	return int64(mi * 1024 * 1024)
+}

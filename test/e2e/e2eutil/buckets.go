@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -795,4 +796,29 @@ func MustVerifyStorageBackendUnchanged(t *testing.T, k8s *types.Cluster, cluster
 	if err := storageBackendUnchanged(t, k8s, cluster, bucket, storageBackendType, timeout); err != nil {
 		Die(t, err)
 	}
+}
+
+func MustVerifyCouchbaseBucketAutoCompactionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, expectedSettings couchbaseutil.BucketAutoCompactionSettings, expectedPurgeInterval *float64, timeout time.Duration) {
+	if err := verifyBuckAutoCompactionSettings(t, k8s, cluster, bucket, expectedSettings, expectedPurgeInterval, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func verifyBuckAutoCompactionSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, expectedSettings couchbaseutil.BucketAutoCompactionSettings, expectedPurgeInterval *float64, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if !reflect.DeepEqual(info.AutoCompactionSettings, expectedSettings) {
+			return fmt.Errorf("bucket auto compaction settings from api %v, expected %v", info.AutoCompactionSettings.Settings, expectedSettings.Settings)
+		}
+
+		if !reflect.DeepEqual(info.PurgeInterval, expectedPurgeInterval) {
+			return fmt.Errorf("bucket auto compaction purge interval from api %v, expected %v", info.PurgeInterval, expectedPurgeInterval)
+		}
+
+		return nil
+	})
 }

@@ -1413,6 +1413,13 @@ type CouchbaseBucketSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1000
 	Rank int `json:"rank,omitempty"`
+
+	// AutoCompaction allows the configuration of auto-compaction settings, including on what
+	// conditions disk space is reclaimed and when it is allowed to run, on a per-bucket basis.
+	// If any of these fields are configured, those that are not configured here will take the value set at the cluster level.
+	// Excluding this field (which is the default), will set the autoCompactionSettings to false and the bucket will use cluster defaults.
+	// +optional
+	AutoCompaction *AutoCompactionSpecBucket `json:"autoCompaction,omitempty"`
 }
 
 type HistoryRetentionSettings struct {
@@ -3185,7 +3192,9 @@ type ClusterConfig struct {
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`
 
 	// AutoCompaction allows the configuration of auto-compaction, including on what
-	// conditions disk space is reclaimed and when it is allowed to run.
+	// conditions disk space is reclaimed and when it is allowed to run. Cluster level settings
+	// will be used as the default when creating new buckets and any changes to the settings will be applied
+	// to all existing buckets that have not had their auto-compaction settings individually modified.
 	// +kubebuilder:default="x-couchbase-object"
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty"`
 }
@@ -3542,6 +3551,36 @@ type ViewFragmentationThreshold struct {
 	Size *resource.Quantity `json:"size,omitempty"`
 }
 
+// DatabaseFragmentationThresholdBucket lists triggers for when database compaction at the bucket level. This has different defaults and documentation than cluster level.
+type DatabaseFragmentationThresholdBucket struct {
+	// Percent specifies the level of view fragmentation that must be reached for View compaction to be automatically triggered.
+	// This field must be in the range 0-100, defaulting to the cluster level value.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	Percent *int `json:"percent,omitempty"`
+
+	// Size the level of database fragmentation that must be reached for data compaction to be automatically triggered on the bucket.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:validation:Type=string
+	Size *resource.Quantity `json:"size,omitempty"`
+}
+
+// ViewFragmentationThresholdBucket lists triggers for when view compaction should start at the bucket level. This has different defaults and documentation than cluster level.
+type ViewFragmentationThresholdBucket struct {
+	// Percent specifies the percentage level of View fragmentation that must be reached for View compaction to be automatically triggered on the bucket
+	// This field must be in the range 0-100, defaulting to the cluster level value.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	Percent *int `json:"percent,omitempty"`
+
+	// Size is the level of View fragmentation that must be reached for view compaction to be automatically triggered on the bucket.
+	// More info:
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes
+	// +kubebuilder:validation:Type=string
+	Size *resource.Quantity `json:"size,omitempty"`
+}
+
 // TimeWindow allows the user to restrict when compaction can occur.
 type TimeWindow struct {
 	// Start is a wallclock time, in the form HH:MM, when a compaction is permitted to start.
@@ -3553,12 +3592,11 @@ type TimeWindow struct {
 	End *string `json:"end,omitempty"`
 
 	// AbortCompactionOutsideWindow stops compaction processes when the
-	// process moves outside the window.
-	// +kubebuilder:default=false
+	// process moves outside the window, defaulting to false.
 	AbortCompactionOutsideWindow bool `json:"abortCompactionOutsideWindow,omitempty"`
 }
 
-// AutoCompaction define auto compaction settings.
+// AutoCompaction defines auto-compaction settings.
 type AutoCompaction struct {
 	// DatabaseFragmentationThreshold defines triggers for when database compaction should start.
 	// +optional
@@ -3582,6 +3620,23 @@ type AutoCompaction struct {
 	// More info:  https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="72h"
 	TombstonePurgeInterval *metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
+}
+
+// AutoCompactionBucket defines auto-compaction settings at the bucket level.
+type AutoCompactionSpecBucket struct {
+	// DatabaseFragmentationThreshold defines triggers for when database compaction should start.
+	DatabaseFragmentationThreshold *DatabaseFragmentationThresholdBucket `json:"databaseFragmentationThreshold,omitempty"`
+
+	// ViewFragmentationThreshold defines triggers for when view compaction should start.
+	ViewFragmentationThreshold *ViewFragmentationThresholdBucket `json:"viewFragmentationThreshold,omitempty"`
+
+	// TombstonePurgeInterval controls how long to wait before purging tombstones.
+	// This field must be in the range 1h-1440h, defaulting to the cluster level value.
+	// More info:  https://golang.org/pkg/time/#ParseDuration
+	TombstonePurgeInterval *metav1.Duration `json:"tombstonePurgeInterval,omitempty"`
+
+	// TimeWindow allows restriction of when compaction can occur.
+	TimeWindow *TimeWindow `json:"timeWindow,omitempty"`
 }
 
 // Replications defines XDCR replications.

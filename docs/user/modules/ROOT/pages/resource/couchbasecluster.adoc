@@ -1022,6 +1022,9 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 
 AutoCompaction allows the configuration of auto-compaction, including on what
 conditions disk space is reclaimed and when it is allowed to run.
+Cluster level settings
+will be used as the default when creating new buckets and any changes to the settings will be applied
+to all existing buckets that have not had their auto-compaction settings individually modified.
 
 === couchbaseclusters.spec.cluster.autoCompaction.databaseFragmentationThreshold
 
@@ -1094,12 +1097,10 @@ TimeWindow allows restriction of when compaction can occur.
 
 *Type*: `boolean`
 
-*Default*: `False`
-
 ==== Description
 
 AbortCompactionOutsideWindow stops compaction processes when the
-process moves outside the window.
+process moves outside the window, defaulting to false.
 
 === couchbaseclusters.spec.cluster.autoCompaction.timeWindow.end
 

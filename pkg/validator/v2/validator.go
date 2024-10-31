@@ -88,8 +88,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintBucketSynchronization,
 		checkConstraintMemoryAllocations,
 		checkConstraintMTLSPaths,
-		checkConstraintAutoCompactionTombstonePurgeInterval,
-		checkConstraintAutoCompactionTimeWindow,
+		checkConstraintAutoCompactionCluster,
 		checkConstraintLDAPAuthentication,
 		checkConstraintLDAPConnectionTLS,
 		checkConstraintLDAPAuthorization,
@@ -1480,35 +1479,42 @@ func checkConstraintMTLSPaths(_ *types.Validator, cluster *couchbasev2.Couchbase
 	return nil
 }
 
-// checkConstraintAutoCompactionTombstonePurgeInterval checks that the tombstone purge
-// interval is in range.
-func checkConstraintAutoCompactionTombstonePurgeInterval(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
-	if purgeInterval < 1.0 {
-		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
+func checkConstraintAutoCompactionCluster(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	err := checkConstraintAutoCompactionTimeWindow(cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow)
+	if err != nil {
+		return err
 	}
 
-	if purgeInterval > 60.0*24.0 {
-		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d")
-	}
-
-	return nil
+	return checkConstraintAutoCompactionPurgeInterval(cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval)
 }
 
-// checkConstraintAutoCompactionTimeWindow checks that the autocompaction time window is valid with
-// start time being before end time.
-func checkConstraintAutoCompactionTimeWindow(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	timeWindow := cluster.Spec.ClusterSettings.AutoCompaction.TimeWindow
+func checkConstraintAutoCompactionBucket(autoCompaction *couchbasev2.AutoCompactionSpecBucket) error {
+	if autoCompaction == nil {
+		return nil
+	}
 
+	if autoCompaction.TimeWindow != nil {
+		err := checkConstraintAutoCompactionTimeWindow(*autoCompaction.TimeWindow)
+		if err != nil {
+			return err
+		}
+	}
+
+	return checkConstraintAutoCompactionPurgeInterval(autoCompaction.TombstonePurgeInterval)
+}
+
+// checkConstraintAutoCompactionTimeWindow checks that the auto-compaction time window is valid with
+// start time being before end time.
+func checkConstraintAutoCompactionTimeWindow(timeWindow couchbasev2.TimeWindow) error {
 	if timeWindow.Start != nil {
 		// both start and end are required for valid time window
 		if timeWindow.End == nil {
-			return errors.Required("spec.cluster.autoCompaction.timeWindow.end", "body", nil)
+			return errors.Required("autoCompaction.timeWindow.end", "body", nil)
 		}
 
 		// cluster will not start if start and end times are the same
 		if *timeWindow.Start == *timeWindow.End {
-			return fmt.Errorf("spec.cluster.autoCompaction.timeWindow.start in body cannot be the same as timeWindow.end")
+			return fmt.Errorf("autoCompaction.timeWindow.start in body cannot be the same as timeWindow.end")
 		}
 
 		// parse out hours and minutes.
@@ -1522,20 +1528,28 @@ func checkConstraintAutoCompactionTimeWindow(_ *types.Validator, cluster *couchb
 
 		// start must be before end
 		if startHH*60+startMM > endHH*60+endMM {
-			return fmt.Errorf("spec.cluster.autoCompaction.timeWindow.start in body must be less than timeWindow.end")
+			return fmt.Errorf("autoCompaction.timeWindow.start in body must be less than timeWindow.end")
 		}
 	} else if timeWindow.End != nil {
 		// cannot have end without start
-		return errors.Required("spec.cluster.autoCompaction.timeWindow.start", "body", nil)
+		return errors.Required("autoCompaction.timeWindow.start", "body", nil)
 	}
 
-	purgeInterval := cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Duration.Hours()
-	if purgeInterval < 1.0 {
-		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
-	}
+	return nil
+}
 
-	if purgeInterval > 60.0*24.0 {
-		return fmt.Errorf("spec.cluster.autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d")
+// checkConstraintAutoCompactionTombstonePurgeInterval checks that the tombstone purge
+// interval is in range.
+func checkConstraintAutoCompactionPurgeInterval(purgeInterval *metav1.Duration) error {
+	if purgeInterval != nil {
+		purgeIntervalHours := purgeInterval.Duration.Hours()
+		if purgeIntervalHours < 1.0 {
+			return fmt.Errorf("autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h")
+		}
+
+		if purgeIntervalHours > 60.0*24.0 {
+			return fmt.Errorf("autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d")
+		}
 	}
 
 	return nil
@@ -1798,6 +1812,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketHistoryRetentionSettings(bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkConstraintAutoCompactionBucket(bucket.Spec.AutoCompaction); err != nil {
 		errs = append(errs, err)
 	}
 
