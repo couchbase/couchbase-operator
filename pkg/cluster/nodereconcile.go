@@ -1672,21 +1672,24 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			}
 
 			for _, nodeInfo := range clusterInfo.Nodes {
-				if nodeInfo.Membership != "inactiveFailed" {
-					for _, pod := range pods.Items {
-						if strings.EqualFold(pod.Name, nodeInfo.HostName.GetMemberName()) {
-							continue
-						}
+				// We only need to failover if the node is active and is in the eject list
+				if nodeInfo.Membership != "active" || !slices.Contains(eject, nodeInfo.OTPNode) {
+					continue
+				}
 
-						if slices.Contains(eject, nodeInfo.OTPNode) {
-							list := couchbaseutil.OTPNodeList{}
-							list = append(list, nodeInfo.OTPNode)
+				failoverList := couchbaseutil.OTPNodeList{}
+				failoverList = append(failoverList, nodeInfo.OTPNode)
 
-							if err := couchbaseutil.Failover(list, false).On(c.api, c.readyMembers()); err != nil {
-								return err
-							}
-						}
+				for _, pod := range pods.Items {
+					if strings.EqualFold(pod.Name, nodeInfo.HostName.GetMemberName()) {
+						continue
 					}
+
+					if err := couchbaseutil.Failover(failoverList, false).On(c.api, c.readyMembers()); err != nil {
+						return err
+					}
+
+					break
 				}
 			}
 		}
