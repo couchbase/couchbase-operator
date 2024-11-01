@@ -147,16 +147,34 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 	return members
 }
 
-func nodeInfosToMemberSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.ServerConfig) (couchbaseutil.MemberSet, error) {
-	members := couchbaseutil.NewMemberSet()
-
+func addMissingNodesToSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.ServerConfig, existingMembers couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+	members := existingMembers.Copy()
 	configName := ""
 
+	configMatches := map[string]int{}
+
+	for _, m := range members {
+		configMatches[m.Config()]++
+	}
+
 	for _, node := range nodes {
+		// First match and consider the size of the server classes
 		for _, config := range configs {
-			if config.NodeMatchesConfig(node) {
+			if config.NodeMatchesConfig(node) && configMatches[config.Name] < config.Size {
+				configMatches[config.Name]++
 				configName = config.Name
+
 				break
+			}
+		}
+
+		// If all server classes are full, then check if there are any server classes that match the node at all
+		if configName == "" {
+			for _, config := range configs {
+				if config.NodeMatchesConfig(node) {
+					configName = config.Name
+					break
+				}
 			}
 		}
 

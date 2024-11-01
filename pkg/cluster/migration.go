@@ -114,7 +114,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 
 	k8sMembers := podsToMemberSet(c.getClusterPods())
 
-	allNodes, err := nodeInfosToMemberSet(pd.Nodes, c.cluster.Spec.Servers)
+	allNodes, err := addMissingNodesToSet(pd.Nodes, c.cluster.Spec.Servers, k8sMembers)
 	if err != nil {
 		log.Error(err, "Failed to get all nodes", "cluster", c.namespacedName())
 		return nil, err
@@ -199,6 +199,7 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleRebalanceCheck,
 		(*MigrationReconcileMachine).handleWarmupNodes,
 		(*MigrationReconcileMachine).handleDownNodes,
+		(*MigrationReconcileMachine).handleUnclusteredNodes,
 		(*MigrationReconcileMachine).handleFailedAddNodes,
 		(*MigrationReconcileMachine).handleAddBackNodes,
 		(*MigrationReconcileMachine).handleFailedNodes,
