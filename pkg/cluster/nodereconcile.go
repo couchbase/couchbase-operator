@@ -1665,7 +1665,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 		}
 
 		// We don't want to do this while upgrading as this will be done as part of the upgrade process.
-		if !upgrading {
+		if !upgrading || c.isMigrating() {
 			clusterInfo := couchbaseutil.ClusterInfo{}
 			if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
 				return err
