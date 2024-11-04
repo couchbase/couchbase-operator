@@ -106,3 +106,14 @@ func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object)
 
 	return nil
 }
+
+func WarnOnNonProductionFieldValues(resource runtime.Object) []string {
+	switch t := resource.(type) {
+	case *couchbasev2.CouchbaseCluster:
+		return checkFieldsCouchbaseCluster(*t)
+	case *couchbasev2.CouchbaseBucket:
+		return checkFieldsCouchbaseBucket(*t)
+	}
+
+	return nil
+}
