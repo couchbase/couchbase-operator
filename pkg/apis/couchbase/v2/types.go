@@ -4136,6 +4136,7 @@ const (
 	ClusterConditionAutoscaleReady           ClusterConditionType = "AutoscaleReady"
 	ClusterConditionSynchronized             ClusterConditionType = "Synchronized"
 	ClusterConditionWaitingBetweenMigrations ClusterConditionType = "WaitingBetweenMigrations"
+	ClusterConditionMigrating                ClusterConditionType = "Migrating"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

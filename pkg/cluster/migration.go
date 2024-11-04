@@ -72,6 +72,11 @@ func (c *Cluster) reconcileMigrationCluster() error {
 	}
 
 	mrm, err := NewMigrationReconcileMachine(c)
+
+	if !mrm.unclusteredMembers.Empty() {
+		c.cluster.Status.SetMigratingCondition()
+	}
+
 	if err != nil {
 		return err
 	}
@@ -289,6 +294,13 @@ func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 		return nil
 	}
 
+	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenMigrations)
+
+	// If we have no more nodes to migrate and we are not waiting for the stabilization period to end, then we are done migrating.
+	if r.unclusteredMembers.Empty() && waitingCond == nil {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionMigrating)
+	}
+
 	if c.cluster.Spec.Migration.UnmanagedClusterHost == "" {
 		return nil
 	}
@@ -303,17 +315,15 @@ func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 		return nil
 	}
 
-	cond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenMigrations)
-
 	// Initialize the condition if it doesn't exist.
-	if cond == nil {
+	if waitingCond == nil {
 		c.cluster.Status.SetNotWaitingBetweenMigrations()
 		return nil
 	}
 
 	// If we are waiting then check if the stabilization period has passed.
-	if cond.Status == v1.ConditionTrue {
-		lastTransitionTime, err := time.Parse(time.RFC3339, cond.LastTransitionTime)
+	if waitingCond.Status == v1.ConditionTrue {
+		lastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
 
 		if err != nil {
 			// This can happen if someone has messed with the status fields.
@@ -436,7 +446,6 @@ func (r *MigrationReconcileMachine) migrateNode(m couchbaseutil.Member) error {
 	log.Info("Migration complete", "cluster", r.c.namespacedName(), "errors", len(errs))
 
 	if len(errs) == 0 {
-		log.Info("Returning nil", "cluster", r.c.namespacedName(), "errors", len(errs))
 		return nil
 	}
 

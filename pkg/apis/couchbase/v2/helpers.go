@@ -903,6 +903,11 @@ func (cs *ClusterStatus) SetNotWaitingBetweenMigrations() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetMigratingCondition() {
+	c := newClusterCondition(ClusterConditionMigrating, v1.ConditionTrue, "Migrating", "Migrating unmanaged cluster")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {
