@@ -14,11 +14,6 @@ func CreateBasicJob(jobName string) *Job {
 	return &job
 }
 
-func CheckJobCompletion(jobName string) (bool, error) {
-	// TODO
-	panic("CheckJobCompletion to be implemented")
-}
-
 func (j *Job) AddContainer(cntName, cntImage string, cmdList, argList []string) {
 	c := Container{
 		Name:    cntName,
