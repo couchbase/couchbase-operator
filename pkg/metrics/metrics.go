@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	SeparateNameAndNamespace = true
+	SeparateNameAndNamespace bool
 
 	OptionalLabels UUIDorName = None
 	// ReconcileTotalMetric
@@ -394,7 +394,7 @@ func InitMetrics() {
 		Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
-	}, []string{"name", "method", "service", "host"})
+	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
 
 	HTTPRequestDurationMSMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:      "server_http_requests_time_milliseconds",
