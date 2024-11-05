@@ -190,6 +190,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 			needsRebalance:     state.NeedsRebalance,
 			couchbase:          state,
 			c:                  c,
+			rebalanceRetries:   3,
 		},
 		externalMembers: external,
 	}, nil
@@ -282,7 +283,9 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 			return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
 		}
 
-		r.removeMemberUser(c.members[server])
+		if m := c.members[server]; m != nil {
+			r.removeMemberUser(m)
+		}
 	}
 
 	return nil

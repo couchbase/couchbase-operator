@@ -144,6 +144,9 @@ type ReconcileMachine struct {
 	// We only do this once to prevent spam, and only once we know we will take an action
 	// that affects cluster topology.
 	logged bool
+
+	// rebalanceRetries is the number of times to retry rebalance operations when handling rebalances.
+	rebalanceRetries uint
 }
 
 func (r *ReconcileMachine) logState() {
@@ -284,6 +287,8 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		couchbase: state,
 
 		c: c,
+
+		rebalanceRetries: 1,
 	}
 
 	// Reset any timeout counters if nodes have recovered.
@@ -1694,7 +1699,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			}
 		}
 
-		if err := c.rebalance(r.clusteredMembers, eject); err != nil {
+		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, eject, r.rebalanceRetries); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop
