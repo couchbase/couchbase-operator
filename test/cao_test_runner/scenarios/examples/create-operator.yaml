@@ -5,7 +5,12 @@ config:
   cpuLimit: 1
   cpuRequest: 500
   imagePullPolicy: IfNotPresent
-  imagePullSecret: "abc"
+  imagePullSecret:
+    name: "xxxx"
+    server: "xxxx"
+    username: "xxxxx"
+    password: "xxxx"
+    email: "xxxx"
   operatorLogLevel: 1
   memoryLimit: 400
   memoryRequest: 200

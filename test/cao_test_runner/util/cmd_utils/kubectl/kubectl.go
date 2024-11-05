@@ -161,6 +161,11 @@ func GetByFiles(paths ...string) *KubectlCmd {
 	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
 }
 
+func GetSecretNames() *KubectlCmd {
+	args := []string{"secrets", "-o", "name"}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+}
+
 // =============================================
 // ======= Cluster Mgmt Kubectl Commands =======
 // =============================================
