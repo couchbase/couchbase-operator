@@ -40,27 +40,25 @@ func (c *Cluster) updateMembers() error {
 	if !runningMembers.Empty() {
 		// Try to find a Couchbase node that responds.
 		status, err := c.GetStatusUnsafe(runningMembers)
-		if err != nil {
-			return err
-		}
+		if err == nil {
+			// Add any nodes that Couchbase knows about that we do not.
+			// Don't overwrite anything derived from PVCs as the member
+			// metadata will be garbage from Couchbase.
+			members.Merge(status.UnknownMembers)
 
-		// Add any nodes that Couchbase knows about that we do not.
-		// Don't overwrite anything derived from PVCs as the member
-		// metadata will be garbage from Couchbase.
-		members.Merge(status.UnknownMembers)
+			for name, member := range runningMembers {
+				state, ok := status.NodeStates[name]
+				if !ok {
+					continue
+				}
 
-		for name, member := range runningMembers {
-			state, ok := status.NodeStates[name]
-			if !ok {
-				continue
-			}
+				if state == NodeStateActive {
+					ready.Add(member)
+				}
 
-			if state == NodeStateActive {
-				ready.Add(member)
-			}
-
-			if state.Callable() {
-				callable.Add(member)
+				if state.Callable() {
+					callable.Add(member)
+				}
 			}
 		}
 	}
