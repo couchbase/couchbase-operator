@@ -70,6 +70,8 @@ var (
 	// or an attempt to use an incompatible version etc.
 	ErrInvalidVersion = fmt.Errorf("version error")
 
+	ErrClusterVersionMismatch = errors.New("cluster version mismatch")
+
 	// ErrRebalanceIncomplete is raised when we think the rebalance failed or did not
 	// even occur and thus we should avoid deleting anything yet.
 	ErrRebalanceIncomplete = errors.New("unexpected rebalance error")

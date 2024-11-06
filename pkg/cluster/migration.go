@@ -19,6 +19,35 @@ func (c *Cluster) getMigratingReadyTarget() interface{} {
 	return c.readyMembers()
 }
 
+func (c *Cluster) checkTargetClusterVersion() error {
+	var clusterInfo couchbaseutil.ClusterInfo
+
+	target := c.getMigratingReadyTarget()
+
+	if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, target); err != nil {
+		return err
+	}
+
+	imageVersion, err := couchbaseutil.NewVersionFromImage(c.cluster.Spec.Image)
+
+	if err != nil {
+		return err
+	}
+
+	for _, node := range clusterInfo.Nodes {
+		nodeVersion, err := couchbaseutil.NewVersion(node.Version)
+		if err != nil {
+			return err
+		}
+
+		if imageVersion.Equal(nodeVersion) {
+			return nil
+		}
+	}
+
+	return errors.ErrClusterVersionMismatch
+}
+
 func (c *Cluster) reconcileMigrationCluster() error {
 	log.Info("Reconciling migration cluster", "cluster", c.namespacedName())
 
@@ -48,6 +77,10 @@ func (c *Cluster) reconcileMigrationCluster() error {
 			log.Error(err, "Failed to update members", "cluster", c.namespacedName())
 			return err
 		}
+	}
+
+	if err := c.checkTargetClusterVersion(); err != nil {
+		return err
 	}
 
 	// Run pre-creation reconcilers.  These are all the things we need to correctly
