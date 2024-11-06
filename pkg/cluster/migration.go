@@ -7,6 +7,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
 )
@@ -52,6 +53,19 @@ func (c *Cluster) reconcileMigrationCluster() error {
 	log.Info("Reconciling migration cluster", "cluster", c.namespacedName())
 
 	pods := c.getClusterPods()
+
+	for _, pod := range pods {
+		if c.podInitialized(pod) {
+			continue
+		}
+
+		log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+
+		if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, c.config.GetDeleteOptions()); err != nil {
+			log.Error(err, "Failed to delete uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+			continue
+		}
+	}
 
 	scheduler, err := scheduler.New(pods, c.cluster)
 	if err != nil {
