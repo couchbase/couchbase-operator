@@ -5,6 +5,7 @@ import (
 	changekubeconfig "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/change_config/kubeconfig"
 	changenamespace "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/change_config/namespace"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/chaos"
+	chaosbaremetal "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/chaos_bare_metal"
 	destroyadmissioncontroller "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/admission_controller"
 	destroycrd "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/crd"
 	destroykubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/kubernetes"
@@ -59,5 +60,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Data Workload":                    {newAction: dataworkloads.NewDataWorkloadConfig, config: &dataworkloads.DataWorkloadConfig{}},
 		"Chaos":                            {newAction: chaos.NewChaosConfig, config: &chaos.ChaosConfig{}},
 		"Upgrade Kubernetes Cluster":       {newAction: upgradekubernetes.NewKubernetesUpgradeConfig, config: &upgradekubernetes.KubernetesUpgradeConfig{}},
+		"Bare Metal Chaos":                 {newAction: chaosbaremetal.NewChaosBareMetalConfig, config: &chaosbaremetal.BareMetalChaosConfig{}},
 	}
 }
