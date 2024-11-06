@@ -124,6 +124,8 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*C
 		return nil, err
 	}
 
+	c.KubeConfig.WarningHandler = rest.NoWarnings{}
+
 	c.KubeConfig.Wrap(KubeAPIWrapper)
 
 	c.KubeClient, err = kubernetes.NewForConfig(c.KubeConfig)
