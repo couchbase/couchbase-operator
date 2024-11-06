@@ -1544,3 +1544,9 @@ func (c *CouchbaseCluster) IsReadyToAttemptMigration() bool {
 
 	return cond.Status != v1.ConditionTrue
 }
+
+func (c *CouchbaseCluster) IsMigrating() bool {
+	cond := c.Status.GetCondition(ClusterConditionMigrating)
+
+	return (cond != nil && cond.Status == v1.ConditionTrue)
+}

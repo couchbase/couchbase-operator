@@ -3615,7 +3615,7 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		return err
 	}
 
-	if err := checkForMigrationAdded(prev, curr); err != nil {
+	if err := checkChangeConstraintsMigration(prev, curr); err != nil {
 		return err
 	}
 
@@ -4001,9 +4001,19 @@ func checkAnnotationSkipValidation(annotations map[string]string) bool {
 	return false
 }
 
-func checkForMigrationAdded(current, updated *couchbasev2.CouchbaseCluster) error {
+func checkChangeConstraintsMigration(current, updated *couchbasev2.CouchbaseCluster) error {
 	if current.Spec.Migration == nil && updated.Spec.Migration != nil {
 		return fmt.Errorf("spec.migration cannot be added to a pre-existing cluster")
+	}
+
+	if current.Spec.Migration != nil && current.IsMigrating() {
+		if updated.Spec.Migration == nil {
+			return fmt.Errorf("spec.migration cannot be removed during migration")
+		}
+
+		if current.Spec.Migration.UnmanagedClusterHost != updated.Spec.Migration.UnmanagedClusterHost {
+			return fmt.Errorf("spec.migration.unmanagedClusterHost cannot be changed during migration")
+		}
 	}
 
 	return nil
