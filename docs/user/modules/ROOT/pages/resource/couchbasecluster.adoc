@@ -2582,11 +2582,13 @@ If not specified the operator will start the next migration immediately.
 
 *Type*: `string`
 
+*Pattern (Regular Expression)*: `^((([a-zA-Z0-9](-?[a-zA-Z0-9])\*)\.)+[a-zA-Z]{2,})|((25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.)\{3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})|(([0-9A-Fa-f]{1,4}:){1,7}[0-9A-Fa-f]{1,4})$`
+
 ==== Description
 
 UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated.
 This is the host
-that the operator will connecto to to start the migration process.
+that the operator will connect to to start the migration process.
 
 === couchbaseclusters.spec.monitoring
 

@@ -30,6 +30,24 @@ func RetryFor(timeout time.Duration, callback func() error) error {
 	return Retry(ctx, time.Second, callback)
 }
 
+// RetryWithBackoff will retry a callback until it doesn't return an error or reaches the time limit, with an exponential backoff doubling the interval each failure.
+func RetryWithBackoff(interval, timeout time.Duration, callback func() error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+	defer cancel()
+
+	for err := callback(); err != nil; err = callback() {
+		select {
+		case <-time.After(interval):
+			interval *= 2
+		case <-ctx.Done():
+			return fmt.Errorf("timeout: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Assert retries a callback until it returns an error, returning that
 // error.  The context timing out or begin cancelled is not an error condition.
 func Assert(ctx context.Context, interval time.Duration, callback func() error) error {

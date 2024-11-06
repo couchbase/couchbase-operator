@@ -427,7 +427,7 @@ func (c *Cluster) initalizeClusterKubernetesResources(target any) error {
 		return nil
 	}
 
-	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
+	if err := retryutil.RetryWithBackoff(time.Second, time.Minute, callback); err != nil {
 		return err
 	}
 

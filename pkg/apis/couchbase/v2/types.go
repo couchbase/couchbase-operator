@@ -2513,7 +2513,8 @@ type ClusterSpec struct {
 // cluster to a managed Kubernetes cluster
 type ClusterAssimilationSpec struct {
 	// UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated. This is the host
-	// that the operator will connecto to to start the migration process.
+	// that the operator will connect to to start the migration process.
+	// +kubebuilder:validation:Pattern=`^((([a-zA-Z0-9](-?[a-zA-Z0-9])*)\.)+[a-zA-Z]{2,})|((25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})\.){3}(25[0-5]|2[0-4][0-9]|[0-1]?[0-9]{1,2})|(([0-9A-Fa-f]{1,4}:){1,7}[0-9A-Fa-f]{1,4})$`
 	UnmanagedClusterHost string `json:"unmanagedClusterHost,omitempty"`
 
 	// NumUnmanagedNodes is the number of nodes the operator will leave in the cluster unmigrated.
