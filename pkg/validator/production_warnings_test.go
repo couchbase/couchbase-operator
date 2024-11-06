@@ -53,11 +53,11 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"spec.antiAffinity"},
 		},
 		{
-			name: "spec.cluster.indexer.storageMode is not memory_optimized",
+			name: "spec.cluster.indexer.storageMode is not plasma",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
-						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
+						StorageMode: v2.CouchbaseClusterIndexStorageSettingMemoryOptimized,
 					},
 					AutoFailoverMaxCount: 2,
 					AutoCompaction:       &v2.AutoCompaction{},

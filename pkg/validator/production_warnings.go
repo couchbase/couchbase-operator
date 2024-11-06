@@ -17,8 +17,8 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 		warnings = append(warnings, "CouchbaseCluster spec.antiAffinity is disabled. It is recommended this is enabled for production clusters.")
 	}
 
-	if cluster.Spec.ClusterSettings.Indexer != nil && cluster.Spec.ClusterSettings.Indexer.StorageMode != couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized {
-		warnings = append(warnings, "CouchbaseCluster spec.cluster.indexer.storageMode is not set to memory_optimized. This is recommended for production clusters.")
+	if cluster.Spec.ClusterSettings.Indexer != nil && cluster.Spec.ClusterSettings.Indexer.StorageMode != couchbasev2.CouchbaseClusterIndexStorageSettingStandard {
+		warnings = append(warnings, "CouchbaseCluster spec.cluster.indexer.storageMode is not set to plasma. This is recommended for production clusters.")
 	}
 
 	if cluster.Spec.Buckets.Synchronize {
