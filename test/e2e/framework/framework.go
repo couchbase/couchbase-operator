@@ -497,6 +497,10 @@ func configure() (err error) {
 		analyzer.RegisterTest(analyzerSuiteName, test.Name())
 	}
 
+	if !strings.EqualFold(version.Version, strings.Split(strings.Split(params.OpImage, ":")[1], "-")[0]) {
+		return fmt.Errorf("must use the same operator version as certification version")
+	}
+
 	Global = params
 
 	return nil
