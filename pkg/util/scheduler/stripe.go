@@ -194,7 +194,13 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 		group = sched.getSmallesGroupForClass(class)
 	}
 
-	sched.serverClasses[class].getGroup(group).push(name)
+	classServerList := sched.serverClasses[class].getGroup(group)
+
+	if classServerList == nil {
+		return "", fmt.Errorf("%s: pod %s server class '%s' group '%s' has no server list: %w", stripeErrorHeader, name, class, group, errors.NewStackTracedError(errors.ErrResourceRequired))
+	}
+
+	classServerList.push(name)
 
 	return group, nil
 }
