@@ -101,11 +101,8 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 				},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
-			// once member is recovered the Operator will proceed with upgrade
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			// followed by removal of node that was upgraded pre & post failure
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			// once member is recovered the Operator will proceed with upgrade
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
