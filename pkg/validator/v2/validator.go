@@ -789,8 +789,8 @@ func isScopesAndCollectionsSupported(cluster *couchbasev2.CouchbaseCluster) (boo
 	return couchbaseutil.VersionAfter(tag, "7.0.0")
 }
 
-func createReplicationHash(spec couchbasev2.CouchbaseReplicationSpec) string {
-	return fmt.Sprintf("%s/%s", spec.Bucket, spec.RemoteBucket)
+func createReplicationHash(remoteClusterName string, spec couchbasev2.CouchbaseReplicationSpec) string {
+	return fmt.Sprintf("%s/%s/%s", remoteClusterName, spec.Bucket, spec.RemoteBucket)
 }
 
 func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -800,8 +800,8 @@ func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev
 
 	var errs []error
 
-	// We cannot have the same buckets involved in both replication and migration rules
-	// or in fact no duplicates in general. We do this by hashing the source and destination buckets to search for.
+	// We cannot have the same buckets involved in both replication and migration rules in the same remote cluster
+	// or in fact no duplicates in general. We do this by hashing the remote name with the source and destination buckets to search for.
 	currentRules := make(map[string]bool)
 
 	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
@@ -812,7 +812,7 @@ func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev
 		}
 
 		for _, replication := range replications.Items {
-			hash := createReplicationHash(replication.Spec)
+			hash := createReplicationHash(remoteCluster.Name, replication.Spec)
 			if _, exists := currentRules[hash]; exists {
 				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR replication in couchbasereplications.couchbase.com/%s", hash, replication.Name))
 				continue
@@ -833,7 +833,7 @@ func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev
 		}
 
 		for _, migration := range migrations.Items {
-			hash := createReplicationHash(migration.Spec)
+			hash := createReplicationHash(remoteCluster.Name, migration.Spec)
 			if _, exists := currentRules[hash]; exists {
 				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR migration in couchbasereplications.couchbase.com/%s", hash, migration.Name))
 				continue
