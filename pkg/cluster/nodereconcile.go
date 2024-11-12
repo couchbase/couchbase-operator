@@ -1690,8 +1690,16 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 						continue
 					}
 
-					if err := couchbaseutil.Failover(failoverList, false).On(c.api, c.readyMembers()); err != nil {
-						return err
+					for _, member := range c.members {
+						if member.Name() == nodeInfo.HostName.GetMemberName() {
+							if err := r.gracefullyFailoverNode(member, c); err != nil {
+								if err := couchbaseutil.Failover(failoverList, false).On(c.api, c.readyMembers()); err != nil {
+									return err
+								}
+							}
+
+							break
+						}
 					}
 
 					break
