@@ -982,24 +982,12 @@ func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchba
 	return nil, nil
 }
 
-func getNumberOfDataServiceNodes(cluster *couchbasev2.CouchbaseCluster) int {
-	dataServiceNodes := 0
-
-	for _, config := range cluster.Spec.Servers {
-		if couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService) {
-			dataServiceNodes += config.Size
-		}
-	}
-
-	return dataServiceNodes
-}
-
 func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.UpgradeProcess == nil {
 		return nil
 	}
 
-	if (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) && (getNumberOfDataServiceNodes(cluster) < 2 && len(cluster.Spec.Servers) > 1) {
+	if (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) && (cluster.GetNumberOfDataServiceNodes() < 2 && len(cluster.Spec.Servers) > 1) {
 		return fmt.Errorf("cannot enable InPlaceUpgrade with one data service node in a multi-node cluster")
 	}
 
@@ -1009,7 +997,7 @@ func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.
 // checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
 func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.UpgradeProcess != nil {
-		if getNumberOfDataServiceNodes(cluster) < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
+		if cluster.GetNumberOfDataServiceNodes() < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
 			return []string{"It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online."}, nil
 		}
 	}

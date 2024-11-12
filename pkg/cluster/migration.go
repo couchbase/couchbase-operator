@@ -414,7 +414,20 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 
 	migrationCandidates := couchbaseutil.NewMemberSet()
 
+	numDataNodes := c.cluster.GetNumberOfDataServiceNodes()
+	performDataNodesCheck := (numDataNodes > 1 && maxNodes >= numDataNodes)
+	allDataNodes := true
+
 	for _, member := range r.getMigrationCandidates() {
+		// Prevent migration of all data nodes at once if we have more than one data node.
+		if performDataNodesCheck && allDataNodes {
+			if !r.isDataNode(member) {
+				allDataNodes = false
+			} else if migrationCandidates.Size() == (maxNodes - 1) {
+				continue
+			}
+		}
+
 		migrationCandidates.Add(member)
 
 		if migrationCandidates.Size() >= maxNodes {
@@ -436,6 +449,15 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 	log.Info("Node migration complete", "cluster", c.namespacedName())
 
 	return nil
+}
+
+func (r *MigrationReconcileMachine) isDataNode(m couchbaseutil.Member) bool {
+	config := r.c.cluster.Spec.GetServerConfigByName(m.Config())
+	if config == nil {
+		return false
+	}
+
+	return couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService)
 }
 
 func (r *MigrationReconcileMachine) getMigrationCandidates() couchbaseutil.MemberSet {

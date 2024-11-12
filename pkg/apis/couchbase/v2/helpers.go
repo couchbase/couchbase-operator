@@ -1550,3 +1550,15 @@ func (c *CouchbaseCluster) IsMigrating() bool {
 
 	return (cond != nil && cond.Status == v1.ConditionTrue)
 }
+
+func (c *CouchbaseCluster) GetNumberOfDataServiceNodes() int {
+	dataServiceNodes := 0
+
+	for _, config := range c.Spec.Servers {
+		if ServiceList(config.Services).Contains(DataService) {
+			dataServiceNodes += config.Size
+		}
+	}
+
+	return dataServiceNodes
+}
