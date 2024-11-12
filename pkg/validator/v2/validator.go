@@ -3468,8 +3468,10 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	upgradeCondition := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
 
+	migratingCondition := current.Status.GetCondition(couchbasev2.ClusterConditionMigrating)
+
 	// Condition is not set, therefore we are starting an upgrade.
-	if upgradeCondition == nil {
+	if upgradeCondition == nil && migratingCondition == nil {
 		if updatedVersion == "9.9.9" {
 			// we have no idea what this is so we trust the user
 			return nil
