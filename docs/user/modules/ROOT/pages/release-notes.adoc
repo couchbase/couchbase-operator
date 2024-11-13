@@ -123,6 +123,9 @@ a| *Summary:* Previously the `eventing_manage_functions` RBAC role was missing f
 a| https://issues.couchbase.com/browse/K8S-3632[K8S-3632^]
 a| *Summary:* It is not currently possible to set xref:resource/couchbasecollection.adoc#couchbasecollections-spec-maxttl[`couchbasecollections.spec.maxTTL`] to `-1` to disable expiry.
 
+a| https://jira.issues.couchbase.com/browse/K8S-3663[K8S-3663^]
+a| Three tests: TestPersistentVolumeAutoRecovery, TestUpgradeSupportableKillStatefulPodOnCreate, and TestAutoscaleUpMandatoryMutualTLS may fail when running self-certification on Kubernetes 1.31.
+
 |===
 
 == Feedback

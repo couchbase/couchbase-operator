@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" version="24.7.6" pages="3">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36" version="24.7.10" pages="3">
   <diagram id="_1yWQNMe7d7-nIx6jldb" name="Compat Kuberentes">
     <mxGraphModel dx="2074" dy="1121" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
@@ -100,8 +100,11 @@
         <mxCell id="-U8zYlrer_65rnfJ_lfs-1" value="&lt;b&gt;1.30&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
           <mxGeometry x="850" y="240" width="80" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="Lo4MG1J0GPrFGfEhFTxd-1" value="&lt;b&gt;2.7&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-          <mxGeometry x="526" y="60" width="400" height="40" as="geometry" />
+        <mxCell id="Lo4MG1J0GPrFGfEhFTxd-1" value="&lt;b&gt;2.7&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="526" y="60" width="484" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="Vh3jq1A7Mj43AE-nLppB-1" value="&lt;b&gt;1.31&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="930" y="240" width="80" height="40" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
