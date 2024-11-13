@@ -385,14 +385,23 @@ func TestEnqueueRemovals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s.EnQueueRemovals(serverClass1, []string{podName3, podName1})
+	s.EnQueueRemovals(serverClass1, []string{podName3, podName6})
 
+	// The first delete is from the queue.
 	server1, err := s.Delete(serverClass1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	checkDeleteScheduling(t, server1, podName3)
+
+	// The second delete is alphabetically chosen.
+	server2, err := s.Delete(serverClass1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	checkDeleteScheduling(t, server2, podName5)
 }
 
 // Adds four pods to global server groups and expects them to be scheduled deterministically.

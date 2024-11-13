@@ -31,7 +31,7 @@ func NewNullScheduler(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster)
 	// pod removal
 	sched := &nullSchedulerImpl{
 		serverClasses:          map[string]*serverList{},
-		removableServerClasses: map[string]*serverRemovalQueue{},
+		removableServerClasses: map[string]*serverRemovalPriorityQueue{},
 	}
 
 	for _, class := range cluster.Spec.Servers {
@@ -66,7 +66,7 @@ func (sched *nullSchedulerImpl) Create(class, name, _ string) (string, error) {
 	return "", nil
 }
 
-// Delete removes the server(pod) depending on the serverRemovalQueue in a scale down scenario.
+// Delete removes the server(pod) depending on the serverRemovalPriorityQueue in a scale down scenario.
 func (sched *nullSchedulerImpl) Delete(class string) (string, error) {
 	// Select the victim server group based on population
 	if _, ok := sched.serverClasses[class]; !ok {
@@ -122,9 +122,7 @@ func (sched *nullSchedulerImpl) LogStatus(_ string) {
 // EnQueueRemovals sets the list server names per serve class name for in-order removal.
 func (sched *nullSchedulerImpl) EnQueueRemovals(class string, servers []string) {
 	if _, ok := sched.removableServerClasses[class]; !ok {
-		sched.removableServerClasses[class] = &serverRemovalQueue{
-			servers: []string{},
-		}
+		sched.removableServerClasses[class] = NewServerRemovalPriorityQueue()
 		sched.removableServerClasses[class].enqueueAll(servers)
 	} else {
 		sched.removableServerClasses[class].enqueueAll(servers)

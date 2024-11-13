@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"container/list"
 	"fmt"
 	"hash/fnv"
 	"math/rand"
@@ -68,6 +69,7 @@ type serverGroups interface {
 	groupExists(group string) bool
 	smallestGroup() string
 	largestGroup() string
+	largestGroups() []string
 
 	// smallestGroups returns a list of the smallest server groups is order.
 	smallestGroups() []string
@@ -281,31 +283,56 @@ func (s lexicalServerGroups) largestGroup() string {
 // serverClassGroupMap maps server classes to their server groups of pods.
 type serverClassGroupMap map[string]serverGroups
 
-// serverRemovalQueue represents a FIFO queue for removing pods(servers) in a FIFO way.
-type serverRemovalQueue struct {
-	servers []string
+// serverRemovalPriorityQueue represents a priority queue for removing pods(servers)
+// in either a FIFO way or picking between potential removal candidates.
+type serverRemovalPriorityQueue struct {
+	servers *list.List
+}
+
+func NewServerRemovalPriorityQueue() *serverRemovalPriorityQueue {
+	return &serverRemovalPriorityQueue{
+		servers: list.New(),
+	}
 }
 
 // enqueueAll adds all servers(pods) to the end of the queue.
-func (q *serverRemovalQueue) enqueueAll(servers []string) {
-	q.servers = append(q.servers, servers...)
+func (q *serverRemovalPriorityQueue) enqueueAll(servers []string) {
+	for _, server := range servers {
+		q.servers.PushBack(server)
+	}
 }
 
 // dequeue removes and returns the server(pod) from the front of the queue.
-func (q *serverRemovalQueue) dequeue() string {
-	if len(q.servers) == 0 {
+func (q *serverRemovalPriorityQueue) dequeue() string {
+	if q.servers.Len() == 0 {
 		return ""
 	}
 
-	server := q.servers[0]
-	q.servers = q.servers[1:]
+	frontElement := q.servers.Front()
+	q.servers.Remove(frontElement)
 
-	return server
+	return frontElement.Value.(string)
+}
+
+// dequeHighestRankedCandidate removes and returns the highest ranked server(pod) from the queue along with
+// the server group it belongs to.
+func (q *serverRemovalPriorityQueue) dequeHighestRankedCandidate(serverLists map[string]*serverList) (string, string) {
+	for e := q.servers.Front(); e != nil; e = e.Next() {
+		server := e.Value.(string)
+		for serverGroup, sl := range serverLists {
+			if sl.find(server) {
+				q.servers.Remove(e)
+				return server, serverGroup
+			}
+		}
+	}
+
+	return "", ""
 }
 
 // serverClassServerRemovalMap maps server classes to the serverDeletionQueue FIFO queue.
 // N.B. Don't care about serverGroup.
-type serverClassServerRemovalMap map[string]*serverRemovalQueue
+type serverClassServerRemovalMap map[string]*serverRemovalPriorityQueue
 
 func hashString(s string) uint64 {
 	h := fnv.New64a()

@@ -228,40 +228,46 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 		return "", fmt.Errorf("%s: no server list present for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	allServerGroupsForClass := []string{}
-
-	for s := range sched.serverClasses[class].getMap() {
-		allServerGroupsForClass = append(allServerGroupsForClass, s)
-	}
-
 	var podName string
 
-	// Victims are selected based on priority order of the backing serverRemovalQueue.
-	rq, ok := sched.removableServerClasses[class]
-	if !ok {
+	// Victims are selected based on priority order of the backing serverRemovalPriorityQueue.
+	rq, rqFound := sched.removableServerClasses[class]
+
+	// If we have a removal queue, we use that to prioritize the removals
+	if rqFound {
+		largestGroups := sched.serverClasses[class].largestGroups()
+
+		removalServerListsMap := map[string]*serverList{}
+
+		// Get all the possible removal candidates
+		for _, group := range largestGroups {
+			removalServerListsMap[group] = sched.serverClasses[class].getGroup(group)
+		}
+
+		var serverGroup string
+		// Find the highest priority node in the list of candidates
+		podName, serverGroup = rq.dequeHighestRankedCandidate(removalServerListsMap)
+		if podName != "" {
+			if found := sched.serverClasses[class].getGroup(serverGroup).find(podName); found {
+				err := sched.serverClasses[class].getGroup(serverGroup).del(podName)
+				if err != nil {
+					return "", fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+				}
+			}
+		}
+	}
+
+	// If the rq hasn't prioritized any thing then select the victim server
+	// deterministically based on alphabetical order.
+	if podName == "" {
 		serverGroup := sched.serverClasses[class].largestGroup()
 
-		// Select the victim server deterministically based on alphabetical order
 		server, err := sched.serverClasses[class].getGroup(serverGroup).pop()
 		if err != nil {
 			return "", fmt.Errorf("%s: no server list found for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
 		podName = server
-	} else {
-		// if present, dequeue and delete
-		podName = rq.dequeue()
-
-		// looks up the server name(unique pod name) in all server groups for the particular class and delete, if found.
-		for _, serverGroup := range allServerGroupsForClass {
-			if found := sched.serverClasses[class].getGroup(serverGroup).find(podName); found {
-				err := sched.serverClasses[class].getGroup(serverGroup).del(podName)
-				if err != nil {
-					return "", fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-				}
-				break
-			}
-		}
 	}
 
 	return podName, nil
@@ -287,9 +293,7 @@ func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
 // EnQueueRemovals sets the list server names per serve class name for in-order removal.
 func (sched *stripeSchedulerImpl) EnQueueRemovals(class string, servers []string) {
 	if _, ok := sched.removableServerClasses[class]; !ok {
-		sched.removableServerClasses[class] = &serverRemovalQueue{
-			servers: []string{},
-		}
+		sched.removableServerClasses[class] = NewServerRemovalPriorityQueue()
 		sched.removableServerClasses[class].enqueueAll(servers)
 	} else {
 		sched.removableServerClasses[class].enqueueAll(servers)
