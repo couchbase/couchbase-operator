@@ -3825,7 +3825,8 @@ type ServerConfig struct {
 	// Services is the set of Couchbase services to run on this server class.
 	// At least one class must contain the data service.  The field may contain
 	// any of "data", "index", "query", "search", "eventing" or "analytics".
-	// Each service may only be specified once.
+	// Each service may only be specified once. An empty list can also be specified
+	// for a serviceless class ("[]").
 	// +listType=set
 	Services []Service `json:"services"`
 

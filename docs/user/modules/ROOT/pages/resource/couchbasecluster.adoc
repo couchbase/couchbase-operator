@@ -4775,6 +4775,8 @@ At least one class must contain the data service.
 The field may contain
 any of "data", "index", "query", "search", "eventing" or "analytics".
 Each service may only be specified once.
+An empty list can also be specified
+for a serviceless class ("[]").
 
 === couchbaseclusters.spec.servers.size
 
