@@ -406,6 +406,8 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 		return nil
 	}
 
+	r.log()
+
 	maxNodes := c.cluster.Spec.Migration.MaxConcurrentMigrations
 
 	if maxNodes <= 0 {

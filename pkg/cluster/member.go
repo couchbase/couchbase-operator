@@ -147,7 +147,6 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 
 func addMissingNodesToSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.ServerConfig, existingMembers couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
 	members := existingMembers.Copy()
-	configName := ""
 
 	configMatches := map[string]int{}
 
@@ -156,6 +155,12 @@ func addMissingNodesToSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.
 	}
 
 	for _, node := range nodes {
+		if members.Contains(node.HostName.GetMemberName()) {
+			continue
+		}
+
+		configName := ""
+
 		// First match and consider the size of the server classes
 		for _, config := range configs {
 			if config.NodeMatchesConfig(node) && configMatches[config.Name] < config.Size {
