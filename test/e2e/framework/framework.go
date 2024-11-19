@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -72,6 +73,10 @@ func Init() error {
 	if err := preflight(); err != nil {
 		return err
 	}
+
+	// The certification pod uses some of the same methods for validation as the operator, so we should also initialise
+	// the metrics to avoid any metric errors.
+	metrics.InitMetrics()
 
 	return setup()
 }

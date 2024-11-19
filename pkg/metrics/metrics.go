@@ -534,6 +534,7 @@ func InitMetrics() {
 		ReconcileFailureMetric,
 		ReconcileDurationMetric,
 		HTTPRequestTotalMetric,
+		HTTPRequestTotalCodeMetric,
 		HTTPRequestFailureMetric,
 		HTTPRequestDurationMSMetric,
 		buildInfoCollector,

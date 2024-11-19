@@ -120,11 +120,11 @@ func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {
 	meta.SetAnnotations(existingAnnotations)
 }
 
-func ShouldSeparateNameAndNamespaceLabels(existingLables []string, joinedString string) []string {
+func ShouldSeparateNameAndNamespaceLabels(existingLabels []string, joinedString string) []string {
 	if metrics.SeparateNameAndNamespace {
 		splitString := strings.Split(joinedString, "/")
-		return append(existingLables, splitString[0], splitString[1])
+		return append(existingLabels, splitString[0], splitString[1])
 	}
 
-	return append(existingLables, joinedString)
+	return append(existingLabels, joinedString)
 }

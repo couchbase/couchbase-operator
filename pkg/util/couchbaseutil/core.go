@@ -10,8 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -30,10 +28,8 @@ const (
 )
 
 var (
-	ErrCertificateError      = fmt.Errorf("certificate error")
-	ErrStatusError           = fmt.Errorf("unexpected status code")
-	ErrUUIDError             = fmt.Errorf("cluster UUID error")
-	separateNameAndNamespace = os.Getenv("separate-cluster-name-and-namespace")
+	ErrCertificateError = fmt.Errorf("certificate error")
+	ErrStatusError      = fmt.Errorf("unexpected status code")
 )
 
 type FailedRequestError struct {
@@ -198,9 +194,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 	metricPath := request.URL.Path
 	metricHostname := request.URL.Hostname()
 
-	if strings.EqualFold(separateNameAndNamespace, "true") {
-		metrics.HTTPRequestTotalMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, metricPath, metricHostname}, c.cluster)...).Inc()
-	}
+	metrics.HTTPRequestTotalMetric.WithLabelValues(ShouldSeparateNameAndNamespaceLabels([]string{request.Method, metricPath, metricHostname}, c.cluster)...).Inc()
 
 	// Logs are always emitted regardless of status.  Context is added to the log labels
 	// depending on the path taken.
