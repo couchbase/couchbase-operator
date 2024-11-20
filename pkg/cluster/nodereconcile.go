@@ -1856,14 +1856,6 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 	}
 
 	if migrationCandidates.Size() > 0 {
-		for _, candidate := range migrationCandidates {
-			log.Info("Swap Rebalancing node to match bucket storage backend", "cluster", c.namespacedName(), "name", candidate.Name())
-
-			if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
-				return err
-			}
-		}
-
 		return r.swapRebalanceMembers(c, migrationCandidates)
 	}
 

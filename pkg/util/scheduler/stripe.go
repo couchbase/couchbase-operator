@@ -275,15 +275,19 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
 func (sched *stripeSchedulerImpl) Upgrade(class, name string) error {
-	for serverGroup := range sched.serverClasses[class].getMap() {
-		if err := sched.serverClasses[class].getGroup(serverGroup).del(name); err == nil {
-			return nil
+	if serverClasses := sched.serverClasses[class]; serverClasses != nil {
+		for serverGroup := range serverClasses.getMap() {
+			if err := serverClasses.getGroup(serverGroup).del(name); err == nil {
+				return nil
+			}
 		}
 	}
 
-	for serverGroup := range sched.unschedulableServerClasses[class].getMap() {
-		if err := sched.unschedulableServerClasses[class].getGroup(serverGroup).del(name); err == nil {
-			return nil
+	if unschedulableClass := sched.unschedulableServerClasses[class]; unschedulableClass != nil {
+		for serverGroup := range unschedulableClass.getMap() {
+			if err := unschedulableClass.getGroup(serverGroup).del(name); err == nil {
+				return nil
+			}
 		}
 	}
 
