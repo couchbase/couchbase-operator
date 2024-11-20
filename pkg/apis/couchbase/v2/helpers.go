@@ -1012,6 +1012,8 @@ var scopeRoles = []RoleName{
 	RoleQueryExecuteFunctions,
 	RoleQueryManageExternalFunctions,
 	RoleQueryExecuteExternalFunctions,
+	RoleQueryUseSequences,
+	RoleQueryManageSequences,
 }
 
 // collectionRoles can be bucket + scope + collection scoped.
