@@ -99,6 +99,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
 		checkMigrationConstraints,
+		checkAdminServiceConstraints,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -285,6 +286,17 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 
 	if cluster.Spec.Migration.NumUnmanagedNodes >= cluster.Spec.TotalSize() {
 		return fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
+	}
+
+	return nil
+}
+
+func checkAdminServiceConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	for i, config := range cluster.Spec.Servers {
+		serviceList := couchbasev2.ServiceList(config.Services)
+		if serviceList.Contains(couchbasev2.AdminService) && len(serviceList) > 1 {
+			return fmt.Errorf("spec.servers[%d].services cannot contain the admin service and other services", i)
+		}
 	}
 
 	return nil
