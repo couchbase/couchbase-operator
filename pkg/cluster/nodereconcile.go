@@ -1669,8 +1669,10 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			return err
 		}
 
+		scaleDownCondition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionScalingDown)
+
 		// We don't want to do this while upgrading as this will be done as part of the upgrade process.
-		if !upgrading && !c.isMigrating() {
+		if !upgrading && !c.isMigrating() && scaleDownCondition == nil {
 			clusterInfo := couchbaseutil.ClusterInfo{}
 			if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
 				return err
@@ -1692,6 +1694,8 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 					for _, member := range c.members {
 						if member.Name() == nodeInfo.HostName.GetMemberName() {
+							log.Info("Attempting graceful failover of: " + member.Name())
+
 							if err := r.gracefullyFailoverNode(member, c); err != nil {
 								if err := couchbaseutil.Failover(failoverList, false).On(c.api, c.readyMembers()); err != nil {
 									return err
