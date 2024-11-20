@@ -72,6 +72,10 @@ func ServiceListFromStringArray(arr []string) (ServiceList, error) {
 	list := []ServiceName{}
 
 	for _, svc := range arr {
+		if svc == "admin" {
+			continue
+		}
+
 		serviceName, err := MapServiceNameToServerServiceName(svc)
 		if err != nil {
 			return list, err
