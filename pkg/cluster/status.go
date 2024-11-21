@@ -150,7 +150,7 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 		// some source we don't trust.
 		if _, ok := members[name]; !ok {
 			// Fake it until you make it...
-			member := couchbaseutil.NewPartialMember(c.cluster.Namespace, c.cluster.Name, name)
+			member := couchbaseutil.NewExternalMember(strings.Split(string(node.HostName), ":")[0], "", false)
 
 			status.UnknownMembers.Add(member)
 		}
