@@ -855,8 +855,8 @@ bucket resources.
 ==== Description
 
 Managed defines whether buckets are managed by the Operator (true), or user managed (false).
-When Operator managed, all buckets must be defined with either CouchbaseBucket,
-CouchbaseEphemeralBucket or CouchbaseMemcachedBucket resources.
+When Operator managed, all buckets must be defined with either CouchbaseBucket or
+CouchbaseEphemeralBucket resources.
 Manual addition
 of buckets will be reverted by the Operator.
 When user managed, the Operator

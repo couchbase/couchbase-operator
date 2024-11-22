@@ -1578,6 +1578,7 @@ type CouchbaseEphemeralBucketList struct {
 	Items           []CouchbaseEphemeralBucket `json:"items"`
 }
 
+// DEPRECATED - Memcached buckets are now deprecated in Couchbase Server and should not be used, they will be removed in a future release.
 // The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase server.
 // A Couchbase client connects to and operates on a bucket, which provides independent
 // management of a set documents and a security boundary for role based access control.
@@ -3722,8 +3723,8 @@ type XDCR struct {
 
 type Buckets struct {
 	// Managed defines whether buckets are managed by the Operator (true), or user managed (false).
-	// When Operator managed, all buckets must be defined with either CouchbaseBucket,
-	// CouchbaseEphemeralBucket or CouchbaseMemcachedBucket resources.  Manual addition
+	// When Operator managed, all buckets must be defined with either CouchbaseBucket or
+	// CouchbaseEphemeralBucket resources.  Manual addition
 	// of buckets will be reverted by the Operator.  When user managed, the Operator
 	// will not interrogate buckets at all.  This field defaults to false.
 	Managed bool `json:"managed,omitempty"`

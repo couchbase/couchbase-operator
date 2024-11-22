@@ -5,6 +5,8 @@ include::partial$autogen-reference-aliases.adoc[tags=couchbasememcachedbucket]
 :resource-name-plural: couchbasememcachedbuckets
 :resource-name-kind: CouchbaseMemcachedBucket
 
+*DEPRECATED* - Memcached buckets are now deprecated in Couchbase Server and should not be used, they will be removed in a future release.
+
 The CouchbaseMemcachedBucket resource defines a set of documents in Couchbase server.
 A Couchbase client connects to and operates on a bucket, which provides independent
 management of a set documents and a security boundary for role based access control.
