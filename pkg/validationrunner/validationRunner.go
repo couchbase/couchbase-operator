@@ -85,6 +85,10 @@ func (n *bucketNamer) GenerateCollectionName(bucket *couchbaseutil.Bucket, scope
 func ValidateImmutableFields(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
+	if currentCluster.GetCouchbaseCluster().Spec.Paused {
+		return nil
+	}
+
 	errs = append(errs, validateBucketsImmutableFields(currentCluster)...)
 	errs = append(errs, validateReplicationsImmutableFields(currentCluster)...)
 	errs = append(errs, validateBackupsImmutableFields(currentCluster)...)
@@ -248,6 +252,10 @@ func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 func CheckChangeConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
+	if currentCluster.GetCouchbaseCluster().Spec.Paused {
+		return nil
+	}
+
 	errs = append(errs, validateBucketsChangeConstraints(currentCluster)...)
 
 	return errs
@@ -310,6 +318,10 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 
 func CheckConstraints(cluster *cluster.Cluster) []error {
 	var errs []error
+
+	if cluster.GetCouchbaseCluster().Spec.Paused {
+		return nil
+	}
 
 	k8s := cluster.GetK8sClient()
 
