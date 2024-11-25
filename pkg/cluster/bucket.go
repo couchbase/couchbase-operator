@@ -335,7 +335,7 @@ func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.B
 	return updateBuckets, nil
 }
 
-func (c *Cluster) checkUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
+func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 	var annotations = make(map[string]string)
 
 	switch bucket.BucketType {
@@ -365,15 +365,26 @@ func (c *Cluster) checkUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
 // of buckets to create, update or remove and the requested set for status updates.
+//
+//nolint:gocognit
 func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
 	requested, err := c.gatherBuckets()
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	actual := couchbaseutil.BucketList{}
-	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
+	unfilteredActual := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&unfilteredActual).On(c.api, c.readyMembers()); err != nil {
 		return nil, nil, nil, nil, err
+	}
+
+	// Filter out unreconcilable buckets.
+	actual := couchbaseutil.BucketList{}
+
+	for _, bucket := range unfilteredActual {
+		if !c.isUnreconilableBucket(bucket) {
+			actual = append(actual, bucket)
+		}
 	}
 
 	create := []couchbaseutil.Bucket{}
@@ -387,7 +398,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				if found = c.checkUnreconilableBucket(a); found {
+				if found = c.isUnreconilableBucket(a); found {
 					continue
 				}
 
@@ -416,7 +427,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, r := range requested {
 			if a.BucketName == r.BucketName {
-				if found = c.checkUnreconilableBucket(a); found {
+				if found = c.isUnreconilableBucket(a); found {
 					continue
 				}
 

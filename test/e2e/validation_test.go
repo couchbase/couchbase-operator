@@ -3366,9 +3366,14 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name: "TestBucketMigrationToCouchstoreValid",
-			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
-				Replace("/spec/storageBackend", "couchstore").
-				Remove("/metadata/annotations")},
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
+				}),
+				"bucket2": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore").
+					Remove("/metadata/annotations"),
+			},
 			shouldFail: false,
 		},
 		{
@@ -3379,9 +3384,23 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			shouldFail:     true,
 		},
 		{
-			name:       "TestBucketMigrationToMagmaValid",
-			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma")},
+			name: "TestBucketMigrationToMagmaValid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
+				}),
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma")},
 			shouldFail: false,
+		},
+		{
+			name: "TestBucketMigrationToCouchstoreInvalidAnnotation",
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore").
+					Remove("/metadata/annotations")},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true"},
+			shouldFail:     true,
 		},
 	}
 
