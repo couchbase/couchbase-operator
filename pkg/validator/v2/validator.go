@@ -3509,17 +3509,11 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	}
 
 	if prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
-		allClustersAtleast76, err := areAllBucketsClustersAtleast76(v, curr)
-
-		if err != nil {
-			return err
+		if err := checkAllBucketsClustersValidForMigration(v, curr); err != nil {
+			errs = append(errs, err)
 		}
 
-		if !allClustersAtleast76 {
-			errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater"))
-		}
-
-		if allClustersAtleast76 && prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "couchstore" {
+		if prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "couchstore" {
 			if err := checkBucketHistoryDisabled(prev); err != nil {
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
@@ -3544,42 +3538,52 @@ func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 		} else if historyRetentionEnabled {
 			return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
 		}
+	} else {
+		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
 	}
 
 	return nil
 }
 
-func areAllBucketsClustersAtleast76(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) (bool, error) {
+func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
 	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	for _, cluster := range clusters.Items {
 		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
 		if err != nil {
-			return false, err
+			return err
 		}
 
 		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			if err := annotations.Populate(&cluster.Spec, cluster.Annotations); err != nil {
+				return err
+			}
+
+			if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true")
+			}
+
 			tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
 
 			if err != nil {
-				return false, err
+				return err
 			}
 
 			if !after76 {
-				return false, nil
+				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater")
 			}
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 func CheckImmutableFieldsEphemeralBucket(prev, curr *couchbasev2.CouchbaseEphemeralBucket) error {
