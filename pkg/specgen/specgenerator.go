@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,6 +42,8 @@ type extractorFunc func(s *SpecGenerator) error
 
 // Generate generates a spec file for a running Couchbase cluster.
 func (s *SpecGenerator) Generate() (*couchbasev2.ClusterSpec, error) {
+	metrics.InitMetrics()
+
 	extractors := []extractorFunc{
 		(*SpecGenerator).applyServerClasses,
 		(*SpecGenerator).applyPoolsDefaults,
