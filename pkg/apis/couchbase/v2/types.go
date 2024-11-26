@@ -1297,7 +1297,8 @@ type CouchbaseBucketSpec struct {
 	Name BucketName `json:"name,omitempty"`
 
 	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
-	// The bucket name will define the sample bucket used.
+	// If set to "true", the bucket name will define the sample bucket used and the bucket will not be updated to match the given specification.
+	// If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification.
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
@@ -1476,7 +1477,8 @@ type CouchbaseEphemeralBucketSpec struct {
 	Name BucketName `json:"name,omitempty"`
 
 	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
-	// The bucket name will define the sample bucket used.
+	// If set to "true", the bucket name will define the sample bucket used and the bucket will not be updated to match the given specification.
+	// If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification.
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
@@ -1608,7 +1610,8 @@ type CouchbaseMemcachedBucketSpec struct {
 	Name BucketName `json:"name,omitempty"`
 
 	// SampleBucket indicates whether the bucket should be treated as a sample bucket.
-	// The bucket name will define the sample bucket used.
+	// If set to "true", the bucket name will define the sample bucket used and the bucket will not be updated to match the given specification.
+	// If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification.
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// MemoryQuota is a memory limit to the size of a bucket. The memory quota

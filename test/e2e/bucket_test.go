@@ -701,6 +701,55 @@ func TestSampleBucket(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
 }
 
+// TestUpdateSampleBucket will check that sample buckets aren't updated to match the CRD spec until the sampleBucket annotation is false.
+func TestUpdateSampleBucket(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Static configuration
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "beer-sample",
+			Annotations: map[string]string{"cao.couchbase.com/sampleBucket": "true"},
+		},
+	}
+
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+
+	beerSampleDefaultMemoryQuota := e2espec.NewResourceQuantityMi(200)
+	updatedMemoryQuota := e2espec.NewResourceQuantityMi(256)
+
+	// Update the memory quota with a value that is different to the sample bucket default
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Add("/spec/memoryQuota", updatedMemoryQuota), time.Minute)
+
+	// Validate that the sample bucket's memory quota has not been updated
+	e2eutil.MustVerifyCouchbaseBucketMemoryQuota(t, kubernetes, cluster, bucketObj.GetName(), beerSampleDefaultMemoryQuota, time.Minute)
+
+	// Set the sampleBucket annotation to false
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/sampleBucket": "false"}), time.Minute)
+
+	// We now expect the memory quota to be updated
+	e2eutil.MustVerifyCouchbaseBucketMemoryQuota(t, kubernetes, cluster, bucketObj.GetName(), updatedMemoryQuota, time.Minute)
+
+	// Check the events contain a single bucket edited event where the memory quota was updated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited, FuzzyMessage: bucket.Name},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings tests that auto-compaction settings configured at the bucket level are set on the couchbase bucket
 // and that editing and removing settings will be correctly reflected by the bucket.
 func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings(t *testing.T) {

@@ -20,7 +20,8 @@ Accepts either `couchstore` or `magma`.
 == Sample buckets
 ==== `cao.couchbase.com/sampleBucket`
 SampleBucket indicates whether the bucket should be treated as a sample bucket.
-If set to "true", the bucket name will define the sample bucket used.
+If set to "true", the bucket name will define the sample bucket used and the bucket will not be updated to match the given specification.
+If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification.
 
 == Cluster Scheduling
 === Rescheduling To Different Server Groups On Failed Scheduling

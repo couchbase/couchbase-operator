@@ -10,6 +10,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -817,6 +818,31 @@ func verifyBuckAutoCompactionSettings(t *testing.T, k8s *types.Cluster, cluster 
 
 		if !reflect.DeepEqual(info.PurgeInterval, expectedPurgeInterval) {
 			return fmt.Errorf("bucket auto compaction purge interval from api %v, expected %v", info.PurgeInterval, expectedPurgeInterval)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyCouchbaseBucketMemoryQuota(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, expectedMemoryQuota *resource.Quantity, timeout time.Duration) {
+	if err := verifyBucketMemoryQuota(t, k8s, cluster, bucket, expectedMemoryQuota, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func verifyBucketMemoryQuota(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, expectedMemoryQuota *resource.Quantity, timeout time.Duration) error {
+	expectedQuotaBytes := k8sutil.Bytes(expectedMemoryQuota)
+
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if actualQuotaBytes, ok := info.Quota["rawRAM"]; ok {
+			if actualQuotaBytes != expectedQuotaBytes {
+				return fmt.Errorf("expected bucket memory quota to be %d, but got %d", expectedQuotaBytes, actualQuotaBytes)
+			}
 		}
 
 		return nil

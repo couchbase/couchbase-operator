@@ -402,6 +402,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					continue
 				}
 
+				// If the bucket is a sample bucket, we don't update it until this field is false or removed to avoid unnecessary updates.
+				if found = r.SampleBucket; found {
+					continue
+				}
+
 				equalizeBucketAutoCompactionSettings(&r, &a)
 
 				if !reflect.DeepEqual(r, a) {
