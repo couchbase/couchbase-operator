@@ -1,0 +1,670 @@
+pipeline {
+  agent {
+    label 'k8'
+  }
+
+  options {
+    timestamps()
+
+    buildDiscarder(
+      logRotator(
+        artifactDaysToKeepStr: '14',
+        artifactNumToKeepStr: '20',
+        daysToKeepStr: '14',
+        numToKeepStr: '20',
+      )
+    )
+
+    disableConcurrentBuilds()
+  }
+
+  parameters {
+    string(name: 'refspec', defaultValue: 'refs/heads/master')
+    string(name: 'operator_image', defaultValue: 'ghcr.io/cb-rhcc/operator:latest')
+    string(name: 'admission_image', defaultValue: 'ghcr.io/cb-rhcc/admission-controller:latest')
+    string(name: 'certification_image', defaultValue: 'ghcr.io/cb-rhcc/operator-certification:latest')
+    string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.6.3-5')
+    string(name: 'server_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.2.6-3')
+    string(name: 'backup_image', defaultValue: 'registry.connect.redhat.com/couchbase/operator-backup:1.4.0-1')
+    string(name: 'exporter_image', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.10-1')
+    string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
+    string(name: 'logging_image', defaultValue: 'registry.connect.redhat.com/couchbase/fluent-bit:1.2.8-1')
+    string(name: 'logging_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/fluent-bit:1.1.1-1')
+    string(name: 'cloud_native_gateway_image', defaultValue: 'ghcr.io/cb-rhcc/cloud-native-gateway:1.0.2-127')
+    string(name: 'mobile_image', defaultValue: 'ghcr.io/cb-rhcc/sync-gateway:4.0.0-64')
+    string(name: 'openshift_version', defaultValue: '4.17')
+    string(name: 'platform', defaultValue: 'openshift')
+    string(name: 'storage_class', defaultValue: 'gp2')
+    string(name: 'bucket_type', defaultValue: 'couchbase')
+    string(name: 'compression_mode', defaultValue: 'passive')
+    string(name: 's3_region', defaultValue: 'us-west-2')
+    string(name: 'tls_version', defaultValue: '1.2')
+    string(name: 'docs', defaultValue: '100')
+    booleanParam(name: 'lpv', defaultValue: false)
+    booleanParam(name: 'validation', defaultValue: true)
+    booleanParam(name: 'sanity', defaultValue: true)
+    booleanParam(name: 'p0', defaultValue: true)
+    booleanParam(name: 'p1', defaultValue: true)
+    booleanParam(name: 'platformcert', defaultValue: true)
+    booleanParam(name: 'custom', defaultValue: false)
+    string(name: 'custom_args', defaultValue: '')
+    booleanParam(name: 'first_rerun', defaultValue: true)
+    booleanParam(name: 'second_rerun', defaultValue: true)
+  }
+
+  environment {
+    GOVERSION = '1.22.1'
+    GOROOT = "${env.WORKSPACE}/go"
+    PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
+    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
+    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
+    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
+    AWS_ACCESS_KEY_ID = credentials('couchbaseqe-aws-access-id')
+    AWS_SECRET_ACCESS_KEY = credentials('couchbaseqe-aws-access-secret')
+    REDHAT_PULL_SECRET = credentials('rhcc-pull-secret')
+    LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
+    NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Prerequisites') {
+      steps {
+        script {
+          currentBuild.description = "refspec:${params.refspec}--oc:${params.openshift_version}\noperator:${params.operator_image}\nserver:${params.server_image}\nserver_upgrade:${params.server_image_upgrade}"
+        }
+
+        sh "mkdir -p ${env.WORKSPACE}/bin"
+
+        sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
+
+        sh 'wget -q https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+        sh 'chmod +x jq-linux64'
+        sh "mv jq-linux64 ${env.WORKSPACE}/bin/jq"
+
+        sh "wget -q https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${params.openshift_version}/openshift-install-linux.tar.gz"
+        sh 'tar xfv openshift-install-linux.tar.gz'
+      }
+    }
+
+    stage('Provision OC') {
+      steps {
+        sh "sed 's/PULL_SECRET/${env.REDHAT_PULL_SECRET}/g;s/CLUSTER_NAME/${env.NAME}/g' ${env.WORKSPACE}/test/e2e/resources/provisioners/oc/install-config.yaml > install-config.yaml"
+        sh './openshift-install create cluster'
+        sh "cp auth/kubeconfig ${env.WORKSPACE}/config1"
+      }
+    }
+
+    stage('Build') {
+      steps {
+        // Just checking the Operator Image.
+        sh "docker pull ${params.operator_image}"
+        sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
+        sh "docker rmi -f ${params.operator_image}"
+        
+        sh 'make touch-generated tools'
+      }
+    }
+
+    stage('Install Istio') {
+      when {
+        expression {
+          params.enable_istio
+        }
+      }
+      steps {
+        script {
+          // Download and install istioctl
+          sh "wget -q https://github.com/istio/istio/releases/download/${params.istio_version}/istioctl-${params.istio_version}-linux-amd64.tar.gz"
+          sh "tar xfv istioctl-${params.istio_version}-linux-amd64.tar.gz"
+          sh "chmod +x istioctl"
+          sh "mv istioctl ${env.WORKSPACE}/bin/"
+
+          // Provision istio
+          sh "./test/e2e/resources/provisioners/istio/istio_provision start --kubeconfig ${env.WORKSPACE}/config1 --mode ${params.istio_mode}"
+        }
+      }
+    }
+
+    stage('Install Rancher') {
+      when {
+        expression {
+          params.lpv
+        }
+      }
+      steps {
+        script {
+          sh "KUBECONFIG=${env.WORKSPACE}/config1 kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.24/deploy/local-path-storage.yaml"
+        }
+      }
+    }
+
+    // ===================================================================================================
+    // ========================================= TEST STAGES =============================================
+    // ===================================================================================================
+
+    stage('Test Suites') {
+      steps {
+        sh "sleep 1"
+        script {
+          def testSuites = ['validation', 'sanity', 'p0', 'p1', 'platform', 'lpv']
+
+          for (suite in testSuites) {
+            stage("Test ${suite}") {
+              if (params[suite]) {
+                echo "Running ${suite} Test Suite"
+
+                try {
+                  sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+                  --clean \
+                  --parallel 6 \
+                  --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+                  --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+                  --image ${params.certification_image} \
+                  --archive-name ${suite} \
+                  -- \
+                  -suite ${suite} \
+                  -platform-type openshift \
+                  -operator-image ${params.operator_image} \
+                  -admission-image ${params.admission_image} \
+                  -mobile-image ${params.mobile_image} \
+                  -server-image ${params.server_image} \
+                  -server-image-upgrade ${params.server_image_upgrade} \
+                  -exporter-image ${params.exporter_image} \
+                  -exporter-image-upgrade ${params.exporter_image_upgrade} \
+                  -backup-image ${params.backup_image} \
+                  -logging-image ${params.logging_image} \
+                  -logging-image-upgrade ${params.logging_image_upgrade} \
+                  -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+                  -storage-class ${params.storage_class} \
+                  -lpv=${params.lpv} \
+                  -bucket-type ${params.bucket_type} \
+                  -compression-mode ${params.compression_mode} \
+                  -s3-region ${params.s3_region} \
+                  -s3-access-key ${env.S3_ACCESS_KEY} \
+                  -s3-secret-id ${env.S3_SECRET_ID} \
+                  -tls-version ${params.tls_version} \
+                  -collect-logs \
+                  -color=false"
+                } catch (e) {
+                  currentBuild.result = 'UNSTABLE'
+                }
+
+                sh "sleep 1"
+
+                // Extract the results.
+                try {
+                  sh "tar xf ${suite}.tar.bz2"
+                } catch (Exception e) {
+                  echo "Extract ${suite}.tar.bz2: ${e.message}"
+                  currentBuild.result = 'FAILURE'
+                  return
+                }
+                try {
+                  sh 'tar xf results.tar.bz'
+                } catch (Exception e) {
+                  echo "Extract ${suite}.tar.bz2/results.tar.bz: ${e.message}"
+                  currentBuild.result = 'FAILURE'
+                  return
+                }
+
+                // ===========================
+                // ========== POST ===========
+                // ===========================
+                echo "POST ${suite} Test Suite"
+
+                try {
+                  sh "tar czf ${suite}.tar.gz artifacts/*"
+                  archiveArtifacts artifacts: "${suite}.tar.gz", fingerprint: true
+                }
+                catch (Exception e) {
+                  echo "compress ${suite}.tar.gz: ${e.message}"
+                  currentBuild.result = 'FAILURE'
+                  return
+                }
+
+                // Renaming the results-timestamp.xml to the ${env.BUILD_NUMBER}_${suite}.xml
+                def xmlFile = sh(script: "ls artifacts/*.xml", returnStdout: true).trim()
+                sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_${suite}.xml"
+
+                // Moving the xml file to the workspace
+                sh "mv artifacts/${env.BUILD_NUMBER}_${suite}.xml ./"
+
+                // Deleting the files and folders which are not required.
+                /*
+                * The ${suite}.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
+                * The ${suite}.tar.gz file (compressed) contains the artifacts folder; artifacts/ contains the logs and results-timestamp.xml.
+                * Prevents duplication of test results. Otherwise the JUnit plugin will report the same test results twice or more.
+                */
+                sh "rm -rf ${suite}.tar.bz2"
+                sh 'rm -rf results.tar.bz'
+                sh 'rm -rf artifacts'
+
+              } else {
+                echo "Skipped Test Suite: ${suite}"
+                sh "sleep 1"
+              }
+            }
+          }
+        }
+      }
+    }
+
+    stage('Test Custom') {
+      when {
+        allOf {
+          expression { params.custom }
+          expression { currentBuild.result != 'FAILURE' }
+        }
+      }
+
+      steps {
+        script {
+          echo "Running Custom Tests"
+
+          try {
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+            --clean \
+            --parallel 6 \
+            --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+            --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --image ${params.certification_image} \
+            --archive-name custom \
+            -- \
+            ${params.custom_args} \
+            -platform-type openshift \
+            -operator-image ${params.operator_image} \
+            -admission-image ${params.admission_image} \
+            -mobile-image ${params.mobile_image} \
+            -server-image ${params.server_image} \
+            -server-image-upgrade ${params.server_image_upgrade} \
+            -exporter-image ${params.exporter_image} \
+            -exporter-image-upgrade ${params.exporter_image_upgrade} \
+            -backup-image ${params.backup_image} \
+            -logging-image ${params.logging_image} \
+            -logging-image-upgrade ${params.logging_image_upgrade} \
+            -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+            -storage-class ${params.storage_class} \
+            -lpv=${params.lpv} \
+            -bucket-type ${params.bucket_type} \
+            -compression-mode ${params.compression_mode} \
+            -s3-region ${params.s3_region} \
+            -s3-access-key ${env.S3_ACCESS_KEY} \
+            -s3-secret-id ${env.S3_SECRET_ID} \
+            -tls-version ${params.tls_version} \
+            -collect-logs \
+            -color=false"
+          }
+          catch (e) {
+            currentBuild.result = 'UNSTABLE'
+          }
+
+          sh "sleep 1"
+
+          // Extract the results.
+          try {
+            sh 'tar xf custom.tar.bz2'
+          } catch (Exception e) {
+            echo "Extract custom.tar.bz2: ${e.message}"
+            currentBuild.result = 'FAILURE'
+            return
+          }
+          try {
+            sh 'tar xf results.tar.bz'
+          } catch (Exception e) {
+            echo "Extract custom.tar.bz2/results.tar.bz: ${e.message}"
+            currentBuild.result = 'FAILURE'
+            return
+          }
+
+          // ===========================
+          // ========== POST ===========
+          // ===========================
+          echo "POST Custom Tests"
+
+          // Archive any logs as an artifact, these may be needed to debug an issue.
+          try {
+            sh 'tar czf custom.tar.gz artifacts/*'
+            archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
+          }
+          catch (Exception e) {
+            echo "compress custom.tar.gz: ${e.message}"
+            currentBuild.result = 'FAILURE'
+            return
+          }
+
+          // Renaming the results-timestamp.xml to ${env.BUILD_NUMBER}_custom.xml
+          def xmlFile = sh(script: "ls artifacts/results-*.xml", returnStdout: true).trim()
+          sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_custom.xml"
+
+          // Moving the xml file to the workspace
+          sh "mv artifacts/${env.BUILD_NUMBER}_custom.xml ./"
+
+          // Deleting the files and folders which are not required.
+          /*
+           * The custom.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
+           * The custom.tar.gz file (compressed) contains the artifacts folder; artifacts/ contains the logs and results-timestamp.xml.
+           * Prevents duplication of test results. Otherwise the JUnit plugin will report the same test results twice or more.
+           */
+          sh 'rm -rf custom.tar.bz2'
+          sh 'rm -rf results.tar.bz'
+          sh 'rm -rf artifacts'
+        }
+      }
+    }
+
+    // ===================================================================================================
+    // ========================================== RERUN INFO =============================================
+    // ===================================================================================================
+    /*
+     * Test reruns can be executed for all the test suites and custom tests as well.
+     * The failed tests are collected and rerun.
+     * If the second rerun is enabled, then the failed tests from the first rerun are collected and rerun once again.
+     * Finally the we record the test failures from the last rerun. Check resultsXML.go for more info.
+     */
+
+    stage('First Rerun') {
+      when {
+        allOf {
+          expression { params.first_rerun }
+          expression { currentBuild.result != 'FAILURE'}
+        }
+      }
+
+      steps {
+        echo "Started First Rerun"
+
+        script {
+          def failedTestsStr = ''
+
+          // Running the Go Script which gets all the failed tests by parsing all the XMLs.
+          sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=1"
+
+          // Reading all the failed tests.
+          try {
+            failedTestsStr = readFile("./${env.BUILD_NUMBER}_failed_tests.txt").trim()
+            echo "failedTestsStr for First Rerun: ${failedTestsStr}"
+          }
+          catch (Exception e) {
+            echo "Read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
+            currentBuild.result = 'FAILURE'
+            echo "Cannot execute Test Rerun 1"
+            return
+          }
+
+          if (failedTestsStr != '') {
+            try {
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+              --clean \
+              --parallel 6 \
+              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --image ${params.certification_image} \
+              --archive-name first_rerun \
+              -- \
+              ${failedTestsStr} \
+              -platform-type openshift \
+              -operator-image ${params.operator_image} \
+              -admission-image ${params.admission_image} \
+              -mobile-image ${params.mobile_image} \
+              -server-image ${params.server_image} \
+              -server-image-upgrade ${params.server_image_upgrade} \
+              -exporter-image ${params.exporter_image} \
+              -exporter-image-upgrade ${params.exporter_image_upgrade} \
+              -backup-image ${params.backup_image} \
+              -logging-image ${params.logging_image} \
+              -logging-image-upgrade ${params.logging_image_upgrade} \
+              -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+              -storage-class ${params.storage_class} \
+              -lpv=${params.lpv} \
+              -bucket-type ${params.bucket_type} \
+              -compression-mode ${params.compression_mode} \
+              -s3-region ${params.s3_region} \
+              -s3-access-key ${env.S3_ACCESS_KEY} \
+              -s3-secret-id ${env.S3_SECRET_ID} \
+              -tls-version ${params.tls_version} \
+              -collect-logs \
+              -color=false"
+            }
+            catch (e) {
+              currentBuild.result = 'UNSTABLE'
+            }
+
+            // Extract the results.
+            try {
+              sh 'tar xf first_rerun.tar.bz2'
+            } catch (Exception e) {
+              echo "Extract first_rerun.tar.bz2: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+            try {
+              sh 'tar xf results.tar.bz'
+            } catch (Exception e) {
+              echo "Extract first_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+
+          } else {
+            echo "All tests passed :)"
+            return
+          }
+
+          // ===========================
+          // ====== POST ACTIONS =======
+          // ===========================
+          if (currentBuild.result != 'FAILURE') {
+            echo "POST First Rerun"
+
+            // Archive any logs as an artifact, these may be needed to debug an issue.
+            try {
+              sh 'tar czf first_rerun.tar.gz artifacts/*'
+              archiveArtifacts artifacts: 'first_rerun.tar.gz', fingerprint: true
+            }
+            catch (Exception e) {
+              echo "compress first_rerun.tar.gz: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+
+            // Renaming the results-timestamp.xml to the ${env.BUILD_NUMBER}_first_rerun.xml
+            def xmlFile = sh(script: "ls artifacts/results-*.xml", returnStdout: true).trim()
+            sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_rerun_1.xml"
+
+            // Moving the xml file from artifacts folder to the workspace
+            sh "mv artifacts/${env.BUILD_NUMBER}_rerun_1.xml ./"
+
+            // Deleting the files and folders which are not required.
+            /*
+            * The first_rerun.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
+            * The first_rerun.tar.gz file (compressed) contains the artifacts folder; artifacts/ contains the logs and results-timestamp.xml.
+            * Prevents duplication of test results. Otherwise the JUnit plugin will report the same test results twice or more.
+            */
+            sh 'rm -rf first_rerun.tar.bz2'
+            sh 'rm -rf results.tar.bz'
+            sh 'rm -rf artifacts'
+          }
+        }
+      }
+    }
+
+    stage('Second Rerun') {
+      when {
+        allOf {
+          expression { params.first_rerun }
+          expression { params.second_rerun }
+          expression { currentBuild.result != 'FAILURE'}
+        }
+      }
+
+      steps {
+        script {
+          echo "Started Second Rerun"
+          def failedTestsStr = ''
+
+          // Running the Go Script which gets all the failed tests by parsing all the XMLs.
+          sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=1"
+
+          // Reading all the failed tests.
+          try {
+            failedTestsStr = readFile("./${env.BUILD_NUMBER}_failed_tests.txt").trim()
+            echo "failedTestsStr for Second Rerun: ${failedTestsStr}"
+          }
+          catch (Exception e) {
+            echo "Read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
+            currentBuild.result = 'FAILURE'
+            echo "Cannot execute Test Rerun 2"
+            return
+          }
+
+          if (failedTestsStr != '') {
+            try {
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+              --clean \
+              --parallel 6 \
+              --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
+              --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --image ${params.certification_image} \
+              --archive-name second_rerun \
+              -- \
+              ${failedTestsStr} \
+              -platform-type openshift \
+              -operator-image ${params.operator_image} \
+              -admission-image ${params.admission_image} \
+              -mobile-image ${params.mobile_image} \
+              -server-image ${params.server_image} \
+              -server-image-upgrade ${params.server_image_upgrade} \
+              -exporter-image ${params.exporter_image} \
+              -exporter-image-upgrade ${params.exporter_image_upgrade} \
+              -backup-image ${params.backup_image} \
+              -logging-image ${params.logging_image} \
+              -logging-image-upgrade ${params.logging_image_upgrade} \
+              -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
+              -storage-class ${params.storage_class} \
+              -lpv=${params.lpv} \
+              -bucket-type ${params.bucket_type} \
+              -compression-mode ${params.compression_mode} \
+              -s3-region ${params.s3_region} \
+              -s3-access-key ${env.S3_ACCESS_KEY} \
+              -s3-secret-id ${env.S3_SECRET_ID} \
+              -tls-version ${params.tls_version} \
+              -collect-logs \
+              -color=false"
+            }
+            catch (e) {
+              currentBuild.result = 'UNSTABLE'
+            }
+
+            // Extract the results.
+            try {
+              sh 'tar xf second_rerun.tar.bz2'
+            } catch (Exception e) {
+              echo "Extract second_rerun.tar.bz2: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+            try {
+              sh 'tar xf results.tar.bz'
+            } catch (Exception e) {
+              echo "Extract second_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+
+          } else {
+            echo "All of the tests passed :)"
+            return
+          }
+
+          // ===========================
+          // ====== POST ACTIONS =======
+          // ===========================
+
+          if (currentBuild.result != 'FAILURE') {
+            echo "POST Second Rerun"
+
+            // Archive any logs as an artifact, these may be needed to debug an issue.
+            try {
+              sh 'tar czf second_rerun.tar.gz artifacts/*'
+              archiveArtifacts artifacts: 'second_rerun.tar.gz', fingerprint: true
+            }
+            catch (Exception e) {
+              echo "compress second_rerun.tar.gz: ${e.message}"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+
+            // Renaming the results-timestamp.xml to ${env.BUILD_NUMBER}_rerun_2.xml
+            def xmlFile = sh(script: "ls artifacts/results-*.xml", returnStdout: true).trim()
+            sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_rerun_2.xml"
+
+            // Moving the xml file from artifacts folder to the workspace
+            sh "mv artifacts/${env.BUILD_NUMBER}_rerun_2.xml ./"
+
+
+            // Deleting the files and folders which are not required.
+            /*
+            * The second_rerun.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
+            * The second_rerun.tar.gz file (compressed) contains the artifacts folder; artifacts/ contains the logs and results-timestamp.xml.
+            * Prevents duplication of test results. Otherwise the JUnit plugin will report the same test results twice or more.
+            */
+            sh 'rm -rf second_rerun.tar.bz2'
+            sh 'rm -rf results.tar.bz'
+            sh 'rm -rf artifacts'
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      sh "echo POST OC Pipeline"
+
+      // Building the final results.
+      script {
+        try {
+          if (params.first_rerun && params.second_rerun) {
+            sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=2 -buildFinalResult=true"
+          } else if (params.first_rerun && !params.second_rerun) {
+            sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=1 -buildFinalResult=true"
+          } else {
+            sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=0 -buildFinalResult=true"
+          }
+        }
+        catch (Exception e) {
+          echo "Cannot build the final results: ${e.message}"
+          currentBuild.result = 'FAILURE'
+          return
+        }
+        
+
+        // Recording all the test results.
+        def testSuites = ['validation', 'sanity', 'p0', 'p1', 'platform', 'custom']
+
+        for (suite in testSuites) {
+          if (params[suite]) {
+            echo "Recording results for ${suite} test suite ..."
+            def xmlFile = "${env.BUILD_NUMBER}_${suite}_modified.xml"
+
+            if (fileExists(xmlFile)) {
+              junit xmlFile
+            } else {
+              echo "File ${xmlFile} does not exist."
+            }
+          }
+        }
+      }
+
+      // Destroy the OC cluster.
+      sh './openshift-install destroy cluster'
+
+      // Cleanup the docker images.
+      sh 'docker system prune --force'
+      
+      // Cleanup the workspace.
+      cleanWs()
+    }
+  }
+}
