@@ -352,7 +352,7 @@ func getCertifyCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 			cao certify
 
 			# Run platform certification with a custom storage class
-			cao certify -storage-class my-class
+			cao certify --storage-class my-class
 
 			# Run platform certification with private image repository
 			cao certify --registry=https://index.docker.io/v1/,username,password
