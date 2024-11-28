@@ -2857,6 +2857,30 @@ const (
 	CloudNativeGatewayLogLevelDebug  CloudNativeGatewayLogLevel = "debug"
 )
 
+type CloudNativeGatewayDataAPIProxyService string
+
+type CloudNativeGatewayDataAPIProxyServiceList []CloudNativeGatewayDataAPIProxyService
+
+const (
+	CloudNativeGatewayDataAPIProxyServiceMgmt      CloudNativeGatewayDataAPIProxyService = "mgmt"
+	CloudNativeGatewayDataAPIProxyServiceQuery     CloudNativeGatewayDataAPIProxyService = "query"
+	CloudNativeGatewayDataAPIProxyServiceSearch    CloudNativeGatewayDataAPIProxyService = "search"
+	CloudNativeGatewayDataAPIProxyServiceAnalytics CloudNativeGatewayDataAPIProxyService = "analytics"
+)
+
+type CloudNativeGatewayDataAPI struct {
+	// DEVELOPER PREVIEW - This feature is in developer preview.
+	// Enabled defines whether the data api will be available through cloud native gateway.
+	// This defaults to false. If set to true, the data api will be available on port 18008 of the cloud native gateway service.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// DEVELOPER PREVIEW - This feature is in developer preview.
+	// ProxyServices is a list of services that the Cloud Native Gateway can proxy via the data api.
+	// If this field is used, it must be one of "mgmt", "query", "search" or "analytics". By default, none of these services will
+	// be available through the data api if it has been enabled.
+	ProxyServices *CloudNativeGatewayDataAPIProxyServiceList `json:"proxyServices,omitempty"`
+}
+
 type CloudNativeGateway struct {
 	// Image is the Cloud Native Gateway image to be used to run the sidecar container.
 	// No validation is carried out as this can be any arbitrary repo and tag.
@@ -2888,6 +2912,12 @@ type CloudNativeGateway struct {
 	// "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
 	// +kubebuilder:default="info"
 	LogLevel CloudNativeGatewayLogLevel `json:"logLevel"`
+
+	// DEVELOPER PREVIEW - This feature is in developer preview.
+	// The DataAPI settings control whether the Cloud Native Gateway can be used to access the data api. Adding or changing
+	// this configuration on an existing cluster with cloud native gateway will add the rescheduling annotation to each of the pods, which
+	// will trigger a restart depending on the configured UpgradeProcess.
+	DataAPI *CloudNativeGatewayDataAPI `json:"dataAPI,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {

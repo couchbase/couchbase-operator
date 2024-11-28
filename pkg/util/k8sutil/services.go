@@ -143,6 +143,12 @@ const (
 	managementExchangePortName    = "management-exchange"
 	managementExchangePortTLS     = 21150
 	managementExchangePortNameTLS = "management-exchange-tls"
+
+	// Cloud Native Gateway constants.
+	CNGHTTPSServiceName = "cloud-native-gateway-https"
+	CNGHTTPSServicePort = 443
+	CNGDAPIServiceName  = "cloud-native-gateway-dapi"
+	CNGDAPIServicePort  = 18008
 )
 
 var (
@@ -731,16 +737,30 @@ func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v
 		cluster.AsOwner(),
 	}
 
+	var svcPorts []v1.ServicePort
+
 	// Always https(443)
 	svcPort := v1.ServicePort{
-		Name:       "cloud-native-gateway-https",
+		Name:       CNGHTTPSServiceName,
 		Protocol:   v1.ProtocolTCP,
-		Port:       443,
-		TargetPort: intstr.FromInt(snDataPort),
+		Port:       int32(CNGHTTPSServicePort),
+		TargetPort: intstr.IntOrString{IntVal: snDataPort},
+	}
+
+	svcPorts = append(svcPorts, svcPort)
+
+	// Always 18008
+	if cluster.Spec.Networking.CloudNativeGateway.DataAPI != nil && cluster.Spec.Networking.CloudNativeGateway.DataAPI.Enabled {
+		svcPorts = append(svcPorts, v1.ServicePort{
+			Name:       CNGDAPIServiceName,
+			Protocol:   v1.ProtocolTCP,
+			Port:       int32(CNGDAPIServicePort),
+			TargetPort: intstr.IntOrString{IntVal: int32(CNGDAPIServicePort)},
+		})
 	}
 
 	service.Spec.Selector = selectorForCloudNativeGatewayService(cluster)
-	service.Spec.Ports = []v1.ServicePort{svcPort}
+	service.Spec.Ports = svcPorts
 
 	return service
 }

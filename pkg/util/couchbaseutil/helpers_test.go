@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -119,6 +120,61 @@ func TestMemberOnVersion(t *testing.T) {
 		result := MemberOnVersion(clusterMembers, testcase.targetMemberName, testcase.targetVersion)
 		if result != testcase.expectedResult {
 			t.Errorf("expected member version check to return %v, got %v", testcase.expectedResult, result)
+		}
+	}
+}
+
+func TestDoStringSlicesContainEqualValues(t *testing.T) {
+	t.Parallel()
+
+	type stringSlicesContainEqualValuesTest struct {
+		sliceA   []string
+		sliceB   []string
+		expected bool
+	}
+
+	testcases := []stringSlicesContainEqualValuesTest{
+		{
+			[]string{"one", "two", "three"},
+			[]string{"one", "two", "three"},
+			true,
+		},
+		{
+			[]string{"one", "two", "three"},
+			[]string{"one", "two", "four"},
+			false,
+		},
+		{
+			[]string{"one", "two", "three"},
+			[]string{"one", "two"},
+			false,
+		},
+		{
+			[]string{"one", "two", "three"},
+			[]string{"one", "two", "three", "four"},
+			false,
+		},
+		{
+			[]string{"one", "two", "two"},
+			[]string{"one", "two", "two"},
+			true,
+		},
+		{
+			[]string{},
+			[]string{},
+			true,
+		},
+		{
+			[]string{"one"},
+			[]string{},
+			false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		result := DoStringSlicesContainEqualValues(strings.Join(testcase.sliceA, ","), strings.Join(testcase.sliceB, ","), ",")
+		if result != testcase.expected {
+			t.Errorf("expected DoStringSlicesContainEqualValues to return %v, but got %v", testcase.expected, result)
 		}
 	}
 }

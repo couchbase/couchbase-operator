@@ -181,6 +181,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
     - ""
     <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
+      <<couchbaseclusters-spec-networking-cloudnativegateway-dataapi,dataAPI>>:
+        <<couchbaseclusters-spec-networking-cloudnativegateway-dataapi-enabled,enabled>>: false
+        <<couchbaseclusters-spec-networking-cloudnativegateway-dataapi-proxyservices,proxyServices>>:
+        - ""
       <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
       <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 75
@@ -2776,6 +2780,50 @@ Each service may only be included once.
 
 CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
 cluster.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.dataAPI
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+*DEVELOPER PREVIEW* - This feature is in developer preview.
+
+The DataAPI settings control whether the Cloud Native Gateway can be used to access the data api.
+Adding or changing
+this configuration on an existing cluster with cloud native gateway will add the rescheduling annotation to each of the pods, which
+will trigger a restart depending on the configured UpgradeProcess.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.dataAPI.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+*DEVELOPER PREVIEW* - This feature is in developer preview.
+
+Enabled defines whether the data api will be available through cloud native gateway.
+This defaults to false.
+If set to true, the data api will be available on port 18008 of the cloud native gateway service.
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.dataAPI.proxyServices
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+*DEVELOPER PREVIEW* - This feature is in developer preview.
+
+ProxyServices is a list of services that the Cloud Native Gateway can proxy via the data api.
+If this field is used, it must be one of "mgmt", "query", "search" or "analytics".
+By default, none of these services will
+be available through the data api if it has been enabled.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.image
 

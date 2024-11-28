@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestCreateCNG(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
 
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
@@ -47,7 +48,7 @@ func TestCreateCNG(t *testing.T) {
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
 	// Verify the CM exists
-	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
+	e2eutil.MustGetCNGConfigMap(t, kubernetesCluster, cluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -157,7 +158,7 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 	clusterSize := 3
 
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
 
 	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
 	cluster.Name = clusterName
@@ -172,7 +173,7 @@ func setupCNGTests(ctx context.Context, t *testing.T, kubernetesCluster *types.C
 
 	username := string(kubernetesCluster.DefaultSecret.Data["username"])
 	password := string(kubernetesCluster.DefaultSecret.Data["password"])
-	client, err := getCloudNativeGatewayClient(ctx, cluster, clusterName, username, password)
+	client, err := e2eutil.MustGetCNGClient(ctx, cluster, clusterName, username, password)
 
 	return client, cluster, err
 }
@@ -189,7 +190,7 @@ func TestCngOtlp(t *testing.T) {
 	clusterSize := 3
 
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetes)
 
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string)
@@ -250,7 +251,7 @@ func TestCNGLiveConfigReload(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage).Generate(kubernetesCluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
 
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
@@ -258,66 +259,110 @@ func TestCNGLiveConfigReload(t *testing.T) {
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
 	// Verify the CM exists
-	mustGetCNGConfigMap(t, kubernetesCluster, cluster)
+	e2eutil.MustGetCNGConfigMap(t, kubernetesCluster, cluster)
 
 	cluster = e2eutil.MustPatchCluster(t, kubernetesCluster, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/cloudNativeGateway/logLevel", "debug"), time.Minute)
 	e2eutil.MustFindLog(t, kubernetesCluster, cluster, k8sutil.CloudNativeGatewayContainerName, "updated log level")
 }
 
-func getCloudNativeGatewayClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster, clusterName string, username string, password string) (*gocbcoreps.RoutingClient, error) {
-	var cngClient *gocbcoreps.RoutingClient
+// TestCNGDataAPI tests the ability to configure the data api and proxy services for CNG.
+func TestCNGDataAPI(t *testing.T) {
+	f := framework.Global
 
-	dialopts := gocbcoreps.DialOptions{
-		Username:           username,
-		Password:           password,
-		InsecureSkipVerify: true,
-		PoolSize:           1,
+	kubernetesCluster, cleanup := f.SetupTest(t)
+
+	ctx := context.Background()
+
+	framework.Requires(t, kubernetesCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the DAPI config with the mgmt service enabled
+	dConfig := &couchbasev2.CloudNativeGatewayDataAPI{
+		Enabled:       true,
+		ProxyServices: &couchbasev2.CloudNativeGatewayDataAPIProxyServiceList{couchbasev2.CloudNativeGatewayDataAPIProxyServiceMgmt},
 	}
 
-	cngSvcName := clusterName + "-cloud-native-gateway-service"
-	connStr := fmt.Sprintf("%s.%s.svc.cluster.local:%d", cngSvcName, cluster.Namespace, 443)
+	// Create the cluster spec
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, dConfig).Generate(kubernetesCluster)
 
-	cngConnErr := retryutil.Retry(ctx, 10*time.Minute, func() error {
-		var err error
-		cngClient, err = gocbcoreps.DialContext(ctx, connStr, &dialopts)
-		if err != nil {
-			return err
-		}
+	// We are going to use CNG to create a bucket, so we should disable operator management.
+	cluster.Spec.Buckets.Managed = false
 
-		return nil
-	})
+	// Create the cluster
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetesCluster, cluster, 5*time.Minute)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
-	if cngConnErr != nil {
-		return nil, cngConnErr
-	}
+	// Check the HTTPS CNG service still works by creating a bucket
+	username := string(kubernetesCluster.DefaultSecret.Data["username"])
+	password := string(kubernetesCluster.DefaultSecret.Data["password"])
 
-	cngToCBConnErr := retryutil.Retry(ctx, 10*time.Minute, func() error {
-		if cngClient.ConnectionState() == gocbcoreps.ConnStateDegraded {
-			return fmt.Errorf("CNG container not ready")
-		}
-		return nil
-	})
-
-	if cngToCBConnErr != nil {
-		return nil, cngToCBConnErr
-	}
-
-	return cngClient, nil
-}
-
-func mustGetCNGConfigMap(t *testing.T, kubernetesCluster *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
-	configMapName := k8sutil.GetCNGConfigMapName(cluster)
-
-	err := retryutil.RetryFor(1*time.Minute, func() error {
-		_, k8sErr := kubernetesCluster.KubeClient.CoreV1().ConfigMaps(kubernetesCluster.Namespace).Get(context.Background(), configMapName, metav1.GetOptions{})
-		if k8sErr == nil {
-			return nil
-		}
-
-		return fmt.Errorf("%s configmap not found for cluster: %s", configMapName, cluster.Name)
-	})
+	httpClient, err := e2eutil.MustGetCNGClient(ctx, cluster, cluster.GetName(), username, password)
 
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
+
+	bucketName := "dapiTestBucket"
+
+	e2eutil.MustCreateBasicBucketWithCNGClient(t, ctx, httpClient, bucketName)
+
+	// Create a DAPI client and test with a callerIdentity request
+	dClient := e2eutil.NewDAPITestClient(kubernetesCluster, cluster, time.Minute)
+
+	e2eutil.MustCheckCallerIdentityDAPI(t, dClient)
+
+	// Using the DAPI client, check that the mgmt proxy service works correctly
+	e2eutil.MustCheckBucketExistsDAPIMgmtService(t, dClient, bucketName)
+}
+
+// TestCNGDataAPIConfigChangeRestart tests the ability to change the data api configuration and have the CNG pods restart to use the new config.
+func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
+	f := framework.Global
+
+	k8sCluster, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, k8sCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+
+	// Create the DAPI config with no proxy services enabled
+	dConfig := &couchbasev2.CloudNativeGatewayDataAPI{
+		Enabled: true,
+	}
+
+	// Create the cluster spec
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, dConfig).Generate(k8sCluster)
+
+	// Create the cluster
+	cluster = e2eutil.CreateNewClusterFromSpec(t, k8sCluster, cluster, 5)
+	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, k8sCluster, cluster, 5*time.Minute)
+
+	// Create a DAPI client and test with a callerIdentity request
+	dClient := e2eutil.NewDAPITestClient(k8sCluster, cluster, time.Minute)
+	e2eutil.MustCheckCallerIdentityDAPI(t, dClient)
+
+	// Check that the mgmt service is not available
+	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusNotFound)
+
+	// Update the DAPI config to enable the mgmt service
+	ps := &couchbasev2.CloudNativeGatewayDataAPIProxyServiceList{couchbasev2.CloudNativeGatewayDataAPIProxyServiceMgmt}
+
+	cluster = e2eutil.MustPatchCluster(t, k8sCluster, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/cloudNativeGateway/dataAPI/proxyServices", ps), time.Minute)
+
+	// Check the update triggers a restart of the pods
+	e2eutil.MustWaitForClusterEvent(t, k8sCluster, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, k8sCluster, cluster, 5*time.Minute)
+
+	// Check the mgmt service is now available
+	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusOK)
 }

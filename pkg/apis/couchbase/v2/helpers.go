@@ -1569,3 +1569,13 @@ func (c *CouchbaseCluster) GetNumberOfDataServiceNodes() int {
 
 	return dataServiceNodes
 }
+
+func (l CloudNativeGatewayDataAPIProxyServiceList) StringSlice() []string {
+	var out []string
+
+	for _, name := range l {
+		out = append(out, string(name))
+	}
+
+	return out
+}

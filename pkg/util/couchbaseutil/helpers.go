@@ -128,3 +128,30 @@ func ShouldSeparateNameAndNamespaceLabels(existingLabels []string, joinedString 
 
 	return append(existingLabels, joinedString)
 }
+
+// DoStringSlicesContainEqualValues returns true if two delimited strings contain the same set of values, regardless of order and false if otherwise.
+// This method will also handle if the slices contain duplicate values and will return false if the counts of each value do not match.
+func DoStringSlicesContainEqualValues(a, b, delimiter string) bool {
+	sliceA := strings.Split(a, delimiter)
+	sliceB := strings.Split(b, delimiter)
+
+	if len(sliceA) != len(sliceB) {
+		return false
+	}
+
+	// Count the occurrences of each element in aSlice
+	valueCounts := make(map[string]int)
+	for _, value := range sliceA {
+		valueCounts[value]++
+	}
+
+	// Decrease counts for each element in bSlice
+	for _, value := range sliceB {
+		if valueCounts[value] == 0 {
+			return false // Either not in aSlice or counts don't match
+		}
+		valueCounts[value]--
+	}
+
+	return true
+}
