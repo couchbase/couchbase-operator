@@ -207,12 +207,12 @@ func ListGroups(hostname string) *requestutils.Request {
 	}
 }
 
-// CreateNewGroup creates a new group.
+// CreateGroup creates a new group.
 /*
  * PUT :: /settings/rbac/groups/<new-group_name>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func CreateNewGroup(hostname, groupName, desc, ldapGroupRef string, roles []string) *requestutils.Request {
+func CreateGroup(hostname, groupName, desc, ldapGroupRef string, roles []string) *requestutils.Request {
 	formData := url.Values{}
 
 	if desc != "" {
