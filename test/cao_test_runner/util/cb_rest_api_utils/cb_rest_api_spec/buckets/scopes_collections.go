@@ -1,16 +1,16 @@
 package buckets
 
 import (
-	"fmt"
 	"net/url"
+	"strconv"
 
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
 
 // CreateScope creates a new scope in the specified bucket.
 /*
- * POST :: /pools/default/buckets/<bucket_name>/scopes
- * docs.couchbase.com/server/current/rest-api/creating-a-scope.html
+ * POST :: /pools/default/buckets/<bucket_name>/scopes.
+ * docs.couchbase.com/server/current/rest-api/creating-a-scope.html.
  */
 func CreateScope(hostname, bucketName, scopeName string) *requestutils.Request {
 	formData := url.Values{}
@@ -29,8 +29,8 @@ func CreateScope(hostname, bucketName, scopeName string) *requestutils.Request {
 
 // DropScope deletes a scope from the specified bucket.
 /*
- * DELETE :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>
- * docs.couchbase.com/server/current/rest-api/dropping-a-scope.html
+ * DELETE :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>.
+ * docs.couchbase.com/server/current/rest-api/dropping-a-scope.html.
  */
 func DropScope(hostname, bucketName, scopeName string) *requestutils.Request {
 	return &requestutils.Request{
@@ -45,8 +45,8 @@ func DropScope(hostname, bucketName, scopeName string) *requestutils.Request {
 
 // CreateCollection creates a new collection in the specified scope.
 /*
- * POST :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections
- * docs.couchbase.com/server/current/rest-api/creating-a-collection.html
+ * POST :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections.
+ * docs.couchbase.com/server/current/rest-api/creating-a-collection.html.
  */
 func CreateCollection(hostname, bucketName, scopeName, collectionName string, maxTTL int, history bool) *requestutils.Request {
 	formData := url.Values{}
@@ -54,7 +54,7 @@ func CreateCollection(hostname, bucketName, scopeName, collectionName string, ma
 	formData.Set("name", collectionName)
 
 	if maxTTL != 0 {
-		formData.Set("maxTTL", fmt.Sprintf("%d", maxTTL))
+		formData.Set("maxTTL", strconv.Itoa(maxTTL))
 	}
 
 	if history {
@@ -74,14 +74,14 @@ func CreateCollection(hostname, bucketName, scopeName, collectionName string, ma
 
 // EditCollection updates the specified collection in the specified scope.
 /*
- * PATCH :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections/<collection_name>
- * docs.couchbase.com/server/current/rest-api/creating-a-collection.html
+ * PATCH :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections/<collection_name>.
+ * docs.couchbase.com/server/current/rest-api/creating-a-collection.html.
  */
 func EditCollection(hostname, bucketName, scopeName, collectionName string, maxTTL int, history bool) *requestutils.Request {
 	formData := url.Values{}
 
 	if maxTTL != 0 {
-		formData.Set("maxTTL", fmt.Sprintf("%d", maxTTL))
+		formData.Set("maxTTL", strconv.Itoa(maxTTL))
 	}
 
 	if history {
@@ -101,8 +101,8 @@ func EditCollection(hostname, bucketName, scopeName, collectionName string, maxT
 
 // DropCollection deletes a collection from the specified scope.
 /*
- * DELETE :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections/<collection_name>
- * docs.couchbase.com/server/current/rest-api/dropping-a-collection.html
+ * DELETE :: /pools/default/buckets/<bucket_name>/scopes/<scope_name>/collections/<collection_name>.
+ * docs.couchbase.com/server/current/rest-api/dropping-a-collection.html.
  */
 func DropCollection(hostname, bucketName, scopeName, collectionName string) *requestutils.Request {
 	return &requestutils.Request{
@@ -117,9 +117,9 @@ func DropCollection(hostname, bucketName, scopeName, collectionName string) *req
 
 // ListScopesCollections lists all collections in the specified bucket.
 /*
- * GET :: /pools/default/buckets/<bucket_name>/scopes/
- * docs.couchbase.com/server/current/rest-api/listing-scopes-and-collections.html
- * Unmarshal into ListScopesCollectionsStruct.
+ * GET :: /pools/default/buckets/<bucket_name>/scopes.
+ * docs.couchbase.com/server/current/rest-api/listing-scopes-and-collections.html.
+ * Unmarshal into ListScopesCollectionsStruct..
  */
 func ListScopesCollections(hostname, bucketName string) *requestutils.Request {
 	return &requestutils.Request{

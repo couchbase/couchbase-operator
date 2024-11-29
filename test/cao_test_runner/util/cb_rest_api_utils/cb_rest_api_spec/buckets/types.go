@@ -4,6 +4,10 @@ import (
 	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
 )
 
+// =======================================================================================
+// ================================== Bucket Stats =======================================
+// =======================================================================================
+
 // ======================================================
 // =============== /pools/default/buckets ===============
 // ======================================================
@@ -194,4 +198,22 @@ type BucketOpSamples struct {
 	RestRequests                    []float64 `json:"rest_requests"`
 	SwapTotal                       []int     `json:"swap_total"`
 	SwapUsed                        []int     `json:"swap_used"`
+}
+
+// =======================================================================================
+// ============================ Scopes and Collections ===================================
+// =======================================================================================
+
+type ListScopesCollectionsStruct struct {
+	UID    string `json:"uid"`
+	Scopes []struct {
+		Name        string `json:"name"`
+		UID         string `json:"uid"`
+		Collections []struct {
+			Name    string `json:"name"`
+			UID     string `json:"uid"`
+			MaxTTL  int    `json:"maxTTL,omitempty"`
+			History bool   `json:"history"`
+		} `json:"collections"`
+	} `json:"scopes"`
 }
