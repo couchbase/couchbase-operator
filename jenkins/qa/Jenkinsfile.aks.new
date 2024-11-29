@@ -190,7 +190,7 @@ pipeline {
                   -logging-image ${params.logging_image} \
                   -logging-image-upgrade ${params.logging_image_upgrade} \
                   -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-                  -storage-class ${params.storage_class} \
+                  --storage-class ${params.storage_class} \
                   -lpv=${params.lpv} \
                   -bucket-type ${params.bucket_type} \
                   -compression-mode ${params.compression_mode} \
@@ -300,7 +300,7 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-            -storage-class ${params.storage_class} \
+            --storage-class ${params.storage_class} \
             -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -433,7 +433,7 @@ pipeline {
               -logging-image ${params.logging_image} \
               -logging-image-upgrade ${params.logging_image_upgrade} \
               -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              -storage-class ${params.storage_class} \
+              --storage-class ${params.storage_class} \
               -lpv=${params.lpv} \
               -bucket-type ${params.bucket_type} \
               -compression-mode ${params.compression_mode} \
@@ -561,7 +561,7 @@ pipeline {
               -logging-image ${params.logging_image} \
               -logging-image-upgrade ${params.logging_image_upgrade} \
               -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              -storage-class ${params.storage_class} \
+              --storage-class ${params.storage_class} \
               -lpv=${params.lpv} \
               -bucket-type ${params.bucket_type} \
               -compression-mode ${params.compression_mode} \
