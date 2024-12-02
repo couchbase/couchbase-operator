@@ -66,6 +66,10 @@ const (
 	HostnameAAadded = "hostnameAAadded"
 
 	MembersWithHostnameAAadded = "membersWithHostnameAAadded"
+
+	RebalanceEjectMembers = "rebalanceEjectMembers"
+
+	RebalanceClusteredMembers = "rebalanceClusteredMembers"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

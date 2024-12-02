@@ -11,6 +11,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -362,6 +363,43 @@ func (r *ReconcileMachine) handleWarmupNodes(_ *Cluster) error {
 	return nil
 }
 
+func (r *ReconcileMachine) checkRebalanceStarted(c *Cluster) (bool, error) {
+	balancedConditionStatus := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionBalanced).Status
+	if balancedConditionStatus != "True" {
+		r.needsRebalance = true
+
+		ejectMembers, err := c.state.Get(persistence.RebalanceEjectMembers)
+		if err != nil {
+			return false, err
+		}
+
+		for _, eject := range strings.Split(ejectMembers, ",") {
+			for _, clusterMember := range c.members {
+				if eject == clusterMember.Name() {
+					r.ejectMembers.Add(clusterMember)
+				}
+			}
+		}
+
+		clusteredMembers, err := c.state.Get(persistence.RebalanceClusteredMembers)
+		if err != nil {
+			return false, err
+		}
+
+		for _, clusteredMember := range strings.Split(clusteredMembers, ",") {
+			for _, clusterMember := range c.members {
+				if clusteredMember == clusterMember.Name() {
+					r.clusteredMembers.Add(clusterMember)
+				}
+			}
+		}
+
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // If the cluster is rebalancing, we need to let it continue before letting any more
 // topology changes happen.  If Couchbase reports as rebalancing, but there is no
 // active task, then stop the rebalance.
@@ -377,6 +415,15 @@ func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) error {
 
 	if running {
 		r.abort("cluster is currently rebalancing")
+		return nil
+	}
+
+	ok, err := r.checkRebalanceStarted(c)
+	if err != nil {
+		return err
+	}
+
+	if ok {
 		return nil
 	}
 
@@ -1656,6 +1703,8 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
 
+		c.cluster.Status.SetRebalancingCondition()
+
 		// Eject nodes that we want to discard.
 		eject := r.ejectMembers.OTPNodes()
 
@@ -1709,6 +1758,14 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 					break
 				}
 			}
+		}
+
+		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
+			return err
+		}
+
+		if err := c.state.Upsert(persistence.RebalanceEjectMembers, strings.Join(r.ejectMembers.Names(), ",")); err != nil {
+			return err
 		}
 
 		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, eject, r.rebalanceRetries); err != nil {

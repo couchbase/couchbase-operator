@@ -814,6 +814,11 @@ func (cs *ClusterStatus) SetScalingDownCondition(msg string) {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetRebalancingCondition() {
+	c := newClusterCondition(ClusterConditionRebalancing, v1.ConditionTrue, "Rebalancing", "Rebalancing the cluster")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetBalancedCondition() {
 	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionTrue, "Balanced",
 		"Data is equally distributed across all nodes in the cluster")
