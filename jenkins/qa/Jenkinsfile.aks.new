@@ -174,6 +174,7 @@ pipeline {
                   --parallel 6 \
                   --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
                   --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+                  --storage-class ${params.storage_class} \
                   --image ${params.certification_image} \
                   --archive-name ${suite} \
                   -- \
@@ -190,7 +191,6 @@ pipeline {
                   -logging-image ${params.logging_image} \
                   -logging-image-upgrade ${params.logging_image_upgrade} \
                   -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-                  --storage-class ${params.storage_class} \
                   -lpv=${params.lpv} \
                   -bucket-type ${params.bucket_type} \
                   -compression-mode ${params.compression_mode} \
@@ -284,6 +284,7 @@ pipeline {
             --parallel 6 \
             --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
             --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+            --storage-class ${params.storage_class} \
             --image ${params.certification_image} \
             --archive-name custom \
             -- \
@@ -300,7 +301,6 @@ pipeline {
             -logging-image ${params.logging_image} \
             -logging-image-upgrade ${params.logging_image_upgrade} \
             -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-            --storage-class ${params.storage_class} \
             -lpv=${params.lpv} \
             -bucket-type ${params.bucket_type} \
             -compression-mode ${params.compression_mode} \
@@ -417,6 +417,7 @@ pipeline {
               --parallel 6 \
               --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
               --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --storage-class ${params.storage_class} \
               --image ${params.certification_image} \
               --archive-name first_rerun \
               -- \
@@ -433,7 +434,6 @@ pipeline {
               -logging-image ${params.logging_image} \
               -logging-image-upgrade ${params.logging_image_upgrade} \
               -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              --storage-class ${params.storage_class} \
               -lpv=${params.lpv} \
               -bucket-type ${params.bucket_type} \
               -compression-mode ${params.compression_mode} \
@@ -545,6 +545,7 @@ pipeline {
               --parallel 6 \
               --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
               --registry=https://index.docker.io/v1/,${env.DOCKER_CREDENTIALS_USR},${env.DOCKER_CREDENTIALS_PSW} \
+              --storage-class ${params.storage_class} \
               --image ${params.certification_image} \
               --archive-name second_rerun \
               -- \
@@ -561,7 +562,6 @@ pipeline {
               -logging-image ${params.logging_image} \
               -logging-image-upgrade ${params.logging_image_upgrade} \
               -cloud-native-gateway-image ${params.cloud_native_gateway_image} \
-              --storage-class ${params.storage_class} \
               -lpv=${params.lpv} \
               -bucket-type ${params.bucket_type} \
               -compression-mode ${params.compression_mode} \
