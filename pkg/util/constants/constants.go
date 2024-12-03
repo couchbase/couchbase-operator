@@ -127,6 +127,7 @@ const (
 	AnnotationUnreconcilable             = "dac.couchbase.com/unreconcilable"
 	AnnotationSkipDACValidation          = "dac.couchbase.com/skipvalidation"
 	AnnotationDisableAdmissionController = "dac.couchbase.com/skipDAC"
+	AnnotationSampleBucket               = "cao.couchbase.com/sampleBucket"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion

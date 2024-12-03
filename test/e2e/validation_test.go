@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -17,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	other_jsonpatch "github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
@@ -2027,7 +2029,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			name:           "TestValidateBucketQuotaOverflow",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(2025Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
+			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
@@ -2102,28 +2104,48 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{`spec.storageBackend`},
 		},
 		{
-			name:           "TestValidateHistoryRetentionBytesBelowWorkingRange",
-			mutations:      patchMap{"historyretentionbucket": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Add("/spec/historyRetention/bytes", uint64(2147483647))},
+			name: "TestValidateHistoryRetentionBytesBelowWorkingRange",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Add("/spec/historyRetention", &couchbasev2.HistoryRetentionSettings{
+				Bytes: uint64(2147483647),
+			})},
 			shouldFail:     true,
-			expectedErrors: []string{`historyRetention.bytes`},
+			expectedErrors: []string{`historyRetention.bytes value 2147483647 is less than minimum working value of 2147483648`},
 		},
 		{
 			name:           "TestValidateBucketAutoCompactionPurgeIntervalTooShort",
-			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction/tombstonePurgeInterval", "59m")},
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{TombstonePurgeInterval: &metav1.Duration{Duration: time.Duration(59) * time.Minute}})},
 			shouldFail:     true,
 			expectedErrors: []string{"autoCompaction.tombstonePurgeInterval in body should be greater than or equal to 1h"},
 		},
 		{
 			name:           "TestValidateBucketAutoCompactionPurgeIntervalTooLong",
-			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction/tombstonePurgeInterval", "1441h")},
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{TombstonePurgeInterval: &metav1.Duration{Duration: time.Duration(1441) * time.Hour}})},
 			shouldFail:     true,
 			expectedErrors: []string{"autoCompaction.tombstonePurgeInterval in body should be less than or equal to 60d"},
 		},
 		{
 			name:           "TestValidateBucketAutoCompactionStartTimeIllegal",
-			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction/timeWindow/start", "26:00")},
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{TimeWindow: &couchbasev2.TimeWindow{Start: util.StrPtr("26:00")}})},
 			shouldFail:     true,
 			expectedErrors: []string{`autoCompaction.timeWindow.start: Invalid value`},
+		},
+		{
+			name: "TestValidateSampleBucketConflictResolutionInvalid",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/sampleBucket": "true",
+				}).Replace("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionTimestamp)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.conflictResolution must be set to seqno for sample buckets`},
+		},
+		{
+			name: "TestValidateSampleBucketEnableIndexReplicaInvalid",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/sampleBucket": "true",
+				}).Replace("/spec/enableIndexReplica", true)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.enableIndexReplica must be set to false for sample buckets`},
 		},
 	}
 

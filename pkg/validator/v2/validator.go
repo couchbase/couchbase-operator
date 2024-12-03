@@ -1710,10 +1710,6 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 
 func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
-		if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
-			return fmt.Errorf("spec.historyRetentionSettings can only be used with magma storage backend")
-		}
-
 		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
@@ -1771,6 +1767,11 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		return nil
 	}
 
+	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
+	if err != nil {
+		return err
+	}
+
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
@@ -1821,6 +1822,12 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 
 	errs = append(errs, checkBucketAnnotations(bucket)...)
 
+	if bucket.Spec.SampleBucket {
+		if err := checkSampleBucketFieldPresets(bucket.Spec.ConflictResolution, bucket.Spec.EnableIndexReplica); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -1868,6 +1875,11 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		return nil
 	}
 
+	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
+	if err != nil {
+		return err
+	}
+
 	if bucket.Spec.MemoryQuota != nil {
 		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
@@ -1890,6 +1902,12 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.EphemeralBucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
+	}
+
+	if bucket.Spec.SampleBucket {
+		if err := checkSampleBucketFieldPresets(bucket.Spec.ConflictResolution, false); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if errs != nil {
@@ -4021,6 +4039,20 @@ func checkChangeConstraintsMigration(current, updated *couchbasev2.CouchbaseClus
 		if current.Spec.Migration.UnmanagedClusterHost != updated.Spec.Migration.UnmanagedClusterHost {
 			return fmt.Errorf("spec.migration.unmanagedClusterHost cannot be changed during migration")
 		}
+	}
+
+	return nil
+}
+
+// Sample buckets have a number of defaults that are also immutable fields. We should check the bucket CRD
+// either has these same defaults or omits them in order to avoid operator continuously trying to update the bucket.
+func checkSampleBucketFieldPresets(resolution couchbasev2.CouchbaseBucketConflictResolution, enableIndexReplica bool) error {
+	if resolution != couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber {
+		return fmt.Errorf("spec.conflictResolution must be set to seqno for sample buckets")
+	}
+
+	if enableIndexReplica {
+		return fmt.Errorf("spec.enableIndexReplica must be set to false for sample buckets")
 	}
 
 	return nil

@@ -47,3 +47,7 @@ func PrettyHeading(s string) string {
 
 	return result
 }
+
+func StrPtr(s string) *string {
+	return &s
+}

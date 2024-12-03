@@ -156,17 +156,6 @@ spec:
   compressionMode: passive
 ---
 apiVersion: couchbase.com/v2
-kind: CouchbaseBucket
-metadata:
-  name: historyretentionbucket
-spec:
-  storageBackend: magma
-  evictionPolicy: fullEviction
-  memoryQuota: 1024Mi
-  historyRetention:
-    bytes: 2147483648
----
-apiVersion: couchbase.com/v2
 kind: CouchbaseReplication
 metadata:
   name: replication0
