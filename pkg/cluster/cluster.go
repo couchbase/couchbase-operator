@@ -1049,9 +1049,9 @@ func (c *Cluster) setPodIndex(index int) error {
 // if enable flag is 'true' otherwise state is deleted.
 func (c *Cluster) setVolumeExpansionState(enable bool) (err error) {
 	if enable {
-		err = c.state.Insert(persistence.VolumeExpansion, "true")
+		c.cluster.Status.SetExpandingVolumeCondition()
 	} else {
-		err = c.state.Delete(persistence.VolumeExpansion)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 	}
 
 	return err
@@ -1060,12 +1060,8 @@ func (c *Cluster) setVolumeExpansionState(enable bool) (err error) {
 // checkVolumeExpansionState simplifies inquiries as to
 // whether or not the volume expansion state is set.
 func (c *Cluster) checkVolumeExpansionState() bool {
-	if _, err := c.state.Get(persistence.VolumeExpansion); err != nil {
-		// not returning actual error, but instead false implies the bit is missing
-		return false
-	}
-
-	return true
+	cond := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionExpandingVolume)
+	return cond != nil
 }
 
 func (c *Cluster) logStatus(status *MemberState) {

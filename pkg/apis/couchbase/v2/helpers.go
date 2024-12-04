@@ -913,6 +913,11 @@ func (cs *ClusterStatus) SetMigratingCondition() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetExpandingVolumeCondition() {
+	c := newClusterCondition(ClusterConditionExpandingVolume, v1.ConditionTrue, "ExpandingVolume", "Expanding volume")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) ClearCondition(t ClusterConditionType) {
 	for index, condition := range cs.Conditions {
 		if condition.Type == t {
