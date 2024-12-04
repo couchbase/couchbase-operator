@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/admission"
@@ -103,6 +104,10 @@ func validateCollectionGroupsImmutableFields(currentCluster *cluster.Cluster) []
 
 	updates, err := currentCluster.GatherCollectionGroupUpdates()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -126,6 +131,10 @@ func validateAutoscalersImmutableField(currentCluster *cluster.Cluster) []error 
 
 	autoscalerUpdates, err := currentCluster.GatherAutoscalerUpdates()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -149,6 +158,10 @@ func validateBackupsImmutableFields(currentCluster *cluster.Cluster) []error {
 
 	backupUpdates, err := currentCluster.GatherBackupUpdates()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -172,6 +185,10 @@ func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []erro
 
 	replicationChanges, err := currentCluster.GatherReplicationChanges()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -197,6 +214,10 @@ func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 
 	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -261,6 +282,7 @@ func CheckChangeConstraints(currentCluster *cluster.Cluster) []error {
 	return errs
 }
 
+//nolint:gocognit
 func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
@@ -270,6 +292,10 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 
 	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
+		}
+
 		return append(errs, err)
 	}
 
@@ -300,6 +326,10 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 					couchbaseutil.AddAnnotation(&cbBucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 					if updateErr := currentCluster.GetK8sClient().CouchbaseBuckets.Update(cbBucket); updateErr != nil {
+						if errors.Is(err, couchbaseutil.ErrMemberError) {
+							return nil
+						}
+
 						errs = append(errs, err)
 					}
 				}
@@ -661,6 +691,10 @@ func CheckCouchbaseClusterResourceUpdate(update *couchbasev2.CouchbaseCluster, c
 		}
 	}
 
+	if reflect.DeepEqual(update, cluster) {
+		return nil
+	}
+
 	couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
 	return validationv2.CheckChangeConstraintsCluster(v, cluster, update)
@@ -672,6 +706,10 @@ func CheckCouchbaseClusterResourceImmutableFields(update *couchbasev2.CouchbaseC
 		if strings.EqualFold(skipValidation, "true") {
 			return nil
 		}
+	}
+
+	if reflect.DeepEqual(update, cluster) {
+		return nil
 	}
 
 	couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
@@ -714,4 +752,8 @@ func checkCouchbaseScopeGroupResourceConstraints(scopeGroup *couchbasev2.Couchba
 func shouldSkipValidation(annotations map[string]string) bool {
 	skipValidation, found := annotations[constants.AnnotationSkipDACValidation]
 	return found && strings.EqualFold(skipValidation, "true")
+}
+
+func checkIsMemberError(err error) bool {
+	return errors.Is(err, couchbaseutil.ErrMemberError)
 }
