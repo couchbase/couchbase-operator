@@ -2524,7 +2524,7 @@ type ClusterAssimilationSpec struct {
 	UnmanagedClusterHost string `json:"unmanagedClusterHost,omitempty"`
 
 	// NumUnmanagedNodes is the number of nodes the operator will leave in the cluster unmigrated.
-	// This is useful for constrolling how much of the cluster to mgirate over at a time. If not specified
+	// This is useful for controlling how much of the cluster to migrate over at a time. If not specified
 	// the operator will migrate all nodes.
 	// e.g. if the unmanaged cluster has 10 nodes and NumUnmanagedNodes is set to 2, then the operator will
 	// migrate 8 nodes to Kubernetes and leave 2 nodes.

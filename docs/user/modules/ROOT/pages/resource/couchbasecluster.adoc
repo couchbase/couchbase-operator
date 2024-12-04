@@ -2562,7 +2562,7 @@ MaxConcurrentMigrations is the maximum number of nodes migrations the operator w
 ==== Description
 
 NumUnmanagedNodes is the number of nodes the operator will leave in the cluster unmigrated.
-This is useful for constrolling how much of the cluster to mgirate over at a time.
+This is useful for controlling how much of the cluster to migrate over at a time.
 If not specified
 the operator will migrate all nodes.
 e.g.

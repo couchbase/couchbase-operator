@@ -420,7 +420,9 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 	performDataNodesCheck := (numDataNodes > 1 && maxNodes >= numDataNodes)
 	allDataNodes := true
 
-	for _, member := range r.getMigrationCandidates() {
+	allCandidates := r.getMigrationCandidates()
+
+	for _, member := range allCandidates {
 		// Prevent migration of all data nodes at once if we have more than one data node.
 		if performDataNodesCheck && allDataNodes {
 			if !r.isDataNode(member) {
@@ -448,7 +450,9 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 		log.Info("Node migrated", "cluster", c.namespacedName(), "node", member.Name())
 	}
 
-	log.Info("Node migration complete", "cluster", c.namespacedName())
+	if r.createdMigrationNode {
+		log.Info("Node migration complete", "cluster", c.namespacedName(), "members", migrationCandidates.Names(), "remainingMigrationNodes", len(allCandidates)-len(migrationCandidates))
+	}
 
 	return nil
 }
