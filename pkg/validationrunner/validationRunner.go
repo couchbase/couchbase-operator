@@ -41,6 +41,13 @@ var (
 	errResourceNotFound = errors.New("resource not found in cache")
 )
 
+func isValidationError(err error) bool {
+	// This is a hack to stop scenarios where resources are created simultaneously or before
+	// operator and its roles.  This can lead to the K8S API rejecting the cache requests.
+	// This is really only been seen in E2E, not a common customer issue.
+	return err != nil && !strings.Contains(err.Error(), "forbidden")
+}
+
 // generateSuffix generates a unique fixed length, and DNS compatible, suffix.
 func (n *bucketNamer) generateSuffix(input string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(input)))
@@ -112,7 +119,7 @@ func validateCollectionGroupsImmutableFields(currentCluster *cluster.Cluster) []
 	}
 
 	for current, update := range updates {
-		if err := validationv2.CheckImmutableFieldsCollectionGroup(current, update); err != nil {
+		if err := validationv2.CheckImmutableFieldsCollectionGroup(current, update); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := currentCluster.GetK8sClient().CouchbaseCollectionGroups.Update(update); updateErr != nil {
@@ -139,7 +146,7 @@ func validateAutoscalersImmutableField(currentCluster *cluster.Cluster) []error 
 	}
 
 	for current, update := range autoscalerUpdates {
-		if err := validationv2.CheckImmutableFieldsAutoscaler(current, update); err != nil {
+		if err := validationv2.CheckImmutableFieldsAutoscaler(current, update); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := currentCluster.GetK8sClient().CouchbaseAutoscalers.Update(update); updateErr != nil {
@@ -166,7 +173,7 @@ func validateBackupsImmutableFields(currentCluster *cluster.Cluster) []error {
 	}
 
 	for actual, update := range backupUpdates {
-		if err := validationv2.CheckImmutableFieldsBackup(actual, update); err != nil {
+		if err := validationv2.CheckImmutableFieldsBackup(actual, update); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := currentCluster.GetK8sClient().CouchbaseBackups.Update(update); updateErr != nil {
@@ -238,7 +245,7 @@ func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 			continue
 		}
 
-		if err := validator.CheckImmutableFields(oldBucket, newBucket); err != nil {
+		if err := validator.CheckImmutableFields(oldBucket, newBucket); isValidationError(err) {
 			switch t := newBucket.(type) {
 			case *couchbasev2.CouchbaseBucket:
 				couchbaseutil.AddAnnotation(&t.ObjectMeta, constants.AnnotationUnreconcilable, "true")
@@ -315,7 +322,7 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 		switch t1 := oldBucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseBucket); ok {
-				if err := validationv2.CheckChangeConstraintsBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); err != nil {
+				if err := validationv2.CheckChangeConstraintsBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
 					errs = append(errs, err)
 
 					cbBucket, found := currentCluster.GetK8sClient().CouchbaseBuckets.Get(update.BucketName)
@@ -334,9 +341,7 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 					}
 				}
 
-				if err != nil {
-					errs = append(errs, err)
-				}
+				errs = append(errs, err)
 			}
 
 		default:
@@ -380,7 +385,7 @@ func validateScopeGroups(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&scopeGroup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseScopeGroupResourceConstraints(scopeGroup); err != nil {
+		if err := checkCouchbaseScopeGroupResourceConstraints(scopeGroup); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&scopeGroup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseScopeGroups.Update(scopeGroup); updateErr != nil {
@@ -404,7 +409,7 @@ func validateScopes(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&scope.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseScopeResourceConstraints(scope); err != nil {
+		if err := checkCouchbaseScopeResourceConstraints(scope); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&scope.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseScopes.Update(scope); updateErr != nil {
@@ -428,7 +433,7 @@ func validateCollectionGroups(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&collectionGroup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseCollectionGroupResourceConstraints(collectionGroup); err != nil {
+		if err := checkCouchbaseCollectionGroupResourceConstraints(collectionGroup); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&collectionGroup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseCollectionGroups.Update(collectionGroup); updateErr != nil {
@@ -452,7 +457,7 @@ func validateCollections(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&collection.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseCollectionResourceConstraints(collection); err != nil {
+		if err := checkCouchbaseCollectionResourceConstraints(collection); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&collection.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseCollections.Update(collection); updateErr != nil {
@@ -476,7 +481,7 @@ func validateBackupRestores(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&backupRestore.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseBackupRestoreResourceConstraints(backupRestore); err != nil {
+		if err := checkCouchbaseBackupRestoreResourceConstraints(backupRestore); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&backupRestore.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseBackupRestores.Update(backupRestore); updateErr != nil {
@@ -524,7 +529,7 @@ func validateCouchbaseGroupsConstraints(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&group.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseGroupResourceConstraints(group); err != nil {
+		if err := checkCouchbaseGroupResourceConstraints(group); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&group.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseGroups.Update(group); updateErr != nil {
@@ -548,7 +553,7 @@ func validateCouchbaseBackupsConstraints(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&backup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseBackupResourceConstraints(backup); err != nil {
+		if err := checkCouchbaseBackupResourceConstraints(backup); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&backup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseBackups.Update(backup); updateErr != nil {
@@ -572,7 +577,7 @@ func validateCouchbaseUsers(client *client.Client) []error {
 
 		couchbaseutil.AddAnnotation(&user.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseUserResourceConstraints(user); err != nil {
+		if err := checkCouchbaseUserResourceConstraints(user); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&user.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseUsers.Update(user); updateErr != nil {
@@ -596,7 +601,7 @@ func validateCouchbaseBuckets(buckets []*couchbasev2.CouchbaseBucket, client *cl
 
 		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkCouchbaseBucketsConstraints(bucket, cluster); err != nil {
+		if err := checkCouchbaseBucketsConstraints(bucket, cluster); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseBuckets.Update(bucket); updateErr != nil {
@@ -620,7 +625,7 @@ func validateMemcachedBuckets(buckets []*couchbasev2.CouchbaseMemcachedBucket, c
 
 		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkMemcachedBucketsConstraints(bucket, cluster); err != nil {
+		if err := checkMemcachedBucketsConstraints(bucket, cluster); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseMemcachedBuckets.Update(bucket); updateErr != nil {
@@ -644,7 +649,7 @@ func validateEphemeralBuckets(buckets []*couchbasev2.CouchbaseEphemeralBucket, c
 
 		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-		if err := checkEphemeralBucketConstraints(bucket, cluster); err != nil {
+		if err := checkEphemeralBucketConstraints(bucket, cluster); isValidationError(err) {
 			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
 
 			if updateErr := client.CouchbaseEphemeralBuckets.Update(bucket); updateErr != nil {

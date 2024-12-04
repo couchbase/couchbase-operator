@@ -298,8 +298,11 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	allBuckets := []couchbaseutil.Bucket{}
 
-	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, c.k8s.CouchbaseBuckets.List(), allBuckets, c.cluster, c.k8s)
-	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, c.k8s.CouchbaseEphemeralBuckets.List(), allBuckets, c.k8s)
+	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
+	ephemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
+
+	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
 
 	return allBuckets, nil
@@ -482,7 +485,7 @@ func (c *Cluster) reconcileBuckets() error {
 	for i := range create {
 		bucket := &create[i]
 
-		if bucket.SampleBucket == true {
+		if bucket.SampleBucket {
 			if err := couchbaseutil.CreateSampleBucket(bucket.BucketName).On(c.api, c.readyMembers()); err != nil {
 				return err
 			}

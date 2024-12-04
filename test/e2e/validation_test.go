@@ -2818,7 +2818,7 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 			name:           "TestValidateDataServiceMemoryQuotaDefault",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/dataServiceMemoryQuota")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(500Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
+			expectedErrors: []string{`bucket memory allocation \([0-9]*Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

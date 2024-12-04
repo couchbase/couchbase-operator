@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/config"
+	"github.com/couchbase/couchbase-operator/pkg/logging"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -49,7 +50,9 @@ import (
 	autoscalev2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	klog "k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // Init performs one time only initialization of the framework.  Dynamic calls to these
@@ -470,6 +473,13 @@ func configure() (err error) {
 	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
 
+	logOptions := &logging.Options{}
+	logOptions.AddFlagSet(flag.CommandLine)
+
+	logger := logging.New(logOptions)
+	logf.SetLogger(logger)
+	klog.SetLogger(logger)
+
 	if util.UseANSIColor {
 		logrus.SetFormatter(&logrus.TextFormatter{ForceColors: true})
 	}
@@ -502,7 +512,8 @@ func configure() (err error) {
 		analyzer.RegisterTest(analyzerSuiteName, test.Name())
 	}
 
-	if !strings.EqualFold(version.Version, strings.Split(strings.Split(params.OpImage, ":")[1], "-")[0]) {
+	// If our build number is 999, that means we're building from source and we should know what we're doing.
+	if version.BuildNumber != "999" && !strings.EqualFold(version.Version, strings.Split(strings.Split(params.OpImage, ":")[1], "-")[0]) {
 		return fmt.Errorf("must use the same operator version as certification version")
 	}
 
@@ -599,6 +610,9 @@ func createKubeClusterObject() (*types.Cluster, error) {
 	// defaults or whatever the provider has specified :D
 	config.QPS = 1000
 	config.Burst = 1000
+
+	// Suppress warnings from our own client.  It just clutters the logs for testing.
+	config.WarningHandler = rest.NoWarnings{}
 
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {

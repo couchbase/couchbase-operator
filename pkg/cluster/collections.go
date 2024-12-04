@@ -95,6 +95,11 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	// Get the current state of the system.
 	current := &couchbaseutil.ScopeList{}
 
+	if !c.bucketExists(bucket.GetCouchbaseName()) {
+		log.Info("Bucket does not yet exist", "bucket", bucket.GetCouchbaseName())
+		return nil
+	}
+
 	if err := couchbaseutil.ListScopes(bucket.GetCouchbaseName(), current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
@@ -416,6 +421,8 @@ func (c *Cluster) GatherCollectionGroupUpdates() (map[*couchbasev2.CouchbaseColl
 
 // reconcileCollections magaes collection state for a specific scope within
 // a specific bucket.
+//
+//nolint:gocognit
 func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope *couchbasev2.CouchbaseScope, current *couchbaseutil.ScopeList, raiseEvent *bool) error {
 	collections, err := c.gatherCollections(scope)
 	if err != nil {
@@ -486,12 +493,16 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			return err
 		}
 
-		// check if couchbase bucket
-		cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
+		// Added a check here for bucket type because we can cast the abstract to a CouchbaseBucket even
+		// if the sub-type is Ephemeral.  Memcached buckets are EOL, so we don't need to worry about those
+		if bucket.GetType() == couchbasev2.BucketTypeCouchbase {
+			// check if couchbase bucket
+			cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
 
-		bucketStorageBackend := cbBucket.GetStorageBackend(c.cluster)
-		if ok && cdcEnabled && bucketStorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-			apiCollection.History = collection.Spec.History
+			bucketStorageBackend := cbBucket.GetStorageBackend(c.cluster)
+			if ok && cdcEnabled && bucketStorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+				apiCollection.History = collection.Spec.History
+			}
 		}
 
 		if err := couchbaseutil.CreateCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), apiCollection).On(c.api, c.readyMembers()); err != nil {
