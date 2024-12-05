@@ -40,6 +40,12 @@ func (c *Cluster) updateMembers() error {
 	if !runningMembers.Empty() {
 		// Try to find a Couchbase node that responds.
 		status, err := c.GetStatusUnsafe(runningMembers)
+
+		// If we are in a migration cluster, we don't want to return an error
+		if err != nil && !c.cluster.IsMigrationCluster() {
+			return err
+		}
+
 		if err == nil {
 			// Add any nodes that Couchbase knows about that we do not.
 			// Don't overwrite anything derived from PVCs as the member
