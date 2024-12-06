@@ -2950,6 +2950,15 @@ func TestNegValidationApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
+		{
+			name: "TestValidateAddSampleBucketAnnotation",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/sampleBucket": "true",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`cao.couchbase.com/sampleBucket annotation cannot be added to an existing bucket`},
+		},
 	}
 
 	// Cases to validate with all volume mounts present in Pod.VolumeMounts but one of the Service missing

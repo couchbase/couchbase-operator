@@ -248,8 +248,8 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 	}
 
 	// Warn when recommended production values are missing and/or left as their defaults.
-	if productionWarnings := validator.WarnOnNonProductionFieldValues(couchbaseCluster); len(productionWarnings) != 0 {
-		reviewResponse.Warnings = append(reviewResponse.Warnings, productionWarnings...)
+	if dacWarnings := validator.WarnOnFieldValues(couchbaseCluster); len(dacWarnings) != 0 {
+		reviewResponse.Warnings = append(reviewResponse.Warnings, dacWarnings...)
 	}
 
 	return &reviewResponse

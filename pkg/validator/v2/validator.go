@@ -1763,13 +1763,14 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
-	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
-	}
-
 	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
+
 	if err != nil {
 		return err
+	}
+
+	if checkAnnotationSkipValidation(bucket.Annotations) {
+		return nil
 	}
 
 	if bucket.Spec.MemoryQuota != nil {
@@ -1871,13 +1872,14 @@ func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseB
 func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
-	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
-	}
-
 	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
+
 	if err != nil {
 		return err
+	}
+
+	if checkAnnotationSkipValidation(bucket.Annotations) {
+		return nil
 	}
 
 	if bucket.Spec.MemoryQuota != nil {
@@ -3690,6 +3692,16 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
+	err := annotations.Populate(&prev.Spec, prev.Annotations)
+	if err != nil {
+		return err
+	}
+
+	err = annotations.Populate(&curr.Spec, curr.Annotations)
+	if err != nil {
+		return err
+	}
+
 	if checkAnnotationSkipValidation(curr.Annotations) {
 		return nil
 	}
@@ -3708,6 +3720,10 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
 		}
+	}
+
+	if !prev.Spec.SampleBucket && curr.Spec.SampleBucket {
+		errs = append(errs, fmt.Errorf("cao.couchbase.com/sampleBucket annotation cannot be added to an existing bucket"))
 	}
 
 	if errs != nil {

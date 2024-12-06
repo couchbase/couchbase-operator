@@ -4,8 +4,8 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
-// checkFieldsCouchbaseCluster will return a slice of strings, each warning if the value of a certain field
-// in a couchbase bucket configuration is not recommended for use in production environments.
+// checkFieldsCouchbaseCluster will return a slice of strings, each representing a warning that should not block
+// validation but should be communicated back to the user, such as non-optimal settings for production clusters.
 func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string {
 	warnings := make([]string, 0)
 
@@ -52,13 +52,17 @@ func checkLogVolumeMountConfigured(servers []couchbasev2.ServerConfig) bool {
 	return true
 }
 
-// checkFieldsCouchbaseBucket will return a slice of strings, each warning if the value of a certain field
-// in a couchbase cluster configuration is not recommended for use in production environments.
+// checkFieldsCouchbaseBucket will return a slice of strings, each representing a warning that should not block
+// validation but should be communicated back to the user, such as non-optimal settings for production clusters.
 func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 	warnings := make([]string, 0)
 
 	if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
 		warnings = append(warnings, "CouchbaseBucket spec.storageBackend is not set to magma, which is the storage mechanism recommended for production clusters.")
+	}
+
+	if bucket.Spec.SampleBucket {
+		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While this is set to true, the bucket will be considered a sample bucket will not be updated to match the CRD specification.")
 	}
 
 	return warnings

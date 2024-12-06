@@ -170,6 +170,14 @@ func TestCheckFieldsCouchbaseBuckets(t *testing.T) {
 			bucketSpec:       v2.CouchbaseBucketSpec{StorageBackend: v2.CouchbaseStorageBackendCouchstore},
 			expectedWarnings: []string{"spec.storageBackend"},
 		},
+		{
+			name: "spec.sampleBucket is set to true ",
+			bucketSpec: v2.CouchbaseBucketSpec{
+				SampleBucket:   true,
+				StorageBackend: v2.CouchbaseStorageBackendMagma,
+			},
+			expectedWarnings: []string{"CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled"},
+		},
 	}
 
 	for _, testcase := range testcases {
