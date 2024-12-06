@@ -479,8 +479,8 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 		if podAge > c.config.PodCreateTimeout {
 			log.Info("Pod creation timeout exceeded", "cluster", c.namespacedName(), "pod", pod.Name)
 
-			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, c.config.GetDeleteOptions()); err != nil {
-				log.Error(err, "Failed to delete pod", "cluster", c.namespacedName(), "pod", pod.Name)
+			if rerr := c.removePod(pod.Name, true); rerr != nil {
+				log.Error(rerr, "Failed to delete pod", "cluster", c.namespacedName(), "pod", pod.Name)
 				continue
 			}
 
