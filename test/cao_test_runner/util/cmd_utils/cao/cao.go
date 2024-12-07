@@ -208,12 +208,14 @@ func CreateAdmissionController(cpuLimit, cpuRequest, memoryLimit, memoryRequest,
 		"--cpu-request", fmt.Sprintf("%d", cpuRequest),
 		"--image", image,
 		"--image-pull-policy", imagePullPolicy,
-		"--image-pull-secret", imagePullSecret,
 		"--logLevel", logLevel,
 		"--memory-limit", fmt.Sprintf("%d", memoryLimit),
 		"--memory-request", fmt.Sprintf("%d", memoryRequest),
 		"--replicas", fmt.Sprintf("%d", replicas),
 		"--scope", scope,
+	}
+	if imagePullSecret != "" {
+		args = append(args, "--image-pull-secret", imagePullSecret)
 	}
 	if validateSecrets {
 		args = append(args, "--validate-secrets")
@@ -235,7 +237,6 @@ func CreateOperator(cpuLimit, cpuRequest, memoryLimit, memoryRequest int,
 		"--cpu-request", fmt.Sprintf("%d", cpuRequest),
 		"--image", image,
 		"--image-pull-policy", imagePullPolicy,
-		"--image-pull-secret", imagePullSecret,
 		"--log-level", logLevel,
 		"--memory-limit", fmt.Sprintf("%d", memoryLimit),
 		"--memory-request", fmt.Sprintf("%d", memoryRequest),
@@ -245,7 +246,9 @@ func CreateOperator(cpuLimit, cpuRequest, memoryLimit, memoryRequest int,
 		"--pod-readiness-period", podReadinessPeriod,
 		"--scope", scope,
 	}
-
+	if imagePullSecret != "" {
+		args = append(args, "--image-pull-secret", imagePullSecret)
+	}
 	return &CaoCmd{cmdutils.Cmd{RootCommand: caoRootCmd, Command: "create", Args: args}}
 }
 

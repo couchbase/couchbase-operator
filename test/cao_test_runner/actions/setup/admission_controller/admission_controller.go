@@ -7,8 +7,8 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -44,21 +44,6 @@ const (
 	DefaultMemoryRequest   int                 = 200
 	DefaultScope           ScopeType           = Cluster
 	DefaultReplicas        int                 = 1
-)
-
-const (
-	cpuLimitArgs               string = "--cpu-limit"
-	cpuRequestArgs             string = "--cpu-request"
-	imageArgs                  string = "--image"
-	imagePullPolicyArgs        string = "--image-pull-policy"
-	imagePullSecretArgs        string = "--image-pull-secret"
-	logLevelArgs               string = "--log-level"
-	memoryLimitArgs            string = "--memory-limit"
-	memoryRequestArgs          string = "--memory-request"
-	replicasArgs               string = "--replicas"
-	scopeArgs                  string = "--scope"
-	validateSecretsArgs        string = "--validate-secrets"
-	validateStorageClassesArgs string = "--validate-storage-classes"
 )
 
 type AdmissionControllerConfig struct {
@@ -167,40 +152,6 @@ func (action *SetupAdmissionController) Checks(ctx *context.Context, config inte
 	return nil
 }
 
-func generateAdmissionArguments(c *AdmissionControllerConfig) []string {
-	commandArgs := []string{"create", "admission"}
-
-	argMap := map[string]string{
-		cpuLimitArgs:        fmt.Sprintf("%d", c.CPULimit),
-		cpuRequestArgs:      fmt.Sprintf("%d", c.CPURequest),
-		imageArgs:           c.AdmissionControllerImage,
-		imagePullPolicyArgs: string(c.ImagePullPolicy),
-		logLevelArgs:        fmt.Sprintf("%d", c.AdmissionControllerLogLevel),
-		memoryLimitArgs:     fmt.Sprintf("%d", c.MemoryLimit),
-		memoryRequestArgs:   fmt.Sprintf("%d", c.MemoryRequest),
-		scopeArgs:           string(c.Scope),
-		replicasArgs:        fmt.Sprintf("%d", c.Replicas),
-	}
-
-	if c.ImagePullSecret != "" {
-		argMap[imagePullSecretArgs] = c.ImagePullSecret
-	}
-
-	if c.ValidateSecrets {
-		argMap[validateSecretsArgs] = ""
-	}
-
-	if c.ValidateStorageClasses {
-		argMap[validateStorageClassesArgs] = ""
-	}
-
-	for argument, value := range argMap {
-		commandArgs = append(commandArgs, argument, value)
-	}
-
-	return commandArgs
-}
-
 func (action *SetupAdmissionController) Do(ctx *context.Context, _ interface{}) error {
 	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
 	if !ok {
@@ -209,12 +160,14 @@ func (action *SetupAdmissionController) Do(ctx *context.Context, _ interface{}) 
 
 	logrus.Infof("Admission Controller pod creation started")
 
-	commandArgs := generateAdmissionArguments(c)
-
 	logrus.Info("cao create admission at :", time.Now().Format(time.RFC3339))
 
-	err := shell.RunWithoutOutputCapture(c.CAOBinaryPath, commandArgs...)
-	if err != nil {
+	cao.WithBinaryPath(c.CAOBinaryPath)
+
+	if err := cao.CreateAdmissionController(c.CPULimit, c.CPURequest, c.MemoryLimit,
+		c.MemoryRequest, c.Replicas, c.AdmissionControllerImage, string(c.ImagePullPolicy),
+		c.ImagePullSecret, fmt.Sprintf("%d", c.AdmissionControllerLogLevel), string(c.Scope), c.ValidateSecrets,
+		c.ValidateStorageClasses).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to execute cao create admission: %w", err)
 	}
 
