@@ -639,7 +639,16 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 
 	// This needs a retry, server doesn't gracefully shutdown and give us a response,
 	// it may just slam the door shut and give us an EOF.
-	return couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.getMigratingReadyTarget())
+	if err := couchbaseutil.SetSecuritySettings(securitySettings).RetryFor(time.Minute).On(c.api, c.getMigratingReadyTarget()); err != nil {
+		return err
+	}
+
+	// We need to ping pools default to make sure we're working now.
+	// Couchbase server needs some time to reset after updating the security settings.
+	// If it doesn't work after a minute, something's definitely wrong.
+	clusterInfo := couchbaseutil.ClusterInfo{}
+
+	return couchbaseutil.GetPoolsDefault(&clusterInfo).RetryFor(time.Minute).On(c.api, c.readyMembers())
 }
 
 // Initialize a member with TLS certificates.
