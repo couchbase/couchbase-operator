@@ -21,8 +21,9 @@ Accepts either `couchstore` or `magma`.
 ==== `cao.couchbase.com/sampleBucket`
 SampleBucket indicates whether the bucket should be treated as a sample bucket.
 If set to "true", the bucket name will define the sample bucket used and the bucket will be created with the sample bucket configuration, not the CRD specification.
-If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification. Sample buckets are
-initialised with a couchstore storage backend. This annotation cannot be added to an existing bucket and should not be used for production clusters.
+SampleBuckets have a memory quota of 200Mi and a couchstore storage backend.
+If this annotation is changed to false or removed, the bucket will then be updated with the CRD specification.
+This annotation cannot be added to an existing bucket and should not be used for production clusters.
 
 == Cluster Scheduling
 === Rescheduling To Different Server Groups On Failed Scheduling

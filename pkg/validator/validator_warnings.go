@@ -62,7 +62,7 @@ func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 	}
 
 	if bucket.Spec.SampleBucket {
-		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While this is set to true, the bucket will be considered a sample bucket will not be updated to match the CRD specification.")
+		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While enabled, the bucket will not be updated to match the CRD specification.")
 	}
 
 	return warnings

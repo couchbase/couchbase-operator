@@ -1251,6 +1251,9 @@ type AbstractBucket interface {
 
 	// AddScopeResource appends a reference to a scope resource.
 	AddScopeResource(ScopeLocalObjectReference)
+
+	// IsSampleBucket() returns true if the bucket is a sample bucket.
+	IsSampleBucket() bool
 }
 
 func (b *CouchbaseBucket) GetCouchbaseName() string {
@@ -1321,6 +1324,10 @@ func (b *CouchbaseBucket) getStorageBackend() CouchbaseStorageBackend {
 	return b.Spec.StorageBackend
 }
 
+func (b *CouchbaseBucket) IsSampleBucket() bool {
+	return b.Spec.SampleBucket
+}
+
 func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
 	name := b.Name
 
@@ -1355,6 +1362,10 @@ func (b *CouchbaseEphemeralBucket) AddScopeResource(resource ScopeLocalObjectRef
 	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
 }
 
+func (b *CouchbaseEphemeralBucket) IsSampleBucket() bool {
+	return b.Spec.SampleBucket
+}
+
 func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 	name := b.Name
 
@@ -1386,6 +1397,10 @@ func (b *CouchbaseMemcachedBucket) GetScopes() *ScopeSelector {
 }
 
 func (b *CouchbaseMemcachedBucket) AddScopeResource(_ ScopeLocalObjectReference) {
+}
+
+func (b *CouchbaseMemcachedBucket) IsSampleBucket() bool {
+	return b.Spec.SampleBucket
 }
 
 // Abstractions for scopes and collections.

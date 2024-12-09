@@ -2147,6 +2147,20 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.enableIndexReplica must be set to false for sample buckets`},
 		},
+		{
+			name: "TestValidateSampleBucketMemoryQuotaExceeded",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/sampleBucket": "true",
+				}),
+				"bucket0": jsonpatch.NewPatchSet().
+					Add("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/sampleBucket": "true",
+					}),
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/dataServiceMemoryQuota", "256Mi")},
+			shouldFail:     true,
+			expectedErrors: []string{`sample buckets have a memory quota of 200Mi`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

@@ -2733,6 +2733,11 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 	}
 
 	for i := range couchbaseBuckets.Items {
+		err = annotations.Populate(&couchbaseBuckets.Items[i].Spec, couchbaseBuckets.Items[i].Annotations)
+		if err != nil {
+			return nil, err
+		}
+
 		buckets = append(buckets, &couchbaseBuckets.Items[i])
 	}
 
@@ -2742,6 +2747,11 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 	}
 
 	for i := range ephemeralBuckets.Items {
+		err = annotations.Populate(&ephemeralBuckets.Items[i].Spec, ephemeralBuckets.Items[i].Annotations)
+		if err != nil {
+			return nil, err
+		}
+
 		buckets = append(buckets, &ephemeralBuckets.Items[i])
 	}
 
@@ -2751,6 +2761,11 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 	}
 
 	for i := range memcachedBuckets.Items {
+		err = annotations.Populate(&memcachedBuckets.Items[i].Spec, memcachedBuckets.Items[i].Annotations)
+		if err != nil {
+			return nil, err
+		}
+
 		buckets = append(buckets, &memcachedBuckets.Items[i])
 	}
 
@@ -2897,13 +2912,29 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	allocated := resource.NewQuantity(0, resource.BinarySI)
 
 	buckets = util.MergeAbstractBucketLists(newBuckets, buckets)
+
+	sb := false
+
 	for _, bucket := range buckets {
-		allocated.Add(*bucket.GetMemoryQuota())
+		// If the bucket is a sample bucket, we want to validate with a pre-determined resource quantity of 200Mi
+		if bucket.IsSampleBucket() {
+			allocated.Add(*k8sutil.NewResourceQuantityMi(int64(200)))
+
+			sb = true
+		} else {
+			allocated.Add(*bucket.GetMemoryQuota())
+		}
 	}
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota != nil {
 		if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
-			return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
+			errMsg := fmt.Sprintf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
+
+			if sb {
+				errMsg = fmt.Sprintf("%s, sample buckets have a memory quota of 200Mi", errMsg)
+			}
+
+			return fmt.Errorf(errMsg)
 		}
 	}
 
@@ -3710,7 +3741,9 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
 	}
 
-	if prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend) {
+	// We want to validate whether a bucket can be migrated to a new storage backend if the storage backend has been explicitly changed on the CRD,
+	// or it's changed from being a sample bucket and has magma in the CRD, in which case a migration will also take place.
+	if (prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend)) || (prev.Spec.SampleBucket && !curr.Spec.SampleBucket && curr.Spec.StorageBackend == "magma") {
 		if err := checkAllBucketsClustersValidForMigration(v, curr, cluster); err != nil {
 			errs = append(errs, err)
 		}
