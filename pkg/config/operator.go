@@ -359,6 +359,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.BackupCRDResourcePlural,
 			},
 			Verbs: []string{
+				"get",   // used by the operator for Validation
 				"list",  // used by the operator for caching
 				"watch", // used by the operator for caching
 			},
@@ -377,6 +378,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.CollectionGroupCRDResourcePlural,
 			},
 			Verbs: []string{
+				"get",    // used by the operator for Validation
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by my "favourite" synchronization feature
@@ -390,6 +392,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.BackupRestoreCRDResourcePlural,
 			},
 			Verbs: []string{
+				"get",    // used by the operator for Validation
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"delete", // used by the operator to cleanup restores

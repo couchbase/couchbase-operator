@@ -31,19 +31,19 @@ couchbase.com/couchbasebackups::
 The Operator logically combines `CouchbaseCluster` resources with these resources in order to manage a Couchbase cluster.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `list`, `watch`
+_Required Permissions_: `get`, `list`, `watch`
 
 couchbase.com/couchbasebackuprestores::
 The Operator needs to be able to see restores in order to provision jobs that will execute them.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 It also garbage collects restores on success, so needs permission to delete them.
 +
-_Required Permissions_: `list`, `watch`, `delete`
+_Required Permissions_: `get`, `list`, `watch`, `delete`
 
 couchbase.com/couchbaseautoscalers::
 The Operator needs to be able to create and delete autoscaler endpoints to provide an interface with the Kubernetes horizontal pod autoscaler (HPA).
 +
-_Required Permissions_: `list`, `watch`, `create`, `update`, `delete`
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 couchbase.com/couchbaseautoscalers/status::
 The Operator needs to be able to update autoscaler status to communicate cluster state with the HPA.
@@ -113,7 +113,7 @@ couchbase.com/couchbaseautoscalers::
 The operator needs to be able to create, update, and delete these resources to propagate changes received from the `HorizontalPodAutoscaler`.
 The Operator locally caches these resources, so needs to list them to get an initial set, and watch for changes to observe updates.
 +
-_Required Permissions_: `list`, `watch`, `create`, `update`, `delete`
+_Required Permissions_: `get`, `list`, `watch`, `create`, `update`, `delete`
 
 [TIP]
 ====
