@@ -40,10 +40,16 @@ func TestMigrateCluster(t *testing.T) {
 		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
 	}
 
-	e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	// Check that the cluster goes to healthy
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 3*time.Minute)
 
 	// Check that all nodes from the initial cluster have been ejected
 	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+
+	// Check that we've removed the migrating condition from the cluster
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
 }
 
 func TestMigrateLeaveUnmanagedCluster(t *testing.T) {
@@ -155,6 +161,9 @@ func TestStabilizationPeriod(t *testing.T) {
 
 	// Check that all nodes from the initial cluster have been ejected
 	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+
+	// Check that we've removed the migrating and stabilization period condition from the cluster
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating, couchbasev2.ClusterConditionWaitingBetweenMigrations)
 }
 
 func TestMaxConcurrency(t *testing.T) {

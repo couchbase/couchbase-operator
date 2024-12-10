@@ -747,6 +747,19 @@ func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType
 	}
 }
 
+// MustWaitForClusterConditionsRemoved checks that all conditions from the given list do not exist on the cluster.
+func MustWaitForClusterConditionsRemoved(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, timeout time.Duration, clusterConditions ...couchbasev2.ClusterConditionType) {
+	var constraints []resourceCheckFunc
+
+	for _, conditionType := range clusterConditions {
+		constraints = append(constraints, resourceConditionNotExists(string(conditionType)))
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceConstraints(k8s, cl, constraints...)); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustWaitForClusterWithErrorMessage waits until the cluster has a specific error message.
 func MustWaitForClusterWithErrorMessage(t *testing.T, k8s *types.Cluster, errMessage string, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceConditionWithMessage(k8s, cl, string(couchbasev2.ClusterConditionError), string(v1.ConditionTrue), errMessage)); err != nil {

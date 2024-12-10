@@ -347,8 +347,9 @@ func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenMigrations)
 
 	// If we have no more nodes to migrate and we are not waiting for the stabilization period to end, then we are done migrating.
-	if r.externalMembers.Empty() && waitingCond == nil {
+	if r.externalMembers.Empty() && (waitingCond == nil || waitingCond.Status == v1.ConditionFalse) {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionMigrating)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenMigrations)
 	}
 
 	if c.cluster.Spec.Migration.UnmanagedClusterHost == "" {
