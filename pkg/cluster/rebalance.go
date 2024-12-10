@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -282,6 +284,15 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
+	c.cluster.Status.ClearCondition(v2.ClusterConditionRebalancing)
+
+	if err := c.state.Delete(persistence.RebalanceClusteredMembers); err != nil {
+		return err
+	}
+
+	if err := c.state.Delete(persistence.RebalanceEjectMembers); err != nil {
+		return err
+	}
 
 	return c.updateCRStatus()
 }
