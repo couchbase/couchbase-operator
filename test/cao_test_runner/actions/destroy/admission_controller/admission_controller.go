@@ -7,8 +7,8 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -30,10 +30,6 @@ const (
 
 const (
 	DefaultScope ScopeType = Cluster
-)
-
-const (
-	scopeArgs string = "--scope"
 )
 
 type AdmissionControllerConfig struct {
@@ -94,20 +90,6 @@ func (action *DeleteAdmissionController) Checks(ctx *context.Context, config int
 	return nil
 }
 
-func generateAdmissionArguments(c *AdmissionControllerConfig) []string {
-	commandArgs := []string{"delete", "admission"}
-
-	argMap := map[string]string{
-		scopeArgs: string(c.Scope),
-	}
-
-	for argument, value := range argMap {
-		commandArgs = append(commandArgs, argument, value)
-	}
-
-	return commandArgs
-}
-
 func (action *DeleteAdmissionController) Do(ctx *context.Context, _ interface{}) error {
 	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
 	if !ok {
@@ -116,12 +98,11 @@ func (action *DeleteAdmissionController) Do(ctx *context.Context, _ interface{})
 
 	logrus.Infof("Admission Controller pod deletion started")
 
-	commandArgs := generateAdmissionArguments(c)
-
 	logrus.Info("cao delete admission at :", time.Now().Format(time.RFC3339))
 
-	err := shell.RunWithoutOutputCapture(c.CAOBinaryPath, commandArgs...)
-	if err != nil {
+	cao.WithBinaryPath(c.CAOBinaryPath)
+
+	if err := cao.DeleteAdmissionController(string(c.Scope)).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to execute cao delete admission: %w", err)
 	}
 

@@ -7,8 +7,8 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -30,10 +30,6 @@ const (
 
 const (
 	DefaultScope ScopeType = Namespace
-)
-
-const (
-	scopeArgs string = "--scope"
 )
 
 type OperatorConfig struct {
@@ -94,20 +90,6 @@ func (action *DeleteOperator) Checks(ctx *context.Context, config interface{}, s
 	return nil
 }
 
-func generatOperatorArguments(c *OperatorConfig) []string {
-	commandArgs := []string{"delete", "operator"}
-
-	argMap := map[string]string{
-		scopeArgs: string(c.Scope),
-	}
-
-	for argument, value := range argMap {
-		commandArgs = append(commandArgs, argument, value)
-	}
-
-	return commandArgs
-}
-
 func (action *DeleteOperator) Do(ctx *context.Context, _ interface{}) error {
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
@@ -116,12 +98,11 @@ func (action *DeleteOperator) Do(ctx *context.Context, _ interface{}) error {
 
 	logrus.Infof("Operator pod deletion started")
 
-	commandArgs := generatOperatorArguments(c)
-
 	logrus.Info("cao delete operator at :", time.Now().Format(time.RFC3339))
 
-	err := shell.RunWithoutOutputCapture(c.CAOBinaryPath, commandArgs...)
-	if err != nil {
+	cao.WithBinaryPath(c.CAOBinaryPath)
+
+	if err := cao.DeleteOperator(string(c.Scope)).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to execute cao delete operator: %w", err)
 	}
 
