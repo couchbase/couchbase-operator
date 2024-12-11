@@ -495,6 +495,24 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	// and check if it has persistent volumes to be recovered
 	recovered := 0
 
+	// If the node is not recoverable and the recovery policy is set to prioritize data integrity, then
+	// we need to wait for users to take manual action to get the cluster to a stable state.
+	manualActionNodes := []string{}
+
+	for name, m := range r.couchbase.DownNodes {
+		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
+			manualActionNodes = append(manualActionNodes, name)
+		}
+	}
+
+	if len(manualActionNodes) > 0 {
+		log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
+
+		r.abort("waiting for manual action of down nodes")
+
+		return nil
+	}
+
 	for name, m := range r.couchbase.DownNodes {
 		// Ephemeral clusters are handled either automatically by server or
 		// manually by the user.
@@ -550,6 +568,10 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		for _, member := range r.couchbase.DownNodes {
 			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name())
 
+			otpNodes = append(otpNodes, member.GetOTPNode())
+		}
+
+		for _, member := range r.couchbase.FailedNodes {
 			otpNodes = append(otpNodes, member.GetOTPNode())
 		}
 
