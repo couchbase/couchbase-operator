@@ -4,7 +4,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1707,58 +1706,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 		// Eject nodes that we want to discard.
 		eject := r.ejectMembers.OTPNodes()
-
-		pods, err := c.GetK8sClient().KubeClient.CoreV1().Pods(c.cluster.Namespace).List(c.ctx, v1.ListOptions{LabelSelector: constants.LabelNode})
-		if err != nil {
-			return err
-		}
-
-		upgrading, err := c.isUpgrading()
-		if err != nil {
-			return err
-		}
-
-		scaleDownCondition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionScalingDown)
-
-		// We don't want to do this while upgrading as this will be done as part of the upgrade process.
-		if !upgrading && !c.isMigrating() && scaleDownCondition == nil {
-			clusterInfo := couchbaseutil.ClusterInfo{}
-			if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
-				return err
-			}
-
-			for _, nodeInfo := range clusterInfo.Nodes {
-				// We only need to failover if the node is active and is in the eject list
-				if nodeInfo.Membership != "active" || !slices.Contains(eject, nodeInfo.OTPNode) {
-					continue
-				}
-
-				failoverList := couchbaseutil.OTPNodeList{}
-				failoverList = append(failoverList, nodeInfo.OTPNode)
-
-				for _, pod := range pods.Items {
-					if strings.EqualFold(pod.Name, nodeInfo.HostName.GetMemberName()) {
-						continue
-					}
-
-					for _, member := range c.members {
-						if member.Name() == nodeInfo.HostName.GetMemberName() {
-							log.Info("Attempting graceful failover of: " + member.Name())
-
-							if err := r.gracefullyFailoverNode(member, c); err != nil {
-								if err := couchbaseutil.Failover(failoverList, false).On(c.api, c.readyMembers()); err != nil {
-									return err
-								}
-							}
-
-							break
-						}
-					}
-
-					break
-				}
-			}
-		}
 
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
 			return err

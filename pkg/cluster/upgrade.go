@@ -262,9 +262,3 @@ func (c *Cluster) isUpgrading() (bool, error) {
 	// explicitly check for active status
 	return upgradeStatus == string(persistence.UpgradeActive), nil
 }
-
-func (c *Cluster) isMigrating() bool {
-	cond := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionMigrating)
-
-	return (cond != nil && cond.Status == v1.ConditionTrue)
-}
