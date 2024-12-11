@@ -340,8 +340,6 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 						errs = append(errs, err)
 					}
 				}
-
-				errs = append(errs, err)
 			}
 
 		default:
