@@ -17,6 +17,7 @@
  ** xref:concept-operator.adoc[Operator Architecture]
  ** xref:concept-operator-logging.adoc[Operator Logging]
  ** xref:concept-platform-certification.adoc[Operator Self-Certification Lifecycle]
+ ** xref:concept-pod-templating.adoc[Couchbase Pod Templating]
 * Couchbase Cluster Concepts
  ** Authentication and Authorization
   *** xref:concept-user-rbac.adoc[Couchbase User RBAC]

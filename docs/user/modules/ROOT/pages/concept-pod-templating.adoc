@@ -1,0 +1,28 @@
+= Couchbase Pod Templating
+
+[abstract]
+The Autonomous Operator allows users to define a pod template to use when creating pods for a Couchbase Server class.
+Modifying pod metadata such as labels and annotations will update the pod in-place. Any other modification will result in a cluster upgrade in order to fulfill the request. The Operator reserves the right to modify or replace any field.
+
+
+== Operators Attribute Modifications
+Some of the attributes in the pod template are overridden by the Autonomous Operator. The following attributes are overridden:
+
+=== Metadata
+* `metadata.name` - The name of the pod is overridden by the Autonomous Operator.
+* `metadata.labels` - The Autonomous Operator adds labels to the pod to identify the pod as part of a operator managed Couchbase cluster.
+* `metadata.annotaions` - The Autonomous Operator adds annotations to the pod to identify the pod as part of a operator managed Couchbase cluster.
+
+=== Spec
+* `spec.containers` - The Autonomous Operator overrides any containers to run the Couchbase Server process and any other required containers.
+* `spec.restartPolicy` - The Autonomous Operator overrides the restart policy to `Never`.
+* `spec.hostname` - The Autonomous Operator overrides the hostname to the pod name.
+* `spec.subdomain` - The Autonomous Operator overrides the subdomain to the cluster name.
+* `spec.terminationGracePeriodSeconds` - The Autonomous Operator overrides the termination grace period to 1200 seconds.
+* `spec.securityContext` - The Autonomous Operator overrides the security context to the security context provided in `cluster.spec.security.podSecurityContext`.
+* `spec.readinessGates` - The Autonomous Operator overrides the readiness gates to manage the readiness of the pods.
+* `spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution` - The Autonomous Operator adds a pod anti-affinity rule to ensure that pods are not scheduled on the same node if `cluster.spec.antiAffinity` is set to `true`.
+* `spec.nodeSelector` - The Autonomous Operator adds a node selector to ensure that pods are scheduled on the correct Availability Zone if they are enabled for the pods server class.
+* `spec.hostAliases` - The Autonomous Operator overrides any host aliases to map `127.0.0.1` to `localhost` the pod DNS name, unless istio mode is enabled.
+* `spec.volumes` - The Autonomous Operator adds any required volumes to the pod.
+
