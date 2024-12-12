@@ -15,6 +15,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -648,7 +649,13 @@ func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbas
 	// If it doesn't work after a minute, something's definitely wrong.
 	clusterInfo := couchbaseutil.ClusterInfo{}
 
-	return couchbaseutil.GetPoolsDefault(&clusterInfo).RetryFor(time.Minute).On(c.api, c.readyMembers())
+	return retryutil.RetryUntilSuccess(1*time.Minute, 1*time.Second, func() error {
+		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // Initialize a member with TLS certificates.

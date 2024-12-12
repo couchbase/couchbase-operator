@@ -75,6 +75,25 @@ func AssertFor(timeout time.Duration, callback func() error) error {
 	return Assert(ctx, time.Second, callback)
 }
 
+// RetryUntilSuccess retries a callback until it succeeds or times out.
+func RetryUntilSuccess(timeout, interval time.Duration, callback func() error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	tick := time.NewTicker(interval)
+	defer tick.Stop()
+
+	for err := callback(); err != nil; err = callback() {
+		select {
+		case <-tick.C:
+		case <-ctx.Done():
+			return fmt.Errorf("timeout: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // RetryUntilErrorOrSuccess retries a callback until it returns an error or succeeds (returns true).
 // It will return the any errors from te callback and also if the context times out or is cancelled.
 func RetryUntilErrorOrSuccess(timeout, interval time.Duration, callback func() (error, bool)) error {

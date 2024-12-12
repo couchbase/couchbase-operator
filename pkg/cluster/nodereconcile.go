@@ -488,7 +488,8 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	// stable state before we do "dangerous" things like reconcile TLS, which needs to
 	// be done one-shot.
 	if !c.allDownNodesRecoveryTimedout(r.couchbase.DownNodes) {
-		return fmt.Errorf("%w: waiting for pod failover", errors.NewStackTracedError(ErrReconcileInhibited))
+		r.abort(errors.NewStackTracedError(ErrReconcileInhibited).Error() + ": waiting for pod failover")
+		return nil
 	}
 
 	// Get the duration that the node has been down from the status
