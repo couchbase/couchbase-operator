@@ -1,9 +1,13 @@
 = Prometheus Metrics Reference
 
 [abstract]
-This page captures the metrics supplied to Prometheus by the Couchbase Autonomous Operator.
+This page captures the metrics supplied to Prometheus by the Couchbase Autonomous Operator and links reference pages of a number of additional metrics that are exported by third party libraries.
+
+== Operator Metrics
 
 [template,attachment$cao_metrics_metadata.json]
 --
 include::partial$metrics.hbs[]
 --
+== Additional Metrics
+* https://book.kubebuilder.io/reference/metrics-reference[Kubebuilder]

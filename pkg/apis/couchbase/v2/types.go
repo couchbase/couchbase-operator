@@ -2887,7 +2887,6 @@ type CloudNativeGatewayDataAPI struct {
 type CloudNativeGateway struct {
 	// Image is the Cloud Native Gateway image to be used to run the sidecar container.
 	// No validation is carried out as this can be any arbitrary repo and tag.
-	// TODO: provide a default kubebuilder default image tag as field is mandatory.
 	Image string `json:"image"`
 
 	// TLS defines the TLS configuration for the Cloud Native Gateway server including
