@@ -20,6 +20,11 @@ By hibernating a Couchbase cluster:
 When a cluster is hibernated, any persistent volumes associated with the cluster are retained.
 This allows the cluster to be recovered at the point of hibernation with existing data still intact.
 
+[WARNING]
+====
+Upgrading a Kubernetes Cluster or Couchbase Operator should not be attempted while any couchbase clusters are in hibernation.
+====
+
 === Hibernation Strategies
 
 At present there is only one hibernation strategy:

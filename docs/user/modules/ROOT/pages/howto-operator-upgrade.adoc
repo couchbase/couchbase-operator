@@ -31,6 +31,11 @@ To upgrade from a 1.x.x release, you must first upgrade to 2.0.x, paying particu
 Refer to the xref:2.0@operator::howto-operator-upgrade.adoc[2.0.x version of this page] if upgrading from a 1.x.x release.
 ====
 
+[WARNING]
+====
+The Operator should not be upgraded while any Couchbase clusters are in hibernation. Instructions to wake the cluster can be found in the https://docs.couchbase.com/operator/current/concept-hibernation.html[hibernation] documentation.
+====
+
 [#download-operator]
 == Step 1: Download the New Operator Package
 
