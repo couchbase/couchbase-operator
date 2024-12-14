@@ -1,0 +1,9 @@
+cbPodFilter:
+  filterType: all # all | services | serverNames | servicesAndServerNames
+  selectionStrategy: sorted # sorted | random | oldest | latest
+  services: # for the filterType: services and servicesAndServerNames
+    - data
+  servicesNotStrict: true # Default: false. If set to true, then the checking of CBPodFilter.Services will not be strict.
+  serverNames: # for the filterType: serverNames and servicesAndServerNames
+    - "data-only"
+  count: 1 # number of CB pods to be filtered
