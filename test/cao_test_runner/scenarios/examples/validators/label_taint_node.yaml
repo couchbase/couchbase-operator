@@ -1,0 +1,10 @@
+action: "Action Name"
+config:
+  description:
+    - "Action Description"
+    - "Add the action.config"
+  validators:
+    - name: "labelTaintNodes"
+      state: "PRE"
+      nodeFilter:
+        managedSvcName: eks # kind | eks | gke | aks
