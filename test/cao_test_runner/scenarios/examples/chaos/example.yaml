@@ -1,0 +1,42 @@
+trees:
+  - action: "Chaos"
+    config:
+      description:
+        - Describe the Chaos Action here.
+        - The logs will print this description to help identify the chaos action easily.
+      managedService: eks # kind | eks | gke | aks
+      clusterName: k8s-cluster-name
+      chaosList: # This list contains all the details for the chaos. All the chaosActions listed will start concurrently.
+        - cbPodFilter: # IMPORTANT: This will filter and provide the CB Pods on which we perform the chaos. Make sure to match the count of filtered pods with num(chaosActions, triggerConfig, cbServiceChaos, cbClusterChaosConfig).
+            filterType: serverNames
+            selectionStrategy: sorted
+            serverNames:
+              - "data-only"
+            count: 1
+          chaosActions: # This list contains all the chaos actions that will be performed together. The actions will be performed on the number of filtered pods.
+            - RestartNodes # RestartNodes | DeleteNodes | DeletePods | CBServiceChaos | CBClusterChaos
+          chaosIterations: 1
+          triggerConfig:
+            # The triggerConfig list contains all the triggers.
+            # Map each trigger with the chaosActions list.
+            # The triggers are used to wait for a certain event before triggering the chaos.
+            triggerName: wait # wait | deltaRecoveryRebalance | deltaRecoveryUpgrade | deltaRecoveryWarmup | deltaRecoverySwapRebalance | deltaRecoveryFailover ...
+            triggerDuration: 10m # the total time for which we check for the trigger.
+            triggerInterval: 1m # the interval time between trigger checks.
+            preTriggerWait: 30s # the time to wait for before starting trigger check.
+            postTriggerWait: 30s # the time to wait for after successful trigger check.
+            cbSecret: cb-example-auth # the K8S CB Secret to use to communicate with CB cluster.
+          cbServiceChaos:
+            # The cbServiceChaos list contains information about the CB Service Chaos.
+            # cbServiceChaos is used when chaosActions contains CBServiceChaos.
+            # Map each cbServiceChaos with the chaosActions list.
+            - serviceChaosAction: kill # kill | killAll | stop | restart
+              cbServices: # List the CB Services on which you want to perform serviceChaosAction.
+                - kv # kv | index | query | fts | eventing | analytics ...
+          cbClusterChaosConfig:
+            # The cbClusterChaosConfig contains information about the CB Cluster Chaos.
+            # cbClusterChaosConfig is used when chaosActions contains CBClusterChaos.
+            # Map each cbClusterChaosConfig with the chaosActions list.
+            - clusterChaosAction: stopRebalance # stopRebalance
+          cbUpgradeVersion: 7.6.3 # the CB version to which the cluster is being upgraded to. Used for upgrade trigger checks.
+          cbPodsAfterScaling: 3 # the number of CB Pods the cluster shall have after scaling up.

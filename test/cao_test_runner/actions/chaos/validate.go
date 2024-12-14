@@ -92,7 +92,7 @@ func validateChaosList(chaosList *ChaosList) error {
 
 func validateChaosAction(action ActionName) error {
 	switch action {
-	case RestartNodes, DeletePods, DeleteNodes, CBServiceChaos:
+	case RestartNodes, DeletePods, DeleteNodes, CBServiceChaos, CBClusterChaosActionName:
 		return nil
 	default:
 		return fmt.Errorf("validate chaos action `%s`: %w", action, ErrChaosActionNotFound)

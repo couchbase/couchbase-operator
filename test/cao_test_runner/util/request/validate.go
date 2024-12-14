@@ -34,6 +34,7 @@ func validateHTTPMethod(method string) error {
 		http.MethodPost:   true,
 		http.MethodPut:    true,
 		http.MethodDelete: true,
+		http.MethodPatch:  true,
 	}
 
 	if val, ok := validMethods[method]; ok && val {

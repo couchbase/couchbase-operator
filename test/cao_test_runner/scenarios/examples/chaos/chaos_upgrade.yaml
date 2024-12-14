@@ -1,0 +1,71 @@
+trees:
+  - action: "Deploy Couchbase"
+    config:
+      description:
+        - "Deploy Couchbase Cluster with 4 pods"
+      cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery-copy.yaml"
+      applyClusterSpecChanges:
+        "/spec/image": "couchbase/server:7.2.6"
+        "/spec/servers/0/size": 2
+        "/spec/servers/1/size": 2
+      validators:
+        - name: "couchbaseClusterSize"
+          state: "POST"
+          durationInSecs: 600 # 10 Minutes = 10 * 60 Seconds
+          intervalInSecs: 60
+          preRunWaitInSecs: 90
+          mapServerNameToSize:
+            "data-only": 2
+            "index-query": 2
+        - name: "couchbaseReadiness"
+          state: "POST"
+    trees:
+      - action: "Deploy Couchbase"
+        config:
+          description:
+            - "Upgrade Couchbase Cluster to 7.6.3"
+          cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery-copy.yaml"
+          applyClusterSpecChanges:
+            "/spec/image": "couchbase/server:7.6.3"
+          validators:
+            - name: "couchbaseVersion"
+              state: "POST"
+              cbVersion: "7.6.3"
+              durationInMinutes: 20
+              intervalInMinutes: 1
+            - name: "couchbaseReadiness"
+              state: "POST"
+      - action: "Chaos"
+        config:
+          description:
+            - Perform chaos on CBService which has cb pod with data service. Once during Warmup, and other after Warmup.
+          managedService: eks
+          clusterName: k8s-cluster-name
+          chaosList:
+            - chaosActions:
+                - CBServiceChaos
+                - CBServiceChaos
+              cbPodFilter:
+                filterType: services
+                selectionStrategy: random
+                services:
+                  - data
+                servicesNotStrict: true
+                count: 2
+              cbServiceChaos:
+                - serviceChaosAction: kill
+                  cbServices:
+                    - kv
+                - serviceChaosAction: stop
+                  cbServices:
+                    - kv
+              triggerConfig:
+                - triggerName: deltaRecoveryUpgrade
+                  triggerDuration: 30m0s
+                  triggerInterval: 10s
+                  cbSecret: cb-example-auth
+                - triggerName: deltaRecoveryWarmup
+                  triggerDuration: 30m0s
+                  triggerInterval: 2s
+                  cbSecret: cb-example-auth
+              cbUpgradeVersion: 7.6.3

@@ -1,0 +1,68 @@
+trees:
+  - action: "Deploy Couchbase"
+    config:
+      description:
+        - "Deploy Couchbase Cluster with 4 pods"
+      cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery-copy.yaml"
+      applyClusterSpecChanges:
+        "/spec/image": "couchbase/server:7.2.6"
+        "/spec/servers/0/size": 2
+        "/spec/servers/1/size": 2
+      validators:
+        - name: "couchbaseClusterSize"
+          state: "POST"
+          durationInSecs: 600 # 10 Minutes = 10 * 60 Seconds
+          intervalInSecs: 60
+          preRunWaitInSecs: 90
+          mapServerNameToSize:
+            "data-only": 2
+            "index-query": 2
+        - name: "couchbaseReadiness"
+          state: "POST"
+    trees:
+      - action: "Deploy Couchbase"
+        config:
+          description:
+            - "Deploy Couchbase Cluster with 5 pods"
+          cbClusterSpecPath: "./test_data/cb_clusters/cb-cluster-7.2.5-delta-recovery-copy.yaml"
+          applyClusterSpecChanges:
+            "/spec/servers/0/size": 3
+            "/spec/servers/1/size": 2
+          validators:
+            - name: "couchbaseClusterSize"
+              state: "POST"
+              durationInSecs: 600 # 10 Minutes = 10 * 60 Seconds
+              intervalInSecs: 60
+              preRunWaitInSecs: 90
+              mapServerNameToSize:
+                "data-only": 3
+                "index-query": 2
+            - name: "couchbaseReadiness"
+              state: "POST"
+      - action: "Chaos"
+        config:
+          description:
+            - Perform chaos on CBService which has cb pod with data service.
+          managedService: eks
+          clusterName: k8s-aryaan
+          chaosList:
+            - chaosActions:
+                - CBServiceChaos
+              cbPodFilter:
+                filterType: services
+                selectionStrategy: random
+                services:
+                  - data
+                servicesNotStrict: true
+                count: 1
+              cbServiceChaos:
+                - serviceChaosAction: kill
+                  cbServices:
+                    - kv
+              triggerConfig:
+                - triggerName: scaling
+                  triggerDuration: 2m0s
+                  triggerInterval: 5s
+                  postTriggerWait: 10s
+                  cbSecret: cb-example-auth
+              cbPodsAfterScaling: 5
