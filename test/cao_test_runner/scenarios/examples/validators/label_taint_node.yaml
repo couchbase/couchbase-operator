@@ -7,4 +7,25 @@ config:
     - name: "labelTaintNodes"
       state: "PRE"
       nodeFilter:
-        managedSvcName: eks # kind | eks | gke | aks
+        managedSvcName: "eks"
+        count: 1
+        selectStrategy: "any"
+        sortByStrategy: "default"
+        azList:
+          - "us-east-2a"
+          - "us-east-2b"
+        skipOperator: true
+        skipAdmission: true
+        avoidLabels:
+          - [ "label1_key", "label1_value1" ]
+          - [ "label1_key", "label1_value2" ]
+          - [ "label2_key", "label2_value" ]
+      labelKey: "workload-node"
+      labelValue: "true"
+      taintKey: "exampleTaintKey"
+      taintValue: "exampleTaintValue"
+      taintEffect: "NoSchedule" # NoSchedule | PreferNoSchedule | NoExecute
+      applyTaint: true
+      applyLabel: true
+      removeTaint: false
+      removeLabel: false
