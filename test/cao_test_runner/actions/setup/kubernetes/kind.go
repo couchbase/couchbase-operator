@@ -36,6 +36,7 @@ type CreateKindCluster struct {
 	ConfigPath               string
 	OperatorImage            string
 	AdmissionControllerImage string
+	LoadDockerImageToKind    bool
 }
 
 type Node struct {
@@ -91,12 +92,14 @@ func (ckc *CreateKindCluster) CreateCluster(ctx context.Context) error {
 		return fmt.Errorf("unable to create cluster %s: %w", ckc.ClusterName, err)
 	}
 
-	if err = kind.LoadDockerImage(ckc.OperatorImage, ckc.ClusterName, nil).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("unable to load operator image into cluster %s: %w", ckc.ClusterName, err)
-	}
+	if ckc.LoadDockerImageToKind {
+		if err = kind.LoadDockerImage(ckc.OperatorImage, ckc.ClusterName, nil).ExecWithoutOutputCapture(); err != nil {
+			return fmt.Errorf("unable to load operator image into cluster %s: %w", ckc.ClusterName, err)
+		}
 
-	if err = kind.LoadDockerImage(ckc.AdmissionControllerImage, ckc.ClusterName, nil).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("unable to load admission controller image into cluster %s: %w", ckc.ClusterName, err)
+		if err = kind.LoadDockerImage(ckc.AdmissionControllerImage, ckc.ClusterName, nil).ExecWithoutOutputCapture(); err != nil {
+			return fmt.Errorf("unable to load admission controller image into cluster %s: %w", ckc.ClusterName, err)
+		}
 	}
 
 	return nil

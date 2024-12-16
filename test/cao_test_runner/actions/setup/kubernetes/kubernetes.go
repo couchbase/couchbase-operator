@@ -46,6 +46,7 @@ type KubernetesSetupConfig struct {
 	Environment              EnvironmentType                   `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
 	NumControlPlane          int                               `yaml:"numControlPlane"`
 	NumWorkers               int                               `yaml:"numWorkers"`
+	LoadDockerImageToKind    bool                              `yaml:"loadDockerImageToKind"`
 	OperatorImage            string                            `yaml:"operatorImage" caoCli:"required,context" env:"OPERATOR_IMAGE"`
 	AdmissionControllerImage string                            `yaml:"admissionControllerImage" caoCli:"required,context" env:"ADMISSION_CONTROLLER_IMAGE"`
 	Provider                 ProviderType                      `yaml:"provider" caoCli:"context" env:"PROVIDER"`
