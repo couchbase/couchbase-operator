@@ -153,19 +153,19 @@ func (s *Couchbase) Config() interface{} {
 
 // getModifiedSpecPath returns the modified spec path.
 /*
- * Modified spec path is in the ./cao_test_runner/modified_test_data/... directory.
+ * Modified spec path is in the ./cao_test_runner/tmp/... directory.
  * The spec file name is renamed as <old-file-name>-<random-8-chars>.extension.
  */
 func getModifiedSpecPath(specPath string) (string, error) {
 	fileDir, fileName := filepath.Split(specPath)
 	isModified := false
 
-	if !strings.Contains(fileDir, "modified_test_data") {
+	if !strings.Contains(fileDir, "tmp") {
 		if !strings.Contains(fileDir, "test_data") {
 			return "", fmt.Errorf("get modified spec path: %w", ErrWrongSpecPath)
 		}
 
-		fileDir = strings.Replace(fileDir, "test_data", "modified_test_data", 1)
+		fileDir = strings.Replace(fileDir, "test_data", "tmp", 1)
 	} else {
 		isModified = true
 	}
