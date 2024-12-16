@@ -185,6 +185,10 @@ func (cac *CreateAKSCluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("cluster %s already exists: %w", cac.ClusterName, ErrAKSClusterAlreadyExists)
 	}
 
+	if !fileutils.NewFile(cac.KubeConfigPath).IsFileExists() {
+		return fmt.Errorf("kube config path %s does not exist: %w", cac.KubeConfigPath, ErrKubeConfigFileInvalid)
+	}
+
 	return nil
 }
 

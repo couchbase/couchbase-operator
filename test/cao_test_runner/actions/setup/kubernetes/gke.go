@@ -201,6 +201,10 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 
 	cgc.KubernetesVersion = highestVersion
 
+	if !fileutils.NewFile(cgc.KubeConfigPath).IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cgc.KubeConfigPath, ErrKubeconfigFileInvalid)
+	}
+
 	return nil
 }
 

@@ -290,5 +290,9 @@ func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("eks cluster %s already exists: %w", cec.ClusterName, ErrEKSClusterAlreadyExists)
 	}
 
+	if !fileutils.NewFile(cec.KubeConfigPath).IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath, ErrKubeconfigFileInvalid)
+	}
+
 	return nil
 }
