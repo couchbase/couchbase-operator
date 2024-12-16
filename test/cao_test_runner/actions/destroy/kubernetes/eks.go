@@ -175,7 +175,10 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 	policiesToDelete := []string{dec.ClusterName + "-ebs-csi-driver-policy"}
 	for _, policyName := range policiesToDelete {
 		if err = eksSession.DeletePolicy(ctx, &policyName); err != nil {
-			return fmt.Errorf("unable to delete iam policy %s: %w", policyName, err)
+			// The policy clustername-ebs-csi-driver-policy is only created sometimes
+			// TODO : Investigate why and when this policy is created and fix the code accordingly
+			// return fmt.Errorf("unable to delete iam policy %s: %w", policyName, err)
+			logrus.Errorf("unable to delete iam policy %s", policyName)
 		}
 
 		logrus.Infof("Deleted IAM policy %s", policyName)
