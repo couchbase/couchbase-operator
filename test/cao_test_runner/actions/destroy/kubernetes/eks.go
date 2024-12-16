@@ -166,7 +166,10 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 	rolesToDelete := []string{dec.ClusterName + "-eks-role", dec.ClusterName + "-eks-ebscsidriver-role"}
 	for _, roleName := range rolesToDelete {
 		if err = eksSession.DeleteIAMRole(ctx, &roleName); err != nil {
-			return fmt.Errorf("unable to delete iam role %s: %w", roleName, err)
+			// The policy clustername-ebs-csidriver-role is only created sometimes
+			// TODO : Investigate why and when this role is created and fix the code accordingly
+			// return fmt.Errorf("unable to delete iam role %s: %w", roleName, err)
+			logrus.Errorf("unable to delete iam role %s", roleName)
 		}
 
 		logrus.Infof("Deleted IAM role %s", roleName)
