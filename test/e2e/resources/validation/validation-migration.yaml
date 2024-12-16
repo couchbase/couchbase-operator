@@ -1,0 +1,19 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+  namespace: default
+spec:
+  migration:
+    unmanagedClusterHost: "some-unmanaged-host.default.local"
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing

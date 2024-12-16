@@ -4080,13 +4080,23 @@ func checkChangeConstraintsMigration(current, updated *couchbasev2.CouchbaseClus
 		return fmt.Errorf("spec.migration cannot be added to a pre-existing cluster")
 	}
 
-	if current.Spec.Migration != nil && current.IsMigrating() {
-		if updated.Spec.Migration == nil {
-			return fmt.Errorf("spec.migration cannot be removed during migration")
+	if current.Spec.Migration != nil {
+		if updated.Spec.Migration != nil {
+			if vc, err := checkForVersionChange(current, updated); err == nil && vc {
+				return fmt.Errorf("couchbase version cannot be changed while in migration mode")
+			} else if err != nil {
+				return err
+			}
 		}
 
-		if current.Spec.Migration.UnmanagedClusterHost != updated.Spec.Migration.UnmanagedClusterHost {
-			return fmt.Errorf("spec.migration.unmanagedClusterHost cannot be changed during migration")
+		if current.IsMigrating() {
+			if updated.Spec.Migration == nil {
+				return fmt.Errorf("spec.migration cannot be removed during migration")
+			}
+
+			if current.Spec.Migration.UnmanagedClusterHost != updated.Spec.Migration.UnmanagedClusterHost {
+				return fmt.Errorf("spec.migration.unmanagedClusterHost cannot be changed during migration")
+			}
 		}
 	}
 
@@ -4105,4 +4115,28 @@ func checkSampleBucketFieldPresets(resolution couchbasev2.CouchbaseBucketConflic
 	}
 
 	return nil
+}
+
+func checkForVersionChange(current, updated *couchbasev2.CouchbaseCluster) (bool, error) {
+	currentImage, err := current.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false, err
+	}
+
+	updatedImage, err := updated.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false, err
+	}
+
+	currentVersion, err := k8sutil.CouchbaseVersion(currentImage)
+	if err != nil {
+		return false, err
+	}
+
+	updatedVersion, err := k8sutil.CouchbaseVersion(updatedImage)
+	if err != nil {
+		return false, err
+	}
+
+	return currentVersion != updatedVersion, nil
 }

@@ -60,18 +60,68 @@ func TestCheckChangeConstraintsMigration(t *testing.T) {
 		status := couchbasev2.ClusterStatus{Conditions: []couchbasev2.ClusterCondition{{Status: testcase.migratingCondition, Type: couchbasev2.ClusterConditionMigrating}}}
 
 		currentCluster := &couchbasev2.CouchbaseCluster{
-			Spec:   couchbasev2.ClusterSpec{Migration: testcase.currentMigrationSpec},
+			Spec: couchbasev2.ClusterSpec{Migration: testcase.currentMigrationSpec,
+				Image: "couchbase/server:7.6.2"},
 			Status: status,
 		}
 
 		updatedCluster := &couchbasev2.CouchbaseCluster{
-			Spec: couchbasev2.ClusterSpec{Migration: testcase.updatedMigrationSpec},
+			Spec: couchbasev2.ClusterSpec{Migration: testcase.updatedMigrationSpec,
+				Image: "couchbase/server:7.6.2"},
 		}
 
 		err := checkChangeConstraintsMigration(currentCluster, updatedCluster)
 
 		if (err == nil && testcase.expectedErr != "") || (err != nil && (testcase.expectedErr == "" || err.Error() != testcase.expectedErr)) {
 			t.Errorf("test %s failed, expected error %s, got %s", testcase.name, testcase.expectedErr, err)
+		}
+	}
+}
+
+func TestCheckForVersionChange(t *testing.T) {
+	testcases := []struct {
+		name           string
+		currentVersion string
+		updatedVersion string
+		expectedChange bool
+		expectedError  string
+	}{
+		{
+			name:           "has version downgrade",
+			currentVersion: "couchbase/server:7.6.2",
+			updatedVersion: "couchbase/server:7.6.1",
+			expectedChange: true,
+			expectedError:  "",
+		},
+		{
+			name:           "has version upgrade",
+			currentVersion: "couchbase/server:7.6.0",
+			updatedVersion: "couchbase/server:7.6.2",
+			expectedChange: true,
+			expectedError:  "",
+		},
+		{
+			name:           "no version change",
+			currentVersion: "couchbase/server:7.6.2",
+			updatedVersion: "couchbase/server:7.6.2",
+			expectedChange: false,
+			expectedError:  "",
+		},
+		{
+			name:           "invalid version string",
+			currentVersion: "couchbase/server:7.6.2",
+			updatedVersion: "couchbase/server",
+			expectedChange: false,
+			expectedError:  "version error: invalid image string couchbase/server",
+		},
+	}
+
+	for _, testcase := range testcases {
+		res, err := checkForVersionChange(
+			&couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{Image: testcase.currentVersion}},
+			&couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{Image: testcase.updatedVersion}})
+		if res != testcase.expectedChange || (err == nil && testcase.expectedError != "") || (err != nil && (testcase.expectedError == "" || err.Error() != testcase.expectedError)) {
+			t.Errorf("%s failed, expected check to return %t with error %s, got %t with error %s", testcase.name, testcase.expectedChange, testcase.expectedError, res, err)
 		}
 	}
 }

@@ -3635,3 +3635,16 @@ func TestClusterMigrationInvalidMigration(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
+
+func TestNegValidationClusterMigrationApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "UpdateImageDuringMigration",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.2")},
+			shouldFail:     true,
+			expectedErrors: []string{"couchbase version cannot be changed while in migration mode"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
+}
