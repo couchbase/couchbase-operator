@@ -8,6 +8,19 @@
 # AKS_REGION / AKSRegion
 # KUBECONFIG / KubeConfigPath
 
+# This yaml optionally requires the following fields to be set in env
+# IMAGE_REGISTRY_SERVER
+# IMAGE_REGISTRY_USERNAME
+# IMAGE_REGISTRY_PASSWORD
+# IMAGE_REGISTRY_EMAIL
+
+# This yaml may also require the following env to be set
+# AKS_REGION
+# AKS_SUBSCRIPTION_ID
+# AKS_SERVICE_PRINCIPAL_ID
+# AKS_SERVICE_PRINCIPAL_SECRET_ID
+# AKS_TENANT_ID
+
 action: "Setup Kubernetes Cluster"
 config:
   description:

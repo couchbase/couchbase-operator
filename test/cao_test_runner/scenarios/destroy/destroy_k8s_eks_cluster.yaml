@@ -7,6 +7,12 @@
 # PROVIDER / Provider
 # EKS_REGION / EKSRegion
 
+# This yaml may also require the following env to be set
+# EKS_REGION
+# EKS_ACCESS_KEY
+# EKS_SECRET_KEY
+# EKS_ACCOUNT_ID
+
 action: "Destroy Admission Controller"
 config:
   description:

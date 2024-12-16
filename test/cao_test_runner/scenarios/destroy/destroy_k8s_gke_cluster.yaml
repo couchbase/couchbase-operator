@@ -7,6 +7,12 @@
 # PROVIDER / Provider
 # GKE_REGION / GKERegion
 
+# This yaml may also require the following env to be set
+# GKE_REGION
+# GKE_PROJECT_ID
+# GKE_AUTH_ACCOUNT
+# GKE_CREDENTIALS_JSON_PATH
+
 action: "Destroy Admission Controller"
 config:
   description:

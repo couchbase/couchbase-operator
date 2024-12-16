@@ -8,6 +8,18 @@
 # GKE_REGION / GKERegion
 # KUBECONFIG / KubeConfigPath
 
+# This yaml optionally requires the following fields to be set in env
+# IMAGE_REGISTRY_SERVER
+# IMAGE_REGISTRY_USERNAME
+# IMAGE_REGISTRY_PASSWORD
+# IMAGE_REGISTRY_EMAIL
+
+# This yaml may also require the following env to be set
+# GKE_REGION
+# GKE_PROJECT_ID
+# GKE_AUTH_ACCOUNT
+# GKE_CREDENTIALS_JSON_PATH
+
 action: "Setup Kubernetes Cluster"
 config:
   description:

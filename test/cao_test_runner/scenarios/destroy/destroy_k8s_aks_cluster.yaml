@@ -7,6 +7,13 @@
 # PROVIDER / Provider
 # AKS_REGION / AKSRegion
 
+# This yaml may also require the following env to be set
+# AKS_REGION
+# AKS_SUBSCRIPTION_ID
+# AKS_SERVICE_PRINCIPAL_ID
+# AKS_SERVICE_PRINCIPAL_SECRET_ID
+# AKS_TENANT_ID
+
 action: "Destroy Admission Controller"
 config:
   description:

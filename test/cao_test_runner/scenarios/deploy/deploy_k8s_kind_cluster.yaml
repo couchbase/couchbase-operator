@@ -6,6 +6,12 @@
 # OPERATING_SYSTEM / OperatingSystem
 # ARCHITECTURE / Architecture
 
+# This yaml optionally requires the following fields to be set in env
+# IMAGE_REGISTRY_SERVER
+# IMAGE_REGISTRY_USERNAME
+# IMAGE_REGISTRY_PASSWORD
+# IMAGE_REGISTRY_EMAIL
+
 action: "Setup Kubernetes Cluster"
 config:
   description:
