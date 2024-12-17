@@ -81,9 +81,29 @@ func killAllXDCRNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.C
 		e2eutil.MustWaitClusterStatusHealthy(t, k8s, couchbase, 2*time.Minute)
 	}
 
+	// When a node is killed, we expect the PodDownFailoverRecoverySequence events to occur. Depending on the
+	// timing at which the node is killed, the reconciliation loop may be at a point where killing a node triggers
+	// a ReconciliationFailed event. If this occurs, we want to handle the event with the Optional validator.
 	return eventschema.Repeat{
-		Times:     couchbase.Spec.TotalSize(),
-		Validator: e2eutil.PodDownFailoverRecoverySequence(),
+		Times: couchbase.Spec.TotalSize(),
+		Validator: eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Optional{
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
+				eventschema.Optional{
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+				eventschema.Optional{
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		},
 	}
 }
 

@@ -511,6 +511,9 @@ func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {
 					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 				},
 			},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
