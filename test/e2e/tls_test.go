@@ -249,6 +249,7 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 

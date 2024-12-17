@@ -3,10 +3,13 @@ package cluster
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
+
+var RetryPeriod = 100 * time.Millisecond
 
 // NodeState is the human readable state a Couchbase cluster
 // node is in.
@@ -126,7 +129,7 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 // to use.
 func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.MemberSet) (*Status, error) {
 	info := &couchbaseutil.ClusterInfo{}
-	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, target); err != nil {
+	if err := couchbaseutil.GetPoolsDefault(info).RetryFor(RetryPeriod).On(c.api, target); err != nil {
 		return nil, err
 	}
 
