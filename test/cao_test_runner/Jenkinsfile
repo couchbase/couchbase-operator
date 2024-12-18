@@ -48,7 +48,7 @@ pipeline {
     AKS_SERVICE_PRINCIPAL_ID = credentials('cloud-native-azure-principal-id')
     AKS_SERVICE_PRINCIPAL_SECRET_ID = credentials('cloud-native-azure-principal-secret-id')
     AKS_TENANT_ID = credentials('cloud-native-azure-tenant-id')
-    GKE_CREDENTIALS_JSON = credentials('cloud-native-gcp-credentials')
+    GKE_CREDENTIALS_JSON_PATH = credentials('cloud-native-gcp-credentials')
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     OPERATING_SYSTEM = "linux"
@@ -95,10 +95,6 @@ pipeline {
       steps {
         dir("./test/cao_test_runner") {
             script {
-              // Set google credentials here
-              sh "echo ${env.GKE_CREDENTIALS_JSON} > credentials.json"
-              env.GKE_CREDENTIALS_JSON_PATH = "${env.WORKSPACE}/test/cao_test_runner/credentials.json"
-
               try {
                   sh """
                      go mod tidy

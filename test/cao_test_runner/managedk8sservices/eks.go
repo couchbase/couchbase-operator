@@ -652,7 +652,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 		"arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
 		"arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
 	}
-	roleName := es.clusterName + "-eks-node-group-role" + time.Now().Format("20060102150405.00000000000006")
+	roleName := es.clusterName + "-eks-ng-role" + time.Now().Format("20060102150405")
 
 	role, err := es.CreateIAMRole(ctx, roleName, trustPolicy, policies)
 	if err != nil {
@@ -1084,7 +1084,6 @@ func (es *EKSSession) DeletePolicy(ctx context.Context, policyName *string) erro
 
 	var policyArn *string
 	for _, policy := range result.Policies {
-		fmt.Println(*policy.PolicyName)
 		if *policy.PolicyName == *policyName {
 			policyArn = policy.Arn
 		}

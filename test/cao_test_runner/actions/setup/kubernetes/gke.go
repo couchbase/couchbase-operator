@@ -81,7 +81,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 
 	logrus.Infof("Created subnet %s in virtual network %s", subnetName, networkName)
 
-	nodePoolName := cgc.ClusterName + "nodepool-0"
+	nodePoolName := cgc.ClusterName + "np-0"
 	if err := gkeSession.CreateCluster(ctx, networkName, subnetName, cgc.MachineType, cgc.ImageType,
 		cgc.DiskType, cgc.KubernetesVersion, nodePoolName, cgc.DiskSize, cgc.Count, cgc.ReleaseChannel); err != nil {
 		return fmt.Errorf("error creating cluster %s: %w", cgc.ClusterName, err)
@@ -90,7 +90,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	logrus.Infof("Created cluster %s with 1 node pool %s", cgc.ClusterName, nodePoolName)
 
 	for i := 1; i < cgc.NumNodePools; i++ {
-		nodePoolName = fmt.Sprintf("%s-nodepool-%d", cgc.ClusterName, i)
+		nodePoolName = fmt.Sprintf("%s-np-%d", cgc.ClusterName, i)
 
 		if err := gkeSession.CreateNodePool(ctx, nodePoolName, cgc.MachineType, cgc.DiskType, cgc.ImageType, cgc.DiskSize, cgc.Count); err != nil {
 			return fmt.Errorf("error creating node pool %s: %w", nodePoolName, err)
