@@ -61,7 +61,6 @@ type AKSCredentials struct {
 type GKECredentials struct {
 	gkeRegion              string `env:"GKE_REGION"`
 	gkeProjectID           string `env:"GKE_PROJECT_ID"`
-	gkeAuthAccount         string `env:"GKE_AUTH_ACCOUNT"`
 	gkeCredentialsJSONPath string `env:"GKE_CREDENTIALS_JSON_PATH"`
 }
 
@@ -72,7 +71,7 @@ func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName strin
 		ClusterName:    clusterName,
 		EKSCredentials: GetEKSCredentials("", "", "", ""),
 		AKSCredentials: GetAKSCredentials("", "", "", "", ""),
-		GKECredentials: GetGKECredentials("", "", "", ""),
+		GKECredentials: GetGKECredentials("", "", ""),
 	}
 	if ok, err := ValidateManagedServiceCredentials(svc, ms); !ok || err != nil {
 		return nil, err
@@ -159,10 +158,6 @@ func ValidateAKSCredentials(aksSvcCred *AKSCredentials) (bool, error) {
 func ValidateGKECredentials(gkeSvcCred *GKECredentials) (bool, error) {
 	if gkeSvcCred.gkeRegion == "" {
 		return false, fmt.Errorf("gke region key is missing: %w", ErrGKERegionEmpty)
-	}
-
-	if gkeSvcCred.gkeAuthAccount == "" {
-		return false, fmt.Errorf("gke auth account key is missing: %w", ErrGKEAuthAccountEmpty)
 	}
 
 	if gkeSvcCred.gkeProjectID == "" {
@@ -279,24 +274,17 @@ func GetAKSCredentials(region, subscriptionID, servicePrincipalID, servicePrinci
  * Recommended way to set the credentials is by calling the function NewManagedServiceCredentials (uses env variables).
  * Use case of this function is if it is required to set ManagedServiceCredentials by directly providing the credentials.
  */
-func GetGKECredentials(region, projectID, authAccount, credentialsJSONPath string) *GKECredentials {
+func GetGKECredentials(region, projectID, credentialsJSONPath string) *GKECredentials {
 	gkeOnce.Do(func() {
 		gkeSvcCred = &GKECredentials{
 			gkeRegion:              region,
 			gkeProjectID:           projectID,
-			gkeAuthAccount:         authAccount,
 			gkeCredentialsJSONPath: credentialsJSONPath,
 		}
 
 		if region == "" {
 			if envValue, ok := os.LookupEnv(gkeRegionEnv); ok {
 				gkeSvcCred.gkeRegion = envValue
-			}
-		}
-
-		if authAccount == "" {
-			if envValue, ok := os.LookupEnv(gkeAuthAccountEnv); ok {
-				gkeSvcCred.gkeAuthAccount = envValue
 			}
 		}
 

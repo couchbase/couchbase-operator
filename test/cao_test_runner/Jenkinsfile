@@ -52,7 +52,6 @@ pipeline {
     AKS_SERVICE_PRINCIPAL_SECRET_ID = "${env.AZURE_CREDENTIALS_PSW}"
     AKS_TENANT_ID = credentials('azure-tenant-id')
     GKE_CREDENTIALS_JSON = credentials('couchbaseqe-gcp')
-    GKE_AUTH_ACCOUNT = "couchbase-operator@couchbase-qe.iam.gserviceaccount.com"
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     OPERATOR_IMAGE = "${params.operator_image}"

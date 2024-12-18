@@ -28,7 +28,6 @@ const (
 	aksTenantIDEnv               = "AKS_TENANT_ID"
 	gkeRegionEnv                 = "GKE_REGION"
 	gkeProjectIDEnv              = "GKE_PROJECT_ID"
-	gkeAuthAccountEnv            = "GKE_AUTH_ACCOUNT"
 	gkeCredentialsJSONPathEnv    = "GKE_CREDENTIALS_JSON_PATH"
 )
 
