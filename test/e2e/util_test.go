@@ -504,9 +504,9 @@ func registerTests() {
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSS3).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSAzure).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
 		framework.NewTestDef(TestBackupFullIncrementalOverTLSGCP).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup, TagFeatureBackupCloud),
-		framework.NewTestDef(TestOperatorDacValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
-		framework.NewTestDef(TestOperatorDacValidationDisabled).WithTags(TagSuiteP1, TagFeatureAdmission),
-		framework.NewTestDef(TestOperatorValidationUnreconcilable).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestCAODacValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestCAODacValidationDisabled).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestCAOValidationUnreconcilable).WithTags(TagSuiteP1, TagFeatureAdmission),
 		framework.NewTestDef(TestDisableAllValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
 
 		// Low priority tests.

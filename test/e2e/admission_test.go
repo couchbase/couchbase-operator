@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestOperatorDacValidation(t *testing.T) {
+func TestCAODacValidation(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -38,7 +38,7 @@ func TestOperatorDacValidation(t *testing.T) {
 	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, ""))
 }
 
-func TestOperatorDacValidationDisabled(t *testing.T) {
+func TestCAODacValidationDisabled(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -57,7 +57,7 @@ func TestOperatorDacValidationDisabled(t *testing.T) {
 	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", targetVersionIllegalDowngrade))
 }
 
-func TestOperatorValidationUnreconcilable(t *testing.T) {
+func TestCAOValidationUnreconcilable(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
