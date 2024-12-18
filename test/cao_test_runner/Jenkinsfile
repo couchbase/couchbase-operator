@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label 'k8'
+    label 'cao_testrunner'
   }
 
   options {
@@ -8,10 +8,10 @@ pipeline {
 
     buildDiscarder(
       logRotator(
-        artifactDaysToKeepStr: '14',
-        artifactNumToKeepStr: '20',
-        daysToKeepStr: '14',
-        numToKeepStr: '20',
+        artifactDaysToKeepStr: '30',
+        artifactNumToKeepStr: '100',
+        daysToKeepStr: '30',
+        numToKeepStr: '100',
       )
     )
 
@@ -33,25 +33,25 @@ pipeline {
 
   environment {
     GOVERSION = '1.22.5'
-    GOROOT = "${env.WORKSPACE}/go"
     KUBECTL_PATH = "${env.WORKSPACE}/kubectl"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
-    DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
-    GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
-    GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
-    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
-    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
-    EKS_ACCESS_KEY = credentials('couchbaseqe-aws-access-id')
-    EKS_SECRET_KEY = credentials('couchbaseqe-aws-access-secret')
+    GOROOT = "${env.WORKSPACE}/go"
+    IMAGE_REGISTRY_SERVER = credentials('cloud-native-image-registry-server')
+    IMAGE_REGISTRY_USERNAME = credentials('cloud-native-image-registry-username')
+    IMAGE_REGISTRY_PASSWORD = credentials('cloud-native-image-registry-password')
+    IMAGE_REGISTRY_EMAIL = credentials('cloud-native-image-registry-email')
+    EKS_ACCESS_KEY = credentials('cloud-native-aws-access-id')
+    EKS_SECRET_KEY = credentials('cloud-native-aws-access-secret-key')
+    EKS_ACCOUNT_ID = credentials('cloud-native-aws-account-id')
+    KUBECONFIG = "/root/.kube/config"
     EKS_REGION = "${params.eks_region}"
     AKS_REGION = "${params.aks_region}"
     GKE_REGION = "${params.gke_region}"
-    AKS_SUBSCRIPTION_ID = credentials('azure-subscription-id')
-    AZURE_CREDENTIALS = credentials('couchbaseqe-azure')
-    AKS_SERVICE_PRINCIPAL_ID = "${env.AZURE_CREDENTIALS_USR}"
-    AKS_SERVICE_PRINCIPAL_SECRET_ID = "${env.AZURE_CREDENTIALS_PSW}"
-    AKS_TENANT_ID = credentials('azure-tenant-id')
-    GKE_CREDENTIALS_JSON = credentials('couchbaseqe-gcp')
+    AKS_SUBSCRIPTION_ID = credentials('cloud-native-azure-subscription-id')
+    AKS_SERVICE_PRINCIPAL_ID = credentials('cloud-native-azure-principal-id')
+    AKS_SERVICE_PRINCIPAL_SECRET_ID = credentials('cloud-native-azure-principal-secret-id')
+    AKS_TENANT_ID = credentials('cloud-native-azure-tenant-id')
+    GKE_CREDENTIALS_JSON = credentials('cloud-native-gcp-credentials')
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     OPERATOR_IMAGE = "${params.operator_image}"
@@ -59,6 +59,7 @@ pipeline {
     OPERATOR_VERSION = "${params.cao_version}"
     OPERATING_SYSTEM = "linux"
     ARCHITECTURE= "amd64"
+    GO111MODULE="auto"
   }
 
   stages {
@@ -99,6 +100,7 @@ pipeline {
               env.GKE_CREDENTIALS_JSON_PATH = "${env.WORKSPACE}/test/cao_test_runner/credentials.json"
 
               try {
+                  sh "go mod tidy"
                   sh "go run . scenario --scenario ${params.scenario_file}"
               }
               catch (e) {
