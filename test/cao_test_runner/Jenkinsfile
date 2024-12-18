@@ -20,15 +20,15 @@ pipeline {
   }
 
   parameters {
-    string(name: 'git_cmd', defaultValue:'')
-    string(name: 'scenario_file', defaultValue: 'scenarios/deploy/data_node_couchase.yaml')
-    string(name: 'operator_image', defaultValue: 'ghcr.io/cb-vanilla/operator:latest')
-    string(name: 'admission_image', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
-    string(name: 'cao_version', defaultValue: '2.7.0-211')
-    string(name: 'kubectl_version', defaultValue: '1.27.0')
-    string(name: 'eks_region', defaultValue: 'us-east-2')
-    string(name: 'aks_region', defaultValue: 'eastus')
-    string(name: 'gke_region', defaultValue: 'us-central1')
+    string(name: 'GIT_CMD', defaultValue:'')
+    string(name: 'SCENARIO_FILE', defaultValue: 'scenarios/deploy/data_node_couchase.yaml')
+    string(name: 'OPERATOR_IMAGE', defaultValue: 'ghcr.io/cb-vanilla/operator:latest')
+    string(name: 'ADMISSION_IMAGE', defaultValue: 'ghcr.io/cb-vanilla/admission-controller:latest')
+    string(name: 'CAO_VERSION', defaultValue: '2.7.0-211')
+    string(name: 'KUBECTL_VERSION', defaultValue: '1.27.0')
+    string(name: 'EKS_REGION', defaultValue: 'us-east-2')
+    string(name: 'AKS_REGION', defaultValue: 'eastus')
+    string(name: 'GKE_REGION', defaultValue: 'us-central1')
   }
 
   environment {
@@ -44,9 +44,6 @@ pipeline {
     EKS_SECRET_KEY = credentials('cloud-native-aws-access-secret-key')
     EKS_ACCOUNT_ID = credentials('cloud-native-aws-account-id')
     KUBECONFIG = "/root/.kube/config"
-    EKS_REGION = "${params.eks_region}"
-    AKS_REGION = "${params.aks_region}"
-    GKE_REGION = "${params.gke_region}"
     AKS_SUBSCRIPTION_ID = credentials('cloud-native-azure-subscription-id')
     AKS_SERVICE_PRINCIPAL_ID = credentials('cloud-native-azure-principal-id')
     AKS_SERVICE_PRINCIPAL_SECRET_ID = credentials('cloud-native-azure-principal-secret-id')
@@ -54,12 +51,15 @@ pipeline {
     GKE_CREDENTIALS_JSON = credentials('cloud-native-gcp-credentials')
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
-    OPERATOR_IMAGE = "${params.operator_image}"
-    ADMISSION_CONTROLLER_IMAGE = "${params.admission_image}"
-    OPERATOR_VERSION = "${params.cao_version}"
     OPERATING_SYSTEM = "linux"
     ARCHITECTURE= "amd64"
     GO111MODULE="auto"
+    OPERATOR_IMAGE = "${params.operator_image}"
+    ADMISSION_CONTROLLER_IMAGE = "${params.admission_image}"
+    OPERATOR_VERSION = "${params.cao_version}"
+    EKS_REGION = "${params.eks_region}"
+    AKS_REGION = "${params.aks_region}"
+    GKE_REGION = "${params.gke_region}"
   }
 
   stages {
@@ -100,8 +100,10 @@ pipeline {
               env.GKE_CREDENTIALS_JSON_PATH = "${env.WORKSPACE}/test/cao_test_runner/credentials.json"
 
               try {
-                  sh "go mod tidy"
-                  sh "go run . scenario --scenario ${params.scenario_file}"
+                  sh """
+                     go mod tidy
+                     go run . scenario --scenario ${params.scenario_file}
+                     """
               }
               catch (e) {
                   currentBuild.result = 'UNSTABLE'
