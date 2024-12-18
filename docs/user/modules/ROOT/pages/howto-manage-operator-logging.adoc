@@ -182,11 +182,11 @@ Kubernetes Events provide insights into what is happening inside a Kubernetes cl
 
 They can be used to monitor changes that have occurred in the cluster, and can be helpful when troubleshooting issues with the Autonomous Operator. However, they expire after a certain period of time, typically one hour. You can use the https://github.com/couchbase/couchbase-k8s-event-collector[Kubernetes Event Collector] tool to collect and store events for longer periods of time.
 
-The Kubernetes Event Collector (KEL) watches for Kubernetes events within a namespace and stores them to a buffer which can be stashed. It can be deployed and configured using helm
+The Kubernetes Event Collector watches for Kubernetes events within a namespace and stores them to a buffer which can be stashed. It can be deployed and configured using helm
 
 [source,console]
 ----
 $ helm install event-collector charts/event-collector
 ----
 
-For more details about the tool and how to use it, refer to the repo README: https://github.com/couchbase/couchbase-k8s-event-collector
+For more details about the tool and how to use it, refer to the github repository README: https://github.com/couchbase/couchbase-k8s-event-collector

@@ -28,7 +28,7 @@ See xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-upgradeprocess[`c
 == Server Group Improvements
 
 In public cloud providers, it is common for the Server Groups in use to match the Availability Zones, and for there to be a small number of them.
-In private data centres they are more likely to be used to represent a larger number of zones, based on racks, rows of racks, or even rooms, as well as PDUs and switches.
+In private data centers they are more likely to be used to represent a larger number of zones, based on racks, rows of racks, or even rooms, as well as PDUs and switches.
 
 To allow a more even spread of Pods over a larger range of Server Groups, we have added the `shuffleServerGroups` annotation.
 

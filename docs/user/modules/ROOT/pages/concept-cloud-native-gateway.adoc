@@ -84,8 +84,6 @@ First, forward a port to any of the nodes in your defined cluster:
 ----
 $ kubectl port-forward pod/mycluster-0000 18098:18098
 ----
-// TODO: update the above to use the service when added in operator 2.7
-
 Then call it with `grpcurl` against a default `Health/Check` once you have the definition.
 To get the RPC definition:
 

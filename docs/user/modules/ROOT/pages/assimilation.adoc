@@ -14,7 +14,8 @@ To perform the migration we need a cluster to migrate. For this example the clus
 
 Source Cluster Spec:
 
-```
+[source,yaml]
+----
 apiVersion: v1
 kind: Secret
 metadata:
@@ -42,10 +43,12 @@ spec:
       name: data
       services:
         - data
-```
+----
 
 Once the operator has finished creating the cluster it can be paused with the spec.paused field. I.e.
-```
+
+[source,yaml]
+----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
@@ -53,7 +56,7 @@ metadata:
 spec:
   paused: true
   ...
-```
+----
 
 ### Migrating the cluster
 To migrate the cluster a new CouchbaseCluster resource needs to be created. This spec needs three things to migrate the cluster:
@@ -64,7 +67,8 @@ To migrate the cluster a new CouchbaseCluster resource needs to be created. This
 
 To migrate the source cluster described above the following CouchbaseCluster spec can be used:
 
-```
+[source,yaml]
+----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
@@ -82,33 +86,34 @@ spec:
       name: data
       services:
         - data
-```
+----
 
 
-Once this resource is creaed the operator will begin the migration of the cluster.
+Once this resource is created the operator will begin the migration of the cluster.
 
 
 == Migration Control 
 === Migration Parameters
 The migration field supports additional parameters to control the migration of the cluster.
 
-```
+[source,yaml]
+----
   migration:
     unmanagedClusterHost: cb-example.default.svc.cluster.local
     stabilizationPeriod:  30s
     numUnmanagedNodes: 2
     maxConcurrentMigrations: 2
-```
+----
 
 stabilizationPeriod is the time the operator will wait after a migration before starting the next migration.
 If not specified the operator will start the next migration immediately.
 
 numUnmanagedNodes is the number of nodes the operator will leave in the cluster unmigrated.
-This is useful for constrolling how much of the cluster to mgirate over at a time.
+This is useful for controlling how much of the cluster to migrate over at a time.
 If not specified
 the operator will migrate all nodes.
 e.g.
-if the unmanaged cluster has 10 nodes and NumUnmanagedNodes is set to 2, then the operator will
+if the unmanaged cluster has 10 nodes and numUnmanagedNodes is set to 2, then the operator will
 migrate 8 nodes to Kubernetes and leave 2 nodes.
 
 maxConcurrentMigrations is the maximum number of nodes migrations the operator will run concurrently.
@@ -117,7 +122,8 @@ maxConcurrentMigrations is the maximum number of nodes migrations the operator w
 === Pre-migration nodes
 To add nodes to the source cluster before performing any migration pre-migration nodes can be defined. These nodes will be added before any migration happens. Pre-migration nodes are simply defined by adding a Server Class for nodes that don't exist on the source cluster. Using the examples above two single pre-migration nodes can be added by modifying the spec like:
 
-```
+[source,yaml]
+----
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
@@ -139,11 +145,11 @@ spec:
       name: pre_migration
       services:
         - data
-```
+----
 
 
 To migrate an existing cluster a Couchbase Cluster spec describing the state of the existing cluster needs to be created. This spec should contain the configuration of the existing cluster, most importantly the nodes that make up the existing cluster and the services that they run. The Couchbase Operator will then recreate each of these nodes in Kubernetes and swap-rebalance them into the cluster whilst simultaneously removing their counterparts in the source cluster.
 
-== Limiations
+== Limitations
 === Backup Service
 Currently the Operator doesn't support running nodes with the backup service. This means that if the source cluster has nodes with the backup service then these nodes will need to be removed or replaced with nodes that aren't running the backup service. Backup is still supported by the Operator

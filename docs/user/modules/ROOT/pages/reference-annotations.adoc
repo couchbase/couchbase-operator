@@ -7,7 +7,7 @@ Couchbase Operator uses special annotations to configure specific resources.
 === Managed Buckets
 ==== `cao.couchbase.com/buckets.defaultStorageBackend`
 Used to configure the default storage backend for managed CouchbaseBucket.
-Changing the storage backend of a pre-existing bucket is only supported on CouchbaseServer version 7.6.0
+Changing the storage backend of a pre-existing bucket is only supported on Couchbase Server version 7.6.0
 Defaults to `couchstore`, accepts either `couchstore` or `magma`. 
 
 === Unmanaged Buckets
@@ -38,7 +38,7 @@ Accepts either `true` or `false`.
 ==== `cao.couchbase.com/shuffleServerGroups`
 Used to allow Couchbase Operator to shuffle the order that pods are scheduled to defined server groups.
 By default Couchbase Operator will schedule pods to server groups in lexical order.
-The shuffling is pseudo-random and is based on the cluster name and namespce, so the same cluster/namespace combination will always shuffle the server groups in the same order.
+The shuffling is pseudo-random and is based on the cluster name and namespace, so the same cluster/namespace combination will always shuffle the server groups in the same order.
 Accepts either `true` or `false`.
 
 == Pod Rescheduling

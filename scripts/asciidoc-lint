@@ -82,7 +82,7 @@ fi
 # Now that your general spelling has been corrected, let's look at syntax...
 # This step will also check for any xrefs you got wrong...
 npm install
-WARNINGS=$(node_modules/@antora/cli/bin/antora generate --log-level="$LOG_LEVEL" scripts/playbook.yaml 2>&1 | sed -e /^.*tabs.*$/d)
+WARNINGS=$(NODE_OPTIONS="$NODE_OPTIONS --no-deprecation" node_modules/@antora/cli/bin/antora generate --log-level="$LOG_LEVEL" scripts/playbook.yaml 2>&1 | sed -e /^.*tabs.*$/d)
 if [[ "${WARNINGS}" != "" ]]; then
   echo "Asciidoc markup contains errors"
   echo "${WARNINGS}" | sed 's/^/    /g'

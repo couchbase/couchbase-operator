@@ -103,7 +103,7 @@ a| https://issues.couchbase.com/browse/K8S-3377[K8S-3377^]
 a| *Summary:* Previously the `TestTLSRotateCAKillPodAndKillOperator` test was failing with Server 7.6.
 
 a| https://issues.couchbase.com/browse/K8S-3391[K8S-3391^]
-a| *Summary:* Previously the Operator was not correctly deleting un-managed XDCR Remote Cluster References.
+a| *Summary:* Previously the Operator was not correctly deleting unmanaged XDCR Remote Cluster References.
 
 a| https://issues.couchbase.com/browse/K8S-3452[K8S-3452^]
 a| *Summary:* Previously the Operator was triggering a mandatory upgrade cycle when upgrading from 2.4.x or earlier.

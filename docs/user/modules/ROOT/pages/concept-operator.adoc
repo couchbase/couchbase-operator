@@ -147,7 +147,7 @@ The Operator takes a wide range of actions on the Couchbase cluster based on the
 The order of reconciliation operations that the Operator performs is as follows:
 
 ==== Hibernation & Pausing
-Pausing and hibernating the cluster takes priority over everything else. If `spec.paused` is `true` then the Operator will pause the cluster without taking any further action and takes precedance over hibernating. If `spec.hibernate` is `true` then the Operator will hibernate the cluster without taking any further action.
+Pausing and hibernating the cluster takes priority over everything else. If `spec.paused` is `true` then the Operator will pause the cluster without taking any further action and takes precedence over hibernating. If `spec.hibernate` is `true` then the Operator will hibernate the cluster without taking any further action.
 
 ==== Pre-requisite resources
 The operator reconciles the requisite resources that are needed for the cluster to operate, this includes:
