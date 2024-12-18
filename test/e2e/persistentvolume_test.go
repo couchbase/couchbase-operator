@@ -311,6 +311,7 @@ func TestPersistentVolumeKillAllPods(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -370,6 +371,7 @@ func TestPersistentVolumeKillAllPodsTLS(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.PodDownWithPVCRecoverySequence(clusterSize, clusterSize),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -675,7 +677,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 		}
 	}
 
-	// Loop to kill the nodes and check for rebalalnce started events.
+	// Loop to kill the nodes and check for rebalance started events.
 	for _, podMemberToKill := range victims {
 		e2eutil.MustKillPodForMember(t, kubernetes, cluster, podMemberToKill, false)
 		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.RebalanceStartedEvent(cluster), 20*time.Minute)
@@ -689,6 +691,7 @@ func TestPersistentVolumeRzaFailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{Times: len(victims), Validator: e2eutil.PodRecoverySequenceAfterKilled()},
 	}
 

@@ -524,6 +524,7 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 	expectedEvents2 := []eventschema.Validatable{

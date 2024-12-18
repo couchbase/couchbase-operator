@@ -314,10 +314,19 @@ func PodRecoverySequenceAfterKilled() eventschema.Validatable {
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 			},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
 			},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},

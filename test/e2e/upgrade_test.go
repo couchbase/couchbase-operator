@@ -89,6 +89,7 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+						eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 						eventschema.Optional{
 							Validator: eventschema.Sequence{
 								Validators: []eventschema.Validatable{
@@ -100,7 +101,9 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 					},
 				},
 			},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			// once member is recovered the Operator will proceed with upgrade
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},

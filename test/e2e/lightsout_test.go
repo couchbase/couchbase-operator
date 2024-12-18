@@ -6,6 +6,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 )
@@ -79,6 +80,7 @@ func TestLightsOutPersistent(t *testing.T) {
 	// * Cluster recovered
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(t, clusterSize, mdsGroupSize, mdsGroupSize, f.CouchbaseServerImage),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
