@@ -54,12 +54,12 @@ pipeline {
     OPERATING_SYSTEM = "linux"
     ARCHITECTURE= "amd64"
     GO111MODULE="auto"
-    OPERATOR_IMAGE = "${params.operator_image}"
-    ADMISSION_CONTROLLER_IMAGE = "${params.admission_image}"
-    OPERATOR_VERSION = "${params.cao_version}"
-    EKS_REGION = "${params.eks_region}"
-    AKS_REGION = "${params.aks_region}"
-    GKE_REGION = "${params.gke_region}"
+    OPERATOR_IMAGE = "${params.OPERATOR_IMAGE}"
+    ADMISSION_CONTROLLER_IMAGE = "${params.ADMISSION_IMAGE}"
+    OPERATOR_VERSION = "${params.CAO_VERSION}"
+    EKS_REGION = "${params.EKS_REGION}"
+    AKS_REGION = "${params.AKS_REGION}"
+    GKE_REGION = "${params.GKE_REGION}"
   }
 
   stages {
@@ -70,7 +70,7 @@ pipeline {
 
         sh "wget -q -O- https://dl.google.com/go/go${env.GOVERSION}.linux-amd64.tar.gz | tar xz"
 
-        sh "wget -q https://dl.k8s.io/release/v${params.kubectl_version}/bin/linux/amd64/kubectl"
+        sh "wget -q https://dl.k8s.io/release/v${params.KUBECTL_VERSION}/bin/linux/amd64/kubectl"
         sh "chmod +x kubectl"
         sh "mv kubectl ${env.WORKSPACE}/bin/"
 
@@ -82,11 +82,11 @@ pipeline {
 
  stage('Git Operations') {
      when {
-        expression { params.git_cmd.trim() != '' }
+        expression { params.GIT_CMD.trim() != '' }
     }
     steps {
         script {
-            sh "${params.git_cmd}"
+            sh "${params.GIT_CMD}"
         }
     }
 }
@@ -102,7 +102,7 @@ pipeline {
               try {
                   sh """
                      go mod tidy
-                     go run . scenario --scenario ${params.scenario_file}
+                     go run . scenario --scenario ${params.SCENARIO_FILE}
                      """
               }
               catch (e) {
