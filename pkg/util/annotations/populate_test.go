@@ -30,6 +30,31 @@ type SimpleStruct struct {
 	Bang bool            `annotations:"bang"`
 }
 
+type ArrayContainingStruct struct {
+	Enabled       bool     `annotation:"enabled"`
+	ProxyServices []string `annotation:"proxyServices"`
+	ProxyBools    []bool   `annotation:"proxyBools"`
+	ProxyInts     []int    `annotation:"proxyInts"`
+}
+
+type ProxyValues string
+
+type ProxyValuesList []ProxyValues
+
+type ProxyBools bool
+
+type ProxyBoolsList []ProxyBools
+
+type ProxyInts int
+type ProxyIntsList []ProxyInts
+
+type ArrayContainingIndirectStruct struct {
+	Enabled          bool            `annotation:"enabled"`
+	ProxyValues      ProxyValuesList `annotation:"proxyValues"`
+	ProxyBoolsValues ProxyBoolsList  `annotation:"proxyBoolsValues"`
+	ProxyIntsValues  ProxyIntsList   `annotation:"proxyIntsValues"`
+}
+
 var aboutTen = metav1.Duration{Duration: time.Duration(10) * time.Second}
 
 func TestSimpleEncode(t *testing.T) {
@@ -150,6 +175,58 @@ func TestPointerStruct(t *testing.T) {
 
 	if !cmp.Equal(pointer, expected) {
 		t.Fatalf("Failed to annotate pointer struct. found %v expected %v", pointer, expected)
+	}
+}
+
+func TestArrayEncoding(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/enabled":       "true",
+		"cao.couchbase.com/proxyServices": "mgmt,query",
+		"cao.couchbase.com/proxyBools":    "true,false,true",
+		"cao.couchbase.com/proxyInts":     "1,3,5,7",
+	}
+
+	container := ArrayContainingStruct{}
+	expected := ArrayContainingStruct{
+		Enabled:       true,
+		ProxyServices: []string{"mgmt", "query"},
+		ProxyBools:    []bool{true, false, true},
+		ProxyInts:     []int{1, 3, 5, 7},
+	}
+
+	err := Populate(&container, annotations)
+	if err != nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(container, expected) {
+		t.Fatalf("Failed to annotate array struct. found %v expected %v", container, expected)
+	}
+}
+
+func TestArrayIndirectEncoding(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/enabled":          "true",
+		"cao.couchbase.com/proxyValues":      "mgmt,query",
+		"cao.couchbase.com/proxyBoolsValues": "true,false,true",
+		"cao.couchbase.com/proxyIntsValues":  "1,3,5,7",
+	}
+
+	container := ArrayContainingIndirectStruct{}
+	expected := ArrayContainingIndirectStruct{
+		Enabled:          true,
+		ProxyValues:      ProxyValuesList{"mgmt", "query"},
+		ProxyBoolsValues: ProxyBoolsList{true, false, true},
+		ProxyIntsValues:  ProxyIntsList{1, 3, 5, 7},
+	}
+
+	err := Populate(&container, annotations)
+	if err != nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(container, expected) {
+		t.Fatalf("Failed to annotate array struct. found %v expected %v", container, expected)
 	}
 }
 

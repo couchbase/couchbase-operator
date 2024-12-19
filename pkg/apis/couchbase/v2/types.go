@@ -2553,7 +2553,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
-	// +kubebuilder:default="couchbase/operator-backup:1.3.1"
+	// +kubebuilder:default="couchbase/operator-backup:1.4.1"
 	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
@@ -2875,13 +2875,13 @@ type CloudNativeGatewayDataAPI struct {
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// Enabled defines whether the data api will be available through cloud native gateway.
 	// This defaults to false. If set to true, the data api will be available on port 18008 of the cloud native gateway service.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"-" annotation:"enabled"`
 
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// ProxyServices is a list of services that the Cloud Native Gateway can proxy via the data api.
 	// If this field is used, it must be one of "mgmt", "query", "search" or "analytics". By default, none of these services will
 	// be available through the data api if it has been enabled.
-	ProxyServices *CloudNativeGatewayDataAPIProxyServiceList `json:"proxyServices,omitempty"`
+	ProxyServices *CloudNativeGatewayDataAPIProxyServiceList `json:"-" annotation:"proxyServices"`
 }
 
 type CloudNativeGateway struct {
@@ -2919,7 +2919,7 @@ type CloudNativeGateway struct {
 	// The DataAPI settings control whether the Cloud Native Gateway can be used to access the data api. Adding or changing
 	// this configuration on an existing cluster with cloud native gateway will add the rescheduling annotation to each of the pods, which
 	// will trigger a restart depending on the configured UpgradeProcess.
-	DataAPI *CloudNativeGatewayDataAPI `json:"dataAPI,omitempty"`
+	DataAPI *CloudNativeGatewayDataAPI `json:"-" annotation:"dataAPI"`
 }
 
 type CloudNativeGatewayOTLP struct {
@@ -4467,7 +4467,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.2.1"
+	// +kubebuilder:default="couchbase/fluent-bit:1.2.9"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.
