@@ -129,6 +129,40 @@ Keeping your data safe is of paramount importance. This section contains some be
 
 When you deploy a cluster, you do so in a https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/[namespace^]. The Operator needs to be given a fairly broad set of permissions in order to dynamically create pods, services, etc. It is recommended that the Operator, and the clusters that it manages, be segregated in their own name space. This limits the set of resources that the Operator can affect, and that xref:tools/cao.adoc#cao-collect-logs[support tools] can collect data about, which aids in security compliance situations where confidential information may be leaked via the Kubernetes API operations.
 
+
+== Production Deployments
+
+This section contains some best practices for resource configuration values that are recommended when deploying Couchbase Server in a production environment. In some cases these values are different from the default values. These are not enforced by the Operator, however the DAC will warn users when values are set that are not recommended for production use.
+
+=== Couchbase Clusters
+
+The following are recommended values for the `CouchbaseCluster` resource:
+
+`spec.cluster.autoFailover`::
+Auto failover settings should not be left at their default values, but should be tuned on a case by case basis.
+
+`spec.antiAffinity`::
+This should be enabled for clusters in production.
+
+`spec.clusterSettings.indexer.storageMode`::
+The storage mode recommended for production clusters is `plasma`.
+
+`spec.Buckets.synchronize`::
+This should be disabled. It is intended for development use only.
+
+`spec.clusterSettings.autoCompaction`::
+It's recommended that auto-compaction settings are used in production.
+
+`spec.servers.volumeMounts.default` or `spec.servers.volumeMounts.logs`::
+To ensure that logs are persisted, one of the above should be configured for at least one server resource.
+
+=== Couchbase Buckets
+
+The following are recommended values for the `CouchbaseBucket` resource:
+
+Sample Buckets::
+These should not be used when deploying to production. They are intended for development purposes only.
+
 == Node Configuration
 
 How your Kubernetes nodes are configured may also have a detrimental impact on your ability to deploy a Couchbase Server cluster. These are not officially supported but recommended for cluster administrators.
