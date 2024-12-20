@@ -75,6 +75,11 @@ type JUnitTestSuites struct {
 }
 
 func main() {
+	/* Purpose of this go file
+	 * Parse the results.xml generated for the test suites: (1) to get the failed tests (2) to generate final results.
+	 * If there are reruns to be done, then it will provide the failed tests to the Jenkins job for the rerun. Failed tests are saved in a text file.
+	 * If we want to build final result, then it will parse all the test results that have completed for the job build and will generate the final result.xml
+	 */
 	jobBuildNumber, numReruns, buildFinalResult := parseArguments()
 
 	var suiteNames = []string{"validation", "sanity", "p0", "p1", "platform", "lpv", "custom"}
@@ -226,9 +231,14 @@ func generateFinalResult(testSuitesResults map[string]*JUnitTestSuites, numRerun
 	}
 
 	// Validating if the testSuitesResults has all the rerunSuiteNames
-	for _, rerunSuiteName := range rerunSuiteNames {
+	for i, rerunSuiteName := range rerunSuiteNames {
 		if _, ok := testSuitesResults[rerunSuiteName]; !ok {
-			log.Fatalf("test suite: %s not found in testSuitesResults", rerunSuiteName)
+			// Instead of ending the program we will log and continue.
+			// This ensures that even if a particular test suite failed, the results of the previous test suites will be recorded.
+			log.Printf("ERROR! test suite: %s not found in testSuitesResults\n", rerunSuiteName)
+
+			// Removing the missing rerunSuiteName from the rerunSuiteNames slice.
+			rerunSuiteNames = append(rerunSuiteNames[:i], rerunSuiteNames[i+1:]...)
 		}
 	}
 
@@ -312,8 +322,11 @@ func generateModifiedResultsXML(testSuitesResults map[string]*JUnitTestSuites, s
 	for _, suite := range suiteNames {
 		// If a suite is not found in the testSuitesResults, then we will skip it.
 		if _, ok := testSuitesResults[suite]; !ok {
+			log.Printf("Generating Final Results XML: Test Suite %s NOT FOUND!", suite)
 			continue
 		}
+
+		log.Printf("Generating Final Results XML: Test Suite %s FOUND!", suite)
 
 		resultFileName := fmt.Sprintf("%d_%s_modified.xml", buildNum, suite)
 
