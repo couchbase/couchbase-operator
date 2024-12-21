@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	cbpods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pods"
 
@@ -79,7 +80,7 @@ func (gideon *Gideon) MarshalJobYAMLs() error {
 	}
 
 	for i := range gideon.Jobs {
-		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, gideon.Jobs[i].Metadata.Name, GetRandomString(4), "yaml")
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, gideon.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
 
 		gideon.FilePaths = append(gideon.FilePaths, filePath)
 

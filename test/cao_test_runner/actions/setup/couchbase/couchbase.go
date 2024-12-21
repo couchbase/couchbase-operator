@@ -3,7 +3,6 @@ package couchbasesetup
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,10 +16,6 @@ import (
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	randomStringLen = 8
 )
 
 var (
@@ -154,7 +149,7 @@ func (s *Couchbase) Config() interface{} {
 // getModifiedSpecPath returns the modified spec path.
 /*
  * Modified spec path is in the ./cao_test_runner/tmp/... directory.
- * The spec file name is renamed as <old-file-name>-<random-8-chars>.extension.
+ * The spec file name is renamed as <old-file-name>-<timestamp>.extension.
  */
 func getModifiedSpecPath(specPath string) (string, error) {
 	fileDir, fileName := filepath.Split(specPath)
@@ -178,16 +173,15 @@ func getModifiedSpecPath(specPath string) (string, error) {
 		return "", fmt.Errorf("get modified spec path: %w", err)
 	}
 
-	// Removing the `-<random-8-chars>` if the spec path is modified
+	// Removing the timestamp if the spec path is modified
 	if isModified {
-		// e.g. file-name-qwerty12 changes to file-name-
-		// So, for each modification the file name changes as:  file-name, file-name-qwerty12, file-name--random34 ...
-		fileNameWithoutExt = fileNameWithoutExt[0 : len(fileNameWithoutExt)-8]
+		// e.g. file-name-2006-01-02-15-04-05 changes to file-name
+		fileNameWithoutExt = fileNameWithoutExt[0 : len(fileNameWithoutExt)-20]
 	}
 
-	// The spec file name is renamed as <old-file-name>-<random-8-chars>.extension.
+	// The spec file name is renamed as <old-file-name>-<timestamp>.extension.
 	modifiedSpecPath := filepath.Join(fileDir,
-		fmt.Sprintf("%s-%s%s", fileNameWithoutExt, RandomString(randomStringLen), filepath.Ext(fileName)))
+		fmt.Sprintf("%s-%s%s", fileNameWithoutExt, time.Now().Format("2006-01-02-15-04-05"), filepath.Ext(fileName)))
 
 	_, modifiedFileName := filepath.Split(modifiedSpecPath)
 	logrus.Infof("modified file name: %s", modifiedFileName)
@@ -226,32 +220,4 @@ func applySpecChanges(specChanges map[string]interface{}, specPath string) (stri
 	}
 
 	return modifiedSpecPath, nil
-}
-
-// RandomString generates an arbitrary length random string.  Not cryptographically
-// secure, but who cares, this is a test suite :D  At present this uses the dictionary
-// 0-9a-z as that is compatible with DNS names and Couchbase Server passwords.
-func RandomString(length int) string {
-	// Seed the PRNG so we get vagely random suffixes across runs
-	ranGen := rand.New(rand.New(rand.NewSource(time.Now().UnixNano())))
-
-	// Generate a random 5 character suffix for the cluster name
-	suffix := ""
-
-	for i := 0; i < length; i++ {
-		// Our alphabet is 0-9 a-z, so 36 characters
-		ordinal := ranGen.Intn(36)
-		// Less than 10 places it in the 0-9 range, otherwise in
-		// the a-z range
-		if ordinal < 10 {
-			ordinal += int('0')
-		} else {
-			ordinal += int('a') - 10
-		}
-
-		// Append to the name
-		suffix += string(rune(ordinal))
-	}
-
-	return suffix
 }

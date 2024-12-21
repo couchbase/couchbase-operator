@@ -3,7 +3,6 @@ package dataworkloads
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"reflect"
 )
 
@@ -44,15 +43,4 @@ func BuildArgsList(v interface{}) ([]string, error) {
 	}
 
 	return args, nil
-}
-
-func GetRandomString(length int) string {
-	letters := "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, length)
-
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-
-	return string(b)
 }
