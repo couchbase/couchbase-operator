@@ -11,6 +11,8 @@ import (
 	"cloud.google.com/go/compute/apiv1/computepb"
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
 
@@ -44,7 +46,7 @@ type GKESessionStore struct {
 
 type GKESession struct {
 	globalOperationsClient *compute.GlobalOperationsClient
-	networksCLient         *compute.NetworksClient
+	networksClient         *compute.NetworksClient
 	firewallsClient        *compute.FirewallsClient
 	subnetClient           *compute.SubnetworksClient
 	clusterManagerClient   *container.ClusterManagerClient
@@ -93,7 +95,7 @@ func NewGKESession(ctx context.Context, managedSvcCred *ManagedServiceCredential
 
 	return &GKESession{
 		globalOperationsClient: globalOperationsClient,
-		networksCLient:         networksClient,
+		networksClient:         networksClient,
 		firewallsClient:        firewallClient,
 		subnetClient:           subnetClient,
 		clusterManagerClient:   clusterManagerClient,
@@ -220,7 +222,7 @@ func (gks *GKESession) CreateVirtualNetwork(ctx context.Context, networkName str
 		NetworkResource: network,
 	}
 
-	op, err := gks.networksCLient.Insert(ctx, req)
+	op, err := gks.networksClient.Insert(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
@@ -268,7 +270,8 @@ func (gks *GKESession) CreateFirewallRule(ctx context.Context, firewallRuleName,
 	return nil
 }
 
-func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName, ipCidrRange string) error {
+func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName, ipCidrRange string,
+	waitForSubnetCreation bool) error {
 	network := fmt.Sprintf("projects/%s/global/networks/%s", gks.projectID, networkName)
 	region := fmt.Sprintf("projects/%s/regions/%s", gks.projectID, gks.region)
 
@@ -294,7 +297,32 @@ func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName
 	// 	return fmt.Errorf("subnet %s creation operation failed: %w", subnetName, err)
 	// }
 
-	return nil
+	if !waitForSubnetCreation {
+		return nil
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(60)*time.Minute)
+	defer cancel()
+
+	interval := 60
+
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("timeout reached while waiting for subnet %s to be deleted", subnetName)
+		default:
+		}
+
+		exists, _ := gks.IsSubnetExists(timeoutCtx, subnetName)
+		if exists {
+			logrus.Infof("Subnet %s has been created.\n", subnetName)
+			return nil
+		} else {
+			logrus.Infof("Subnet %s does not exist. Attempting to check again in %v...\n", subnetName, interval)
+			time.Sleep(time.Duration(interval) * time.Second)
+		}
+	}
+
 }
 
 func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetworkName, machineType, imageType, diskType, initialClusterVersion, nodePoolName string,
@@ -452,7 +480,23 @@ func (gks *GKESession) DeleteCluster(ctx context.Context) error {
 	return nil
 }
 
-func (gks *GKESession) DeleteSubnet(ctx context.Context, subnetName string) error {
+func (gks *GKESession) IsSubnetExists(ctx context.Context, subnetName string) (bool, error) {
+	req := &computepb.GetSubnetworkRequest{
+		Project:    gks.projectID,
+		Region:     gks.region,
+		Subnetwork: subnetName,
+	}
+
+	_, err := gks.subnetClient.Get(ctx, req)
+	if err != nil {
+		// TODO : parse and check if the error is specifically that the subnet is not found
+		return false, fmt.Errorf("failed to check subnet existence: %w", err)
+	}
+
+	return true, nil
+}
+
+func (gks *GKESession) DeleteSubnet(ctx context.Context, subnetName string, waitForSubnetDeletion bool) error {
 	req := &computepb.DeleteSubnetworkRequest{
 		Project:    gks.projectID,
 		Region:     gks.region,
@@ -468,7 +512,32 @@ func (gks *GKESession) DeleteSubnet(ctx context.Context, subnetName string) erro
 	// 	return fmt.Errorf("subnet %s deletion operation failed: %w", subnetName, err)
 	// }
 
-	return nil
+	if !waitForSubnetDeletion {
+		return nil
+	}
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(60)*time.Minute)
+	defer cancel()
+
+	interval := 60
+
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("timeout reached while waiting for subnet %s to be deleted", subnetName)
+		default:
+		}
+
+		exists, _ := gks.IsSubnetExists(timeoutCtx, subnetName)
+		if !exists {
+			logrus.Infof("Subnet %s has been deleted.\n", subnetName)
+			return nil
+		} else {
+			logrus.Infof("Subnet %s still exists. Retrying in %v...\n", subnetName, interval)
+			time.Sleep(time.Duration(interval) * time.Second)
+		}
+	}
+
 }
 
 func (gks *GKESession) DeleteFirewallRule(ctx context.Context, firewallRuleName string) error {
@@ -495,7 +564,7 @@ func (gks *GKESession) DeleteVirtualNetwork(ctx context.Context, virtualNetworkN
 		Project: gks.projectID,
 	}
 
-	operation, err := gks.networksCLient.Delete(ctx, req)
+	operation, err := gks.networksClient.Delete(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to delete virtual network: %w", err)
 	}
@@ -576,4 +645,27 @@ func (gks *GKESession) UpdateNodePoolKubernetesVersion(ctx context.Context, node
 	}
 
 	return nil
+}
+
+func (gks *GKESession) ListSubnets(ctx context.Context) ([]*computepb.Subnetwork, error) {
+	var subnets []*computepb.Subnetwork
+
+	it := gks.subnetClient.List(ctx, &computepb.ListSubnetworksRequest{
+		Project: gks.projectID,
+		Region:  gks.region,
+	})
+
+	// Iterate through the subnets and collect them
+	for {
+		subnet, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list subnets: %w", err)
+		}
+		subnets = append(subnets, subnet)
+	}
+
+	return subnets, nil
 }

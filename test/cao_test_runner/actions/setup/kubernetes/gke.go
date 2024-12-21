@@ -75,7 +75,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	logrus.Infof("Created firewall rule %s in virtual network %s", firewallRuleName, networkName)
 
 	subnetName := cgc.ClusterName + "-subnet"
-	if err := gkeSession.CreateSubnet(ctx, subnetName, networkName, ipCidrRange); err != nil {
+	if err := gkeSession.CreateSubnet(ctx, subnetName, networkName, ipCidrRange, true); err != nil {
 		return fmt.Errorf("error creating subnet %s in network %s: %w", subnetName, networkName, err)
 	}
 

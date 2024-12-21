@@ -3,7 +3,6 @@ package destroykubernetes
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -62,13 +61,9 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	userName := fmt.Sprintf("gke_%s_%s", dgc.Region, dgc.ClusterName)
 	kubeconfigClusterName := fmt.Sprintf("gke_%s_%s", dgc.Region, dgc.ClusterName)
 
-	if err := gkeSession.DeleteSubnet(ctx, subnetName); err != nil {
+	if err := gkeSession.DeleteSubnet(ctx, subnetName, true); err != nil {
 		return fmt.Errorf("failed to delete subnet %s of virtual network %s: %w", subnetName, networkName, err)
 	}
-
-	// Sleeping 2 minutes after deleting subnet
-	// TODO : Make sure subnet does not exist. Only then proceed
-	time.Sleep(time.Duration(2) * time.Minute)
 
 	logrus.Infof("Deleted subnet %s of virtual network %s", subnetName, networkName)
 
