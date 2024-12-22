@@ -231,7 +231,9 @@ func generateFinalResult(testSuitesResults map[string]*JUnitTestSuites, numRerun
 	}
 
 	// Validating if the testSuitesResults has all the rerunSuiteNames
-	for i, rerunSuiteName := range rerunSuiteNames {
+	i := 0
+
+	for _, rerunSuiteName := range rerunSuiteNames {
 		if _, ok := testSuitesResults[rerunSuiteName]; !ok {
 			// Instead of ending the program we will log and continue.
 			// This ensures that even if a particular test suite failed, the results of the previous test suites will be recorded.
@@ -239,7 +241,11 @@ func generateFinalResult(testSuitesResults map[string]*JUnitTestSuites, numRerun
 
 			// Removing the missing rerunSuiteName from the rerunSuiteNames slice.
 			rerunSuiteNames = append(rerunSuiteNames[:i], rerunSuiteNames[i+1:]...)
+
+			continue
 		}
+
+		i++
 	}
 
 	// Parsing the rerun test suites in reverse order (rerunSuiteNames is in reverse order) and adding them to the map only once.
