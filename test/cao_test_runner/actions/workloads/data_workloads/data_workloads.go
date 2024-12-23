@@ -31,6 +31,9 @@ type DataWorkloadInterface interface {
 	// ExecuteJobs applies the YAMLs using kubectl to start the jobs.
 	ExecuteJobs() error
 
+	// CheckJobs checks for the completion of jobs.
+	CheckJobs() error
+
 	// DeleteJobs deletes the running / completed jobs.
 	DeleteJobs() error
 }
@@ -41,15 +44,5 @@ func NewDataWorkload(name DataWorkloadName) (DataWorkloadInterface, error) {
 		return ConfigGideonDataWorkload(), nil
 	default:
 		return nil, ErrInvalidDataWorkloadName
-	}
-}
-
-// ValidateDataWorkloadName validates the DataWorkloadName for the supported Data Workloads.
-func ValidateDataWorkloadName(name DataWorkloadName) bool {
-	switch name {
-	case GideonDataWorkload, SiriusDataWorkload, PillowFightDataWorkload:
-		return true
-	default:
-		return false
 	}
 }

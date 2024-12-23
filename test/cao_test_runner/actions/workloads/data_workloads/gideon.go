@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	cbpods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pods"
-
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	cbpods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pods"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/jobs"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 	v1 "k8s.io/api/core/v1"
@@ -109,6 +109,10 @@ func (gideon *Gideon) ExecuteJobs() error {
 	return nil
 }
 
+func (gideon *Gideon) CheckJobs() error {
+	panic("gideon jobs don't support check jobs")
+}
+
 func (gideon *Gideon) DeleteJobs() error {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -139,7 +143,7 @@ func createJob(gideonArgs *GideonArgs) (*jobs.Job, error) {
 
 	gideonArgsList := []string{"kv"}
 
-	argsList, err := BuildArgsList(gideonArgs)
+	argsList, err := workloads.BuildArgsList("args", gideonArgs)
 	if err != nil {
 		return nil, fmt.Errorf("create gideon job: %w", err)
 	}
@@ -177,7 +181,7 @@ func populateGideonArgs(config *DataWorkloadConfig) ([]*GideonArgs, error) {
 
 	var gideonArgs []*GideonArgs
 
-	for _, bucketConfig := range config.Buckets {
+	for i, bucketConfig := range config.Buckets {
 		gideonArgs = append(gideonArgs, &GideonArgs{
 			NodeSelector: config.NodeSelector,
 			Ops:          strconv.Itoa(config.OpsRate),
@@ -186,7 +190,7 @@ func populateGideonArgs(config *DataWorkloadConfig) ([]*GideonArgs, error) {
 			Sizes:        strconv.FormatInt(config.DocSize, 10),
 			Expire:       strconv.Itoa(config.Expires),
 			TTL:          strconv.Itoa(config.TTL),
-			Hosts:        cbpods.GetCBPodHostname(config.FilteredPods[0], "default"),
+			Hosts:        cbpods.GetCBPodHostname(config.filteredPods[i%len(config.filteredPods)], "default"),
 			User:         cbClusterAuth.Username,
 			Password:     cbClusterAuth.Password,
 			Bucket:       bucketConfig.Bucket,
