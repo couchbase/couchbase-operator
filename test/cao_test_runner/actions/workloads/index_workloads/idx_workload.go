@@ -15,7 +15,7 @@ const (
 
 const (
 	// YAML File Directory.
-	idxWorkloadYAMLDir = "./modified_test_data/index_workloads/"
+	idxWorkloadYAMLDir = "./tmp/index_workloads/"
 )
 
 var (

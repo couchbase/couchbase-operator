@@ -93,6 +93,8 @@ func (d *IndexWorkload) Do(_ *context.Context, _ interface{}) error {
 
 	var err error
 
+	logrus.Infof("Starting workload: %s", workloadConfig.Name)
+
 	// Filtering the CB pod with Query service.
 	queryPodFilter := cbpodfilter.CBPodFilter{
 		FilterType:        "services",
@@ -107,16 +109,11 @@ func (d *IndexWorkload) Do(_ *context.Context, _ interface{}) error {
 		return fmt.Errorf("index workload: %w", err)
 	}
 
-	logrus.Infof("filtered pod: %v", workloadConfig.cbQueryPods)
-
 	indexWorkload, err := NewIndexWorkload(workloadConfig.IndexWorkloadName, workloadConfig.Namespace, workloadConfig.RunDuration)
 	if err != nil {
 		return fmt.Errorf("index workload: %w", err)
 	}
 
-	// TODO
-	// Build the Scripts i.e. Queries to be used for building indexes.
-	// Populate indexWorkload struct accordingly
 	if workloadConfig.IndexConfig.PrimaryIndex {
 		workloadConfig.queries = generateQueryForPrimaryIdx(workloadConfig)
 	} else {
@@ -140,8 +137,6 @@ func (d *IndexWorkload) Do(_ *context.Context, _ interface{}) error {
 	if err != nil {
 		return fmt.Errorf("index workload: %w", err)
 	}
-
-	logrus.Infof("Started workload: %s", workloadConfig.Name)
 
 	// Execute the workload for duration = workloadConfig.RunDuration.
 	if workloadConfig.RunDuration != 0 {

@@ -95,13 +95,13 @@ func (d *DataWorkload) Do(_ *context.Context, _ interface{}) error {
 
 	var err error
 
+	logrus.Infof("Starting workload: %s", workloadConfig.Name)
+
 	// Filtering the Pod to be used as the Host
 	workloadConfig.filteredPods, err = workloadConfig.CBPodFilter.FilterPods()
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)
 	}
-
-	logrus.Infof("filtered pod: %v", workloadConfig.filteredPods)
 
 	dataWorkload, err := NewDataWorkload(workloadConfig.DataWorkloadName)
 	if err != nil {
@@ -125,8 +125,6 @@ func (d *DataWorkload) Do(_ *context.Context, _ interface{}) error {
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)
 	}
-
-	logrus.Infof("Started workload: %s", workloadConfig.Name)
 
 	// Execute the workload for duration = workloadConfig.RunDuration.
 	if workloadConfig.RunDuration != 0 {

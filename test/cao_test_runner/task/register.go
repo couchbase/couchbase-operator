@@ -20,6 +20,7 @@ import (
 	upgradekubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/upgrade/kubernetes"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
 	dataworkloads "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads/data_workloads"
+	indexworkloads "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads/index_workloads"
 )
 
 const (
@@ -61,5 +62,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Chaos":                            {newAction: chaos.NewChaosConfig, config: &chaos.ChaosConfig{}},
 		"Upgrade Kubernetes Cluster":       {newAction: upgradekubernetes.NewKubernetesUpgradeConfig, config: &upgradekubernetes.KubernetesUpgradeConfig{}},
 		"Bare Metal Chaos":                 {newAction: chaosbaremetal.NewChaosBareMetalConfig, config: &chaosbaremetal.BareMetalChaosConfig{}},
+		"Index Workload":                   {newAction: indexworkloads.NewIndexWorkloadConfig, config: &indexworkloads.IndexWorkloadConfig{}},
 	}
 }

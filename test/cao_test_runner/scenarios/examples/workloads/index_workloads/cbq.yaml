@@ -1,0 +1,28 @@
+trees:
+  - action: "Index Workload"
+    config:
+      name: "CBQ Workload"
+      namespace: default
+      cbClusterSecret: cb-example-auth
+      runDuration: 2m0s
+      preRunWait: 5s
+      postRunWait: 5s
+      checkJobCompletion: true
+#      nodeSelector:
+#        workload-node: "true"
+      indexWorkloadName: cbq
+      numQueryPods: 2
+      bucketCount: 2 # If `buckets` is not given then buckets (= bucket1, bucket2...) with default scope and collection will be taken
+      #      buckets:
+      #        - bucket: bucket-name1
+      #          scopes:
+      #            - scope: scope1
+      #              collections:
+      #                - collection1
+      #            - scope: scope2
+      #              collections:
+      #                - collection2
+      indexConfig:
+        numIndexes: 2 # This is per Bucket per Scope per Collection
+        primaryIndex: true
+        indexReplicas: 1
