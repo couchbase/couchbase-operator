@@ -27,6 +27,7 @@ type IndexWorkloadConfig struct {
 	IndexWorkloadName IndexWorkloadName `yaml:"indexWorkloadName" caoCli:"required"`
 
 	NumQueryPods int `yaml:"numQueryPods" caoCli:"required"`
+	NumIndexPods int `yaml:"numIndexPods" caoCli:"required"`
 
 	// NodeSelector contains the labels key and value to match for k8s node selection.
 	NodeSelector map[string]string `yaml:"nodeSelector"`
@@ -43,9 +44,24 @@ type IndexWorkloadConfig struct {
 }
 
 type IndexConfig struct {
-	NumIndexes    int  `yaml:"numIndexes"`    // CBQ; per Bucket per Scope per Collection
-	PrimaryIndex  bool `yaml:"primaryIndex"`  // CBQ
-	IndexReplicas int  `yaml:"indexReplicas"` // CBQ
+	NumIndexes   int  `yaml:"numIndexes"`   // CBQ; per Bucket per Scope per Collection
+	PrimaryIndex bool `yaml:"primaryIndex"` // CBQ
+
+	// WITH clause parameters.
+	NumReplicas   int  `yaml:"numReplicas"`   // CBQ
+	NumPartitions int  `yaml:"numPartitions"` // CBQ
+	DeferBuild    bool `yaml:"deferBuild"`    // CBQ; TODO; NOTE: adding this with IndexSelectionStrategy=random?
+
+	// TemplateName is required to generate Indexes wrt to the schema of data.
+	TemplateName string `yaml:"templateName"`
+
+	// How to choose Indexes from List
+	IndexSelectionStrategy IndexSelectionStrategy `yaml:"indexSelectionStrategy"`
+
+	// Indices are used to specify the range or the selective indexes as required.
+	// For IndexSelectionStrategy=selective, provide the indexes you want to select. e.g. [0, 2, 5, 7, 10] (NumIndexes=5)
+	// For IndexSelectionStrategy=range, provide the range of indexes you want to select. e.g. [0, 5) or [3, 8) (NumIndexes=5)
+	Indices []int `yaml:"indices"`
 }
 
 func NewIndexWorkloadConfig(config interface{}) (actions.Action, error) {
@@ -117,7 +133,7 @@ func (d *IndexWorkload) Do(_ *context.Context, _ interface{}) error {
 	if workloadConfig.IndexConfig.PrimaryIndex {
 		workloadConfig.queries = generateQueryForPrimaryIdx(workloadConfig)
 	} else {
-		workloadConfig.queries = generateQueryForIdx(workloadConfig)
+		workloadConfig.queries = generateQueryForGSI(workloadConfig)
 	}
 
 	// Create the jobs

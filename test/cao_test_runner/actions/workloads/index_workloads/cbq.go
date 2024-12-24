@@ -81,7 +81,7 @@ func (cbq *CBQ) MarshalJobYAMLs() error {
 	}
 
 	for i := range cbq.Jobs {
-		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, cbq.Jobs[i].Metadata.Name, workloads.GetRandomString(4), "yaml")
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, cbq.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
 
 		cbq.FilePaths = append(cbq.FilePaths, filePath)
 
