@@ -3,13 +3,24 @@ package workloads
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 )
 
 var (
-	ErrBucketNameEmpty = errors.New("bucket name is empty")
-	ErrScopeEmpty      = errors.New("scope name is empty")
-	ErrCollectionEmpty = errors.New("collection name is empty")
+	ErrBucketNameEmpty       = errors.New("bucket name is empty")
+	ErrInvalidBucketName     = errors.New("invalid bucket name")
+	ErrScopeNameEmpty        = errors.New("scope name is empty")
+	ErrInvalidScopeName      = errors.New("invalid scope name")
+	ErrCollectionNameEmpty   = errors.New("collection name is empty")
+	ErrInvalidCollectionName = errors.New("invalid collection name")
+)
+
+var (
+	// https://docs.couchbase.com/server/current/manage/manage-buckets/create-bucket.html.
+	validBucketNameRegex = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_\-%.]{0,99}$`)
+	// https://docs.couchbase.com/server/current/learn/data/scopes-and-collections.html#naming-for-scopes-and-collections.
+	validScopeOrCollNameRegex = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_\-%]{0,250}$`)
 )
 
 type BucketConfig struct {
@@ -29,8 +40,8 @@ type ScopeConfig struct {
  */
 func ValidateBucketsConfig(bucketsConfig []*BucketConfig) error {
 	for _, bucketConfig := range bucketsConfig {
-		if bucketConfig.Bucket == "" {
-			return fmt.Errorf("validate buckets config: %w", ErrBucketNameEmpty)
+		if err := validateBucketName(bucketConfig.Bucket); err != nil {
+			return fmt.Errorf("validate buckets config: %w", err)
 		}
 
 		if bucketConfig.Scopes == nil {
@@ -41,8 +52,8 @@ func ValidateBucketsConfig(bucketsConfig []*BucketConfig) error {
 		}
 
 		for _, scopeConfig := range bucketConfig.Scopes {
-			if scopeConfig.Scope == "" {
-				return fmt.Errorf("validate buckets config: %w", ErrScopeEmpty)
+			if err := validateScopeName(scopeConfig.Scope); err != nil {
+				return fmt.Errorf("validate buckets config: %w", err)
 			}
 
 			if scopeConfig.Collections == nil {
@@ -50,8 +61,8 @@ func ValidateBucketsConfig(bucketsConfig []*BucketConfig) error {
 			}
 
 			for _, coll := range scopeConfig.Collections {
-				if coll == "" {
-					return fmt.Errorf("validate buckets config: %w", ErrCollectionEmpty)
+				if err := validateCollectionName(coll); err != nil {
+					return fmt.Errorf("validate buckets config: %w", err)
 				}
 			}
 		}
@@ -66,7 +77,7 @@ func PopulateBucketConfig(bucketCount int) []*BucketConfig {
 
 	// Bucket naming goes bucket0, bucket1, ...
 	bucketPrefix := "bucket"
-	
+
 	for i := range bucketCount {
 		bucketConfigs = append(bucketConfigs, &BucketConfig{
 			Bucket: bucketPrefix + strconv.Itoa(i),
@@ -78,4 +89,48 @@ func PopulateBucketConfig(bucketCount int) []*BucketConfig {
 	}
 
 	return bucketConfigs
+}
+
+func validateBucketName(bucket string) error {
+	if bucket == "" {
+		return fmt.Errorf("validate bucket name: %w", ErrBucketNameEmpty)
+	}
+
+	if !validBucketNameRegex.MatchString(bucket) {
+		return fmt.Errorf("validate bucket name: %w", ErrInvalidBucketName)
+	}
+
+	return nil
+}
+
+func validateScopeName(scope string) error {
+	if scope == "" {
+		return fmt.Errorf("validate scope name: %w", ErrScopeNameEmpty)
+	}
+
+	if scope == "_system" {
+		return fmt.Errorf("validate scope name: %w", ErrInvalidScopeName)
+	}
+
+	if !validScopeOrCollNameRegex.MatchString(scope) {
+		if scope != "_default" {
+			return fmt.Errorf("validate scope name: %w", ErrInvalidScopeName)
+		}
+	}
+
+	return nil
+}
+
+func validateCollectionName(collection string) error {
+	if collection == "" {
+		return fmt.Errorf("validate collection name: %w", ErrCollectionNameEmpty)
+	}
+
+	if !validScopeOrCollNameRegex.MatchString(collection) {
+		if collection != "_default" {
+			return fmt.Errorf("validate collection name: %w", ErrInvalidCollectionName)
+		}
+	}
+
+	return nil
 }
