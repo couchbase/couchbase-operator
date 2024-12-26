@@ -5,8 +5,6 @@ trees:
       namespace: default
       cbClusterSecret: cb-example-auth
       runDuration: 2m0s
-      preRunWait: 5s
-      postRunWait: 5s
       checkJobCompletion: true
 #      nodeSelector:
 #        workload-node: "true"
@@ -24,6 +22,12 @@ trees:
       #              collections:
       #                - collection2
       indexConfig:
-        numIndexes: 2 # This is per Bucket per Scope per Collection
-        primaryIndex: true
-        numReplicas: 1
+        numIndexes: 3 # This is per Bucket per Scope per Collection. Make sure this is less than the number of indexes in stored queries slice.
+        numReplicas: 1 # Make sure this is less than the number of index pods in the cluster
+        numPartitions: 1 # Make sure this is less than the number of index pods in the cluster
+        templateName: gideon
+        indexSelectionStrategy: random
+#        indexSelectionStrategy: range
+#        indices: [3, 6] # This is a range [3, 6) and it refers to the range of indices of the stored queries slice.
+#        indexSelectionStrategy: selective
+#        indices: [0, 5, 19] # Refers to the indices of the stored queries slice.
