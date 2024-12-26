@@ -13,16 +13,17 @@ import (
 )
 
 type DataWorkloadConfig struct {
-	Name        string        `yaml:"name" caoCli:"required"`
-	SpecPath    string        `yaml:"specPath"`
+	Name            string `yaml:"name" caoCli:"required"`
+	Namespace       string `yaml:"namespace" caoCli:"required"`
+	CBClusterSecret string `yaml:"cbClusterSecret" caoCli:"required"`
+
 	PreRunWait  time.Duration `yaml:"preRunWait"`
 	PostRunWait time.Duration `yaml:"postRunWait"`
 	RunDuration time.Duration `yaml:"runDuration" caoCli:"required"`
 
 	DataWorkloadName DataWorkloadName `yaml:"dataWorkloadName" caoCli:"required"`
 
-	// CBPodFilter will be used to filter the CB pod with whom we will communicate.
-	CBPodFilter cbpodfilter.CBPodFilter `yaml:"cbPodFilter"`
+	NumDataPods int `yaml:"numDataPods" caoCli:"required"` // Number of CB Pods having data service.
 
 	// CheckJobCompletion checks for completion of job. If job completed (e.g. before RunDuration) then we can delete the job.
 	CheckJobCompletion bool `yaml:"checkJobCompletion"`
@@ -47,7 +48,7 @@ type DataWorkloadConfig struct {
 	TTL     int `yaml:"ttl"`     // For Gideon: % of OpsRate e.g. 10;
 
 	// Internal Parameters
-	filteredPods []string `yaml:"-"`
+	cbDataPods []string `yaml:"-"`
 }
 
 func NewDataWorkloadConfig(config interface{}) (actions.Action, error) {
@@ -97,13 +98,22 @@ func (d *DataWorkload) Do(_ *context.Context, _ interface{}) error {
 
 	logrus.Infof("Starting workload: %s", workloadConfig.Name)
 
+	// Filtering the CB pod with Query service.
+	dataPodFilter := cbpodfilter.CBPodFilter{
+		FilterType:        "services",
+		SelectionStrategy: "sorted",
+		Services:          []string{"data"},
+		ServicesNotStrict: true,
+		Count:             workloadConfig.NumDataPods,
+	}
+
 	// Filtering the Pod to be used as the Host
-	workloadConfig.filteredPods, err = workloadConfig.CBPodFilter.FilterPods()
+	workloadConfig.cbDataPods, err = dataPodFilter.FilterPods()
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)
 	}
 
-	dataWorkload, err := NewDataWorkload(workloadConfig.DataWorkloadName)
+	dataWorkload, err := NewDataWorkload(workloadConfig.DataWorkloadName, workloadConfig.Namespace, workloadConfig.RunDuration)
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)
 	}
@@ -147,7 +157,7 @@ func (d *DataWorkload) Do(_ *context.Context, _ interface{}) error {
 		return nil
 	}
 
-	// After the workload duration is over, we delete the workload
+	// After the workload duration is over, we delete the workload.
 	err = dataWorkload.DeleteJobs()
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)

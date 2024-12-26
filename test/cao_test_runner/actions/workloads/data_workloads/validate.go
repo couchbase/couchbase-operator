@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/workloads"
-	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 )
 
 const (
@@ -13,10 +12,11 @@ const (
 )
 
 var (
-	ErrBucketCountNotProvided      = errors.New("bucket count is not provided")
-	ErrOpsRateNotProvided          = errors.New("ops rate not provided")
-	ErrCRUDValuesNotProvided       = errors.New("crud values not provided")
-	ErrReadsDeletesMoreThanCreates = errors.New("reads or deletes are more than creates")
+	ErrBucketCountNotProvided         = errors.New("bucket count is not provided")
+	ErrOpsRateNotProvided             = errors.New("ops rate not provided")
+	ErrCRUDValuesNotProvided          = errors.New("crud values not provided")
+	ErrReadsDeletesMoreThanCreates    = errors.New("reads or deletes are more than creates")
+	ErrCheckJobCompletionNotSupported = errors.New("check job completion is not supported")
 )
 
 // ValidateDataWorkloadName validates the DataWorkloadName for the supported Data Workloads.
@@ -40,11 +40,6 @@ func ValidateDataWorkloadConfig(config *DataWorkloadConfig) error {
 	}
 
 	err := workloads.ValidateBucketsConfig(config.Buckets)
-	if err != nil {
-		return fmt.Errorf("validate data workload config: %w", err)
-	}
-
-	err = cbpodfilter.ValidateCBPodFilter(&config.CBPodFilter)
 	if err != nil {
 		return fmt.Errorf("validate data workload config: %w", err)
 	}
@@ -79,6 +74,10 @@ func validateGideonConfig(config *DataWorkloadConfig) error {
 
 	if config.Deletes > config.Creates || config.Reads > config.Creates {
 		return fmt.Errorf("validate gideon config: %w", ErrReadsDeletesMoreThanCreates)
+	}
+
+	if config.CheckJobCompletion {
+		return fmt.Errorf("validate gideon config: %w", ErrCheckJobCompletionNotSupported)
 	}
 
 	return nil

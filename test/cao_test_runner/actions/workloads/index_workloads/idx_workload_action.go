@@ -13,7 +13,6 @@ import (
 
 type IndexWorkloadConfig struct {
 	Name            string `yaml:"name" caoCli:"required"`
-	SpecPath        string `yaml:"specPath"`
 	Namespace       string `yaml:"namespace" caoCli:"required"`
 	CBClusterSecret string `yaml:"cbClusterSecret" caoCli:"required"`
 

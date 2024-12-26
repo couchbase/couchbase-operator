@@ -2,6 +2,7 @@ package dataworkloads
 
 import (
 	"errors"
+	"time"
 )
 
 type DataWorkloadName string
@@ -38,10 +39,10 @@ type DataWorkloadInterface interface {
 	DeleteJobs() error
 }
 
-func NewDataWorkload(name DataWorkloadName) (DataWorkloadInterface, error) {
+func NewDataWorkload(name DataWorkloadName, namespace string, jobDuration time.Duration) (DataWorkloadInterface, error) {
 	switch name {
 	case GideonDataWorkload:
-		return ConfigGideonDataWorkload(), nil
+		return ConfigGideonDataWorkload(namespace), nil
 	default:
 		return nil, ErrInvalidDataWorkloadName
 	}

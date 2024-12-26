@@ -28,6 +28,7 @@ const (
 type Gideon struct {
 	Jobs      []*jobs.Job
 	FilePaths []string
+	Namespace string
 }
 
 type GideonArgs struct {
@@ -45,10 +46,11 @@ type GideonArgs struct {
 	Bucket   string `args:"--bucket"`
 }
 
-func ConfigGideonDataWorkload() *Gideon {
+func ConfigGideonDataWorkload(namespace string) *Gideon {
 	return &Gideon{
 		Jobs:      make([]*jobs.Job, 0),
 		FilePaths: make([]string, 0),
+		Namespace: namespace,
 	}
 }
 
@@ -100,7 +102,7 @@ func (gideon *Gideon) ExecuteJobs() error {
 	}
 
 	for _, filePath := range gideon.FilePaths {
-		err := executeJob(filepath.Join(dir, filePath))
+		err := executeJob(filepath.Join(dir, filePath), gideon.Namespace)
 		if err != nil {
 			return err
 		}
@@ -120,7 +122,7 @@ func (gideon *Gideon) DeleteJobs() error {
 	}
 
 	for _, filePath := range gideon.FilePaths {
-		err := deleteJob(filepath.Join(dir, filePath))
+		err := deleteJob(filepath.Join(dir, filePath), gideon.Namespace)
 		if err != nil {
 			return err
 		}
@@ -155,8 +157,8 @@ func createJob(gideonArgs *GideonArgs) (*jobs.Job, error) {
 	return gideonJob, nil
 }
 
-func executeJob(filePath string) error {
-	err := kubectl.ApplyFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+func executeJob(filePath, namespace string) error {
+	err := kubectl.ApplyFiles(filePath).InNamespace(namespace).ExecWithoutOutputCapture()
 	if err != nil {
 		return fmt.Errorf("execute job %s: %w", filepath.Base(filePath), err)
 	}
@@ -164,8 +166,8 @@ func executeJob(filePath string) error {
 	return nil
 }
 
-func deleteJob(filePath string) error {
-	err := kubectl.DeleteFromFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+func deleteJob(filePath, namespace string) error {
+	err := kubectl.DeleteFromFiles(filePath).InNamespace(namespace).ExecWithoutOutputCapture()
 	if err != nil {
 		return fmt.Errorf("delete job %s: %w", filepath.Base(filePath), err)
 	}
@@ -174,7 +176,7 @@ func deleteJob(filePath string) error {
 }
 
 func populateGideonArgs(config *DataWorkloadConfig) ([]*GideonArgs, error) {
-	cbClusterAuth, err := requestutils.GetCBClusterAuth("cb-example-auth", "default")
+	cbClusterAuth, err := requestutils.GetCBClusterAuth(config.CBClusterSecret, config.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf("populate gideon args: %w", err)
 	}
@@ -190,7 +192,7 @@ func populateGideonArgs(config *DataWorkloadConfig) ([]*GideonArgs, error) {
 			Sizes:        strconv.FormatInt(config.DocSize, 10),
 			Expire:       strconv.Itoa(config.Expires),
 			TTL:          strconv.Itoa(config.TTL),
-			Hosts:        cbpods.GetCBPodHostname(config.filteredPods[i%len(config.filteredPods)], "default"),
+			Hosts:        cbpods.GetCBPodHostname(config.cbDataPods[i%len(config.cbDataPods)], config.Namespace),
 			User:         cbClusterAuth.Username,
 			Password:     cbClusterAuth.Password,
 			Bucket:       bucketConfig.Bucket,

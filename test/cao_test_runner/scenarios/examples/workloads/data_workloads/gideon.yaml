@@ -2,16 +2,12 @@ trees:
   - action: "Data Workload"
     config:
       name: "Gideon Workload"
+      namespace: default
+      cbClusterSecret: cb-example-auth
       preRunWait: 30s
       postRunWait: 30s
       runDuration: 1m
-      cbPodFilter:
-        filterType: services
-        selectionStrategy: latest
-        services:
-          - data
-        servicesNotStrict: True
-        count: 1
+      numDataPods: 1
       nodeSelector:
         workload-node: "true"
       checkJobCompletion: False # Default is False. TODO

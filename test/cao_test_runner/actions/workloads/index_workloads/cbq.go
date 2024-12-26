@@ -101,7 +101,7 @@ func (cbq *CBQ) ExecuteJobs() error {
 	}
 
 	for _, filePath := range cbq.FilePaths {
-		err := executeJob(filepath.Join(dir, filePath))
+		err := executeJob(filepath.Join(dir, filePath), cbq.Namespace)
 		if err != nil {
 			return err
 		}
@@ -117,7 +117,7 @@ func (cbq *CBQ) CheckJobs() error {
 		jobName := job.Metadata.Name
 
 		eg.Go(func() error {
-			return jobs.CheckJobCompletion(jobName, "default", cbq.JobDuration, 2*time.Second, 1)
+			return jobs.CheckJobCompletion(jobName, cbq.Namespace, cbq.JobDuration, 2*time.Second, 1)
 		})
 	}
 
@@ -136,7 +136,7 @@ func (cbq *CBQ) DeleteJobs() error {
 	}
 
 	for _, filePath := range cbq.FilePaths {
-		err := deleteJob(filepath.Join(dir, filePath))
+		err := deleteJob(filepath.Join(dir, filePath), cbq.Namespace)
 		if err != nil {
 			return err
 		}
@@ -173,8 +173,8 @@ func createJob(cbqArgs *CBQArgs) (*jobs.Job, error) {
 	return cbqJob, nil
 }
 
-func executeJob(filePath string) error {
-	err := kubectl.ApplyFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+func executeJob(filePath, namespace string) error {
+	err := kubectl.ApplyFiles(filePath).InNamespace(namespace).ExecWithoutOutputCapture()
 	if err != nil {
 		return fmt.Errorf("execute job %s: %w", filepath.Base(filePath), err)
 	}
@@ -182,8 +182,8 @@ func executeJob(filePath string) error {
 	return nil
 }
 
-func deleteJob(filePath string) error {
-	err := kubectl.DeleteFromFiles(filePath).InNamespace("default").ExecWithoutOutputCapture()
+func deleteJob(filePath, namespace string) error {
+	err := kubectl.DeleteFromFiles(filePath).InNamespace(namespace).ExecWithoutOutputCapture()
 	if err != nil {
 		return fmt.Errorf("delete job %s: %w", filepath.Base(filePath), err)
 	}
