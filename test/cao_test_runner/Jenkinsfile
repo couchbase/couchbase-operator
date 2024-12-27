@@ -33,7 +33,7 @@ pipeline {
 
   environment {
     GOVERSION = '1.22.5'
-    KUBECTL_PATH = "${env.WORKSPACE}/kubectl"
+    KUBECTL_PATH = "kubectl_${env.JOB_NAME}_${env.BUILD_NUMBER}"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
     GOROOT = "${env.WORKSPACE}/go"
     IMAGE_REGISTRY_SERVER = credentials('cloud-native-image-registry-server')
@@ -43,7 +43,7 @@ pipeline {
     EKS_ACCESS_KEY = credentials('cloud-native-aws-access-id')
     EKS_SECRET_KEY = credentials('cloud-native-aws-access-secret-key')
     EKS_ACCOUNT_ID = credentials('cloud-native-aws-account-id')
-    KUBECONFIG = "/root/.kube/config"
+    KUBECONFIG = "${env.WORKSPACE}/bin/kubectl_config.yaml"
     AKS_SUBSCRIPTION_ID = credentials('cloud-native-azure-subscription-id')
     AKS_SERVICE_PRINCIPAL_ID = credentials('cloud-native-azure-principal-id')
     AKS_SERVICE_PRINCIPAL_SECRET_ID = credentials('cloud-native-azure-principal-secret-id')
@@ -91,12 +91,27 @@ pipeline {
     }
 }
 
+stage('Setup Kubeconfig') {
+  steps {
+        sh """
+echo 'apiVersion: v1
+clusters: null
+contexts: null
+current-context: ""
+kind: Config
+preferences: {}
+users: null' > ${env.WORKSPACE}/bin/kubectl_config.yaml
+           """
+      }
+}
+
     stage('Test CAO Testrunner') {
       steps {
         dir("./test/cao_test_runner") {
             script {
               try {
                   sh """
+                     alias kubectl_${env.JOB_NAME}_${env.BUILD_NUMBER}='${env.WORKSPACE}/bin/kubectl --kubeconfig ${env.WORKSPACE}/bin/kubectl_config.yaml'
                      go mod tidy
                      go run . scenario --scenario ${params.SCENARIO_FILE}
                      """
@@ -113,6 +128,8 @@ pipeline {
   post {
     always {
       sh 'docker system prune --force' // Clean up docker - optimise disk usage
+      archiveArtifacts artifacts: '**/*', allowEmptyArchive: true
+      // TODO : Only archive the results directories
       cleanWs()
     }
   }
