@@ -58,18 +58,36 @@ func (req *Request) DownloadFile(outputFile *fileutils.File) error {
 	return nil
 }
 
-func GetHTTPHostname(host string, port int64) (string, error) {
+func GetPodHostname(podName, clusterName, namespace string) (string, error) {
+	if podName == "" {
+		return "", fmt.Errorf("")
+	}
+
+	if clusterName == "" {
+
+	}
+
+	if namespace == "" {
+		namespace = "default"
+	}
+
+	return fmt.Sprintf("%s.%s.%s.svc", podName, clusterName, namespace), nil
+}
+
+func GetHTTPHostname(host, port string) (string, error) {
 	if host == "" {
 		return "", fmt.Errorf("get hostname: %w", ErrHostNotProvided)
 	}
 
-	if port == 0 {
+	if port == "" {
 		return "", fmt.Errorf("get hostname: %w", ErrPortNotProvided)
 	}
+
+	// Validating port limits
 
 	if !strings.HasPrefix(host, "http://") {
 		host = "http://" + host
 	}
 
-	return fmt.Sprintf("%s:%d", host, port), nil
+	return fmt.Sprintf("%s:%s", host, port), nil
 }

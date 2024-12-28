@@ -85,9 +85,13 @@ func RebalanceReport(hostname, reportID string) *requestutils.Request {
  * CB Documentation not available.
  * Success gives 200 OK. Failure to authenticate gives 401 Unauthorized. A malformed URI gives 404 Object Not Found.
  */
-func RebalanceStop(hostname string) *requestutils.Request {
+func RebalanceStop(hostname string, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/controller/stopRebalance",
 		Method: "POST",
 		Body:   nil,
@@ -107,11 +111,15 @@ type RebalanceRetryStruct struct {
  * Unmarshal into RebalanceRetryStruct for GET / POST.
  * For POST request, the request body has x-www-form-urlencoded data based on RebalanceRetryStruct.
  */
-func RebalanceRetry(hostname string, get bool, enabled bool, afterTimePeriod, maxAttempts int) *requestutils.Request {
+func RebalanceRetry(hostname string, port string, get bool, enabled bool, afterTimePeriod, maxAttempts int) *requestutils.Request {
 	// Performs GET request if enabled = true as we want to set the rebalance retry settings.
+	if port == "" {
+		port = "8091"
+	}
 	if get {
 		return &requestutils.Request{
 			Host:   hostname,
+			Port:   port,
 			Path:   "/settings/retryRebalance",
 			Method: "GET",
 			Headers: map[string]string{
@@ -129,6 +137,7 @@ func RebalanceRetry(hostname string, get bool, enabled bool, afterTimePeriod, ma
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/settings/retryRebalance",
 		Method: "POST",
 		Headers: map[string]string{

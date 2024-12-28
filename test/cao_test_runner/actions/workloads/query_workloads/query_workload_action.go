@@ -13,7 +13,7 @@ import (
 
 type QueryWorkloadConfig struct {
 	Name            string `yaml:"name" caoCli:"required"`
-	Namespace       string `yaml:"namespace" caoCli:"required"`
+	Namespace       string `yaml:"namespace" caoCli:"context,required"`
 	CBClusterSecret string `yaml:"cbClusterSecret" caoCli:"required"`
 
 	RunDuration time.Duration `yaml:"runDuration" caoCli:"required"`

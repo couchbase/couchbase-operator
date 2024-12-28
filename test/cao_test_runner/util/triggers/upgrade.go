@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
+	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api"
 	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
-	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
 
 var (
@@ -23,28 +24,20 @@ var (
 // WaitForDeltaRecoveryUpgradeWarmup checks for the Delta Recovery warmup to get started. Delta Recovery warmup happens after
 // the CB node has been failed over and is brought back (with upgraded version).
 func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for rebalance: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for delta recovery warmup: %w", err)
-	}
-
 	checkDeltaUpgradeWarmup := func() error {
-		var poolsDefault clusternodesapi.PoolsDefault
-
 		checkCBPodVersion := false
 
-		err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
+
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			return fmt.Errorf("make request to %s/pools/default: %w", hostname, err)
+			return err
+		}
+
+		poolsDefault, err := clusterNodesAPI.PoolsDefault(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for scaling: %w", err)
 		}
 
 		for _, poolsNode := range poolsDefault.Nodes {
@@ -67,11 +60,9 @@ func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
 
 		// If the required cbPod is in the delta nodes, we just confirm the version of the cbPod
 		if checkCBPodVersion {
-			var poolsDefault clusternodesapi.PoolsDefault
-
-			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
+			poolsDefault, err := clusterNodesAPI.PoolsDefault(trigger.PortForward)
 			if err != nil {
-				return fmt.Errorf("make request to %s/pools/default: %w", hostname, err)
+				return fmt.Errorf("wait for scaling: %w", err)
 			}
 
 			for _, poolsNode := range poolsDefault.Nodes {
@@ -89,7 +80,7 @@ func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
 		return fmt.Errorf("cb pod %s: %w", trigger.CBInfo.cbPodName, ErrCBPodNotFound)
 	}
 
-	err = util.RetryFunctionTillTimeout(checkDeltaUpgradeWarmup, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkDeltaUpgradeWarmup, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for delta recovery warmup: %w", err)
 	}
@@ -99,28 +90,20 @@ func WaitForDeltaRecoveryUpgradeWarmup(trigger *TriggerConfig) error {
 
 // WaitForDeltaRecoveryUpgrade checks if the Delta Recovery upgrade has started for the CB pod.
 func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for rebalance: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for delta recovery upgrade: %w", err)
-	}
-
 	checkDeltaUpgrade := func() error {
-		var clusterTasks []clusternodesapi.Task
-
 		checkCBPodVersion := false
 
-		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
+
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			return fmt.Errorf("make request to %s/pools/default/tasks: %w", hostname, err)
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for scaling: %w", err)
 		}
 
 		for _, task := range clusterTasks {
@@ -142,11 +125,9 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 
 		// If the required cbPod is in the delta nodes, we just confirm the version of the cbPod
 		if checkCBPodVersion {
-			var poolsDefault clusternodesapi.PoolsDefault
-
-			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
+			poolsDefault, err := clusterNodesAPI.PoolsDefault(trigger.PortForward)
 			if err != nil {
-				return fmt.Errorf("make request to %s/pools/default: %w", hostname, err)
+				return fmt.Errorf("wait for scaling: %w", err)
 			}
 
 			for _, poolsNode := range poolsDefault.Nodes {
@@ -164,7 +145,7 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 		return ErrDeltaRecoveryUpgradeNotStarted
 	}
 
-	err = util.RetryFunctionTillTimeout(checkDeltaUpgrade, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkDeltaUpgrade, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for delta recovery upgrade: %w", err)
 	}
@@ -175,30 +156,22 @@ func WaitForDeltaRecoveryUpgrade(trigger *TriggerConfig) error {
 // WaitForSwapRebalanceIn checks if the Swap Rebalance has started for the CB pod which is getting ejected and
 // updates TriggerConfig.CBInfo CBSwapRebPodName with the name of the CB pod which is being added to CB cluster.
 func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for rebalance: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for swap rebalance in: %w", err)
-	}
-
 	checkSwapRebalance := func() error {
-		var clusterTasks []clusternodesapi.Task
-
 		var reqRebalanceTask clusternodesapi.Task
 
 		getSwapInPod := false
 
-		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
+
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			return fmt.Errorf("make request to %s/pools/default/tasks: %w", hostname, err)
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for rebalance: %w", err)
 		}
 
 		// First checking if Swap Rebalance upgrade has started.
@@ -233,11 +206,9 @@ func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
 			// swapInPod is the latest pod with updated count in the name.
 			swapInPod := keepNodes[len(keepNodes)-1]
 
-			var poolsDefault clusternodesapi.PoolsDefault
-
-			err := requestClient.Do(clusternodesapi.ClusterDetails(hostname), &poolsDefault, defaultRequestTimeout)
+			poolsDefault, err := clusterNodesAPI.PoolsDefault(trigger.PortForward)
 			if err != nil {
-				return fmt.Errorf("make request to %s/pools/default: %w", hostname, err)
+				return fmt.Errorf("wait for rebalance: %w", err)
 			}
 
 			for _, poolsNode := range poolsDefault.Nodes {
@@ -257,7 +228,7 @@ func WaitForSwapRebalanceIn(trigger *TriggerConfig) error {
 		return ErrSwapRebUpgradeNotStarted
 	}
 
-	err = util.RetryFunctionTillTimeout(checkSwapRebalance, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkSwapRebalance, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for swap rebalance in: %w", err)
 	}

@@ -24,6 +24,7 @@ const (
 	GKERegionKey
 	KubeConfigPathKey
 	CBBackupRestoreKey
+	PortForwardKey
 )
 
 var (
@@ -49,5 +50,6 @@ var (
 		"GKERegion":                GKERegionKey,
 		"KubeConfigPath":           KubeConfigPathKey,
 		"CBBackupRestore":          CBBackupRestoreKey,
+		"PortForward":              PortForwardKey,
 	}
 )

@@ -13,8 +13,12 @@ import (
  * docs.couchbase.com/server/current/rest-api/rest-buckets-summary.html.
  * Unmarshal into BucketsInfo if /buckets, else into the struct BucketInfo if /buckets/<bucketName>.
  */
-func GetBucketsInfo(hostname string, bucketName string, basicStats bool) *requestutils.Request {
+func GetBucketsInfo(hostname, port, bucketName string, basicStats bool) *requestutils.Request {
 	apiEndpoint := "/pools/default/buckets"
+
+	if port == "" {
+		port = "8091"
+	}
 
 	if bucketName != "" {
 		bucketName = url.PathEscape(bucketName)
@@ -27,6 +31,7 @@ func GetBucketsInfo(hostname string, bucketName string, basicStats bool) *reques
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   apiEndpoint,
 		Method: "GET",
 		Headers: map[string]string{
@@ -42,9 +47,13 @@ func GetBucketsInfo(hostname string, bucketName string, basicStats bool) *reques
  * Values for zoom: minute | hour | day | week | month | year. Default is minute.
  * Unmarshal into the struct BucketStats.
  */
-func GetBucketStats(hostname string, bucketName string, zoom string) *requestutils.Request {
+func GetBucketStats(hostname, port, bucketName, zoom string) *requestutils.Request {
 	if bucketName == "" {
 		return nil
+	}
+
+	if port == "" {
+		port = "8091"
 	}
 
 	bucketName = url.PathEscape(bucketName)
@@ -56,6 +65,7 @@ func GetBucketStats(hostname string, bucketName string, zoom string) *requestuti
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   apiEndpoint,
 		Method: "GET",
 		Headers: map[string]string{
@@ -71,9 +81,13 @@ func GetBucketStats(hostname string, bucketName string, zoom string) *requestuti
  * docs.couchbase.com/server/current/rest-api/rest-bucket-stats.html
  * Unmarshal into the struct BucketStats.
  */
-func GetBucketStatsFromNode(hostname, bucketName, cbPodHostname, zoom string) *requestutils.Request {
+func GetBucketStatsFromNode(hostname, port, bucketName, cbPodHostname, zoom string) *requestutils.Request {
 	if bucketName == "" {
 		return nil
+	}
+
+	if port == "" {
+		port = "8091"
 	}
 
 	bucketName = url.PathEscape(bucketName)
@@ -86,6 +100,7 @@ func GetBucketStatsFromNode(hostname, bucketName, cbPodHostname, zoom string) *r
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   apiEndpoint,
 		Method: "GET",
 		Headers: map[string]string{

@@ -18,17 +18,17 @@ var (
 type BucketsAPI interface {
 	// Scopes and Collections APIs.
 
-	CreateScope(bucketName, scopeName string) error
-	DeleteScope(bucketName, scopeName string) error
+	CreateScope(bucketName, scopeName string, portForward bool) error
+	DeleteScope(bucketName, scopeName string, portForward bool) error
 
-	CreateCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool) error
-	EditCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool) error
-	DeleteCollection(bucketName, scopeName, collectionName string) error
+	CreateCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool, portForward bool) error
+	EditCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool, portForward bool) error
+	DeleteCollection(bucketName, scopeName, collectionName string, portForward bool) error
 }
 
 type Buckets struct {
+	podName    string
 	hostname   string
-	port       int
 	username   string
 	password   string
 	isSecure   bool // True for HTTPS request.
@@ -40,14 +40,10 @@ type Buckets struct {
 /*
  * If secretName is provided (along with namespace) then username and password will be taken from the K8S secret.
  */
-func NewBucketsAPI(hostname string, port int, username, password, secretName, namespace string,
+func NewBucketsAPI(podName, clusterName, username, password, secretName, namespace string,
 	requestTimeout time.Duration, isSecure bool) (BucketsAPI, error) {
-	if hostname == "" {
-		return nil, fmt.Errorf("new buckets api: %w", ErrHostnameNotFound)
-	}
-
-	if port <= 0 {
-		return nil, fmt.Errorf("new buckets api: %w", ErrPortNotFound)
+	if podName == "" {
+		return nil, fmt.Errorf("new cluster nodes api: %w", ErrPodnameNotFound)
 	}
 
 	if secretName != "" {
@@ -76,20 +72,17 @@ func NewBucketsAPI(hostname string, port int, username, password, secretName, na
 		return nil, fmt.Errorf("new buckets api: %w", ErrRequestTimeout)
 	}
 
-	// Checking the hostname
-	// TODO split the hostname and port.
-	// TODO update GetHTTPHostname to have isSecure parameter to support https.
-	updatedHostname, err := requestutils.GetHTTPHostname(hostname, int64(port))
+	hostname, err := requestutils.GetPodHostname(podName, clusterName, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("new buckets api: %w", err)
+		return nil, fmt.Errorf("new cluster nodes api: %w", err)
 	}
 
 	reqClient := requestutils.NewClient()
 	reqClient.SetHTTPAuth(username, password)
 
 	return &Buckets{
-		hostname:   updatedHostname,
-		port:       port,
+		podName:    podName,
+		hostname:   hostname,
 		username:   username,
 		password:   password,
 		isSecure:   isSecure,
@@ -102,7 +95,7 @@ func NewBucketsAPI(hostname string, port int, username, password, secretName, na
 // =========================== Scopes and Collections APIs ===============================
 // =======================================================================================
 
-func (b *Buckets) CreateScope(bucketName, scopeName string) error {
+func (b *Buckets) CreateScope(bucketName, scopeName string, portForward bool) error {
 	if bucketName == "" {
 		return fmt.Errorf("create scope %s of bucket %s: %w", scopeName, bucketName, ErrBucketNameNotFound)
 	}
@@ -111,7 +104,20 @@ func (b *Buckets) CreateScope(bucketName, scopeName string) error {
 		return fmt.Errorf("create scope %s of bucket %s: %w", scopeName, bucketName, ErrScopeNameNotFound)
 	}
 
-	err := b.reqClient.Do(buckets.CreateScope(b.hostname, bucketName, scopeName), nil, b.reqTimeout)
+	req := buckets.CreateScope(b.hostname, "", bucketName, scopeName)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: b.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := b.reqClient.Do(req, nil, b.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("create scope: %w", err)
 	}
@@ -119,7 +125,7 @@ func (b *Buckets) CreateScope(bucketName, scopeName string) error {
 	return nil
 }
 
-func (b *Buckets) DeleteScope(bucketName, scopeName string) error {
+func (b *Buckets) DeleteScope(bucketName, scopeName string, portForward bool) error {
 	if bucketName == "" {
 		return fmt.Errorf("delete scope %s of bucket %s: %w", scopeName, bucketName, ErrBucketNameNotFound)
 	}
@@ -128,7 +134,20 @@ func (b *Buckets) DeleteScope(bucketName, scopeName string) error {
 		return fmt.Errorf("delete scope %s of bucket %s: %w", scopeName, bucketName, ErrScopeNameNotFound)
 	}
 
-	err := b.reqClient.Do(buckets.DropScope(b.hostname, bucketName, scopeName), nil, b.reqTimeout)
+	req := buckets.DropScope(b.hostname, "", bucketName, scopeName)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: b.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := b.reqClient.Do(req, nil, b.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("delete scope %s of bucket %s: %w", scopeName, bucketName, err)
 	}
@@ -136,7 +155,8 @@ func (b *Buckets) DeleteScope(bucketName, scopeName string) error {
 	return nil
 }
 
-func (b *Buckets) CreateCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool) error {
+func (b *Buckets) CreateCollection(bucketName, scopeName, collectionName string,
+	maxTTL int, history bool, portForward bool) error {
 	if bucketName == "" {
 		return fmt.Errorf("create collection %s of scope %s: %w", collectionName, scopeName, ErrBucketNameNotFound)
 	}
@@ -149,7 +169,20 @@ func (b *Buckets) CreateCollection(bucketName, scopeName, collectionName string,
 		return fmt.Errorf("create collection %s of scope %s: %w", collectionName, scopeName, ErrCollectionNameNotFound)
 	}
 
-	err := b.reqClient.Do(buckets.CreateCollection(b.hostname, bucketName, scopeName, collectionName, maxTTL, history), nil, b.reqTimeout)
+	req := buckets.CreateCollection(b.hostname, "", bucketName, scopeName, collectionName, maxTTL, history)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: b.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := b.reqClient.Do(req, nil, b.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("create collection %s for scope %s of bucket %s: %w", collectionName, scopeName, bucketName, err)
 	}
@@ -157,7 +190,8 @@ func (b *Buckets) CreateCollection(bucketName, scopeName, collectionName string,
 	return nil
 }
 
-func (b *Buckets) EditCollection(bucketName, scopeName, collectionName string, maxTTL int, history bool) error {
+func (b *Buckets) EditCollection(bucketName, scopeName, collectionName string,
+	maxTTL int, history bool, portForward bool) error {
 	if bucketName == "" {
 		return fmt.Errorf("edit collection %s of scope %s: %w", collectionName, scopeName, ErrBucketNameNotFound)
 	}
@@ -170,7 +204,20 @@ func (b *Buckets) EditCollection(bucketName, scopeName, collectionName string, m
 		return fmt.Errorf("edit collection %s of scope %s: %w", collectionName, scopeName, ErrCollectionNameNotFound)
 	}
 
-	err := b.reqClient.Do(buckets.EditCollection(b.hostname, bucketName, scopeName, collectionName, maxTTL, history), nil, b.reqTimeout)
+	req := buckets.EditCollection(b.hostname, "", bucketName, scopeName, collectionName, maxTTL, history)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: b.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := b.reqClient.Do(req, nil, b.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("edit collection %s for scope %s of bucket %s: %w", collectionName, scopeName, bucketName, err)
 	}
@@ -178,7 +225,7 @@ func (b *Buckets) EditCollection(bucketName, scopeName, collectionName string, m
 	return nil
 }
 
-func (b *Buckets) DeleteCollection(bucketName, scopeName, collectionName string) error {
+func (b *Buckets) DeleteCollection(bucketName, scopeName, collectionName string, portForward bool) error {
 	if bucketName == "" {
 		return fmt.Errorf("delete collection %s of scope %s: %w", collectionName, scopeName, ErrBucketNameNotFound)
 	}
@@ -191,7 +238,20 @@ func (b *Buckets) DeleteCollection(bucketName, scopeName, collectionName string)
 		return fmt.Errorf("delete collection %s of scope %s: %w", collectionName, scopeName, ErrCollectionNameNotFound)
 	}
 
-	err := b.reqClient.Do(buckets.DropCollection(b.hostname, bucketName, scopeName, collectionName), nil, b.reqTimeout)
+	req := buckets.DropCollection(b.hostname, "", bucketName, scopeName, collectionName)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: b.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := b.reqClient.Do(req, nil, b.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("delete collection %s for scope %s of bucket %s: %w", collectionName, scopeName, bucketName, err)
 	}

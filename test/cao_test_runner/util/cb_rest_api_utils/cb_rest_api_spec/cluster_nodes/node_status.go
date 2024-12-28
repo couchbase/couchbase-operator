@@ -8,9 +8,14 @@ import requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runne
  * docs.couchbase.com/server/current/rest-api/rest-getting-storage-information.html.
  * Unmarshal into the struct clusternodesapi.Nodes.
  */
-func NodeDetails(hostname string) *requestutils.Request {
+func NodeDetails(hostname, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/nodes/self",
 		Method: "GET",
 		Headers: map[string]string{
@@ -25,9 +30,14 @@ func NodeDetails(hostname string) *requestutils.Request {
  * Not documented in CB docs.
  * Unmarshal into the struct clusternodesapi.NodeStatuses.
  */
-func GetNodeStatuses(hostname string) *requestutils.Request {
+func GetNodeStatuses(hostname, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/nodeStatuses",
 		Method: "GET",
 		Headers: map[string]string{

@@ -7,13 +7,14 @@ import (
 // TriggerConfig stores all the information required to check for the trigger.
 type TriggerConfig struct {
 	TriggerName     TriggerName   `yaml:"triggerName" caoCli:"required"`
+	CBClusterName   string        `yaml:"CBClusterName" caoCli:"context"`
 	TriggerDuration time.Duration `yaml:"triggerDuration"` // Total time for which we check for trigger.
 	TriggerInterval time.Duration `yaml:"triggerInterval"` // Interval time between trigger checks.
 	PreTriggerWait  time.Duration `yaml:"preTriggerWait"`  // Time to wait before starting trigger check.
 	PostTriggerWait time.Duration `yaml:"postTriggerWait"` // Time to wait after successful trigger check.
 	CBSecretName    string        `yaml:"cbSecret"`        // K8S CB Secret to use to communicate with CB cluster.
-
-	CBInfo CBInfo
+	PortForward     bool          `yaml:"portForward"`     // When requests are sent to CB Server, port forward and send requests
+	CBInfo          CBInfo
 }
 
 // CBInfo stores all the information about the CB cluster and pods required during trigger checks.

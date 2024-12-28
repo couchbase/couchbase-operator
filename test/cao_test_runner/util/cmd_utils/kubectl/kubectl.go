@@ -233,6 +233,11 @@ func Exec(podName, containerName string, commandArgs ...string) *KubectlCmd {
 // ========= Advanced Kubectl Commands =========
 // =============================================
 
+func PortForward(podName, port string) *KubectlCmd {
+	args := []string{podName, port}
+	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "port-forward", Args: args}}
+}
+
 // ==============================
 // kubectl apply command(s)
 // ==============================

@@ -14,7 +14,7 @@ import (
 
 type DataWorkloadConfig struct {
 	Name            string `yaml:"name" caoCli:"required"`
-	Namespace       string `yaml:"namespace" caoCli:"required"`
+	Namespace       string `yaml:"namespace" caoCli:"context,required"`
 	CBClusterSecret string `yaml:"cbClusterSecret" caoCli:"required"`
 
 	PreRunWait  time.Duration `yaml:"preRunWait"`

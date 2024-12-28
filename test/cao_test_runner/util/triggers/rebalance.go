@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
+	cbrestapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api"
 	clusternodesapi "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_rest_api_utils/cb_rest_api_spec/cluster_nodes"
-	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,27 +26,18 @@ var (
 // WaitForRebalance checks for latest rebalance to trigger. This trigger checks for any rebalance.
 // To check for specific rebalance use other triggers.
 func WaitForRebalance(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for rebalance: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for rebalance: %w", err)
-	}
-
 	checkRebalanceFunc := func() error {
-		var clusterTasks []clusternodesapi.Task
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
 
-		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			logrus.Debugf("make request to %s/pools/default/tasks: %v", hostname, err)
-			return fmt.Errorf("make request to %s/pools/default/tasks: %w", hostname, err)
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for rebalance: %w", err)
 		}
 
 		logrus.Debugf("tasks: %v\n", clusterTasks)
@@ -63,7 +55,7 @@ func WaitForRebalance(trigger *TriggerConfig) error {
 		return ErrRebalanceNotStarted
 	}
 
-	err = util.RetryFunctionTillTimeout(checkRebalanceFunc, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkRebalanceFunc, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for rebalance: %w", err)
 	}
@@ -73,27 +65,18 @@ func WaitForRebalance(trigger *TriggerConfig) error {
 
 // WaitForDeltaRecoveryRebalance checks for latest delta recovery rebalance to trigger.
 func WaitForDeltaRecoveryRebalance(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for delta recovery rebalance: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for delta recovery rebalance: %w", err)
-	}
-
 	checkDeltaRecovery := func() error {
-		var clusterTasks []clusternodesapi.Task
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
 
-		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			logrus.Debugf("make request to %s/pools/default/tasks: %v", hostname, err)
-			return fmt.Errorf("make request to %s/pools/default/tasks: %w", hostname, err)
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for delta recovery rebalance: %w", err)
 		}
 
 		logrus.Debugf("tasks: %v\n", clusterTasks)
@@ -116,7 +99,7 @@ func WaitForDeltaRecoveryRebalance(trigger *TriggerConfig) error {
 		return ErrDeltaRecoveryNotStarted
 	}
 
-	err = util.RetryFunctionTillTimeout(checkDeltaRecovery, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkDeltaRecovery, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for delta recovery rebalance: %w", err)
 	}
@@ -126,26 +109,18 @@ func WaitForDeltaRecoveryRebalance(trigger *TriggerConfig) error {
 
 // WaitForSwapRebalanceOut checks if the Swap Rebalance has started for the CB pod which is getting ejected.
 func WaitForSwapRebalanceOut(trigger *TriggerConfig) error {
-	requestClient := requestutils.NewClient()
-
-	cbAuth, err := requestutils.GetCBClusterAuth(trigger.CBSecretName, "default")
-	if err != nil {
-		return fmt.Errorf("trigger for swap rebalance out: %w", err)
-	}
-
-	requestClient.SetHTTPAuth(cbAuth.Username, cbAuth.Password)
-
-	hostname, err := requestutils.GetHTTPHostname("localhost", 8091)
-	if err != nil {
-		return fmt.Errorf("trigger for swap rebalance out: %w", err)
-	}
-
 	checkSwapRebalance := func() error {
-		var clusterTasks []clusternodesapi.Task
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
 
-		err := requestClient.Do(clusternodesapi.ClusterTasks(hostname), &clusterTasks, defaultRequestTimeout)
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
 		if err != nil {
-			return fmt.Errorf("make request to %s/pools/default/tasks: %w", hostname, err)
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for delta recovery rebalance: %w", err)
 		}
 
 		for _, task := range clusterTasks {
@@ -166,7 +141,7 @@ func WaitForSwapRebalanceOut(trigger *TriggerConfig) error {
 		return ErrSwapRebNotStarted
 	}
 
-	err = util.RetryFunctionTillTimeout(checkSwapRebalance, trigger.TriggerDuration, trigger.TriggerInterval)
+	err := util.RetryFunctionTillTimeout(checkSwapRebalance, trigger.TriggerDuration, trigger.TriggerInterval)
 	if err != nil {
 		return fmt.Errorf("trigger for swap rebalance out: %w", err)
 	}

@@ -143,12 +143,12 @@ func (cpf *CBBareMetalFilter) filterAll() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, "", "", "", secretName, "default", 5*time.Second, false, true)
 	if err != nil {
 		return nil, err
 	}
 
-	poolsDefault, err := clusterNodesAPI.PoolsDefault()
+	poolsDefault, err := clusterNodesAPI.PoolsDefault(false)
 	if err != nil {
 		return nil, fmt.Errorf("filter all: %w", err)
 	}
@@ -181,12 +181,12 @@ func (cpf *CBBareMetalFilter) filterByServicesCB() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, "", "", "", secretName, "default", 5*time.Second, false, true)
 	if err != nil {
 		return nil, err
 	}
 
-	poolsDefault, err := clusterNodesAPI.PoolsDefault()
+	poolsDefault, err := clusterNodesAPI.PoolsDefault(false)
 	if err != nil {
 		return nil, fmt.Errorf("filter all: %w", err)
 	}
@@ -232,12 +232,12 @@ func (cpf *CBBareMetalFilter) filterByServerGroups() ([]string, error) {
 		secretName = cpf.ClusterSecretName
 	}
 
-	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, 8091, "", "", secretName, "default", 5*time.Second, false)
+	clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(hostname, "", "", "", secretName, "default", 5*time.Second, false, true)
 	if err != nil {
 		return nil, err
 	}
 
-	poolsDefault, err := clusterNodesAPI.PoolsDefault()
+	poolsDefault, err := clusterNodesAPI.PoolsDefault(false)
 	if err != nil {
 		return nil, fmt.Errorf("filter all: %w", err)
 	}

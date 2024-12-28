@@ -13,10 +13,14 @@ import (
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  * Unmarshal into slice of Roles struct.
  */
-func ListRoles(hostname string) *requestutils.Request {
+func ListRoles(hostname, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/roles",
 		Method: "GET",
 		Headers: map[string]string{
@@ -31,10 +35,14 @@ func ListRoles(hostname string) *requestutils.Request {
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  * Unmarshal into a slice of Users struct.
  */
-func ListCurrentUsersAndRoles(hostname string) *requestutils.Request {
+func ListCurrentUsersAndRoles(hostname, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users",
 		Method: "GET",
 		Headers: map[string]string{
@@ -48,17 +56,21 @@ func ListCurrentUsersAndRoles(hostname string) *requestutils.Request {
  * POST :: /pools/default/checkPermissions.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func CheckPermissions(hostname, permCheckSpec string) *requestutils.Request {
+func CheckPermissions(hostname, port, permCheckSpec string) *requestutils.Request {
 	formData := url.Values{}
 
 	if permCheckSpec != "" {
 		formData.Set(permCheckSpec, "")
 	}
 
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/pools/default/checkPermissions",
-		Port:   "8091",
 		Method: "POST",
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
@@ -72,11 +84,15 @@ func CheckPermissions(hostname, permCheckSpec string) *requestutils.Request {
  * PUT :: /settings/rbac/users/local/<new-username>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func CreateLocalUser(hostname, userUsername, userPassword string, roles, groups []string) *requestutils.Request {
+func CreateLocalUser(hostname, port, userUsername, userPassword string, roles, groups []string) *requestutils.Request {
 	formData := url.Values{}
 
 	if userPassword != "" {
 		formData.Set("password", userPassword)
+	}
+
+	if port == "" {
+		port = "8091"
 	}
 
 	if roles != nil {
@@ -89,7 +105,7 @@ func CreateLocalUser(hostname, userUsername, userPassword string, roles, groups 
 
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users/local/" + url.PathEscape(userUsername),
 		Method: "PUT",
 		Headers: map[string]string{
@@ -104,16 +120,20 @@ func CreateLocalUser(hostname, userUsername, userPassword string, roles, groups 
  * PATCH :: /settings/rbac/users/local/<existing-username>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func UpdateLocalUser(hostname, userUsername, userPassword string) *requestutils.Request {
+func UpdateLocalUser(hostname, port, userUsername, userPassword string) *requestutils.Request {
 	formData := url.Values{}
 
 	if userPassword != "" {
 		formData.Set("password", userPassword)
 	}
 
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users/local/" + url.PathEscape(userUsername),
 		Method: "PATCH",
 		Headers: map[string]string{
@@ -128,10 +148,14 @@ func UpdateLocalUser(hostname, userUsername, userPassword string) *requestutils.
  * DELETE :: /settings/rbac/users/local/<local-username>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func DeleteLocalUser(hostname, userUsername string) *requestutils.Request {
+func DeleteLocalUser(hostname, port, userUsername string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users/local/" + url.PathEscape(userUsername),
 		Method: "DELETE",
 		Headers: map[string]string{
@@ -145,11 +169,15 @@ func DeleteLocalUser(hostname, userUsername string) *requestutils.Request {
  * PUT :: /settings/rbac/users/external/<new-username>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func CreateExternalUser(hostname, userUsername string, roles, groups []string) *requestutils.Request {
+func CreateExternalUser(hostname, port, userUsername string, roles, groups []string) *requestutils.Request {
 	formData := url.Values{}
 
 	if userUsername != "" {
 		formData.Set("name", userUsername)
+	}
+
+	if port == "" {
+		port = "8091"
 	}
 
 	if roles != nil {
@@ -162,7 +190,7 @@ func CreateExternalUser(hostname, userUsername string, roles, groups []string) *
 
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users/external/" + url.PathEscape(userUsername),
 		Method: "PUT",
 		Headers: map[string]string{
@@ -177,10 +205,14 @@ func CreateExternalUser(hostname, userUsername string, roles, groups []string) *
  * DELETE :: /settings/rbac/users/external/<external-username>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func DeleteExternalUser(hostname, userUsername string) *requestutils.Request {
+func DeleteExternalUser(hostname, port, userUsername string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/users/external/" + url.PathEscape(userUsername),
 		Method: "DELETE",
 		Headers: map[string]string{
@@ -195,10 +227,14 @@ func DeleteExternalUser(hostname, userUsername string) *requestutils.Request {
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  * Unmarshal into a slice of Groups struct.
  */
-func ListGroups(hostname string) *requestutils.Request {
+func ListGroups(hostname, port string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/groups",
 		Method: "GET",
 		Headers: map[string]string{
@@ -212,7 +248,7 @@ func ListGroups(hostname string) *requestutils.Request {
  * PUT :: /settings/rbac/groups/<new-group_name>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func CreateGroup(hostname, groupName, desc, ldapGroupRef string, roles []string) *requestutils.Request {
+func CreateGroup(hostname, port, groupName, desc, ldapGroupRef string, roles []string) *requestutils.Request {
 	formData := url.Values{}
 
 	if desc != "" {
@@ -227,9 +263,13 @@ func CreateGroup(hostname, groupName, desc, ldapGroupRef string, roles []string)
 		formData.Set("ldap_group_ref", ldapGroupRef)
 	}
 
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/groups/" + url.PathEscape(groupName),
 		Method: "PUT",
 		Headers: map[string]string{
@@ -244,10 +284,14 @@ func CreateGroup(hostname, groupName, desc, ldapGroupRef string, roles []string)
  * DELETE :: /settings/rbac/groups/<group_name>.
  * docs.couchbase.com/server/current/rest-api/rbac.html.
  */
-func DeleteGroup(hostname, groupName string) *requestutils.Request {
+func DeleteGroup(hostname, port, groupName string) *requestutils.Request {
+	if port == "" {
+		port = "8091"
+	}
+
 	return &requestutils.Request{
 		Host:   hostname,
-		Port:   "8091",
+		Port:   port,
 		Path:   "/settings/rbac/groups/" + url.PathEscape(groupName),
 		Method: "DELETE",
 		Headers: map[string]string{

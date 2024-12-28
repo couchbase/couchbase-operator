@@ -32,20 +32,20 @@ func ExecuteCBClusterChaos(ctx *context.Context, chaosConfig *CBPodChaosConfig) 
 	switch chaosConfig.CBClusterChaosConfig.ClusterChaosAction {
 	case StopRebalance:
 		{
-			return chaosConfig.CBClusterChaosConfig.StopRebalance(ctx)
+			return chaosConfig.CBClusterChaosConfig.StopRebalance(ctx, chaosConfig.CBPod, chaosConfig.ClusterName, chaosConfig.PortForward)
 		}
 	default:
 		return fmt.Errorf("execute cb cluster chaos: %w", ErrCBClusterChaosInvalid)
 	}
 }
 
-func (c *CBClusterChaosConfig) StopRebalance(ctx *context.Context) error {
-	cbAPIClient, err := cbrestapi.NewClusterNodesAPI("localhost", 8091, "", "", "cb-example-auth", "default", 5*time.Second, false)
+func (c *CBClusterChaosConfig) StopRebalance(ctx *context.Context, podName, clusterName string, portForward bool) error {
+	cbAPIClient, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", "cb-example-auth", "default", 5*time.Second, false, false)
 	if err != nil {
 		return fmt.Errorf("chaos stop rebalance: %w", err)
 	}
 
-	err = cbAPIClient.StopRebalance()
+	err = cbAPIClient.StopRebalance(portForward)
 	if err != nil {
 		return fmt.Errorf("chaos stop rebalance: %w", err)
 	}

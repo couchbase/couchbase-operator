@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	ErrHostnameNotFound  = errors.New("hostname not provided")
-	ErrPortNotFound      = errors.New("port not provided")
+	ErrPodnameNotFound   = errors.New("pod name not provided")
 	ErrUsernameNotFound  = errors.New("username not provided")
 	ErrNamespaceNotFound = errors.New("namespace not provided")
 	ErrPasswordNotFound  = errors.New("password not provided")
@@ -20,15 +19,16 @@ var (
 
 type ClusterNodesAPI interface {
 	// CB Cluster Information APIs.
-	PoolsDefault() (*clusternodesapi.PoolsDefault, error)
+	PoolsDefault(portForward bool) (*clusternodesapi.PoolsDefault, error)
+	PoolsDefaultTasks(portForward bool) ([]clusternodesapi.Task, error)
 
 	// Rebalance APIs.
-	StopRebalance() error
+	StopRebalance(portForward bool) error
 }
 
 type ClusterNodes struct {
+	podName    string
 	hostname   string
-	port       int // TODO not being used as of now. hostname has the port included.
 	username   string
 	password   string
 	isSecure   bool // True for HTTPS request.
@@ -40,14 +40,10 @@ type ClusterNodes struct {
 /*
  * If secretName is provided (along with namespace) then username and password will be taken from the K8S secret.
  */
-func NewClusterNodesAPI(hostname string, port int, username, password, secretName, namespace string,
-	requestTimeout time.Duration, isSecure bool) (ClusterNodesAPI, error) {
-	if hostname == "" {
-		return nil, fmt.Errorf("new cluster nodes api: %w", ErrHostnameNotFound)
-	}
-
-	if port <= 0 {
-		return nil, fmt.Errorf("new cluster nodes api: %w", ErrPortNotFound)
+func NewClusterNodesAPI(podName, clusterName, username, password, secretName, namespace string,
+	requestTimeout time.Duration, isSecure bool, isBareMetal bool) (ClusterNodesAPI, error) {
+	if podName == "" {
+		return nil, fmt.Errorf("new cluster nodes api: %w", ErrPodnameNotFound)
 	}
 
 	if secretName != "" {
@@ -76,20 +72,24 @@ func NewClusterNodesAPI(hostname string, port int, username, password, secretNam
 		return nil, fmt.Errorf("new cluster nodes api: %w", ErrRequestTimeout)
 	}
 
-	// Checking the hostname
-	// TODO split the hostname and port.
-	// TODO update GetHTTPHostname to have isSecure parameter to support https.
-	updatedHostname, err := requestutils.GetHTTPHostname(hostname, int64(port))
-	if err != nil {
-		return nil, fmt.Errorf("new cluster nodes api: %w", err)
+	var hostname string
+	var err error
+
+	if !isBareMetal {
+		hostname, err = requestutils.GetPodHostname(podName, clusterName, namespace)
+		if err != nil {
+			return nil, fmt.Errorf("new cluster nodes api: %w", err)
+		}
+	} else {
+		hostname = podName
 	}
 
 	reqClient := requestutils.NewClient()
 	reqClient.SetHTTPAuth(username, password)
 
 	return &ClusterNodes{
-		hostname:   updatedHostname,
-		port:       port,
+		podName:    podName,
+		hostname:   hostname,
 		username:   username,
 		password:   password,
 		isSecure:   isSecure,
@@ -102,10 +102,23 @@ func NewClusterNodesAPI(hostname string, port int, username, password, secretNam
 // ================= CB Cluster Information APIs =================
 // ===============================================================
 
-func (cn *ClusterNodes) PoolsDefault() (*clusternodesapi.PoolsDefault, error) {
+func (cn *ClusterNodes) PoolsDefault(portForward bool) (*clusternodesapi.PoolsDefault, error) {
 	var poolsDefault clusternodesapi.PoolsDefault
 
-	err := cn.reqClient.Do(clusternodesapi.ClusterDetails(cn.hostname), &poolsDefault, cn.reqTimeout)
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	req := clusternodesapi.ClusterDetails(cn.hostname, "")
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: cn.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := cn.reqClient.Do(req, &poolsDefault, cn.reqTimeout, portForwardConfig)
 	if err != nil {
 		return nil, fmt.Errorf("pools default: %w", err)
 	}
@@ -113,12 +126,49 @@ func (cn *ClusterNodes) PoolsDefault() (*clusternodesapi.PoolsDefault, error) {
 	return &poolsDefault, nil
 }
 
+func (cn *ClusterNodes) PoolsDefaultTasks(portForward bool) ([]clusternodesapi.Task, error) {
+	var poolsDefaultTasks []clusternodesapi.Task
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	req := clusternodesapi.ClusterTasks(cn.hostname, "")
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: cn.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := cn.reqClient.Do(req, &poolsDefaultTasks, cn.reqTimeout, portForwardConfig)
+	if err != nil {
+		return nil, fmt.Errorf("pools default tasks: %w", err)
+	}
+
+	return poolsDefaultTasks, nil
+}
+
 // ===============================================================
 // ======================= Rebalance APIs ========================
 // ===============================================================
 
-func (cn *ClusterNodes) StopRebalance() error {
-	err := cn.reqClient.Do(clusternodesapi.RebalanceStop(cn.hostname), nil, cn.reqTimeout)
+func (cn *ClusterNodes) StopRebalance(portForward bool) error {
+	req := clusternodesapi.RebalanceStop(cn.hostname, "")
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: cn.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := cn.reqClient.Do(clusternodesapi.RebalanceStop(cn.hostname, "8091"), nil, cn.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("stop rebalance: %w", err)
 	}

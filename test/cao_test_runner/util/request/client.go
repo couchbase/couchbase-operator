@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
 )
 
@@ -31,6 +32,11 @@ type Client struct {
 	httpAuth   *HTTPAuth
 }
 
+type PortForwardConfig struct {
+	PodName string
+	Port    string
+}
+
 // NewClient creates a new HTTP client. httpAuth is by default nil. Set it using SetHTTPAuth.
 func NewClient() *Client {
 	return &Client{
@@ -48,12 +54,29 @@ func (c *Client) SetHTTPAuth(username, password string) {
 }
 
 // Do perform the API request.
-func (c *Client) Do(req *Request, result interface{}, timeout time.Duration) error {
+func (c *Client) Do(req *Request, result interface{}, timeout time.Duration, portForwardConfig *PortForwardConfig) error {
 	if req == nil {
 		return fmt.Errorf("perform request: %w", ErrHTTPRequestIsNil)
 	}
 
-	err := ValidateHTTPRequest(req)
+	if portForwardConfig != nil {
+		if err := kubectl.PortForward(portForwardConfig.PodName, portForwardConfig.Port).ExecWithoutOutputCapture(); err != nil {
+			return err
+		}
+		req.Host = "localhost"
+	}
+
+	// Checking the hostname
+	// TODO split the hostname and port.
+	// TODO update GetHTTPHostname to have isSecure parameter to support https.
+	hostname, err := GetHTTPHostname(req.Host, req.Port)
+	if err != nil {
+		return fmt.Errorf("new cluster nodes api: %w", err)
+	}
+
+	req.Host = hostname
+
+	err = ValidateHTTPRequest(req)
 	if err != nil {
 		return fmt.Errorf("perform %s request %s%s: %w", req.Method, req.Host, req.Path, err)
 	}

@@ -28,6 +28,7 @@ type ChaosConfig struct {
 	Provider    managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
 	ChaosList   []ChaosList                        `yaml:"chaosList" caoCli:"required"`
 	Validators  []map[string]any                   `yaml:"validators,omitempty"`
+	PortForward bool                               `yaml:"portForward" caoCli:"context"`
 	ms          *managedk8sservices.ManagedServiceProvider
 }
 

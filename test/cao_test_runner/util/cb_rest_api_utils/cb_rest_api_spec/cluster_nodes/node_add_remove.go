@@ -15,9 +15,13 @@ import (
  * NOTE: Services: kv, index, n1ql, eventing, fts, cbas, and backup.
  * NOTE: Rebalance the cluster after adding the CB node. Include the node added in knownNodes.
  */
-func AddNode(hostname, cbNodeHostname, username, password string, services []string) *requestutils.Request {
+func AddNode(hostname, port, cbNodeHostname, username, password string, services []string) *requestutils.Request {
 	formData := url.Values{}
 	formData.Set("hostname", cbNodeHostname)
+
+	if port == "" {
+		port = "8091"
+	}
 
 	if username != "" {
 		formData.Set("user", username)
@@ -33,6 +37,7 @@ func AddNode(hostname, cbNodeHostname, username, password string, services []str
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/controller/addNode",
 		Method: "POST",
 		Headers: map[string]string{
@@ -47,9 +52,13 @@ func AddNode(hostname, cbNodeHostname, username, password string, services []str
  * POST :: /node/controller/doJoinCluster.
  * docs.couchbase.com/server/current/rest-api/rest-cluster-joinnode.html.
  */
-func JoinNodeToCluster(hostname, clusterMemberHostIP, clusterMemberPort, username, password string, services []string) *requestutils.Request {
+func JoinNodeToCluster(hostname, port, clusterMemberHostIP, clusterMemberPort, username, password string, services []string) *requestutils.Request {
 	formData := url.Values{}
 	formData.Set("clusterMemberHostIp", clusterMemberHostIP)
+
+	if port == "" {
+		port = "8091"
+	}
 
 	if clusterMemberPort != "" {
 		formData.Set("clusterMemberPort", clusterMemberPort)
@@ -69,6 +78,7 @@ func JoinNodeToCluster(hostname, clusterMemberHostIP, clusterMemberPort, usernam
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/node/controller/doJoinCluster",
 		Method: "POST",
 		Headers: map[string]string{
@@ -85,8 +95,12 @@ func JoinNodeToCluster(hostname, clusterMemberHostIP, clusterMemberPort, usernam
  * NOTE: Cannot remove active nodes using this, to remove an active node use RebalanceStart() with ejectedNodes.
  * NOTE: Can be used on failed over nodes, nodes in pending state, or nodes that have been recently added or joined but not yet rebalanced into the cluster.
  */
-func EjectNode(hostname, otpNode string) *requestutils.Request {
+func EjectNode(hostname, port, otpNode string) *requestutils.Request {
 	formData := url.Values{}
+
+	if port == "" {
+		port = "8091"
+	}
 
 	otpNodes := ConvertToOTPNames([]string{otpNode})
 
@@ -94,6 +108,7 @@ func EjectNode(hostname, otpNode string) *requestutils.Request {
 
 	return &requestutils.Request{
 		Host:   hostname,
+		Port:   port,
 		Path:   "/controller/ejectNode",
 		Method: "POST",
 		Headers: map[string]string{

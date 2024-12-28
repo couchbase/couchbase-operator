@@ -48,7 +48,8 @@ type CBPodChaosConfig struct {
 	CBClusterChaosConfig CBClusterChaosConfig
 	CBUpgradeVersion     string
 	CBPodsAfterScaling   int
-	ClusterName          string // TODO to be removed. K8S Cluster Name to be taken from context
+	ClusterName          string
+	PortForward          bool
 }
 
 // ChaosActionsInterface contains all the methods for executing chaos actions.
@@ -174,6 +175,7 @@ func populateCBPodChaos(chaosConfig *ChaosConfig, chaosAction *ChaosList, cbPodN
 			CBServiceChaos:       chaosAction.CBServiceChaos[i],
 			CBClusterChaosConfig: chaosAction.CBClusterChaos[i],
 			ClusterName:          chaosConfig.ClusterName,
+			PortForward:          chaosConfig.PortForward,
 			CBUpgradeVersion:     chaosAction.CBUpgradeVersion,
 			CBPodsAfterScaling:   chaosAction.CBPodsAfterScaling,
 		}

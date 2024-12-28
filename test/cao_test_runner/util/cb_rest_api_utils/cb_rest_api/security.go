@@ -18,25 +18,25 @@ var (
 type SecurityAPI interface {
 	// RBAC Authorization APIs.
 
-	ListRoles() ([]security.Roles, error)
-	ListCurrentUsersAndRoles() ([]security.Users, error)
-	CheckPermissions(permCheckSpec string) error
+	ListRoles(portForward bool) ([]security.Roles, error)
+	ListCurrentUsersAndRoles(portForward bool) ([]security.Users, error)
+	CheckPermissions(permCheckSpec string, portForward bool) error
 
-	CreateLocalUser(username, password string, roles, groups []string) error
-	UpdateLocalUser(username, password string) error
-	DeleteLocalUser(username string) error
+	CreateLocalUser(username, password string, roles, groups []string, portForward bool) error
+	UpdateLocalUser(username, password string, portForward bool) error
+	DeleteLocalUser(username string, portForward bool) error
 
-	CreateExternalUser(username string, roles, groups []string) error
-	DeleteExternalUser(username string) error
+	CreateExternalUser(username string, roles, groups []string, portForward bool) error
+	DeleteExternalUser(username string, portForward bool) error
 
-	ListGroups() ([]security.Groups, error)
-	CreateGroup(groupName, desc, ldapGroupRef string, roles []string) error
-	DeleteGroup(groupName string) error
+	ListGroups(portForward bool) ([]security.Groups, error)
+	CreateGroup(groupName, desc, ldapGroupRef string, roles []string, portForward bool) error
+	DeleteGroup(groupName string, portForward bool) error
 }
 
 type Security struct {
+	podName    string
 	hostname   string
-	port       int
 	username   string
 	password   string
 	isSecure   bool // True for HTTPS request.
@@ -48,14 +48,10 @@ type Security struct {
 /*
  * If secretName is provided (along with namespace) then username and password will be taken from the K8S secret.
  */
-func NewSecurityAPI(hostname string, port int, username, password, secretName, namespace string,
+func NewSecurityAPI(podName, clusterName, username, password, secretName, namespace string,
 	requestTimeout time.Duration, isSecure bool) (SecurityAPI, error) {
-	if hostname == "" {
-		return nil, fmt.Errorf("new buckets api: %w", ErrHostnameNotFound)
-	}
-
-	if port <= 0 {
-		return nil, fmt.Errorf("new buckets api: %w", ErrPortNotFound)
+	if podName == "" {
+		return nil, fmt.Errorf("new cluster nodes api: %w", ErrPodnameNotFound)
 	}
 
 	if secretName != "" {
@@ -84,20 +80,17 @@ func NewSecurityAPI(hostname string, port int, username, password, secretName, n
 		return nil, fmt.Errorf("new buckets api: %w", ErrRequestTimeout)
 	}
 
-	// Checking the hostname
-	// TODO split the hostname and port.
-	// TODO update GetHTTPHostname to have isSecure parameter to support https.
-	updatedHostname, err := requestutils.GetHTTPHostname(hostname, int64(port))
+	hostname, err := requestutils.GetPodHostname(podName, clusterName, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("new buckets api: %w", err)
+		return nil, fmt.Errorf("new cluster nodes api: %w", err)
 	}
 
 	reqClient := requestutils.NewClient()
 	reqClient.SetHTTPAuth(username, password)
 
 	return &Security{
-		hostname:   updatedHostname,
-		port:       port,
+		podName:    podName,
+		hostname:   hostname,
 		username:   username,
 		password:   password,
 		isSecure:   isSecure,
@@ -110,10 +103,23 @@ func NewSecurityAPI(hostname string, port int, username, password, secretName, n
 // ============================= RBAC Authorization APIs =================================
 // =======================================================================================
 
-func (s *Security) ListRoles() ([]security.Roles, error) {
+func (s *Security) ListRoles(portForward bool) ([]security.Roles, error) {
 	var roles []security.Roles
 
-	err := s.reqClient.Do(security.ListRoles(s.hostname), &roles, s.reqTimeout)
+	req := security.ListRoles(s.hostname, "")
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, &roles, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return nil, fmt.Errorf("list roles: %w", err)
 	}
@@ -121,10 +127,23 @@ func (s *Security) ListRoles() ([]security.Roles, error) {
 	return roles, nil
 }
 
-func (s *Security) ListCurrentUsersAndRoles() ([]security.Users, error) {
+func (s *Security) ListCurrentUsersAndRoles(portForward bool) ([]security.Users, error) {
 	var users []security.Users
 
-	err := s.reqClient.Do(security.ListCurrentUsersAndRoles(s.hostname), &users, s.reqTimeout)
+	req := security.ListCurrentUsersAndRoles(s.hostname, "")
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, &users, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return nil, fmt.Errorf("list current users and roles: %w", err)
 	}
@@ -132,12 +151,25 @@ func (s *Security) ListCurrentUsersAndRoles() ([]security.Users, error) {
 	return users, nil
 }
 
-func (s *Security) CheckPermissions(permCheckSpec string) error {
+func (s *Security) CheckPermissions(permCheckSpec string, portForward bool) error {
 	if permCheckSpec == "" {
 		return fmt.Errorf("check permissions: %w", ErrPermCheckSpecNotFound)
 	}
 
-	err := s.reqClient.Do(security.CheckPermissions(s.hostname, permCheckSpec), nil, s.reqTimeout)
+	req := security.CheckPermissions(s.hostname, "", permCheckSpec)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("check permissions %s: %w", permCheckSpec, err)
 	}
@@ -145,7 +177,7 @@ func (s *Security) CheckPermissions(permCheckSpec string) error {
 	return nil
 }
 
-func (s *Security) CreateLocalUser(username, password string, roles, groups []string) error {
+func (s *Security) CreateLocalUser(username, password string, roles, groups []string, portForward bool) error {
 	if username == "" {
 		return fmt.Errorf("create local user: %w", ErrUsernameNotFound)
 	}
@@ -158,7 +190,20 @@ func (s *Security) CreateLocalUser(username, password string, roles, groups []st
 		logrus.Warn("create local user: no roles or groups provided")
 	}
 
-	err := s.reqClient.Do(security.CreateLocalUser(s.hostname, username, password, roles, groups), nil, s.reqTimeout)
+	req := security.CreateLocalUser(s.hostname, "", username, password, roles, groups)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("create local user %s with roles %v: %w", username, roles, err)
 	}
@@ -166,7 +211,7 @@ func (s *Security) CreateLocalUser(username, password string, roles, groups []st
 	return nil
 }
 
-func (s *Security) UpdateLocalUser(username, password string) error {
+func (s *Security) UpdateLocalUser(username, password string, portForward bool) error {
 	if username == "" {
 		return fmt.Errorf("create local user: %w", ErrUsernameNotFound)
 	}
@@ -175,7 +220,20 @@ func (s *Security) UpdateLocalUser(username, password string) error {
 		return fmt.Errorf("create local user: %w", ErrPasswordNotFound)
 	}
 
-	err := s.reqClient.Do(security.UpdateLocalUser(s.hostname, username, password), nil, s.reqTimeout)
+	req := security.UpdateLocalUser(s.hostname, "", username, password)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("update user %s: %w", username, err)
 	}
@@ -183,12 +241,25 @@ func (s *Security) UpdateLocalUser(username, password string) error {
 	return nil
 }
 
-func (s *Security) DeleteLocalUser(username string) error {
+func (s *Security) DeleteLocalUser(username string, portForward bool) error {
 	if username == "" {
 		return fmt.Errorf("create local user: %w", ErrUsernameNotFound)
 	}
 
-	err := s.reqClient.Do(security.DeleteLocalUser(s.hostname, username), nil, s.reqTimeout)
+	req := security.DeleteLocalUser(s.hostname, "", username)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("delete user %s: %w", username, err)
 	}
@@ -196,7 +267,7 @@ func (s *Security) DeleteLocalUser(username string) error {
 	return nil
 }
 
-func (s *Security) CreateExternalUser(username string, roles, groups []string) error {
+func (s *Security) CreateExternalUser(username string, roles, groups []string, portForward bool) error {
 	if username == "" {
 		return fmt.Errorf("create external user: %w", ErrUsernameNotFound)
 	}
@@ -205,7 +276,20 @@ func (s *Security) CreateExternalUser(username string, roles, groups []string) e
 		logrus.Warn("create external user: no roles or groups provided")
 	}
 
-	err := s.reqClient.Do(security.CreateExternalUser(s.hostname, username, roles, groups), nil, s.reqTimeout)
+	req := security.CreateExternalUser(s.hostname, "", username, roles, groups)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("create external user %s with roles %v: %w", username, roles, err)
 	}
@@ -213,12 +297,25 @@ func (s *Security) CreateExternalUser(username string, roles, groups []string) e
 	return nil
 }
 
-func (s *Security) DeleteExternalUser(username string) error {
+func (s *Security) DeleteExternalUser(username string, portForward bool) error {
 	if username == "" {
 		return fmt.Errorf("delete external user: %w", ErrUsernameNotFound)
 	}
 
-	err := s.reqClient.Do(security.DeleteExternalUser(s.hostname, username), nil, s.reqTimeout)
+	req := security.DeleteExternalUser(s.hostname, "", username)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("delete external user %s: %w", username, err)
 	}
@@ -226,10 +323,23 @@ func (s *Security) DeleteExternalUser(username string) error {
 	return nil
 }
 
-func (s *Security) ListGroups() ([]security.Groups, error) {
+func (s *Security) ListGroups(portForward bool) ([]security.Groups, error) {
 	var groups []security.Groups
 
-	err := s.reqClient.Do(security.ListGroups(s.hostname), &groups, s.reqTimeout)
+	req := security.ListGroups(s.hostname, "")
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, &groups, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return nil, fmt.Errorf("list groups: %w", err)
 	}
@@ -237,12 +347,25 @@ func (s *Security) ListGroups() ([]security.Groups, error) {
 	return groups, nil
 }
 
-func (s *Security) CreateGroup(groupName, desc, ldapGroupRef string, roles []string) error {
+func (s *Security) CreateGroup(groupName, desc, ldapGroupRef string, roles []string, portForward bool) error {
 	if groupName == "" {
 		return fmt.Errorf("create new group: %w", ErrGroupNameNotFound)
 	}
 
-	err := s.reqClient.Do(security.CreateGroup(s.hostname, groupName, desc, ldapGroupRef, roles), nil, s.reqTimeout)
+	req := security.CreateGroup(s.hostname, "", groupName, desc, ldapGroupRef, roles)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("create new group %s with roles %v: %w", groupName, roles, err)
 	}
@@ -250,12 +373,25 @@ func (s *Security) CreateGroup(groupName, desc, ldapGroupRef string, roles []str
 	return nil
 }
 
-func (s *Security) DeleteGroup(groupName string) error {
+func (s *Security) DeleteGroup(groupName string, portForward bool) error {
 	if groupName == "" {
 		return fmt.Errorf("delete group: %w", ErrGroupNameNotFound)
 	}
 
-	err := s.reqClient.Do(security.DeleteGroup(s.hostname, groupName), nil, s.reqTimeout)
+	req := security.DeleteGroup(s.hostname, "", groupName)
+
+	var portForwardConfig *requestutils.PortForwardConfig
+
+	if portForward {
+		portForwardConfig = &requestutils.PortForwardConfig{
+			PodName: s.podName,
+			Port:    req.Port,
+		}
+	} else {
+		portForwardConfig = nil
+	}
+
+	err := s.reqClient.Do(req, nil, s.reqTimeout, portForwardConfig)
 	if err != nil {
 		return fmt.Errorf("delete group %s: %w", groupName, err)
 	}
