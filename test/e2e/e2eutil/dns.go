@@ -90,6 +90,14 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 		return nil, fmt.Errorf("dns endpoint address is empty")
 	}
 
+	// Add the dns port
+	for _, port := range endpoints.Subsets[0].Ports {
+		if port.Name == "dns" {
+			remoteAddress = fmt.Sprintf("%s:%d", remoteAddress, port.Port)
+			break
+		}
+	}
+
 	// Get the local DNS endpoint.
 	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{})
 	if err != nil {
