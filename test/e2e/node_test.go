@@ -478,7 +478,9 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},

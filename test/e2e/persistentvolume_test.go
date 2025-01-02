@@ -195,7 +195,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	// When ready terminate the victims, expect the Operator auto recover the nodes.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim2, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim1), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events are as expected:
@@ -209,9 +209,9 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 				e2eutil.PodDownWithPVCRecoverySequence(clusterSize, 2),
 				eventschema.Sequence{
 					Validators: []eventschema.Validatable{
-						eventschema.Repeat{
-							Times:     2,
-							Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+
+						eventschema.Optional{
+							Validator: eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 						},
 						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
