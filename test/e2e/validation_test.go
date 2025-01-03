@@ -648,6 +648,13 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.volumeClaimTemplates.resources.requests"},
 		},
+		{
+			name: "TestValidateCouchbaseServerVersionNegBelowMin",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:6.6.5")},
+			shouldFail:     true,
+			expectedErrors: []string{"unsupported Couchbase version: 6.6.5, minimum version required: 7.0.0"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
