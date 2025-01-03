@@ -52,7 +52,7 @@ func ConvertAbstractBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucket
 // convertCouchbaseBucketToAPIBucket takes a raw bucket from the Couchbase API and converts
 // it into a Kubernetes API equivalent.
 func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer BucketNameGenerator) runtime.Object {
-	return &couchbasev2.CouchbaseBucket{
+	cbBucket := &couchbasev2.CouchbaseBucket{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: couchbasev2.Group,
 			Kind:       couchbasev2.BucketCRDResourceKind,
@@ -79,6 +79,16 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 			},
 		},
 	}
+
+	if bucket.BucketStorageBackend == "magma" {
+		cbBucket.Spec.HistoryRetentionSettings = &couchbasev2.HistoryRetentionSettings{
+			CollectionDefault: bucket.HistoryRetentionCollectionDefault,
+			Seconds:           bucket.HistoryRetentionSeconds,
+			Bytes:             bucket.HistoryRetentionBytes,
+		}
+	}
+
+	return cbBucket
 }
 
 // convertCouchbaseEphemeralBucketToAPIBucket takes a raw bucket from the Couchbase API and converts
