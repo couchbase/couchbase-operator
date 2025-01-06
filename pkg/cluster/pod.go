@@ -165,7 +165,21 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 		return false
 	}
 
-	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m); err != nil {
+	serverConf := c.cluster.Spec.GetServerConfigByName(m.Config())
+
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
+	if err != nil {
+		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+		return false
+	}
+
+	targetSemVersion, err := couchbaseutil.NewVersion(targetVersion)
+	if err != nil {
+		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+		return false
+	}
+
+	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m, targetSemVersion); err != nil {
 		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		return false
 	}

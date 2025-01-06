@@ -1594,11 +1594,11 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	r.log()
 
-	pvcPresent := true
+	podRecoverable := true
 
 	for _, candidate := range candidates {
 		if !c.isPodRecoverable(candidate) {
-			pvcPresent = false
+			podRecoverable = false
 			break
 		}
 	}
@@ -1648,13 +1648,13 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			return err
 		}
 
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && pvcPresent {
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && podRecoverable {
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
 
 			err = r.handleInPlaceUpgrade(c, serverCandidates, targetVersion)
 		} else {
-			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !pvcPresent {
-				log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !podRecoverable {
+				log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 			}
 
 			log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)

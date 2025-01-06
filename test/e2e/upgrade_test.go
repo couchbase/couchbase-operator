@@ -1429,6 +1429,59 @@ func TestResilientDeltaRecovery(t *testing.T) {
 	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
 }
 
+func TestInplaceUpgradeWithRollback(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0").Upgradable()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	upgradeProcess := couchbasev2.InPlaceUpgrade
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Spec.UpgradeProcess = &upgradeProcess
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// this will happen as the first upgrade begins, at which point revert.  The cluster will
+	// healthy after rollback has completed.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	startingVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImageUpgrade, startingVersion)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * One node upgrades
+	// * Rollback starts
+	// * One node is rolled back
+	// * Rollback completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{
+			Times:     2,
+			Validator: upgradeSequence,
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestPartialUpgrade(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

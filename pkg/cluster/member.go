@@ -785,7 +785,17 @@ func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
 		return nil
 	}
 
-	err := k8sutil.IsPodRecoverable(c.k8s, *config, m)
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(config))
+	if err != nil {
+		return err
+	}
+
+	targetSemVersion, err := couchbaseutil.NewVersion(targetVersion)
+	if err != nil {
+		return err
+	}
+
+	err = k8sutil.IsPodRecoverable(c.k8s, *config, m, targetSemVersion)
 	if err != nil {
 		if goerrors.Is(err, errors.ErrNoVolumeMounts) {
 			// Pod is not configured for volumes

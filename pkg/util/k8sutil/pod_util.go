@@ -2301,7 +2301,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member) error {
+func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2320,8 +2320,15 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, me
 	}
 
 	for _, mountMapping := range mountMappings {
-		if _, err := findMemberPVC(client, member.Name(), mountMapping.mountPath); err != nil {
+		if pvc, err := findMemberPVC(client, member.Name(), mountMapping.mountPath); err != nil {
 			return err
+		} else if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
+			pvcServerVersion, err := couchbaseutil.NewVersion(pvc.Annotations[constants.CouchbaseVersionAnnotationKey])
+			if err != nil {
+				return err
+			} else if targetVersion.Less(pvcServerVersion) {
+				return fmt.Errorf("%w: pvc server version higher than target version", errors.NewStackTracedError(errors.ErrInvalidVersion))
+			}
 		}
 	}
 
