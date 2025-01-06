@@ -3553,8 +3553,10 @@ type CouchbaseClusterDataSettings struct {
 
 	// MinReplicasCount allows the minimum number of replicas required for
 	// buckets to be set. New buckets cannot be created with less than this minimum.
-	// Defaults to 0.
+	// This field must be between 0 and 3, defaulting to 0.
 	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3
 	MinReplicasCount int `json:"minReplicasCount,omitempty"`
 }
 

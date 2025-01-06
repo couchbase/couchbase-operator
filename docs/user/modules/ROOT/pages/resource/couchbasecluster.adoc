@@ -1309,12 +1309,16 @@ default value set by Couchbase Server.
 
 *Default*: `0`
 
+*Minimum*: `0`
+
+*Maximum*: `3`
+
 ==== Description
 
 MinReplicasCount allows the minimum number of replicas required for
 buckets to be set.
 New buckets cannot be created with less than this minimum.
-Defaults to 0.
+This field must be between 0 and 3, defaulting to 0.
 
 === couchbaseclusters.spec.cluster.data.nonIOThreads
 
