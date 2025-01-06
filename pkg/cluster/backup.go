@@ -206,14 +206,14 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 			continue
 		}
 
+		if _, ok := job.Labels[constants.LabelBackupRestore]; ok {
+			continue
+		}
+
 		// check if it's ours
 		name, ok := job.Labels[constants.LabelBackup]
 		if !ok {
 			log.Info("job missing backup label", "cluster", c.namespacedName(), "job", job.Name)
-		}
-
-		if _, ok := job.Labels[constants.LabelBackupRestore]; ok {
-			continue
 		}
 
 		resource := &backupResources{
