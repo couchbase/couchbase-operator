@@ -1907,8 +1907,11 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 	candidatesNoOrchestrator, orchestrator := separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
 
 	if len(candidatesNoOrchestrator) == 0 && orchestrator == nil {
+		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
 		return nil
 	}
+
+	r.c.cluster.Status.SetBucketMigrationCondition()
 
 	migrationCandidates := couchbaseutil.MemberSet{}
 
