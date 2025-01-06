@@ -3296,9 +3296,9 @@ type CouchbaseClusterIndexerSettings struct {
 	// high availability and high performance.
 	// Note, if nodes and num_replica are both specified in the WITH clause,
 	// the specified number of nodes must be one greater than num_replica
-	// This defaults to 0, which means no index replicas to be created by default.
-	// Minimum must be 0.
+	// This field must be between 0 and 16, defaulting to 0, which means no index replicas to be created by default.
 	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=16
 	// +kubebuilder:default=0
 	NumberOfReplica int `json:"numReplica,omitempty"`
 
