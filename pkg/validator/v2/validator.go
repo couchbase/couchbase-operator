@@ -248,8 +248,12 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 		return checkValidStorageBackend(backend, annotation)
 	}
 
-	checkStringToBoolBucketAnnotation := func(backend, _ string) error {
-		return checkStringToBool(backend)
+	enableBucketMigrationRoutinesValidation := func(val, annotation string) error {
+		if cond := cluster.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
+			return fmt.Errorf("%s annotation cannot be changed whilst a bucket migration routine is in progress", annotation)
+		}
+
+		return checkStringToBool(val)
 	}
 
 	checkStringToUintBucketAnnotation := func(backend, _ string) error {
@@ -259,7 +263,7 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 	bucketAnnotations := map[string]func(string, string) error{
 		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
-		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       checkStringToBoolBucketAnnotation,
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       enableBucketMigrationRoutinesValidation,
 		"cao.couchbase.com/buckets.maxMigratableBuckets":                checkStringToUintBucketAnnotation,
 	}
 
