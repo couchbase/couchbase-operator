@@ -1566,6 +1566,8 @@ This defaults to 200ms, and must be greater than or equal to 1ms.
 
 *Minimum*: `0`
 
+*Maximum*: `16`
+
 ==== Description
 
 NumberOfReplica specifies number of secondary index replicas to be created
@@ -1573,8 +1575,7 @@ by the Index Service whenever CREATE INDEX is invoked, which ensures
 high availability and high performance.
 Note, if nodes and num_replica are both specified in the WITH clause,
 the specified number of nodes must be one greater than num_replica
-This defaults to 0, which means no index replicas to be created by default.
-Minimum must be 0.
+This field must be between 0 and 16, defaulting to 0, which means no index replicas to be created by default.
 
 === couchbaseclusters.spec.cluster.indexer.redistributeIndexes
 
