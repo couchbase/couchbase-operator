@@ -1340,6 +1340,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.redistributeIndexes`},
 		},
+		{
+			name:           "TestValidateIndexerNumReplicasMax",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", 17)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.numReplica cannot exceed 16`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

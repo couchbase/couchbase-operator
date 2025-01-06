@@ -54,6 +54,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
+		checkConstraintMaxIndexerNumReplicas,
 		checkConstraintAdminSecret,
 		checkAdminServiceConstraints,
 		checkConstraintPrometheusAuthorizationSecret,
@@ -430,6 +431,20 @@ func checkConstraintIndexerMemorySnapshotInterval(_ *types.Validator, cluster *c
 
 	if int(cluster.Spec.ClusterSettings.Indexer.MemorySnapshotInterval.Milliseconds()) < 1 {
 		return fmt.Errorf("spec.cluster.indexer.memorySnapshotInterval in body must be greater than or equal to 1ms")
+	}
+
+	return nil
+}
+
+// checkConstraintMaxIndexerNumReplicas checks the indexer numReplicas does not exceed 16.
+// added in a backport and is solved via kubebuilder validation in later versions.
+func checkConstraintMaxIndexerNumReplicas(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Indexer == nil {
+		return nil
+	}
+
+	if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica > 16 {
+		return fmt.Errorf("spec.cluster.indexer.numReplica cannot exceed 16")
 	}
 
 	return nil
