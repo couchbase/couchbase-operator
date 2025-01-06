@@ -6,7 +6,8 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
@@ -20,11 +21,14 @@ var (
 )
 
 type ChaosConfig struct {
-	Description    []string                           `yaml:"description"`
-	ManagedSvcName managedsvcs.ManagedServiceProvider `yaml:"managedService" caoCli:"required"` // TODO to be taken from context
-	ClusterName    string                             `yaml:"clusterName" caoCli:"required"`    // TODO to be taken from context
-	ChaosList      []ChaosList                        `yaml:"chaosList" caoCli:"required"`
-	Validators     []map[string]any                   `yaml:"validators,omitempty"`
+	Description []string                           `yaml:"description"`
+	ClusterName string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Platform    caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Environment managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
+	Provider    managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
+	ChaosList   []ChaosList                        `yaml:"chaosList" caoCli:"required"`
+	Validators  []map[string]any                   `yaml:"validators,omitempty"`
+	ms          *managedk8sservices.ManagedServiceProvider
 }
 
 type ChaosList struct {
@@ -64,10 +68,6 @@ func NewChaosConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new chaos config: %w", ErrChaosConfigDecode)
 	}
 
-	if !managedsvcs.ValidateManagedServices(chaosConfig.ManagedSvcName) {
-		return nil, fmt.Errorf("new chaos config: %w", managedsvcs.ErrManagedServiceNotFound)
-	}
-
 	// Validating the ChaosList.
 	for i := range chaosConfig.ChaosList {
 		err := validateChaosList(&chaosConfig.ChaosList[i])
@@ -84,6 +84,16 @@ func NewChaosConfig(config interface{}) (actions.Action, error) {
 
 func (c *Chaos) Checks(ctx *context.Context, _ interface{}, state string) error {
 	chaosConfig, _ := c.yamlConfig.(*ChaosConfig)
+
+	chaosConfig.ms = &managedk8sservices.ManagedServiceProvider{
+		Platform:    chaosConfig.Platform,
+		Environment: chaosConfig.Environment,
+		Provider:    chaosConfig.Provider,
+	}
+
+	if err := managedk8sservices.ValidateManagedServices(chaosConfig.ms); err != nil {
+		return err
+	}
 
 	logrus.Infof("%s validators running for the chaos action desc `%v`", state, chaosConfig.Description)
 

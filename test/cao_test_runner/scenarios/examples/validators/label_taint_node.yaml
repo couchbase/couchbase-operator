@@ -7,7 +7,10 @@ config:
     - name: "labelTaintNodes"
       state: "PRE"
       nodeFilter:
-        managedSvcName: "eks"
+        managedServiceProvider:
+            platform: kubernetes # kubernetes | openshift
+            environment: cloud # kind | cloud
+            provider: aws # (optional) aws | azure | gcp
         count: 1
         selectStrategy: "any"
         sortByStrategy: "default"

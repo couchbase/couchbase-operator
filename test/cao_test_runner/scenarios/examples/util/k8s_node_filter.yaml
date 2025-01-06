@@ -1,5 +1,8 @@
 nodeFilter:
-  managedSvcName: eks # kind | eks | aks | gke
+  managedServiceProvider:
+    platform: kubernetes # kubernetes | openshift
+    environment: cloud # kind | cloud
+    provider: aws # (optional) aws | azure | gcp
   count: 1
   selectStrategy: any # any | roundRobinAZ
   sortByStrategy: default # default | sorted | random | oldest | latest

@@ -36,17 +36,18 @@ const (
 )
 
 type CreateEKSCluster struct {
-	ClusterName       string
-	Region            string
-	KubernetesVersion string
-	InstanceType      string
-	NumNodeGroups     int
-	MinSize           int
-	MaxSize           int
-	DesiredSize       int
-	DiskSize          int
-	AMI               ekstypes.AMITypes
-	KubeConfigPath    string
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	InstanceType           string
+	NumNodeGroups          int
+	MinSize                int
+	MaxSize                int
+	DesiredSize            int
+	DiskSize               int
+	AMI                    ekstypes.AMITypes
+	KubeConfigPath         string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
@@ -55,12 +56,12 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, cec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(cec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
@@ -266,12 +267,12 @@ func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, cec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(cec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}

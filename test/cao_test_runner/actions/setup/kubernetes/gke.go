@@ -18,17 +18,18 @@ import (
 )
 
 type CreateGKECluster struct {
-	ClusterName       string
-	Region            string
-	KubernetesVersion string
-	MachineType       string
-	ImageType         string
-	DiskType          string
-	DiskSize          int
-	NumNodePools      int
-	Count             int
-	ReleaseChannel    managedk8sservices.ReleaseChannel
-	KubeConfigPath    string
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	MachineType            string
+	ImageType              string
+	DiskType               string
+	DiskSize               int
+	NumNodePools           int
+	Count                  int
+	ReleaseChannel         managedk8sservices.ReleaseChannel
+	KubeConfigPath         string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 const (
@@ -45,12 +46,13 @@ var (
 )
 
 func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
-	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, cgc.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(cgc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}
@@ -145,12 +147,13 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("invalid release channel %s: %w", cgc.ReleaseChannel, err)
 	}
 
-	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, cgc.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(cgc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}

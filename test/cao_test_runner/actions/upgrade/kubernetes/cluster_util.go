@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
@@ -24,42 +25,45 @@ func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, erro
 	switch p.Platform {
 	case caoinstallutils.Kubernetes:
 		switch p.Environment {
-		case Kind:
+		case managedk8sservices.Kind:
 			return nil, ErrNotImplemented
 
-		case Cloud:
+		case managedk8sservices.Cloud:
 			switch p.Provider {
-			case AWS:
+			case managedk8sservices.AWS:
 				return &UpgradeEKSCluster{
-					ClusterName:           p.ClusterName,
-					Region:                p.EKSRegion,
-					KubernetesVersion:     p.KubernetesVersion,
-					UpgradeClusterVersion: p.UpgradeClusterVersion,
-					WaitForClusterUpgrade: p.WaitForClusterUpgrade,
-					UpgradeNodeGroups:     p.UpgradeEKSNodeGroups,
-					NodeGroupsToUpgrade:   p.EKSNodeGroupsToUpgrade,
+					ClusterName:            p.ClusterName,
+					Region:                 p.EKSRegion,
+					KubernetesVersion:      p.KubernetesVersion,
+					UpgradeClusterVersion:  p.UpgradeClusterVersion,
+					WaitForClusterUpgrade:  p.WaitForClusterUpgrade,
+					UpgradeNodeGroups:      p.UpgradeEKSNodeGroups,
+					NodeGroupsToUpgrade:    p.EKSNodeGroupsToUpgrade,
+					ManagedServiceProvider: p.ms,
 				}, nil
-			case Azure:
+			case managedk8sservices.Azure:
 				return &UpgradeAKSCluster{
-					ClusterName:           p.ClusterName,
-					Region:                p.AKSRegion,
-					KubernetesVersion:     p.KubernetesVersion,
-					UpgradeClusterVersion: p.UpgradeClusterVersion,
-					WaitForClusterUpgrade: p.WaitForClusterUpgrade,
-					UpgradeNodePools:      p.UpgradeAKSNodePools,
-					NodePoolsToUpgrade:    p.AKSNodePoolsToUpgrade,
+					ClusterName:            p.ClusterName,
+					Region:                 p.AKSRegion,
+					KubernetesVersion:      p.KubernetesVersion,
+					UpgradeClusterVersion:  p.UpgradeClusterVersion,
+					WaitForClusterUpgrade:  p.WaitForClusterUpgrade,
+					UpgradeNodePools:       p.UpgradeAKSNodePools,
+					NodePoolsToUpgrade:     p.AKSNodePoolsToUpgrade,
+					ManagedServiceProvider: p.ms,
 				}, nil
-			case GCP:
+			case managedk8sservices.GCP:
 				return &UpgradeGKECluster{
-					ClusterName:           p.ClusterName,
-					Region:                p.GKERegion,
-					KubernetesVersion:     p.KubernetesVersion,
-					UpgradeClusterVersion: p.UpgradeClusterVersion,
-					WaitForClusterUpgrade: p.WaitForClusterUpgrade,
-					UpgradeMaster:         p.UpgradeGKEMaster,
-					WaitForMasterUpgrade:  p.WaitForGKEMasterUpgrade,
-					UpgradeNodePool:       p.UpgradeGKENodePool,
-					NodePoolsToUpgrade:    p.GKENodePoolsToUpgrade,
+					ClusterName:            p.ClusterName,
+					Region:                 p.GKERegion,
+					KubernetesVersion:      p.KubernetesVersion,
+					UpgradeClusterVersion:  p.UpgradeClusterVersion,
+					WaitForClusterUpgrade:  p.WaitForClusterUpgrade,
+					UpgradeMaster:          p.UpgradeGKEMaster,
+					WaitForMasterUpgrade:   p.WaitForGKEMasterUpgrade,
+					UpgradeNodePool:        p.UpgradeGKENodePool,
+					NodePoolsToUpgrade:     p.GKENodePoolsToUpgrade,
+					ManagedServiceProvider: p.ms,
 				}, nil
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)

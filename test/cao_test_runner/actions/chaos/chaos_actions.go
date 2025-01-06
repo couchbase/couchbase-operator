@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/sirupsen/logrus"
 )
@@ -38,7 +40,7 @@ const (
  */
 type CBPodChaosConfig struct {
 	ChaosAction          ActionName
-	ManagedSvcName       managedsvcs.ManagedServiceProvider
+	ManagedSvcName       *managedsvcs.ManagedServiceProvider
 	ChaosIterations      int64
 	CBPod                string
 	TriggerConfig        triggers.TriggerConfig
@@ -68,20 +70,28 @@ type ChaosActionsInterface interface {
 }
 
 // NewChaosAction initializes ChaosActionsInterface for the provided managed service.
-func NewChaosAction(context *context.Context, managedService managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
-	switch managedService {
-	case managedsvcs.EKSManagedService:
-		{
-			return NewEKSChaos(context, clusterName)
-		}
-	case managedsvcs.KindManagedService:
-		{
+func NewChaosAction(context *context.Context, managedService *managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
+	switch managedService.Platform {
+	case caoinstallutils.Kubernetes:
+		switch managedService.Environment {
+		case managedk8sservices.Kind:
 			return NewKindChaos()
-		}
-	default:
-		{
+		case managedk8sservices.Cloud:
+			switch managedService.Provider {
+			case managedk8sservices.AWS:
+				return NewEKSChaos(context, clusterName, managedService)
+			case managedsvcs.Azure:
+				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
+			case managedsvcs.GCP:
+				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
+			default:
+				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
+			}
+		default:
 			return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
 		}
+	default:
+		return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
 	}
 }
 
@@ -157,7 +167,7 @@ func populateCBPodChaos(chaosConfig *ChaosConfig, chaosAction *ChaosList, cbPodN
 	for i, cbPodName := range cbPodNames {
 		cbPodChaos := &CBPodChaosConfig{
 			ChaosAction:          chaosAction.ChaosActions[i],
-			ManagedSvcName:       chaosConfig.ManagedSvcName,
+			ManagedSvcName:       chaosConfig.ms,
 			ChaosIterations:      chaosAction.ChaosIterations,
 			CBPod:                cbPodName,
 			TriggerConfig:        chaosAction.Trigger[i],

@@ -15,15 +15,16 @@ type GKENodePoolUpgradeConfig struct {
 }
 
 type UpgradeGKECluster struct {
-	ClusterName           string
-	Region                string
-	KubernetesVersion     string
-	UpgradeClusterVersion bool
-	WaitForClusterUpgrade bool
-	UpgradeMaster         bool
-	WaitForMasterUpgrade  bool
-	UpgradeNodePool       bool
-	NodePoolsToUpgrade    []GKENodePoolUpgradeConfig
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	UpgradeClusterVersion  bool
+	WaitForClusterUpgrade  bool
+	UpgradeMaster          bool
+	WaitForMasterUpgrade   bool
+	UpgradeNodePool        bool
+	NodePoolsToUpgrade     []GKENodePoolUpgradeConfig
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 var (
@@ -31,12 +32,13 @@ var (
 )
 
 func (ugc *UpgradeGKECluster) UpgradeCluster(ctx context.Context) error {
-	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, ugc.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(ugc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}
@@ -118,12 +120,13 @@ func (ugc *UpgradeGKECluster) UpgradeCluster(ctx context.Context) error {
 }
 
 func (ugc *UpgradeGKECluster) ValidateParams(ctx context.Context) error {
-	svc, err := managedk8sservices.NewManagedServiceCredentials([]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, ugc.ClusterName)
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(ugc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}

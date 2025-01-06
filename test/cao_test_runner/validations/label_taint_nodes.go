@@ -41,7 +41,7 @@ func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
 		return fmt.Errorf("label taint nodes: %w", err)
 	}
 
-	filterNodes, err := nodefilter.NewFilterNodesInterface(ltn.NodeFilter.ManagedSvcName)
+	filterNodes, err := nodefilter.NewFilterNodesInterface(&ltn.NodeFilter.ManagedSvcName)
 	if err != nil {
 		return fmt.Errorf("label taint nodes: %w", err)
 	}

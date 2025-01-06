@@ -5,10 +5,11 @@ import (
 	"fmt"
 
 	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
 type NodeFilter struct {
-	ManagedSvcName managedsvc.ManagedServiceProvider `yaml:"managedSvcName" caoCli:"required"`
+	ManagedSvcName managedsvc.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
 
 	// Number of nodes to filter.
 	Count int `yaml:"count" caoCli:"required"`
@@ -57,12 +58,28 @@ type FilterNodesInterface interface {
 }
 
 // NewFilterNodesInterface returns the FilterNodesInterface for the provided managedk8sservices.ManagedServiceProvider.
-func NewFilterNodesInterface(managedSvcName managedsvc.ManagedServiceProvider) (FilterNodesInterface, error) {
-	switch managedSvcName {
-	case managedsvc.KindManagedService:
-		return ConfigNodeFilterKind(), nil
-	case managedsvc.EKSManagedService:
-		return ConfigNodeFilterEKS(), nil
+func NewFilterNodesInterface(managedSvcName *managedsvc.ManagedServiceProvider) (FilterNodesInterface, error) {
+	switch managedSvcName.Platform {
+	case caoinstallutils.Openshift:
+		return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+	case caoinstallutils.Kubernetes:
+		switch managedSvcName.Environment {
+		case managedsvc.Kind:
+			return ConfigNodeFilterKind(), nil
+		case managedsvc.Cloud:
+			switch managedSvcName.Provider {
+			case managedsvc.AWS:
+				return ConfigNodeFilterEKS(), nil
+			case managedsvc.Azure:
+				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+			case managedsvc.GCP:
+				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+			default:
+				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+			}
+		default:
+			return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+		}
 	default:
 		return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
 	}

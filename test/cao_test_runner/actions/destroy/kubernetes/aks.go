@@ -11,8 +11,9 @@ import (
 )
 
 type DeleteAKSCluster struct {
-	ClusterName string
-	Region      string
+	ClusterName            string
+	Region                 string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
@@ -21,12 +22,12 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, dac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dac.ManagedServiceProvider}, dac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(dac.ManagedServiceProvider)
 
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
@@ -108,12 +109,12 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
 }
 func (dac *DeleteAKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, dac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dac.ManagedServiceProvider}, dac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(dac.ManagedServiceProvider)
 
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)

@@ -13,8 +13,9 @@ import (
 )
 
 type DeleteEKSCluster struct {
-	ClusterName string
-	Region      string
+	ClusterName            string
+	Region                 string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func containsRoute(routeTables []ec2types.RouteTable, routeID string) bool {
@@ -33,12 +34,12 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(dec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
@@ -211,12 +212,12 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 
 func (dec *DeleteEKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, dec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(dec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}

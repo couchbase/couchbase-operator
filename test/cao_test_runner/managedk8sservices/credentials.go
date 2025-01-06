@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"sync"
+
+	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
 var (
@@ -66,7 +68,7 @@ type GKECredentials struct {
 
 // GetManagedServiceCredentials sets up the ManagedServiceCredentials for all the ManagedServiceProviders.
 // It gets the values from environment variables.
-func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
+func NewManagedServiceCredentials(ms []*ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
 	svc := &ManagedServiceCredentials{
 		ClusterName:    clusterName,
 		EKSCredentials: GetEKSCredentials("", "", "", ""),
@@ -84,26 +86,40 @@ func NewManagedServiceCredentials(ms []ManagedServiceProvider, clusterName strin
 // =============== Validation of Credentials  ===========
 // ======================================================
 
-func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []ManagedServiceProvider) (bool, error) {
+func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []*ManagedServiceProvider) (bool, error) {
 	if svcCred.ClusterName == "" {
 		return false, fmt.Errorf("cluster name not provided: %w", ErrClusterNameNotProvided)
 	}
 
 	for _, ms := range providers {
-		switch ms {
-		case EKSManagedService:
-			if ok, err := ValidateEKSCredentials(svcCred.EKSCredentials); !ok || err != nil {
-				return ok, err
+		switch ms.Platform {
+		case caoinstallutils.Kubernetes:
+			switch ms.Environment {
+			case Kind:
+				return false, ErrNotImplemented
+			case Cloud:
+				switch ms.Provider {
+				case AWS:
+					if ok, err := ValidateEKSCredentials(svcCred.EKSCredentials); !ok || err != nil {
+						return ok, err
+					}
+				case Azure:
+					if ok, err := ValidateAKSCredentials(svcCred.AKSCredentials); !ok || err != nil {
+						return ok, err
+					}
+				case GCP:
+					if ok, err := ValidateGKECredentials(svcCred.GKECredentials); !ok || err != nil {
+						return ok, err
+					}
+				default:
+					return false, ErrNotImplemented
+				}
+			default:
+				return false, ErrNotImplemented
 			}
-		case AKSManagedService:
-			if ok, err := ValidateAKSCredentials(svcCred.AKSCredentials); !ok || err != nil {
-				return ok, err
-			}
-		case GKEManagedService:
-			if ok, err := ValidateGKECredentials(svcCred.GKECredentials); !ok || err != nil {
-				return ok, err
-			}
-		case KindManagedService:
+		case caoinstallutils.Openshift:
+			return false, ErrNotImplemented
+		default:
 			return false, ErrNotImplemented
 		}
 	}

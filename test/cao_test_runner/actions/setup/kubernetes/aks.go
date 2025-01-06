@@ -18,16 +18,17 @@ import (
 )
 
 type CreateAKSCluster struct {
-	ClusterName       string
-	Region            string
-	KubernetesVersion string
-	VMSize            string
-	Count             int32
-	DiskSize          int32
-	OSType            armcontainerservice.OSType
-	OSSKU             armcontainerservice.OSSKU
-	NumNodePools      int
-	KubeConfigPath    string
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	VMSize                 string
+	Count                  int32
+	DiskSize               int32
+	OSType                 armcontainerservice.OSType
+	OSSKU                  armcontainerservice.OSSKU
+	NumNodePools           int
+	KubeConfigPath         string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 var (
@@ -45,12 +46,12 @@ func (cac *CreateAKSCluster) CreateCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, cac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(cac.ManagedServiceProvider)
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}
@@ -161,12 +162,12 @@ func (cac *CreateAKSCluster) ValidateParams(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, cac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(cac.ManagedServiceProvider)
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}

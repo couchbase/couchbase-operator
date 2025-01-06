@@ -10,8 +10,9 @@ import (
 )
 
 type DeleteGKECluster struct {
-	ClusterName string
-	Region      string
+	ClusterName            string
+	Region                 string
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
@@ -20,12 +21,12 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, dgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(dgc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}
@@ -100,12 +101,12 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 
 func (dgc *DeleteGKECluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.GKEManagedService}, dgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	gkeSessionStore := managedk8sservices.NewManagedService(managedk8sservices.GKEManagedService)
+	gkeSessionStore := managedk8sservices.NewManagedService(dgc.ManagedServiceProvider)
 	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set gke session: %w", err)
 	}

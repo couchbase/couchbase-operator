@@ -14,23 +14,24 @@ type EKSNodeGroupUpgradeConfig struct {
 }
 
 type UpgradeEKSCluster struct {
-	ClusterName           string
-	Region                string
-	KubernetesVersion     string
-	UpgradeClusterVersion bool
-	WaitForClusterUpgrade bool
-	UpgradeNodeGroups     bool
-	NodeGroupsToUpgrade   []EKSNodeGroupUpgradeConfig
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	UpgradeClusterVersion  bool
+	WaitForClusterUpgrade  bool
+	UpgradeNodeGroups      bool
+	NodeGroupsToUpgrade    []EKSNodeGroupUpgradeConfig
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (uec *UpgradeEKSCluster) UpgradeCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, uec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(uec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}
@@ -101,12 +102,12 @@ func (uec *UpgradeEKSCluster) UpgradeCluster(ctx context.Context) error {
 
 func (uec *UpgradeEKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.EKSManagedService}, uec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	eksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.EKSManagedService)
+	eksSessionStore := managedk8sservices.NewManagedService(uec.ManagedServiceProvider)
 	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set eks session: %w", err)
 	}

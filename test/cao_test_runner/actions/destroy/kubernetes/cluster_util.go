@@ -6,6 +6,7 @@ import (
 
 	"context"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
@@ -25,27 +26,30 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 	switch p.Platform {
 	case caoinstallutils.Kubernetes:
 		switch p.Environment {
-		case Kind:
+		case managedk8sservices.Kind:
 			return &DeleteKindCluster{
 				ClusterName: p.ClusterName,
 			}, nil
 
-		case Cloud:
+		case managedk8sservices.Cloud:
 			switch p.Provider {
-			case AWS:
+			case managedk8sservices.AWS:
 				return &DeleteEKSCluster{
-					ClusterName: p.ClusterName,
-					Region:      p.EKSRegion,
+					ClusterName:            p.ClusterName,
+					Region:                 p.EKSRegion,
+					ManagedServiceProvider: p.ms,
 				}, nil
-			case Azure:
+			case managedk8sservices.Azure:
 				return &DeleteAKSCluster{
-					ClusterName: p.ClusterName,
-					Region:      p.AKSRegion,
+					ClusterName:            p.ClusterName,
+					Region:                 p.AKSRegion,
+					ManagedServiceProvider: p.ms,
 				}, nil
-			case GoogleCloud:
+			case managedk8sservices.GCP:
 				return &DeleteGKECluster{
-					ClusterName: p.ClusterName,
-					Region:      p.GKERegion,
+					ClusterName:            p.ClusterName,
+					Region:                 p.GKERegion,
+					ManagedServiceProvider: p.ms,
 				}, nil
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)

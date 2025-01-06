@@ -14,23 +14,24 @@ type AKSNodePoolUpgradeConfig struct {
 }
 
 type UpgradeAKSCluster struct {
-	ClusterName           string
-	Region                string
-	KubernetesVersion     string
-	UpgradeClusterVersion bool
-	WaitForClusterUpgrade bool
-	UpgradeNodePools      bool
-	NodePoolsToUpgrade    []AKSNodePoolUpgradeConfig
+	ClusterName            string
+	Region                 string
+	KubernetesVersion      string
+	UpgradeClusterVersion  bool
+	WaitForClusterUpgrade  bool
+	UpgradeNodePools       bool
+	NodePoolsToUpgrade     []AKSNodePoolUpgradeConfig
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (uac *UpgradeAKSCluster) UpgradeCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, uac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(uac.ManagedServiceProvider)
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}
@@ -103,12 +104,12 @@ func (uac *UpgradeAKSCluster) UpgradeCluster(ctx context.Context) error {
 
 func (uac *UpgradeAKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]managedk8sservices.ManagedServiceProvider{managedk8sservices.AKSManagedService}, uac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
 
-	aksSessionStore := managedk8sservices.NewManagedService(managedk8sservices.AKSManagedService)
+	aksSessionStore := managedk8sservices.NewManagedService(uac.ManagedServiceProvider)
 	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
 		return fmt.Errorf("unable to set aks session: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -12,35 +13,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type EnvironmentType string
-type ProviderType string
-
-const (
-	Kind        EnvironmentType = "kind"
-	Cloud       EnvironmentType = "cloud"
-	AWS         ProviderType    = "aws"
-	Azure       ProviderType    = "azure"
-	GoogleCloud ProviderType    = "gcp"
-)
-
 var (
 	ErrDecodeKubernetesConfig = errors.New("unable to decode KubernetesDestroyConfig")
 	ErrNoConfigFound          = errors.New("no config found for deleting kubernetes cluster")
-	ErrIllegalPlatform        = errors.New("illegal platform")
-	ErrIllegalEnvironment     = errors.New("illegal environment")
-	ErrIllegalConfiguration   = errors.New("illegal configuration")
 )
 
 type KubernetesDestroyConfig struct {
-	Description []string                     `yaml:"description"`
-	ClusterName string                       `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform    caoinstallutils.PlatformType `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Environment EnvironmentType              `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
-	Provider    ProviderType                 `yaml:"provider" caoCli:"context" env:"PROVIDER"`
-	EKSRegion   string                       `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
-	AKSRegion   string                       `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
-	GKERegion   string                       `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
-	Validators  []map[string]any             `yaml:"validators,omitempty"`
+	Description []string                           `yaml:"description"`
+	ClusterName string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Platform    caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Environment managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
+	Provider    managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
+	EKSRegion   string                             `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion   string                             `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion   string                             `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
+	Validators  []map[string]any                   `yaml:"validators,omitempty"`
+	ms          *managedk8sservices.ManagedServiceProvider
 }
 
 type DestroyKubernetes struct {
@@ -104,22 +92,14 @@ func (action *DestroyKubernetes) Checks(ctx *context.Context, config interface{}
 		return ErrNoConfigFound
 	}
 
-	switch c.Platform {
-	case caoinstallutils.Kubernetes, caoinstallutils.Openshift:
-		// No-op
-	default:
-		return ErrIllegalPlatform
+	c.ms = &managedk8sservices.ManagedServiceProvider{
+		Platform:    c.Platform,
+		Environment: c.Environment,
+		Provider:    c.Provider,
 	}
 
-	switch c.Environment {
-	case Kind, Cloud:
-		// No-op
-	default:
-		return ErrIllegalEnvironment
-	}
-
-	if c.Environment == Kind && c.Platform == caoinstallutils.Openshift {
-		return ErrIllegalConfiguration
+	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
+		return err
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
