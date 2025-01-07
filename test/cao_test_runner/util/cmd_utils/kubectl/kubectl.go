@@ -2,9 +2,14 @@ package kubectl
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	cmdutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -233,11 +238,6 @@ func Exec(podName, containerName string, commandArgs ...string) *KubectlCmd {
 // ========= Advanced Kubectl Commands =========
 // =============================================
 
-func PortForward(podName, port string) *KubectlCmd {
-	args := []string{podName, port}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "port-forward", Args: args}}
-}
-
 // ==============================
 // kubectl apply command(s)
 // ==============================
@@ -362,3 +362,45 @@ func DeleteCluster(clusterName string) *KubectlCmd {
 // =============================================
 // ========== Other Kubectl Commands ===========
 // =============================================
+
+// ===============================================
+// ========== Kubectl Port-forward Util ==========
+// ===============================================
+
+func runPortForward(podName, localPort, remotePort string, stopCh <-chan struct{}, done chan<- struct{}) error {
+	cmd := exec.Command(kubectlRootCmd, "port-forward", podName, fmt.Sprintf("%s:%s", localPort, remotePort))
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start port-forward command: %w", err)
+	}
+
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			logrus.Errorf("kubectl port-forward process terminated: %v", err)
+		}
+		close(done)
+	}()
+
+	<-stopCh
+	if err := cmd.Process.Kill(); err != nil {
+		return fmt.Errorf("failed to kill the port-forward process: %w", err)
+	}
+
+	return nil
+}
+
+func PortForward(podName, localPort, remotePort string, stopCh <-chan struct{}, done chan<- struct{}) {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		err := runPortForward(podName, localPort, remotePort, stopCh, done)
+		if err != nil {
+			panic(fmt.Errorf("error running port-forward: %w", err))
+		}
+	}()
+}

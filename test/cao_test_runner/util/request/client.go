@@ -59,10 +59,11 @@ func (c *Client) Do(req *Request, result interface{}, timeout time.Duration, por
 		return fmt.Errorf("perform request: %w", ErrHTTPRequestIsNil)
 	}
 
+	done := make(chan struct{})
+	stopCh := make(chan struct{})
+
 	if portForwardConfig != nil {
-		if err := kubectl.PortForward(portForwardConfig.PodName, portForwardConfig.Port).ExecWithoutOutputCapture(); err != nil {
-			return err
-		}
+		kubectl.PortForward(portForwardConfig.PodName, portForwardConfig.Port, portForwardConfig.Port, stopCh, done)
 		req.Host = "localhost"
 	}
 
@@ -89,10 +90,18 @@ func (c *Client) Do(req *Request, result interface{}, timeout time.Duration, por
 	for {
 		select {
 		case <-ctx.Done():
+			if portForwardConfig != nil {
+				close(stopCh)
+				<-done
+			}
 			return fmt.Errorf("perform %s request %s%s timed out after %v: %w", req.Method, req.Host, req.Path, timeout, err)
 		default:
 			resp, err = c.makeRequest(req)
 			if err == nil {
+				if portForwardConfig != nil {
+					close(stopCh)
+					<-done
+				}
 				return c.handleResponse(resp, result)
 			}
 
