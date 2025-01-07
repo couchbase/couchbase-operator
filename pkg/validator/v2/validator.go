@@ -3797,6 +3797,7 @@ func CheckBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	return nil
 }
 
+//nolint:gocognit
 func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var clusters = new(couchbasev2.CouchbaseClusterList)
 
@@ -3826,6 +3827,12 @@ func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchb
 				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true")
 			}
 
+			upgradeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+
+			if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
+				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
+			}
+
 			tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 			if err != nil {
 				return err
@@ -3837,7 +3844,13 @@ func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchb
 				return err
 			}
 
-			if !after76 {
+			currentVersionAfter76, err := couchbaseutil.VersionAfter(cluster.Status.CurrentVersion, "7.6.0")
+
+			if err != nil {
+				return err
+			}
+
+			if !after76 || !currentVersionAfter76 {
 				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater")
 			}
 		}
