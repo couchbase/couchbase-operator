@@ -293,9 +293,20 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 
 func checkAdminServiceConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	for i, config := range cluster.Spec.Servers {
+		tag, err := k8sutil.CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(&config))
+		if err != nil {
+			return err
+		}
+
 		serviceList := couchbasev2.ServiceList(config.Services)
-		if serviceList.Contains(couchbasev2.AdminService) && len(serviceList) > 1 {
-			return fmt.Errorf("spec.servers[%d].services cannot contain the admin service and other services", i)
+		if serviceList.Contains(couchbasev2.AdminService) {
+			if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); !after76 && err == nil {
+				return fmt.Errorf("couchbase server version must be greater than 7.6.0 to enable the admin service")
+			}
+
+			if len(serviceList) > 1 {
+				return fmt.Errorf("spec.servers[%d].services cannot contain the admin service and other services", i)
+			}
 		}
 	}
 
