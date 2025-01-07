@@ -4,8 +4,10 @@ trees:
       description:
         - Restart a k8s node which has cb pod with data service.
         - Then check for rebalance and again restart node.
-      managedService: eks
-      clusterName: k8s-aryaan # k8s cluster
+      platform: kubernetes
+      environment: cloud
+      provider: aws
+      clusterName: k8s-cluster-name
       chaosList:
         - chaosActions:
             - RestartNodes

@@ -24,7 +24,7 @@ func ValidateTriggerConfig(tc *TriggerConfig) error {
 
 func validateTriggerName(triggerName TriggerName) error {
 	switch triggerName {
-	case TriggerWait, TriggerRebalance, TriggerDeltaRecovery:
+	case TriggerWait, TriggerInstant, TriggerRebalance, TriggerDeltaRecovery, TriggerRebalanceEnd:
 		return nil
 	case TriggerDeltaRecoveryUpgradeWarmup, TriggerDeltaRecoveryUpgrade, TriggerSwapRebalanceInUpgrade, TriggerSwapRebalanceOutUpgrade:
 		return nil

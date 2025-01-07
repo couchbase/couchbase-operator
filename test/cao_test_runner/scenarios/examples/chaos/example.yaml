@@ -4,7 +4,9 @@ trees:
       description:
         - Describe the Chaos Action here.
         - The logs will print this description to help identify the chaos action easily.
-      managedService: eks # kind | eks | gke | aks
+      platform: kubernetes # kubernetes | openshift
+      environment: cloud # cloud | kind
+      provider: aws # aws | gcp | azure
       clusterName: k8s-cluster-name
       chaosList: # This list contains all the details for the chaos. All the chaosActions listed will start concurrently.
         - cbPodFilter: # IMPORTANT: This will filter and provide the CB Pods on which we perform the chaos. Make sure to match the count of filtered pods with num(chaosActions, triggerConfig, cbServiceChaos, cbClusterChaosConfig).

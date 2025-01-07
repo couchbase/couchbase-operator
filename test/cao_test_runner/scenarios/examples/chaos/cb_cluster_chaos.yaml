@@ -43,7 +43,9 @@ trees:
         config:
           description:
             - "CB Cluster Chaos Action: Stop Rebalance"
-          managedService: eks
+          platform: kubernetes
+          environment: cloud
+          provider: aws
           clusterName: k8s-cluster-name
           chaosList:
             - chaosActions:

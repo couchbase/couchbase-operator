@@ -13,11 +13,11 @@ import (
 var (
 	ErrConfigSleep   = errors.New("sleep config is nil")
 	ErrSleepDecode   = errors.New("unable to decode sleepConfig")
-	DefaultSleepTime = 5
+	DefaultSleepTime = 30 * time.Second
 )
 
 type SleepActionConfig struct {
-	Time int `yaml:"time" `
+	Duration time.Duration `yaml:"duration" `
 }
 
 func NewSleepActionConfig(config interface{}) (actions.Action, error) {
@@ -29,8 +29,8 @@ func NewSleepActionConfig(config interface{}) (actions.Action, error) {
 			return nil, ErrSleepDecode
 		}
 
-		if c.Time == 0 {
-			c.Time = DefaultSleepTime
+		if c.Duration == 0 {
+			c.Duration = DefaultSleepTime
 		}
 
 		return &SleepAction{
@@ -53,8 +53,12 @@ func (s *SleepAction) Describe() string {
 
 func (s *SleepAction) Do(_ *context.Context, _ interface{}) error {
 	c, _ := s.yamlConfig.(*SleepActionConfig)
-	logrus.Infof("Sleeping for %d minutes", c.Time)
-	time.Sleep(time.Duration(c.Time) * time.Minute)
+
+	logrus.Infof("Sleeping for %s", c.Duration.String())
+
+	time.Sleep(c.Duration)
+
+	logrus.Infof("Sleep complete.")
 
 	return nil
 }

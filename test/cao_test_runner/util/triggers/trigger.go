@@ -20,7 +20,9 @@ const (
 
 	// Rebalance Triggers.
 
-	TriggerRebalance     TriggerName = "rebalance"
+	TriggerRebalance    TriggerName = "rebalance"
+	TriggerRebalanceEnd TriggerName = "rebalanceEnd"
+
 	TriggerDeltaRecovery TriggerName = "deltaRecoveryRebalance"
 
 	// Upgrade Triggers.
@@ -154,6 +156,10 @@ func switchTrigger(t *TriggerConfig) error {
 	case TriggerRebalance:
 		{
 			return WaitForRebalance(t)
+		}
+	case TriggerRebalanceEnd:
+		{
+			return WaitForRebalanceEnd(t)
 		}
 	case TriggerDeltaRecovery:
 		{

@@ -21,6 +21,7 @@ var (
 	ErrRebalanceNotStarted     = errors.New("rebalance not started")
 	ErrDeltaRecoveryNotStarted = errors.New("delta recovery rebalance not started")
 	ErrSwapRebNotStarted       = errors.New("swap rebalance not started")
+	ErrRebalanceRunning        = errors.New("a rebalance is running")
 )
 
 // WaitForRebalance checks for latest rebalance to trigger. This trigger checks for any rebalance.
@@ -53,6 +54,44 @@ func WaitForRebalance(trigger *TriggerConfig) error {
 		}
 
 		return ErrRebalanceNotStarted
+	}
+
+	err := util.RetryFunctionTillTimeout(checkRebalanceFunc, trigger.TriggerDuration, trigger.TriggerInterval)
+	if err != nil {
+		return fmt.Errorf("trigger for rebalance: %w", err)
+	}
+
+	return nil
+}
+
+// WaitForRebalanceEnd checks if the current running rebalance has ended.
+// Make sure to start this trigger when a rebalance is going on.
+func WaitForRebalanceEnd(trigger *TriggerConfig) error {
+	checkRebalanceFunc := func() error {
+		podName := trigger.CBInfo.cbPodName
+		clusterName := trigger.CBClusterName
+
+		clusterNodesAPI, err := cbrestapi.NewClusterNodesAPI(podName, clusterName, "", "", trigger.CBSecretName, "default", 5*time.Second, false, false)
+		if err != nil {
+			return err
+		}
+
+		clusterTasks, err := clusterNodesAPI.PoolsDefaultTasks(trigger.PortForward)
+		if err != nil {
+			return fmt.Errorf("wait for rebalance end: %w", err)
+		}
+
+		logrus.Debugf("tasks: %v\n", clusterTasks)
+
+		for _, task := range clusterTasks {
+			if task.Type == clusternodesapi.TaskTypeRebalance {
+				if task.Status == clusternodesapi.TaskStatusRunning {
+					return ErrRebalanceRunning
+				}
+			}
+		}
+
+		return nil
 	}
 
 	err := util.RetryFunctionTillTimeout(checkRebalanceFunc, trigger.TriggerDuration, trigger.TriggerInterval)

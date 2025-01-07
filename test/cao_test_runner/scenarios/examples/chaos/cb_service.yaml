@@ -43,7 +43,9 @@ trees:
         config:
           description:
             - Perform chaos on CBService which has cb pod with data service.
-          managedService: eks
+          platform: kubernetes
+          environment: cloud
+          provider: aws
           clusterName: k8s-aryaan
           chaosList:
             - chaosActions:
