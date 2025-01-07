@@ -2149,10 +2149,11 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 		},
 		{
 			name: "TestValidateSampleBucketMemoryQuotaExceeded",
-			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
-				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/sampleBucket": "true",
-				}),
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Add("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/sampleBucket": "true",
+					}),
 				"bucket0": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/sampleBucket": "true",
@@ -2160,6 +2161,20 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/dataServiceMemoryQuota", "256Mi")},
 			shouldFail:     true,
 			expectedErrors: []string{`sample buckets have a memory quota of 200Mi`},
+		},
+		{
+			name: "TestValidateCreateMagmaBucketInvalidClusterSupport",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1024Mi").
+					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.1.1").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "2Gi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2`},
 		},
 	}
 

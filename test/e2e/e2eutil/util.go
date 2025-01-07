@@ -1827,6 +1827,12 @@ func MustRetrieveMemcachedBucketByLabel(t *testing.T, kubernetes *types.Cluster,
 	return &buckets.Items[0]
 }
 
+func MustGetAdmissionFailureOnCreateBucket(t *testing.T, k8s *types.Cluster, bucket metav1.Object, rejectReason string) {
+	if _, err := NewBucketOld(k8s, bucket); err == nil || !strings.Contains(err.Error(), rejectReason) {
+		Die(t, fmt.Errorf("expected admission error: %s", rejectReason))
+	}
+}
+
 func GetPvcName(lpv bool) string {
 	if lpv {
 		return "local"
