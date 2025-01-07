@@ -3466,11 +3466,29 @@ func checkImmutableServerClass(current, updated *couchbasev2.CouchbaseCluster) e
 	var errs []error
 
 	for _, cur := range current.Spec.Servers {
+		before76 := true
+
+		tag, err := k8sutil.CouchbaseVersion(current.Spec.ServerClassCouchbaseImage(&cur))
+		if err != nil {
+			return err
+		}
+
+		if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); after76 && err == nil {
+			before76 = false
+		}
+
 		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
 				if !util.StringArrayCompare(couchbasev2.ServiceList(cur.Services).StringSlice(), couchbasev2.ServiceList(up.Services).StringSlice()) {
 					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 					continue
+				}
+			}
+
+			if before76 {
+				serviceList := couchbasev2.ServiceList(up.Services)
+				if serviceList.Contains(couchbasev2.AdminService) || serviceList.Len() == 0 {
+					errs = append(errs, fmt.Errorf("cannot enable admin service until cluster is upgraded to 7.6.x+"))
 				}
 			}
 		}
