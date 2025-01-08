@@ -63,22 +63,21 @@ func NewChaosBareMetalConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new bare metal chaos config: %w", ErrChaosBareMetalConfigDecode)
 	}
 
-	// Validating the ChaosList.
-	for i := range chaosConfig.ChaosList {
-		err := validateChaosList(&chaosConfig.ChaosList[i])
-		if err != nil {
-			return nil, fmt.Errorf("new bare metal chaos config: %w", err)
-		}
-	}
-
 	return &ChaosBareMetal{
 		desc:       fmt.Sprintf("perform chaos action desc: %v", chaosConfig.Description),
 		yamlConfig: chaosConfig,
 	}, nil
 }
 
-func (c *ChaosBareMetal) Checks(ctx *context.Context, _ interface{}, state string) error {
-	chaosConfig, _ := c.yamlConfig.(*BareMetalChaosConfig)
+func (c *ChaosBareMetal) RunValidators(ctx *context.Context, state string) error {
+	if c.yamlConfig == nil {
+		return ErrChaosBareMetalConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*BareMetalChaosConfig)
+	if !ok {
+		return ErrChaosBareMetalConfigDecode
+	}
 
 	logrus.Infof("%s validators running for the bare metal chaos action desc `%v`", state, chaosConfig.Description)
 
@@ -91,8 +90,36 @@ func (c *ChaosBareMetal) Checks(ctx *context.Context, _ interface{}, state strin
 	return nil
 }
 
-func (c *ChaosBareMetal) Do(ctx *context.Context, _ interface{}) error {
-	chaosConfig, _ := c.yamlConfig.(*BareMetalChaosConfig)
+func (c *ChaosBareMetal) CheckConfig() error {
+	if c.yamlConfig == nil {
+		return ErrChaosBareMetalConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*BareMetalChaosConfig)
+	if !ok {
+		return ErrChaosBareMetalConfigDecode
+	}
+
+	// Validating the ChaosList.
+	for i := range chaosConfig.ChaosList {
+		err := validateChaosList(&chaosConfig.ChaosList[i])
+		if err != nil {
+			return fmt.Errorf("new bare metal chaos config: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (c *ChaosBareMetal) Do(ctx *context.Context) error {
+	if c.yamlConfig == nil {
+		return ErrChaosBareMetalConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*BareMetalChaosConfig)
+	if !ok {
+		return ErrChaosBareMetalConfigDecode
+	}
 
 	logrus.Infof("Starting chaos action desc: %v", chaosConfig.Description)
 

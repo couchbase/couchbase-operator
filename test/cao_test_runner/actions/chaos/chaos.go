@@ -69,22 +69,29 @@ func NewChaosConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new chaos config: %w", ErrChaosConfigDecode)
 	}
 
-	// Validating the ChaosList.
-	for i := range chaosConfig.ChaosList {
-		err := validateChaosList(&chaosConfig.ChaosList[i])
-		if err != nil {
-			return nil, fmt.Errorf("new chaos config: %w", err)
-		}
-	}
-
 	return &Chaos{
 		desc:       fmt.Sprintf("perform chaos action desc: %v", chaosConfig.Description),
 		yamlConfig: chaosConfig,
 	}, nil
 }
 
-func (c *Chaos) Checks(ctx *context.Context, _ interface{}, state string) error {
-	chaosConfig, _ := c.yamlConfig.(*ChaosConfig)
+func (c *Chaos) CheckConfig() error {
+	if c.yamlConfig == nil {
+		return ErrChaosConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*ChaosConfig)
+	if !ok {
+		return ErrChaosConfigDecode
+	}
+
+	// Validating the ChaosList.
+	for i := range chaosConfig.ChaosList {
+		err := validateChaosList(&chaosConfig.ChaosList[i])
+		if err != nil {
+			return fmt.Errorf("new chaos config: %w", err)
+		}
+	}
 
 	chaosConfig.ms = &managedk8sservices.ManagedServiceProvider{
 		Platform:    chaosConfig.Platform,
@@ -94,6 +101,19 @@ func (c *Chaos) Checks(ctx *context.Context, _ interface{}, state string) error 
 
 	if err := managedk8sservices.ValidateManagedServices(chaosConfig.ms); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (c *Chaos) RunValidators(ctx *context.Context, state string) error {
+	if c.yamlConfig == nil {
+		return ErrChaosConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*ChaosConfig)
+	if !ok {
+		return ErrChaosConfigDecode
 	}
 
 	logrus.Infof("%s validators running for the chaos action desc `%v`", state, chaosConfig.Description)
@@ -107,8 +127,15 @@ func (c *Chaos) Checks(ctx *context.Context, _ interface{}, state string) error 
 	return nil
 }
 
-func (c *Chaos) Do(ctx *context.Context, _ interface{}) error {
-	chaosConfig, _ := c.yamlConfig.(*ChaosConfig)
+func (c *Chaos) Do(ctx *context.Context) error {
+	if c.yamlConfig == nil {
+		return ErrChaosConfigNotFound
+	}
+
+	chaosConfig, ok := c.yamlConfig.(*ChaosConfig)
+	if !ok {
+		return ErrChaosConfigDecode
+	}
 
 	logrus.Infof("Starting chaos action desc: %v", chaosConfig.Description)
 

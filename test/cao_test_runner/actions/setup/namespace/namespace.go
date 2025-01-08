@@ -50,10 +50,27 @@ func (action *SetupNamespace) Describe() string {
 	return action.desc
 }
 
-func (action *SetupNamespace) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *SetupNamespace) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoSetupNamespaceConfigFound
+	}
+
+	_, ok := action.yamlConfig.(*SetupNamespaceConfig)
+	if !ok {
+		return ErrUnableToDecodeSetupNamespaceConfig
+	}
+
+	return nil
+}
+
+func (action *SetupNamespace) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoSetupNamespaceConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*SetupNamespaceConfig)
 	if !ok {
-		return ErrNoSetupNamespaceConfigFound
+		return ErrUnableToDecodeSetupNamespaceConfig
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
@@ -63,10 +80,14 @@ func (action *SetupNamespace) Checks(ctx *context.Context, config interface{}, s
 	return nil
 }
 
-func (action *SetupNamespace) Do(ctx *context.Context, _ interface{}) error {
+func (action *SetupNamespace) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoSetupNamespaceConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*SetupNamespaceConfig)
 	if !ok {
-		return ErrNoSetupNamespaceConfigFound
+		return ErrUnableToDecodeSetupNamespaceConfig
 	}
 
 	logrus.Infof("Namespace creation started")

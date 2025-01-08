@@ -85,10 +85,14 @@ func (action *SetupKubernetes) Describe() string {
 	return action.desc
 }
 
-func (action *SetupKubernetes) Do(ctx *context.Context, config interface{}) error {
+func (action *SetupKubernetes) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesSetupConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeKubernetesConfig
 	}
 
 	logrus.Infof("Kubernetes Setup started")
@@ -124,10 +128,14 @@ func (action *SetupKubernetes) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *SetupKubernetes) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesSetupConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeKubernetesConfig
 	}
 
 	c.ms = &managedk8sservices.ManagedServiceProvider{
@@ -144,6 +152,19 @@ func (action *SetupKubernetes) Checks(ctx *context.Context, config interface{}, 
 		if !fileutils.NewFile(c.KubectlPath).IsFileExists() {
 			return ErrIllegalKubectlPath
 		}
+	}
+
+	return nil
+}
+
+func (action *SetupKubernetes) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*KubernetesSetupConfig)
+	if !ok {
+		return ErrDecodeKubernetesConfig
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {

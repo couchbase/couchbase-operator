@@ -57,10 +57,14 @@ func (action *SetupCaoCrd) Describe() string {
 	return action.desc
 }
 
-func (action *SetupCaoCrd) Do(ctx *context.Context, config interface{}) error {
+func (action *SetupCaoCrd) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeCAOSetupConfig
 	}
 
 	logrus.Infof("CAO CRD Setup started")
@@ -105,10 +109,14 @@ func (action *SetupCaoCrd) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *SetupCaoCrd) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *SetupCaoCrd) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeCAOSetupConfig
 	}
 
 	switch c.Platform {
@@ -130,6 +138,19 @@ func (action *SetupCaoCrd) Checks(ctx *context.Context, config interface{}, stat
 		// No-op
 	default:
 		return ErrIllegalArchitecture
+	}
+
+	return nil
+}
+
+func (action *SetupCaoCrd) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
+	if !ok {
+		return ErrDecodeCAOSetupConfig
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {

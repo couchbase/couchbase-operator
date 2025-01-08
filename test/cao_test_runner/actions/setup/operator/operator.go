@@ -115,10 +115,31 @@ func (action *SetupOperator) Describe() string {
 	return action.desc
 }
 
-func (action *SetupOperator) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *SetupOperator) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoOperatorConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
+		return ErrUnableToDecodeOperatorConfig
+	}
+
+	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+		return fmt.Errorf("run %s validations: %w", state, err)
+	}
+
+	return nil
+}
+
+func (action *SetupOperator) CheckConfig() error {
+	if action.yamlConfig == nil {
 		return ErrNoOperatorConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*OperatorConfig)
+	if !ok {
+		return ErrUnableToDecodeOperatorConfig
 	}
 
 	if c.OperatorImage == "" {
@@ -183,17 +204,17 @@ func (action *SetupOperator) Checks(ctx *context.Context, config interface{}, st
 		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
-	}
-
 	return nil
 }
 
-func (action *SetupOperator) Do(ctx *context.Context, _ interface{}) error {
+func (action *SetupOperator) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoOperatorConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
-		return ErrNoOperatorConfigFound
+		return ErrUnableToDecodeOperatorConfig
 	}
 
 	logrus.Infof("Operator pod creation started")

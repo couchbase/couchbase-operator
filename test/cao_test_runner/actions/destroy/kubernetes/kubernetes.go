@@ -56,10 +56,14 @@ func (action *DestroyKubernetes) Describe() string {
 	return action.desc
 }
 
-func (action *DestroyKubernetes) Do(ctx *context.Context, config interface{}) error {
+func (action *DestroyKubernetes) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesDestroyConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeKubernetesConfig
 	}
 
 	logrus.Infof("Kubernetes Destroy started")
@@ -86,10 +90,14 @@ func (action *DestroyKubernetes) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *DestroyKubernetes) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *DestroyKubernetes) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesDestroyConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeKubernetesConfig
 	}
 
 	c.ms = &managedk8sservices.ManagedServiceProvider{
@@ -100,6 +108,19 @@ func (action *DestroyKubernetes) Checks(ctx *context.Context, config interface{}
 
 	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (action *DestroyKubernetes) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*KubernetesDestroyConfig)
+	if !ok {
+		return ErrDecodeKubernetesConfig
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {

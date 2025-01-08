@@ -73,15 +73,6 @@ func NewIndexWorkloadConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new index workload config: %w", workloads.ErrWorkloadDecode)
 	}
 
-	if !ValidateIndexWorkloadName(indexWorkloadConfig.IndexWorkloadName) {
-		return nil, fmt.Errorf("new index workload config: %w", ErrInvalidIndexWorkloadName)
-	}
-
-	err := ValidateIndexWorkloadConfig(indexWorkloadConfig)
-	if err != nil {
-		return nil, fmt.Errorf("new index workload config: %w", err)
-	}
-
 	return &IndexWorkload{
 		desc:       "run index workloads on CB cluster in K8S",
 		yamlConfig: indexWorkloadConfig,
@@ -97,8 +88,15 @@ func (d *IndexWorkload) Describe() string {
 	return d.desc
 }
 
-func (d *IndexWorkload) Do(_ *context.Context, _ interface{}) error {
-	workloadConfig, _ := d.yamlConfig.(*IndexWorkloadConfig)
+func (d *IndexWorkload) Do(_ *context.Context) error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	workloadConfig, ok := d.yamlConfig.(*IndexWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
 
 	// Introduce a wait before starting to run the workload.
 	if workloadConfig.PreRunWait != 0 {
@@ -205,6 +203,28 @@ func (d *IndexWorkload) Config() interface{} {
 	return d.yamlConfig
 }
 
-func (d *IndexWorkload) Checks(_ *context.Context, _ interface{}, _ string) error {
+func (d *IndexWorkload) CheckConfig() error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	workloadConfig, ok := d.yamlConfig.(*IndexWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
+
+	if !ValidateIndexWorkloadName(workloadConfig.IndexWorkloadName) {
+		return fmt.Errorf("new index workload config: %w", ErrInvalidIndexWorkloadName)
+	}
+
+	err := ValidateIndexWorkloadConfig(workloadConfig)
+	if err != nil {
+		return fmt.Errorf("new index workload config: %w", err)
+	}
+
+	return nil
+}
+
+func (d *IndexWorkload) RunValidators(_ *context.Context, _ string) error {
 	return nil
 }

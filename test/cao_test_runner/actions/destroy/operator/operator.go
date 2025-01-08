@@ -64,10 +64,14 @@ func (action *DeleteOperator) Describe() string {
 	return action.desc
 }
 
-func (action *DeleteOperator) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *DeleteOperator) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoOperatorConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
-		return ErrNoOperatorConfigFound
+		return ErrUnableToDecodeOperatorConfig
 	}
 
 	switch c.Scope {
@@ -83,6 +87,19 @@ func (action *DeleteOperator) Checks(ctx *context.Context, config interface{}, s
 		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
+	return nil
+}
+
+func (action *DeleteOperator) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoOperatorConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*OperatorConfig)
+	if !ok {
+		return ErrUnableToDecodeOperatorConfig
+	}
+
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
@@ -90,10 +107,14 @@ func (action *DeleteOperator) Checks(ctx *context.Context, config interface{}, s
 	return nil
 }
 
-func (action *DeleteOperator) Do(ctx *context.Context, _ interface{}) error {
+func (action *DeleteOperator) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoOperatorConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*OperatorConfig)
 	if !ok {
-		return ErrNoOperatorConfigFound
+		return ErrUnableToDecodeOperatorConfig
 	}
 
 	logrus.Infof("Operator pod deletion started")

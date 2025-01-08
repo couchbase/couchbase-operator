@@ -29,10 +29,6 @@ func NewSleepActionConfig(config interface{}) (actions.Action, error) {
 			return nil, ErrSleepDecode
 		}
 
-		if c.Duration == 0 {
-			c.Duration = DefaultSleepTime
-		}
-
 		return &SleepAction{
 			desc:       "sleep execution to delay the child actions",
 			yamlConfig: c,
@@ -51,8 +47,15 @@ func (s *SleepAction) Describe() string {
 	return s.desc
 }
 
-func (s *SleepAction) Do(_ *context.Context, _ interface{}) error {
-	c, _ := s.yamlConfig.(*SleepActionConfig)
+func (s *SleepAction) Do(_ *context.Context) error {
+	if s.yamlConfig == nil {
+		return ErrConfigSleep
+	}
+
+	c, ok := s.yamlConfig.(*SleepActionConfig)
+	if !ok {
+		return ErrSleepDecode
+	}
 
 	logrus.Infof("Sleeping for %s", c.Duration.String())
 
@@ -67,6 +70,23 @@ func (s *SleepAction) Config() interface{} {
 	return s.yamlConfig
 }
 
-func (s *SleepAction) Checks(_ *context.Context, _ interface{}, _ string) error {
+func (s *SleepAction) CheckConfig() error {
+	if s.yamlConfig == nil {
+		return ErrConfigSleep
+	}
+
+	c, ok := s.yamlConfig.(*SleepActionConfig)
+	if !ok {
+		return ErrSleepDecode
+	}
+
+	if c.Duration == 0 {
+		c.Duration = DefaultSleepTime
+	}
+
+	return nil
+}
+
+func (s *SleepAction) RunValidators(_ *context.Context, _ string) error {
 	return nil
 }

@@ -61,15 +61,6 @@ func NewDataWorkloadConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new data workload config: %w", workloads.ErrWorkloadDecode)
 	}
 
-	if !ValidateDataWorkloadName(dataWorkloadConfig.DataWorkloadName) {
-		return nil, fmt.Errorf("new data workload config: %w", ErrInvalidDataWorkloadName)
-	}
-
-	err := ValidateDataWorkloadConfig(dataWorkloadConfig)
-	if err != nil {
-		return nil, fmt.Errorf("new data workload config: %w", err)
-	}
-
 	return &DataWorkload{
 		desc:       "run data workloads on CB cluster in K8S",
 		yamlConfig: dataWorkloadConfig,
@@ -85,8 +76,15 @@ func (d *DataWorkload) Describe() string {
 	return d.desc
 }
 
-func (d *DataWorkload) Do(_ *context.Context, _ interface{}) error {
-	workloadConfig, _ := d.yamlConfig.(*DataWorkloadConfig)
+func (d *DataWorkload) Do(_ *context.Context) error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	workloadConfig, ok := d.yamlConfig.(*DataWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
 
 	// Introduce a wait before starting to run the workload.
 	if workloadConfig.PreRunWait != 0 {
@@ -178,6 +176,28 @@ func (d *DataWorkload) Config() interface{} {
 	return d.yamlConfig
 }
 
-func (d *DataWorkload) Checks(_ *context.Context, _ interface{}, _ string) error {
+func (d *DataWorkload) CheckConfig() error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	c, ok := d.yamlConfig.(*DataWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
+
+	if !ValidateDataWorkloadName(c.DataWorkloadName) {
+		return fmt.Errorf("new data workload config: %w", ErrInvalidDataWorkloadName)
+	}
+
+	err := ValidateDataWorkloadConfig(c)
+	if err != nil {
+		return fmt.Errorf("new data workload config: %w", err)
+	}
+
+	return nil
+}
+
+func (d *DataWorkload) RunValidators(_ *context.Context, _ string) error {
 	return nil
 }

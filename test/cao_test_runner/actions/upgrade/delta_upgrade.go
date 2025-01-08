@@ -46,10 +46,27 @@ type DeltaRecoveryUpgrade struct {
 	yamlConfig interface{}
 }
 
-func (d *DeltaRecoveryUpgrade) Checks(ctx *context.Context, _ interface{}, state string) error {
+func (d *DeltaRecoveryUpgrade) CheckConfig() error {
+	if d.yamlConfig == nil {
+		return ErrDeltaUpgradeConfig
+	}
+
+	_, ok := d.yamlConfig.(*DeltaRecoveryUpgradeConfig)
+	if !ok {
+		return ErrDeltaUpgradeDecodeFailed
+	}
+
+	return nil
+}
+
+func (d *DeltaRecoveryUpgrade) RunValidators(ctx *context.Context, state string) error {
+	if d.yamlConfig == nil {
+		return ErrDeltaUpgradeConfig
+	}
+
 	c, ok := d.yamlConfig.(*DeltaRecoveryUpgradeConfig)
 	if !ok {
-		return ErrDeltaUpgradeConfig
+		return ErrDeltaUpgradeDecodeFailed
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
@@ -63,10 +80,14 @@ func (d *DeltaRecoveryUpgrade) Describe() string {
 	return d.desc
 }
 
-func (d *DeltaRecoveryUpgrade) Do(_ *context.Context, _ interface{}) error {
+func (d *DeltaRecoveryUpgrade) Do(_ *context.Context) error {
+	if d.yamlConfig == nil {
+		return ErrDeltaUpgradeConfig
+	}
+
 	c, ok := d.yamlConfig.(*DeltaRecoveryUpgradeConfig)
 	if !ok {
-		return ErrDeltaUpgradeConfig
+		return ErrDeltaUpgradeDecodeFailed
 	}
 
 	logrus.Infof("Couchbase Upgrade started")

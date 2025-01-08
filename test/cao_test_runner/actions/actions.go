@@ -6,7 +6,8 @@ import (
 
 type Action interface {
 	Describe() string
-	Do(ctx *context.Context, config interface{}) error
+	Do(ctx *context.Context) error
 	Config() interface{}
-	Checks(ctx *context.Context, config interface{}, state string) error
+	CheckConfig() error
+	RunValidators(ctx *context.Context, state string) error
 }

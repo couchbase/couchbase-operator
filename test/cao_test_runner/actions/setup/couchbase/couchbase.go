@@ -42,10 +42,6 @@ func NewCouchbaseConfig(config interface{}) (actions.Action, error) {
 			return nil, ErrCouchbaseConfigDecode
 		}
 
-		if c.CBClusterSpecPath == "" {
-			return nil, ErrMissingYaml
-		}
-
 		return &Couchbase{
 			desc:       "setup or configure couchbase using cluster yaml specification",
 			yamlConfig: c,
@@ -60,8 +56,32 @@ type Couchbase struct {
 	yamlConfig interface{}
 }
 
-func (s *Couchbase) Checks(ctx *context.Context, _ interface{}, state string) error {
-	c, _ := s.yamlConfig.(*CouchbaseConfig)
+func (s *Couchbase) CheckConfig() error {
+	if s.yamlConfig == nil {
+		return ErrConfigCouchbase
+	}
+
+	c, ok := s.yamlConfig.(*CouchbaseConfig)
+	if !ok {
+		return ErrCouchbaseConfigDecode
+	}
+
+	if c.CBClusterSpecPath == "" {
+		return ErrMissingYaml
+	}
+
+	return nil
+}
+
+func (s *Couchbase) RunValidators(ctx *context.Context, state string) error {
+	if s.yamlConfig == nil {
+		return ErrConfigCouchbase
+	}
+
+	c, ok := s.yamlConfig.(*CouchbaseConfig)
+	if !ok {
+		return ErrCouchbaseConfigDecode
+	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
@@ -74,8 +94,15 @@ func (s *Couchbase) Describe() string {
 	return s.desc
 }
 
-func (s *Couchbase) Do(ctx *context.Context, _ interface{}) error {
-	c, _ := s.yamlConfig.(*CouchbaseConfig)
+func (s *Couchbase) Do(ctx *context.Context) error {
+	if s.yamlConfig == nil {
+		return ErrConfigCouchbase
+	}
+
+	c, ok := s.yamlConfig.(*CouchbaseConfig)
+	if !ok {
+		return ErrCouchbaseConfigDecode
+	}
 
 	var cbClusterSpecPath, modifiedClusterSpecPath, cbBucketSpecPath, modifiedBucketSpecPath string
 

@@ -54,8 +54,15 @@ func (g *GenericWorkload) Describe() string {
 	return g.desc
 }
 
-func (g *GenericWorkload) Do(_ *context.Context, _ interface{}) error {
-	workloadConfig, _ := g.yamlConfig.(*GenericWorkloadConfig)
+func (g *GenericWorkload) Do(_ *context.Context) error {
+	if g.yamlConfig == nil {
+		return ErrConfigWorkload
+	}
+
+	workloadConfig, ok := g.yamlConfig.(*GenericWorkloadConfig)
+	if !ok {
+		return ErrWorkloadDecode
+	}
 
 	// Introduce a wait before starting to run the workload.
 	if workloadConfig.PreRunWait != 0 {
@@ -118,6 +125,19 @@ func (g *GenericWorkload) Config() interface{} {
 	return g.yamlConfig
 }
 
-func (g *GenericWorkload) Checks(_ *context.Context, _ interface{}, _ string) error {
+func (g *GenericWorkload) CheckConfig() error {
+	if g.yamlConfig == nil {
+		return ErrConfigWorkload
+	}
+
+	_, ok := g.yamlConfig.(*GenericWorkloadConfig)
+	if !ok {
+		return ErrWorkloadDecode
+	}
+
+	return nil
+}
+
+func (g *GenericWorkload) RunValidators(_ *context.Context, _ string) error {
 	return nil
 }

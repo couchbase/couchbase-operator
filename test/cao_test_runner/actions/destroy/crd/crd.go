@@ -51,10 +51,14 @@ func (action *DestroyCRD) Describe() string {
 	return action.desc
 }
 
-func (action *DestroyCRD) Do(ctx *context.Context, config interface{}) error {
+func (action *DestroyCRD) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*CRDDestroyConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeCRDSetupConfig
 	}
 
 	logrus.Infof("CRD delete action started")
@@ -71,18 +75,35 @@ func (action *DestroyCRD) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *DestroyCRD) Checks(ctx *context.Context, config interface{}, state string) error {
-	c, ok := action.yamlConfig.(*CRDDestroyConfig)
-	if !ok {
+func (action *DestroyCRD) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
 		return ErrNoConfigFound
 	}
 
-	if ok = fileutils.NewFile(c.CRDPath).IsFileExists(); !ok {
-		return fmt.Errorf("crd file %s does not exist : %w", c.CRDPath, ErrCRDFileNoExist)
+	c, ok := action.yamlConfig.(*CRDDestroyConfig)
+	if !ok {
+		return ErrDecodeCRDSetupConfig
 	}
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
+	}
+
+	return nil
+}
+
+func (action *DestroyCRD) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*CRDDestroyConfig)
+	if !ok {
+		return ErrDecodeCRDSetupConfig
+	}
+
+	if ok = fileutils.NewFile(c.CRDPath).IsFileExists(); !ok {
+		return fmt.Errorf("crd file %s does not exist : %w", c.CRDPath, ErrCRDFileNoExist)
 	}
 
 	return nil

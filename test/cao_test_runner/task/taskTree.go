@@ -39,23 +39,23 @@ func newTree() *Tree {
 func (t *Tree) Execute(ctx context.Context) []error {
 	tCtx := icontext.NewContext(ctx)
 	if t.Action != nil {
-		actionConfig, err := tCtx.ReconcileConfig(t.Action.Config())
-		if err != nil {
+		if _, err := tCtx.ReconcileConfig(t.Action.Config()); err != nil {
 			return []error{err}
 		}
 
-		err = t.Action.Checks(tCtx, actionConfig, validations.Pre)
-		if err != nil {
+		if err := t.Action.CheckConfig(); err != nil {
 			return []error{err}
 		}
 
-		err = t.Action.Do(tCtx, actionConfig)
-		if err != nil {
+		if err := t.Action.RunValidators(tCtx, validations.Pre); err != nil {
 			return []error{err}
 		}
 
-		err = t.Action.Checks(tCtx, actionConfig, validations.Post)
-		if err != nil {
+		if err := t.Action.Do(tCtx); err != nil {
+			return []error{err}
+		}
+
+		if err := t.Action.RunValidators(tCtx, validations.Post); err != nil {
 			return []error{err}
 		}
 	}

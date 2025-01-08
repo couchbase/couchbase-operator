@@ -62,15 +62,6 @@ func NewQueryWorkloadConfig(config interface{}) (actions.Action, error) {
 		return nil, fmt.Errorf("new query workload config: %w", workloads.ErrWorkloadDecode)
 	}
 
-	if !ValidateQueryWorkloadName(queryWorkloadConfig.QueryWorkloadName) {
-		return nil, fmt.Errorf("new query workload config: %w", ErrInvalidQueryWorkloadName)
-	}
-
-	err := ValidateQueryWorkloadConfig(queryWorkloadConfig)
-	if err != nil {
-		return nil, fmt.Errorf("new query workload config: %w", err)
-	}
-
 	return &QueryWorkload{
 		desc:       "run query workloads on CB cluster in K8S",
 		yamlConfig: queryWorkloadConfig,
@@ -86,8 +77,15 @@ func (d *QueryWorkload) Describe() string {
 	return d.desc
 }
 
-func (d *QueryWorkload) Do(_ *context.Context, _ interface{}) error {
-	queryConfig, _ := d.yamlConfig.(*QueryWorkloadConfig)
+func (d *QueryWorkload) Do(_ *context.Context) error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	queryConfig, ok := d.yamlConfig.(*QueryWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
 
 	// Introduce a wait before starting to run the workload.
 	if queryConfig.PreRunWait != 0 {
@@ -188,6 +186,28 @@ func (d *QueryWorkload) Config() interface{} {
 	return d.yamlConfig
 }
 
-func (d *QueryWorkload) Checks(_ *context.Context, _ interface{}, _ string) error {
+func (d *QueryWorkload) CheckConfig() error {
+	if d.yamlConfig == nil {
+		return workloads.ErrConfigWorkload
+	}
+
+	queryConfig, ok := d.yamlConfig.(*QueryWorkloadConfig)
+	if !ok {
+		return workloads.ErrWorkloadDecode
+	}
+
+	if !ValidateQueryWorkloadName(queryConfig.QueryWorkloadName) {
+		return fmt.Errorf("new query workload config: %w", ErrInvalidQueryWorkloadName)
+	}
+
+	err := ValidateQueryWorkloadConfig(queryConfig)
+	if err != nil {
+		return fmt.Errorf("new query workload config: %w", err)
+	}
+
+	return nil
+}
+
+func (d *QueryWorkload) RunValidators(_ *context.Context, _ string) error {
 	return nil
 }

@@ -64,10 +64,14 @@ func (action *DeleteAdmissionController) Describe() string {
 	return action.desc
 }
 
-func (action *DeleteAdmissionController) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *DeleteAdmissionController) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoAdmissionConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
 	if !ok {
-		return ErrNoAdmissionConfigFound
+		return ErrUnableToDecodeAdmissionConfig
 	}
 
 	switch c.Scope {
@@ -83,6 +87,19 @@ func (action *DeleteAdmissionController) Checks(ctx *context.Context, config int
 		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
 	}
 
+	return nil
+}
+
+func (action *DeleteAdmissionController) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoAdmissionConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
+	if !ok {
+		return ErrUnableToDecodeAdmissionConfig
+	}
+
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
@@ -90,10 +107,14 @@ func (action *DeleteAdmissionController) Checks(ctx *context.Context, config int
 	return nil
 }
 
-func (action *DeleteAdmissionController) Do(ctx *context.Context, _ interface{}) error {
+func (action *DeleteAdmissionController) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoAdmissionConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
 	if !ok {
-		return ErrNoAdmissionConfigFound
+		return ErrUnableToDecodeAdmissionConfig
 	}
 
 	logrus.Infof("Admission Controller pod deletion started")

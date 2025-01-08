@@ -71,10 +71,14 @@ func (action *KubernetesUpgrade) Describe() string {
 	return action.desc
 }
 
-func (action *KubernetesUpgrade) Do(ctx *context.Context, config interface{}) error {
+func (action *KubernetesUpgrade) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
 	if !ok {
-		return ErrNoConfigFound
+		return ErrDecodeKubernetesConfig
 	}
 
 	logrus.Infof("Kubernetes Upgrade started")
@@ -101,10 +105,31 @@ func (action *KubernetesUpgrade) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *KubernetesUpgrade) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *KubernetesUpgrade) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
 	if !ok {
+		return ErrDecodeKubernetesConfig
+	}
+
+	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+		return fmt.Errorf("run %s validations: %w", state, err)
+	}
+
+	return nil
+}
+
+func (action *KubernetesUpgrade) CheckConfig() error {
+	if action.yamlConfig == nil {
 		return ErrNoConfigFound
+	}
+
+	c, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
+	if !ok {
+		return ErrDecodeKubernetesConfig
 	}
 
 	c.ms = &managedk8sservices.ManagedServiceProvider{
@@ -115,10 +140,6 @@ func (action *KubernetesUpgrade) Checks(ctx *context.Context, config interface{}
 
 	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
 		return err
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

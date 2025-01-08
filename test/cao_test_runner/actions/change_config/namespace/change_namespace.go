@@ -50,7 +50,11 @@ func (action *ChangeNamespace) Describe() string {
 	return action.desc
 }
 
-func (action *ChangeNamespace) Do(ctx *context.Context, config interface{}) error {
+func (action *ChangeNamespace) Do(ctx *context.Context) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*NamespaceChangeConfig)
 	if !ok {
 		return ErrNoConfigFound
@@ -78,7 +82,11 @@ func (action *ChangeNamespace) Config() interface{} {
 	return action.yamlConfig
 }
 
-func (action *ChangeNamespace) Checks(ctx *context.Context, config interface{}, state string) error {
+func (action *ChangeNamespace) RunValidators(ctx *context.Context, state string) error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
 	c, ok := action.yamlConfig.(*NamespaceChangeConfig)
 	if !ok {
 		return ErrNoConfigFound
@@ -86,6 +94,19 @@ func (action *ChangeNamespace) Checks(ctx *context.Context, config interface{}, 
 
 	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
+	}
+
+	return nil
+}
+
+func (action *ChangeNamespace) CheckConfig() error {
+	if action.yamlConfig == nil {
+		return ErrNoConfigFound
+	}
+
+	_, ok := action.yamlConfig.(*NamespaceChangeConfig)
+	if !ok {
+		return ErrNoConfigFound
 	}
 
 	return nil
