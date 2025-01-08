@@ -33,6 +33,8 @@ var (
 	ErrNoAssociationsFound      = errors.New("no associations between subnet and route table found")
 	ErrInvalidOIDURL            = errors.New("invalid oid url")
 	ErrInvalidPolicy            = errors.New("invalid policy")
+	ErrTagKeyInvalid            = errors.New("invalid tag key")
+	ErrTagValueInvalid          = errors.New("invalid tag value")
 )
 
 // EKSSessionStore implements ManagedService interface.
@@ -377,14 +379,20 @@ func (es *EKSSession) GetInstancesInAutoscalingGroup(ctx context.Context, asgNam
 	return resultInstances, nil
 }
 
-func (es *EKSSession) CreateVPC(ctx context.Context, cidrBlock string) (*ec2types.Vpc, error) {
+func (es *EKSSession) CreateVPC(ctx context.Context, cidrBlock, vpcName string) (*ec2types.Vpc, error) {
 	result, err := es.ec2Client.CreateVpc(
 		ctx,
 		&ec2.CreateVpcInput{
 			CidrBlock: aws.String(cidrBlock),
 		})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create VPC: %w", err)
+		return nil, fmt.Errorf("create VPC: %w", err)
+	}
+
+	// Naming the VPC.
+	err = es.addTagsToResource(ctx, *result.Vpc.VpcId, map[string]string{"Name": vpcName})
+	if err != nil {
+		return nil, fmt.Errorf("tag VPC: %w", err)
 	}
 
 	return result.Vpc, nil
@@ -402,7 +410,7 @@ func (es *EKSSession) CreateSubnets(ctx context.Context, vpcID string, azs []str
 				AvailabilityZone: aws.String(azs[i]),
 			})
 		if err != nil {
-			return nil, fmt.Errorf("failed to create subnet: %w", err)
+			return nil, fmt.Errorf("create subnets: %w", err)
 		}
 
 		subnets = append(subnets, result.Subnet)
@@ -420,7 +428,7 @@ func (es *EKSSession) CreateSecurityGroup(ctx context.Context, vpcID, groupName 
 			VpcId:       aws.String(vpcID),
 		})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create security group: %w", err)
+		return nil, fmt.Errorf("create security group %s: %w", groupName, err)
 	}
 
 	// TODO : Take the ip permissions as params
@@ -679,7 +687,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 
 	result, err := es.eksClient.CreateNodegroup(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create node group: %w", err)
+		return nil, fmt.Errorf("failed to create node group %s: %w", nodeGroupName, err)
 	}
 
 	if !waitForNodeGroupCreation {
@@ -687,7 +695,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 	}
 
 	if err = es.waitForNodeGroupActive(ctx, nodeGroupName); err != nil {
-		return nil, fmt.Errorf("failed waiting for node group to become ACTIVE: %w", err)
+		return nil, fmt.Errorf("failed waiting for node group %s to become ACTIVE: %w", nodeGroupName, err)
 	}
 
 	describeResult, err := es.eksClient.DescribeNodegroup(
@@ -697,7 +705,7 @@ func (es *EKSSession) CreateNodeGroup(ctx context.Context, instanceType, nodeGro
 			NodegroupName: aws.String(nodeGroupName),
 		})
 	if err != nil {
-		return nil, fmt.Errorf("failed to describe EKS cluster node group after creation: %w", err)
+		return nil, fmt.Errorf("failed to describe EKS cluster node group %s after creation: %w", nodeGroupName, err)
 	}
 
 	return describeResult.Nodegroup, nil
@@ -927,7 +935,7 @@ func (es *EKSSession) EnableAutoAssignPublicIP(ctx context.Context, subnetID str
 				Value: aws.Bool(true),
 			},
 		}); err != nil {
-		return fmt.Errorf("failed to enable auto-assign public IP for subnet %s: %w", subnetID, err)
+		return fmt.Errorf("enable auto-assign public IP for subnet %s: %w", subnetID, err)
 	}
 
 	return nil
@@ -991,10 +999,15 @@ func (es *EKSSession) DeleteSecurityGroups(ctx context.Context, groupIDs []strin
 	return nil
 }
 
-func (es *EKSSession) CreateInternetGateway(ctx context.Context) (*ec2types.InternetGateway, error) {
+func (es *EKSSession) CreateInternetGateway(ctx context.Context, igwName string) (*ec2types.InternetGateway, error) {
 	result, err := es.ec2Client.CreateInternetGateway(ctx, &ec2.CreateInternetGatewayInput{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Internet Gateway: %w", err)
+		return nil, fmt.Errorf("create internet gateway: %w", err)
+	}
+
+	err = es.addTagsToResource(ctx, *result.InternetGateway.InternetGatewayId, map[string]string{"Name": igwName})
+	if err != nil {
+		return nil, fmt.Errorf("tag internet gateway: %w", err)
 	}
 
 	return result.InternetGateway, nil
@@ -1007,7 +1020,7 @@ func (es *EKSSession) AttachInternetGateway(ctx context.Context, vpcID, igwID st
 			VpcId:             aws.String(vpcID),
 			InternetGatewayId: aws.String(igwID),
 		}); err != nil {
-		return fmt.Errorf("failed to attach Internet Gateway: %w", err)
+		return fmt.Errorf("attach internet gateway: %w", err)
 	}
 
 	return nil
@@ -1027,14 +1040,14 @@ func (es *EKSSession) DeleteSubnets(ctx context.Context, subnetIDs []string) err
 	return nil
 }
 
-func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID string) (*ec2types.RouteTable, error) {
+func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID, routeTableName string) (*ec2types.RouteTable, error) {
 	result, err := es.ec2Client.CreateRouteTable(
 		ctx,
 		&ec2.CreateRouteTableInput{
 			VpcId: aws.String(vpcID),
 		})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Route Table: %w", err)
+		return nil, fmt.Errorf("create route table: %w", err)
 	}
 
 	// TODO: Take the routes as params
@@ -1045,7 +1058,12 @@ func (es *EKSSession) CreateRouteTable(ctx context.Context, vpcID, igwID string)
 			DestinationCidrBlock: aws.String("0.0.0.0/0"),
 			GatewayId:            aws.String(igwID),
 		}); err != nil {
-		return nil, fmt.Errorf("failed to create route in Route Table: %w", err)
+		return nil, fmt.Errorf("add route to internet gateway: %w", err)
+	}
+
+	err = es.addTagsToResource(ctx, *result.RouteTable.RouteTableId, map[string]string{"Name": routeTableName})
+	if err != nil {
+		return nil, fmt.Errorf("create route in Route Table: %w", err)
 	}
 
 	return result.RouteTable, nil
@@ -1058,7 +1076,7 @@ func (es *EKSSession) AssociateRouteTable(ctx context.Context, routeTableID stri
 			RouteTableId: aws.String(routeTableID),
 			SubnetId:     aws.String(subnetID),
 		}); err != nil {
-		return fmt.Errorf("failed to associate Route Table with Subnet: %w", err)
+		return fmt.Errorf("associate route table %s with subnet %s: %w", routeTableID, subnetID, err)
 	}
 
 	return nil
@@ -1337,15 +1355,19 @@ func (es *EKSSession) RebootInstances(ctx context.Context, instanceIds []string)
 	return nil
 }
 
-func (es *EKSSession) CreateOidcProvider(ctx context.Context, url *string, clientIDList []string) error {
-	if _, err := es.iamClient.CreateOpenIDConnectProvider(
-		ctx,
-		&iam.CreateOpenIDConnectProviderInput{
-			Url:          url,
-			ClientIDList: clientIDList,
+func (es *EKSSession) CreateOidcProvider(ctx context.Context, url *string, clientIDList []string, oidcName string) error {
+	_, err := es.iamClient.CreateOpenIDConnectProvider(ctx, &iam.CreateOpenIDConnectProviderInput{
+		Url:          url,
+		ClientIDList: clientIDList,
+		Tags: []iamtypes.Tag{
+			{
+				Key:   aws.String("Name"),
+				Value: aws.String(oidcName),
+			},
 		},
-	); err != nil {
-		return fmt.Errorf("unable to create oidc provider %s: %w", *url, err)
+	})
+	if err != nil {
+		return fmt.Errorf("create oidc provider %s: %w", *url, err)
 	}
 
 	return nil
@@ -1422,6 +1444,36 @@ func (es *EKSSession) UpdateNodeGroupKubernetesVersion(ctx context.Context, node
 		if err := es.waitForNodeGroupActive(ctx, *nodeGroupName); err != nil {
 			return fmt.Errorf("failed waiting for node group to become ACTIVE: %w", err)
 		}
+	}
+
+	return nil
+}
+
+// addTagsToResource adds tags to a given AWS resource. Add the Tag: Key and Value to tags.
+func (es *EKSSession) addTagsToResource(ctx context.Context, resourceID string, tags map[string]string) error {
+	var ec2Tags []ec2types.Tag
+
+	for key, value := range tags {
+		if len(key) > 128 || len(key) == 0 {
+			return fmt.Errorf("add tag `%s:%s` to resource: %w", key, value, ErrTagKeyInvalid)
+		}
+
+		if len(value) > 256 {
+			return fmt.Errorf("add tag `%s:%s` to resource: %w", key, value, ErrTagValueInvalid)
+		}
+
+		ec2Tags = append(ec2Tags, ec2types.Tag{
+			Key:   aws.String(key),
+			Value: aws.String(value),
+		})
+	}
+
+	_, err := es.ec2Client.CreateTags(ctx, &ec2.CreateTagsInput{
+		Resources: []string{resourceID},
+		Tags:      ec2Tags,
+	})
+	if err != nil {
+		return fmt.Errorf("add tags to resource %s: %w", resourceID, err)
 	}
 
 	return nil

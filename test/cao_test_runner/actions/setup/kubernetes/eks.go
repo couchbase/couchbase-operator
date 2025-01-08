@@ -17,7 +17,6 @@ import (
 var (
 	ErrEKSClusterAlreadyExists       = errors.New("eks cluster already exists")
 	ErrEKSSecurityGroupAlreadyExists = errors.New("eks security group already exists")
-	ErrInvalidAmiType                = errors.New("invalid ami type")
 	ErrNumNodeGroupsInvalid          = errors.New("for environment type 'cloud' and provider 'aws', NumNodeGroups must be greater than 0")
 	ErrDesiredSizeInvalid            = errors.New("for environment type 'cloud' and provider 'aws', DesiredSize must be greater than 0")
 	ErrMinSizeInvalid                = errors.New("for environment type 'cloud' and provider 'aws', MinSize must be greater than 0")
@@ -28,9 +27,9 @@ var (
 
 const (
 	vpcCIDR             = "10.0.0.0/16"
-	subnetCIDR1         = "10.0.1.0/24"
-	subnetCIDR2         = "10.0.2.0/24"
-	subnetCIDR3         = "10.0.3.0/24"
+	subnetCIDR1         = "10.0.4.0/22"
+	subnetCIDR2         = "10.0.8.0/22"
+	subnetCIDR3         = "10.0.12.0/22"
 	sshKey              = "qe-cao-testrunner"
 	ebscsidriverVersion = "v1.35.0-eksbuild.1"
 )
@@ -52,7 +51,7 @@ type CreateEKSCluster struct {
 
 func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	if err := cec.ValidateParams(ctx); err != nil {
-		return err
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
@@ -71,62 +70,68 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 		return fmt.Errorf("unable to get eks session: %w", err)
 	}
 
-	vpc, err := eksSession.CreateVPC(ctx, vpcCIDR)
+	vpcName := cec.ClusterName + "-vpc"
+
+	vpc, err := eksSession.CreateVPC(ctx, vpcCIDR, vpcName)
 	if err != nil {
-		return fmt.Errorf("error creating vpc: %w", err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
-	logrus.Info("Created VPC for the cluster")
+	logrus.Infof("Created VPC %s for the cluster", *vpc.VpcId)
 
 	azs := []string{cec.Region + "a", cec.Region + "b", cec.Region + "c"}
 	cidrs := []string{subnetCIDR1, subnetCIDR2, subnetCIDR3}
 
 	subnets, err := eksSession.CreateSubnets(ctx, *vpc.VpcId, azs, cidrs)
 	if err != nil {
-		return fmt.Errorf("error creating subnets in the vpc: %w", err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	logrus.Info("Created subnets for the cluster")
 
-	igw, err := eksSession.CreateInternetGateway(ctx)
+	igwName := cec.ClusterName + "-igw"
+
+	igw, err := eksSession.CreateInternetGateway(ctx, igwName)
 	if err != nil {
-		return fmt.Errorf("error trying to create internet gateway: %w", err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	logrus.Info("Created Internet Gateway for the VPC")
 
 	if err := eksSession.AttachInternetGateway(ctx, *vpc.VpcId, *igw.InternetGatewayId); err != nil {
-		return fmt.Errorf("error trying to attach internet gateway to vpc: %w", err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
-	logrus.Info("Attached Internet gateway to VPC")
+	logrus.Info("Attached Internet Gateway to the VPC")
 
-	rt, err := eksSession.CreateRouteTable(ctx, *vpc.VpcId, *igw.InternetGatewayId)
+	routeTableName := cec.ClusterName + "-rtb"
+
+	rt, err := eksSession.CreateRouteTable(ctx, *vpc.VpcId, *igw.InternetGatewayId, routeTableName)
 	if err != nil {
-		return fmt.Errorf("error trying to create route table with route to internet gateway: %w", err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
-	logrus.Info("Created route table for the subnet")
+	logrus.Info("Created route table for the subnets")
 
 	subnetIds := make([]string, len(subnets))
 	for i, subnet := range subnets {
 		subnetIds[i] = *subnet.SubnetId
 		if err := eksSession.EnableAutoAssignPublicIP(ctx, subnetIds[i]); err != nil {
-			return fmt.Errorf("error enabling auto assign public ip: %w", err)
+			return fmt.Errorf("create eks cluster: %w", err)
 		}
 
 		if err := eksSession.AssociateRouteTable(ctx, *rt.RouteTableId, subnetIds[i]); err != nil {
-			return fmt.Errorf("error trying to associate route table to subnet: %w", err)
+			return fmt.Errorf("create eks cluster: %w", err)
 		}
 	}
 
-	logrus.Info("Attached route table to the subnet and allowed auto assign public ip to subnets")
+	logrus.Info("Attached route table to the subnets and allowed auto assign public ip to the subnets")
 
 	securityGroupName := cec.ClusterName + "-security-group"
 
 	securityGroup, err := eksSession.CreateSecurityGroup(ctx, *vpc.VpcId, securityGroupName)
 	if err != nil {
-		return fmt.Errorf("error creating security group %s: %w", securityGroupName, err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	logrus.Info("Created Security groups for the cluster")
@@ -134,7 +139,7 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	cluster, err := eksSession.CreateEKSCluster(ctx, cec.KubernetesVersion, subnetIds,
 		[]string{*securityGroup.GroupId}, true)
 	if err != nil {
-		return fmt.Errorf("unable to create eks cluster %s: %w", cec.ClusterName, err)
+		return fmt.Errorf("create eks cluster %s: %w", cec.ClusterName, err)
 	}
 
 	logrus.Info("Created EKS Cluster")
@@ -144,21 +149,22 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 		if _, err = eksSession.CreateNodeGroup(ctx, cec.InstanceType, nodeGroupName,
 			sshKey, subnetIds, []string{*securityGroup.GroupId}, int32(cec.MinSize), int32(cec.DesiredSize),
 			int32(cec.MaxSize), int32(cec.DiskSize), cec.AMI, true); err != nil {
-			return fmt.Errorf("unable to create node group %s: %w", nodeGroupName, err)
+			return fmt.Errorf("create eks cluster: %w", err)
 		}
 	}
 
 	logrus.Info("Created Node groups for the cluster")
 
-	if err := eksSession.CreateOidcProvider(ctx, cluster.Identity.Oidc.Issuer, []string{"sts.amazonaws.com"}); err != nil {
-		return fmt.Errorf("unable to create oidc provider: %w", err)
+	oidcName := cec.ClusterName + "-oidc"
+
+	if err := eksSession.CreateOidcProvider(ctx, cluster.Identity.Oidc.Issuer, []string{"sts.amazonaws.com"}, oidcName); err != nil {
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	logrus.Info("Created OIDC Provider for the cluster")
 
 	if _, err = eksSession.EnableEBSCSIDriverAddon(ctx, ebscsidriverVersion, *cluster.Identity.Oidc.Issuer); err != nil {
-		return fmt.Errorf("unable to create ebs csi drive add on for eks cluster %s: %w",
-			cec.ClusterName, err)
+		return fmt.Errorf("create eks cluster: %w", err)
 	}
 
 	logrus.Info("Enabled EBSCSI Driver for the cluster")
