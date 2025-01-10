@@ -3736,23 +3736,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	if validUpgrade, err := couchbaseutil.ValidUpgrade(oldVersion, newVersion); err != nil {
-		return err
-	} else if !validUpgrade {
-		if isDowngrade, err := couchbaseutil.VersionBefore(newVersion, oldVersion); err != nil {
-			return err
-		} else if isDowngrade {
-			return fmt.Errorf("cannot upgrade from %s to %s. Downgrades are not supported", oldVersion, newVersion)
-		}
-		upperboundVersion, err := couchbaseutil.GetUpgradeUpperbound(oldVersion)
-		if err != nil {
-			return err
-		}
-
-		return fmt.Errorf("cannot upgrade from %s to %s. Version must be less than %s", oldVersion, newVersion, upperboundVersion)
-	}
-
-	return nil
+	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
 }
 
 func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
