@@ -1,7 +1,11 @@
 package assets
 
+import "sync"
+
 type TestAssets struct {
 	resultsDirectory string
+	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
+	mu sync.Mutex
 }
 
 func NewTestAssets() *TestAssets {
@@ -18,9 +22,13 @@ type TestAssetGetterSetter interface {
 }
 
 func (ts *TestAssets) GetResultsDirectory() *string {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 	return &ts.resultsDirectory
 }
 
 func (ts *TestAssets) SetResultsDirectory(resultsDirectory string) {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
 	ts.resultsDirectory = resultsDirectory
 }
