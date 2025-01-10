@@ -4002,22 +4002,9 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 
 	var hasMagma bool
 
-	// // storageBackend is only allowed above CB version 7.0.0.
-	storageBackendSupported, err := cluster.IsAtLeastVersion("7.0.0")
-	if err != nil {
-		return err
-	}
-
-	// // magma storageBackend is only allowed above CB version 7.1.0.
-	magmaStorageBackendSupported, err := cluster.IsAtLeastVersion("7.1.0")
-	if err != nil {
-		return err
-	}
-
 	// find if any bucket has storage backend as "magma"
 	for _, cbBucket := range couchbaseBuckets.Items {
-		backend := k8sutil.GetBucketStorageBackend(&cbBucket, storageBackendSupported, magmaStorageBackendSupported, cluster)
-		if backend == couchbasev2.CouchbaseStorageBackendMagma {
+		if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 			hasMagma = true
 			break
 		}
