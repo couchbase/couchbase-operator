@@ -32,7 +32,7 @@ type CreateKindCluster struct {
 	ClusterName              string
 	NumControlPlane          int
 	NumWorkers               int
-	ConfigDirectory          string
+	ConfigDirectory          *fileutils.Directory
 	ConfigPath               string
 	OperatorImage            string
 	AdmissionControllerImage string
@@ -64,15 +64,7 @@ func (ckc *CreateKindCluster) CreateCluster(ctx context.Context) error {
 		return err
 	}
 
-	// TODO : Add this onto result directory instead of ./tmp
-	directory := fileutils.NewDirectory(ckc.ConfigDirectory, 0777)
-	if !directory.IsDirectoryExists() {
-		if err := directory.CreateDirectory(); err != nil {
-			return fmt.Errorf("error creating directory: %w", err)
-		}
-	}
-
-	ckc.ConfigPath = filepath.Join(directory.DirectoryPath, fmt.Sprintf("kind-cluster-%s.yaml", time.Now().Format(time.RFC3339)))
+	ckc.ConfigPath = filepath.Join(ckc.ConfigDirectory.DirectoryPath, fmt.Sprintf("kind-cluster-%s.yaml", time.Now().Format(time.RFC3339)))
 
 	out, _, err := kind.GetClusters().ExecWithOutputCapture()
 	if err != nil {
@@ -113,6 +105,7 @@ func (ckc *CreateKindCluster) ValidateParams(_ context.Context) error {
 	if ckc.NumWorkers < 0 {
 		return ErrNumWorkersMissing
 	}
+
 	// if _, err := os.Stat(ckc.ConfigDirectory); err != nil {
 	// 	return fmt.Errorf("the directory %s cannot be accessed: %w", ckc.ConfigDirectory, err)
 	// }

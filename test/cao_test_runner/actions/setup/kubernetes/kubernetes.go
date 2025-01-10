@@ -59,6 +59,7 @@ type KubernetesSetupConfig struct {
 	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"`
 	Validators               []map[string]any                   `yaml:"validators,omitempty"`
 	ms                       *managedk8sservices.ManagedServiceProvider
+	resultsDirectory         *fileutils.Directory
 }
 
 type SetupKubernetes struct {
@@ -101,6 +102,8 @@ func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAs
 	if c.KubectlPath != "" {
 		kubectl.WithBinaryPath(c.KubectlPath)
 	}
+
+	c.resultsDirectory = testAssets.GetResultsDirectory()
 
 	createClusterUtil, err := NewCreateClusterUtil(c)
 	if err != nil {

@@ -27,10 +27,11 @@ const (
 )
 
 type QueryApp struct {
-	Namespace   string
-	FilePaths   []string
-	Jobs        []*jobs.Job
-	JobDuration time.Duration
+	Namespace            string
+	FilePaths            []string
+	Jobs                 []*jobs.Job
+	JobDuration          time.Duration
+	queryWorkloadYAMLDir *fileutils.Directory
 }
 
 type QueryAppArgs struct {
@@ -81,16 +82,9 @@ func (qa *QueryApp) CreateJobs(config *QueryWorkloadConfig) error {
 }
 
 func (qa *QueryApp) MarshalJobYAMLs() error {
-	dir := fileutils.NewDirectory(queryWorkloadYAMLDir, os.ModePerm)
-	if !dir.IsDirectoryExists() {
-		err := dir.CreateDirectory()
-		if err != nil {
-			return fmt.Errorf("marshal job yamls: %w", err)
-		}
-	}
-
 	for i := range qa.Jobs {
-		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, qa.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", qa.queryWorkloadYAMLDir.DirectoryPath,
+			qa.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
 
 		qa.FilePaths = append(qa.FilePaths, filePath)
 

@@ -13,11 +13,6 @@ const (
 	PillowFightDataWorkload DataWorkloadName = "pillowfight"
 )
 
-const (
-	// YAML File Directory.
-	dataWorkloadYAMLDir = "./tmp/data_workloads/"
-)
-
 var (
 	ErrInvalidDataWorkloadName = errors.New("invalid data workload name provided")
 )

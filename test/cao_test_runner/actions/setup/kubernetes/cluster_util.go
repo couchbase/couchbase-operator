@@ -30,7 +30,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 				ClusterName:              p.ClusterName,
 				NumControlPlane:          p.NumControlPlane,
 				NumWorkers:               p.NumWorkers,
-				ConfigDirectory:          "./tmp", // TODO : Move to results directory
+				ConfigDirectory:          p.resultsDirectory,
 				OperatorImage:            p.OperatorImage,
 				AdmissionControllerImage: p.AdmissionControllerImage,
 				LoadDockerImageToKind:    p.LoadDockerImageToKind,

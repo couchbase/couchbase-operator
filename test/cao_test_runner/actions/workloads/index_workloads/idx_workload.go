@@ -13,11 +13,6 @@ const (
 	QueryAppIndexWorkload IndexWorkloadName = "queryApp"
 )
 
-const (
-	// YAML File Directory.
-	idxWorkloadYAMLDir = "./tmp/index_workloads/"
-)
-
 var (
 	ErrInvalidIndexWorkloadName = errors.New("invalid index workload name provided")
 )

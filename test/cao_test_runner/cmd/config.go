@@ -1,6 +1,9 @@
 package cmd
 
-import "github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+import (
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+)
 
 const (
 	scenarioKey             = "scenario"
@@ -18,7 +21,7 @@ func buildConfigurator() (*RootConfig, error) {
 	return rootCfg, err
 }
 
-func buildTestAssets(resultsDirectory string) (*assets.TestAssets, error) {
+func buildTestAssets(resultsDirectory *fileutils.Directory) (*assets.TestAssets, error) {
 	testAssets := assets.NewTestAssets()
 
 	testAssets.SetResultsDirectory(resultsDirectory)

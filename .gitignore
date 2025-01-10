@@ -35,4 +35,6 @@ scripts/venv/
 package-lock.json
 /.vscode/
 
-tmp
+# These are for CAO-Testrunner
+tmp/
+results/

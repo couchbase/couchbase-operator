@@ -11,11 +11,6 @@ const (
 	QueryAppWorkload QueryWorkloadName = "queryApp"
 )
 
-const (
-	// YAML File Directory.
-	queryWorkloadYAMLDir = "./tmp/query_workloads/"
-)
-
 var (
 	ErrInvalidQueryWorkloadName = errors.New("invalid query workload name provided")
 )

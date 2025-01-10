@@ -27,10 +27,11 @@ const (
 )
 
 type CBQ struct {
-	Namespace   string
-	FilePaths   []string
-	Jobs        []*jobs.Job
-	JobDuration time.Duration
+	Namespace          string
+	FilePaths          []string
+	Jobs               []*jobs.Job
+	JobDuration        time.Duration
+	idxWorkloadYAMLDir *fileutils.Directory
 }
 
 type CBQArgs struct {
@@ -72,16 +73,9 @@ func (cbq *CBQ) CreateJobs(config *IndexWorkloadConfig) error {
 }
 
 func (cbq *CBQ) MarshalJobYAMLs() error {
-	dir := fileutils.NewDirectory(idxWorkloadYAMLDir, os.ModePerm)
-	if !dir.IsDirectoryExists() {
-		err := dir.CreateDirectory()
-		if err != nil {
-			return fmt.Errorf("marshal job yamls: %w", err)
-		}
-	}
-
 	for i := range cbq.Jobs {
-		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, cbq.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", cbq.idxWorkloadYAMLDir.DirectoryPath,
+			cbq.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
 
 		cbq.FilePaths = append(cbq.FilePaths, filePath)
 

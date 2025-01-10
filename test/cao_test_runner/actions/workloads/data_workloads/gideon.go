@@ -26,9 +26,10 @@ const (
 )
 
 type Gideon struct {
-	Jobs      []*jobs.Job
-	FilePaths []string
-	Namespace string
+	Jobs                []*jobs.Job
+	FilePaths           []string
+	Namespace           string
+	dataWorkloadYAMLDir *fileutils.Directory
 }
 
 type GideonArgs struct {
@@ -73,16 +74,9 @@ func (gideon *Gideon) CreateJobs(config *DataWorkloadConfig) error {
 }
 
 func (gideon *Gideon) MarshalJobYAMLs() error {
-	dir := fileutils.NewDirectory(dataWorkloadYAMLDir, os.ModePerm)
-	if !dir.IsDirectoryExists() {
-		err := dir.CreateDirectory()
-		if err != nil {
-			return fmt.Errorf("marshal job yamls: %w", err)
-		}
-	}
-
 	for i := range gideon.Jobs {
-		filePath := fmt.Sprintf("%s/job-%s-%s.%s", dir.DirectoryPath, gideon.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
+		filePath := fmt.Sprintf("%s/job-%s-%s.%s", gideon.dataWorkloadYAMLDir.DirectoryPath,
+			gideon.Jobs[i].Metadata.Name, time.Now().Format("2006-01-02-15-04-05"), "yaml")
 
 		gideon.FilePaths = append(gideon.FilePaths, filePath)
 

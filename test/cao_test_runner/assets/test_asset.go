@@ -1,9 +1,13 @@
 package assets
 
-import "sync"
+import (
+	"sync"
+
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+)
 
 type TestAssets struct {
-	resultsDirectory string
+	resultsDirectory *fileutils.Directory
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
@@ -13,21 +17,21 @@ func NewTestAssets() *TestAssets {
 }
 
 type TestAssetGetter interface {
-	GetResultsDirectory() *string
+	GetResultsDirectory() *fileutils.Directory
 }
 
 type TestAssetGetterSetter interface {
-	GetResultsDirectory() *string
-	SetResultsDirectory(resultsDirectory string)
+	GetResultsDirectory() *fileutils.Directory
+	SetResultsDirectory(resultsDirectory *fileutils.Directory)
 }
 
-func (ts *TestAssets) GetResultsDirectory() *string {
+func (ts *TestAssets) GetResultsDirectory() *fileutils.Directory {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return &ts.resultsDirectory
+	return ts.resultsDirectory
 }
 
-func (ts *TestAssets) SetResultsDirectory(resultsDirectory string) {
+func (ts *TestAssets) SetResultsDirectory(resultsDirectory *fileutils.Directory) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	ts.resultsDirectory = resultsDirectory

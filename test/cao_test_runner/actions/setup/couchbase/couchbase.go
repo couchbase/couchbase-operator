@@ -128,14 +128,18 @@ func (s *Couchbase) Do(ctx *context.Context, testAssets assets.TestAssetGetter) 
 
 	logrus.Infof("Configuring couchbase cluster")
 
+	resultsDir := testAssets.GetResultsDirectory()
+
 	// Parse and apply the spec changes to the cb cluster yaml file.
-	modifiedClusterSpecPath, err = applySpecChanges(c.ApplyClusterSpecChanges, cbClusterSpecPath)
+	modifiedClusterSpecPath, err = applySpecChanges(c.ApplyClusterSpecChanges,
+		cbClusterSpecPath, resultsDir)
 	if err != nil {
 		return fmt.Errorf("configure cb cluster: %w", err)
 	}
 
 	// Parse and apply the spec changes to the cb buckets yaml file.
-	modifiedBucketSpecPath, err = applySpecChanges(c.ApplyBucketSpecChanges, cbBucketSpecPath)
+	modifiedBucketSpecPath, err = applySpecChanges(c.ApplyBucketSpecChanges,
+		cbBucketSpecPath, resultsDir)
 	if err != nil {
 		return fmt.Errorf("configure cb buckets: %w", err)
 	}
@@ -177,19 +181,19 @@ func (s *Couchbase) Config() interface{} {
 
 // getModifiedSpecPath returns the modified spec path.
 /*
- * Modified spec path is in the ./cao_test_runner/tmp/... directory.
+ * Modified spec path is in the ./cao_test_runner/results/results-<timestamp>/... directory.
  * The spec file name is renamed as <old-file-name>-<timestamp>.extension.
  */
-func getModifiedSpecPath(specPath string) (string, error) {
+func getModifiedSpecPath(specPath string, resultsDir *fileutils.Directory) (string, error) {
 	fileDir, fileName := filepath.Split(specPath)
 	isModified := false
 
-	if !strings.Contains(fileDir, "tmp") {
+	if !strings.Contains(fileDir, resultsDir.DirectoryPath) {
 		if !strings.Contains(fileDir, "test_data") {
 			return "", fmt.Errorf("get modified spec path: %w", ErrWrongSpecPath)
 		}
 
-		fileDir = strings.Replace(fileDir, "test_data", "tmp", 1)
+		fileDir = strings.Replace(fileDir, "test_data", resultsDir.DirectoryPath, 1)
 	} else {
 		isModified = true
 	}
@@ -219,7 +223,7 @@ func getModifiedSpecPath(specPath string) (string, error) {
 }
 
 // applySpecChanges applies all the specification changes to the YAML file (whose location is specPath).
-func applySpecChanges(specChanges map[string]interface{}, specPath string) (string, error) {
+func applySpecChanges(specChanges map[string]interface{}, specPath string, resultsDir *fileutils.Directory) (string, error) {
 	var modifiedSpecPath string
 
 	if specChanges != nil {
@@ -235,7 +239,7 @@ func applySpecChanges(specChanges map[string]interface{}, specPath string) (stri
 			}
 		}
 
-		modifiedSpecPath, err = getModifiedSpecPath(specPath)
+		modifiedSpecPath, err = getModifiedSpecPath(specPath, resultsDir)
 		if err != nil {
 			return "", fmt.Errorf("apply spec changes: %w", err)
 		}

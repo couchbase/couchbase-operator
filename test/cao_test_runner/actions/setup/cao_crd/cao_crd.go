@@ -6,7 +6,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
@@ -70,16 +69,9 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 
 	logrus.Infof("CAO CRD Setup started")
 
-	// TODO : Add this onto result directory instead of tmp
-	directory := fileutils.NewDirectory("./tmp", 0777)
-	if !directory.IsDirectoryExists() {
-		err := directory.CreateDirectory()
-		if err != nil {
-			return fmt.Errorf("error creating directory: %w", err)
-		}
-	}
+	resultsDir := testAssets.GetResultsDirectory()
 
-	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform, c.OperatingSystem, c.Architecture, directory.DirectoryPath)
+	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform, c.OperatingSystem, c.Architecture, resultsDir.DirectoryPath)
 	if err != nil {
 		return fmt.Errorf("error creating cao crd install setup: %w", err)
 	}
