@@ -10,6 +10,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -1507,10 +1508,35 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	return nil
 }
 
+func (r *ReconcileMachine) checkIfValidUpgradePath() error {
+	currentVersion, err := r.c.state.Get(persistence.Version)
+	if err != nil {
+		return err
+	}
+
+	newVersionImage, err := r.c.cluster.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	newVersion, err := couchbaseutil.NewVersionFromImage(newVersionImage)
+	if err != nil {
+		return err
+	}
+
+	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
+}
+
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
 		return nil
+	}
+
+	// check if the upgrade is a valid upgrade path
+
+	if err := r.checkIfValidUpgradePath(); err != nil {
+		return err
 	}
 
 	// Nothing to do, move along.

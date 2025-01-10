@@ -1147,6 +1147,26 @@ func (c *CouchbaseCluster) IsAtLeastVersion(v string) (bool, error) {
 	return available, nil
 }
 
+// Checks cluster version is above minimum version requirement.
+func (c *CouchbaseCluster) HighestIsAtLeastVersion(v string) (bool, error) {
+	image, err := c.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false, err
+	}
+
+	tag, err := couchbaseutil.CouchbaseImageVersion(image)
+	if err != nil {
+		return false, err
+	}
+
+	available, err := couchbaseutil.VersionAfter(tag, v)
+	if err != nil {
+		return false, err
+	}
+
+	return available, nil
+}
+
 // GetMinimumDurability returns a safe default for the bucket durability, because it's
 // always set to something, it allows the feature to be disabled when posted to the API.
 func (b *CouchbaseBucket) GetMinimumDurability() CouchbaseBucketMinimumDurability {

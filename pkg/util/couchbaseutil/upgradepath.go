@@ -3,6 +3,8 @@ package couchbaseutil
 import (
 	"fmt"
 	"strconv"
+
+	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 // SupportedUpgradePath represents the valid upgrade path.
@@ -37,6 +39,26 @@ func ValidUpgrade(old, new string) (bool, error) {
 	fmt.Println(test)
 
 	return withinTwoMajorVersions && (newGroup == oldGroup || oldGroup+1 == newGroup), nil
+}
+
+func CheckUpgradePath(currentVersion, newVersion string) error {
+	if valid, err := ValidUpgrade(currentVersion, newVersion); err != nil {
+		return err
+	} else if !valid {
+		if isDowngrade, err := VersionBefore(newVersion, currentVersion); err != nil {
+			return err
+		} else if isDowngrade {
+			return fmt.Errorf("%w: cannot upgrade from %s to %s. Downgrades are not supported", errors.ErrInvalidVersion, currentVersion, newVersion)
+		}
+		upperboundVersion, err := GetUpgradeUpperbound(currentVersion)
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("%w: cannot upgrade from %s to %s. Version must be less than %s", errors.ErrInvalidVersion, currentVersion, newVersion, upperboundVersion)
+	}
+
+	return nil
 }
 
 func GetUpgradeUpperbound(version string) (string, error) {
