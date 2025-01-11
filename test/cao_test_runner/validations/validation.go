@@ -22,7 +22,6 @@ func RegisterValidators() map[string]Validator {
 		"collectLogs":          &oldvalidators.CollectLogs{},
 		"preFlight":            &oldvalidators.PreFlight{},
 		"couchbaseVersion":     &oldvalidators.CBVersion{},
-		"labelTaintNodes":      &oldvalidators.LabelTaintNodes{},
 		"couchbaseClusterSize": &oldvalidators.CouchbaseClusterSize{},
 		"kubeconfigContext":    &oldvalidators.KubeConfigValidator{},
 	}

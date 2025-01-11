@@ -37,6 +37,10 @@ func (n *NodeFilterEKS) FilterNodesUsingStrategy(nodeFilter *NodeFilter) ([]stri
 		return nil, fmt.Errorf("filter nodes `eks`: %w", err)
 	}
 
+	if nodeFilter.Count == 0 {
+		nodeFilter.Count = len(n.NodeMap)
+	}
+
 	err = filterNodesOnConditionalParameters(nodeFilter, n.NodeMap)
 	if err != nil {
 		return nil, fmt.Errorf("filter nodes `eks`: %w", err)
@@ -123,11 +127,10 @@ func (n *NodeFilterEKS) eksFilterRoundRobinAZ(nodeFilter *NodeFilter) ([]string,
 
 	var filteredNodes []string
 
-	// Getting the list of nodes
-	for _, node := range n.NodeMap {
-		tempAZ := node.Metadata.Labels[NodeZoneLabelKey]
+	for _, nodeName := range n.NodeNames {
+		tempAZ := n.NodeMap[nodeName].Metadata.Labels[NodeZoneLabelKey]
 		if _, ok := reqAZMap[tempAZ]; ok && reqAZMap[tempAZ] > 0 {
-			filteredNodes = append(filteredNodes, node.Metadata.Name)
+			filteredNodes = append(filteredNodes, n.NodeMap[nodeName].Metadata.Name)
 
 			reqAZMap[tempAZ]--
 		}

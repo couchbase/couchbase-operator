@@ -85,6 +85,11 @@ func sortByLatest(nodesMap map[string]*nodes.Node) ([]string, error) {
 		nodesWithTimestamp = append(nodesWithTimestamp, temp)
 	}
 
+	// Sorting in ascending order of node names. Ensures consistent order while sorting later if timestamps are same.
+	slices.SortFunc(nodesWithTimestamp, func(i, j []string) int {
+		return cmp.Compare(i[0], j[0])
+	})
+
 	// Sorting in descending order of timestamp
 	slices.SortFunc(nodesWithTimestamp, func(i, j []string) int {
 		return cmp.Compare(j[1], i[1])
@@ -107,6 +112,11 @@ func sortByOldest(nodesMap map[string]*nodes.Node) ([]string, error) {
 		temp := []string{node.Metadata.Name, node.Metadata.CreationTimestamp.String()}
 		nodesWithTimestamp = append(nodesWithTimestamp, temp)
 	}
+
+	// Sorting in ascending order of node names. Ensures consistent order while sorting later if timestamps are same.
+	slices.SortFunc(nodesWithTimestamp, func(i, j []string) int {
+		return cmp.Compare(i[0], j[0])
+	})
 
 	// Sorting in ascending order of timestamp
 	slices.SortFunc(nodesWithTimestamp, func(i, j []string) int {

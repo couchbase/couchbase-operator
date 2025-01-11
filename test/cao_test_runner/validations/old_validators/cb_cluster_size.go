@@ -23,6 +23,7 @@ const (
 )
 
 var (
+	ErrDecodeError                    = errors.New("unable to decode")
 	ErrScalingInProcess               = errors.New("scaling is in progress")
 	ErrMapServerNameToSizeNotProvided = errors.New("MapServerNameToSize not provided")
 )

@@ -1,0 +1,38 @@
+action: "Label Taint Nodes"
+config:
+  name: "Label Taint Nodes"
+  description:
+    - "Action Description"
+  nodeFilter:
+    managedServiceProvider:
+      platform: kubernetes # kubernetes | openshift
+      environment: cloud # kind | cloud
+      provider: aws # aws | azure | gcp | not required for environment=kind
+    namespace: default # can be taken from context as well.
+    count: 1
+    selectStrategy: any # any | roundRobinAZ
+    sortByStrategy: default # default | sorted | random | oldest | latest
+    nodegroupNames: # If not provided all the nodegroups / nodepools will be considered.
+      - "nodegroup-1"
+    azList: # If not provided all the AZs will be considered.
+      - us-east-2a
+      - us-east-2b
+    skipOperator: true
+    skipAdmission: true
+    avoidLabels:
+      - [ "label1_key", "label1_value1" ]
+      - [ "label1_key", "label1_value2" ]
+      - [ "label2_key", "label2_value1" ]
+  applyTaint: true
+  applyLabel: true
+  removeTaint: false
+  removeLabel: false
+  labels:
+    - labelKey: "workload-node"
+      labelValue: "true"
+    - labelKey: "label-key-1"
+      labelValue: "label-value-1"
+  taints:
+    - taintKey: "exampleTaintKey"
+      taintValue: "exampleTaintValue"
+      taintEffect: "NoSchedule" # NoSchedule | PreferNoSchedule | NoExecute

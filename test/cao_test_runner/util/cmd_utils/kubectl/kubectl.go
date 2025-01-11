@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	cmdutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils"
@@ -66,7 +65,7 @@ func (k *KubectlCmd) FormatOutput(outputType string) *KubectlCmd {
 }
 
 // WithFlag adds a flag to the kubectl command. Flags are appended just after "kubectl" like: "kubectl --flag command".
-func (k *KubectlCmd) WithFlag(name string, value string) *KubectlCmd {
+func (k *KubectlCmd) WithFlag(name, value string) *KubectlCmd {
 	if k.Flags == nil {
 		k.Flags = make(map[string]string)
 	}
@@ -95,7 +94,7 @@ func CreateNamespace(namespace string) *KubectlCmd {
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func CreateSecretLiteral(name string, user string, pw string) *KubectlCmd {
+func CreateSecretLiteral(name, user, pw string) *KubectlCmd {
 	args := []string{"secret", "generic", name}
 	flags := map[string]string{
 		"from-literal=username": user,
@@ -215,24 +214,38 @@ func ClusterInfoForContext(ctxt string) *KubectlCmd {
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func Taint(node string, key string, value string, effect string) *KubectlCmd {
-	var args []string
+func Taint(nodes []string, key, value, effect string) *KubectlCmd {
+	args := []string{"nodes"}
+
+	for _, nodeName := range nodes {
+		if nodeName != "" {
+			args = append(args, nodeName)
+		}
+	}
+
 	if value != "" {
-		args = []string{"nodes", node, fmt.Sprintf("%s=%s:%s", key, value, effect)}
+		args = append(args, fmt.Sprintf("%s=%s:%s", key, value, effect))
 	} else {
-		args = []string{"nodes", node, fmt.Sprintf("%s:%s", key, effect)}
+		args = append(args, fmt.Sprintf("%s:%s", key, effect))
 	}
 
 	cmd := "taint"
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func RemoveTaint(node string, key string, value string, effect string) *KubectlCmd {
-	var args []string
+func RemoveTaint(nodes []string, key, value, effect string) *KubectlCmd {
+	args := []string{"nodes"}
+
+	for _, nodeName := range nodes {
+		if nodeName != "" {
+			args = append(args, nodeName)
+		}
+	}
+
 	if value != "" {
-		args = []string{"nodes", node, fmt.Sprintf("%s=%s:%s-", key, value, effect)}
+		args = append(args, fmt.Sprintf("%s=%s:%s-", key, value, effect))
 	} else {
-		args = []string{"nodes", node, fmt.Sprintf("%s:%s-", key, effect)}
+		args = append(args, fmt.Sprintf("%s:%s-", key, effect))
 	}
 
 	cmd := "taint"
@@ -305,19 +318,19 @@ func ApplyFiles(paths ...string) *KubectlCmd {
 // kubectl patch command(s)
 // ==============================
 
-func Patch(resource string, data string) *KubectlCmd {
+func Patch(resource, data string) *KubectlCmd {
 	args := []string{resource, "-p", data}
 	cmd := "patch"
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func PatchMerge(resource string, data string) *KubectlCmd {
+func PatchMerge(resource, data string) *KubectlCmd {
 	args := []string{resource, "--patch", data, "--type", "merge"}
 	cmd := "patch"
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func PatchJSON(resource string, data string) *KubectlCmd {
+func PatchJSON(resource, data string) *KubectlCmd {
 	args := []string{resource, "--patch", data, "--type", "json"}
 	cmd := "patch"
 	return NewKubectlCmd(cmd, args, nil)
@@ -327,13 +340,12 @@ func PatchJSON(resource string, data string) *KubectlCmd {
 // ========= Settings Kubectl Commands =========
 // =============================================
 
-func Label(nodes string, key string, value string) *KubectlCmd {
+func Label(names []string, resource, key, value string) *KubectlCmd {
 	var args []string
 
-	tokens := strings.Split(nodes, " ")
-	for _, t := range tokens {
-		if t != "" {
-			args = append(args, "nodes/"+t)
+	for _, name := range names {
+		if name != "" {
+			args = append(args, resource+"/"+name)
 		}
 	}
 
@@ -345,24 +357,23 @@ func Label(nodes string, key string, value string) *KubectlCmd {
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func Unlabel(nodes string, key string) *KubectlCmd {
+func Unlabel(names []string, resource, key string) *KubectlCmd {
 	var args []string
 
-	tokens := strings.Split(nodes, " ")
-	for _, t := range tokens {
-		if t != "" {
-			args = append(args, "nodes/"+t)
+	for _, name := range names {
+		if name != "" {
+			args = append(args, resource+"/"+name)
 		}
 	}
 
-	label := "%s-" + key
+	label := key + "-"
 	args = append(args, label)
 
 	cmd := "label"
 	return NewKubectlCmd(cmd, args, nil)
 }
 
-func Annotate(resource string, name string, key string, value string) *KubectlCmd {
+func Annotate(resource, name, key, value string) *KubectlCmd {
 	args := []string{resource, name, fmt.Sprintf("%s=%s", key, value)}
 	cmd := "annotate"
 	return NewKubectlCmd(cmd, args, nil)

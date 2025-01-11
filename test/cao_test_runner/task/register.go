@@ -10,6 +10,7 @@ import (
 	destroycrd "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/crd"
 	destroykubernetes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/kubernetes"
 	destoryoperator "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/destroy/operator"
+	labeltaintnodes "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/k8s/label_taint_nodes"
 	admissioncontrollersetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/admission_controller"
 	caocrdsetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/cao_crd"
 	couchbasesetup "github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/setup/couchbase"
@@ -65,5 +66,6 @@ func (r Register) Actions() map[string]ActionRegistration {
 		"Bare Metal Chaos":                 {newAction: chaosbaremetal.NewChaosBareMetalConfig, config: &chaosbaremetal.BareMetalChaosConfig{}},
 		"Index Workload":                   {newAction: indexworkloads.NewIndexWorkloadConfig, config: &indexworkloads.IndexWorkloadConfig{}},
 		"Query Workload":                   {newAction: queryworkloads.NewQueryWorkloadConfig, config: &queryworkloads.QueryWorkloadConfig{}},
+		"Label Taint Nodes":                {newAction: labeltaintnodes.NewLabelTaintNodeConfig, config: &labeltaintnodes.LabelTaintNodeConfig{}},
 	}
 }

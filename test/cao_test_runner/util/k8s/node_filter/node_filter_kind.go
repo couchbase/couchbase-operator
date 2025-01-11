@@ -40,6 +40,10 @@ func (n *NodeFilterKind) FilterNodesUsingStrategy(nodeFilter *NodeFilter) ([]str
 		return nil, fmt.Errorf("filter nodes `eks`: %w", err)
 	}
 
+	if nodeFilter.Count == 0 {
+		nodeFilter.Count = len(n.NodeMap)
+	}
+
 	err = filterNodesOnConditionalParameters(nodeFilter, n.NodeMap)
 	if err != nil {
 		return nil, fmt.Errorf("filter nodes `kind`: %w", err)
