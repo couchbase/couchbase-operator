@@ -2,6 +2,7 @@ package nodefilter
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"math/rand"
 	"slices"
@@ -9,6 +10,9 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
+// NodeSortByStrategy is the strategy used to sort the nodes.
+// We sort the nodes after filtering them based on conditional parameters.
+// After sorting, we select the nodes based on the NodeSelectionStrategy.
 type NodeSortByStrategy string
 
 const (
@@ -19,34 +23,50 @@ const (
 	SortBySorted  NodeSortByStrategy = "sorted"
 )
 
+var (
+	ErrNodesMapIsNil         = errors.New("nodes map is nil")
+	ErrInvalidSortByStrategy = errors.New("sort strategy used is invalid")
+)
+
 // sortNodesUsingSortByStrategy finds all the nodes in the k8s cluster and then sorts them as per the NodeSortByStrategy.
-func sortNodesUsingSortByStrategy(strategy NodeSortByStrategy) ([]string, error) {
+func sortNodesUsingSortByStrategy(strategy NodeSortByStrategy, nodesMap map[string]*nodes.Node) ([]string, error) {
+	if nodesMap == nil {
+		return nil, fmt.Errorf("sort nodes `%s`: %w", strategy, ErrNodesMapIsNil)
+	}
+
 	switch strategy {
 	case SortByDefault:
-		return sortByDefault()
+		return sortByDefault(nodesMap)
 	case SortBySorted:
-		return sortBySorted()
+		return sortBySorted(nodesMap)
 	case SortByLatest:
-		return sortByLatest()
+		return sortByLatest(nodesMap)
 	case SortByOldest:
-		return sortByOldest()
+		return sortByOldest(nodesMap)
 	case SortByRandom:
-		return sortByRandom()
+		return sortByRandom(nodesMap)
 	default:
 		return nil, fmt.Errorf("sort nodes `%s`: %w", strategy, ErrInvalidSortByStrategy)
 	}
 }
 
 // sortByDefault returns the node names as the way kubectl returns them.
-func sortByDefault() ([]string, error) {
-	return nodes.GetNodeNames()
+func sortByDefault(nodesMap map[string]*nodes.Node) ([]string, error) {
+	var nodeNames []string
+
+	for nodeName := range nodesMap {
+		nodeNames = append(nodeNames, nodeName)
+	}
+
+	return nodeNames, nil
 }
 
 // sortBySorted sorts the node names in ascending order.
-func sortBySorted() ([]string, error) {
-	nodeNames, err := nodes.GetNodeNames()
-	if err != nil {
-		return nil, fmt.Errorf("sort nodes by `%s`: %w", SortBySorted, err)
+func sortBySorted(nodesMap map[string]*nodes.Node) ([]string, error) {
+	var nodeNames []string
+
+	for nodeName := range nodesMap {
+		nodeNames = append(nodeNames, nodeName)
 	}
 
 	slices.Sort(nodeNames)
@@ -55,12 +75,14 @@ func sortBySorted() ([]string, error) {
 }
 
 // sortByLatest sorts the nodes as per their creation time from latest (most recently created) -> oldest.
-func sortByLatest() ([]string, error) {
+func sortByLatest(nodesMap map[string]*nodes.Node) ([]string, error) {
+	var nodesWithTimestamp [][]string
 	var latestNodes []string
 
-	nodesWithTimestamp, err := GetNodesWithTimestamp()
-	if err != nil {
-		return nil, fmt.Errorf("sort nodes by `%s`: %w", SortByLatest, err)
+	// Get the nodes with their creation timestamp
+	for _, node := range nodesMap {
+		temp := []string{node.Metadata.Name, node.Metadata.CreationTimestamp.String()}
+		nodesWithTimestamp = append(nodesWithTimestamp, temp)
 	}
 
 	// Sorting in descending order of timestamp
@@ -76,12 +98,14 @@ func sortByLatest() ([]string, error) {
 }
 
 // sortByOldest sorts the nodes as per their creation time from oldest -> latest.
-func sortByOldest() ([]string, error) {
+func sortByOldest(nodesMap map[string]*nodes.Node) ([]string, error) {
+	var nodesWithTimestamp [][]string
 	var oldestNodes []string
 
-	nodesWithTimestamp, err := GetNodesWithTimestamp()
-	if err != nil {
-		return nil, fmt.Errorf("sort nodes by `%s`: %w", SortByOldest, err)
+	// Get the nodes with their creation timestamp
+	for _, node := range nodesMap {
+		temp := []string{node.Metadata.Name, node.Metadata.CreationTimestamp.String()}
+		nodesWithTimestamp = append(nodesWithTimestamp, temp)
 	}
 
 	// Sorting in ascending order of timestamp
@@ -97,10 +121,11 @@ func sortByOldest() ([]string, error) {
 }
 
 // sortByRandom sorts the nodes randomly.
-func sortByRandom() ([]string, error) {
-	nodeNames, err := nodes.GetNodeNames()
-	if err != nil {
-		return nil, fmt.Errorf("sort nodes by `%s`: %w", SortByRandom, err)
+func sortByRandom(nodesMap map[string]*nodes.Node) ([]string, error) {
+	var nodeNames []string
+
+	for nodeName := range nodesMap {
+		nodeNames = append(nodeNames, nodeName)
 	}
 
 	rand.Shuffle(len(nodeNames), func(i, j int) {

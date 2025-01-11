@@ -1,7 +1,6 @@
 package nodefilter
 
 import (
-	"errors"
 	"fmt"
 
 	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
@@ -9,13 +8,21 @@ import (
 )
 
 type NodeFilter struct {
-	ManagedSvcName managedsvc.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
+	ManagedSvcProvider managedsvc.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
 
-	// Number of nodes to filter.
+	// Namespace is used when filtering based on pods e.g. Operator, Admission.
+	Namespace string `yaml:"namespace" caoCli:"context"`
+
+	// Number of nodes to filter. If Count = 0 then all the nodes will be considered.
 	Count int `yaml:"count" caoCli:"required"`
 
 	SelectStrategy NodeSelectionStrategy `yaml:"selectStrategy"`
 	SortByStrategy NodeSortByStrategy    `yaml:"sortByStrategy"`
+
+	// Conditional Parameters for filtering nodes.
+
+	// NodegroupNames stores the names of the nodegroups / nodepools which will be used to filter the nodes. If nil, all the nodegroups will be considered.
+	NodegroupNames []string `yaml:"nodegroupNames"`
 
 	// AZList holds the list of AZs to be used for filtering k8s nodes. If nil, all the AZs will be considered.
 	AZList []string `yaml:"azList"`
@@ -31,7 +38,8 @@ type NodeFilter struct {
 }
 
 var (
-	ErrInvalidSortByStrategy = errors.New("sort strategy used is invalid")
+	NodeZoneLabelKey     = "topology.kubernetes.io/zone"
+	EKSNodegroupLabelKey = "eks.amazonaws.com/nodegroup"
 )
 
 func NewNodeFilter() *NodeFilter {
@@ -46,14 +54,10 @@ func NewNodeFilter() *NodeFilter {
 }
 
 type FilterNodesInterface interface {
-	// SortNodesUsingSortByStrategy sorts the nodes based on NodeSortByStrategy.
-	SortNodesUsingSortByStrategy(nodeFilter *NodeFilter) ([]string, error)
-
-	// FilterOutNodes first runs SortNodesUsingSortByStrategy() and then filters out nodes based on
-	// NodeFilter.SkipOperator, NodeFilter.SkipAdmission and NodeFilter.AvoidLabels.
-	FilterOutNodes(nodeFilter *NodeFilter) ([]string, error)
-
-	// FilterNodesUsingStrategy first runs FilterOutNodes() and then selects nodes based on NodeSelectionStrategy strategy.
+	// FilterNodesUsingStrategy filters and selects the nodes and returns the node names in sorted order.
+	// First we filter out the nodes based on the conditional parameters using filterNodesOnConditionalParameters().
+	// Next, we sort the nodes using NodeSortByStrategy.
+	// Finally, we select the nodes based on NodeSelectionStrategy strategy.
 	FilterNodesUsingStrategy(nodeFilter *NodeFilter) ([]string, error)
 }
 

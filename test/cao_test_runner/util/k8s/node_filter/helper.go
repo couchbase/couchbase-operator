@@ -2,11 +2,58 @@ package nodefilter
 
 import (
 	"fmt"
+	"slices"
 
 	caopods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cao_pods"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
 )
+
+// filterNodesOnConditionalParameters filters out the nodes based on all the conditional parameters.
+/*
+ * Conditional parameters: NodeFilter.SkipOperator, NodeFilter.SkipAdmission, NodeFilter.NodegroupNames and NodeFilter.AvoidLabels.
+ * After this, NodeFilterEKS.NodeMap and NodeFilterEKS.NodeNames have eligible nodes - ready to be sorted using NodeSortByStrategy followed by selection using NodeSelectionStrategy.
+ */
+func filterNodesOnConditionalParameters(nodeFilter *NodeFilter, nodeMap map[string]*nodes.Node) error {
+	var err error
+	var operatorNodeName string
+	var admissionNodeNames []string
+
+	if nodeFilter.SkipOperator || nodeFilter.SkipAdmission {
+		operatorNodeName, admissionNodeNames, err = GetOperatorAdmissionNodeNames(nodeFilter.Namespace)
+		if err != nil {
+			return fmt.Errorf("filter nodes on condition: %w", err)
+		}
+	}
+
+	for nodeName := range nodeMap {
+		if nodeFilter.SkipOperator && nodeName == operatorNodeName {
+			delete(nodeMap, nodeName)
+			continue
+		}
+
+		if nodeFilter.SkipAdmission && slices.Contains(admissionNodeNames, nodeName) {
+			delete(nodeMap, nodeName)
+			continue
+		}
+
+		// Checking if the node is of the required Nodegroup.
+		if nodeFilter.NodegroupNames != nil && !slices.Contains(nodeFilter.NodegroupNames, nodeMap[nodeName].Metadata.Labels[EKSNodegroupLabelKey]) {
+			delete(nodeMap, nodeName)
+			continue
+		}
+
+		// If one of the labels in AvoidLabels is present on the node then we reject the node.
+		for _, avoidLabel := range nodeFilter.AvoidLabels {
+			if LabelExists(nodeMap[nodeName], avoidLabel[0], avoidLabel[1]) {
+				delete(nodeMap, nodeName)
+				break
+			}
+		}
+	}
+
+	return nil
+}
 
 // GetOperatorAdmissionNodeNames retrieves the k8s node names which has the operator and admission pod respectively.
 func GetOperatorAdmissionNodeNames(namespace string) (string, []string, error) {
@@ -45,35 +92,4 @@ func LabelExists(node *nodes.Node, labelKeyName, labelValue string) bool {
 	}
 
 	return false
-}
-
-// RemoveEmptyFromSlice removes empty strings from a string slice.
-func RemoveEmptyFromSlice(oldSlice []string) []string {
-	var newSlice []string
-
-	for i := range oldSlice {
-		if oldSlice[i] != "" {
-			newSlice = append(newSlice, oldSlice[i])
-		}
-	}
-
-	return newSlice
-}
-
-// GetNodesWithTimestamp returns the names of nodes with their creation timestamp.
-// []{[]{"node-name", "creation-timestamp"}, ...}.
-func GetNodesWithTimestamp() ([][]string, error) {
-	var nodesWithTimestamp [][]string
-
-	nodeList, err := nodes.GetNodes(nil)
-	if err != nil {
-		return nil, fmt.Errorf("get nodes with timestamp: %w", err)
-	}
-
-	for _, node := range nodeList.Nodes {
-		temp := []string{node.Metadata.Name, node.Metadata.CreationTimestamp.String()}
-		nodesWithTimestamp = append(nodesWithTimestamp, temp)
-	}
-
-	return nodesWithTimestamp, nil
 }
