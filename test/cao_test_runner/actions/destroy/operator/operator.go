@@ -102,7 +102,7 @@ func (action *DeleteOperator) RunValidators(ctx *context.Context,
 		return ErrUnableToDecodeOperatorConfig
 	}
 
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 

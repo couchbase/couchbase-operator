@@ -1,9 +1,10 @@
-package validations
+package oldvalidators
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	nodefilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/node_filter"
 	corev1 "k8s.io/api/core/v1"
 
@@ -33,7 +34,7 @@ type LabelTaintNodes struct {
 	RemoveLabel bool                  `yaml:"removeLabel"`
 }
 
-func (ltn *LabelTaintNodes) Run(ctxt *context.Context) error {
+func (ltn *LabelTaintNodes) Run(ctxt *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	defer handlePanic()
 
 	err := ltn.validate()

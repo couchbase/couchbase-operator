@@ -147,7 +147,7 @@ func (action *SetupCaoCrd) RunValidators(ctx *context.Context,
 		return ErrDecodeCAOSetupConfig
 	}
 
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 

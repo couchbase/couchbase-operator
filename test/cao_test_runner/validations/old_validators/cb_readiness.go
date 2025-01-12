@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
@@ -35,7 +36,7 @@ type CouchbaseReadiness struct {
 	IntervalInSecs int64  `yaml:"intervalInSecs"`
 }
 
-func (c *CouchbaseReadiness) Run(_ *context.Context) error {
+func (c *CouchbaseReadiness) Run(_ *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	defer handlePanic()
 	logrus.Info("Couchbase readiness check started")
 

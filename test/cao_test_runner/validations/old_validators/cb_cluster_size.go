@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	jsonpatchutil "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
@@ -35,7 +36,7 @@ type CouchbaseClusterSize struct {
 	PreRunWaitInSecs    int64              `yaml:"preRunWaitInSecs"`
 }
 
-func (c *CouchbaseClusterSize) Run(_ *context.Context) error {
+func (c *CouchbaseClusterSize) Run(_ *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	defer handlePanic()
 
 	// Check if Cluster Scaling has started or not.

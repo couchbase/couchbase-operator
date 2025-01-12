@@ -93,7 +93,7 @@ func (action *ChangeNamespace) RunValidators(ctx *context.Context, state string,
 		return ErrNoConfigFound
 	}
 
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 

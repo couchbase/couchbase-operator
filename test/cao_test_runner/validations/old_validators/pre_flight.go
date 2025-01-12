@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	caopods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cao_pods"
@@ -34,7 +35,7 @@ type PreFlight struct {
 	State string `yaml:"state" caoCli:"required"`
 }
 
-func (pf *PreFlight) Run(_ *context.Context) error {
+func (pf *PreFlight) Run(_ *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	logrus.Info("Pre-flight checks started")
 
 	// CHECK: CRDs

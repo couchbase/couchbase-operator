@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -36,7 +37,7 @@ var (
 	curlSleepTime        = 5 * time.Second
 )
 
-func (cl *CollectLogs) Run(_ *context.Context) error {
+func (cl *CollectLogs) Run(_ *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	logrus.Info("log collection running")
 
 	workDir, err := os.Getwd()

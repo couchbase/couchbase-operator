@@ -82,7 +82,7 @@ func (c *ChaosBareMetal) RunValidators(ctx *context.Context, state string, testA
 
 	logrus.Infof("%s validators running for the bare metal chaos action desc `%v`", state, chaosConfig.Description)
 
-	if ok, err := validations.RunValidator(ctx, chaosConfig.Validators, state); !ok {
+	if ok, err := validations.RunValidator(ctx, chaosConfig.Validators, state, testAssets); !ok {
 		return fmt.Errorf("run %s validations for the bare metal chaos action desc `%v`: %w", state, chaosConfig.Description, err)
 	}
 

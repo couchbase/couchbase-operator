@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/goccy/go-yaml"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +24,7 @@ func checkValidValidation(validate string) Validator {
 	return nil
 }
 
-func RunValidator(ctx *context.Context, validators []map[string]any, state string) (bool, error) {
+func RunValidator(ctx *context.Context, validators []map[string]any, state string, testAssets assets.TestAssetGetterSetter) (bool, error) {
 	var errs []error
 
 	for _, validatorMap := range validators {
@@ -42,7 +43,7 @@ func RunValidator(ctx *context.Context, validators []map[string]any, state strin
 			}
 
 			if state == v.GetState() {
-				if err = v.Run(ctx); err != nil {
+				if err = v.Run(ctx, testAssets); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -56,10 +57,4 @@ func RunValidator(ctx *context.Context, validators []map[string]any, state strin
 	}
 
 	return true, nil
-}
-
-func handlePanic() {
-	if a := recover(); a != nil {
-		logrus.Warn("recover", a)
-	}
 }

@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,7 @@ type KubeConfigValidator struct {
 func (validator *KubeConfigValidator) GetState() string {
 	return validator.State
 }
-func (validator *KubeConfigValidator) Run(ctx *context.Context) error {
+func (validator *KubeConfigValidator) Run(ctx *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	defer handlePanic()
 	logrus.Info("Kubeconfig context validator check started")
 

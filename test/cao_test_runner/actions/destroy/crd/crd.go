@@ -86,7 +86,7 @@ func (action *DestroyCRD) RunValidators(ctx *context.Context, state string, test
 		return ErrDecodeCRDSetupConfig
 	}
 
-	if ok, err := validations.RunValidator(ctx, c.Validators, state); !ok {
+	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
 		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 

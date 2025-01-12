@@ -1,4 +1,4 @@
-package validations
+package oldvalidators
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/jsonpatch"
@@ -26,7 +27,7 @@ type CBVersion struct {
 	IntervalInMinutes int64  `yaml:"intervalInMinutes"`
 }
 
-func (c *CBVersion) Run(_ *context.Context) error {
+func (c *CBVersion) Run(_ *context.Context, testAssets assets.TestAssetGetterSetter) error {
 	defer handlePanic()
 	logrus.Info("Couchbase version check started")
 
