@@ -14,6 +14,7 @@ type RootConfig struct {
 	ScenarioTags         []string
 	TriggerLogCollection bool
 	OutputPath           *fileutils.Directory
+	KubectlPath          *fileutils.File
 }
 
 var (
@@ -41,6 +42,8 @@ func buildRootConfig() (*RootConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("build root config: %w", err)
 	}
+
+	cfg.KubectlPath = fileutils.NewFile(viper.GetString(kubectlPathKey))
 
 	return cfg, nil
 }

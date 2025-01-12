@@ -14,6 +14,5 @@ config:
   releaseChannel: REGULAR
   numNodePools: 1
   kubeconfigPath: /root/.kube/config
-  kubectlPath: /root/kubectl
   operatorImage: couchbase/admission-controller:2.7.0
   admissionControllerImage: couchbase/operator:2.7.0

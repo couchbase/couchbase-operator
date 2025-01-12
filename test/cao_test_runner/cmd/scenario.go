@@ -23,7 +23,8 @@ func newScenarioCmd() *cobra.Command {
 		},
 	}
 	addStringFlag(scenarioCmd, scenarioKey, "f", "", "Scenario YAML file path")
-	addStringFlag(scenarioCmd, outputPathKey, "o", ".", "CSV output path")
+	addStringFlag(scenarioCmd, kubectlPathKey, "k", "kubectl", "Kubectl path")
+	addStringFlag(scenarioCmd, outputPathKey, "o", ".", "output directory path")
 	addStringFlag(scenarioCmd, scenarioTags, "", "", "Run only scenario with tags")
 	addBoolFlag(scenarioCmd, triggerLogCollectionKey, "l", false, "trigger log collection")
 
@@ -38,7 +39,7 @@ func RunScenario() error {
 
 	f := task.FilePath(rootCfg.Scenario)
 
-	testAssets, err := buildTestAssets(rootCfg.OutputPath)
+	testAssets, err := buildTestAssets(rootCfg.OutputPath, rootCfg.KubectlPath)
 	if err != nil {
 		return err
 	}

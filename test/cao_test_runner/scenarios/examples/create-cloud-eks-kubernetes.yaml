@@ -14,6 +14,5 @@ config:
   diskSize: 100
   ami: AL2_x86_64
   kubeconfigPath: /Users/cao-testrunner/.kube/config
-  kubectlPath: /root/kubectl
   operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
   admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64

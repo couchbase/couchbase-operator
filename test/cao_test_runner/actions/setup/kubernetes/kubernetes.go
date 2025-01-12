@@ -8,7 +8,6 @@ import (
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
@@ -21,12 +20,10 @@ import (
 var (
 	ErrDecodeKubernetesConfig = errors.New("unable to decode KubernetesSetupConfig")
 	ErrNoConfigFound          = errors.New("no config found for setting up kubernetes cluster")
-	ErrIllegalKubectlPath     = errors.New("illegal kubectl path")
 )
 
 type KubernetesSetupConfig struct {
 	Description              []string                           `yaml:"description"`
-	KubectlPath              string                             `yaml:"kubectlPath" env:"KUBECTL_PATH"`
 	ClusterName              string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 	Platform                 caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
 	Environment              managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
@@ -99,10 +96,6 @@ func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAs
 
 	logrus.Infof("Kubernetes Setup started")
 
-	if c.KubectlPath != "" {
-		kubectl.WithBinaryPath(c.KubectlPath)
-	}
-
 	c.resultsDirectory = testAssets.GetResultsDirectory()
 
 	createClusterUtil, err := NewCreateClusterUtil(c)
@@ -150,12 +143,6 @@ func (action *SetupKubernetes) CheckConfig() error {
 
 	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
 		return err
-	}
-
-	if c.KubectlPath != "" {
-		if !fileutils.NewFile(c.KubectlPath).IsFileExists() {
-			return ErrIllegalKubectlPath
-		}
 	}
 
 	return nil
