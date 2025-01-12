@@ -50,7 +50,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					DesiredSize:            p.DesiredSize,
 					DiskSize:               p.DiskSize,
 					AMI:                    p.AMI,
-					KubeConfigPath:         p.KubeConfigPath,
+					KubeConfigPath:         p.kubeconfigPath,
 					ManagedServiceProvider: p.ms,
 				}, nil
 			case managedk8sservices.Azure:
@@ -59,7 +59,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					Region:                 p.AKSRegion,
 					KubernetesVersion:      p.KubernetesVersion,
 					DiskSize:               int32(p.DiskSize),
-					KubeConfigPath:         p.KubeConfigPath,
+					KubeConfigPath:         p.kubeconfigPath,
 					NumNodePools:           p.NumNodePools,
 					OSSKU:                  p.OSSKU,
 					OSType:                 p.OSType,
@@ -79,7 +79,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					NumNodePools:           p.NumNodePools,
 					Count:                  p.Count,
 					ReleaseChannel:         p.ReleaseChannel,
-					KubeConfigPath:         p.KubeConfigPath,
+					KubeConfigPath:         p.kubeconfigPath,
 					ManagedServiceProvider: p.ms,
 				}, nil
 			default:

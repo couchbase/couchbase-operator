@@ -44,7 +44,6 @@ type KubernetesSetupConfig struct {
 	DesiredSize              int                                `yaml:"desiredSize"`
 	DiskSize                 int                                `yaml:"diskSize"`
 	AMI                      ekstypes.AMITypes                  `yaml:"ami"`
-	KubeConfigPath           string                             `yaml:"kubeconfigPath" caoCli:"context" env:"KUBECONFIG"`
 	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`
 	OSType                   armcontainerservice.OSType         `yaml:"osType"`
 	VMSize                   string                             `yaml:"vmSize"`
@@ -55,6 +54,7 @@ type KubernetesSetupConfig struct {
 	DiskType                 string                             `yaml:"diskType"`
 	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"`
 	Validators               []map[string]any                   `yaml:"validators,omitempty"`
+	kubeconfigPath           *fileutils.File
 	ms                       *managedk8sservices.ManagedServiceProvider
 	resultsDirectory         *fileutils.Directory
 }
@@ -97,6 +97,7 @@ func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAs
 	logrus.Infof("Kubernetes Setup started")
 
 	c.resultsDirectory = testAssets.GetResultsDirectory()
+	c.kubeconfigPath = testAssets.GetKubeconfigPath()
 
 	createClusterUtil, err := NewCreateClusterUtil(c)
 	if err != nil {

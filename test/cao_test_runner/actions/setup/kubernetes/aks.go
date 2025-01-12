@@ -27,7 +27,7 @@ type CreateAKSCluster struct {
 	OSType                 armcontainerservice.OSType
 	OSSKU                  armcontainerservice.OSSKU
 	NumNodePools           int
-	KubeConfigPath         string
+	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
@@ -186,8 +186,8 @@ func (cac *CreateAKSCluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("cluster %s already exists: %w", cac.ClusterName, ErrAKSClusterAlreadyExists)
 	}
 
-	if !fileutils.NewFile(cac.KubeConfigPath).IsFileExists() {
-		return fmt.Errorf("kube config path %s does not exist: %w", cac.KubeConfigPath, ErrKubeConfigFileInvalid)
+	if !cac.KubeConfigPath.IsFileExists() {
+		return fmt.Errorf("kube config path %s does not exist: %w", cac.KubeConfigPath.FilePath, ErrKubeConfigFileInvalid)
 	}
 
 	return nil
@@ -208,11 +208,9 @@ func (cac *CreateAKSCluster) updateKubeconfig(creds *armcontainerservice.Managed
 		decodedKubeconfig = kubeconfig
 	}
 
-	kubeConfigFile := fileutils.NewFile(cac.KubeConfigPath)
+	defer cac.KubeConfigPath.CloseFile()
 
-	defer kubeConfigFile.CloseFile()
-
-	existingKubeconfig, err := kubeConfigFile.ReadFile()
+	existingKubeconfig, err := cac.KubeConfigPath.ReadFile()
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to load existing kubeconfig: %w", err)
 	}
@@ -256,7 +254,7 @@ func (cac *CreateAKSCluster) updateKubeconfig(creds *armcontainerservice.Managed
 		return fmt.Errorf("failed to marshal updated kubeconfig: %w", err)
 	}
 
-	if err := kubeConfigFile.WriteFile(updatedKubeconfig, 0600); err != nil {
+	if err := cac.KubeConfigPath.WriteFile(updatedKubeconfig, 0600); err != nil {
 		return fmt.Errorf("failed to write updated kubeconfig file: %w", err)
 	}
 

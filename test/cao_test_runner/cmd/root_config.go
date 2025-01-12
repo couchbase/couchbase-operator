@@ -15,6 +15,7 @@ type RootConfig struct {
 	TriggerLogCollection bool
 	OutputPath           *fileutils.Directory
 	KubectlPath          *fileutils.File
+	KubeconfigPath       *fileutils.File
 }
 
 var (
@@ -44,6 +45,8 @@ func buildRootConfig() (*RootConfig, error) {
 	}
 
 	cfg.KubectlPath = fileutils.NewFile(viper.GetString(kubectlPathKey))
+
+	cfg.KubeconfigPath = fileutils.NewFile(viper.GetString(kubeconfigPathKey))
 
 	return cfg, nil
 }

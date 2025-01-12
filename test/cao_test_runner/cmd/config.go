@@ -10,6 +10,7 @@ import (
 const (
 	scenarioKey             = "scenario"
 	kubectlPathKey          = "kubectlPath"
+	kubeconfigPathKey       = "kubeconfigPath"
 	outputPathKey           = "output"
 	triggerLogCollectionKey = "triggerLogCollection"
 	scenarioTags            = "tags"
@@ -24,7 +25,8 @@ func buildConfigurator() (*RootConfig, error) {
 	return rootCfg, err
 }
 
-func buildTestAssets(resultsDirectory *fileutils.Directory, kubectlPath *fileutils.File) (*assets.TestAssets, error) {
+func buildTestAssets(resultsDirectory *fileutils.Directory, kubectlPath *fileutils.File,
+	kubeconfigPath *fileutils.File) (*assets.TestAssets, error) {
 	testAssets := assets.NewTestAssets()
 
 	if err := testAssets.SetResultsDirectory(resultsDirectory); err != nil {
@@ -33,6 +35,12 @@ func buildTestAssets(resultsDirectory *fileutils.Directory, kubectlPath *fileuti
 
 	if err := testAssets.SetKubectlPath(kubectlPath); err != nil {
 		return nil, fmt.Errorf("build test assets: %w", err)
+	}
+
+	if kubeconfigPath.FilePath != "" {
+		if err := testAssets.SetKubeconfigPath(kubeconfigPath); err != nil {
+			return nil, fmt.Errorf("build test assets: %w", err)
+		}
 	}
 
 	// Populate test assets with existing data (current state of clusters)

@@ -28,7 +28,7 @@ type CreateGKECluster struct {
 	NumNodePools           int
 	Count                  int
 	ReleaseChannel         managedk8sservices.ReleaseChannel
-	KubeConfigPath         string
+	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
@@ -204,8 +204,8 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 
 	cgc.KubernetesVersion = highestVersion
 
-	if !fileutils.NewFile(cgc.KubeConfigPath).IsFileExists() {
-		return fmt.Errorf("kubeconfig path %s does not exist: %w", cgc.KubeConfigPath, ErrKubeconfigFileInvalid)
+	if !cgc.KubeConfigPath.IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cgc.KubeConfigPath.FilePath, ErrKubeconfigFileInvalid)
 	}
 
 	return nil
@@ -217,11 +217,9 @@ func (cgc *CreateGKECluster) updateKubeconfig(cluster *containerpb.Cluster) erro
 
 	var kubeconfig map[string]interface{}
 
-	kubeconfigFile := fileutils.NewFile(cgc.KubeConfigPath)
-
-	kubeconfigBytes, err := kubeconfigFile.ReadFile()
+	kubeconfigBytes, err := cgc.KubeConfigPath.ReadFile()
 	if err != nil {
-		return fmt.Errorf("unable to read kubeconfig file %s: %w", cgc.KubeConfigPath, err)
+		return fmt.Errorf("unable to read kubeconfig file %s: %w", cgc.KubeConfigPath.FilePath, err)
 	}
 
 	if err := yaml.Unmarshal(kubeconfigBytes, &kubeconfig); err != nil {
@@ -284,7 +282,7 @@ func (cgc *CreateGKECluster) updateKubeconfig(cluster *containerpb.Cluster) erro
 		return fmt.Errorf("failed to marshal updated kubeconfig: %w", err)
 	}
 
-	if err := kubeconfigFile.WriteFile(data, 0600); err != nil {
+	if err := cgc.KubeConfigPath.WriteFile(data, 0600); err != nil {
 		return fmt.Errorf("failed to write to kubeconfig file: %w", err)
 	}
 

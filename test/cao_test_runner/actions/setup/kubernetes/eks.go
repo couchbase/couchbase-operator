@@ -46,7 +46,7 @@ type CreateEKSCluster struct {
 	DesiredSize            int
 	DiskSize               int
 	AMI                    ekstypes.AMITypes
-	KubeConfigPath         string
+	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
@@ -184,11 +184,11 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *ekstypes.Cluster, region 
 			 chmod +x ./aws-iam-authenticator
 		     sudo mv ./aws-iam-authenticator /usr/local/bin/
 	*/
-	if !fileutils.NewFile(cec.KubeConfigPath).IsFileExists() {
-		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath, ErrKubeconfigFileInvalid)
+	if !cec.KubeConfigPath.IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath.FilePath, ErrKubeconfigFileInvalid)
 	}
 
-	kubeconfig, err := clientcmd.LoadFromFile(cec.KubeConfigPath)
+	kubeconfig, err := clientcmd.LoadFromFile(cec.KubeConfigPath.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load existing kubeconfig file: %w", err)
 	}
@@ -234,7 +234,7 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *ekstypes.Cluster, region 
 	kubeconfig.AuthInfos[*cluster.Name] = userConfig
 	kubeconfig.CurrentContext = contextName
 
-	if err = clientcmd.WriteToFile(*kubeconfig, cec.KubeConfigPath); err != nil {
+	if err = clientcmd.WriteToFile(*kubeconfig, cec.KubeConfigPath.FilePath); err != nil {
 		return fmt.Errorf("failed to write kubeconfig file: %w", err)
 	}
 
@@ -291,8 +291,8 @@ func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 		return fmt.Errorf("eks cluster %s already exists: %w", cec.ClusterName, ErrEKSClusterAlreadyExists)
 	}
 
-	if !fileutils.NewFile(cec.KubeConfigPath).IsFileExists() {
-		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath, ErrKubeconfigFileInvalid)
+	if !cec.KubeConfigPath.IsFileExists() {
+		return fmt.Errorf("kubeconfig path %s does not exist: %w", cec.KubeConfigPath.FilePath, ErrKubeconfigFileInvalid)
 	}
 
 	return nil
