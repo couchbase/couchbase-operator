@@ -26,5 +26,8 @@ func buildTestAssets(resultsDirectory *fileutils.Directory) (*assets.TestAssets,
 
 	testAssets.SetResultsDirectory(resultsDirectory)
 
+	// Populate test assets with existing data (current state of clusters)
+	testAssets.PopulateTestAssets()
+
 	return testAssets, nil
 }

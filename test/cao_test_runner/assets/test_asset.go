@@ -36,3 +36,8 @@ func (ts *TestAssets) SetResultsDirectory(resultsDirectory *fileutils.Directory)
 	defer ts.mu.Unlock()
 	ts.resultsDirectory = resultsDirectory
 }
+
+// This function is used to populate test assets in the beginning with existing cluster details.
+func (ts *TestAssets) PopulateTestAssets() {
+
+}
