@@ -392,6 +392,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-status-currentversion,currentVersion>>: ""
   <<couchbaseclusters-status-groups,groups>>:
   - ""
+  <<couchbaseclusters-status-lastupdatetime,lastUpdateTime>>: ""
   <<couchbaseclusters-status-members,members>>:
     <<couchbaseclusters-status-members-ready,ready>>:
     - ""
@@ -5573,6 +5574,16 @@ updated when the upgrade has completed.
 ==== Description
 
 Groups describes all the groups managed by the cluster.
+
+=== couchbaseclusters.status.lastUpdateTime
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+LastUpdateTime is the time that the cluster object was last updated.
 
 === couchbaseclusters.status.members
 

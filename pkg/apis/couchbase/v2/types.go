@@ -4236,6 +4236,7 @@ const (
 	ClusterConditionMigrating                ClusterConditionType = "Migrating"
 	ClusterConditionRebalancing              ClusterConditionType = "Rebalancing"
 	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"
+	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.
@@ -4278,6 +4279,9 @@ type ClusterStatus struct {
 
 	// Autscalers describes all the autoscalers managed by the cluster.
 	Autoscalers []string `json:"autoscalers,omitempty"`
+
+	// LastUpdateTime is the time that the cluster object was last updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
 }
 
 // ServerClassStatus summarizes memory allocations to make configuration easier.

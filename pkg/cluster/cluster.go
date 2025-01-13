@@ -496,7 +496,7 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 //
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
-func (c *Cluster) RunReconcile() {
+func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
 
@@ -574,6 +574,10 @@ func (c *Cluster) RunReconcile() {
 		return
 	}
 
+	if err := c.checkUpdateTime(operatorStartTime); err != nil {
+		log.Error(err, "Error when checking time of last update", "cluster", c.namespacedName())
+	}
+
 	var err error
 	// If we are in migration mode handle that differently.
 	if c.cluster.IsMigrationCluster() {
@@ -620,11 +624,17 @@ func (c *Cluster) RunReconcile() {
 	}
 
 	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Inc()
+
+	c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
+
+	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(c.ctx, c.cluster, metav1.UpdateOptions{}); err != nil {
+		log.Error(err, "Failed to update cluster", "cluster", c.namespacedName())
+	}
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
 // then update the specification and unconditionally reconcile.
-func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
+func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTime time.Time) {
 	if cluster.Generation < c.generation {
 		log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
 		return
@@ -639,7 +649,7 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 	}
 
 	c.cluster = cluster
-	c.RunReconcile()
+	c.RunReconcile(operatorStartTime)
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {
@@ -1129,4 +1139,39 @@ func (c *Cluster) isClusterRebalancing() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
+	// If there's no value, it must be a brand new cluster so ignore this step for now.
+	if c.cluster.Status.LastUpdateTime != "" {
+		return nil
+	}
+
+	timeOfChange, parseErr := time.Parse(time.RFC3339, c.cluster.Status.LastUpdateTime)
+	if parseErr != nil {
+		return parseErr
+	}
+
+	if !timeOfChange.IsZero() {
+		if timeOfChange.Before(operatorStartTime) {
+			log.Info("Operator started after changes made. Revert your changes to avoid errors.")
+			c.cluster.Status.SetErrorCondition("Operator started after changes made. Revert your changes to avoid errors.")
+
+			if err := c.state.Upsert(persistence.ChangesMadeBeforeOperatorStart, "true"); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		if _, err := c.state.Get(persistence.ChangesMadeBeforeOperatorStart); err == nil {
+			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+
+			if err := c.state.Update(persistence.ChangesMadeBeforeOperatorStart, "false"); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
