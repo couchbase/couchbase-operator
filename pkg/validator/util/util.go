@@ -2,8 +2,11 @@ package util
 
 import (
 	"fmt"
+	"strconv"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
+	storagev1 "k8s.io/api/storage/v1"
 )
 
 func UniqueString(strList []string) bool {
@@ -73,4 +76,20 @@ func MergeAbstractBucketLists(l1, l2 []v2.AbstractBucket) []v2.AbstractBucket {
 	}
 
 	return result
+}
+
+func CheckDefaultStorageClassExists(scList *storagev1.StorageClassList) bool {
+	if scList == nil {
+		return false
+	}
+
+	for _, sc := range scList.Items {
+		if val, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
+			if d, err := strconv.ParseBool(val); err == nil && d {
+				return true
+			}
+		}
+	}
+
+	return false
 }

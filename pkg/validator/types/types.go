@@ -22,6 +22,8 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	GetSecret(string, string) (*corev1.Secret, bool, error)
 	// GetStorageClass checks whether the named stoage class exists.
 	GetStorageClass(string) (*storagev1.StorageClass, bool, error)
+	// GetStorageClasses returns all storage classes in the cluster.
+	GetStorageClasses() (*storagev1.StorageClassList, error)
 	// GetCouchbaseClusters returns all clusters in the specified namespace.
 	GetCouchbaseClusters(string) (*couchbasev2.CouchbaseClusterList, error)
 	// GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
@@ -85,7 +87,7 @@ func (ab *kubeAbstractionImpl) GetSecret(namespace, name string) (*corev1.Secret
 	return secret, true, nil
 }
 
-// storageClassExists checks whether the named stoage class exists.
+// GetStorageClass checks whether the named stoage class exists.
 func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageClass, bool, error) {
 	// Warning, this returns a valid pointer on error
 	storageClass, err := ab.client.StorageV1().StorageClasses().Get(context.Background(), name, metav1.GetOptions{})
@@ -98,6 +100,11 @@ func (ab *kubeAbstractionImpl) GetStorageClass(name string) (*storagev1.StorageC
 	}
 
 	return storageClass, true, nil
+}
+
+// GetStorageClasses returns all storage classes in the cluster.
+func (ab *kubeAbstractionImpl) GetStorageClasses() (*storagev1.StorageClassList, error) {
+	return ab.client.StorageV1().StorageClasses().List(context.Background(), metav1.ListOptions{})
 }
 
 // GetCouchbaseClusters returns all clusters in the specified namespace.

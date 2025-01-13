@@ -454,6 +454,7 @@ func (o *generateAdmissionOptions) getAdmissionRole() runtime.Object {
 				},
 				Verbs: []string{
 					"get",
+					"list", // used to check that a default storageClass exists in the cluster
 				},
 			})
 		}
