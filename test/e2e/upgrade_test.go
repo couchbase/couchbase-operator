@@ -132,9 +132,11 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 						},
 					},
 					// ... or the operator notices it's gone pop, aborts the topology reconcile
-					// and next time around the pod is already in failed add.
+					// and next time around the pod is already in failed add. This is logged as
+					// a reconcile failed event.
 					eventschema.Sequence{
 						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
 							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 						},
 					},
