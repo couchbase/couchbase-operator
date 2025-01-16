@@ -941,6 +941,11 @@ func (c *Cluster) clusterRemoveMember(name string) error {
 
 	c.cluster.Status.Size = c.members.Size()
 
+	// If there are no members left, we don't need to update their status
+	if c.members.Empty() {
+		return nil
+	}
+
 	return c.updateMemberStatus(false)
 }
 
@@ -1079,10 +1084,16 @@ func (c *Cluster) hibernate() error {
 		return nil
 	}
 
-	for _, pod := range c.getClusterPods() {
-		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
+	members := podsToMemberSet(c.getClusterPods())
 
-		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
+	for _, member := range members {
+		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
+
+		if err := c.removePod(member.Name(), false); err != nil {
+			return err
+		}
+
+		if err := c.clusterRemoveMember(member.Name()); err != nil {
 			return err
 		}
 	}
@@ -1102,6 +1113,11 @@ func (c *Cluster) hibernate() error {
 
 func (c *Cluster) isClusterRebalancing() (bool, error) {
 	rebalanceProgress := couchbaseutil.RebalanceProgress{}
+
+	members := c.readyMembers()
+	if len(members) == 0 {
+		return false, nil
+	}
 
 	if err := couchbaseutil.GetRebalanceProgress(&rebalanceProgress).On(c.api, c.readyMembers()); err != nil {
 		return true, err
