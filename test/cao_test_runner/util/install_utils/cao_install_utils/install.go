@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
@@ -20,8 +21,8 @@ var (
 type InstallParams struct {
 	buildVersion      string
 	platform          PlatformType
-	operatingSystem   OperatingSystemType
-	architecture      ArchitectureType
+	operatingSystem   assets.OperatingSystemType
+	architecture      assets.ArchitectureType
 	downloadDirectory string
 }
 
@@ -32,7 +33,8 @@ func NewInstallClient() *CAOInstallClient {
 	return &CAOInstallClient{}
 }
 
-func NewInstallParams(buildVersion string, platform PlatformType, os OperatingSystemType, arch ArchitectureType, downloadDir string) (*InstallParams, error) {
+func NewInstallParams(buildVersion string, platform PlatformType,
+	os assets.OperatingSystemType, arch assets.ArchitectureType, downloadDir string) (*InstallParams, error) {
 	switch platform {
 	case Kubernetes, Openshift:
 		// No-op
@@ -41,14 +43,14 @@ func NewInstallParams(buildVersion string, platform PlatformType, os OperatingSy
 	}
 
 	switch os {
-	case Linux, Windows, MacOs:
+	case assets.Linux, assets.Windows, assets.MacOS:
 		// No-op
 	default:
 		return nil, ErrIllegalOperatingSystem
 	}
 
 	switch arch {
-	case Amd64, Arm64:
+	case assets.AMD64, assets.ARM64:
 		// No-op
 	default:
 		return nil, ErrIllegalArchitecture

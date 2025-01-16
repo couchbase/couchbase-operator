@@ -1,17 +1,12 @@
 package caoinstallutils
 
+import "github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+
 type PlatformType string
-type OperatingSystemType string
-type ArchitectureType string
 
 const (
-	Kubernetes PlatformType        = "kubernetes"
-	Openshift  PlatformType        = "openshift"
-	Linux      OperatingSystemType = "linux"
-	MacOs      OperatingSystemType = "macos"
-	Windows    OperatingSystemType = "windows"
-	Amd64      ArchitectureType    = "amd64"
-	Arm64      ArchitectureType    = "arm64"
+	Kubernetes PlatformType = "kubernetes"
+	Openshift  PlatformType = "openshift"
 )
 
 const (
@@ -23,10 +18,10 @@ const (
 	operatorPath string = "couchbase-autonomous-operator_%s-%s-%s-%s-%s%s"
 )
 
-var ext = map[OperatingSystemType]string{
-	Linux:   ".tar.gz",
-	MacOs:   ".zip",
-	Windows: ".zip",
+var ext = map[assets.OperatingSystemType]string{
+	assets.Linux:   ".tar.gz",
+	assets.MacOS:   ".zip",
+	assets.Windows: ".zip",
 }
 
 var releasedBuilds = map[string]string{

@@ -24,12 +24,10 @@ var (
 )
 
 type CaoCrdSetupConfig struct {
-	Description     []string                            `yaml:"description"`
-	OperatorVersion string                              `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
-	Platform        caoinstallutils.PlatformType        `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	OperatingSystem caoinstallutils.OperatingSystemType `yaml:"operatingSystem" caoCli:"required,context" env:"OPERATING_SYSTEM"`
-	Architecture    caoinstallutils.ArchitectureType    `yaml:"architecture" caoCli:"required,context" env:"ARCHITECTURE"`
-	Validators      []map[string]any                    `yaml:"validators,omitempty"`
+	Description     []string                     `yaml:"description"`
+	OperatorVersion string                       `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
+	Platform        caoinstallutils.PlatformType `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
+	Validators      []map[string]any             `yaml:"validators,omitempty"`
 }
 
 type SetupCaoCrd struct {
@@ -71,7 +69,8 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 
 	resultsDir := testAssets.GetResultsDirectory()
 
-	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform, c.OperatingSystem, c.Architecture, resultsDir.DirectoryPath)
+	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform,
+		*testAssets.GetOperatingSystem(), *testAssets.GetArchitecture(), resultsDir.DirectoryPath)
 	if err != nil {
 		return fmt.Errorf("error creating cao crd install setup: %w", err)
 	}
@@ -88,9 +87,7 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 		return fmt.Errorf("kubectl apply crd yaml: %w", err)
 	}
 
-	ctx.WithID(context.OperatingSystemKey, string(c.OperatingSystem))
 	ctx.WithID(context.PlatformKey, string(c.Platform))
-	ctx.WithID(context.ArchitectureKey, string(c.Architecture))
 	ctx.WithID(context.OperatorVersionKey, c.OperatorVersion)
 	ctx.WithID(context.CRDPathKey, crdPath)
 	ctx.WithID(context.CAOBinaryPathKey, caoBinaryPath)
@@ -117,20 +114,6 @@ func (action *SetupCaoCrd) CheckConfig() error {
 		// No-op
 	default:
 		return ErrIllegalPlatform
-	}
-
-	switch c.OperatingSystem {
-	case caoinstallutils.Linux, caoinstallutils.Windows, caoinstallutils.MacOs:
-		// No-op
-	default:
-		return ErrIllegalOperatingSystem
-	}
-
-	switch c.Architecture {
-	case caoinstallutils.Amd64, caoinstallutils.Arm64:
-		// No-op
-	default:
-		return ErrIllegalArchitecture
 	}
 
 	return nil
