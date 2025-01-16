@@ -165,6 +165,7 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			eventschema.AnyOf{
 				Validators: []eventschema.Validatable{
 					// In the first incarnation, the candidate has already been
