@@ -14,15 +14,30 @@ import (
 
 var (
 	kubectlRootCmd = "kubectl"
+	kubeconfigPath = ""
 )
 
 type KubectlCmd struct {
 	cmdutils.Cmd
 }
 
+func NewKubectlCmd(cmd string, args []string, flags map[string]string) *KubectlCmd {
+	k := &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: cmd, Args: args, Flags: flags}}
+	if kubeconfigPath != "" {
+		k.WithKubeconfigPath(kubeconfigPath)
+	}
+
+	return k
+}
+
 // If the path of the kubectl binary is not in env, then we can use this function to explicitly set the path
 func WithBinaryPath(path string) {
 	kubectlRootCmd = path
+}
+
+// If the path of the kubeconfig is not in env, then we can use this function to explicitly set the path
+func WithKubeonfigPath(path string) {
+	kubeconfigPath = path
 }
 
 func (k *KubectlCmd) WithLabel(label string) *KubectlCmd {
@@ -36,6 +51,10 @@ func (k *KubectlCmd) InNamespace(namespace string) *KubectlCmd {
 
 func (k *KubectlCmd) WithContext(ctxt string) *KubectlCmd {
 	return k.WithFlag("context", ctxt)
+}
+
+func (k *KubectlCmd) WithKubeconfigPath(path string) *KubectlCmd {
+	return k.WithFlag("kubeconfig", path)
 }
 
 // FormatOutput adds the --output flag. Mostly used with `kubectl get`.
@@ -66,12 +85,14 @@ func (k *KubectlCmd) WithFlag(name string, value string) *KubectlCmd {
 // ==============================
 
 func Create(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args}}
+	cmd := "create"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func CreateNamespace(namespace string) *KubectlCmd {
 	args := []string{"namespace", namespace}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args}}
+	cmd := "create"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func CreateSecretLiteral(name string, user string, pw string) *KubectlCmd {
@@ -81,7 +102,8 @@ func CreateSecretLiteral(name string, user string, pw string) *KubectlCmd {
 		"from-literal=password": pw,
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args, Flags: flags}}
+	cmd := "create"
+	return NewKubectlCmd(cmd, args, flags)
 }
 
 func CreateSecretDockerRegistry(secretName, dockerServer, dockerUsername, dockerPassword, dockerEmail string) *KubectlCmd {
@@ -92,7 +114,9 @@ func CreateSecretDockerRegistry(secretName, dockerServer, dockerUsername, docker
 		"--docker-password", dockerPassword,
 		"--docker-email", dockerEmail,
 	}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args}}
+
+	cmd := "create"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func CreateFromFiles(paths ...string) *KubectlCmd {
@@ -101,7 +125,8 @@ func CreateFromFiles(paths ...string) *KubectlCmd {
 		args = append(args, "-f", p)
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "create", Args: args}}
+	cmd := "create"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // ==============================
@@ -109,12 +134,14 @@ func CreateFromFiles(paths ...string) *KubectlCmd {
 // ==============================
 
 func Delete(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "delete", Args: args}}
+	cmd := "delete"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteNamespace(namespace string) *KubectlCmd {
 	args := []string{"namespace", namespace}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "delete", Args: args}}
+	cmd := "delete"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteFromFiles(paths ...string) *KubectlCmd {
@@ -123,7 +150,8 @@ func DeleteFromFiles(paths ...string) *KubectlCmd {
 		args = append(args, "-f", path)
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "delete", Args: args}}
+	cmd := "delete"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteByTypeAndName(resourceType string, names ...string) *KubectlCmd {
@@ -132,7 +160,8 @@ func DeleteByTypeAndName(resourceType string, names ...string) *KubectlCmd {
 		args = append(args, fmt.Sprintf("%s/%s", resourceType, n))
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "delete", Args: args}}
+	cmd := "delete"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // ==============================
@@ -140,12 +169,14 @@ func DeleteByTypeAndName(resourceType string, names ...string) *KubectlCmd {
 // ==============================
 
 func Get(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+	cmd := "get"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func GetNamespaces() *KubectlCmd {
 	args := []string{"namespaces", "-o", "name"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+	cmd := "get"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func GetByTypeAndName(resourceType string, names ...string) *KubectlCmd {
@@ -154,7 +185,8 @@ func GetByTypeAndName(resourceType string, names ...string) *KubectlCmd {
 		args = append(args, fmt.Sprintf("%s/%s", resourceType, n))
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+	cmd := "get"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func GetByFiles(paths ...string) *KubectlCmd {
@@ -163,12 +195,14 @@ func GetByFiles(paths ...string) *KubectlCmd {
 		args = append(args, "-f", path)
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+	cmd := "get"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func GetSecretNames() *KubectlCmd {
 	args := []string{"secrets", "-o", "name"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "get", Args: args}}
+	cmd := "get"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -177,7 +211,8 @@ func GetSecretNames() *KubectlCmd {
 
 func ClusterInfoForContext(ctxt string) *KubectlCmd {
 	args := []string{"--context", ctxt}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "cluster-info", Args: args}}
+	cmd := "cluster-info"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Taint(node string, key string, value string, effect string) *KubectlCmd {
@@ -188,7 +223,8 @@ func Taint(node string, key string, value string, effect string) *KubectlCmd {
 		args = []string{"nodes", node, fmt.Sprintf("%s:%s", key, effect)}
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "taint", Args: args}}
+	cmd := "taint"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func RemoveTaint(node string, key string, value string, effect string) *KubectlCmd {
@@ -199,19 +235,26 @@ func RemoveTaint(node string, key string, value string, effect string) *KubectlC
 		args = []string{"nodes", node, fmt.Sprintf("%s:%s-", key, effect)}
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "taint", Args: args}}
+	cmd := "taint"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Cordon(nodeName string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "cordon", Args: []string{nodeName}}}
+	cmd := "cordon"
+	args := []string{nodeName}
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Uncordon(nodeName string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "uncordon", Args: []string{nodeName}}}
+	cmd := "uncordon"
+	args := []string{nodeName}
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Drain(nodeName string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "drain", Args: []string{nodeName}}}
+	cmd := "drain"
+	args := []string{nodeName}
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -219,19 +262,20 @@ func Drain(nodeName string) *KubectlCmd {
 // =============================================
 
 func Logs(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "logs", Args: args}}
+	cmd := "logs"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Describe(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "describe", Args: args}}
+	cmd := "describe"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Exec(podName, containerName string, commandArgs ...string) *KubectlCmd {
 	args := []string{podName, "-c", containerName, "--"}
-
 	args = append(args, commandArgs...)
-
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "exec", Args: args}}
+	cmd := "exec"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -243,7 +287,8 @@ func Exec(podName, containerName string, commandArgs ...string) *KubectlCmd {
 // ==============================
 
 func Apply(args ...string) *KubectlCmd {
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "apply", Args: args}}
+	cmd := "apply"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func ApplyFiles(paths ...string) *KubectlCmd {
@@ -252,7 +297,8 @@ func ApplyFiles(paths ...string) *KubectlCmd {
 		args = append(args, "-f", path)
 	}
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "apply", Args: args}}
+	cmd := "apply"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // ==============================
@@ -261,17 +307,20 @@ func ApplyFiles(paths ...string) *KubectlCmd {
 
 func Patch(resource string, data string) *KubectlCmd {
 	args := []string{resource, "-p", data}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "patch", Args: args}}
+	cmd := "patch"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func PatchMerge(resource string, data string) *KubectlCmd {
 	args := []string{resource, "--patch", data, "--type", "merge"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "patch", Args: args}}
+	cmd := "patch"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func PatchJSON(resource string, data string) *KubectlCmd {
 	args := []string{resource, "--patch", data, "--type", "json"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "patch", Args: args}}
+	cmd := "patch"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -292,7 +341,8 @@ func Label(nodes string, key string, value string) *KubectlCmd {
 	args = append(args, label)
 	args = append(args, "--overwrite")
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "label", Args: args}}
+	cmd := "label"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Unlabel(nodes string, key string) *KubectlCmd {
@@ -308,12 +358,14 @@ func Unlabel(nodes string, key string) *KubectlCmd {
 	label := "%s-" + key
 	args = append(args, label)
 
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "label", Args: args}}
+	cmd := "label"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func Annotate(resource string, name string, key string, value string) *KubectlCmd {
 	args := []string{resource, name, fmt.Sprintf("%s=%s", key, value)}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "annotate", Args: args}}
+	cmd := "annotate"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -322,22 +374,26 @@ func Annotate(resource string, name string, key string, value string) *KubectlCm
 
 func GetCurrentContext() *KubectlCmd {
 	args := []string{"current-context"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteContext(contextName string) *KubectlCmd {
 	args := []string{"delete-context", contextName}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func GetContexts() *KubectlCmd {
 	args := []string{"get-contexts", "-o", "name"}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func RenameContext(oldContextName, newContextName string) *KubectlCmd {
 	args := []string{"rename-context", oldContextName, newContextName}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func SetContext(args ...string) *KubectlCmd {
@@ -346,17 +402,20 @@ func SetContext(args ...string) *KubectlCmd {
 
 func UseContext(contextName string) *KubectlCmd {
 	args := []string{"use-context", contextName}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteUser(userName string) *KubectlCmd {
 	args := []string{"delete-user", userName}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 func DeleteCluster(clusterName string) *KubectlCmd {
 	args := []string{"delete-cluster", clusterName}
-	return &KubectlCmd{cmdutils.Cmd{RootCommand: kubectlRootCmd, Command: "config", Args: args}}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
 }
 
 // =============================================
@@ -368,7 +427,7 @@ func DeleteCluster(clusterName string) *KubectlCmd {
 // ===============================================
 
 func runPortForward(podName, localPort, remotePort string, stopCh <-chan struct{}, done chan<- struct{}) error {
-	cmd := exec.Command(kubectlRootCmd, "port-forward", podName, fmt.Sprintf("%s:%s", localPort, remotePort))
+	cmd := exec.Command(kubectlRootCmd, "port-forward", podName, fmt.Sprintf("%s:%s", localPort, remotePort), "--kubeconfig", kubeconfigPath)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
