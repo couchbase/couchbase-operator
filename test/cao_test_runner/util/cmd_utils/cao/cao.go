@@ -253,9 +253,10 @@ func CreateOperator(cpuLimit, cpuRequest, memoryLimit, memoryRequest int,
 }
 
 func CreateBackup(iamRoleArn string) *CaoCmd {
-	args := []string{
-		"backup",
-		"--iam-role-arn", iamRoleArn,
+	args := []string{"backup"}
+
+	if iamRoleArn != "" {
+		args = append(args, "--iam-role-arn", iamRoleArn)
 	}
 
 	return &CaoCmd{cmdutils.Cmd{RootCommand: caoRootCmd, Command: "create", Args: args}}
@@ -335,9 +336,10 @@ func GenerateAdmissionController(cpuLimit, cpuRequest, memoryLimit, memoryReques
 }
 
 func GenerateBackup(iamRoleArn string) *CaoCmd {
-	args := []string{
-		"backup",
-		"--iam-role-arn", iamRoleArn,
+	args := []string{"backup"}
+
+	if iamRoleArn != "" {
+		args = append(args, "--iam-role-arn", iamRoleArn)
 	}
 
 	return &CaoCmd{cmdutils.Cmd{RootCommand: caoRootCmd, Command: "generate", Args: args}}
