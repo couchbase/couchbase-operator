@@ -834,23 +834,28 @@ func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 			return err
 		}
 
-		// We're only getting a single metric, so we can just get the first 'Data'.
 		if len(metrics.Data) == 0 {
 			return fmt.Errorf("metrics response had no data")
 		}
-		values := metrics.Data[0].Values
-		// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
-		if len(values) == 0 {
-			return fmt.Errorf("metrics response had no values")
+
+		totalItemCount := 0
+		for _, d := range metrics.Data {
+			values := d.Values
+
+			if len(values) == 0 {
+				return fmt.Errorf("metrics response had no values")
+			}
+			// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+			itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
+			if err != nil {
+				return err
+			}
+
+			totalItemCount += itemCount
 		}
 
-		itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
-		if err != nil {
-			return err
-		}
-
-		if itemCount != items {
-			return fmt.Errorf("document count %d, expected %d", itemCount, items)
+		if totalItemCount != items {
+			return fmt.Errorf("document count %d, expected %d", totalItemCount, items)
 		}
 
 		return nil

@@ -121,7 +121,7 @@ func TestFTSWithScopesAndCollections(t *testing.T) {
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket()
 
 	// Static configuration.
-	clusterSize := 1
+	clusterSize := 2
 	scopeName := "pinky"
 	collectionName := "brain"
 	numOfDocs := f.DocsCount
