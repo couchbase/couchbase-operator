@@ -618,18 +618,13 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+	c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
 	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Inc()
-
-	c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
-
-	if _, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(c.ctx, c.cluster, metav1.UpdateOptions{}); err != nil {
-		log.Error(err, "Failed to update cluster", "cluster", c.namespacedName())
-	}
 }
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
@@ -1143,7 +1138,7 @@ func (c *Cluster) isClusterRebalancing() (bool, error) {
 
 func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
 	// If there's no value, it must be a brand new cluster so ignore this step for now.
-	if c.cluster.Status.LastUpdateTime != "" {
+	if c.cluster.Status.LastUpdateTime == "" {
 		return nil
 	}
 

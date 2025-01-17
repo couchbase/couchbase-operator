@@ -698,6 +698,8 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 				c.raiseEvent(k8sutil.UserEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
+
+			existingUserNames = append(existingUserNames, e.ID)
 		} else {
 			// If this is a user that is not reconcilable, we should not delete it
 			if _, ok := unreconcilableUsers[e.ID]; ok {
@@ -712,8 +714,6 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
 			log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 		}
-
-		existingUserNames = append(existingUserNames, e.ID)
 	}
 
 	// create requested groups that do not exist
