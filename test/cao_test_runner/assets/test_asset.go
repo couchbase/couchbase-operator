@@ -3,12 +3,15 @@ package assets
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sync"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	"k8s.io/client-go/util/homedir"
 )
 
 var (
@@ -19,6 +22,8 @@ var (
 	ErrIllegalOperatingSystem    = errors.New("illegal operating system")
 	ErrUnsupportedOperatorSystem = errors.New("unsupported operating system")
 	ErrUnsupportedArchitecture   = errors.New("unsupported architecture")
+	ErrInvalidHomeDir            = errors.New("invalid home dir")
+	ErrInvalidUserProfile        = errors.New("invalid user profile")
 )
 
 type OperatingSystemType string
@@ -162,6 +167,8 @@ func (ts *TestAssets) SetKubeconfigPath(kubeconfigPath *fileutils.File) error {
 		return ErrIllegalKubeconfigPath
 	}
 
+	kubectl.WithKubeonfigPath(kubeconfigPath.FilePath)
+
 	ts.kubeconfigPath = kubeconfigPath
 	return nil
 }
@@ -211,6 +218,12 @@ func (ts *TestAssets) PopulateTestAssets() error {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 
+	ts.kubectlPath = fileutils.NewFile("kubectl")
+
+	if err := ts.PopulateKubeconfigPath(); err != nil {
+		return fmt.Errorf("populate test assets: %w", err)
+	}
+
 	return nil
 }
 
@@ -249,6 +262,50 @@ func (ts *TestAssets) PopulateArchitecture() error {
 
 	if err := ts.SetArchitecture(architecture); err != nil {
 		return fmt.Errorf("populate architecture: %w", err)
+	}
+
+	return nil
+}
+
+func (ts *TestAssets) PopulateKubeconfigPath() error {
+	if ts.kubeconfigPath != nil {
+		return nil
+	}
+
+	kubeConfigPath := ""
+
+	if envValue, ok := os.LookupEnv("KUBECONFIG"); ok {
+		kubeConfigPath = envValue
+	} else {
+		switch ts.OperatingSystem {
+		case MacOS:
+			homeDir := homedir.HomeDir()
+			if homeDir != "" {
+				kubeConfigPath = filepath.Join(homeDir, ".kube", "config")
+			} else {
+				return fmt.Errorf("populate kubeconfig path: %w", ErrInvalidHomeDir)
+			}
+		case Windows:
+			userProfile := os.Getenv("USERPROFILE")
+			if userProfile != "" {
+				kubeConfigPath = filepath.Join(os.Getenv("USERPROFILE"), ".kube", "config")
+			} else {
+				return fmt.Errorf("populate kubeconfig path: %w", ErrInvalidUserProfile)
+			}
+		case Linux:
+			homeDir := homedir.HomeDir()
+			if homeDir != "" {
+				kubeConfigPath = filepath.Join(homeDir, ".kube", "config")
+			} else {
+				return fmt.Errorf("populate kubeconfig path: %w", ErrInvalidHomeDir)
+			}
+		default:
+			return ErrIllegalOperatingSystem
+		}
+	}
+
+	if err := ts.SetKubeconfigPath(fileutils.NewFile(kubeConfigPath)); err != nil {
+		return fmt.Errorf("populate kubeconfig path: %w", err)
 	}
 
 	return nil

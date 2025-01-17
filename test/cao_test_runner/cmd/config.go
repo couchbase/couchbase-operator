@@ -33,8 +33,10 @@ func buildTestAssets(resultsDirectory *fileutils.Directory, kubectlPath *fileuti
 		return nil, fmt.Errorf("build test assets: %w", err)
 	}
 
-	if err := testAssets.SetKubectlPath(kubectlPath); err != nil {
-		return nil, fmt.Errorf("build test assets: %w", err)
+	if kubectlPath.FilePath != kubectlDefault {
+		if err := testAssets.SetKubectlPath(kubectlPath); err != nil {
+			return nil, fmt.Errorf("build test assets: %w", err)
+		}
 	}
 
 	if kubeconfigPath.FilePath != "" {

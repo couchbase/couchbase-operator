@@ -13,6 +13,12 @@ var (
 	ErrFound = errors.New("")
 )
 
+const (
+	kubectlDefault              = "kubectl"
+	triggerLogCollectionDefault = true
+	outputPathDefault           = "."
+)
+
 func newScenarioCmd() *cobra.Command {
 	scenarioCmd := &cobra.Command{
 		Use:   "scenario",
@@ -23,11 +29,11 @@ func newScenarioCmd() *cobra.Command {
 		},
 	}
 	addStringFlag(scenarioCmd, scenarioKey, "f", "", "Scenario YAML file path")
-	addStringFlag(scenarioCmd, kubectlPathKey, "", "kubectl", "Kubectl path")
+	addStringFlag(scenarioCmd, kubectlPathKey, "", kubectlDefault, "Kubectl path")
 	addStringFlag(scenarioCmd, kubeconfigPathKey, "", "", "Kubeconfig path")
-	addStringFlag(scenarioCmd, outputPathKey, "o", ".", "output directory path")
+	addStringFlag(scenarioCmd, outputPathKey, "o", outputPathDefault, "output directory path")
 	addStringFlag(scenarioCmd, scenarioTags, "", "", "Run only scenario with tags")
-	addBoolFlag(scenarioCmd, triggerLogCollectionKey, "l", false, "trigger log collection")
+	addBoolFlag(scenarioCmd, triggerLogCollectionKey, "l", triggerLogCollectionDefault, "trigger log collection")
 
 	return scenarioCmd
 }
