@@ -515,6 +515,8 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 				c.raiseEvent(k8sutil.GroupEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
+
+			existingGroupNames = append(existingGroupNames, e.ID)
 		} else {
 			// delete unrequested group
 			if err := couchbaseutil.DeleteGroup(&e).On(c.api, c.readyMembers()); err != nil {
@@ -524,8 +526,6 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			c.raiseEvent(k8sutil.GroupDeleteEvent(e.ID, c.cluster))
 			log.Info("delete CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 		}
-
-		existingGroupNames = append(existingGroupNames, e.ID)
 	}
 
 	// create requested groups that do not exist
