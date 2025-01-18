@@ -3,6 +3,7 @@ package chaos
 import (
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -21,9 +22,9 @@ type EKSChaos struct {
 
 // NewEKSChaos returns an instance of EKSChaos to perform chaos actions on EKS cluster.
 func NewEKSChaos(ctxt *context.Context, clusterName string,
-	managedServiceProvider *managedsvc.ManagedServiceProvider) (*EKSChaos, error) {
+	managedServiceProvider *assets.ManagedServiceProvider) (*EKSChaos, error) {
 	eksCred, err := managedsvc.NewManagedServiceCredentials(
-		[]*managedsvc.ManagedServiceProvider{managedServiceProvider}, clusterName)
+		[]*assets.ManagedServiceProvider{managedServiceProvider}, clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("new eks chaos: %w", err)
 	}

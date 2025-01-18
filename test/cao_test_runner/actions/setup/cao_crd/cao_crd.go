@@ -24,10 +24,10 @@ var (
 )
 
 type CaoCrdSetupConfig struct {
-	Description     []string                     `yaml:"description"`
-	OperatorVersion string                       `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
-	Platform        caoinstallutils.PlatformType `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Validators      []map[string]any             `yaml:"validators,omitempty"`
+	Description     []string         `yaml:"description"`
+	OperatorVersion string           `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
+	ClusterName     string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Validators      []map[string]any `yaml:"validators,omitempty"`
 }
 
 type SetupCaoCrd struct {
@@ -69,7 +69,9 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 
 	resultsDir := testAssets.GetResultsDirectory()
 
-	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, c.Platform,
+	platform := testAssets.GetK8SClusterGetter(c.ClusterName).GetServiceProvider().GetPlatform()
+
+	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, platform,
 		*testAssets.GetOperatingSystem(), *testAssets.GetArchitecture(), resultsDir.DirectoryPath)
 	if err != nil {
 		return fmt.Errorf("error creating cao crd install setup: %w", err)
@@ -87,7 +89,6 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 		return fmt.Errorf("kubectl apply crd yaml: %w", err)
 	}
 
-	ctx.WithID(context.PlatformKey, string(c.Platform))
 	ctx.WithID(context.OperatorVersionKey, c.OperatorVersion)
 	ctx.WithID(context.CRDPathKey, crdPath)
 	ctx.WithID(context.CAOBinaryPathKey, caoBinaryPath)
@@ -104,16 +105,9 @@ func (action *SetupCaoCrd) CheckConfig() error {
 		return ErrNoConfigFound
 	}
 
-	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
+	_, ok := action.yamlConfig.(*CaoCrdSetupConfig)
 	if !ok {
 		return ErrDecodeCAOSetupConfig
-	}
-
-	switch c.Platform {
-	case caoinstallutils.Kubernetes, caoinstallutils.Openshift:
-		// No-op
-	default:
-		return ErrIllegalPlatform
 	}
 
 	return nil

@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -23,39 +22,39 @@ var (
 )
 
 type KubernetesSetupConfig struct {
-	Description              []string                           `yaml:"description"`
-	ClusterName              string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform                 caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Environment              managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
-	NumControlPlane          int                                `yaml:"numControlPlane"`
-	NumWorkers               int                                `yaml:"numWorkers"`
-	LoadDockerImageToKind    bool                               `yaml:"loadDockerImageToKind"`
-	OperatorImage            string                             `yaml:"operatorImage" caoCli:"required,context" env:"OPERATOR_IMAGE"`
-	AdmissionControllerImage string                             `yaml:"admissionControllerImage" caoCli:"required,context" env:"ADMISSION_CONTROLLER_IMAGE"`
-	Provider                 managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
-	EKSRegion                string                             `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
-	AKSRegion                string                             `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
-	GKERegion                string                             `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
-	KubernetesVersion        string                             `yaml:"kubernetesVersion"`
-	InstanceType             string                             `yaml:"instanceType"`
-	NumNodeGroups            int                                `yaml:"numNodeGroups"`
-	MinSize                  int                                `yaml:"minSize"`
-	MaxSize                  int                                `yaml:"maxSize"`
-	DesiredSize              int                                `yaml:"desiredSize"`
-	DiskSize                 int                                `yaml:"diskSize"`
-	AMI                      ekstypes.AMITypes                  `yaml:"ami"`
-	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`
-	OSType                   armcontainerservice.OSType         `yaml:"osType"`
-	VMSize                   string                             `yaml:"vmSize"`
-	Count                    int                                `yaml:"count"`
-	NumNodePools             int                                `yaml:"numNodePools"`
-	MachineType              string                             `yaml:"machineType"`
-	ImageType                string                             `yaml:"imageType"`
-	DiskType                 string                             `yaml:"diskType"`
-	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"`
-	Validators               []map[string]any                   `yaml:"validators,omitempty"`
+	Description              []string                          `yaml:"description"`
+	ClusterName              string                            `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	Platform                 assets.PlatformType               `yaml:"platform" caoCli:"required" env:"PLATFORM"`
+	Environment              assets.EnvironmentType            `yaml:"environment" caoCli:"required" env:"ENVIRONMENT"`
+	NumControlPlane          int                               `yaml:"numControlPlane"`
+	NumWorkers               int                               `yaml:"numWorkers"`
+	LoadDockerImageToKind    bool                              `yaml:"loadDockerImageToKind"`
+	OperatorImage            string                            `yaml:"operatorImage" caoCli:"required,context" env:"OPERATOR_IMAGE"`
+	AdmissionControllerImage string                            `yaml:"admissionControllerImage" caoCli:"required,context" env:"ADMISSION_CONTROLLER_IMAGE"`
+	Provider                 assets.ProviderType               `yaml:"provider" env:"PROVIDER"`
+	EKSRegion                string                            `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion                string                            `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion                string                            `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
+	KubernetesVersion        string                            `yaml:"kubernetesVersion"`
+	InstanceType             string                            `yaml:"instanceType"`
+	NumNodeGroups            int                               `yaml:"numNodeGroups"`
+	MinSize                  int                               `yaml:"minSize"`
+	MaxSize                  int                               `yaml:"maxSize"`
+	DesiredSize              int                               `yaml:"desiredSize"`
+	DiskSize                 int                               `yaml:"diskSize"`
+	AMI                      ekstypes.AMITypes                 `yaml:"ami"`
+	OSSKU                    armcontainerservice.OSSKU         `yaml:"osSKU"`
+	OSType                   armcontainerservice.OSType        `yaml:"osType"`
+	VMSize                   string                            `yaml:"vmSize"`
+	Count                    int                               `yaml:"count"`
+	NumNodePools             int                               `yaml:"numNodePools"`
+	MachineType              string                            `yaml:"machineType"`
+	ImageType                string                            `yaml:"imageType"`
+	DiskType                 string                            `yaml:"diskType"`
+	ReleaseChannel           managedk8sservices.ReleaseChannel `yaml:"releaseChannel"`
+	Validators               []map[string]any                  `yaml:"validators,omitempty"`
 	kubeconfigPath           *fileutils.File
-	ms                       *managedk8sservices.ManagedServiceProvider
+	ms                       *assets.ManagedServiceProvider
 	resultsDirectory         *fileutils.Directory
 }
 
@@ -114,8 +113,6 @@ func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAs
 		return err
 	}
 
-	ctx.WithID(context.PlatformKey, string(c.Platform))
-	ctx.WithID(context.EnvironmentKey, string(c.Environment))
 	ctx.WithID(context.AdmissionIDKey, c.AdmissionControllerImage)
 	ctx.WithID(context.OperatorIDKey, c.OperatorImage)
 
@@ -136,13 +133,9 @@ func (action *SetupKubernetes) CheckConfig() error {
 		return ErrDecodeKubernetesConfig
 	}
 
-	c.ms = &managedk8sservices.ManagedServiceProvider{
-		Platform:    c.Platform,
-		Environment: c.Environment,
-		Provider:    c.Provider,
-	}
+	c.ms = assets.NewManagedServiceProvider(c.Platform, c.Environment, c.Provider)
 
-	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
+	if err := assets.ValidateManagedServices(c.ms); err != nil {
 		return err
 	}
 

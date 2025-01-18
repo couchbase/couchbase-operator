@@ -7,8 +7,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
@@ -22,15 +20,12 @@ var (
 )
 
 type ChaosConfig struct {
-	Description []string                           `yaml:"description"`
-	ClusterName string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform    caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Environment managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
-	Provider    managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
-	ChaosList   []ChaosList                        `yaml:"chaosList" caoCli:"required"`
-	Validators  []map[string]any                   `yaml:"validators,omitempty"`
-	PortForward bool                               `yaml:"portForward" caoCli:"context"`
-	ms          *managedk8sservices.ManagedServiceProvider
+	Description []string         `yaml:"description"`
+	ClusterName string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	ChaosList   []ChaosList      `yaml:"chaosList" caoCli:"required"`
+	Validators  []map[string]any `yaml:"validators,omitempty"`
+	PortForward bool             `yaml:"portForward" caoCli:"context"`
+	ms          *assets.ManagedServiceProvider
 }
 
 type ChaosList struct {
@@ -94,16 +89,6 @@ func (c *Chaos) CheckConfig() error {
 		}
 	}
 
-	chaosConfig.ms = &managedk8sservices.ManagedServiceProvider{
-		Platform:    chaosConfig.Platform,
-		Environment: chaosConfig.Environment,
-		Provider:    chaosConfig.Provider,
-	}
-
-	if err := managedk8sservices.ValidateManagedServices(chaosConfig.ms); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -137,6 +122,8 @@ func (c *Chaos) Do(ctx *context.Context, testAssets assets.TestAssetGetter) erro
 	if !ok {
 		return ErrChaosConfigDecode
 	}
+
+	chaosConfig.ms = testAssets.GetK8SClusterGetter(chaosConfig.ClusterName).GetServiceProvider()
 
 	logrus.Infof("Starting chaos action desc: %v", chaosConfig.Description)
 

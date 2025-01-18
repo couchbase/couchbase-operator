@@ -7,6 +7,7 @@ import (
 	"context"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
@@ -15,7 +16,7 @@ import (
 type DeleteEKSCluster struct {
 	ClusterName            string
 	Region                 string
-	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+	ManagedServiceProvider *assets.ManagedServiceProvider
 }
 
 func containsRoute(routeTables []ec2types.RouteTable, routeID string) bool {
@@ -34,7 +35,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
+		[]*assets.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -212,7 +213,7 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 
 func (dec *DeleteEKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
+		[]*assets.ManagedServiceProvider{dec.ManagedServiceProvider}, dec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

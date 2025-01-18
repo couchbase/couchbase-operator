@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -68,7 +68,7 @@ type GKECredentials struct {
 
 // GetManagedServiceCredentials sets up the ManagedServiceCredentials for all the ManagedServiceProviders.
 // It gets the values from environment variables.
-func NewManagedServiceCredentials(ms []*ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
+func NewManagedServiceCredentials(ms []*assets.ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
 	svc := &ManagedServiceCredentials{
 		ClusterName:    clusterName,
 		EKSCredentials: GetEKSCredentials("", "", "", ""),
@@ -86,28 +86,28 @@ func NewManagedServiceCredentials(ms []*ManagedServiceProvider, clusterName stri
 // =============== Validation of Credentials  ===========
 // ======================================================
 
-func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []*ManagedServiceProvider) (bool, error) {
+func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []*assets.ManagedServiceProvider) (bool, error) {
 	if svcCred.ClusterName == "" {
 		return false, fmt.Errorf("cluster name not provided: %w", ErrClusterNameNotProvided)
 	}
 
 	for _, ms := range providers {
-		switch ms.Platform {
-		case caoinstallutils.Kubernetes:
-			switch ms.Environment {
-			case Kind:
+		switch ms.GetPlatform() {
+		case assets.Kubernetes:
+			switch ms.GetEnvironment() {
+			case assets.Kind:
 				return false, ErrNotImplemented
-			case Cloud:
-				switch ms.Provider {
-				case AWS:
+			case assets.Cloud:
+				switch ms.GetProvider() {
+				case assets.AWS:
 					if ok, err := ValidateEKSCredentials(svcCred.EKSCredentials); !ok || err != nil {
 						return ok, err
 					}
-				case Azure:
+				case assets.Azure:
 					if ok, err := ValidateAKSCredentials(svcCred.AKSCredentials); !ok || err != nil {
 						return ok, err
 					}
-				case GCP:
+				case assets.GCP:
 					if ok, err := ValidateGKECredentials(svcCred.GKECredentials); !ok || err != nil {
 						return ok, err
 					}
@@ -117,7 +117,7 @@ func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, provi
 			default:
 				return false, ErrNotImplemented
 			}
-		case caoinstallutils.Openshift:
+		case assets.Openshift:
 			return false, ErrNotImplemented
 		default:
 			return false, ErrNotImplemented

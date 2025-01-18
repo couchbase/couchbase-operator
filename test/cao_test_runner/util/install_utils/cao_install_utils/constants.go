@@ -2,13 +2,6 @@ package caoinstallutils
 
 import "github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 
-type PlatformType string
-
-const (
-	Kubernetes PlatformType = "kubernetes"
-	Openshift  PlatformType = "openshift"
-)
-
 const (
 	latestBuildsURL string = "http://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-operator"
 	releasesURL     string = "http://latestbuilds.service.couchbase.com/builds/releases/couchbase-operator/"

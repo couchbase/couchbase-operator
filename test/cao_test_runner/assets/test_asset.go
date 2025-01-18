@@ -44,8 +44,11 @@ type TestAssets struct {
 	resultsDirectory *fileutils.Directory
 	kubectlPath      *fileutils.File
 	kubeconfigPath   *fileutils.File
-	OperatingSystem  OperatingSystemType
-	Architecture     ArchitectureType
+	operatingSystem  OperatingSystemType
+	architecture     ArchitectureType
+
+	k8sClusters map[string]*K8SCluster
+
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
@@ -60,6 +63,8 @@ type TestAssetGetter interface {
 	GetKubeconfigPath() *fileutils.File
 	GetOperatingSystem() *OperatingSystemType
 	GetArchitecture() *ArchitectureType
+	GetK8SClusterGetter(name string) K8SClusterGetter
+	GetAllK8SClustersGetter() []K8SClusterGetter
 }
 
 type TestAssetGetterSetter interface {
@@ -69,6 +74,8 @@ type TestAssetGetterSetter interface {
 	GetKubeconfigPath() *fileutils.File
 	GetOperatingSystem() *OperatingSystemType
 	GetArchitecture() *ArchitectureType
+	GetK8SClusterGetterSetter(name string) K8SClusterGetterSetter
+	GetAllK8SClustersGetterSetter() []K8SClusterGetterSetter
 
 	// Setters
 	SetResultsDirectory(resultsDirectory *fileutils.Directory) error
@@ -76,6 +83,7 @@ type TestAssetGetterSetter interface {
 	SetKubeconfigPath(kubeconfigPath *fileutils.File) error
 	SetOperatingSystem(os string) error
 	SetArchitecture(arch string) error
+	SetK8SCluster(name string, k8sCluster *K8SCluster) error
 }
 
 /*
@@ -109,13 +117,49 @@ func (ts *TestAssets) GetKubeconfigPath() *fileutils.File {
 func (ts *TestAssets) GetOperatingSystem() *OperatingSystemType {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return &ts.OperatingSystem
+	return &ts.operatingSystem
 }
 
 func (ts *TestAssets) GetArchitecture() *ArchitectureType {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return &ts.Architecture
+	return &ts.architecture
+}
+
+func (ts *TestAssets) GetK8SClusterGetter(name string) K8SClusterGetter {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	return ts.k8sClusters[name]
+}
+
+func (ts *TestAssets) GetK8SClusterGetterSetter(name string) K8SClusterGetterSetter {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	return ts.k8sClusters[name]
+}
+
+func (ts *TestAssets) GetAllK8SClustersGetter() []K8SClusterGetter {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	var k8sClusters []K8SClusterGetter
+	for _, k8sCluster := range ts.k8sClusters {
+		k8sClusters = append(k8sClusters, k8sCluster)
+	}
+
+	return k8sClusters
+}
+
+func (ts *TestAssets) GetAllK8SClustersGetterSetter() []K8SClusterGetterSetter {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	var k8sClusters []K8SClusterGetterSetter
+	for _, k8sCluster := range ts.k8sClusters {
+		k8sClusters = append(k8sClusters, k8sCluster)
+	}
+
+	return k8sClusters
 }
 
 /*
@@ -139,7 +183,7 @@ func (ts *TestAssets) SetOperatingSystem(os string) error {
 		return ErrIllegalOperatingSystem
 	}
 
-	ts.OperatingSystem = OperatingSystemType(os)
+	ts.operatingSystem = OperatingSystemType(os)
 
 	return nil
 }
@@ -154,7 +198,7 @@ func (ts *TestAssets) SetArchitecture(arch string) error {
 		return ErrIllegalArchitecture
 	}
 
-	ts.Architecture = ArchitectureType(arch)
+	ts.architecture = ArchitectureType(arch)
 
 	return nil
 }
@@ -195,6 +239,13 @@ func (ts *TestAssets) SetResultsDirectory(resultsDirectory *fileutils.Directory)
 		return ErrIllegalResultsDirectory
 	}
 	ts.resultsDirectory = resultsDirectory
+	return nil
+}
+
+func (ts *TestAssets) SetK8SCluster(name string, k8sCluster *K8SCluster) error {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.k8sClusters[name] = k8sCluster
 	return nil
 }
 
@@ -279,7 +330,7 @@ func (ts *TestAssets) PopulateKubeconfigPath() error {
 	if envValue, ok := os.LookupEnv("KUBECONFIG"); ok {
 		kubeConfigPath = envValue
 	} else {
-		switch ts.OperatingSystem {
+		switch ts.operatingSystem {
 		case MacOS:
 			homeDir := homedir.HomeDir()
 			if homeDir != "" {

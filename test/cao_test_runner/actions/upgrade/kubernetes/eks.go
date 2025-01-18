@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/sirupsen/logrus"
 )
@@ -21,12 +22,12 @@ type UpgradeEKSCluster struct {
 	WaitForClusterUpgrade  bool
 	UpgradeNodeGroups      bool
 	NodeGroupsToUpgrade    []EKSNodeGroupUpgradeConfig
-	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+	ManagedServiceProvider *assets.ManagedServiceProvider
 }
 
 func (uec *UpgradeEKSCluster) UpgradeCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
+		[]*assets.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -102,7 +103,7 @@ func (uec *UpgradeEKSCluster) UpgradeCluster(ctx context.Context) error {
 
 func (uec *UpgradeEKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
+		[]*assets.ManagedServiceProvider{uec.ManagedServiceProvider}, uec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

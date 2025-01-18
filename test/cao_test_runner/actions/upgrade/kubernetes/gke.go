@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/sirupsen/logrus"
 )
@@ -24,7 +25,7 @@ type UpgradeGKECluster struct {
 	WaitForMasterUpgrade   bool
 	UpgradeNodePool        bool
 	NodePoolsToUpgrade     []GKENodePoolUpgradeConfig
-	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+	ManagedServiceProvider *assets.ManagedServiceProvider
 }
 
 var (
@@ -33,7 +34,7 @@ var (
 
 func (ugc *UpgradeGKECluster) UpgradeCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
+		[]*assets.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -121,7 +122,7 @@ func (ugc *UpgradeGKECluster) UpgradeCluster(ctx context.Context) error {
 
 func (ugc *UpgradeGKECluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
+		[]*assets.ManagedServiceProvider{ugc.ManagedServiceProvider}, ugc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

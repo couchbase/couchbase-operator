@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +39,7 @@ const (
  */
 type CBPodChaosConfig struct {
 	ChaosAction          ActionName
-	ManagedSvcName       *managedsvcs.ManagedServiceProvider
+	ManagedSvcName       *assets.ManagedServiceProvider
 	ChaosIterations      int64
 	CBPod                string
 	TriggerConfig        triggers.TriggerConfig
@@ -70,19 +70,19 @@ type ChaosActionsInterface interface {
 }
 
 // NewChaosAction initializes ChaosActionsInterface for the provided managed service.
-func NewChaosAction(context *context.Context, managedService *managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
-	switch managedService.Platform {
-	case caoinstallutils.Kubernetes:
-		switch managedService.Environment {
-		case managedsvcs.Kind:
+func NewChaosAction(context *context.Context, managedService *assets.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
+	switch managedService.GetPlatform() {
+	case assets.Kubernetes:
+		switch managedService.GetEnvironment() {
+		case assets.Kind:
 			return NewKindChaos()
-		case managedsvcs.Cloud:
-			switch managedService.Provider {
-			case managedsvcs.AWS:
+		case assets.Cloud:
+			switch managedService.GetProvider() {
+			case assets.AWS:
 				return NewEKSChaos(context, clusterName, managedService)
-			case managedsvcs.Azure:
+			case assets.Azure:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
-			case managedsvcs.GCP:
+			case assets.GCP:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
 			default:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)

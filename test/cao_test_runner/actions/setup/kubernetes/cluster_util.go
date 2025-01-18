@@ -5,8 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -23,9 +22,9 @@ type CreateClusterUtil interface {
 
 func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 	switch p.Platform {
-	case caoinstallutils.Kubernetes:
+	case assets.Kubernetes:
 		switch p.Environment {
-		case managedk8sservices.Kind:
+		case assets.Kind:
 			return &CreateKindCluster{
 				ClusterName:              p.ClusterName,
 				NumControlPlane:          p.NumControlPlane,
@@ -36,9 +35,9 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 				LoadDockerImageToKind:    p.LoadDockerImageToKind,
 			}, nil
 
-		case managedk8sservices.Cloud:
+		case assets.Cloud:
 			switch p.Provider {
-			case managedk8sservices.AWS:
+			case assets.AWS:
 				return &CreateEKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.EKSRegion,
@@ -53,7 +52,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					KubeConfigPath:         p.kubeconfigPath,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case managedk8sservices.Azure:
+			case assets.Azure:
 				return &CreateAKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
@@ -67,7 +66,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					Count:                  int32(p.Count),
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case managedk8sservices.GCP:
+			case assets.GCP:
 				return &CreateGKECluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
@@ -90,7 +89,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}
 
-	case caoinstallutils.Openshift:
+	case assets.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

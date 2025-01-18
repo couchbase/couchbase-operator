@@ -3,12 +3,12 @@ package nodefilter
 import (
 	"fmt"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 )
 
 type NodeFilter struct {
-	ManagedSvcProvider managedsvc.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
+	ManagedSvcProvider assets.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
 
 	// Namespace is used when filtering based on pods e.g. Operator, Admission.
 	Namespace string `yaml:"namespace" caoCli:"context"`
@@ -62,21 +62,21 @@ type FilterNodesInterface interface {
 }
 
 // NewFilterNodesInterface returns the FilterNodesInterface for the provided managedk8sservices.ManagedServiceProvider.
-func NewFilterNodesInterface(managedSvcName *managedsvc.ManagedServiceProvider) (FilterNodesInterface, error) {
-	switch managedSvcName.Platform {
-	case caoinstallutils.Openshift:
+func NewFilterNodesInterface(managedSvcName *assets.ManagedServiceProvider) (FilterNodesInterface, error) {
+	switch managedSvcName.GetPlatform() {
+	case assets.Openshift:
 		return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
-	case caoinstallutils.Kubernetes:
-		switch managedSvcName.Environment {
-		case managedsvc.Kind:
+	case assets.Kubernetes:
+		switch managedSvcName.GetEnvironment() {
+		case assets.Kind:
 			return ConfigNodeFilterKind(), nil
-		case managedsvc.Cloud:
-			switch managedSvcName.Provider {
-			case managedsvc.AWS:
+		case assets.Cloud:
+			switch managedSvcName.GetProvider() {
+			case assets.AWS:
 				return ConfigNodeFilterEKS(), nil
-			case managedsvc.Azure:
+			case assets.Azure:
 				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
-			case managedsvc.GCP:
+			case assets.GCP:
 				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
 			default:
 				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)

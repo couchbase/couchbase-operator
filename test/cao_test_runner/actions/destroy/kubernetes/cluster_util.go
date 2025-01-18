@@ -6,8 +6,7 @@ import (
 
 	"context"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -23,46 +22,46 @@ type DeleteClusterUtil interface {
 }
 
 func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error) {
-	switch p.Platform {
-	case caoinstallutils.Kubernetes:
-		switch p.Environment {
-		case managedk8sservices.Kind:
+	switch p.ms.GetPlatform() {
+	case assets.Kubernetes:
+		switch p.ms.GetEnvironment() {
+		case assets.Kind:
 			return &DeleteKindCluster{
 				ClusterName: p.ClusterName,
 			}, nil
 
-		case managedk8sservices.Cloud:
-			switch p.Provider {
-			case managedk8sservices.AWS:
+		case assets.Cloud:
+			switch p.ms.GetProvider() {
+			case assets.AWS:
 				return &DeleteEKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.EKSRegion,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case managedk8sservices.Azure:
+			case assets.Azure:
 				return &DeleteAKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case managedk8sservices.GCP:
+			case assets.GCP:
 				return &DeleteGKECluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
 					ManagedServiceProvider: p.ms,
 				}, nil
 			default:
-				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
+				return nil, fmt.Errorf("unknown provider type %s: %w", p.ms.GetProvider(), ErrUnknownProviderType)
 			}
 
 		default:
-			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
+			return nil, fmt.Errorf("unknown environment type %s: %w", p.ms.GetEnvironment(), ErrUnknownEnvironmentType)
 		}
 
-	case caoinstallutils.Openshift:
+	case assets.Openshift:
 		return nil, ErrNotImplemented
 
 	default:
-		return nil, fmt.Errorf("unknown platform type %s: %w", p.Platform, ErrUnknownPlatformType)
+		return nil, fmt.Errorf("unknown platform type %s: %w", p.ms.GetPlatform(), ErrUnknownPlatformType)
 	}
 }

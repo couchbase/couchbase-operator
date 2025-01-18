@@ -20,7 +20,7 @@ var (
 
 type InstallParams struct {
 	buildVersion      string
-	platform          PlatformType
+	platform          assets.PlatformType
 	operatingSystem   assets.OperatingSystemType
 	architecture      assets.ArchitectureType
 	downloadDirectory string
@@ -33,10 +33,10 @@ func NewInstallClient() *CAOInstallClient {
 	return &CAOInstallClient{}
 }
 
-func NewInstallParams(buildVersion string, platform PlatformType,
+func NewInstallParams(buildVersion string, platform assets.PlatformType,
 	os assets.OperatingSystemType, arch assets.ArchitectureType, downloadDir string) (*InstallParams, error) {
 	switch platform {
-	case Kubernetes, Openshift:
+	case assets.Kubernetes, assets.Openshift:
 		// No-op
 	default:
 		return nil, ErrIllegalPlatform

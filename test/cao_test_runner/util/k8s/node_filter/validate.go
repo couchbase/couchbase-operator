@@ -4,8 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -16,10 +15,6 @@ var (
 func ValidateNodeFilter(nf *NodeFilter) error {
 	if nf == nil {
 		return fmt.Errorf("validate node filter: %w", ErrNodeFilterIsNil)
-	}
-
-	if err := managedsvc.ValidateManagedServices(&nf.ManagedSvcProvider); err != nil {
-		return fmt.Errorf("validate node filter: %w", err)
 	}
 
 	if nf.Count < 0 {
@@ -47,17 +42,17 @@ func validateSortByStrategy(strategy NodeSortByStrategy) error {
 }
 
 func validateSelectionStrategy(nf *NodeFilter) error {
-	switch nf.ManagedSvcProvider.Platform {
-	case caoinstallutils.Kubernetes:
-		switch nf.ManagedSvcProvider.Environment {
-		case managedsvc.Kind:
+	switch nf.ManagedSvcProvider.GetPlatform() {
+	case assets.Kubernetes:
+		switch nf.ManagedSvcProvider.GetEnvironment() {
+		case assets.Kind:
 			switch nf.SelectStrategy {
 			case SelectAny:
 				return nil
 			}
-		case managedsvc.Cloud:
-			switch nf.ManagedSvcProvider.Provider {
-			case managedsvc.AWS:
+		case assets.Cloud:
+			switch nf.ManagedSvcProvider.GetProvider() {
+			case assets.AWS:
 				switch nf.SelectStrategy {
 				case SelectAny, SelectRoundRobinAZ:
 					return nil
@@ -66,5 +61,6 @@ func validateSelectionStrategy(nf *NodeFilter) error {
 		}
 	}
 
-	return fmt.Errorf("validate selection strategy %s for %s %s: %w", nf.SelectStrategy, nf.ManagedSvcProvider.Platform, nf.ManagedSvcProvider.Environment, ErrInvalidSelectStrategy)
+	return fmt.Errorf("validate selection strategy %s for %s %s: %w", nf.SelectStrategy,
+		nf.ManagedSvcProvider.GetPlatform(), nf.ManagedSvcProvider.GetEnvironment(), ErrInvalidSelectStrategy)
 }

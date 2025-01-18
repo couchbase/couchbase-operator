@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
-	caoinstallutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/install_utils/cao_install_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -24,27 +22,24 @@ var (
 )
 
 type KubernetesUpgradeConfig struct {
-	Description             []string                           `yaml:"description"`
-	ClusterName             string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Platform                caoinstallutils.PlatformType       `yaml:"platform" caoCli:"required,context" env:"PLATFORM"`
-	Environment             managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required,context" env:"ENVIRONMENT"`
-	Provider                managedk8sservices.ProviderType    `yaml:"provider" caoCli:"context" env:"PROVIDER"`
-	EKSRegion               string                             `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
-	AKSRegion               string                             `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
-	GKERegion               string                             `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
-	KubernetesVersion       string                             `yaml:"kubernetesVersion"`
-	UpgradeClusterVersion   bool                               `yaml:"upgradeClusterVersion"`
-	WaitForClusterUpgrade   bool                               `yaml:"waitForClusterUpgrade"`
-	UpgradeAKSNodePools     bool                               `yaml:"upgradeAKSNodePools"`
-	AKSNodePoolsToUpgrade   []AKSNodePoolUpgradeConfig         `yaml:"aksNodePoolsToUpgrade"`
-	UpgradeEKSNodeGroups    bool                               `yaml:"upgradeEKSNodeGroups"`
-	EKSNodeGroupsToUpgrade  []EKSNodeGroupUpgradeConfig        `yaml:"eksNodeGroupsToUpgrade"`
-	UpgradeGKEMaster        bool                               `yaml:"upgradeGKEMaster"`
-	WaitForGKEMasterUpgrade bool                               `yaml:"waitForGKEMasterUpgrade"`
-	UpgradeGKENodePool      bool                               `yaml:"upgradeGKENodePool"`
-	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig         `yaml:"gkeNodePoolsToUpgrade"`
-	Validators              []map[string]any                   `yaml:"validators,omitempty"`
-	ms                      *managedk8sservices.ManagedServiceProvider
+	Description             []string                    `yaml:"description"`
+	ClusterName             string                      `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	EKSRegion               string                      `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion               string                      `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion               string                      `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
+	KubernetesVersion       string                      `yaml:"kubernetesVersion"`
+	UpgradeClusterVersion   bool                        `yaml:"upgradeClusterVersion"`
+	WaitForClusterUpgrade   bool                        `yaml:"waitForClusterUpgrade"`
+	UpgradeAKSNodePools     bool                        `yaml:"upgradeAKSNodePools"`
+	AKSNodePoolsToUpgrade   []AKSNodePoolUpgradeConfig  `yaml:"aksNodePoolsToUpgrade"`
+	UpgradeEKSNodeGroups    bool                        `yaml:"upgradeEKSNodeGroups"`
+	EKSNodeGroupsToUpgrade  []EKSNodeGroupUpgradeConfig `yaml:"eksNodeGroupsToUpgrade"`
+	UpgradeGKEMaster        bool                        `yaml:"upgradeGKEMaster"`
+	WaitForGKEMasterUpgrade bool                        `yaml:"waitForGKEMasterUpgrade"`
+	UpgradeGKENodePool      bool                        `yaml:"upgradeGKENodePool"`
+	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig  `yaml:"gkeNodePoolsToUpgrade"`
+	Validators              []map[string]any            `yaml:"validators,omitempty"`
+	ms                      *assets.ManagedServiceProvider
 }
 
 type KubernetesUpgrade struct {
@@ -81,6 +76,8 @@ func (action *KubernetesUpgrade) Do(ctx *context.Context, testAssets assets.Test
 	if !ok {
 		return ErrDecodeKubernetesConfig
 	}
+
+	c.ms = testAssets.GetK8SClusterGetter(c.ClusterName).GetServiceProvider()
 
 	logrus.Infof("Kubernetes Upgrade started")
 
@@ -129,19 +126,9 @@ func (action *KubernetesUpgrade) CheckConfig() error {
 		return ErrNoConfigFound
 	}
 
-	c, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
+	_, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
 	if !ok {
 		return ErrDecodeKubernetesConfig
-	}
-
-	c.ms = &managedk8sservices.ManagedServiceProvider{
-		Platform:    c.Platform,
-		Environment: c.Environment,
-		Provider:    c.Provider,
-	}
-
-	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
-		return err
 	}
 
 	return nil

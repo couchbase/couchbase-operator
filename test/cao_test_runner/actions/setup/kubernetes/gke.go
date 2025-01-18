@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/container/apiv1/containerpb"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -29,7 +30,7 @@ type CreateGKECluster struct {
 	Count                  int
 	ReleaseChannel         managedk8sservices.ReleaseChannel
 	KubeConfigPath         *fileutils.File
-	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+	ManagedServiceProvider *assets.ManagedServiceProvider
 }
 
 const (
@@ -47,7 +48,7 @@ var (
 
 func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
+		[]*assets.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -148,7 +149,7 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
+		[]*assets.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
