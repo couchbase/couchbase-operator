@@ -218,7 +218,9 @@ func (ts *TestAssets) PopulateTestAssets() error {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 
-	ts.kubectlPath = fileutils.NewFile("kubectl")
+	if ts.kubectlPath == nil {
+		ts.kubectlPath = fileutils.NewFile("kubectl")
+	}
 
 	if err := ts.PopulateKubeconfigPath(); err != nil {
 		return fmt.Errorf("populate test assets: %w", err)

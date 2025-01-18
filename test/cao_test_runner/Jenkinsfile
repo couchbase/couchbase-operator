@@ -33,7 +33,7 @@ pipeline {
 
   environment {
     GOVERSION = '1.22.5'
-    KUBECTL_PATH = "kubectl_${env.JOB_NAME}_${env.BUILD_NUMBER}"
+    KUBECTL_PATH = "${env.WORKSPACE}/bin/kubectl"
     PATH = "${env.WORKSPACE}/go/bin:${env.WORKSPACE}/bin:$PATH"
     GOROOT = "${env.WORKSPACE}/go"
     IMAGE_REGISTRY_SERVER = credentials('cloud-native-image-registry-server')
@@ -51,8 +51,6 @@ pipeline {
     GKE_CREDENTIALS_JSON_PATH = credentials('cloud-native-gcp-credentials')
     GKE_PROJECT_ID = "couchbase-qe"
     CLUSTER_NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
-    OPERATING_SYSTEM = "linux"
-    ARCHITECTURE= "amd64"
     GO111MODULE="auto"
     OPERATOR_IMAGE = "${params.OPERATOR_IMAGE}"
     ADMISSION_CONTROLLER_IMAGE = "${params.ADMISSION_IMAGE}"
@@ -111,9 +109,8 @@ users: null' > ${env.WORKSPACE}/bin/kubectl_config.yaml
             script {
               try {
                   sh """
-                     alias kubectl_${env.JOB_NAME}_${env.BUILD_NUMBER}='${env.WORKSPACE}/bin/kubectl --kubeconfig ${env.WORKSPACE}/bin/kubectl_config.yaml'
                      go mod tidy
-                     go run . scenario --scenario ${params.SCENARIO_FILE}
+                     go run . scenario --scenario ${params.SCENARIO_FILE} --kubectlPath '${env.WORKSPACE}/bin/kubectl' --kubeconfig '${env.WORKSPACE}/bin/kubectl_config.yaml'
                      """
               }
               catch (e) {
