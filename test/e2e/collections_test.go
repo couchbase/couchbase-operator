@@ -708,6 +708,7 @@ func TestScopesAndCollectionsCascadingScopeDeletion(t *testing.T) {
 	// Wait for all scopes to be created as expected.
 	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
 	expected.WithScope(scopeName).WithCollections(collectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
 
 	// Delete the scope and wait for the scopes and collections to be updated.
 	e2eutil.MustDeleteScope(t, kubernetes, scopeName)

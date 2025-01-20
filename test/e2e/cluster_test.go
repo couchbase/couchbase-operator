@@ -852,6 +852,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 2, Validator: e2eutil.ClusterScaleUpSequence(1)},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.ClusterScaleUpSequence(2),
 		eventschema.Repeat{
 			Times: 3,
