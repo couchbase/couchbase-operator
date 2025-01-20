@@ -19,6 +19,14 @@ type KindClusterDetail struct {
 	mu sync.Mutex
 }
 
+func NewKindClusterDetail(kindClusterName string, controlPlaneNodes, workerNodes []*string) *KindClusterDetail {
+	return &KindClusterDetail{
+		kindClusterName:   kindClusterName,
+		controlPlaneNodes: controlPlaneNodes,
+		workerNodes:       workerNodes,
+	}
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------

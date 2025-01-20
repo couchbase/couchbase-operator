@@ -401,6 +401,12 @@ func GetContexts() *KubectlCmd {
 	return NewKubectlCmd(cmd, args, nil)
 }
 
+func GetClusters() *KubectlCmd {
+	args := []string{"get-clusters"}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
+}
+
 func RenameContext(oldContextName, newContextName string) *KubectlCmd {
 	args := []string{"rename-context", oldContextName, newContextName}
 	cmd := "config"

@@ -182,3 +182,20 @@ func (ks *K8SClusters) SetKindClusterDetail(kindClusterDetail *KindClusterDetail
 
 	return nil
 }
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------------Populate K8S Clusters Functions---------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (ks *K8SClusters) PopulateK8SClusters() error {
+	ks.k8sClusters = make(map[string]*K8SCluster)
+	ks.kindClusters = make(map[string]*KindClusterDetail)
+
+	return nil
+}
