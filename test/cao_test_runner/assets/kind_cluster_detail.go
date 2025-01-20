@@ -3,7 +3,10 @@ package assets
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
 var (
@@ -128,6 +131,44 @@ func (kc *KindClusterDetail) SetWorkerNodes(workerNodes []*string) error {
 	defer kc.mu.Unlock()
 
 	kc.workerNodes = workerNodes
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------Populate Kind Cluster Detail Functions--------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *KindClusterDetail) PopulateKindClusterDetail() error {
+	allNodes, err := nodes.GetNodeNames()
+	if err != nil {
+		return fmt.Errorf("populate kind cluster detail: %w", err)
+	}
+
+	var controlPlaneNodes []*string
+	var workerNodes []*string
+
+	for _, node := range allNodes {
+		if strings.Contains(node, "control-plane") {
+			controlPlaneNodes = append(controlPlaneNodes, &node)
+		} else {
+			workerNodes = append(workerNodes, &node)
+		}
+	}
+
+	if err := kc.SetControlPlaneNodes(controlPlaneNodes); err != nil {
+		return fmt.Errorf("populate kind cluster detail: %w", err)
+	}
+
+	if err := kc.SetWorkerNodes(workerNodes); err != nil {
+		return fmt.Errorf("populate kind cluster detail: %w", err)
+	}
 
 	return nil
 }

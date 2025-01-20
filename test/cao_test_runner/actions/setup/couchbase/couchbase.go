@@ -227,7 +227,7 @@ func applySpecChanges(specChanges map[string]interface{}, specPath string, resul
 	var modifiedSpecPath string
 
 	if specChanges != nil {
-		yaml, err := yamlutils.UnmarshalYAMLFile(specPath)
+		yaml, err := yamlutils.UnmarshalYAMLFile(fileutils.NewFile(specPath))
 		if err != nil {
 			return "", fmt.Errorf("apply spec changes: %w", err)
 		}

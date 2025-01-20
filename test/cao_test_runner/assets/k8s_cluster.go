@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
 var (
@@ -129,6 +131,34 @@ func (kc *K8SCluster) SetNodes(nodes []*string) error {
 	defer kc.mu.Unlock()
 
 	kc.nodes = nodes
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------Populate K8S Cluster Functions------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *K8SCluster) PopulateK8SCluster() error {
+	nodes, err := nodes.GetNodeNames()
+	if err != nil {
+		return fmt.Errorf("populate k8s cluster: %w", err)
+	}
+
+	var allNodes []*string
+	for _, node := range nodes {
+		allNodes = append(allNodes, &node)
+	}
+
+	if err := kc.SetNodes(allNodes); err != nil {
+		return fmt.Errorf("populate k8s cluster: %w", err)
+	}
 
 	return nil
 }

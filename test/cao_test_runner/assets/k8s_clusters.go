@@ -3,13 +3,20 @@ package assets
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
+	"github.com/sirupsen/logrus"
 )
 
 var (
 	ErrServiceProviderAlreadySet = errors.New("service provider already set, cannot be changed")
 	ErrPlatformAlreadySet        = errors.New("platform already set, cannot be changed")
 	ErrClusterNotFound           = errors.New("cluster not found")
+	ErrNotImplemented            = errors.New("not implemented")
 )
 
 type K8SClusters struct {
@@ -193,9 +200,132 @@ func (ks *K8SClusters) SetKindClusterDetail(kindClusterDetail *KindClusterDetail
 -----------------------------------------------------------------
 */
 
-func (ks *K8SClusters) PopulateK8SClusters() error {
+func (ks *K8SClusters) PopulateK8SClusters(kubeconfigPath *fileutils.File) error {
 	ks.k8sClusters = make(map[string]*K8SCluster)
 	ks.kindClusters = make(map[string]*KindClusterDetail)
+
+	if err := ks.PopulateAllClusters(kubeconfigPath); err != nil {
+		return fmt.Errorf("populate k8s clusters: %w", err)
+	}
+
+	return nil
+}
+
+func DetectServiceProvider(kubeconfigPath *fileutils.File, clusterName string) (*ManagedServiceProvider, error) {
+	kubeconfig, err := yaml.UnmarshalYAMLFile(kubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("detect service provider: %w", err)
+	}
+
+	clustersInterface, exists := kubeconfig["clusters"]
+	if !exists {
+		return nil, fmt.Errorf("detect service provider: %w", ErrClusterNotFound)
+	}
+
+	clusters, _ := clustersInterface.([]interface{})
+
+	for _, clusterInterface := range clusters {
+		clusterMap, _ := clusterInterface.(map[string]interface{})
+		name, _ := clusterMap["name"].(string)
+
+		if name != clusterName {
+			continue
+		}
+
+		clusterDetails, _ := clusterMap["cluster"].(map[string]interface{})
+
+		serverURL, _ := clusterDetails["server"].(string)
+
+		if strings.Contains(serverURL, "eks.amazonaws.com") {
+			return NewManagedServiceProvider(Kubernetes, Cloud, AWS), nil
+		} else if strings.Contains(serverURL, "azmk8s.io") {
+			return NewManagedServiceProvider(Kubernetes, Cloud, Azure), nil
+		} else if strings.Contains(serverURL, "googleapis.com") || strings.Contains(serverURL, "googleusercontent.com") {
+			return NewManagedServiceProvider(Kubernetes, Cloud, GCP), nil
+		} else if strings.Contains(serverURL, "127.0.0.1") || strings.Contains(serverURL, "localhost") {
+			return NewManagedServiceProvider(Kubernetes, Kind, ""), nil
+		}
+
+	}
+
+	return nil, fmt.Errorf("detect service provider: %w", ErrClusterNotFound)
+}
+
+func (ks *K8SClusters) PopulateAllClusters(kubeconfigPath *fileutils.File) error {
+	out, _, err := kubectl.GetClusters().ExecWithOutputCapture()
+	if err != nil {
+		return fmt.Errorf("populate all clusters: %w", err)
+	}
+
+	allClusters := strings.Split(out, "\n")
+
+	// First field is "NAME" and removing last ""
+	allClusters = allClusters[1 : len(allClusters)-1]
+
+	for _, cluster := range allClusters {
+		serviceProvider, err := DetectServiceProvider(kubeconfigPath, cluster)
+		if err != nil {
+			// The cluster cannot be properly detected. Won't be populated to TestAssets
+			// TODO : Populate whatever can be found from such clusters as well
+			logrus.Errorf("Service Provider of cluster %s cannot be detected. Not populated in TestAssets", cluster)
+		} else {
+			switch serviceProvider.GetPlatform() {
+			case Kubernetes:
+				switch serviceProvider.GetEnvironment() {
+				case Kind:
+					if err := ks.PopulateKindCluster(cluster); err != nil {
+						return fmt.Errorf("populate all clusters: %w", err)
+					}
+				case Cloud:
+					switch serviceProvider.GetProvider() {
+					case AWS:
+						return ErrNotImplemented
+					case Azure:
+						return ErrNotImplemented
+					case GCP:
+						return ErrNotImplemented
+					default:
+						return ErrNotImplemented
+					}
+				default:
+					return ErrNotImplemented
+				}
+			case Openshift:
+				return ErrNotImplemented
+			default:
+				return ErrNotImplemented
+			}
+		}
+	}
+
+	return nil
+}
+
+func (ks *K8SClusters) PopulateKindCluster(clusterName string) error {
+	if strings.Contains(clusterName, "kind-") {
+		clusterName = strings.Split(clusterName, "kind-")[1]
+	}
+
+	k8sCluster := &K8SCluster{
+		clusterName:     clusterName,
+		serviceProvider: NewManagedServiceProvider(Kubernetes, Kind, ""),
+	}
+
+	kindClusterDetail := &KindClusterDetail{
+		kindClusterName: clusterName,
+	}
+
+	ks.k8sClusters[clusterName] = k8sCluster
+
+	ks.kindClusters[clusterName] = kindClusterDetail
+
+	if err := k8sCluster.PopulateK8SCluster(); err != nil {
+		return fmt.Errorf("populate kind cluster: %w", err)
+	}
+
+	if err := kindClusterDetail.PopulateKindClusterDetail(); err != nil {
+		return fmt.Errorf("populate kind cluster: %w", err)
+	}
 
 	return nil
 }

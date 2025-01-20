@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/shell"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -62,7 +63,7 @@ func (cl *CollectLogs) Run(_ *context.Context, testAssets assets.TestAssetGetter
 		customerName := fmt.Sprintf("%s_%s", time.Now().Format("2006-01-02"), cl.LogName)
 
 		// Get the YAML for the logs job and unmarshal it
-		unmarshalledYAML, err := yamlutils.UnmarshalYAMLFile(logJobSpecPath)
+		unmarshalledYAML, err := yamlutils.UnmarshalYAMLFile(fileutils.NewFile(logJobSpecPath))
 		if err != nil {
 			return err
 		}

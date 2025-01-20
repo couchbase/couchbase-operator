@@ -255,7 +255,7 @@ func (ts *TestAssets) PopulateTestAssets() error {
 		ts.k8sClusters = &K8SClusters{}
 	}
 
-	if err := ts.k8sClusters.PopulateK8SClusters(); err != nil {
+	if err := ts.k8sClusters.PopulateK8SClusters(ts.kubeconfigPath); err != nil {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 

@@ -16,15 +16,15 @@ var (
 )
 
 // UnmarshalYAMLFile unmarshal the yaml file into map[string]interface{}.
-func UnmarshalYAMLFile(pathToYAMLFile string) (map[string]interface{}, error) {
-	yamlFile, err := os.ReadFile(pathToYAMLFile)
+func UnmarshalYAMLFile(yamlFile *fileutils.File) (map[string]interface{}, error) {
+	yamlFileContent, err := yamlFile.ReadFile()
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal yaml file: %w", err)
 	}
 
 	unmarshalledYAML := make(map[string]interface{})
 
-	err = yaml.Unmarshal(yamlFile, &unmarshalledYAML)
+	err = yaml.Unmarshal(yamlFileContent, &unmarshalledYAML)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal yaml file: %w", err)
 	}
