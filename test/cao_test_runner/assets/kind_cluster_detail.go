@@ -1,12 +1,12 @@
 package assets
 
 import (
-	"fmt"
 	"sync"
 )
 
-type K8SCluster struct {
-	serviceProvider *ManagedServiceProvider
+type KindClusterDetail struct {
+	controlPlaneNodes []*string
+	workerNodes       []*string
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -22,57 +22,75 @@ type K8SCluster struct {
 -----------------------------------------------------------------
 */
 
-type K8SClusterGetter interface {
-	GetServiceProvider() *ManagedServiceProvider
+type KindClusterDetailGetter interface {
+	GetAllControlPlaneNodes() []*string
+	GetAllWorkerNodes() []*string
+	GetAllNodes() []*string
 }
 
-type K8SClusterGetterSetter interface {
+type KindClusterDetailGetterSetter interface {
 	// Getters
-	GetServiceProvider() *ManagedServiceProvider
+	GetAllControlPlaneNodes() []*string
+	GetAllWorkerNodes() []*string
+	GetAllNodes() []*string
 
 	// Setters
-	SetServiceProvider(ms *ManagedServiceProvider) error
+	SetControlPlaneNodes(controlPlaneNodes []*string) error
+	SetWorkerNodes(workerNodes []*string) error
 }
 
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
--------------------K8SCluster Getters----------------------------
+-------------------KindClusterDetail Getters---------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
 
-func (kc *K8SCluster) GetServiceProvider() *ManagedServiceProvider {
+func (kc *KindClusterDetail) GetAllControlPlaneNodes() []*string {
 	kc.mu.Lock()
 	defer kc.mu.Unlock()
-	return kc.serviceProvider
+	return kc.controlPlaneNodes
+}
+
+func (kc *KindClusterDetail) GetAllWorkerNodes() []*string {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+	return kc.workerNodes
+}
+
+func (kc *KindClusterDetail) GetAllNodes() []*string {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+	return append(kc.controlPlaneNodes, kc.workerNodes...)
 }
 
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
--------------------K8SCluster Setters----------------------------
+-------------------KindClusterDetail Setters---------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
 
-func (kc *K8SCluster) SetServiceProvider(ms *ManagedServiceProvider) error {
+func (kc *KindClusterDetail) SetControlPlaneNodes(controlPlaneNodes []*string) error {
 	kc.mu.Lock()
 	defer kc.mu.Unlock()
 
-	if kc.serviceProvider != nil {
-		return fmt.Errorf("set service provider: %w", ErrServiceProviderAlreadySet)
-	}
+	kc.controlPlaneNodes = controlPlaneNodes
 
-	if err := ValidateManagedServices(ms); err != nil {
-		return fmt.Errorf("set service provider: %w", err)
-	}
+	return nil
+}
 
-	kc.serviceProvider = ms
+func (kc *KindClusterDetail) SetWorkerNodes(workerNodes []*string) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	kc.workerNodes = workerNodes
 
 	return nil
 }

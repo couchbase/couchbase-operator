@@ -47,7 +47,7 @@ type TestAssets struct {
 	operatingSystem  OperatingSystemType
 	architecture     ArchitectureType
 
-	k8sClusters map[string]*K8SCluster
+	k8sClusters *K8SClusters
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -63,8 +63,7 @@ type TestAssetGetter interface {
 	GetKubeconfigPath() *fileutils.File
 	GetOperatingSystem() *OperatingSystemType
 	GetArchitecture() *ArchitectureType
-	GetK8SClusterGetter(name string) K8SClusterGetter
-	GetAllK8SClustersGetter() []K8SClusterGetter
+	GetK8SClustersGetter() K8SClustersGetter
 }
 
 type TestAssetGetterSetter interface {
@@ -74,8 +73,7 @@ type TestAssetGetterSetter interface {
 	GetKubeconfigPath() *fileutils.File
 	GetOperatingSystem() *OperatingSystemType
 	GetArchitecture() *ArchitectureType
-	GetK8SClusterGetterSetter(name string) K8SClusterGetterSetter
-	GetAllK8SClustersGetterSetter() []K8SClusterGetterSetter
+	GetK8SClustersGetterSetter() K8SClustersGetterSetter
 
 	// Setters
 	SetResultsDirectory(resultsDirectory *fileutils.Directory) error
@@ -83,7 +81,7 @@ type TestAssetGetterSetter interface {
 	SetKubeconfigPath(kubeconfigPath *fileutils.File) error
 	SetOperatingSystem(os string) error
 	SetArchitecture(arch string) error
-	SetK8SCluster(name string, k8sCluster *K8SCluster) error
+	SetK8SClusters(k8sClusters *K8SClusters) error
 }
 
 /*
@@ -126,40 +124,16 @@ func (ts *TestAssets) GetArchitecture() *ArchitectureType {
 	return &ts.architecture
 }
 
-func (ts *TestAssets) GetK8SClusterGetter(name string) K8SClusterGetter {
+func (ts *TestAssets) GetK8SClustersGetter() K8SClustersGetter {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return ts.k8sClusters[name]
+	return ts.k8sClusters
 }
 
-func (ts *TestAssets) GetK8SClusterGetterSetter(name string) K8SClusterGetterSetter {
+func (ts *TestAssets) GetK8SClustersGetterSetter() K8SClustersGetterSetter {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return ts.k8sClusters[name]
-}
-
-func (ts *TestAssets) GetAllK8SClustersGetter() []K8SClusterGetter {
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-
-	var k8sClusters []K8SClusterGetter
-	for _, k8sCluster := range ts.k8sClusters {
-		k8sClusters = append(k8sClusters, k8sCluster)
-	}
-
-	return k8sClusters
-}
-
-func (ts *TestAssets) GetAllK8SClustersGetterSetter() []K8SClusterGetterSetter {
-	ts.mu.Lock()
-	defer ts.mu.Unlock()
-
-	var k8sClusters []K8SClusterGetterSetter
-	for _, k8sCluster := range ts.k8sClusters {
-		k8sClusters = append(k8sClusters, k8sCluster)
-	}
-
-	return k8sClusters
+	return ts.k8sClusters
 }
 
 /*
@@ -242,10 +216,10 @@ func (ts *TestAssets) SetResultsDirectory(resultsDirectory *fileutils.Directory)
 	return nil
 }
 
-func (ts *TestAssets) SetK8SCluster(name string, k8sCluster *K8SCluster) error {
+func (ts *TestAssets) SetK8SClusters(k8sClusters *K8SClusters) error {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	ts.k8sClusters[name] = k8sCluster
+	ts.k8sClusters = k8sClusters
 	return nil
 }
 

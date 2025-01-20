@@ -77,7 +77,12 @@ func (action *KubernetesUpgrade) Do(ctx *context.Context, testAssets assets.Test
 		return ErrDecodeKubernetesConfig
 	}
 
-	c.ms = testAssets.GetK8SClusterGetter(c.ClusterName).GetServiceProvider()
+	cluster, err := testAssets.GetK8SClustersGetter().GetK8SClusterGetter(c.ClusterName)
+	if err != nil {
+		return fmt.Errorf("get k8s cluster: %w", err)
+	}
+
+	c.ms = cluster.GetServiceProvider()
 
 	logrus.Infof("Kubernetes Upgrade started")
 

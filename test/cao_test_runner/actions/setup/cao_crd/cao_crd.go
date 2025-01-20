@@ -69,7 +69,12 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 
 	resultsDir := testAssets.GetResultsDirectory()
 
-	platform := testAssets.GetK8SClusterGetter(c.ClusterName).GetServiceProvider().GetPlatform()
+	cluster, err := testAssets.GetK8SClustersGetter().GetK8SClusterGetter(c.ClusterName)
+	if err != nil {
+		return fmt.Errorf("get k8s cluster: %w", err)
+	}
+
+	platform := cluster.GetServiceProvider().GetPlatform()
 
 	installParams, err := caoinstallutils.NewInstallParams(c.OperatorVersion, platform,
 		*testAssets.GetOperatingSystem(), *testAssets.GetArchitecture(), resultsDir.DirectoryPath)

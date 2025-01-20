@@ -123,7 +123,12 @@ func (c *Chaos) Do(ctx *context.Context, testAssets assets.TestAssetGetter) erro
 		return ErrChaosConfigDecode
 	}
 
-	chaosConfig.ms = testAssets.GetK8SClusterGetter(chaosConfig.ClusterName).GetServiceProvider()
+	cluster, err := testAssets.GetK8SClustersGetter().GetK8SClusterGetter(chaosConfig.ClusterName)
+	if err != nil {
+		return fmt.Errorf("get k8s cluster getter: %w", err)
+	}
+
+	chaosConfig.ms = cluster.GetServiceProvider()
 
 	logrus.Infof("Starting chaos action desc: %v", chaosConfig.Description)
 
@@ -149,7 +154,7 @@ func (c *Chaos) Do(ctx *context.Context, testAssets assets.TestAssetGetter) erro
 	}
 
 	// Wait for the goroutines to complete and if error occurs in one of the go routines return it.
-	err := eg.Wait()
+	err = eg.Wait()
 	if err != nil {
 		return fmt.Errorf("perform chaos action: %w", err)
 	}
