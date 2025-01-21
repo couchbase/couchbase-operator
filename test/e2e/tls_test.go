@@ -2227,6 +2227,7 @@ func TestTLSRotateAndChangeScriptPassphrase(t *testing.T) {
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},

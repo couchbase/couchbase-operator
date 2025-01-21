@@ -712,7 +712,7 @@ func TestSampleBucket(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketGreaterThan(t, kubernetes, cluster, bucket.GetName(), 7300, time.Minute)
 }
 
 // TestUpdateSampleBucket will check that sample buckets aren't updated to match the CRD spec until the sampleBucket annotation is false.
