@@ -1096,6 +1096,8 @@ func TestBackupAutoscaling(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).ExpandableStorage()
+
 	clusterSize := 3
 	initialVolumeSize := e2espec.NewResourceQuantityMi(1024)
 	volumeSizeLimit := e2espec.NewResourceQuantityMi(1024 + 512)
