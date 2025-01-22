@@ -59,6 +59,8 @@ func TestPKCS12CreateCluster(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
 	// Static configuration.
 	clusterSize := constants.Size3
 

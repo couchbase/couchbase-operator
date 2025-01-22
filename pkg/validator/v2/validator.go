@@ -2688,7 +2688,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		chain, key, _, decodeErr = util_x509.DecodePKCS12file(keystore, passphrase, cluster)
 
 		if decodeErr != nil {
-			return []error{err}
+			return []error{decodeErr}
 		}
 	}
 
