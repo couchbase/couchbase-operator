@@ -398,6 +398,9 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 
 	events.Validators = append(events.Validators, eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
 			eventschema.Repeat{
 				Times:     victims,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
@@ -410,6 +413,9 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 				Validator: eventschema.Sequence{
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Optional{
+							Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+						},
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 					},
 				},
