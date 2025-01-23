@@ -151,7 +151,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	if validationFailed {
-		c.Update(c.GetCouchbaseCluster(), r.operatorStartTime)
+		c.RunReconcile(r.operatorStartTime)
 	} else {
 		c.Update(couchbase, r.operatorStartTime)
 	}
