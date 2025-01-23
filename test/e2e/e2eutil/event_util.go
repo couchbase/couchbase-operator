@@ -359,9 +359,9 @@ func KubernetesUpgradeSequenceEphemeral(clusterSize int) eventschema.Validatable
 	}
 }
 
-// ServerCrashRecoverySequence is generated when you kill NS server.
-func ServerCrashRecoverySequence(cluster *couchbasev2.CouchbaseCluster) eventschema.Validatable {
-	if ok, err := cluster.IsAtLeastVersion("7.6.2"); ok && err == nil {
+// ServerCrashRecoverySequence is generated when you kill NS server. Some older server versions may wait for a rebalance during recovery.
+func ServerCrashRecoverySequence(waitForRebalance bool) eventschema.Validatable {
+	if !waitForRebalance {
 		return eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				// The server instance may come back before being registered as down,
