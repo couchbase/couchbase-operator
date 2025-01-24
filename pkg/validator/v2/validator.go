@@ -1821,6 +1821,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		if err := checkBucketClustersMagmaStorageBackend(v, bucket); err != nil {
 			errs = append(errs, err)
 		}
+
+		if bucket.Spec.EnableIndexReplica {
+			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
+		}
 	}
 
 	if bucket.Spec.MaxTTL != nil {
@@ -3786,6 +3790,12 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			if err := CheckBucketHistoryDisabled(prev); err != nil {
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
+		}
+	}
+
+	if curr.Spec.StorageBackend == "magma" {
+		if curr.Spec.EnableIndexReplica {
+			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
 		}
 	}
 
