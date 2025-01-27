@@ -14,6 +14,7 @@ type KubernetesClusterValidator struct {
 	KindConfig  *KindConfig `yaml:"kindConfig"`
 	EKSConfig   *EKSConfig  `yaml:"eksConfig"`
 	AKSConfig   *AKSConfig  `yaml:"aksConfig"`
+	GKEConfig   *GKEConfig  `yaml:"gkeConfig"`
 }
 
 func (c *KubernetesClusterValidator) Run(ctx *context.Context, testAssets assets.TestAssetGetterSetter) error {

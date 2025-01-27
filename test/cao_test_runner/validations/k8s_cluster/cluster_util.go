@@ -32,7 +32,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 				case assets.Azure:
 					return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
 				case assets.GCP:
-					return nil, ErrNotImplemented
+					return &ValidateGKECluster{ClusterName: v.ClusterName, GKEConfig: v.GKEConfig}, nil
 				default:
 					return nil, ErrNotImplemented
 				}
@@ -53,6 +53,9 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 		}
 		if _, err := checkConfigIsNil(v.AKSConfig); err != nil {
 			return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
+		}
+		if _, err := checkConfigIsNil(v.GKEConfig); err != nil {
+			return &ValidateGKECluster{ClusterName: v.ClusterName, GKEConfig: v.GKEConfig}, nil
 		}
 	}
 	return nil, ErrInvalidConfig

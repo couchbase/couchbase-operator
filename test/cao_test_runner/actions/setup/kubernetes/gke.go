@@ -245,7 +245,7 @@ func (cgc *CreateGKECluster) updateKubeconfig(cluster *containerpb.Cluster) erro
 	}
 
 	clusters = append(clusters, map[interface{}]interface{}{
-		"name": contextName,
+		"name": cgc.ClusterName,
 		"cluster": map[interface{}]interface{}{
 			"server":                     fmt.Sprintf("https://%s", apiServer),
 			"certificate-authority-data": caCertificate,
@@ -255,7 +255,7 @@ func (cgc *CreateGKECluster) updateKubeconfig(cluster *containerpb.Cluster) erro
 	contexts = append(contexts, map[interface{}]interface{}{
 		"name": contextName,
 		"context": map[interface{}]interface{}{
-			"cluster": contextName,
+			"cluster": cgc.ClusterName,
 			"user":    contextName,
 		},
 	})
