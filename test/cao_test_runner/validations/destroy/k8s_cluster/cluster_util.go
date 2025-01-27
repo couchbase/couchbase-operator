@@ -31,7 +31,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 		case assets.Cloud:
 			switch cluster.GetServiceProvider().GetProvider() {
 			case assets.AWS:
-				return nil, ErrNotImplemented
+				return &ValidateEKSCluster{ClusterName: v.ClusterName}, nil
 			case assets.Azure:
 				return nil, ErrNotImplemented
 			case assets.GCP:
