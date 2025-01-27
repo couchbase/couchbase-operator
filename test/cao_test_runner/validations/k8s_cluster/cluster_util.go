@@ -30,7 +30,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 				case assets.AWS:
 					return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
 				case assets.Azure:
-					return nil, ErrNotImplemented
+					return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
 				case assets.GCP:
 					return nil, ErrNotImplemented
 				default:
@@ -50,6 +50,9 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 		}
 		if _, err := checkConfigIsNil(v.EKSConfig); err != nil {
 			return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
+		}
+		if _, err := checkConfigIsNil(v.AKSConfig); err != nil {
+			return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
 		}
 	}
 	return nil, ErrInvalidConfig

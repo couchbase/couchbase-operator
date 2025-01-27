@@ -53,6 +53,7 @@ TODO : Also check if all the nodes are healthy and ready
 TODO : When number of nodegroups are updated, make sure the original nodes are intact and same.
 TODO : Check if OIDC provider exists and is correct
 TODO : Validate all values of EKSConfig before validating with cluster. Reduces eks calls and makes sure the yaml is correct.
+TODO : Take config of each node group as a param like in AKSValidator. This will allow for more granular control.
 */
 
 func (c *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets assets.TestAssetGetterSetter) error {

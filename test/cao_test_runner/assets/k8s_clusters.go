@@ -23,6 +23,7 @@ type K8SClusters struct {
 	k8sClusters  map[string]*K8SCluster
 	kindClusters map[string]*KindClusterDetail
 	eksClusters  map[string]*EKSClusterDetail
+	aksClusters  map[string]*AKSClusterDetail
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -45,6 +46,8 @@ type K8SClustersGetter interface {
 	GetKindClusterDetailGetter(clusterName string) (KindClusterDetailGetter, error)
 	GetAllEKSClustersDetailsGetter() []EKSClusterDetailGetter
 	GetEKSClusterDetailGetter(clusterName string) (EKSClusterDetailGetter, error)
+	GetAllAKSClustersDetailsGetter() []AKSClusterDetailGetter
+	GetAKSClusterDetailGetter(clusterName string) (AKSClusterDetailGetter, error)
 }
 
 type K8SClustersGetterSetter interface {
@@ -55,11 +58,14 @@ type K8SClustersGetterSetter interface {
 	GetKindClusterDetailGetterSetter(clusterName string) (KindClusterDetailGetterSetter, error)
 	GetAllEKSClustersDetailsGetterSetter() []EKSClusterDetailGetterSetter
 	GetEKSClusterDetailGetterSetter(clusterName string) (EKSClusterDetailGetterSetter, error)
+	GetAllAKSClustersDetailsGetterSetter() []AKSClusterDetailGetterSetter
+	GetAKSClusterDetailGetterSetter(clusterName string) (AKSClusterDetailGetterSetter, error)
 
 	// Setters
 	SetK8SCluster(k8sCluster *K8SCluster) error
 	SetKindClusterDetail(kindClusterDetail *KindClusterDetail) error
 	SetEKSClusterDetail(eksClusterDetail *EKSClusterDetail) error
+	SetAKSClusterDetail(aksClusterDetail *AKSClusterDetail) error
 }
 
 /*
@@ -216,6 +222,54 @@ func (ks *K8SClusters) GetEKSClusterDetailGetterSetter(clusterName string) (EKSC
 	return cluster, nil
 }
 
+func (ks *K8SClusters) GetAllAKSClustersDetailsGetter() []AKSClusterDetailGetter {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	var clusters []AKSClusterDetailGetter
+	for _, cluster := range ks.aksClusters {
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters
+}
+
+func (ks *K8SClusters) GetAKSClusterDetailGetter(clusterName string) (AKSClusterDetailGetter, error) {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	cluster, ok := ks.aksClusters[clusterName]
+	if !ok {
+		return nil, fmt.Errorf("get aks cluster detail getter: %w", ErrClusterNotFound)
+	}
+
+	return cluster, nil
+}
+
+func (ks *K8SClusters) GetAllAKSClustersDetailsGetterSetter() []AKSClusterDetailGetterSetter {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	var clusters []AKSClusterDetailGetterSetter
+	for _, cluster := range ks.aksClusters {
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters
+}
+
+func (ks *K8SClusters) GetAKSClusterDetailGetterSetter(clusterName string) (AKSClusterDetailGetterSetter, error) {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	cluster, ok := ks.aksClusters[clusterName]
+	if !ok {
+		return nil, fmt.Errorf("get aks cluster detail getter setter: %w", ErrClusterNotFound)
+	}
+
+	return cluster, nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -253,6 +307,15 @@ func (ks *K8SClusters) SetEKSClusterDetail(eksClusterDetail *EKSClusterDetail) e
 	return nil
 }
 
+func (ks *K8SClusters) SetAKSClusterDetail(aksClusterDetail *AKSClusterDetail) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	ks.aksClusters[aksClusterDetail.aksClusterName] = aksClusterDetail
+
+	return nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -267,6 +330,7 @@ func (ks *K8SClusters) PopulateK8SClusters(kubeconfigPath *fileutils.File) error
 	ks.k8sClusters = make(map[string]*K8SCluster)
 	ks.kindClusters = make(map[string]*KindClusterDetail)
 	ks.eksClusters = make(map[string]*EKSClusterDetail)
+	ks.aksClusters = make(map[string]*AKSClusterDetail)
 
 	if err := ks.PopulateAllClusters(kubeconfigPath); err != nil {
 		return fmt.Errorf("populate k8s clusters: %w", err)

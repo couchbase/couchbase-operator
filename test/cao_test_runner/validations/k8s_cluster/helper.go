@@ -67,6 +67,9 @@ func checkConfigIsNil(v interface{}) (bool, error) {
 		if field.Kind() == reflect.Ptr && field.IsNil() {
 			continue
 		}
+		if field.Kind() == reflect.Slice && field.Len() == 0 {
+			continue
+		}
 
 		return false, fmt.Errorf("check config nil: field %s is not nil: %w", val.Type().Field(i).Name, ErrFieldNotNil)
 	}
