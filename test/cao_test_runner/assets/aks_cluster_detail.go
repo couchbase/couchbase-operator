@@ -1,15 +1,18 @@
 package assets
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
 	ErrAKSClusterNameAlreadySet = errors.New("aks cluster name already set, cannot be changed")
+	ErrAKSClusterNameNotSet     = errors.New("aks cluster name not set")
 )
 
 type AKSClusterDetail struct {
@@ -319,6 +322,73 @@ func (ac *AKSNodePool) SetDiskSize(diskSize int32) error {
 	defer ac.mu.Unlock()
 
 	ac.diskSize = diskSize
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------Populate AKS Cluster Detail Functions---------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
+	if kc.aksClusterName == "" {
+		return fmt.Errorf("populate aks cluster detail: %w", ErrAKSClusterNameNotSet)
+	}
+
+	managedServiceProvider := managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes,
+		managedk8sservices.Cloud, managedk8sservices.Azure)
+
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.aksClusterName)
+	if err != nil {
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
+
+	ctx := context.Background()
+
+	aksSessionStore := managedk8sservices.NewManagedService(managedServiceProvider)
+	if err = aksSessionStore.SetSession(ctx, svc); err != nil {
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
+
+	aksSession, err := aksSessionStore.(*managedk8sservices.AKSSessionStore).GetSession(ctx, svc)
+	if err != nil {
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
+
+	resourceGroup := kc.aksClusterName + "-rg"
+
+	aksCluster, err := aksSession.GetCluster(ctx, resourceGroup)
+	if err != nil {
+		// Cluster does not exist in AKS
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
+
+	kc.nodePools = make(map[string]*AKSNodePool)
+
+	nodePools, err := aksSession.ListNodePools(ctx, resourceGroup)
+	if err != nil {
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
+
+	for _, nodePool := range nodePools {
+		assetNodePool := NewAKSNodePool(*nodePool.Name, *nodePool.Properties.OSSKU,
+			*nodePool.Properties.OSType, *nodePool.Properties.Count, *nodePool.Properties.VMSize, *nodePool.Properties.OSDiskSizeGB)
+
+		if err := kc.SetNodePool(assetNodePool); err != nil {
+			return fmt.Errorf("populate aks cluster detail: %w", err)
+		}
+	}
+
+	if err := kc.SetKubernetesVersion(*aksCluster.Properties.KubernetesVersion); err != nil {
+		return fmt.Errorf("populate aks cluster detail: %w", err)
+	}
 
 	return nil
 }
