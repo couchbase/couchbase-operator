@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/sirupsen/logrus"
 )
@@ -22,12 +21,12 @@ type UpgradeAKSCluster struct {
 	WaitForClusterUpgrade  bool
 	UpgradeNodePools       bool
 	NodePoolsToUpgrade     []AKSNodePoolUpgradeConfig
-	ManagedServiceProvider *assets.ManagedServiceProvider
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (uac *UpgradeAKSCluster) UpgradeCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -105,7 +104,7 @@ func (uac *UpgradeAKSCluster) UpgradeCluster(ctx context.Context) error {
 
 func (uac *UpgradeAKSCluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{uac.ManagedServiceProvider}, uac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

@@ -10,7 +10,6 @@ import (
 	"runtime"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -29,7 +28,7 @@ type CreateAKSCluster struct {
 	OSSKU                  armcontainerservice.OSSKU
 	NumNodePools           int
 	KubeConfigPath         *fileutils.File
-	ManagedServiceProvider *assets.ManagedServiceProvider
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 var (
@@ -47,7 +46,7 @@ func (cac *CreateAKSCluster) CreateCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -163,7 +162,7 @@ func (cac *CreateAKSCluster) ValidateParams(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cac.ManagedServiceProvider}, cac.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

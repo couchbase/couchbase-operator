@@ -1,4 +1,4 @@
-package assets
+package managedk8sservices
 
 import "errors"
 

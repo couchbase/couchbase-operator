@@ -7,13 +7,14 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kind"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 )
 
 const (
-	kindPlatform    = assets.Kubernetes
-	kindEnvironment = assets.Kind
+	kindPlatform    = managedk8sservices.Kubernetes
+	kindEnvironment = managedk8sservices.Kind
 	kindProvider    = ""
 )
 

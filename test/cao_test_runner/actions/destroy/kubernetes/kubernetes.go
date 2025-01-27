@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -24,7 +25,7 @@ type KubernetesDestroyConfig struct {
 	AKSRegion   string           `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
 	GKERegion   string           `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
-	ms          *assets.ManagedServiceProvider
+	ms          *managedk8sservices.ManagedServiceProvider
 }
 
 type DestroyKubernetes struct {

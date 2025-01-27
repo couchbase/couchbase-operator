@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	requestutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/request"
 )
@@ -20,7 +21,7 @@ var (
 
 type InstallParams struct {
 	buildVersion      string
-	platform          assets.PlatformType
+	platform          managedk8sservices.PlatformType
 	operatingSystem   assets.OperatingSystemType
 	architecture      assets.ArchitectureType
 	downloadDirectory string
@@ -33,10 +34,10 @@ func NewInstallClient() *CAOInstallClient {
 	return &CAOInstallClient{}
 }
 
-func NewInstallParams(buildVersion string, platform assets.PlatformType,
+func NewInstallParams(buildVersion string, platform managedk8sservices.PlatformType,
 	os assets.OperatingSystemType, arch assets.ArchitectureType, downloadDir string) (*InstallParams, error) {
 	switch platform {
-	case assets.Kubernetes, assets.Openshift:
+	case managedk8sservices.Kubernetes, managedk8sservices.Openshift:
 		// No-op
 	default:
 		return nil, ErrIllegalPlatform

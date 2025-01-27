@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
@@ -14,7 +15,7 @@ var (
 
 type K8SCluster struct {
 	clusterName     string
-	serviceProvider *ManagedServiceProvider
+	serviceProvider *managedk8sservices.ManagedServiceProvider
 
 	nodes []*string
 
@@ -22,7 +23,7 @@ type K8SCluster struct {
 	mu sync.Mutex
 }
 
-func NewK8SCluster(clusterName string, serviceProvider *ManagedServiceProvider, nodes []*string) *K8SCluster {
+func NewK8SCluster(clusterName string, serviceProvider *managedk8sservices.ManagedServiceProvider, nodes []*string) *K8SCluster {
 	return &K8SCluster{
 		clusterName:     clusterName,
 		serviceProvider: serviceProvider,
@@ -42,19 +43,19 @@ func NewK8SCluster(clusterName string, serviceProvider *ManagedServiceProvider, 
 
 type K8SClusterGetter interface {
 	GetClusterName() string
-	GetServiceProvider() *ManagedServiceProvider
+	GetServiceProvider() *managedk8sservices.ManagedServiceProvider
 	GetNodes() []*string
 }
 
 type K8SClusterGetterSetter interface {
 	// Getters
 	GetClusterName() string
-	GetServiceProvider() *ManagedServiceProvider
+	GetServiceProvider() *managedk8sservices.ManagedServiceProvider
 	GetNodes() []*string
 
 	// Setters
 	SetClusterName(clusterName string) error
-	SetServiceProvider(ms *ManagedServiceProvider) error
+	SetServiceProvider(ms *managedk8sservices.ManagedServiceProvider) error
 	SetNodes(nodes []*string) error
 }
 
@@ -74,7 +75,7 @@ func (kc *K8SCluster) GetClusterName() string {
 	return kc.clusterName
 }
 
-func (kc *K8SCluster) GetServiceProvider() *ManagedServiceProvider {
+func (kc *K8SCluster) GetServiceProvider() *managedk8sservices.ManagedServiceProvider {
 	kc.mu.Lock()
 	defer kc.mu.Unlock()
 	return kc.serviceProvider
@@ -109,7 +110,7 @@ func (kc *K8SCluster) SetClusterName(clusterName string) error {
 	return nil
 }
 
-func (kc *K8SCluster) SetServiceProvider(ms *ManagedServiceProvider) error {
+func (kc *K8SCluster) SetServiceProvider(ms *managedk8sservices.ManagedServiceProvider) error {
 	kc.mu.Lock()
 	defer kc.mu.Unlock()
 
@@ -117,7 +118,7 @@ func (kc *K8SCluster) SetServiceProvider(ms *ManagedServiceProvider) error {
 		return fmt.Errorf("set service provider: %w", ErrServiceProviderAlreadySet)
 	}
 
-	if err := ValidateManagedServices(ms); err != nil {
+	if err := managedk8sservices.ValidateManagedServices(ms); err != nil {
 		return fmt.Errorf("set service provider: %w", err)
 	}
 

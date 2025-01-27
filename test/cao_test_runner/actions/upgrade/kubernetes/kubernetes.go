@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -39,7 +40,7 @@ type KubernetesUpgradeConfig struct {
 	UpgradeGKENodePool      bool                        `yaml:"upgradeGKENodePool"`
 	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig  `yaml:"gkeNodePoolsToUpgrade"`
 	Validators              []map[string]any            `yaml:"validators,omitempty"`
-	ms                      *assets.ManagedServiceProvider
+	ms                      *managedk8sservices.ManagedServiceProvider
 }
 
 type KubernetesUpgrade struct {

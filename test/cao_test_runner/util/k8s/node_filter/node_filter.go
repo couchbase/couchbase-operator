@@ -3,12 +3,11 @@ package nodefilter
 import (
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
-	managedsvc "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 type NodeFilter struct {
-	ManagedSvcProvider assets.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
+	ManagedSvcProvider managedk8sservices.ManagedServiceProvider `yaml:"managedServiceProvider" caoCli:"required"`
 
 	// Namespace is used when filtering based on pods e.g. Operator, Admission.
 	Namespace string `yaml:"namespace" caoCli:"context"`
@@ -62,29 +61,29 @@ type FilterNodesInterface interface {
 }
 
 // NewFilterNodesInterface returns the FilterNodesInterface for the provided managedk8sservices.ManagedServiceProvider.
-func NewFilterNodesInterface(managedSvcName *assets.ManagedServiceProvider) (FilterNodesInterface, error) {
+func NewFilterNodesInterface(managedSvcName *managedk8sservices.ManagedServiceProvider) (FilterNodesInterface, error) {
 	switch managedSvcName.GetPlatform() {
-	case assets.Openshift:
-		return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
-	case assets.Kubernetes:
+	case managedk8sservices.Openshift:
+		return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
+	case managedk8sservices.Kubernetes:
 		switch managedSvcName.GetEnvironment() {
-		case assets.Kind:
+		case managedk8sservices.Kind:
 			return ConfigNodeFilterKind(), nil
-		case assets.Cloud:
+		case managedk8sservices.Cloud:
 			switch managedSvcName.GetProvider() {
-			case assets.AWS:
+			case managedk8sservices.AWS:
 				return ConfigNodeFilterEKS(), nil
-			case assets.Azure:
-				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
-			case assets.GCP:
-				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+			case managedk8sservices.Azure:
+				return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
+			case managedk8sservices.GCP:
+				return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
 			default:
-				return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+				return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
 			}
 		default:
-			return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+			return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
 		}
 	default:
-		return nil, fmt.Errorf("filter nodes: %w", managedsvc.ErrManagedServiceNotFound)
+		return nil, fmt.Errorf("filter nodes: %w", managedk8sservices.ErrManagedServiceNotFound)
 	}
 }

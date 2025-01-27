@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/sirupsen/logrus"
@@ -39,7 +38,7 @@ const (
  */
 type CBPodChaosConfig struct {
 	ChaosAction          ActionName
-	ManagedSvcName       *assets.ManagedServiceProvider
+	ManagedSvcName       *managedsvcs.ManagedServiceProvider
 	ChaosIterations      int64
 	CBPod                string
 	TriggerConfig        triggers.TriggerConfig
@@ -70,19 +69,19 @@ type ChaosActionsInterface interface {
 }
 
 // NewChaosAction initializes ChaosActionsInterface for the provided managed service.
-func NewChaosAction(context *context.Context, managedService *assets.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
+func NewChaosAction(context *context.Context, managedService *managedsvcs.ManagedServiceProvider, clusterName string) (ChaosActionsInterface, error) {
 	switch managedService.GetPlatform() {
-	case assets.Kubernetes:
+	case managedsvcs.Kubernetes:
 		switch managedService.GetEnvironment() {
-		case assets.Kind:
+		case managedsvcs.Kind:
 			return NewKindChaos()
-		case assets.Cloud:
+		case managedsvcs.Cloud:
 			switch managedService.GetProvider() {
-			case assets.AWS:
+			case managedsvcs.AWS:
 				return NewEKSChaos(context, clusterName, managedService)
-			case assets.Azure:
+			case managedsvcs.Azure:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
-			case assets.GCP:
+			case managedsvcs.GCP:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)
 			default:
 				return nil, fmt.Errorf("new chaos action: %w", managedsvcs.ErrManagedServiceNotFound)

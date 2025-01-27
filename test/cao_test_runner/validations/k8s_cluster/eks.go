@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	eksPlatform    = assets.Kubernetes
-	eksEnvironment = assets.Cloud
-	eksProvider    = assets.AWS
+	eksPlatform    = managedk8sservices.Kubernetes
+	eksEnvironment = managedk8sservices.Cloud
+	eksProvider    = managedk8sservices.AWS
 )
 
 var (
@@ -150,7 +150,7 @@ func (c *ValidateEKSCluster) ValidatePrevState(ctx context.Context, testAssets a
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate prev state: %w", err)
 	}
@@ -237,10 +237,10 @@ func (c *ValidateEKSCluster) ValidatePrevState(ctx context.Context, testAssets a
 }
 
 func (c *ValidateEKSCluster) ValidateNewCluster(ctx context.Context, testAssets assets.TestAssetGetterSetter) error {
-	managedServiceProvider := assets.NewManagedServiceProvider(eksPlatform, eksEnvironment, eksProvider)
+	managedServiceProvider := managedk8sservices.NewManagedServiceProvider(eksPlatform, eksEnvironment, eksProvider)
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
@@ -361,7 +361,7 @@ func (c *ValidateEKSCluster) ValidateUpdateCluster(ctx context.Context, testAsse
 	managedServiceProvider := k8sCluster.GetServiceProvider()
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate update cluster: %w", err)
 	}

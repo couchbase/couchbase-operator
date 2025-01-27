@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	gkePlatform    = assets.Kubernetes
-	gkeEnvironment = assets.Cloud
-	gkeProvider    = assets.GCP
+	gkePlatform    = managedk8sservices.Kubernetes
+	gkeEnvironment = managedk8sservices.Cloud
+	gkeProvider    = managedk8sservices.GCP
 )
 
 var (
@@ -46,7 +46,7 @@ func (v *ValidateGKECluster) ValidateCluster(ctx context.Context, testAssets ass
 	managedServiceProvider := k8sCluster.GetServiceProvider()
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}

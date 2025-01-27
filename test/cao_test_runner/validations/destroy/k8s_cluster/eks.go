@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	eksPlatform    = assets.Kubernetes
-	eksEnvironment = assets.Cloud
-	eksProvider    = assets.AWS
+	eksPlatform    = managedk8sservices.Kubernetes
+	eksEnvironment = managedk8sservices.Cloud
+	eksProvider    = managedk8sservices.AWS
 )
 
 var (
@@ -46,7 +46,7 @@ func (v *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 	managedServiceProvider := k8sCluster.GetServiceProvider()
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}

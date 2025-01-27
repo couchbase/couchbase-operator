@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -19,13 +21,13 @@ type GKEClusterDetail struct {
 	diskType          string
 	count             int32
 	diskSize          int32
-	releaseChannel    ReleaseChannel
+	releaseChannel    managedk8sservices.ReleaseChannel
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
 
 func NewGKEClusterDetail(gkeClusterName string, nodePools []*string, kubernetesVersion, machineType, imageType, diskType string,
-	diskSize, count int32, releaseChannel ReleaseChannel) *GKEClusterDetail {
+	diskSize, count int32, releaseChannel managedk8sservices.ReleaseChannel) *GKEClusterDetail {
 	return &GKEClusterDetail{
 		gkeClusterName:    gkeClusterName,
 		nodePools:         nodePools,
@@ -58,7 +60,7 @@ type GKEClusterDetailGetter interface {
 	GetDiskType() string
 	GetCount() int32
 	GetDiskSize() int32
-	GetReleaseChannel() ReleaseChannel
+	GetReleaseChannel() managedk8sservices.ReleaseChannel
 }
 
 type GKEClusterDetailGetterSetter interface {
@@ -71,7 +73,7 @@ type GKEClusterDetailGetterSetter interface {
 	GetDiskType() string
 	GetCount() int32
 	GetDiskSize() int32
-	GetReleaseChannel() ReleaseChannel
+	GetReleaseChannel() managedk8sservices.ReleaseChannel
 
 	// Setters
 	SetGKEClusterName(gkeClusterName string) error
@@ -82,7 +84,7 @@ type GKEClusterDetailGetterSetter interface {
 	SetCount(count int32) error
 	SetDiskSize(diskSize int32) error
 	SetDiskType(diskType string) error
-	SetReleaseChannel(releaseChannel ReleaseChannel) error
+	SetReleaseChannel(releaseChannel managedk8sservices.ReleaseChannel) error
 }
 
 /*
@@ -151,7 +153,7 @@ func (ac *GKEClusterDetail) GetDiskSize() int32 {
 	return ac.diskSize
 }
 
-func (ac *GKEClusterDetail) GetReleaseChannel() ReleaseChannel {
+func (ac *GKEClusterDetail) GetReleaseChannel() managedk8sservices.ReleaseChannel {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
@@ -244,11 +246,11 @@ func (ac *GKEClusterDetail) SetDiskSize(diskSize int32) error {
 	return nil
 }
 
-func (ac *GKEClusterDetail) SetReleaseChannel(releaseChannel ReleaseChannel) error {
+func (ac *GKEClusterDetail) SetReleaseChannel(releaseChannel managedk8sservices.ReleaseChannel) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
-	if _, err := ValidateReleaseChannel(releaseChannel); err != nil {
+	if _, err := managedk8sservices.ValidateReleaseChannel(releaseChannel); err != nil {
 		return fmt.Errorf("set release channel: %w", err)
 	}
 

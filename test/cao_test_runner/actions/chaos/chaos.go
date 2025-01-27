@@ -7,6 +7,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
@@ -25,7 +26,7 @@ type ChaosConfig struct {
 	ChaosList   []ChaosList      `yaml:"chaosList" caoCli:"required"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
 	PortForward bool             `yaml:"portForward" caoCli:"context"`
-	ms          *assets.ManagedServiceProvider
+	ms          *managedsvcs.ManagedServiceProvider
 }
 
 type ChaosList struct {

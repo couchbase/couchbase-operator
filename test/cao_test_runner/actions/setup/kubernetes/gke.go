@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/container/apiv1/containerpb"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -28,9 +27,9 @@ type CreateGKECluster struct {
 	DiskSize               int
 	NumNodePools           int
 	Count                  int
-	ReleaseChannel         assets.ReleaseChannel
+	ReleaseChannel         managedk8sservices.ReleaseChannel
 	KubeConfigPath         *fileutils.File
-	ManagedServiceProvider *assets.ManagedServiceProvider
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 const (
@@ -48,7 +47,7 @@ var (
 
 func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -144,12 +143,12 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 		return ErrGKECountInvalid
 	}
 
-	if ok, err := assets.ValidateReleaseChannel(cgc.ReleaseChannel); !ok || err != nil {
+	if ok, err := managedk8sservices.ValidateReleaseChannel(cgc.ReleaseChannel); !ok || err != nil {
 		return fmt.Errorf("invalid release channel %s: %w", cgc.ReleaseChannel, err)
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cgc.ManagedServiceProvider}, cgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

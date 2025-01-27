@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
@@ -13,7 +12,7 @@ import (
 type DeleteGKECluster struct {
 	ClusterName            string
 	Region                 string
-	ManagedServiceProvider *assets.ManagedServiceProvider
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
@@ -22,7 +21,7 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -102,7 +101,7 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 
 func (dgc *DeleteGKECluster) ValidateParams(ctx context.Context) error {
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{dgc.ManagedServiceProvider}, dgc.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

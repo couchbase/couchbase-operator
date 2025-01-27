@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -22,14 +22,14 @@ type UpgradeClusterUtil interface {
 
 func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, error) {
 	switch p.ms.GetPlatform() {
-	case assets.Kubernetes:
+	case managedk8sservices.Kubernetes:
 		switch p.ms.GetEnvironment() {
-		case assets.Kind:
+		case managedk8sservices.Kind:
 			return nil, ErrNotImplemented
 
-		case assets.Cloud:
+		case managedk8sservices.Cloud:
 			switch p.ms.GetProvider() {
-			case assets.AWS:
+			case managedk8sservices.AWS:
 				return &UpgradeEKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.EKSRegion,
@@ -40,7 +40,7 @@ func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, erro
 					NodeGroupsToUpgrade:    p.EKSNodeGroupsToUpgrade,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.Azure:
+			case managedk8sservices.Azure:
 				return &UpgradeAKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
@@ -51,7 +51,7 @@ func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, erro
 					NodePoolsToUpgrade:     p.AKSNodePoolsToUpgrade,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.GCP:
+			case managedk8sservices.GCP:
 				return &UpgradeGKECluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
@@ -72,7 +72,7 @@ func NewUpgradeClusterUtil(p *KubernetesUpgradeConfig) (UpgradeClusterUtil, erro
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.ms.GetEnvironment(), ErrUnknownEnvironmentType)
 		}
 
-	case assets.Openshift:
+	case managedk8sservices.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

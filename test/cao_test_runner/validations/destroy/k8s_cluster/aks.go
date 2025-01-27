@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	aksPlatform    = assets.Kubernetes
-	aksEnvironment = assets.Cloud
-	aksProvider    = assets.Azure
+	aksPlatform    = managedk8sservices.Kubernetes
+	aksEnvironment = managedk8sservices.Cloud
+	aksProvider    = managedk8sservices.Azure
 )
 
 var (
@@ -46,7 +46,7 @@ func (v *ValidateAKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 	managedServiceProvider := k8sCluster.GetServiceProvider()
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, v.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}

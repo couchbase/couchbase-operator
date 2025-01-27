@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -22,9 +22,9 @@ type CreateClusterUtil interface {
 
 func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 	switch p.Platform {
-	case assets.Kubernetes:
+	case managedk8sservices.Kubernetes:
 		switch p.Environment {
-		case assets.Kind:
+		case managedk8sservices.Kind:
 			return &CreateKindCluster{
 				ClusterName:              p.ClusterName,
 				NumControlPlane:          p.NumControlPlane,
@@ -35,9 +35,9 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 				LoadDockerImageToKind:    p.LoadDockerImageToKind,
 			}, nil
 
-		case assets.Cloud:
+		case managedk8sservices.Cloud:
 			switch p.Provider {
-			case assets.AWS:
+			case managedk8sservices.AWS:
 				return &CreateEKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.EKSRegion,
@@ -52,7 +52,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					KubeConfigPath:         p.kubeconfigPath,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.Azure:
+			case managedk8sservices.Azure:
 				return &CreateAKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
@@ -66,7 +66,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					Count:                  int32(p.Count),
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.GCP:
+			case managedk8sservices.GCP:
 				return &CreateGKECluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
@@ -89,7 +89,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}
 
-	case assets.Openshift:
+	case managedk8sservices.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	gkePlatform    = assets.Kubernetes
-	gkeEnvironment = assets.Cloud
-	gkeProvider    = assets.GCP
+	gkePlatform    = managedk8sservices.Kubernetes
+	gkeEnvironment = managedk8sservices.Cloud
+	gkeProvider    = managedk8sservices.GCP
 )
 
 var (
@@ -33,14 +33,14 @@ var (
 )
 
 type GKEConfig struct {
-	KubernetesVersion *string                `yaml:"kubernetesVersion"`
-	MachineType       *string                `yaml:"machineType"`
-	ImageType         *string                `yaml:"imageType"`
-	DiskType          *string                `yaml:"diskType"`
-	Count             *int32                 `yaml:"count"`
-	DiskSize          *int32                 `yaml:"diskSize"`
-	NumNodePools      *int                   `yaml:"numNodePools"`
-	ReleaseChannel    *assets.ReleaseChannel `yaml:"releaseChannel"`
+	KubernetesVersion *string                            `yaml:"kubernetesVersion"`
+	MachineType       *string                            `yaml:"machineType"`
+	ImageType         *string                            `yaml:"imageType"`
+	DiskType          *string                            `yaml:"diskType"`
+	Count             *int32                             `yaml:"count"`
+	DiskSize          *int32                             `yaml:"diskSize"`
+	NumNodePools      *int                               `yaml:"numNodePools"`
+	ReleaseChannel    *managedk8sservices.ReleaseChannel `yaml:"releaseChannel"`
 }
 
 type ValidateGKECluster struct {
@@ -149,7 +149,7 @@ func (c *ValidateGKECluster) ValidatePrevState(ctx context.Context, testAssets a
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate prev state: %w", err)
 	}
@@ -178,7 +178,7 @@ func (c *ValidateGKECluster) ValidatePrevState(ctx context.Context, testAssets a
 		return fmt.Errorf("validate prev state: %w", ErrGKEK8SVersionMismatch)
 	}
 
-	if int(gkeCluster.ReleaseChannel.Channel) != assets.ReleaseChannelMap[cluster.GetReleaseChannel()] {
+	if int(gkeCluster.ReleaseChannel.Channel) != managedk8sservices.ReleaseChannelMap[cluster.GetReleaseChannel()] {
 		return fmt.Errorf("validate prev state: %w", ErrGKEReleaseChannelMismatch)
 	}
 
@@ -236,10 +236,10 @@ func (c *ValidateGKECluster) ValidatePrevState(ctx context.Context, testAssets a
 }
 
 func (c *ValidateGKECluster) ValidateNewCluster(ctx context.Context, testAssets assets.TestAssetGetterSetter) error {
-	managedServiceProvider := assets.NewManagedServiceProvider(gkePlatform, gkeEnvironment, gkeProvider)
+	managedServiceProvider := managedk8sservices.NewManagedServiceProvider(gkePlatform, gkeEnvironment, gkeProvider)
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
@@ -268,7 +268,7 @@ func (c *ValidateGKECluster) ValidateNewCluster(ctx context.Context, testAssets 
 		return fmt.Errorf("validate new cluster: %w", ErrGKEK8SVersionMismatch)
 	}
 
-	if int(gkeCluster.ReleaseChannel.Channel) != assets.ReleaseChannelMap[*c.GKEConfig.ReleaseChannel] {
+	if int(gkeCluster.ReleaseChannel.Channel) != managedk8sservices.ReleaseChannelMap[*c.GKEConfig.ReleaseChannel] {
 		return fmt.Errorf("validate new cluster: %w", ErrGKEReleaseChannelMismatch)
 	}
 
@@ -360,7 +360,7 @@ func (c *ValidateGKECluster) ValidateUpdateCluster(ctx context.Context, testAsse
 	managedServiceProvider := k8sCluster.GetServiceProvider()
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, c.ClusterName)
 	if err != nil {
 		return fmt.Errorf("validate update cluster: %w", err)
 	}
@@ -401,7 +401,7 @@ func (c *ValidateGKECluster) ValidateUpdateCluster(ctx context.Context, testAsse
 	}
 
 	if c.GKEConfig.ReleaseChannel != nil {
-		if int(gkeCluster.ReleaseChannel.Channel) != assets.ReleaseChannelMap[*c.GKEConfig.ReleaseChannel] {
+		if int(gkeCluster.ReleaseChannel.Channel) != managedk8sservices.ReleaseChannelMap[*c.GKEConfig.ReleaseChannel] {
 			return fmt.Errorf("validate update cluster: %w", ErrGKEReleaseChannelMismatch)
 		}
 
@@ -410,7 +410,7 @@ func (c *ValidateGKECluster) ValidateUpdateCluster(ctx context.Context, testAsse
 		}
 
 	} else {
-		if int(gkeCluster.ReleaseChannel.Channel) != assets.ReleaseChannelMap[cluster.GetReleaseChannel()] {
+		if int(gkeCluster.ReleaseChannel.Channel) != managedk8sservices.ReleaseChannelMap[cluster.GetReleaseChannel()] {
 			return fmt.Errorf("validate update cluster: %w", ErrGKEReleaseChannelMismatch)
 		}
 	}

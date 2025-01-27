@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 var (
@@ -68,7 +66,7 @@ type GKECredentials struct {
 
 // GetManagedServiceCredentials sets up the ManagedServiceCredentials for all the ManagedServiceProviders.
 // It gets the values from environment variables.
-func NewManagedServiceCredentials(ms []*assets.ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
+func NewManagedServiceCredentials(ms []*ManagedServiceProvider, clusterName string) (*ManagedServiceCredentials, error) {
 	svc := &ManagedServiceCredentials{
 		ClusterName:    clusterName,
 		EKSCredentials: GetEKSCredentials("", "", "", ""),
@@ -86,28 +84,28 @@ func NewManagedServiceCredentials(ms []*assets.ManagedServiceProvider, clusterNa
 // =============== Validation of Credentials  ===========
 // ======================================================
 
-func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []*assets.ManagedServiceProvider) (bool, error) {
+func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, providers []*ManagedServiceProvider) (bool, error) {
 	if svcCred.ClusterName == "" {
 		return false, fmt.Errorf("cluster name not provided: %w", ErrClusterNameNotProvided)
 	}
 
 	for _, ms := range providers {
 		switch ms.GetPlatform() {
-		case assets.Kubernetes:
+		case Kubernetes:
 			switch ms.GetEnvironment() {
-			case assets.Kind:
+			case Kind:
 				return false, ErrNotImplemented
-			case assets.Cloud:
+			case Cloud:
 				switch ms.GetProvider() {
-				case assets.AWS:
+				case AWS:
 					if ok, err := ValidateEKSCredentials(svcCred.EKSCredentials); !ok || err != nil {
 						return ok, err
 					}
-				case assets.Azure:
+				case Azure:
 					if ok, err := ValidateAKSCredentials(svcCred.AKSCredentials); !ok || err != nil {
 						return ok, err
 					}
-				case assets.GCP:
+				case GCP:
 					if ok, err := ValidateGKECredentials(svcCred.GKECredentials); !ok || err != nil {
 						return ok, err
 					}
@@ -117,7 +115,7 @@ func ValidateManagedServiceCredentials(svcCred *ManagedServiceCredentials, provi
 			default:
 				return false, ErrNotImplemented
 			}
-		case assets.Openshift:
+		case Openshift:
 			return false, ErrNotImplemented
 		default:
 			return false, ErrNotImplemented

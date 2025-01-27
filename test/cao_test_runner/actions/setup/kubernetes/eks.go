@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/sirupsen/logrus"
@@ -47,7 +46,7 @@ type CreateEKSCluster struct {
 	DiskSize               int
 	AMI                    ekstypes.AMITypes
 	KubeConfigPath         *fileutils.File
-	ManagedServiceProvider *assets.ManagedServiceProvider
+	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
 }
 
 func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
@@ -56,7 +55,7 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}
@@ -274,7 +273,7 @@ func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*assets.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{cec.ManagedServiceProvider}, cec.ClusterName)
 	if err != nil {
 		return fmt.Errorf("unable to create service credentials: %w", err)
 	}

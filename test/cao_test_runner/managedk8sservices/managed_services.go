@@ -3,8 +3,6 @@ package managedk8sservices
 import (
 	"context"
 	"errors"
-
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 )
 
 // Environment Variables for Credentials.
@@ -38,21 +36,21 @@ type ManagedService interface {
 	GetInstancesByK8sNodeName(ctx context.Context, managedSvcCred *ManagedServiceCredentials, nodeNames []string) ([]string, error)
 }
 
-func NewManagedService(ms *assets.ManagedServiceProvider) ManagedService {
+func NewManagedService(ms *ManagedServiceProvider) ManagedService {
 	switch ms.GetPlatform() {
-	case assets.Kubernetes:
+	case Kubernetes:
 		switch ms.GetEnvironment() {
-		case assets.Kind:
+		case Kind:
 			return nil
-		case assets.Cloud:
+		case Cloud:
 			switch ms.GetProvider() {
-			case assets.AWS:
+			case AWS:
 				eksSessStore := ConfigEKSSessionStore()
 				return eksSessStore
-			case assets.Azure:
+			case Azure:
 				aksSessStore := ConfigAKSSessionStore()
 				return aksSessStore
-			case assets.GCP:
+			case GCP:
 				gkeSessStore := ConfigGKESessionStore()
 				return gkeSessStore
 			default:
@@ -61,7 +59,7 @@ func NewManagedService(ms *assets.ManagedServiceProvider) ManagedService {
 		default:
 			return nil
 		}
-	case assets.Openshift:
+	case Openshift:
 		return nil
 	default:
 		return nil

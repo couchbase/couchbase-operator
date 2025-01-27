@@ -11,7 +11,6 @@ import (
 	"cloud.google.com/go/compute/apiv1/computepb"
 	container "cloud.google.com/go/container/apiv1"
 	containerpb "cloud.google.com/go/container/apiv1/containerpb"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -299,8 +298,8 @@ func (gks *GKESession) CreateSubnet(ctx context.Context, subnetName, networkName
 }
 
 func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetworkName, machineType, imageType, diskType, initialClusterVersion, nodePoolName string,
-	diskSize, numNodes int, releaseChannel assets.ReleaseChannel) error {
-	if ok, err := assets.ValidateReleaseChannel(releaseChannel); !ok || err != nil {
+	diskSize, numNodes int, releaseChannel ReleaseChannel) error {
+	if ok, err := ValidateReleaseChannel(releaseChannel); !ok || err != nil {
 		return fmt.Errorf("invalid release channel: %w", err)
 	}
 
@@ -308,7 +307,7 @@ func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetwor
 		Name:     gks.clusterName,
 		Location: gks.region,
 		ReleaseChannel: &containerpb.ReleaseChannel{
-			Channel: containerpb.ReleaseChannel_Channel(assets.ReleaseChannelMap[releaseChannel]),
+			Channel: containerpb.ReleaseChannel_Channel(ReleaseChannelMap[releaseChannel]),
 		},
 		InitialClusterVersion: initialClusterVersion,
 		NodePools: []*containerpb.NodePool{

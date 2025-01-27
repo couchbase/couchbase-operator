@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -21,17 +22,17 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 	cluster, err := testAssets.GetK8SClustersGetterSetter().GetK8SClusterGetterSetter(v.ClusterName)
 	if err == nil {
 		switch cluster.GetServiceProvider().GetPlatform() {
-		case assets.Kubernetes:
+		case managedk8sservices.Kubernetes:
 			switch cluster.GetServiceProvider().GetEnvironment() {
-			case assets.Kind:
+			case managedk8sservices.Kind:
 				return &ValidateKindCluster{ClusterName: v.ClusterName, KindConfig: v.KindConfig}, nil
-			case assets.Cloud:
+			case managedk8sservices.Cloud:
 				switch cluster.GetServiceProvider().GetProvider() {
-				case assets.AWS:
+				case managedk8sservices.AWS:
 					return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
-				case assets.Azure:
+				case managedk8sservices.Azure:
 					return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
-				case assets.GCP:
+				case managedk8sservices.GCP:
 					return &ValidateGKECluster{ClusterName: v.ClusterName, GKEConfig: v.GKEConfig}, nil
 				default:
 					return nil, ErrNotImplemented
@@ -39,7 +40,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 			default:
 				return nil, ErrNotImplemented
 			}
-		case assets.Openshift:
+		case managedk8sservices.Openshift:
 			return nil, ErrNotImplemented
 		default:
 			return nil, ErrNotImplemented

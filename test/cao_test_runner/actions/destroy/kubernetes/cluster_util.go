@@ -6,7 +6,7 @@ import (
 
 	"context"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -23,28 +23,28 @@ type DeleteClusterUtil interface {
 
 func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error) {
 	switch p.ms.GetPlatform() {
-	case assets.Kubernetes:
+	case managedk8sservices.Kubernetes:
 		switch p.ms.GetEnvironment() {
-		case assets.Kind:
+		case managedk8sservices.Kind:
 			return &DeleteKindCluster{
 				ClusterName: p.ClusterName,
 			}, nil
 
-		case assets.Cloud:
+		case managedk8sservices.Cloud:
 			switch p.ms.GetProvider() {
-			case assets.AWS:
+			case managedk8sservices.AWS:
 				return &DeleteEKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.EKSRegion,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.Azure:
+			case managedk8sservices.Azure:
 				return &DeleteAKSCluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
 					ManagedServiceProvider: p.ms,
 				}, nil
-			case assets.GCP:
+			case managedk8sservices.GCP:
 				return &DeleteGKECluster{
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
@@ -58,7 +58,7 @@ func NewDeleteClusterUtil(p *KubernetesDestroyConfig) (DeleteClusterUtil, error)
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.ms.GetEnvironment(), ErrUnknownEnvironmentType)
 		}
 
-	case assets.Openshift:
+	case managedk8sservices.Openshift:
 		return nil, ErrNotImplemented
 
 	default:

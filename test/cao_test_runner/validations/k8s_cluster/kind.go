@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kind"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
@@ -24,8 +25,8 @@ var (
 )
 
 const (
-	kindPlatform    = assets.Kubernetes
-	kindEnvironment = assets.Kind
+	kindPlatform    = managedk8sservices.Kubernetes
+	kindEnvironment = managedk8sservices.Kind
 	kindProvider    = ""
 )
 
@@ -236,7 +237,7 @@ func (c *ValidateKindCluster) ValidateNewCluster(testAssets assets.TestAssetGett
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	serviceProvider := assets.NewManagedServiceProvider(kindPlatform, kindEnvironment, kindProvider)
+	serviceProvider := managedk8sservices.NewManagedServiceProvider(kindPlatform, kindEnvironment, kindProvider)
 
 	if err := testAssets.GetK8SClustersGetterSetter().SetK8SCluster(
 		assets.NewK8SCluster(c.ClusterName, serviceProvider, append(controlPlaneNodes, workerNodes...))); err != nil {

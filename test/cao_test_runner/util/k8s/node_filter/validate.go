@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
@@ -43,16 +43,16 @@ func validateSortByStrategy(strategy NodeSortByStrategy) error {
 
 func validateSelectionStrategy(nf *NodeFilter) error {
 	switch nf.ManagedSvcProvider.GetPlatform() {
-	case assets.Kubernetes:
+	case managedk8sservices.Kubernetes:
 		switch nf.ManagedSvcProvider.GetEnvironment() {
-		case assets.Kind:
+		case managedk8sservices.Kind:
 			switch nf.SelectStrategy {
 			case SelectAny:
 				return nil
 			}
-		case assets.Cloud:
+		case managedk8sservices.Cloud:
 			switch nf.ManagedSvcProvider.GetProvider() {
-			case assets.AWS:
+			case managedk8sservices.AWS:
 				switch nf.SelectStrategy {
 				case SelectAny, SelectRoundRobinAZ:
 					return nil

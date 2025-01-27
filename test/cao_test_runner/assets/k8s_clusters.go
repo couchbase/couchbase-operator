@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
@@ -486,7 +487,7 @@ func (ks *K8SClusters) PopulateK8SClusters(kubeconfigPath *fileutils.File) error
 	return nil
 }
 
-func DetectServiceProvider(kubeconfigPath *fileutils.File, clusterName string) (*ManagedServiceProvider, error) {
+func DetectServiceProvider(kubeconfigPath *fileutils.File, clusterName string) (*managedk8sservices.ManagedServiceProvider, error) {
 	kubeconfig, err := yaml.UnmarshalYAMLFile(kubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("detect service provider: %w", err)
@@ -512,13 +513,13 @@ func DetectServiceProvider(kubeconfigPath *fileutils.File, clusterName string) (
 		serverURL, _ := clusterDetails["server"].(string)
 
 		if strings.Contains(serverURL, "eks.amazonaws.com") {
-			return NewManagedServiceProvider(Kubernetes, Cloud, AWS), nil
+			return managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Cloud, managedk8sservices.AWS), nil
 		} else if strings.Contains(serverURL, "azmk8s.io") {
-			return NewManagedServiceProvider(Kubernetes, Cloud, Azure), nil
+			return managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Cloud, managedk8sservices.Azure), nil
 		} else if strings.Contains(serverURL, "googleapis.com") || strings.Contains(serverURL, "googleusercontent.com") {
-			return NewManagedServiceProvider(Kubernetes, Cloud, GCP), nil
+			return managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Cloud, managedk8sservices.GCP), nil
 		} else if strings.Contains(serverURL, "127.0.0.1") || strings.Contains(serverURL, "localhost") {
-			return NewManagedServiceProvider(Kubernetes, Kind, ""), nil
+			return managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Kind, ""), nil
 		}
 
 	}
@@ -545,19 +546,19 @@ func (ks *K8SClusters) PopulateAllClusters(kubeconfigPath *fileutils.File) error
 			logrus.Errorf("Service Provider of cluster %s cannot be detected. Not populated in TestAssets", cluster)
 		} else {
 			switch serviceProvider.GetPlatform() {
-			case Kubernetes:
+			case managedk8sservices.Kubernetes:
 				switch serviceProvider.GetEnvironment() {
-				case Kind:
+				case managedk8sservices.Kind:
 					if err := ks.PopulateKindCluster(cluster); err != nil {
 						return fmt.Errorf("populate all clusters: %w", err)
 					}
-				case Cloud:
+				case managedk8sservices.Cloud:
 					switch serviceProvider.GetProvider() {
-					case AWS:
+					case managedk8sservices.AWS:
 						return ErrNotImplemented
-					case Azure:
+					case managedk8sservices.Azure:
 						return ErrNotImplemented
-					case GCP:
+					case managedk8sservices.GCP:
 						return ErrNotImplemented
 					default:
 						return ErrNotImplemented
@@ -565,7 +566,7 @@ func (ks *K8SClusters) PopulateAllClusters(kubeconfigPath *fileutils.File) error
 				default:
 					return ErrNotImplemented
 				}
-			case Openshift:
+			case managedk8sservices.Openshift:
 				return ErrNotImplemented
 			default:
 				return ErrNotImplemented
@@ -583,7 +584,7 @@ func (ks *K8SClusters) PopulateKindCluster(clusterName string) error {
 
 	k8sCluster := &K8SCluster{
 		clusterName:     clusterName,
-		serviceProvider: NewManagedServiceProvider(Kubernetes, Kind, ""),
+		serviceProvider: managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Kind, ""),
 	}
 
 	kindClusterDetail := &KindClusterDetail{
