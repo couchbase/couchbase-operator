@@ -78,6 +78,7 @@ type K8SClustersGetterSetter interface {
 	DeleteKindClusterDetail(clusterName string) error
 	DeleteEKSClusterDetail(clusterName string) error
 	DeleteAKSClusterDetail(clusterName string) error
+	DeleteGKEClusterDetail(clusterName string) error
 }
 
 /*
@@ -443,6 +444,19 @@ func (ks *K8SClusters) DeleteAKSClusterDetail(clusterName string) error {
 		delete(ks.aksClusters, clusterName)
 	} else {
 		return fmt.Errorf("delete aks cluster detail: %w", ErrClusterNotFound)
+	}
+
+	return nil
+}
+
+func (ks *K8SClusters) DeleteGKEClusterDetail(clusterName string) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	if _, exists := ks.gkeClusters[clusterName]; exists {
+		delete(ks.gkeClusters, clusterName)
+	} else {
+		return fmt.Errorf("delete gke cluster detail: %w", ErrClusterNotFound)
 	}
 
 	return nil

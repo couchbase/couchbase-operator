@@ -35,7 +35,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 			case assets.Azure:
 				return &ValidateAKSCluster{ClusterName: v.ClusterName}, nil
 			case assets.GCP:
-				return nil, ErrNotImplemented
+				return &ValidateGKECluster{ClusterName: v.ClusterName}, nil
 			default:
 				return nil, ErrNotImplemented
 			}
