@@ -148,10 +148,11 @@ func (c *Cluster) reconcileMigrationCluster() error {
 type MigrationReconcileMachine struct {
 	ReconcileMachine
 
-	createdMigrationNode bool
-
 	// externalMembers are the members that are part of the cluster and need to be migrated.
 	externalMembers couchbaseutil.MemberSet
+
+	// migratedMembers are the external members that have been created on the target cluster.
+	migratedMembers couchbaseutil.MemberSet
 }
 
 func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error) {
@@ -240,6 +241,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 			rebalanceRetries:   3,
 		},
 		externalMembers: external,
+		migratedMembers: couchbaseutil.NewMemberSet(),
 	}, nil
 }
 
@@ -338,6 +340,17 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 	return nil
 }
 
+func (r *MigrationReconcileMachine) handleNotifyFinished(c *Cluster) error {
+	if len(r.migratedMembers) > 0 {
+		remainingMigrationNodes := r.externalMembers.Size() - r.c.cluster.Spec.Migration.NumUnmanagedNodes
+		log.Info("Node migration completed", "cluster", c.namespacedName(), "nodes", r.migratedMembers.Names(), "remainingMigrationNodes", remainingMigrationNodes)
+	}
+
+	log.V(1).Info("Migration reconcile completed", "cluster", c.namespacedName())
+
+	return nil
+}
+
 func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 	// null checks for migration
 	if c.cluster.Spec.Migration == nil {
@@ -361,7 +374,7 @@ func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 	}
 
 	// If we've created a migration node, we start the stabilization period.
-	if r.createdMigrationNode {
+	if len(r.migratedMembers) > 0 {
 		c.cluster.Status.SetWaitingBetweenMigrations()
 		return nil
 	}
@@ -442,17 +455,14 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 
 	for _, member := range migrationCandidates {
 		if err := r.migrateNode(member); err != nil {
-			log.Error(err, "Failed to migrate node", "cluster", c.namespacedName(), "node", member.Name())
 			return err
 		}
 
-		r.createdMigrationNode = true
-
-		log.Info("Node migrated", "cluster", c.namespacedName(), "node", member.Name())
+		r.migratedMembers.Add(member)
 	}
 
-	if r.createdMigrationNode {
-		log.Info("Node migration complete", "cluster", c.namespacedName(), "members", migrationCandidates.Names(), "remainingMigrationNodes", len(allCandidates)-len(migrationCandidates))
+	if len(r.migratedMembers) > 0 {
+		log.Info("Migration nodes added to cluster", "cluster", c.namespacedName(), "nodes", r.migratedMembers.Names())
 	}
 
 	return nil
@@ -522,13 +532,15 @@ func (r *MigrationReconcileMachine) migrateNode(m couchbaseutil.Member) error {
 		}
 	}
 
-	log.Info("Migration complete", "cluster", r.c.namespacedName(), "errors", len(errs))
+	if len(errs) > 0 {
+		log.Error(err, "Failed to migrate node", "cluster", r.c.namespacedName(), "node", m.Name(), "errors", len(errs))
 
-	if len(errs) == 0 {
-		return nil
+		return errors.Join(errs...)
 	}
 
-	return errors.Join(errs...)
+	log.Info("Migration node created", "cluster", r.c.namespacedName(), "node", m.Name())
+
+	return nil
 }
 
 // removeMemberUser simulates removing a current member.  This is called as the result
