@@ -288,6 +288,10 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 		return nil
 	}
 
+	if cluster.Spec.Hibernate {
+		return fmt.Errorf("spec.hibernate cannot be enabled when spec.migration is configured")
+	}
+
 	if cluster.Spec.Migration.NumUnmanagedNodes >= cluster.Spec.TotalSize() {
 		return fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
 	}

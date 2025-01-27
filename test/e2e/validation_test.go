@@ -3630,13 +3630,22 @@ func TestClusterMigrationAddition(t *testing.T) {
 func TestClusterMigrationInvalidMigration(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name: "AddingMigrationToExistingCluster",
+			name: "MigrationNumUnmanagedNodesInvalid",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
 				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
 				NumUnmanagedNodes:    199,
 			})},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.migration.numUnmanagedNodes must be less than"},
+		},
+		{
+
+			name: "HibernateEnabledDuringMigrationInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+			}).Add("/spec/hibernate", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.hibernate cannot be enabled when spec.migration is configured"},
 		},
 	}
 
