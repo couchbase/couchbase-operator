@@ -1224,8 +1224,6 @@ func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member,
 			if goerrors.As(err, &failedReqErr) {
 				switch failedReqErr.StatusCode {
 				case http.StatusServiceUnavailable, http.StatusInternalServerError:
-					fmt.Println("Retrying graceful failover")
-					fmt.Println("failedReqErr.StatusCode: ", failedReqErr.StatusCode)
 					return nil, false
 				}
 			}

@@ -542,7 +542,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
-		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
@@ -609,7 +609,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
-		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()

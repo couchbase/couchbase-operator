@@ -145,7 +145,7 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, configName string, fro
 }
 
 func ReconcileFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	return k8sutil.ReconcileFailedEvent(cl)
+	return k8sutil.ReconcileFailedEvent(cl, fmt.Errorf("dummy error"))
 }
 
 func NewVolumeExpandStartedEvent(volumeName string, from string, to string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
