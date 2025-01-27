@@ -12,6 +12,7 @@ type KubernetesClusterValidator struct {
 	ClusterName string      `yaml:"clusterName" caoCli:"required,context"`
 	State       string      `yaml:"state" caoCli:"required"`
 	KindConfig  *KindConfig `yaml:"kindConfig"`
+	EKSConfig   *EKSConfig  `yaml:"eksConfig"`
 }
 
 func (c *KubernetesClusterValidator) Run(ctx *context.Context, testAssets assets.TestAssetGetterSetter) error {

@@ -3,6 +3,7 @@ package k8sclustervalidator
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
@@ -10,6 +11,8 @@ import (
 
 var (
 	ErrClusterKubeconfigDoesntExists = errors.New("cluster kubeconfig doesn't exists")
+	ErrValueNotStruct                = errors.New("value is not a struct")
+	ErrFieldNotNil                   = errors.New("field is not nil")
 )
 
 func contains(array []string, str string) bool {
@@ -45,4 +48,28 @@ func checkIfClusterExistsInKubeconfig(clusterName string) error {
 	}
 
 	return nil
+}
+
+func checkConfigIsNil(v interface{}) (bool, error) {
+	val := reflect.ValueOf(v)
+
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return false, fmt.Errorf("check config nil: %w", ErrValueNotStruct)
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+
+		if field.Kind() == reflect.Ptr && field.IsNil() {
+			continue
+		}
+
+		return false, fmt.Errorf("check config nil: field %s is not nil: %w", val.Type().Field(i).Name, ErrFieldNotNil)
+	}
+
+	return true, nil
 }

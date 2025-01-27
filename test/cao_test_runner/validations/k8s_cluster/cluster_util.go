@@ -28,7 +28,7 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 			case assets.Cloud:
 				switch cluster.GetServiceProvider().GetProvider() {
 				case assets.AWS:
-					return nil, ErrNotImplemented
+					return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
 				case assets.Azure:
 					return nil, ErrNotImplemented
 				case assets.GCP:
@@ -45,8 +45,11 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 			return nil, ErrNotImplemented
 		}
 	} else {
-		if !checkKindConfigNil(v.KindConfig) {
+		if _, err := checkConfigIsNil(v.KindConfig); err != nil {
 			return &ValidateKindCluster{ClusterName: v.ClusterName, KindConfig: v.KindConfig}, nil
+		}
+		if _, err := checkConfigIsNil(v.EKSConfig); err != nil {
+			return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
 		}
 	}
 	return nil, ErrInvalidConfig

@@ -22,6 +22,7 @@ var (
 type K8SClusters struct {
 	k8sClusters  map[string]*K8SCluster
 	kindClusters map[string]*KindClusterDetail
+	eksClusters  map[string]*EKSClusterDetail
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -42,6 +43,8 @@ type K8SClustersGetter interface {
 	GetK8SClusterGetter(clusterName string) (K8SClusterGetter, error)
 	GetAllKindClustersDetailsGetter() []KindClusterDetailGetter
 	GetKindClusterDetailGetter(clusterName string) (KindClusterDetailGetter, error)
+	GetAllEKSClustersDetailsGetter() []EKSClusterDetailGetter
+	GetEKSClusterDetailGetter(clusterName string) (EKSClusterDetailGetter, error)
 }
 
 type K8SClustersGetterSetter interface {
@@ -50,10 +53,13 @@ type K8SClustersGetterSetter interface {
 	GetK8SClusterGetterSetter(clusterName string) (K8SClusterGetterSetter, error)
 	GetAllKindClustersDetailsGetterSetter() []KindClusterDetailGetterSetter
 	GetKindClusterDetailGetterSetter(clusterName string) (KindClusterDetailGetterSetter, error)
+	GetAllEKSClustersDetailsGetterSetter() []EKSClusterDetailGetterSetter
+	GetEKSClusterDetailGetterSetter(clusterName string) (EKSClusterDetailGetterSetter, error)
 
 	// Setters
 	SetK8SCluster(k8sCluster *K8SCluster) error
 	SetKindClusterDetail(kindClusterDetail *KindClusterDetail) error
+	SetEKSClusterDetail(eksClusterDetail *EKSClusterDetail) error
 }
 
 /*
@@ -162,6 +168,54 @@ func (ks *K8SClusters) GetKindClusterDetailGetterSetter(clusterName string) (Kin
 	return cluster, nil
 }
 
+func (ks *K8SClusters) GetAllEKSClustersDetailsGetter() []EKSClusterDetailGetter {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	var clusters []EKSClusterDetailGetter
+	for _, cluster := range ks.eksClusters {
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters
+}
+
+func (ks *K8SClusters) GetEKSClusterDetailGetter(clusterName string) (EKSClusterDetailGetter, error) {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	cluster, ok := ks.eksClusters[clusterName]
+	if !ok {
+		return nil, fmt.Errorf("get eks cluster detail getter: %w", ErrClusterNotFound)
+	}
+
+	return cluster, nil
+}
+
+func (ks *K8SClusters) GetAllEKSClustersDetailsGetterSetter() []EKSClusterDetailGetterSetter {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	var clusters []EKSClusterDetailGetterSetter
+	for _, cluster := range ks.eksClusters {
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters
+}
+
+func (ks *K8SClusters) GetEKSClusterDetailGetterSetter(clusterName string) (EKSClusterDetailGetterSetter, error) {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	cluster, ok := ks.eksClusters[clusterName]
+	if !ok {
+		return nil, fmt.Errorf("get eks cluster detail getter setter: %w", ErrClusterNotFound)
+	}
+
+	return cluster, nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -190,6 +244,15 @@ func (ks *K8SClusters) SetKindClusterDetail(kindClusterDetail *KindClusterDetail
 	return nil
 }
 
+func (ks *K8SClusters) SetEKSClusterDetail(eksClusterDetail *EKSClusterDetail) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	ks.eksClusters[eksClusterDetail.eksClusterName] = eksClusterDetail
+
+	return nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -203,6 +266,7 @@ func (ks *K8SClusters) SetKindClusterDetail(kindClusterDetail *KindClusterDetail
 func (ks *K8SClusters) PopulateK8SClusters(kubeconfigPath *fileutils.File) error {
 	ks.k8sClusters = make(map[string]*K8SCluster)
 	ks.kindClusters = make(map[string]*KindClusterDetail)
+	ks.eksClusters = make(map[string]*EKSClusterDetail)
 
 	if err := ks.PopulateAllClusters(kubeconfigPath); err != nil {
 		return fmt.Errorf("populate k8s clusters: %w", err)

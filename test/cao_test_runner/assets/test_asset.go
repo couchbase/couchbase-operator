@@ -109,7 +109,7 @@ func (ts *TestAssets) GetKubectlPath() *fileutils.File {
 func (ts *TestAssets) GetKubeconfigPath() *fileutils.File {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	return ts.kubectlPath
+	return ts.kubeconfigPath
 }
 
 func (ts *TestAssets) GetOperatingSystem() *OperatingSystemType {

@@ -65,16 +65,18 @@ func (c *ValidateKindCluster) ValidateCluster(_ context.Context, testAssets asse
 		 - If the kind environment is as per the testAssets state
 	*/
 
+	_, errConfig := checkConfigIsNil(c.KindConfig)
+
 	cluster, err := testAssets.GetK8SClustersGetterSetter().GetKindClusterDetailGetterSetter(c.ClusterName)
 	if err != nil {
-		if checkKindConfigNil(c.KindConfig) {
+		if errConfig == nil {
 			return fmt.Errorf("validate kind cluster: %w", ErrInvalidKindConfig)
 		}
 	}
 
 	k8sCluster, err := testAssets.GetK8SClustersGetterSetter().GetK8SClusterGetterSetter(c.ClusterName)
 	if err != nil {
-		if checkKindConfigNil(c.KindConfig) {
+		if errConfig == nil {
 			return fmt.Errorf("validate kind cluster: %w", ErrInvalidKindConfig)
 		}
 	}
@@ -84,7 +86,7 @@ func (c *ValidateKindCluster) ValidateCluster(_ context.Context, testAssets asse
 	}
 
 	// When KindConfig is nil and testAssets does hold kindClusterDetail for the cluster
-	if checkKindConfigNil(c.KindConfig) && k8sCluster != nil {
+	if errConfig == nil && k8sCluster != nil {
 		logrus.Infof("Validating Previous State of Kind Cluster %s", c.ClusterName)
 		if err := c.ValidatePrevState(testAssets); err != nil {
 			return fmt.Errorf("validate kind cluster: %w", err)
@@ -92,7 +94,7 @@ func (c *ValidateKindCluster) ValidateCluster(_ context.Context, testAssets asse
 	}
 
 	// When KindConfig is not nil and testAssets does not hold kindClusterDetail for the cluster
-	if !checkKindConfigNil(c.KindConfig) && cluster == nil {
+	if errConfig != nil && cluster == nil {
 		logrus.Infof("Validating New Kind Cluster %s", c.ClusterName)
 		if err := c.ValidateNewCluster(testAssets); err != nil {
 			return fmt.Errorf("validate kind cluster: %w", err)
@@ -100,7 +102,7 @@ func (c *ValidateKindCluster) ValidateCluster(_ context.Context, testAssets asse
 	}
 
 	// When KindConfig is not nil and testAssets does hold kindClusterDetail for the cluster
-	if !checkKindConfigNil(c.KindConfig) && cluster != nil {
+	if errConfig != nil && cluster != nil {
 		logrus.Infof("Validating Updated State of Kind Cluster %s", c.ClusterName)
 		if err := c.ValidateUpdateCluster(testAssets); err != nil {
 			return fmt.Errorf("validate kind cluster: %w", err)
@@ -329,16 +331,4 @@ func checkIfKindClusterExistsInKubeconfig(clusterName string) error {
 	}
 
 	return nil
-}
-
-func checkKindConfigNil(kindConfig *KindConfig) bool {
-	if kindConfig == nil {
-		return true
-	}
-
-	if kindConfig.NumControlPlane == nil || kindConfig.NumWorkers == nil {
-		return true
-	}
-
-	return false
 }
