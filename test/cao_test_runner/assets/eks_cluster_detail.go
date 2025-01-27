@@ -1,15 +1,18 @@
 package assets
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
 	ErrEKSClusterNameAlreadySet = errors.New("eks cluster name already set, cannot be changed")
+	ErrEKSClusterNameNotSet     = errors.New("eks cluster name not set")
 )
 
 type EKSClusterDetail struct {
@@ -234,5 +237,93 @@ func (ekscd *EKSClusterDetail) SetDiskSize(diskSize int32) error {
 	ekscd.mu.Lock()
 	defer ekscd.mu.Unlock()
 	ekscd.diskSize = diskSize
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------Populate EKS Cluster Detail Functions---------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *EKSClusterDetail) PopulateEKSClusterDetail() error {
+	if kc.eksClusterName == "" {
+		return fmt.Errorf("populate eks cluster: %w", ErrEKSClusterNameNotSet)
+	}
+
+	managedServiceProvider := managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes,
+		managedk8sservices.Cloud, managedk8sservices.AWS)
+
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.eksClusterName)
+	if err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	ctx := context.Background()
+
+	eksSessionStore := managedk8sservices.NewManagedService(managedServiceProvider)
+	if err = eksSessionStore.SetSession(ctx, svc); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	eksSession, err := eksSessionStore.(*managedk8sservices.EKSSessionStore).GetSession(ctx, svc)
+	if err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	eksCluster, err := eksSession.GetEKSCluster(ctx)
+	if err != nil {
+		// Cluster does not exist in EKS
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	var nodeGroupNames []*string
+
+	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	for _, nodeGroup := range nodeGroups {
+		nodeGroupNames = append(nodeGroupNames, nodeGroup.NodegroupName)
+	}
+
+	if err := kc.SetNodeGroups(nodeGroupNames); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetKubernetesVersion(*eksCluster.Version); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetDesiredSize(*nodeGroups[0].ScalingConfig.DesiredSize); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetMinSize(*nodeGroups[0].ScalingConfig.MinSize); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetMaxSize(*nodeGroups[0].ScalingConfig.MaxSize); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetInstanceType(nodeGroups[0].InstanceTypes[0]); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetAMI(nodeGroups[0].AmiType); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := kc.SetDiskSize(*nodeGroups[0].DiskSize); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
 	return nil
 }

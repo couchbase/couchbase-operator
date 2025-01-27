@@ -555,7 +555,9 @@ func (ks *K8SClusters) PopulateAllClusters(kubeconfigPath *fileutils.File) error
 				case managedk8sservices.Cloud:
 					switch serviceProvider.GetProvider() {
 					case managedk8sservices.AWS:
-						return ErrNotImplemented
+						if err := ks.PopulateEKSCluster(cluster); err != nil {
+							return fmt.Errorf("populate all clusters: %w", err)
+						}
 					case managedk8sservices.Azure:
 						return ErrNotImplemented
 					case managedk8sservices.GCP:
@@ -601,6 +603,31 @@ func (ks *K8SClusters) PopulateKindCluster(clusterName string) error {
 
 	if err := kindClusterDetail.PopulateKindClusterDetail(); err != nil {
 		return fmt.Errorf("populate kind cluster: %w", err)
+	}
+
+	return nil
+}
+
+func (ks *K8SClusters) PopulateEKSCluster(clusterName string) error {
+	k8sCluster := &K8SCluster{
+		clusterName:     clusterName,
+		serviceProvider: managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes, managedk8sservices.Cloud, managedk8sservices.AWS),
+	}
+
+	eksClusterDetail := &EKSClusterDetail{
+		eksClusterName: clusterName,
+	}
+
+	ks.k8sClusters[clusterName] = k8sCluster
+
+	ks.eksClusters[clusterName] = eksClusterDetail
+
+	if err := k8sCluster.PopulateK8SCluster(); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
+
+	if err := eksClusterDetail.PopulateEKSClusterDetail(); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
 	}
 
 	return nil
