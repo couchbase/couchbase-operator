@@ -3,6 +3,7 @@ package validations
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	destroyk8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/destroy/k8s_cluster"
 	k8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/k8s_cluster"
 	oldvalidators "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/old_validators"
 )
@@ -19,12 +20,13 @@ type Validator interface {
 
 func RegisterValidators() map[string]Validator {
 	return map[string]Validator{
-		"couchbaseReadiness":         &oldvalidators.CouchbaseReadiness{},
-		"collectLogs":                &oldvalidators.CollectLogs{},
-		"preFlight":                  &oldvalidators.PreFlight{},
-		"couchbaseVersion":           &oldvalidators.CBVersion{},
-		"couchbaseClusterSize":       &oldvalidators.CouchbaseClusterSize{},
-		"kubeconfigContext":          &oldvalidators.KubeConfigValidator{},
-		"KubernetesClusterValidator": &k8sclustervalidator.KubernetesClusterValidator{},
+		"couchbaseReadiness":                &oldvalidators.CouchbaseReadiness{},
+		"collectLogs":                       &oldvalidators.CollectLogs{},
+		"preFlight":                         &oldvalidators.PreFlight{},
+		"couchbaseVersion":                  &oldvalidators.CBVersion{},
+		"couchbaseClusterSize":              &oldvalidators.CouchbaseClusterSize{},
+		"kubeconfigContext":                 &oldvalidators.KubeConfigValidator{},
+		"KubernetesClusterValidator":        &k8sclustervalidator.KubernetesClusterValidator{},
+		"DestroyKubernetesClusterValidator": &destroyk8sclustervalidator.KubernetesClusterValidator{},
 	}
 }

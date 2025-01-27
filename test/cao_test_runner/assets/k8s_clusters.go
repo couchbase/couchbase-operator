@@ -72,6 +72,10 @@ type K8SClustersGetterSetter interface {
 	SetEKSClusterDetail(eksClusterDetail *EKSClusterDetail) error
 	SetAKSClusterDetail(aksClusterDetail *AKSClusterDetail) error
 	SetGKEClusterDetail(gkeClusterDetail *GKEClusterDetail) error
+
+	// Deletes
+	DeleteK8SCluster(clusterName string) error
+	DeleteKindClusterDetail(clusterName string) error
 }
 
 /*
@@ -376,6 +380,42 @@ func (ks *K8SClusters) SetGKEClusterDetail(gkeClusterDetail *GKEClusterDetail) e
 	defer ks.mu.Unlock()
 
 	ks.gkeClusters[gkeClusterDetail.gkeClusterName] = gkeClusterDetail
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------------K8SClusters Deletes----------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (ks *K8SClusters) DeleteK8SCluster(clusterName string) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	if _, exists := ks.k8sClusters[clusterName]; exists {
+		delete(ks.k8sClusters, clusterName)
+	} else {
+		return fmt.Errorf("delete k8s cluster: %w", ErrClusterNotFound)
+	}
+
+	return nil
+}
+
+func (ks *K8SClusters) DeleteKindClusterDetail(clusterName string) error {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+
+	if _, exists := ks.kindClusters[clusterName]; exists {
+		delete(ks.kindClusters, clusterName)
+	} else {
+		return fmt.Errorf("delete kind cluster detail: %w", ErrClusterNotFound)
+	}
 
 	return nil
 }
