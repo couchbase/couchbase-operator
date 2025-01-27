@@ -5,12 +5,30 @@ import "errors"
 type PlatformType string
 type EnvironmentType string
 type ProviderType string
+type ReleaseChannel string
 
 var (
-	ErrIllegalPlatform      = errors.New("illegal platform")
-	ErrIllegalEnvironment   = errors.New("illegal environment")
-	ErrIllegalConfiguration = errors.New("illegal configuration")
-	ErrIllegalProvider      = errors.New("illegal provider")
+	ErrIllegalPlatform       = errors.New("illegal platform")
+	ErrIllegalEnvironment    = errors.New("illegal environment")
+	ErrIllegalConfiguration  = errors.New("illegal configuration")
+	ErrIllegalProvider       = errors.New("illegal provider")
+	ErrInvalidReleaseChannel = errors.New("invalid release channel")
+)
+
+const (
+	UnspecifiedReleaseChannel ReleaseChannel = "UNSPECIFIED"
+	RapidReleaseChannel       ReleaseChannel = "RAPID"
+	RegularReleaseChannel     ReleaseChannel = "REGULAR"
+	StableReleaseChannel      ReleaseChannel = "STABLE"
+)
+
+var (
+	ReleaseChannelMap = map[ReleaseChannel]int{
+		UnspecifiedReleaseChannel: 0,
+		RapidReleaseChannel:       1,
+		RegularReleaseChannel:     2,
+		StableReleaseChannel:      3,
+	}
 )
 
 const (
@@ -66,6 +84,15 @@ func ValidateManagedServices(ms *ManagedServiceProvider) error {
 	}
 
 	return nil
+}
+
+func ValidateReleaseChannel(rc ReleaseChannel) (bool, error) {
+	switch rc {
+	case UnspecifiedReleaseChannel, RapidReleaseChannel, RegularReleaseChannel, StableReleaseChannel:
+		return true, nil
+	default:
+		return false, ErrInvalidReleaseChannel
+	}
 }
 
 /*

@@ -28,7 +28,7 @@ type CreateGKECluster struct {
 	DiskSize               int
 	NumNodePools           int
 	Count                  int
-	ReleaseChannel         managedk8sservices.ReleaseChannel
+	ReleaseChannel         assets.ReleaseChannel
 	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *assets.ManagedServiceProvider
 }
@@ -144,7 +144,7 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 		return ErrGKECountInvalid
 	}
 
-	if ok, err := managedk8sservices.ValidateReleaseChannel(cgc.ReleaseChannel); !ok || err != nil {
+	if ok, err := assets.ValidateReleaseChannel(cgc.ReleaseChannel); !ok || err != nil {
 		return fmt.Errorf("invalid release channel %s: %w", cgc.ReleaseChannel, err)
 	}
 
