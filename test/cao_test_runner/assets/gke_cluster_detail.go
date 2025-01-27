@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 var (
 	ErrGKEClusterNameAlreadySet = errors.New("gke cluster name already set, cannot be changed")
+	ErrGKEClusterNameNotSet     = errors.New("gke cluster name not set")
 )
 
 type GKEClusterDetail struct {
@@ -255,6 +257,94 @@ func (ac *GKEClusterDetail) SetReleaseChannel(releaseChannel managedk8sservices.
 	}
 
 	ac.releaseChannel = releaseChannel
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------Populate GKE Cluster Detail Functions---------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *GKEClusterDetail) PopulateGKEClusterDetail() error {
+	if kc.gkeClusterName == "" {
+		return fmt.Errorf("populate gke cluster detail: %w", ErrGKEClusterNameNotSet)
+	}
+
+	managedServiceProvider := managedk8sservices.NewManagedServiceProvider(managedk8sservices.Kubernetes,
+		managedk8sservices.Cloud, managedk8sservices.GCP)
+
+	svc, err := managedk8sservices.NewManagedServiceCredentials(
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.gkeClusterName)
+	if err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	ctx := context.Background()
+
+	gkeSessionStore := managedk8sservices.NewManagedService(managedServiceProvider)
+	if err = gkeSessionStore.SetSession(ctx, svc); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	gkeSession, err := gkeSessionStore.(*managedk8sservices.GKESessionStore).GetSession(ctx, svc)
+	if err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	gkeCluster, err := gkeSession.GetCluster(ctx)
+	if err != nil {
+		// Cluster does not exist in GKE
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	var nodePoolNames []*string
+
+	nodePools, err := gkeSession.ListNodePools(ctx)
+	if err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	for _, nodePool := range nodePools.NodePools {
+		nodePoolNames = append(nodePoolNames, &nodePool.Name)
+	}
+
+	if err := kc.SetNodePools(nodePoolNames); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetKubernetesVersion(gkeCluster.CurrentMasterVersion); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetMachineType(nodePools.NodePools[0].Config.MachineType); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetImageType(nodePools.NodePools[0].Config.ImageType); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetDiskType(nodePools.NodePools[0].Config.DiskType); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetCount(nodePools.NodePools[0].InitialNodeCount); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetDiskSize(nodePools.NodePools[0].Config.DiskSizeGb); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	if err := kc.SetReleaseChannel(managedk8sservices.ReverseReleaseChannelMap[int(gkeCluster.ReleaseChannel.Channel)]); err != nil {
+		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
 
 	return nil
 }

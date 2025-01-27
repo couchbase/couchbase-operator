@@ -29,6 +29,13 @@ var (
 		RegularReleaseChannel:     2,
 		StableReleaseChannel:      3,
 	}
+
+	ReverseReleaseChannelMap = map[int]ReleaseChannel{
+		0: UnspecifiedReleaseChannel,
+		1: RapidReleaseChannel,
+		2: RegularReleaseChannel,
+		3: StableReleaseChannel,
+	}
 )
 
 const (
