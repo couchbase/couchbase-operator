@@ -366,13 +366,12 @@ func (c *ValidateAKSCluster) ValidateNewCluster(ctx context.Context, testAssets 
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	var nodes []*string
-	for _, nodeName := range allNodes {
-		nodes = append(nodes, &nodeName)
+	k8sCluster, err := assets.NewK8SCluster(c.ClusterName, managedServiceProvider)
+	if err != nil {
+		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	if err := testAssets.GetK8SClustersGetterSetter().SetK8SCluster(
-		assets.NewK8SCluster(c.ClusterName, managedServiceProvider, nodes)); err != nil {
+	if err := testAssets.GetK8SClustersGetterSetter().SetK8SCluster(k8sCluster); err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 

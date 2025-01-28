@@ -239,8 +239,12 @@ func (c *ValidateKindCluster) ValidateNewCluster(testAssets assets.TestAssetGett
 
 	serviceProvider := managedk8sservices.NewManagedServiceProvider(kindPlatform, kindEnvironment, kindProvider)
 
-	if err := testAssets.GetK8SClustersGetterSetter().SetK8SCluster(
-		assets.NewK8SCluster(c.ClusterName, serviceProvider, append(controlPlaneNodes, workerNodes...))); err != nil {
+	k8sCluster, err := assets.NewK8SCluster(c.ClusterName, serviceProvider)
+	if err != nil {
+		return fmt.Errorf("validate new cluster: %w", err)
+	}
+
+	if err := testAssets.GetK8SClustersGetterSetter().SetK8SCluster(k8sCluster); err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 

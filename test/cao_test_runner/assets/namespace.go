@@ -4,10 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/pods"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/services"
 )
 
 var (
 	ErrNamespaceNameAlreadySet = errors.New("namespace name already set, cannot be changed")
+	ErrNamespaceNameNotSet     = errors.New("namespace name not set")
 )
 
 type Namespace struct {
@@ -117,5 +121,51 @@ func (ns *Namespace) SetServices(services []*string) error {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 	ns.services = services
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------------Populate Namespace-----------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (ns *Namespace) PopulateNamespace() error {
+	if ns.namespaceName == "" {
+		return fmt.Errorf("populate namespace: %w", ErrNamespaceNameNotSet)
+	}
+
+	allPods, err := pods.GetPodNames(ns.namespaceName)
+	if err != nil && !errors.Is(err, pods.ErrNoPodsInNamespace) {
+		return fmt.Errorf("populate namespace: %w", err)
+	}
+
+	allServices, err := services.GetServiceNames(ns.namespaceName)
+	if err != nil && !errors.Is(err, services.ErrNoServicesInNamespace) {
+		return fmt.Errorf("populate namespace: %w", err)
+	}
+
+	var pods []*string
+	for _, pod := range allPods {
+		pods = append(pods, &pod)
+	}
+
+	var services []*string
+	for _, service := range allServices {
+		services = append(services, &service)
+	}
+
+	if err := ns.SetPods(pods); err != nil {
+		return fmt.Errorf("populate namespace: %w", err)
+	}
+
+	if err := ns.SetServices(services); err != nil {
+		return fmt.Errorf("populate namespace: %w", err)
+	}
+
 	return nil
 }

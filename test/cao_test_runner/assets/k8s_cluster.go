@@ -3,14 +3,18 @@ package assets
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
 var (
 	ErrClusterNameAlreadySet = errors.New("cluster name already set, cannot be changed")
+	ErrClusterNameNotSet     = errors.New("cluster name not set")
+	ErrServiceProviderNotSet = errors.New("service provider not set")
 )
 
 var (
@@ -29,12 +33,17 @@ type K8SCluster struct {
 	mu sync.Mutex
 }
 
-func NewK8SCluster(clusterName string, serviceProvider *managedk8sservices.ManagedServiceProvider, nodes []*string) *K8SCluster {
-	return &K8SCluster{
+func NewK8SCluster(clusterName string, serviceProvider *managedk8sservices.ManagedServiceProvider) (*K8SCluster, error) {
+	k8sCluster := &K8SCluster{
 		clusterName:     clusterName,
 		serviceProvider: serviceProvider,
-		nodes:           nodes,
 	}
+
+	if err := k8sCluster.PopulateK8SCluster(); err != nil {
+		return nil, fmt.Errorf("new k8s cluster: %w", err)
+	}
+
+	return k8sCluster, nil
 }
 
 /*
@@ -215,6 +224,14 @@ func (kc *K8SCluster) SetNamespaces(namespace *Namespace) error {
 */
 
 func (kc *K8SCluster) PopulateK8SCluster() error {
+	if kc.serviceProvider == nil {
+		return fmt.Errorf("populate k8s cluster: %w", ErrServiceProviderNotSet)
+	}
+
+	if kc.clusterName == "" {
+		return fmt.Errorf("populate k8s cluster: %w", ErrClusterNameNotSet)
+	}
+
 	nodes, err := nodes.GetNodeNames()
 	if err != nil {
 		return fmt.Errorf("populate k8s cluster: %w", err)
@@ -227,6 +244,26 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 
 	if err := kc.SetNodes(allNodes); err != nil {
 		return fmt.Errorf("populate k8s cluster: %w", err)
+	}
+
+	kc.namespaces = make(map[string]*Namespace)
+
+	out, _, err := kubectl.GetNamespaces().ExecWithOutputCapture()
+	if err != nil {
+		return fmt.Errorf("populate k8s cluster: %w", err)
+	}
+
+	allNamespaces := strings.Split(out, "\n")
+	// Remove the last empty string
+	allNamespaces = allNamespaces[:len(allNamespaces)-1]
+
+	for _, namespace := range allNamespaces {
+		namespace = strings.TrimPrefix(namespace, "namespace/")
+
+		kc.namespaces[namespace] = &Namespace{namespaceName: namespace}
+		if err := kc.namespaces[namespace].PopulateNamespace(); err != nil {
+			return fmt.Errorf("populate k8s cluster: %w", err)
+		}
 	}
 
 	return nil
