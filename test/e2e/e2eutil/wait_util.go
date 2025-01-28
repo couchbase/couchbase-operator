@@ -1499,3 +1499,29 @@ func MustWaitUntilUsersExist(t *testing.T, k8s *types.Cluster, couchbase *couchb
 		Die(t, err)
 	}
 }
+
+func MustWaitUntilCouchbaseServerGroupsExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, sgNames []string) {
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		Die(t, err)
+	}
+
+	callback := func() error {
+		existingGroups := &couchbaseutil.ServerGroups{}
+		if err := couchbaseutil.ListServerGroups(existingGroups).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, sg := range sgNames {
+			if existingGroups.GetServerGroup(sg) == nil {
+				return fmt.Errorf("server group %s not found on cluster %s", sg, couchbase.Name)
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(1*time.Minute, callback); err != nil {
+		Die(t, err)
+	}
+}

@@ -261,6 +261,7 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleRemoveNode,
 		(*MigrationReconcileMachine).handleAddNode,
 		(*MigrationReconcileMachine).handleMigrateNodes,
+		(*MigrationReconcileMachine).handleServerGroups,
 		(*MigrationReconcileMachine).handleNodeServices,
 		(*MigrationReconcileMachine).handleRebalance,
 		(*MigrationReconcileMachine).handleMarkReady,

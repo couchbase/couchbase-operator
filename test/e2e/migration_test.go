@@ -202,6 +202,50 @@ func TestMaxConcurrency(t *testing.T) {
 	ValidateEvents(t, kubernetes, dstCluster, expectedEvents)
 }
 
+// TestMigrateClusterWithMultipleServerGroups checks that migration will take several server groups/zones into account and correctly schedule pods onto the correct nodes.
+// This test will also check that we set the correct server groups on couchbase server.
+func TestMigrateClusterWithMultipleServerGroups(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+	clusterSize := len(serverGroups)
+
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	srcCluster.Spec.ServerGroups = serverGroups
+	srcCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, srcCluster)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	// Create the destination cluster
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.ServerGroups = serverGroups
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+	}
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	// Check that all nodes from the initial cluster have been ejected
+	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+
+	// Check that we've removed the migrating condition from the cluster
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
+
+	// Check that the pods have been scheduled correctly
+	expected := getExpectedRzaResultMap(clusterSize, serverGroups)
+	expected.mustValidateRzaMap(t, kubernetes, dstCluster)
+
+	// Check that we have the correct number of server groups on couchbase server
+	e2eutil.MustWaitUntilCouchbaseServerGroupsExist(t, kubernetes, dstCluster, serverGroups)
+}
+
 func MustGetNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) int {
 	selector := labels.SelectorFromSet(labels.Set(k8sutil.LabelsForCluster(cluster)))
 
