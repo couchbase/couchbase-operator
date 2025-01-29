@@ -3,11 +3,14 @@ package assets
 import (
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"sync"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
+	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
@@ -15,10 +18,8 @@ var (
 	ErrClusterNameAlreadySet = errors.New("cluster name already set, cannot be changed")
 	ErrClusterNameNotSet     = errors.New("cluster name not set")
 	ErrServiceProviderNotSet = errors.New("service provider not set")
-)
-
-var (
-	ErrNamespaceNotFound = errors.New("namespace not found")
+	ErrIllegalCAOPath        = errors.New("illegal cao path")
+	ErrNamespaceNotFound     = errors.New("namespace not found")
 )
 
 type K8SCluster struct {
@@ -28,6 +29,8 @@ type K8SCluster struct {
 	nodes []*string
 
 	namespaces map[string]*Namespace
+
+	caoPath *fileutils.File
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -62,6 +65,7 @@ type K8SClusterGetter interface {
 	GetNodes() []*string
 	GetAllNamespacesGetters() []NamespaceGetter
 	GetNamespaceGetter(namespace string) (NamespaceGetter, error)
+	GetCAOPath() *fileutils.File
 }
 
 type K8SClusterGetterSetter interface {
@@ -71,12 +75,14 @@ type K8SClusterGetterSetter interface {
 	GetNodes() []*string
 	GetAllNamespacesGetterSetters() []NamespaceGetterSetter
 	GetNamespaceGetterSetter(namespace string) (NamespaceGetterSetter, error)
+	GetCAOPath() *fileutils.File
 
 	// Setters
 	SetClusterName(clusterName string) error
 	SetServiceProvider(ms *managedk8sservices.ManagedServiceProvider) error
 	SetNodes(nodes []*string) error
 	SetNamespaces(namespace *Namespace) error
+	SetCAOPath(caoPath *fileutils.File) error
 }
 
 /*
@@ -155,6 +161,12 @@ func (kc *K8SCluster) GetNamespaceGetterSetter(namespace string) (NamespaceGette
 	return ns, nil
 }
 
+func (ts *K8SCluster) GetCAOPath() *fileutils.File {
+	ts.mu.Lock()
+	defer ts.mu.Lock()
+	return ts.caoPath
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -210,6 +222,21 @@ func (kc *K8SCluster) SetNamespaces(namespace *Namespace) error {
 
 	kc.namespaces[namespace.namespaceName] = namespace
 
+	return nil
+}
+
+func (ts *K8SCluster) SetCAOPath(caoPath *fileutils.File) error {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	if !caoPath.IsFileExists() {
+		if _, err := exec.LookPath(caoPath.FilePath); err != nil {
+			return ErrIllegalCAOPath
+		}
+	}
+
+	cao.WithBinaryPath(caoPath.FilePath)
+	ts.caoPath = caoPath
 	return nil
 }
 
