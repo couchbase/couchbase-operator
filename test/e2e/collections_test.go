@@ -912,41 +912,37 @@ func TestUpdateCollection(t *testing.T) {
 
 	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, time.Minute)
 
-	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.2.0"); err != nil {
-		e2eutil.Die(t, err)
-	} else if ok {
-		if collection.Annotations == nil {
-			collection.Annotations = make(map[string]string)
-		}
-
-		collection.Annotations["cao.couchbase.com/history"] = "true"
-
-		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
-
-		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+	if collection.Annotations == nil {
+		collection.Annotations = make(map[string]string)
 	}
 
+	collection.Annotations["cao.couchbase.com/history"] = "true"
+
+	collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+
+	expectedUpdates := 1
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
 		collection.Spec.MaxTTL = e2espec.NewDurationS(1000)
 		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
 		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+		expectedUpdates++
 
 		collection.Spec.MaxTTL = e2espec.NewDurationS(-1)
 		collection = e2eutil.MustUpdateCollection(t, kubernetes, collection)
 		e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), *collection, 3*time.Minute)
+		expectedUpdates++
 	}
 
-	// Expect there to be a scopes & collections updated event.
+	// Expect there to be a scopes & collections updated event repeated for each time we update.
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
-		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
-		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Repeat{Times: expectedUpdates, Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
