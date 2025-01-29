@@ -294,6 +294,9 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
+			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},

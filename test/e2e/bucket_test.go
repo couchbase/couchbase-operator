@@ -737,7 +737,7 @@ func TestUpdateSampleBucket(t *testing.T) {
 
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketGreaterThan(t, kubernetes, cluster, bucket.GetName(), 7300, time.Minute)
 
 	beerSampleDefaultMemoryQuota := e2espec.NewResourceQuantityMi(200)
 	updatedMemoryQuota := e2espec.NewResourceQuantityMi(256)

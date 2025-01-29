@@ -866,8 +866,9 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			expectedErrors: []string{`spec.servers(\[3\])?.services requires atleast one service`},
 		},
 		{
-			name:           "TestAdminServiceWithAnotherService",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.AdminService, couchbasev2.DataService})},
+			name: "TestAdminServiceWithAnotherService",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", couchbasev2.ServiceList{couchbasev2.AdminService, couchbasev2.DataService}).
+				Replace("/spec/image", "couchbase/server:7.6.2")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers(\[3\])?.services cannot contain the admin service and other services`},
 		},

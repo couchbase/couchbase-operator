@@ -2641,8 +2641,9 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
 	// added as local users to be authenticated against the specified LDAP Host(s).
+	// +optional
 	// +kubebuilder:default=true
-	AuthenticationEnabled bool `json:"authenticationEnabled,omitempty"`
+	AuthenticationEnabled bool `json:"authenticationEnabled"`
 
 	// AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC roles granted to
 	// any Couchbase Server group associated with the user.
