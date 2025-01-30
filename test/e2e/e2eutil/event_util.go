@@ -438,6 +438,39 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 	return events
 }
 
+// PodFailedOverWithPVCRecoverySequence is a common sequence when some pods are nuked with PVC
+// storage attached and they can delta-recover after a failover event occurs.
+func PodFailedOverWithPVCRecoverySequence(victims int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			// Depending on either server version, auto-failover timeout and where the reconciliation loop
+			// is at when pods are failed over, we may or may not see member down events for the victims
+			eventschema.Optional{
+				Validator: eventschema.Repeat{
+					Times:     victims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
+			},
+			eventschema.Repeat{
+				Times:     victims,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			},
+			eventschema.Repeat{
+				Times: victims,
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+						eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					},
+				},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+}
+
 // PodDownWithPVCRecoverySequenceWithEphemeral is shat to expect when the platform
 // goes down with some ephemeral pods in the cluster.  The persistent pods will
 // be recovered first, then the operator needs to failover the ephemeral pods and
