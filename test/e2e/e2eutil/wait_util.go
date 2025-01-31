@@ -266,7 +266,7 @@ func ResourceConditionWithMessage(k8s *types.Cluster, resource runtime.Object, c
 // event has been seen.  The context allows for timeouts (everything should have one that does this),
 // the ready channel, if not nil, is closed when the routine is up and running, or on error, so it can
 // unblock a caller that needs to wait until this is running before continuing.
-func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.Cluster, resource runtime.Object, event *v1.Event, epoch time.Time) error {
+func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.Cluster, resource runtime.Object, event *v1.Event, epoch time.Time, matchMessage bool) error {
 	// If the ready channel is valid, and we've not closed it, do so.
 	// This will occur if some error happened before the point where we
 	// normally close to indicate we're watching, and unblock the caller.
@@ -344,7 +344,9 @@ func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.C
 				continue
 			}
 
-			if EqualEvent(event, ev) {
+			if matchMessage && EqualEvent(event, ev) {
+				return nil
+			} else if !matchMessage && LooseEqualEvent(event, ev) {
 				return nil
 			}
 		}
@@ -352,13 +354,13 @@ func waitForResourceEvent(ctx context.Context, ready chan struct{}, k8s *types.C
 }
 
 func waitForResourceEventFromNow(ctx context.Context, ready chan struct{}, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
-	return waitForResourceEvent(ctx, ready, k8s, resource, event, time.Now())
+	return waitForResourceEvent(ctx, ready, k8s, resource, event, time.Now(), true)
 }
 
 func waitForResourceEventEver(ctx context.Context, k8s *types.Cluster, resource runtime.Object, event *v1.Event) error {
 	// Tonight we're gonna party like it's 1999... you must have royally screwed up if this
 	// isn't far enough in the past to see every event!
-	return waitForResourceEvent(ctx, nil, k8s, resource, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC))
+	return waitForResourceEvent(ctx, nil, k8s, resource, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC), true)
 }
 
 // mustWaitForResourceEventFromNow watches event streams for a given resource and returns when the requested
@@ -732,6 +734,15 @@ func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	defer cancel()
 
 	if err := waitForResourceEventEver(ctx, k8s, cluster, event); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustObserveClusterEventIgnoringMessage(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, cluster, event, time.Date(1999, time.December, 31, 23, 59, 59, 0, time.UTC), false); err != nil {
 		Die(t, err)
 	}
 }

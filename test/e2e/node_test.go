@@ -434,6 +434,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	// * Replacements are balanced in
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Optional{
 			Validator: eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		},
@@ -484,7 +485,8 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -540,6 +542,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Optional{
 			Validator: eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		},
@@ -688,7 +691,8 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},

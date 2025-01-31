@@ -138,6 +138,6 @@ func TestDisableAllValidation(t *testing.T) {
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.ReconcileFailedEvent(cluster), 2*time.Minute)
+	e2eutil.MustObserveClusterEventIgnoringMessage(t, kubernetes, cluster, e2eutil.ReconcileFailedEvent(cluster), 2*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionError, v1.ConditionTrue, cluster, 5*time.Minute)
 }

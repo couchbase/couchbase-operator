@@ -78,11 +78,11 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 

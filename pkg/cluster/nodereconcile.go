@@ -580,6 +580,14 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			return err
 		}
 
+		for _, name := range r.couchbase.DownNodes.Names() {
+			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
+		}
+
+		for _, name := range r.couchbase.FailedNodes.Names() {
+			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
+		}
+
 		r.abort("pods are failing over")
 
 		return nil

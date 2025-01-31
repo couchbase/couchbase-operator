@@ -51,6 +51,10 @@ func EqualEvent(e1, e2 *v1.Event) bool {
 	return (e1.Type == e2.Type && e1.Reason == e2.Reason && e1.Message == e2.Message)
 }
 
+func LooseEqualEvent(e1, e2 *v1.Event) bool {
+	return (e1.Type == e2.Type && e1.Reason == e2.Reason)
+}
+
 func NewMemberCreationFailedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberCreationFailedEvent(name, cl)
@@ -416,10 +420,10 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 				Validator: eventschema.Sequence{
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 						eventschema.Optional{
 							Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
 						},
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 					},
 				},
 			},
