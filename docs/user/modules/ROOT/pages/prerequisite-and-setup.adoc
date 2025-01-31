@@ -11,7 +11,7 @@ NOTE: For all supported software versions listed on this page, maintenance/patch
 
 == Couchbase Compatibility
 
-Couchbase compatibility falls under these 3 categories:
+Couchbase compatibility falls under these three categories:
 
 * *Unsupported*: This combination is not tested and is not within the scope of technical support if you have purchased a support agreement.
 
@@ -26,7 +26,7 @@ This release supports the deployment of the following Couchbase software:
 | Software | Version
 
 | Couchbase Server Enterprise Edition
-| 7.0 - 7.2^*^
+| 7.0 - 7.6^*^
 |===
 
 *: Couchbase Server 7.6 is supported with Operator 2.6;
@@ -50,7 +50,7 @@ This release supports the following container images for xref:concept-backup.ado
 
 a| https://hub.docker.com/r/couchbase/operator-backup[`operator-backup:1.3.6`^]
 a| https://docs.couchbase.com/server/7.2.3/manage/manage-backup-and-restore/manage-backup-and-restore.html[`cbbackupmgr 7.2.3`^]
-| Couchbase Server 7.0--7.2
+| Couchbase Server 7.0--7.6
 |===
 
 The following diagram depicts Operator Backup image compatibility with all supported Couchbase Server versions, you should consider this when upgrading Couchbase Server:
@@ -95,7 +95,8 @@ The Couchbase Exporter images are all compatible with all versions of Couchbase 
 
 [IMPORTANT]
 ====
-With the release of Couchbase Server 7.0.0, Prometheus endpoints are built into Couchbase Server and as such, the exporter image is no longer required to expose metrics.
+With the release of Couchbase Server 7.0.0, Prometheus endpoints are built into Couchbase Server,
+and as such, the exporter image is no longer required to expose metrics.
 ====
 
 [[kubernetes-platform-compatibility]]
@@ -114,7 +115,8 @@ This release supports the following Kubernetes platforms:
 | 4.13 - 4.16
 |===
 
-The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms, and can be used to calculate upgrade paths:
+The following diagrams depict Couchbase Operator compatibility with Kubernetes and OpenShift platforms
+and can be used to calculate upgrade paths:
 
 .Kubernetes and Red Hat OpenShift Compatibility
 image:compatibility-kubernetes.png[]
@@ -125,7 +127,7 @@ Where an Operator release is marked as _supported_, this means it has been fully
 Couchbase Support will actively recreate and diagnose issues.
 Where relevant, fixes will be made to the affected product and patch releases made.
 
-Where an Operator release is marked as _compatible_ however, this means it has been assessed by the development team to be technically feasible, and may have had rudimentary compatibility testing.
+Where an Operator release is marked as _compatible,_ however, this means it has been assessed by the development team to be technically feasible and may have had rudimentary compatibility testing.
 You may run the xref:concept-platform-certification.adoc[] tooling to verify the Operator will work on a compatible platform.
 Support will be provided on a best-effort basis, and any issues may not result in fixes and patch releases.
 We therefore highly encourage the use of a supported platform version.
@@ -149,16 +151,21 @@ Review the Autonomous Operator xref:best-practices.adoc#persistent-volumes-best-
 
 == Hardware Requirements
 
-It is highly recommended that your Couchbase clusters are deployed with some form of compute and memory resource request in order to ensure fair scheduling of workloads and to ensure resources are available to meet basic service levels.
+It is highly recommended
+that your Couchbase clusters are deployed with some form of compute and memory resource request
+to ensure fair scheduling of workloads and to ensure resources are available to meet basic service levels.
 
-=== CPU and Memory  Requirements
+=== CPU and Memory Requirements
 
-You can set all resource allocations yourself explicitly, however for new users to the platform we recommend using xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[auto resource allocation].
+You can set all resource allocations yourself explicitly;
+however,
+for new users to the platform we recommend
+using xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-autoresourceallocation[auto resource allocation].
 Auto resource allocation will require:
 
 * 2 CPUs per Couchbase pod by default.
 * 512MiB of memory per pod for each of the Data, Index, Search, and Eventing Services that are enabled.
-  1GiB of memory per pod if the the Analytics Service is enabled.
+  1GiB of memory per pod if the Analytics Service is enabled.
   An additional 25% memory overhead on top of the memory requirements for each service.
   For a typical development cluster where all services are enabled, this would equal 3.75GiB.
 
