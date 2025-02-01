@@ -20,6 +20,7 @@ var (
 	ErrServiceProviderNotSet = errors.New("service provider not set")
 	ErrIllegalCAOPath        = errors.New("illegal cao path")
 	ErrNamespaceNotFound     = errors.New("namespace not found")
+	ErrCouchbaseCRDNotFound  = errors.New("couchbase crd not found")
 )
 
 type K8SCluster struct {
@@ -29,6 +30,8 @@ type K8SCluster struct {
 	nodes []*string
 
 	namespaces map[string]*Namespace
+
+	crds map[string]*CouchbaseCRD
 
 	caoPath *fileutils.File
 
@@ -65,6 +68,8 @@ type K8SClusterGetter interface {
 	GetNodes() []*string
 	GetAllNamespacesGetters() []NamespaceGetter
 	GetNamespaceGetter(namespace string) (NamespaceGetter, error)
+	GetAllCouchbaseCRDsGetter() []CouchbaseCRDGetter
+	GetCouchbaseCRDGetter(crdName string) (CouchbaseCRDGetter, error)
 	GetCAOPath() *fileutils.File
 }
 
@@ -75,6 +80,8 @@ type K8SClusterGetterSetter interface {
 	GetNodes() []*string
 	GetAllNamespacesGetterSetters() []NamespaceGetterSetter
 	GetNamespaceGetterSetter(namespace string) (NamespaceGetterSetter, error)
+	GetAllCouchbaseCRDsGetterSetter() []CouchbaseCRDGetterSetter
+	GetCouchbaseCRDGetterSetter(crdName string) (CouchbaseCRDGetterSetter, error)
 	GetCAOPath() *fileutils.File
 
 	// Setters
@@ -82,6 +89,7 @@ type K8SClusterGetterSetter interface {
 	SetServiceProvider(ms *managedk8sservices.ManagedServiceProvider) error
 	SetNodes(nodes []*string) error
 	SetNamespaces(namespace *Namespace) error
+	SetCouchbaseCRD(crd *CouchbaseCRD) error
 	SetCAOPath(caoPath *fileutils.File) error
 }
 
@@ -161,9 +169,57 @@ func (kc *K8SCluster) GetNamespaceGetterSetter(namespace string) (NamespaceGette
 	return ns, nil
 }
 
+func (kc *K8SCluster) GetAllCouchbaseCRDsGetter() []CouchbaseCRDGetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var crds []CouchbaseCRDGetter
+	for _, crd := range kc.crds {
+		crds = append(crds, crd)
+	}
+
+	return crds
+}
+
+func (kc *K8SCluster) GetCouchbaseCRDGetter(crdName string) (CouchbaseCRDGetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	crd, ok := kc.crds[crdName]
+	if !ok {
+		return nil, fmt.Errorf("get crd getter: %w", ErrCouchbaseCRDNotFound)
+	}
+
+	return crd, nil
+}
+
+func (kc *K8SCluster) GetAllCouchbaseCRDsGetterSetter() []CouchbaseCRDGetterSetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var crds []CouchbaseCRDGetterSetter
+	for _, crd := range kc.crds {
+		crds = append(crds, crd)
+	}
+
+	return crds
+}
+
+func (kc *K8SCluster) GetCouchbaseCRDGetterSetter(crdName string) (CouchbaseCRDGetterSetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	crd, ok := kc.crds[crdName]
+	if !ok {
+		return nil, fmt.Errorf("get crd getter setter: %w", ErrCouchbaseCRDNotFound)
+	}
+
+	return crd, nil
+}
+
 func (ts *K8SCluster) GetCAOPath() *fileutils.File {
 	ts.mu.Lock()
-	defer ts.mu.Lock()
+	defer ts.mu.Unlock()
 	return ts.caoPath
 }
 
@@ -221,6 +277,15 @@ func (kc *K8SCluster) SetNamespaces(namespace *Namespace) error {
 	defer kc.mu.Unlock()
 
 	kc.namespaces[namespace.namespaceName] = namespace
+
+	return nil
+}
+
+func (kc *K8SCluster) SetCouchbaseCRD(crd *CouchbaseCRD) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	kc.crds[crd.crdName] = crd
 
 	return nil
 }
