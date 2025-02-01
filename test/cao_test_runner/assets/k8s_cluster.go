@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/crds"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
 
@@ -356,6 +357,17 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 		if err := kc.namespaces[namespace].PopulateNamespace(); err != nil {
 			return fmt.Errorf("populate k8s cluster: %w", err)
 		}
+	}
+
+	kc.crds = make(map[string]*CouchbaseCRD)
+
+	crdsMap, err := crds.GetCRDsMap(nil)
+	if err != nil && !errors.Is(err, crds.ErrNoCRDsInCluster) {
+		return fmt.Errorf("populate k8s cluster: %w", err)
+	}
+
+	for crdName, crd := range crdsMap {
+		kc.crds[crdName] = &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
 	}
 
 	return nil

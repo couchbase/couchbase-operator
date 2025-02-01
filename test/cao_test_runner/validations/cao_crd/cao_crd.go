@@ -177,6 +177,8 @@ func (c *CAOCRDValidator) ValidateNewCAOPath(testAssets assets.TestAssetGetterSe
 		caoPath = fileutils.NewFile(filepath.Join(filePath, "bin", "cao"))
 	}
 
+	cao.WithBinaryPath(caoPath.FilePath)
+
 	if c.OperatorVersion != "" {
 		out, _, err := cao.GetVersion().ExecWithOutputCapture()
 		if err != nil {
