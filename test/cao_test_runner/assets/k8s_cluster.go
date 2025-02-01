@@ -22,6 +22,7 @@ var (
 	ErrIllegalCAOPath        = errors.New("illegal cao path")
 	ErrNamespaceNotFound     = errors.New("namespace not found")
 	ErrCouchbaseCRDNotFound  = errors.New("couchbase crd not found")
+	ErrOperatorPodNotFound   = errors.New("operator pod not found")
 )
 
 type K8SCluster struct {
@@ -35,6 +36,8 @@ type K8SCluster struct {
 	crds map[string]*CouchbaseCRD
 
 	caoPath *fileutils.File
+
+	operatorPods map[string]*OperatorPod
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -72,6 +75,8 @@ type K8SClusterGetter interface {
 	GetAllCouchbaseCRDsGetter() []CouchbaseCRDGetter
 	GetCouchbaseCRDGetter(crdName string) (CouchbaseCRDGetter, error)
 	GetCAOPath() *fileutils.File
+	GetAllOperatorPodsGetter() []OperatorPodGetter
+	GetOperatorPodGetter(operatorPodName string) (OperatorPodGetter, error)
 }
 
 type K8SClusterGetterSetter interface {
@@ -84,6 +89,8 @@ type K8SClusterGetterSetter interface {
 	GetAllCouchbaseCRDsGetterSetter() []CouchbaseCRDGetterSetter
 	GetCouchbaseCRDGetterSetter(crdName string) (CouchbaseCRDGetterSetter, error)
 	GetCAOPath() *fileutils.File
+	GetAllOperatorPodsGetterSetter() []OperatorPodGetterSetter
+	GetOperatorPodGetterSetter(operatorPodName string) (OperatorPodGetterSetter, error)
 
 	// Setters
 	SetClusterName(clusterName string) error
@@ -92,6 +99,7 @@ type K8SClusterGetterSetter interface {
 	SetNamespaces(namespace *Namespace) error
 	SetCouchbaseCRD(crd *CouchbaseCRD) error
 	SetCAOPath(caoPath *fileutils.File) error
+	SetOperatorPod(operatorPod *OperatorPod) error
 }
 
 /*
@@ -224,6 +232,54 @@ func (ts *K8SCluster) GetCAOPath() *fileutils.File {
 	return ts.caoPath
 }
 
+func (kc *K8SCluster) GetAllOperatorPodsGetter() []OperatorPodGetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var operatorPods []OperatorPodGetter
+	for _, operatorPod := range kc.operatorPods {
+		operatorPods = append(operatorPods, operatorPod)
+	}
+
+	return operatorPods
+}
+
+func (kc *K8SCluster) GetOperatorPodGetter(operatorPodName string) (OperatorPodGetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	operatorPod, ok := kc.operatorPods[operatorPodName]
+	if !ok {
+		return nil, fmt.Errorf("get operator pod getter: %w", ErrOperatorPodNotFound)
+	}
+
+	return operatorPod, nil
+}
+
+func (kc *K8SCluster) GetAllOperatorPodsGetterSetter() []OperatorPodGetterSetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var operatorPods []OperatorPodGetterSetter
+	for _, operatorPod := range kc.operatorPods {
+		operatorPods = append(operatorPods, operatorPod)
+	}
+
+	return operatorPods
+}
+
+func (kc *K8SCluster) GetOperatorPodGetterSetter(operatorPodName string) (OperatorPodGetterSetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	operatorPod, ok := kc.operatorPods[operatorPodName]
+	if !ok {
+		return nil, fmt.Errorf("get operator pod getter setter: %w", ErrOperatorPodNotFound)
+	}
+
+	return operatorPod, nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -303,6 +359,15 @@ func (ts *K8SCluster) SetCAOPath(caoPath *fileutils.File) error {
 
 	cao.WithBinaryPath(caoPath.FilePath)
 	ts.caoPath = caoPath
+	return nil
+}
+
+func (kc *K8SCluster) SetOperatorPod(operatorPod *OperatorPod) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	kc.operatorPods[operatorPod.operatorPodName] = operatorPod
+
 	return nil
 }
 
