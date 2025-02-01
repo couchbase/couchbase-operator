@@ -26,18 +26,14 @@ var (
 )
 
 type K8SCluster struct {
-	clusterName     string
-	serviceProvider *managedk8sservices.ManagedServiceProvider
-
-	nodes []*string
-
-	namespaces map[string]*Namespace
-
-	crds map[string]*CouchbaseCRD
-
-	caoPath *fileutils.File
-
-	operatorPods map[string]*OperatorPod
+	clusterName             string
+	serviceProvider         *managedk8sservices.ManagedServiceProvider
+	nodes                   []*string
+	namespaces              map[string]*Namespace
+	crds                    map[string]*CouchbaseCRD
+	caoPath                 *fileutils.File
+	operatorPods            map[string]*OperatorPod
+	admissionControllerPods map[string]*AdmissionControllerPod
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
@@ -77,6 +73,8 @@ type K8SClusterGetter interface {
 	GetCAOPath() *fileutils.File
 	GetAllOperatorPodsGetter() []OperatorPodGetter
 	GetOperatorPodGetter(operatorPodName string) (OperatorPodGetter, error)
+	GetAllAdmissionControllerPodsGetter() []AdmissionControllerPodGetter
+	GetAdmissionControllerPodGetter(admissionControllerPodName string) (AdmissionControllerPodGetter, error)
 }
 
 type K8SClusterGetterSetter interface {
@@ -91,6 +89,8 @@ type K8SClusterGetterSetter interface {
 	GetCAOPath() *fileutils.File
 	GetAllOperatorPodsGetterSetter() []OperatorPodGetterSetter
 	GetOperatorPodGetterSetter(operatorPodName string) (OperatorPodGetterSetter, error)
+	GetAllAdmissionControllerPodsGetterSetter() []AdmissionControllerPodGetterSetter
+	GetAdmissionControllerPodGetterSetter(admissionControllerPodName string) (AdmissionControllerPodGetterSetter, error)
 
 	// Setters
 	SetClusterName(clusterName string) error
@@ -100,6 +100,7 @@ type K8SClusterGetterSetter interface {
 	SetCouchbaseCRD(crd *CouchbaseCRD) error
 	SetCAOPath(caoPath *fileutils.File) error
 	SetOperatorPod(operatorPod *OperatorPod) error
+	SetAdmissionControllerPod(admissionControllerPod *AdmissionControllerPod) error
 }
 
 /*
@@ -280,6 +281,54 @@ func (kc *K8SCluster) GetOperatorPodGetterSetter(operatorPodName string) (Operat
 	return operatorPod, nil
 }
 
+func (kc *K8SCluster) GetAllAdmissionControllerPodsGetter() []AdmissionControllerPodGetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var admissionControllerPods []AdmissionControllerPodGetter
+	for _, admissionControllerPod := range kc.admissionControllerPods {
+		admissionControllerPods = append(admissionControllerPods, admissionControllerPod)
+	}
+
+	return admissionControllerPods
+}
+
+func (kc *K8SCluster) GetAdmissionControllerPodGetter(admissionControllerPodName string) (AdmissionControllerPodGetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	admissionControllerPod, ok := kc.admissionControllerPods[admissionControllerPodName]
+	if !ok {
+		return nil, fmt.Errorf("get admission controller pod getter: %w", ErrOperatorPodNotFound)
+	}
+
+	return admissionControllerPod, nil
+}
+
+func (kc *K8SCluster) GetAllAdmissionControllerPodsGetterSetter() []AdmissionControllerPodGetterSetter {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	var admissionControllerPods []AdmissionControllerPodGetterSetter
+	for _, admissionControllerPod := range kc.admissionControllerPods {
+		admissionControllerPods = append(admissionControllerPods, admissionControllerPod)
+	}
+
+	return admissionControllerPods
+}
+
+func (kc *K8SCluster) GetAdmissionControllerPodGetterSetter(admissionControllerPodName string) (AdmissionControllerPodGetterSetter, error) {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	admissionControllerPod, ok := kc.admissionControllerPods[admissionControllerPodName]
+	if !ok {
+		return nil, fmt.Errorf("get admission controller pod getter setter: %w", ErrOperatorPodNotFound)
+	}
+
+	return admissionControllerPod, nil
+}
+
 /*
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -367,6 +416,15 @@ func (kc *K8SCluster) SetOperatorPod(operatorPod *OperatorPod) error {
 	defer kc.mu.Unlock()
 
 	kc.operatorPods[operatorPod.operatorPodName] = operatorPod
+
+	return nil
+}
+
+func (kc *K8SCluster) SetAdmissionControllerPod(admissionControllerPod *AdmissionControllerPod) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	kc.admissionControllerPods[admissionControllerPod.admissionControllerPodName] = admissionControllerPod
 
 	return nil
 }

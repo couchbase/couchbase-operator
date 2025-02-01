@@ -139,6 +139,9 @@ func (op *OperatorPod) SetScope(scope ScopeType) error {
 func (op *OperatorPod) SetNamespace(namespace string) error {
 	op.mu.Lock()
 	defer op.mu.Unlock()
+
+	// TODO : Make sure that the namespace set here is in K8SCluster.Namespaces as well
+
 	op.namespace = namespace
 	return nil
 }
