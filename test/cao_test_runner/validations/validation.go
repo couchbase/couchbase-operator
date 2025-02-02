@@ -5,6 +5,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	admissioncontrollervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/admission_controller"
 	caocrdvalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/cao_crd"
+	destroyadmissioncontrollervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/destroy/admission_controller"
 	destroyk8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/destroy/k8s_cluster"
 	destroyoperatorvalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/destroy/operator"
 	k8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/k8s_cluster"
@@ -38,5 +39,6 @@ func RegisterValidators() map[string]Validator {
 		"OperatorValidator":                 &operatorvalidator.OperatorValidator{},
 		"AdmissionControllerValidator":      &admissioncontrollervalidator.AdmissionControllerValidator{},
 		"DestroyOperatorValidator":          &destroyoperatorvalidator.DestroyOperatorValidator{},
+		"DestroyAdmissionValidator":         &destroyadmissioncontrollervalidator.DestroyAdmissionControllerValidator{},
 	}
 }

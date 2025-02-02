@@ -26,7 +26,7 @@ func (c *DestroyOperatorValidator) Run(ctx *context.Context, testAssets assets.T
 	k8sCluster, err := testAssets.GetK8SClustersGetterSetter().GetK8SClusterGetterSetter(c.ClusterName)
 	if err != nil {
 		// Cluster does not exist
-		return fmt.Errorf("validator operator previous state: %w", err)
+		return fmt.Errorf("validator run: %w", err)
 	}
 
 	operatorPods := k8sCluster.GetAllOperatorPodsGetterSetter()
@@ -41,7 +41,7 @@ func (c *DestroyOperatorValidator) Run(ctx *context.Context, testAssets assets.T
 
 	if assetOperatorPod == nil {
 		// Operator pod does not exist in testAssets
-		return fmt.Errorf("validator operator previous state: %w", ErrOperatorPodNotInAssets)
+		return fmt.Errorf("validator run: %w", ErrOperatorPodNotInAssets)
 	}
 
 	for retry := 1; retry <= 3; retry += 1 {
@@ -49,16 +49,16 @@ func (c *DestroyOperatorValidator) Run(ctx *context.Context, testAssets assets.T
 		if err != nil && errors.Is(err, caopods.ErrOperatorPodDoesntExist) {
 			break
 		} else if err != nil {
-			return fmt.Errorf("validator operator previous state: %w", err)
+			return fmt.Errorf("validator run: %w", err)
 		} else if retry == 3 {
-			return fmt.Errorf("validator operator previous state: %w", ErrOperatorPodExists)
+			return fmt.Errorf("validator run: %w", ErrOperatorPodExists)
 		} else {
 			time.Sleep(5 * time.Second)
 		}
 	}
 
 	if err := k8sCluster.DeleteOperatorPod(assetOperatorPod.GetOperatorPodName()); err != nil {
-		return fmt.Errorf("validator operator previous state: %w", err)
+		return fmt.Errorf("validator run: %w", err)
 	}
 
 	return nil

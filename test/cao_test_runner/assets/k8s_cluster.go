@@ -104,6 +104,7 @@ type K8SClusterGetterSetter interface {
 
 	// Deletes
 	DeleteOperatorPod(operatorPodName string) error
+	DeleteAdmissionControllerPod(admissionControllerPodName string) error
 }
 
 /*
@@ -447,6 +448,15 @@ func (kc *K8SCluster) DeleteOperatorPod(operatorPodName string) error {
 	defer kc.mu.Unlock()
 
 	delete(kc.operatorPods, operatorPodName)
+
+	return nil
+}
+
+func (kc *K8SCluster) DeleteAdmissionControllerPod(admissionControllerPodName string) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	delete(kc.admissionControllerPods, admissionControllerPodName)
 
 	return nil
 }
