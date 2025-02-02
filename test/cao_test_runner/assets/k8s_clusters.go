@@ -45,8 +45,8 @@ type K8SClustersGetterSetter interface {
 	GetKindClusterDetailGetterSetter(clusterName string) (KindClusterDetailGetterSetter, error)
 
 	// Setters
-	SetK8SCluster(clusterName string, k8sCluster *K8SCluster) error
-	SetKindClusterDetail(clusterName string, kindClusterDetail *KindClusterDetail) error
+	SetK8SCluster(k8sCluster *K8SCluster) error
+	SetKindClusterDetail(kindClusterDetail *KindClusterDetail) error
 }
 
 /*
@@ -165,20 +165,20 @@ func (ks *K8SClusters) GetKindClusterDetailGetterSetter(clusterName string) (Kin
 -----------------------------------------------------------------
 */
 
-func (ks *K8SClusters) SetK8SCluster(clusterName string, k8sCluster *K8SCluster) error {
+func (ks *K8SClusters) SetK8SCluster(k8sCluster *K8SCluster) error {
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
 
-	ks.k8sClusters[clusterName] = k8sCluster
+	ks.k8sClusters[k8sCluster.clusterName] = k8sCluster
 
 	return nil
 }
 
-func (ks *K8SClusters) SetKindClusterDetail(clusterName string, kindClusterDetail *KindClusterDetail) error {
+func (ks *K8SClusters) SetKindClusterDetail(kindClusterDetail *KindClusterDetail) error {
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
 
-	ks.kindClusters[clusterName] = kindClusterDetail
+	ks.kindClusters[kindClusterDetail.kindClusterName] = kindClusterDetail
 
 	return nil
 }

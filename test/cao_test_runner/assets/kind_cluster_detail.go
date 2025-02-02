@@ -1,10 +1,17 @@
 package assets
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 )
 
+var (
+	ErrKindClusterNameAlreadySet = errors.New("kind cluster name already set, cannot be changed")
+)
+
 type KindClusterDetail struct {
+	kindClusterName   string
 	controlPlaneNodes []*string
 	workerNodes       []*string
 
@@ -23,6 +30,7 @@ type KindClusterDetail struct {
 */
 
 type KindClusterDetailGetter interface {
+	GetKindClusterName() string
 	GetAllControlPlaneNodes() []*string
 	GetAllWorkerNodes() []*string
 	GetAllNodes() []*string
@@ -30,11 +38,13 @@ type KindClusterDetailGetter interface {
 
 type KindClusterDetailGetterSetter interface {
 	// Getters
+	GetKindClusterName() string
 	GetAllControlPlaneNodes() []*string
 	GetAllWorkerNodes() []*string
 	GetAllNodes() []*string
 
 	// Setters
+	SetKindClusterName(kindClusterName string) error
 	SetControlPlaneNodes(controlPlaneNodes []*string) error
 	SetWorkerNodes(workerNodes []*string) error
 }
@@ -48,6 +58,12 @@ type KindClusterDetailGetterSetter interface {
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
+
+func (kc *KindClusterDetail) GetKindClusterName() string {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+	return kc.kindClusterName
+}
 
 func (kc *KindClusterDetail) GetAllControlPlaneNodes() []*string {
 	kc.mu.Lock()
@@ -76,6 +92,19 @@ func (kc *KindClusterDetail) GetAllNodes() []*string {
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
+
+func (kc *KindClusterDetail) SetKindClusterName(kindClusterName string) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	if kc.kindClusterName != "" {
+		return fmt.Errorf("set kind cluster name: %w", ErrKindClusterNameAlreadySet)
+	}
+
+	kc.kindClusterName = kindClusterName
+
+	return nil
+}
 
 func (kc *KindClusterDetail) SetControlPlaneNodes(controlPlaneNodes []*string) error {
 	kc.mu.Lock()

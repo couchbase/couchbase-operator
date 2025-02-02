@@ -1,11 +1,17 @@
 package assets
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
 
+var (
+	ErrClusterNameAlreadySet = errors.New("cluster name already set, cannot be changed")
+)
+
 type K8SCluster struct {
+	clusterName     string
 	serviceProvider *ManagedServiceProvider
 
 	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
@@ -23,14 +29,17 @@ type K8SCluster struct {
 */
 
 type K8SClusterGetter interface {
+	GetClusterName() string
 	GetServiceProvider() *ManagedServiceProvider
 }
 
 type K8SClusterGetterSetter interface {
 	// Getters
+	GetClusterName() string
 	GetServiceProvider() *ManagedServiceProvider
 
 	// Setters
+	SetClusterName(clusterName string) error
 	SetServiceProvider(ms *ManagedServiceProvider) error
 }
 
@@ -43,6 +52,12 @@ type K8SClusterGetterSetter interface {
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
+
+func (kc *K8SCluster) GetClusterName() string {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+	return kc.clusterName
+}
 
 func (kc *K8SCluster) GetServiceProvider() *ManagedServiceProvider {
 	kc.mu.Lock()
@@ -59,6 +74,19 @@ func (kc *K8SCluster) GetServiceProvider() *ManagedServiceProvider {
 -----------------------------------------------------------------
 -----------------------------------------------------------------
 */
+
+func (kc *K8SCluster) SetClusterName(clusterName string) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	if kc.clusterName != "" {
+		return fmt.Errorf("set cluster name: %w", ErrClusterNameAlreadySet)
+	}
+
+	kc.clusterName = clusterName
+
+	return nil
+}
 
 func (kc *K8SCluster) SetServiceProvider(ms *ManagedServiceProvider) error {
 	kc.mu.Lock()
