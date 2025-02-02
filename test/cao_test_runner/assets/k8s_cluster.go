@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
+	caopods "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cao_pods"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/crds"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/nodes"
 )
@@ -536,6 +537,26 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 	}
 
 	kc.operatorPods = make(map[string]*OperatorPod)
+
+	for ns, _ := range kc.namespaces {
+		if len(kc.namespaces[ns].GetAllPods()) == 0 {
+			continue
+		}
+
+		operatorPod, err := caopods.GetOperatorPod(ns)
+		if err != nil && !errors.Is(err, caopods.ErrOperatorPodDoesntExist) {
+			return fmt.Errorf("populate k8s cluster: %w", err)
+		}
+
+		if operatorPod != nil {
+			kc.operatorPods[operatorPod.Metadata.Name] = &OperatorPod{
+				operatorPodName: operatorPod.Metadata.Name,
+				namespace:       ns,
+				operatorImage:   operatorPod.Spec.Containers[0].Image,
+				scope:           NamespaceScope,
+			}
+		}
+	}
 
 	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
 
