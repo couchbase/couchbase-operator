@@ -537,6 +537,7 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 	}
 
 	kc.operatorPods = make(map[string]*OperatorPod)
+	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
 
 	for ns, _ := range kc.namespaces {
 		if len(kc.namespaces[ns].GetAllPods()) == 0 {
@@ -548,6 +549,11 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 			return fmt.Errorf("populate k8s cluster: %w", err)
 		}
 
+		admissionPods, err := caopods.GetAdmissionPods(ns)
+		if err != nil && !errors.Is(err, caopods.ErrAdmissionPodDoesntExist) {
+			return fmt.Errorf("populate k8s cluster: %w", err)
+		}
+
 		if operatorPod != nil {
 			kc.operatorPods[operatorPod.Metadata.Name] = &OperatorPod{
 				operatorPodName: operatorPod.Metadata.Name,
@@ -556,9 +562,17 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 				scope:           NamespaceScope,
 			}
 		}
-	}
 
-	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
+		for _, admissionPod := range admissionPods {
+			kc.admissionControllerPods[admissionPod.Metadata.Name] = &AdmissionControllerPod{
+				admissionControllerPodName: admissionPod.Metadata.Name,
+				namespace:                  ns,
+				admissionControllerImage:   admissionPod.Spec.Containers[0].Image,
+				scope:                      ClusterScope,
+				replicas:                   len(admissionPods),
+			}
+		}
+	}
 
 	return nil
 }
