@@ -36,6 +36,39 @@ const (
 	envTag = "env"
 )
 
+func (c *Context) ReconcileConfigComplexStruct(fieldType *reflect.StructField, fieldValue *reflect.Value) error {
+	if fieldType.Type.Kind() == reflect.Struct {
+		if fieldValue.Addr().CanInterface() {
+			if _, err := c.ReconcileConfig(fieldValue.Addr().Interface()); err != nil {
+				return err
+			}
+		}
+	} else if fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct {
+		if fieldValue.IsNil() && fieldValue.CanSet() {
+			fieldValue.Set(reflect.New(fieldType.Type.Elem()))
+		}
+		if fieldValue.CanInterface() {
+			if _, err := c.ReconcileConfig(fieldValue.Interface()); err != nil {
+				return err
+			}
+		}
+	} else if fieldType.Type.Kind() == reflect.Slice {
+		elemType := fieldType.Type.Elem()
+		if elemType.Kind() == reflect.Struct || (elemType.Kind() == reflect.Ptr && elemType.Elem().Kind() == reflect.Struct) {
+			for i := 0; i < fieldValue.Len(); i++ {
+				elemValue := fieldValue.Index(i)
+				if elemValue.CanAddr() {
+					if err := c.ReconcileConfigComplexStruct(&reflect.StructField{Type: elemType}, &elemValue); err != nil {
+						return err
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // ReconcileConfig takes in an action config and applies context values to it.
 func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 	// catch any panics just in case it ever happens.
@@ -62,23 +95,8 @@ func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 		fieldValue := v.Field(i)
 
 		// When the config holds structs or ptr to other structs, those structs are reconciled recursively.
-		if fieldType.Type.Kind() == reflect.Struct {
-			if fieldValue.Addr().CanInterface() {
-				_, err := c.ReconcileConfig(fieldValue.Addr().Interface())
-				if err != nil {
-					return nil, err
-				}
-			}
-		} else if fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct {
-			if fieldValue.IsNil() && fieldValue.CanSet() {
-				fieldValue.Set(reflect.New(fieldType.Type.Elem()))
-			}
-			if fieldValue.CanInterface() {
-				_, err := c.ReconcileConfig(fieldValue.Interface())
-				if err != nil {
-					return nil, err
-				}
-			}
+		if err := c.ReconcileConfigComplexStruct(&fieldType, &fieldValue); err != nil {
+			return nil, err
 		}
 
 		// get the field tag value
