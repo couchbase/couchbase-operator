@@ -101,6 +101,9 @@ type K8SClusterGetterSetter interface {
 	SetCAOPath(caoPath *fileutils.File) error
 	SetOperatorPod(operatorPod *OperatorPod) error
 	SetAdmissionControllerPod(admissionControllerPod *AdmissionControllerPod) error
+
+	// Deletes
+	DeleteOperatorPod(operatorPodName string) error
 }
 
 /*
@@ -425,6 +428,25 @@ func (kc *K8SCluster) SetAdmissionControllerPod(admissionControllerPod *Admissio
 	defer kc.mu.Unlock()
 
 	kc.admissionControllerPods[admissionControllerPod.admissionControllerPodName] = admissionControllerPod
+
+	return nil
+}
+
+/*
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-------------------K8SCluster Deletes----------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+-----------------------------------------------------------------
+*/
+
+func (kc *K8SCluster) DeleteOperatorPod(operatorPodName string) error {
+	kc.mu.Lock()
+	defer kc.mu.Unlock()
+
+	delete(kc.operatorPods, operatorPodName)
 
 	return nil
 }

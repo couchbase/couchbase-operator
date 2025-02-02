@@ -151,7 +151,6 @@ func (c *AdmissionControllerValidator) ValidateAdmissionControllerPreviousState(
 
 	for _, pod := range admissionControllerPods {
 		if pod.GetNamespace() == c.Namespace {
-			// Admission Controller pod scoped to current namespace
 			assetAdmissionControllerPods = append(assetAdmissionControllerPods, pod)
 		}
 	}
