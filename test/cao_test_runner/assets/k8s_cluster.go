@@ -493,5 +493,7 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 		kc.crds[crdName] = &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
 	}
 
+	kc.operatorPods = make(map[string]*OperatorPod)
+
 	return nil
 }

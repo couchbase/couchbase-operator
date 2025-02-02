@@ -27,10 +27,24 @@ type OperatorPod struct {
 	mu sync.Mutex
 }
 
-func NewOperatorPod(operatorPodName string) *OperatorPod {
-	return &OperatorPod{
+func NewOperatorPod(operatorPodName, operatorImage, namespace string, scope ScopeType) (*OperatorPod, error) {
+	operatorPod := &OperatorPod{
 		operatorPodName: operatorPodName,
 	}
+
+	if err := operatorPod.SetOperatorImage(operatorImage); err != nil {
+		return nil, fmt.Errorf("new operator pod: %w", err)
+	}
+
+	if err := operatorPod.SetNamespace(namespace); err != nil {
+		return nil, fmt.Errorf("new operator pod: %w", err)
+	}
+
+	if err := operatorPod.SetScope(scope); err != nil {
+		return nil, fmt.Errorf("new operator pod: %w", err)
+	}
+
+	return operatorPod, nil
 }
 
 func ValidateScopeType(scope ScopeType) error {

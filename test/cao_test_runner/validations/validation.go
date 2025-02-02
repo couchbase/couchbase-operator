@@ -8,6 +8,7 @@ import (
 	k8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/k8s_cluster"
 	namespacevalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/namespace"
 	oldvalidators "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/old_validators"
+	operatorvalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/operator"
 )
 
 const (
@@ -32,5 +33,6 @@ func RegisterValidators() map[string]Validator {
 		"DestroyKubernetesClusterValidator": &destroyk8sclustervalidator.KubernetesClusterValidator{},
 		"NamespaceValidator":                &namespacevalidator.NamespaceValidator{},
 		"CAOCRDValidator":                   &caocrdvalidator.CAOCRDValidator{},
+		"OperatorValidator":                 &operatorvalidator.OperatorValidator{},
 	}
 }

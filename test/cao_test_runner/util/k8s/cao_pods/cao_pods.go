@@ -41,11 +41,11 @@ func GetOperatorAdmissionPodNames(namespace string) (string, []string, error) {
 	}
 
 	if operatorPodName == "" {
-		return "", nil, fmt.Errorf("get operator admission pod names: %w", ErrOperatorPodDoesntExist)
+		return operatorPodName, admissionControllerPodNames, fmt.Errorf("get operator admission pod names: %w", ErrOperatorPodDoesntExist)
 	}
 
 	if len(admissionControllerPodNames) == 0 {
-		return "", nil, fmt.Errorf("get operator admission pod names: %w", ErrAdmissionPodDoesntExist)
+		return operatorPodName, admissionControllerPodNames, fmt.Errorf("get operator admission pod names: %w", ErrAdmissionPodDoesntExist)
 	}
 
 	return operatorPodName, admissionControllerPodNames, nil
@@ -60,7 +60,7 @@ func GetOperatorPod(namespace string) (*pods.Pod, error) {
 	}
 
 	operatorPodName, _, err := GetOperatorAdmissionPodNames(namespace)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrAdmissionPodDoesntExist) {
 		return nil, fmt.Errorf("get operator pod: %w", err)
 	}
 
@@ -87,7 +87,7 @@ func GetAdmissionPods(namespace string) ([]*pods.Pod, error) {
 	}
 
 	_, admissionPodNames, err := GetOperatorAdmissionPodNames(namespace)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrOperatorPodDoesntExist) {
 		return nil, fmt.Errorf("get admission pod: %w", err)
 	}
 
