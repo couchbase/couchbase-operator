@@ -3,6 +3,7 @@ package validations
 import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
+	admissioncontrollervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/admission_controller"
 	caocrdvalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/cao_crd"
 	destroyk8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/destroy/k8s_cluster"
 	k8sclustervalidator "github.com/couchbase/couchbase-operator/test/cao_test_runner/validations/k8s_cluster"
@@ -34,5 +35,6 @@ func RegisterValidators() map[string]Validator {
 		"NamespaceValidator":                &namespacevalidator.NamespaceValidator{},
 		"CAOCRDValidator":                   &caocrdvalidator.CAOCRDValidator{},
 		"OperatorValidator":                 &operatorvalidator.OperatorValidator{},
+		"AdmissionControllerValidator":      &admissioncontrollervalidator.AdmissionControllerValidator{},
 	}
 }

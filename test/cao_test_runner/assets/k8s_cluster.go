@@ -495,5 +495,7 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 
 	kc.operatorPods = make(map[string]*OperatorPod)
 
+	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
+
 	return nil
 }

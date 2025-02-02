@@ -15,10 +15,29 @@ type AdmissionControllerPod struct {
 	mu sync.Mutex
 }
 
-func NewAdmissionControllerPod(admissionControllerPodName string) *AdmissionControllerPod {
-	return &AdmissionControllerPod{
+func NewAdmissionControllerPod(admissionControllerPodName, admissionControllerImage, namespace string,
+	scope ScopeType, replicas int) (*AdmissionControllerPod, error) {
+	admissionControllerPod := &AdmissionControllerPod{
 		admissionControllerPodName: admissionControllerPodName,
 	}
+
+	if err := admissionControllerPod.SetAdmissionControllerImage(admissionControllerImage); err != nil {
+		return nil, fmt.Errorf("new admission controller pod: %w", err)
+	}
+
+	if err := admissionControllerPod.SetNamespace(namespace); err != nil {
+		return nil, fmt.Errorf("new admission controller pod: %w", err)
+	}
+
+	if err := admissionControllerPod.SetScope(scope); err != nil {
+		return nil, fmt.Errorf("new admission controller pod: %w", err)
+	}
+
+	if err := admissionControllerPod.SetReplicas(replicas); err != nil {
+		return nil, fmt.Errorf("new admission controller pod: %w", err)
+	}
+
+	return admissionControllerPod, nil
 }
 
 /*
