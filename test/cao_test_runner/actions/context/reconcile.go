@@ -61,6 +61,26 @@ func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 		fieldType := t.Field(i)
 		fieldValue := v.Field(i)
 
+		// When the config holds structs or ptr to other structs, those structs are reconciled recursively.
+		if fieldType.Type.Kind() == reflect.Struct {
+			if fieldValue.Addr().CanInterface() {
+				_, err := c.ReconcileConfig(fieldValue.Addr().Interface())
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else if fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct {
+			if fieldValue.IsNil() && fieldValue.CanSet() {
+				fieldValue.Set(reflect.New(fieldType.Type.Elem()))
+			}
+			if fieldValue.CanInterface() {
+				_, err := c.ReconcileConfig(fieldValue.Interface())
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		// get the field tag value
 		tagString := fieldType.Tag.Get(caoCliTagString)
 		if tagString == "" {
