@@ -1000,6 +1000,7 @@ var clusterRoles = []RoleName{
 	RoleExternalStatsReader,
 	RoleEventingAdmin,
 	RoleEventingManageFunctions,
+	RoleSyncDevOps,
 }
 
 // bucketRoles can be bucket scoped.
@@ -1042,7 +1043,6 @@ var collectionRoles = []RoleName{
 	RoleSyncGatewayApplication,
 	RoleSyncGatewayApplicationReadOnly,
 	RoleSyncGatewayArchitect,
-	RoleSyncDevOps,
 	RoleSyncReplicator,
 	RoleQueryUseSequentialScans,
 }
