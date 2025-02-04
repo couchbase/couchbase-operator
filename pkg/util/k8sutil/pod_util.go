@@ -183,6 +183,12 @@ type PersistentVolumeClaimState struct {
 	Image string
 }
 
+func NewPersistentVolumeClaimState() *PersistentVolumeClaimState {
+	return &PersistentVolumeClaimState{
+		resizeFailed: map[string]error{},
+	}
+}
+
 // NeedsUpdate indicates whether any PVCs need updating.
 // A PVC is an update candidate if its requested spec
 // differs from currently deployed spec.
@@ -452,7 +458,7 @@ func GetPodVolumes(client *client.Client, member couchbaseutil.Member, cluster *
 		return nil, nil
 	}
 
-	state := &PersistentVolumeClaimState{}
+	state := NewPersistentVolumeClaimState()
 
 	mountMappings, err := getPathsToPersist(member, config.VolumeMounts)
 	if err != nil {

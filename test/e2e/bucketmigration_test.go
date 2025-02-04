@@ -301,6 +301,7 @@ func TestCouchstoreBucketToMagmaUpdateUnmanagedBucket(t *testing.T) {
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       "true",
 	}), time.Minute)
 
 	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
