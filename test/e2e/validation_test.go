@@ -3226,6 +3226,27 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.roles(\[0\])?.bucket`},
 		},
+		{
+			name:           "TestRejectSecurityAdminRoleForServerVersion",
+			mutations:      patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
+			shouldFail:     true,
+			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
+		},
+		{
+			name: "TestRejectSecurityAdminRoleForServerVersionLabelCheck",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Add("/spec/security/rbac/selector", metav1.LabelSelector{MatchLabels: map[string]string{"name": "security-admin-role-label"}}),
+				"admin-group": jsonpatch.NewPatchSet().Add("/metadata/labels", map[string]string{"name": "security-admin-role-label"}).Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
+			shouldFail:     true,
+			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
+		},
+		{
+			name: "TestAllowSecurityAdminRoleForServerVersion",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:6.6.0").Remove("/spec/xdcr"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
