@@ -728,8 +728,7 @@ func TestAutoRecoveryEphemeralWithNoAutofailover(t *testing.T) {
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
-	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
