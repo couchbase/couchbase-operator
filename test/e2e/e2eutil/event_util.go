@@ -298,7 +298,7 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Optional{
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
@@ -548,6 +548,9 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, pers
 func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			eventschema.Optional{
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			},
 			eventschema.Optional{
 				Validator: eventschema.Repeat{
 					Times:     victims,

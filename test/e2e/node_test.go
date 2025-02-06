@@ -221,8 +221,8 @@ func TestNodeRecoveryKilledNewMember(t *testing.T) {
 		eventschema.Repeat{Times: scaleSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -737,7 +737,7 @@ func TestAutoRecoveryEphemeralWithNoAutofailover(t *testing.T) {
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 }

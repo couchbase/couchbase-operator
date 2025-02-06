@@ -771,6 +771,12 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 		if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
 			log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
+			// Check the node is actually active before we attempt to delete the log volumes.
+			info := &couchbaseutil.PoolsInfo{}
+			if err := couchbaseutil.GetPools(info).InPlaintext().RetryFor(10*time.Second).On(c.api, m); err != nil {
+				r.abort("unknown node is going down")
+			}
+
 			r.removeMemberUser(m)
 		}
 	}
