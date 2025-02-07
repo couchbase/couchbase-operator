@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"sync"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -35,6 +36,10 @@ type stripeSchedulerImpl struct {
 
 	// avoidGroups is a list of server groups to avoid when scheduling.
 	avoidGroups map[string]bool
+
+	// mu allows us to lock/unlock goroutines that run concurrently if we need to avoid race conditions when accessing
+	// the scheduler cache
+	mu sync.Mutex
 }
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
@@ -189,6 +194,10 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 	if _, ok := sched.serverClasses[class]; !ok {
 		return "", fmt.Errorf("%s: pod %s server class '%s' undefined: %w", stripeErrorHeader, name, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
+
+	// When calculating the server class to use, we need to consider multiple goroutines accessing the scheduler cache simultaneously.
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
 
 	if group == "" {
 		group = sched.getSmallesGroupForClass(class)

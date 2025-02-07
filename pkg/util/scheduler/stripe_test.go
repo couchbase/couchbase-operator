@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"sync"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -241,6 +242,50 @@ func TestStripeCreateOverrideMultiple(t *testing.T) {
 	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup1)
 	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup2)
 	checkCreateScheduling(t, mustCreate(t, s, serverClass2, "", ""), serverGroup1)
+}
+
+// Checks that calling create multiple times concurrently results in deterministic scheduling.
+func TestStripeCreateConcurrentMultiple(t *testing.T) {
+	c := fixtureCluster
+
+	sgCounter := struct {
+		mu     sync.Mutex
+		values map[string]int
+	}{
+		values: make(map[string]int),
+	}
+
+	var wg sync.WaitGroup
+
+	s, err := NewStripeScheduler(fixturePodsEmpty, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The number of pods to calculate the server group for concurrently.
+	numPods := 9
+
+	for i := 0; i < numPods; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			sg := mustCreate(t, s, serverClass1, "", "")
+
+			sgCounter.mu.Lock()
+			sgCounter.values[sg]++
+			sgCounter.mu.Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	for sg, count := range sgCounter.values {
+		if count != numPods/3 {
+			t.Fatalf("Expected %d pods in server group '%s', got %d", numPods/3, sg, count)
+		}
+	}
 }
 
 // TestStripe bad configurations error.
