@@ -135,16 +135,16 @@ func (ns *Namespace) SetServices(services []*string) error {
 */
 
 func (ns *Namespace) PopulateNamespace() error {
-	if ns.namespaceName == "" {
+	if ns.GetNamespaceName() == "" {
 		return fmt.Errorf("populate namespace: %w", ErrNamespaceNameNotSet)
 	}
 
-	allPods, err := pods.GetPodNames(ns.namespaceName)
+	allPods, err := pods.GetPodNames(ns.GetNamespaceName())
 	if err != nil && !errors.Is(err, pods.ErrNoPodsInNamespace) {
 		return fmt.Errorf("populate namespace: %w", err)
 	}
 
-	allServices, err := services.GetServiceNames(ns.namespaceName)
+	allServices, err := services.GetServiceNames(ns.GetNamespaceName())
 	if err != nil && !errors.Is(err, services.ErrNoServicesInNamespace) {
 		return fmt.Errorf("populate namespace: %w", err)
 	}

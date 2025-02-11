@@ -483,13 +483,22 @@ func (kc *K8SCluster) DeleteCRD(crdName string) error {
 */
 
 func (kc *K8SCluster) PopulateK8SCluster() error {
-	if kc.serviceProvider == nil {
+	if kc.GetServiceProvider() == nil {
 		return fmt.Errorf("populate k8s cluster: %w", ErrServiceProviderNotSet)
 	}
 
-	if kc.clusterName == "" {
+	if kc.GetClusterName() == "" {
 		return fmt.Errorf("populate k8s cluster: %w", ErrClusterNameNotSet)
 	}
+
+	kc.mu.Lock()
+
+	kc.namespaces = make(map[string]*Namespace)
+	kc.crds = make(map[string]*CouchbaseCRD)
+	kc.operatorPods = make(map[string]*OperatorPod)
+	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
+
+	kc.mu.Unlock()
 
 	nodes, err := nodes.GetNodeNames()
 	if err != nil {
@@ -505,8 +514,6 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 		return fmt.Errorf("populate k8s cluster: %w", err)
 	}
 
-	kc.namespaces = make(map[string]*Namespace)
-
 	out, _, err := kubectl.GetNamespaces().ExecWithOutputCapture()
 	if err != nil {
 		return fmt.Errorf("populate k8s cluster: %w", err)
@@ -519,13 +526,16 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 	for _, namespace := range allNamespaces {
 		namespace = strings.TrimPrefix(namespace, "namespace/")
 
-		kc.namespaces[namespace] = &Namespace{namespaceName: namespace}
-		if err := kc.namespaces[namespace].PopulateNamespace(); err != nil {
+		ns := &Namespace{namespaceName: namespace}
+
+		if err := kc.SetNamespaces(ns); err != nil {
+			return fmt.Errorf("populate k8s cluster: %w", err)
+		}
+
+		if err := ns.PopulateNamespace(); err != nil {
 			return fmt.Errorf("populate k8s cluster: %w", err)
 		}
 	}
-
-	kc.crds = make(map[string]*CouchbaseCRD)
 
 	crdsMap, err := crds.GetCRDsMap(nil)
 	if err != nil && !errors.Is(err, crds.ErrNoCRDsInCluster) {
@@ -533,43 +543,51 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 	}
 
 	for crdName, crd := range crdsMap {
-		kc.crds[crdName] = &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
+		couchbaseCRD := &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
+		if err := kc.SetCouchbaseCRD(couchbaseCRD); err != nil {
+			return fmt.Errorf("populate k8s cluster: %w", err)
+		}
 	}
 
-	kc.operatorPods = make(map[string]*OperatorPod)
-	kc.admissionControllerPods = make(map[string]*AdmissionControllerPod)
-
-	for ns, _ := range kc.namespaces {
-		if len(kc.namespaces[ns].GetAllPods()) == 0 {
+	for _, ns := range kc.GetAllNamespacesGetters() {
+		if len(ns.GetAllPods()) == 0 {
 			continue
 		}
 
-		operatorPod, err := caopods.GetOperatorPod(ns)
+		operatorPod, err := caopods.GetOperatorPod(ns.GetNamespaceName())
 		if err != nil && !errors.Is(err, caopods.ErrOperatorPodDoesntExist) {
 			return fmt.Errorf("populate k8s cluster: %w", err)
 		}
 
-		admissionPods, err := caopods.GetAdmissionPods(ns)
+		admissionPods, err := caopods.GetAdmissionPods(ns.GetNamespaceName())
 		if err != nil && !errors.Is(err, caopods.ErrAdmissionPodDoesntExist) {
 			return fmt.Errorf("populate k8s cluster: %w", err)
 		}
 
 		if operatorPod != nil {
-			kc.operatorPods[operatorPod.Metadata.Name] = &OperatorPod{
+			operator := &OperatorPod{
 				operatorPodName: operatorPod.Metadata.Name,
-				namespace:       ns,
+				namespace:       ns.GetNamespaceName(),
 				operatorImage:   operatorPod.Spec.Containers[0].Image,
 				scope:           NamespaceScope,
+			}
+
+			if err := kc.SetOperatorPod(operator); err != nil {
+				return fmt.Errorf("populate k8s cluster: %w", err)
 			}
 		}
 
 		for _, admissionPod := range admissionPods {
-			kc.admissionControllerPods[admissionPod.Metadata.Name] = &AdmissionControllerPod{
+			admission := AdmissionControllerPod{
 				admissionControllerPodName: admissionPod.Metadata.Name,
-				namespace:                  ns,
+				namespace:                  ns.GetNamespaceName(),
 				admissionControllerImage:   admissionPod.Spec.Containers[0].Image,
 				scope:                      ClusterScope,
 				replicas:                   len(admissionPods),
+			}
+
+			if err := kc.SetAdmissionControllerPod(&admission); err != nil {
+				return fmt.Errorf("populate k8s cluster: %w", err)
 			}
 		}
 	}

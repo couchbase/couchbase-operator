@@ -272,7 +272,7 @@ func (ac *GKEClusterDetail) SetReleaseChannel(releaseChannel managedk8sservices.
 */
 
 func (kc *GKEClusterDetail) PopulateGKEClusterDetail() error {
-	if kc.gkeClusterName == "" {
+	if kc.GetGKEClusterName() == "" {
 		return fmt.Errorf("populate gke cluster detail: %w", ErrGKEClusterNameNotSet)
 	}
 
@@ -280,7 +280,7 @@ func (kc *GKEClusterDetail) PopulateGKEClusterDetail() error {
 		managedk8sservices.Cloud, managedk8sservices.GCP)
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.gkeClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.GetGKEClusterName())
 	if err != nil {
 		return fmt.Errorf("populate gke cluster detail: %w", err)
 	}

@@ -474,11 +474,15 @@ func (ks *K8SClusters) DeleteGKEClusterDetail(clusterName string) error {
 */
 
 func (ks *K8SClusters) PopulateK8SClusters(kubeconfigPath *fileutils.File) error {
+	ks.mu.Lock()
+
 	ks.k8sClusters = make(map[string]*K8SCluster)
 	ks.kindClusters = make(map[string]*KindClusterDetail)
 	ks.eksClusters = make(map[string]*EKSClusterDetail)
 	ks.aksClusters = make(map[string]*AKSClusterDetail)
 	ks.gkeClusters = make(map[string]*GKEClusterDetail)
+
+	ks.mu.Unlock()
 
 	if err := ks.PopulateAllClusters(kubeconfigPath); err != nil {
 		return fmt.Errorf("populate k8s clusters: %w", err)
@@ -597,9 +601,13 @@ func (ks *K8SClusters) PopulateKindCluster(clusterName string) error {
 		kindClusterName: clusterName,
 	}
 
-	ks.k8sClusters[clusterName] = k8sCluster
+	if err := ks.SetK8SCluster(k8sCluster); err != nil {
+		return fmt.Errorf("populate kind cluster: %w", err)
+	}
 
-	ks.kindClusters[clusterName] = kindClusterDetail
+	if err := ks.SetKindClusterDetail(kindClusterDetail); err != nil {
+		return fmt.Errorf("populate kind cluster: %w", err)
+	}
 
 	if err := k8sCluster.PopulateK8SCluster(); err != nil {
 		return fmt.Errorf("populate kind cluster: %w", err)
@@ -622,9 +630,13 @@ func (ks *K8SClusters) PopulateEKSCluster(clusterName string) error {
 		eksClusterName: clusterName,
 	}
 
-	ks.k8sClusters[clusterName] = k8sCluster
+	if err := ks.SetK8SCluster(k8sCluster); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
 
-	ks.eksClusters[clusterName] = eksClusterDetail
+	if err := ks.SetEKSClusterDetail(eksClusterDetail); err != nil {
+		return fmt.Errorf("populate eks cluster: %w", err)
+	}
 
 	if err := k8sCluster.PopulateK8SCluster(); err != nil {
 		return fmt.Errorf("populate eks cluster: %w", err)
@@ -647,9 +659,13 @@ func (ks *K8SClusters) PopulateAKSCluster(clusterName string) error {
 		aksClusterName: clusterName,
 	}
 
-	ks.k8sClusters[clusterName] = k8sCluster
+	if err := ks.SetK8SCluster(k8sCluster); err != nil {
+		return fmt.Errorf("populate aks cluster: %w", err)
+	}
 
-	ks.aksClusters[clusterName] = aksClusterDetail
+	if err := ks.SetAKSClusterDetail(aksClusterDetail); err != nil {
+		return fmt.Errorf("populate aks cluster: %w", err)
+	}
 
 	if err := k8sCluster.PopulateK8SCluster(); err != nil {
 		return fmt.Errorf("populate aks cluster: %w", err)
@@ -672,9 +688,13 @@ func (ks *K8SClusters) PopulateGKECluster(clusterName string) error {
 		gkeClusterName: clusterName,
 	}
 
-	ks.k8sClusters[clusterName] = k8sCluster
+	if err := ks.SetK8SCluster(k8sCluster); err != nil {
+		return fmt.Errorf("populate gke cluster: %w", err)
+	}
 
-	ks.gkeClusters[clusterName] = gkeClusterDetail
+	if err := ks.SetGKEClusterDetail(gkeClusterDetail); err != nil {
+		return fmt.Errorf("populate gke cluster: %w", err)
+	}
 
 	if err := k8sCluster.PopulateK8SCluster(); err != nil {
 		return fmt.Errorf("populate gke cluster: %w", err)

@@ -243,19 +243,23 @@ func (ts *TestAssets) PopulateTestAssets() error {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 
-	if ts.kubectlPath == nil {
-		ts.kubectlPath = fileutils.NewFile("kubectl")
+	if ts.GetKubectlPath() == nil {
+		if err := ts.SetKubeconfigPath(fileutils.NewFile("kubectl")); err != nil {
+			return fmt.Errorf("populate test assets: %w", err)
+		}
 	}
 
 	if err := ts.PopulateKubeconfigPath(); err != nil {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 
-	if ts.k8sClusters == nil {
+	if ts.GetK8SClustersGetter() == nil {
+		ts.mu.Lock()
 		ts.k8sClusters = &K8SClusters{}
+		ts.mu.Unlock()
 	}
 
-	if err := ts.k8sClusters.PopulateK8SClusters(ts.kubeconfigPath); err != nil {
+	if err := ts.k8sClusters.PopulateK8SClusters(ts.GetKubeconfigPath()); err != nil {
 		return fmt.Errorf("populate test assets: %w", err)
 	}
 

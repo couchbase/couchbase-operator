@@ -251,7 +251,7 @@ func (ekscd *EKSClusterDetail) SetDiskSize(diskSize int32) error {
 */
 
 func (kc *EKSClusterDetail) PopulateEKSClusterDetail() error {
-	if kc.eksClusterName == "" {
+	if kc.GetEKSClusterName() == "" {
 		return fmt.Errorf("populate eks cluster: %w", ErrEKSClusterNameNotSet)
 	}
 
@@ -259,7 +259,7 @@ func (kc *EKSClusterDetail) PopulateEKSClusterDetail() error {
 		managedk8sservices.Cloud, managedk8sservices.AWS)
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.eksClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.GetEKSClusterName())
 	if err != nil {
 		return fmt.Errorf("populate eks cluster: %w", err)
 	}

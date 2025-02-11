@@ -337,7 +337,7 @@ func (ac *AKSNodePool) SetDiskSize(diskSize int32) error {
 */
 
 func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
-	if kc.aksClusterName == "" {
+	if kc.GetAKSClusterName() == "" {
 		return fmt.Errorf("populate aks cluster detail: %w", ErrAKSClusterNameNotSet)
 	}
 
@@ -345,7 +345,7 @@ func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
 		managedk8sservices.Cloud, managedk8sservices.Azure)
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
-		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.aksClusterName)
+		[]*managedk8sservices.ManagedServiceProvider{managedServiceProvider}, kc.GetAKSClusterName())
 	if err != nil {
 		return fmt.Errorf("populate aks cluster detail: %w", err)
 	}
@@ -362,7 +362,7 @@ func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
 		return fmt.Errorf("populate aks cluster detail: %w", err)
 	}
 
-	resourceGroup := kc.aksClusterName + "-rg"
+	resourceGroup := kc.GetAKSClusterName() + "-rg"
 
 	aksCluster, err := aksSession.GetCluster(ctx, resourceGroup)
 	if err != nil {
@@ -370,7 +370,11 @@ func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
 		return fmt.Errorf("populate aks cluster detail: %w", err)
 	}
 
+	kc.mu.Lock()
+
 	kc.nodePools = make(map[string]*AKSNodePool)
+
+	kc.mu.Unlock()
 
 	nodePools, err := aksSession.ListNodePools(ctx, resourceGroup)
 	if err != nil {
