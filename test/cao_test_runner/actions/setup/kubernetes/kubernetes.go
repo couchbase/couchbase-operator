@@ -29,8 +29,8 @@ type KubernetesSetupConfig struct {
 	NumControlPlane          int                                `yaml:"numControlPlane"`
 	NumWorkers               int                                `yaml:"numWorkers"`
 	LoadDockerImageToKind    bool                               `yaml:"loadDockerImageToKind"`
-	OperatorImage            string                             `yaml:"operatorImage" caoCli:"required,context" env:"OPERATOR_IMAGE"`
-	AdmissionControllerImage string                             `yaml:"admissionControllerImage" caoCli:"required,context" env:"ADMISSION_CONTROLLER_IMAGE"`
+	OperatorImage            string                             `yaml:"operatorImage" caoCli:"required" env:"OPERATOR_IMAGE"`
+	AdmissionControllerImage string                             `yaml:"admissionControllerImage" caoCli:"required" env:"ADMISSION_CONTROLLER_IMAGE"`
 	Provider                 managedk8sservices.ProviderType    `yaml:"provider" env:"PROVIDER"`
 	EKSRegion                string                             `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
 	AKSRegion                string                             `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
@@ -112,9 +112,6 @@ func (action *SetupKubernetes) Do(ctx *context.Context, testAssets assets.TestAs
 	if err = createClusterUtil.CreateCluster(ctxContext); err != nil {
 		return err
 	}
-
-	ctx.WithID(context.AdmissionIDKey, c.AdmissionControllerImage)
-	ctx.WithID(context.OperatorIDKey, c.OperatorImage)
 
 	return nil
 }

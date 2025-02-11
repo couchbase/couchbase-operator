@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
-	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -18,7 +17,6 @@ var (
 	ErrUnableToDecodeOperatorConfig = errors.New("unable to decode OperatorConfig in Do()")
 	ErrNoOperatorConfigFound        = errors.New("no config found for deleting operator pod")
 	ErrIllegalScope                 = errors.New("illegal scope")
-	ErrCAOBinaryPathInvalid         = errors.New("cao binary path does not exist")
 )
 
 type ScopeType string
@@ -34,10 +32,9 @@ const (
 )
 
 type OperatorConfig struct {
-	Description   []string         `yaml:"description"`
-	CAOBinaryPath string           `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
-	Scope         ScopeType        `yaml:"scope"`
-	Validators    []map[string]any `yaml:"validators,omitempty"`
+	Description []string         `yaml:"description"`
+	Scope       ScopeType        `yaml:"scope"`
+	Validators  []map[string]any `yaml:"validators,omitempty"`
 }
 
 func NewDeleteOperatorConfig(config interface{}) (actions.Action, error) {
@@ -84,10 +81,6 @@ func (action *DeleteOperator) CheckConfig() error {
 		return ErrIllegalScope
 	}
 
-	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
-		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
-	}
-
 	return nil
 }
 
@@ -122,8 +115,6 @@ func (action *DeleteOperator) Do(ctx *context.Context, testAssets assets.TestAss
 	logrus.Infof("Operator pod deletion started")
 
 	logrus.Info("cao delete operator at :", time.Now().Format(time.RFC3339))
-
-	cao.WithBinaryPath(c.CAOBinaryPath)
 
 	if err := cao.DeleteOperator(string(c.Scope)).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to execute cao delete operator: %w", err)

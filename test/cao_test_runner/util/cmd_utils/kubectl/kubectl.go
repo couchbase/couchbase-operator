@@ -137,6 +137,12 @@ func Delete(args ...string) *KubectlCmd {
 	return NewKubectlCmd(cmd, args, nil)
 }
 
+func DeleteCRD(name string) *KubectlCmd {
+	args := []string{"crd", name}
+	cmd := "delete"
+	return NewKubectlCmd(cmd, args, nil)
+}
+
 func DeleteNamespace(namespace string) *KubectlCmd {
 	args := []string{"namespace", namespace}
 	cmd := "delete"

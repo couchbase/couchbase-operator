@@ -15,17 +15,15 @@ import (
 )
 
 var (
-	ErrDecodeCAOSetupConfig   = errors.New("unable to decode CaoCrdSetupConfig")
-	ErrNoConfigFound          = errors.New("no config found for setting up cao binary and crd")
-	ErrNoAvailableContexts    = errors.New("no such available contexts")
-	ErrIllegalPlatform        = errors.New("illegal platform")
-	ErrIllegalOperatingSystem = errors.New("illegal operating system")
-	ErrIllegalArchitecture    = errors.New("illegal architecture")
+	ErrDecodeCAOSetupConfig = errors.New("unable to decode CaoCrdSetupConfig")
+	ErrNoConfigFound        = errors.New("no config found for setting up cao binary and crd")
+	ErrNoAvailableContexts  = errors.New("no such available contexts")
+	ErrIllegalPlatform      = errors.New("illegal platform")
 )
 
 type CaoCrdSetupConfig struct {
 	Description     []string         `yaml:"description"`
-	OperatorVersion string           `yaml:"operatorVersion" caoCli:"required,context" env:"OPERATOR_VERSION"`
+	OperatorVersion string           `yaml:"operatorVersion" caoCli:"required" env:"OPERATOR_VERSION"`
 	ClusterName     string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 	Validators      []map[string]any `yaml:"validators,omitempty"`
 }
@@ -94,9 +92,7 @@ func (action *SetupCaoCrd) Do(ctx *context.Context, testAssets assets.TestAssetG
 		return fmt.Errorf("kubectl apply crd yaml: %w", err)
 	}
 
-	ctx.WithID(context.OperatorVersionKey, c.OperatorVersion)
-	ctx.WithID(context.CRDPathKey, crdPath)
-	ctx.WithID(context.CAOBinaryPathKey, caoBinaryPath)
+	logrus.Infof("CAO Binary Path created at: %s", caoBinaryPath)
 
 	return nil
 }

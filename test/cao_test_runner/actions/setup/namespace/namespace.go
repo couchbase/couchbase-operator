@@ -17,7 +17,6 @@ var (
 	ErrNoSetupNamespaceConfigFound        = errors.New("no config found for creating namespace")
 	ErrIllegalImagePullPolicy             = errors.New("illegal image pull policy")
 	ErrIllegalScope                       = errors.New("illegal scope")
-	ErrCAOBinaryPathInvalid               = errors.New("cao binary path does not exist")
 )
 
 type SetupNamespaceConfig struct {

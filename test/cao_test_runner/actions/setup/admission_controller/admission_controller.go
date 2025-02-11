@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +22,6 @@ var (
 	ErrNoAdmissionConfigFound        = errors.New("no config found for creating admission pod")
 	ErrIllegalImagePullPolicy        = errors.New("illegal image pull policy")
 	ErrIllegalScope                  = errors.New("illegal scope")
-	ErrCAOBinaryPathInvalid          = errors.New("cao binary path does not exist")
 	ErrGhcrSecretExists              = errors.New("ghcr docker-registry secret already exists")
 	ErrInvalidSecretParams           = errors.New("ghcr docker-registry secret params invalid")
 )
@@ -71,8 +69,7 @@ type ImagePullSecret struct {
 
 type AdmissionControllerConfig struct {
 	Description                 []string            `yaml:"description"`
-	AdmissionControllerImage    string              `yaml:"admissionControllerImage" caoCli:"context" env:"ADMISSION_CONTROLLER_IMAGE"`
-	CAOBinaryPath               string              `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
+	AdmissionControllerImage    string              `yaml:"admissionControllerImage" env:"ADMISSION_CONTROLLER_IMAGE"`
 	CPULimit                    int                 `yaml:"cpuLimit"`
 	CPURequest                  int                 `yaml:"cpuRequest"`
 	ImagePullPolicy             ImagePullPolicyType `yaml:"imagePullPolicy"`
@@ -168,10 +165,6 @@ func (action *SetupAdmissionController) CheckConfig() error {
 		c.Replicas = DefaultReplicas
 	}
 
-	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
-		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
-	}
-
 	return nil
 }
 
@@ -211,17 +204,12 @@ func (action *SetupAdmissionController) Do(ctx *context.Context, testAssets asse
 		return fmt.Errorf("failed to generate pull secrets: %w", err)
 	}
 
-	cao.WithBinaryPath(c.CAOBinaryPath)
-
 	if err := cao.CreateAdmissionController(c.CPULimit, c.CPURequest, c.MemoryLimit,
 		c.MemoryRequest, c.Replicas, c.AdmissionControllerImage, string(c.ImagePullPolicy),
 		c.ImagePullSecret.Name, fmt.Sprintf("%d", c.AdmissionControllerLogLevel), string(c.Scope), c.ValidateSecrets,
 		c.ValidateStorageClasses).ExecWithoutOutputCapture(); err != nil {
 		return fmt.Errorf("failed to execute cao create admission: %w", err)
 	}
-
-	ctx.WithID(context.AdmissionIDKey, c.AdmissionControllerImage)
-	ctx.WithID(context.CAOBinaryPathKey, c.CAOBinaryPath)
 
 	return nil
 }

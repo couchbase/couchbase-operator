@@ -6,7 +6,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
@@ -23,7 +22,7 @@ var (
 
 type CRDDestroyConfig struct {
 	Description []string         `yaml:"description"`
-	CRDPath     string           `yaml:"crdPath" caoCli:"required,context" env:"CRD_PATH"`
+	ClusterName string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 	Validators  []map[string]any `yaml:"validators,omitempty"`
 }
 
@@ -64,9 +63,18 @@ func (action *DestroyCRD) Do(ctx *context.Context, testAssets assets.TestAssetGe
 
 	logrus.Infof("CRD delete action started")
 
-	err := kubectl.DeleteFromFiles(c.CRDPath).ExecWithoutOutputCapture()
+	cluster, err := testAssets.GetK8SClustersGetter().GetK8SClusterGetter(c.ClusterName)
 	if err != nil {
-		return fmt.Errorf("kubectl delete crd yaml: %w", err)
+		// Cluster does not exist
+		return fmt.Errorf("crd destroy do: %w", err)
+	}
+
+	allCRDs := cluster.GetAllCouchbaseCRDsGetter()
+
+	for _, assetCRD := range allCRDs {
+		if err := kubectl.DeleteCRD(assetCRD.GetCRDName()).ExecWithoutOutputCapture(); err != nil {
+			return fmt.Errorf("crd destroy do: %w", err)
+		}
 	}
 
 	return nil
@@ -98,13 +106,9 @@ func (action *DestroyCRD) CheckConfig() error {
 		return ErrNoConfigFound
 	}
 
-	c, ok := action.yamlConfig.(*CRDDestroyConfig)
+	_, ok := action.yamlConfig.(*CRDDestroyConfig)
 	if !ok {
 		return ErrDecodeCRDSetupConfig
-	}
-
-	if ok = fileutils.NewFile(c.CRDPath).IsFileExists(); !ok {
-		return fmt.Errorf("crd file %s does not exist : %w", c.CRDPath, ErrCRDFileNoExist)
 	}
 
 	return nil

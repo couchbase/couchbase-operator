@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
@@ -23,7 +22,6 @@ var (
 	ErrNoOperatorConfigFound        = errors.New("no config found for creating operator pod")
 	ErrIllegalImagePullPolicy       = errors.New("illegal image pull policy")
 	ErrIllegalScope                 = errors.New("illegal scope")
-	ErrCAOBinaryPathInvalid         = errors.New("cao binary path does not exist")
 	ErrGhcrSecretExists             = errors.New("ghcr docker-registry secret already exists")
 	ErrInvalidSecretParams          = errors.New("ghcr docker-registry secret params invalid")
 )
@@ -74,8 +72,7 @@ type ImagePullSecret struct {
 
 type OperatorConfig struct {
 	Description        []string            `yaml:"description"`
-	OperatorImage      string              `yaml:"operatorImage" caoCli:"context" env:"OPERATOR_IMAGE"`
-	CAOBinaryPath      string              `yaml:"caoBinaryPath" caoCli:"required,context" env:"CAO_BINARY_PATH"`
+	OperatorImage      string              `yaml:"operatorImage" env:"OPERATOR_IMAGE"`
 	CPULimit           int                 `yaml:"cpuLimit"`
 	CPURequest         int                 `yaml:"cpuRequest"`
 	ImagePullPolicy    ImagePullPolicyType `yaml:"imagePullPolicy"`
@@ -202,10 +199,6 @@ func (action *SetupOperator) CheckConfig() error {
 		c.PodReadinessPeriod = DefaultPodReadinessPeriod
 	}
 
-	if ok = fileutils.NewFile(c.CAOBinaryPath).IsFileExists(); !ok {
-		return fmt.Errorf("cao binary path %s does not exist: %w", c.CAOBinaryPath, ErrCAOBinaryPathInvalid)
-	}
-
 	return nil
 }
 
@@ -227,8 +220,6 @@ func (action *SetupOperator) Do(ctx *context.Context, testAssets assets.TestAsse
 		return fmt.Errorf("failed to generate pull secrets: %w", err)
 	}
 
-	cao.WithBinaryPath(c.CAOBinaryPath)
-
 	if err := cao.CreateOperator(c.CPULimit, c.CPURequest, c.MemoryLimit, c.MemoryRequest,
 		c.OperatorImage, string(c.ImagePullPolicy), c.ImagePullSecret.Name,
 		fmt.Sprintf("%d", c.OperatorLogLevel), string(c.Scope), c.PodCreationTimeout,
@@ -237,7 +228,6 @@ func (action *SetupOperator) Do(ctx *context.Context, testAssets assets.TestAsse
 	}
 
 	ctx.WithID(context.OperatorIDKey, c.OperatorImage)
-	ctx.WithID(context.CAOBinaryPathKey, c.CAOBinaryPath)
 
 	return nil
 }
