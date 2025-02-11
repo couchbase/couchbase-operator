@@ -112,6 +112,7 @@ include::partial$autogen-reference.adoc[]
  ** xref:reference-prometheus-metrics.adoc[Operator Prometheus Metrics]
 * Couchbase Cluster
  ** xref:reference-reference-architecture.adoc[`CouchbaseCluster` Reference Architecture]
+ ** xref:reference-couchbasecluster-conditions.adoc[`CouchbaseCluster` Conditions]
  ** xref:reference-couchbasecluster-events.adoc[`CouchbaseCluster` Events]
  ** xref:reference-couchbasecluster-services.adoc[`CouchbaseCluster` Services]
  ** xref:reference-bucket-backend-migration.adoc[Bucket Backend Migration Documentation]

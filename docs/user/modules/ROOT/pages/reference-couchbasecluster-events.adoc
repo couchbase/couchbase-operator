@@ -34,6 +34,14 @@ RebalanceIncomplete::
 A rebalance operation has terminated abnormally; nodes may have not been added or ejected as expected.
 RebalanceCompleted::
 A rebalance operation has successfully completed.
+ExpandVolumeSucceeded::
+A volume expansion operation has successfully completed.
+ExpandVolumeFallback::
+A volume expansion operation has failed and the cluster is falling back to a rolling upgrade of volumes.
+ExpandVolumeStarted::
+A volume expansion operation has started.
+ReconciliationFailed::
+A reconciliation operation failed.  This may be due to a transient error or a configuration issue.
 
 == Cluster Upgrade Lifecycle
 
@@ -104,6 +112,8 @@ TLS client configuration invalid.  Consult the Operator logs for details.
 
 RemoteClusterAdded::
 A remote cluster reference was created.
+RemoteClusterUpdated::
+A remote cluster reference was updated.
 RemoteClusterRemoved::
 A remote cluster reference was removed.
 ReplicationAdded::
@@ -120,7 +130,11 @@ A periodic backup job was updated.
 BackupDeleted::
 A periodic backup job was deleted.
 BackupStarted::
-Backup
+A backup operation has started.
+BackupCompleted::
+A backup operation has completed.
+BackupFailed::
+A backup operation has failed.
 BackupRestoreCreated::
 A restore job was created.
 BackupRestoreDeleted::
@@ -128,22 +142,21 @@ A restore job was deleted.  This condition indicates successful completion.
 
 == Auto-scaling Lifecycle
 
-EventAutoscalerCreated::
+AutoscalerCreated::
 An autoscaling resource was created for a server class.
-EventAutoscalerDeleted::
+AutoscalerDeleted::
 An autoscaling resource was deleted for a server class.
-EventAutoscaleUp::
+AutoscaleUp::
 An autoscaler requested a server class to be scaled up.
-EventAutoscaleDown::
+AutoscaleDown::
 An autoscaler requested a server class to be scaled down.
 
+== Network Lifecycle
 
-== Volume Expansion Lifecycle
+NetworkSettingsModified::
+Network settings were updated.
 
-EventReasonExpandVolumeStarted::
-An expansion event has started for a specific persistent volume.
-EventReasonExpandVolumeFallback::
-An expansion event has failed for a specific persistent volume.
-All subsequent volume expansion requests are canceled and cluster falls back to rolling upgrade of volumes.
-EventReasonExpandVolumeSucceeded::
-An expansion event has successfully completed for a specific persistent volume.
+== Scopes and Collections
+
+ScopesAndCollectionsUpdated::
+Scopes and collections were updated for a bucket.

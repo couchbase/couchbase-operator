@@ -1,0 +1,149 @@
+= Couchbase Cluster Conditions
+
+This document provides an overview of the possible conditions that a Couchbase cluster can be in. These conditions help in understanding the state and health of the cluster.
+
+== Conditions
+
+=== Available
+*Description:* Indicates that the Couchbase cluster is fully operational and available.
+
+*Possible Values:*
+
+* `True`: The cluster is available.
+* `False`: The cluster is not available.
+* `Unknown`: The availability of the cluster cannot be determined.
+
+=== Balanced
+*Description:* Indicates that the Couchbase cluster is balanced.
+
+*Possible Values:*
+
+* `True`: The cluster is balanced.
+* `False`: The cluster is not balanced.
+* `Unknown`: The balance status of the cluster cannot be determined.
+
+=== ManageConfig
+*Description:* Indicates that the Couchbase cluster is managing its configuration.
+
+*Possible Values:*
+
+* `True`: The cluster is managing its configuration.
+* `False`: The cluster is not managing its configuration.
+* `Unknown`: The configuration management status of the cluster cannot be determined.
+
+=== Scaling
+*Description:* Indicates that the Couchbase cluster is currently scaling up or down.
+
+*Possible Values:*
+
+* `True`: The cluster is scaling.
+* `False`: The cluster is not scaling.
+* `Unknown`: The scaling status of the cluster cannot be determined.
+
+=== ScalingUp
+*Description:* Indicates that the Couchbase cluster is scaling up.
+
+*Possible Values:*
+
+* `True`: The cluster is scaling up.
+* `False`: The cluster is not scaling up.
+* `Unknown`: The scaling up status of the cluster cannot be determined.
+
+=== ScalingDown
+*Description:* Indicates that the Couchbase cluster is scaling down.
+
+*Possible Values:*
+
+* `True`: The cluster is scaling down.
+* `False`: The cluster is not scaling down.
+* `Unknown`: The scaling down status of the cluster cannot be determined.
+
+=== Upgrading
+*Description:* Indicates that the Couchbase cluster is undergoing an upgrade.
+
+*Possible Values:*
+
+* `True`: The cluster is upgrading.
+* `False`: The cluster is not upgrading.
+* `Unknown`: The upgrade status of the cluster cannot be determined.
+
+=== Hibernating
+*Description:* Indicates that the Couchbase cluster is in hibernation.
+
+*Possible Values:*
+
+* `True`: The cluster is hibernating.
+* `False`: The cluster is not hibernating.
+* `Unknown`: The hibernation status of the cluster cannot be determined.
+
+=== Error
+*Description:* Indicates that there is an error in the Couchbase cluster.
+
+*Possible Values:*
+
+* `True`: There is an error in the cluster.
+* `False`: There is no error in the cluster.
+* `Unknown`: The error status of the cluster cannot be determined.
+
+=== AutoscaleReady
+*Description:* Indicates that the Couchbase cluster is ready for autoscaling.
+
+*Possible Values:*
+
+* `True`: The cluster is ready for autoscaling.
+* `False`: The cluster is not ready for autoscaling.
+* `Unknown`: The autoscaling readiness of the cluster cannot be determined.
+
+=== Synchronized
+*Description:* Indicates that the Couchbase cluster is synchronized.
+
+*Possible Values:*
+
+* `True`: The cluster is synchronized.
+* `False`: The cluster is not synchronized.
+* `Unknown`: The synchronization status of the cluster cannot be determined.
+
+=== WaitingBetweenMigrations
+*Description:* Indicates that the Couchbase cluster is waiting between migrations.
+
+*Possible Values:*
+
+* `True`: The cluster is waiting between migrations.
+* `False`: The cluster is not waiting between migrations.
+* `Unknown`: The waiting status between migrations of the cluster cannot be determined.
+
+=== Migrating
+*Description:* Indicates that the Couchbase cluster is migrating.
+
+*Possible Values:*
+
+* `True`: The cluster is migrating.
+* `False`: The cluster is not migrating.
+* `Unknown`: The migration status of the cluster cannot be determined.
+
+=== Rebalancing
+*Description:* Indicates that the Couchbase cluster is rebalancing its data across nodes.
+
+*Possible Values:*
+
+* `True`: The cluster is rebalancing.
+* `False`: The cluster is not rebalancing.
+* `Unknown`: The rebalancing status of the cluster cannot be determined.
+
+=== ExpandingVolume
+*Description:* Indicates that the Couchbase cluster is expanding a volume.
+
+*Possible Values:*
+
+* `True`: The cluster is expanding a volume.
+* `False`: The cluster is not expanding a volume.
+* `Unknown`: The volume expansion status of the cluster cannot be determined.
+
+=== BucketMigrating
+*Description:* Indicates that the cluster is migrating a bucket storage backend.
+
+*Possible Values:*
+
+* `True`: The cluster is migrating a bucket storage backend.
+* `False`: The cluster is not migrating a bucket storage backend.
+* `Unknown`: The bucket migration status of the cluster cannot be determined.
