@@ -3451,6 +3451,29 @@ func TestBucketMigrationPre76Invalid(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
 }
 
+func TestBlockChangingMigrationProcessDuringMigration(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestBlockChangingMigrationProcessDuringMigration",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "false"})},
+			expectedErrors: []string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
+			shouldFail:     true,
+		}, {
+			name:           "TestBlockRemovingMigrationProcessDuringMigration",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{})},
+			expectedErrors: []string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
+			shouldFail:     true,
+		}, {
+			name:           "TestBlockRemovingAnnotationsMigrationProcessDuringMigration",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/metadata/annotations")},
+			expectedErrors: []string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
+			shouldFail:     true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration-in-process.yaml"})
+}
+
 func TestBucketMigrationPost76Validation(t *testing.T) {
 	testDefs := []testDef{
 		{
