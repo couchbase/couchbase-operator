@@ -109,7 +109,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketMinReplicasCountApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestVersionUpgradePath).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestClusterChangesDuringHibernation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestHibernationChangeConstraints).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestClusterMigrationAddition).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestClusterMigrationInvalidMigration).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),

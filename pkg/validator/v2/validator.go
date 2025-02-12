@@ -3727,7 +3727,7 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	}
 
 	// If the cluster is in hibernation, we should prohibit any changes
-	if err := checkForClusterChangesDuringHibernation(prev, curr); err != nil {
+	if err := checkChangeConstraintsHibernate(prev, curr); err != nil {
 		return err
 	}
 
@@ -4098,11 +4098,19 @@ func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.
 }
 
 // checkForClusterChangesDuringHibernation validates whether there have been any changes to a cluster while hibernate is enabled.
-func checkForClusterChangesDuringHibernation(current, updated *couchbasev2.CouchbaseCluster) error {
+func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseCluster) error {
 	if current.Spec.Hibernate && updated.Spec.Hibernate {
 		current.Spec.Hibernate = updated.Spec.Hibernate
 		if !reflect.DeepEqual(updated.Spec, current.Spec) {
 			return fmt.Errorf("cluster spec cannot be changed during hibernation")
+		}
+	}
+
+	if updated.Spec.Hibernate {
+		upgradeCondition := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+
+		if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
+			return fmt.Errorf("cluster cannot be hibernated during an upgrade")
 		}
 	}
 

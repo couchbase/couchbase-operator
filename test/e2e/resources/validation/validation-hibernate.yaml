@@ -16,3 +16,32 @@ spec:
         - query
         - search
         - eventing
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-upgrading
+  namespace: default
+spec:
+  hibernate: false
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+status:
+  currentVersion: 7.2.2
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: Cluster upgrading
+      reason: Upgrading
+      status: "True"
+      type: Upgrading

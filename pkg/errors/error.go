@@ -119,7 +119,7 @@ var (
 	// ErrServerClassNotFound is raised when the operator looks for a server class
 	// that doesn't exist.
 	ErrServerClassNotFound       = errors.New("server class not found")
-	ErrImageVersionUnretrievable = errors.New("error extracting image verion")
+	ErrImageVersionUnretrievable = errors.New("error extracting image version")
 
 	// ErrNoMatchingServerClass is raised when no server class is found that matches the node.
 	ErrNoMatchingServerClass = errors.New("no matching server class found")

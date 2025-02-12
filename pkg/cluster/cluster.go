@@ -1085,7 +1085,15 @@ func (c *Cluster) hibernate() error {
 	if isRebalancing, err := c.isClusterRebalancing(); err != nil {
 		return err
 	} else if isRebalancing {
-		log.Info("[WARN] The cluster is currently rebalancing, waiting for rebalance to complete before hibernating cluster")
+		log.Info("[WARN] The cluster is currently rebalancing. Waiting for rebalance to complete before hibernating cluster")
+		return nil
+	}
+
+	// Don't hibernate during an upgrade. This should also have been prevented by the dac, but this is a belt and braces check.
+	if isUpgrading, err := c.isUpgrading(); err != nil {
+		return err
+	} else if isUpgrading {
+		log.Info("[WARN] The cluster is currently upgrading. Waiting for upgrade to complete before hibernating cluster")
 		return nil
 	}
 
