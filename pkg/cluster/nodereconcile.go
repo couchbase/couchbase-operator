@@ -1934,7 +1934,7 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 
 	migrationCandidates := couchbaseutil.MemberSet{}
 
-	explicitNumber := min(max(1, int(c.cluster.Spec.Buckets.MaxMigratableBuckets)), len(candidatesNoOrchestrator))
+	explicitNumber := min(max(1, int(c.cluster.Spec.Buckets.MaxConcurrentPodSwaps)), len(candidatesNoOrchestrator))
 
 	// Add candidates up to the explicitNumber or the orchestrator if no others are available.
 	for _, candidateName := range candidatesNoOrchestrator.Names()[:explicitNumber] {

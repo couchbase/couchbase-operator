@@ -134,7 +134,7 @@ func TestMultipleCouchstoreBucketsToMagmaMigration(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// This test validates that the maxMigratableBuckets annotation will be used to determine the number of pods
+// This test validates that the buckets.maxConcurrentPodSwaps annotation will be used to determine the number of pods
 // that should be migrated each swap-rebalance, excl. the orchestrator.
 func TestCouchstoreBucketsToMagmaMigrationWithMultiMigration(t *testing.T) {
 	f := framework.Global
@@ -150,7 +150,7 @@ func TestCouchstoreBucketsToMagmaMigrationWithMultiMigration(t *testing.T) {
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
 
 	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.maxMigratableBuckets", "2")
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.maxConcurrentPodSwaps", "2")
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -166,8 +166,9 @@ func TestCouchstoreBucketsToMagmaMigrationWithMultiMigration(t *testing.T) {
 		time.Minute)
 
 	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
-	// With a cluster size of 3 and maxMigratableBuckets set to 2, we should
+	// With a cluster size of 3 and buckets.maxConcurrentPodSwaps set to 2, we should
 	// only see 2 rebalances where the non-orchestrator pods are rebalanced at the same time, followed by the orchestrator
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),

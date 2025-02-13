@@ -3803,11 +3803,11 @@ type Buckets struct {
 	// This value defaults to false.
 	EnableBucketMigrationRoutines bool `json:"-" annotation:"enableBucketMigrationRoutines"`
 
-	// MaxMigratableBuckets allows the number of pods affected by a bucket migration at any
+	// MaxConcurrentPodSwaps allows the number of pods affected by a bucket migration at any
 	// one time to be increased.
 	// By default a migration will affect one pod at a time.
 	// This field must be greater than zero.
-	MaxMigratableBuckets uint64 `json:"-" annotation:"maxMigratableBuckets"`
+	MaxConcurrentPodSwaps uint64 `json:"-" annotation:"maxConcurrentPodSwaps"`
 }
 
 type RBAC struct {

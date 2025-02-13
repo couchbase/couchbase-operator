@@ -249,11 +249,7 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 		return checkValidStorageBackend(backend, annotation)
 	}
 
-	enableBucketMigrationRoutinesValidation := func(val, annotation string) error {
-		if cond := cluster.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
-			return fmt.Errorf("%s annotation cannot be changed whilst a bucket migration routine is in progress", annotation)
-		}
-
+	checkStringToBoolBucketAnnotation := func(val, _ string) error {
 		return checkStringToBool(val)
 	}
 
@@ -264,8 +260,8 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 	bucketAnnotations := map[string]func(string, string) error{
 		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
-		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       enableBucketMigrationRoutinesValidation,
-		"cao.couchbase.com/buckets.maxMigratableBuckets":                checkStringToUintBucketAnnotation,
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       checkStringToBoolBucketAnnotation,
+		"cao.couchbase.com/buckets.maxConcurrentPodSwaps":               checkStringToUintBucketAnnotation,
 	}
 
 	for k, v := range cluster.Annotations {
@@ -3735,6 +3731,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		return err
 	}
 
+	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -4107,9 +4107,7 @@ func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseClus
 	}
 
 	if updated.Spec.Hibernate {
-		upgradeCondition := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
-
-		if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
+		if cond := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading); cond != nil && cond.Status == v1.ConditionTrue {
 			return fmt.Errorf("cluster cannot be hibernated during an upgrade")
 		}
 	}
@@ -4295,6 +4293,16 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 			if r.Name == couchbasev2.RoleSecurityAdmin {
 				return fmt.Errorf("security_admin role is configured in group %s and cannot be used with Couchbase Server 7.0.0 and above", g.Name)
 			}
+		}
+	}
+
+	return nil
+}
+
+func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
+	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
+		if cond := prev.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
+			return fmt.Errorf("cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
 		}
 	}
 

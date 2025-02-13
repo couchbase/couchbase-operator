@@ -3532,10 +3532,10 @@ func TestAnnotationValidation(t *testing.T) {
 			expectedErrors: []string{"invalid syntax"},
 		},
 		{
-			name: "TestClusterAnnotationsMaxMigratableBucketsInvalid",
+			name: "TestClusterAnnotationsMaxConcurrentPodSwapsInvalid",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/buckets.maxMigratableBuckets": "NaN",
+					"cao.couchbase.com/buckets.maxConcurrentPodSwaps": "NaN",
 				})},
 			shouldFail:     true,
 			expectedErrors: []string{"invalid syntax"},
