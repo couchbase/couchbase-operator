@@ -506,6 +506,10 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, pers
 				},
 				eventschema.Repeat{
 					Times:     ephemeralVictims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+				},
+				eventschema.Repeat{
+					Times:     ephemeralVictims,
 					Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 				},
 				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},

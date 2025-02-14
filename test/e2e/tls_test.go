@@ -770,7 +770,9 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 			},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{

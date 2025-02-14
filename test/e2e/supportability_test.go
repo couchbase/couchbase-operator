@@ -1675,7 +1675,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 4, kubernetes, cbCluster, 5*time.Minute)
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 1, kubernetes, cbCluster, 5*time.Minute)
 
-	mustVerifyPvcPerPod(t, kubernetes, cbCluster.Name, 4)
+	mustVerifyPvcPerPod(t, kubernetes, cbCluster.Name, 4, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

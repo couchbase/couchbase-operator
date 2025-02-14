@@ -1184,6 +1184,7 @@ func TestMovePod(t *testing.T) {
 
 	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, podsList.Items[0])
 
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{

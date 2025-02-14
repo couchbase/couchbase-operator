@@ -89,8 +89,8 @@ func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMa
 	}
 }
 
-func mustVerifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int) {
-	if err := verifyPvcPerPod(t, k8s, clusterName, expectedPods); err != nil {
+func mustVerifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, func() error { return verifyPvcPerPod(t, k8s, clusterName, expectedPods) }); err != nil {
 		e2eutil.Die(t, err)
 	}
 }
@@ -1055,8 +1055,6 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.EnableOnlineVolumeExpansion = true
-	volumeExpansionTimeout := 1
-	cluster.Spec.OnlineVolumeExpansionTimeoutInMins = &volumeExpansionTimeout
 	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,

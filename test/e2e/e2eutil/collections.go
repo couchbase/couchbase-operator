@@ -818,7 +818,7 @@ func MustDeleteCollectionManually(t *testing.T, kubernetes *types.Cluster, clust
 }
 
 // verifyDocCountInCollection uses Server 7.0's metrics to check that the current number of items in a collection is equal to a given number.
-func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) error {
+func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration, sumMetrics bool) error {
 	return retryutil.RetryFor(timeout, func() error {
 		// Labels are passed to specify which collection we're looking at.
 		labels := make(map[string]string)
@@ -852,6 +852,11 @@ func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 			}
 
 			totalItemCount += itemCount
+
+			// If we're not summing metrics, we can break early.
+			if !sumMetrics {
+				break
+			}
 		}
 
 		if totalItemCount != items {
@@ -863,7 +868,13 @@ func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 }
 
 func MustVerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
-	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout); err != nil {
+	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout, false); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustVerifyDocCountInCollectionSum(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
+	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout, true); err != nil {
 		Die(t, err)
 	}
 }

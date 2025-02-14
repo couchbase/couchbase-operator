@@ -2710,8 +2710,9 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// Sets middlebox compatibility mode for LDAP. This option is only available on
 	// Couchbase Server 7.6.0+.
+	// +optional
 	// +kubebuilder:default=true
-	MiddleboxCompMode bool `json:"middleboxCompMode,omitempty"`
+	MiddleboxCompMode bool `json:"middleboxCompMode"`
 }
 
 type LDAPUserDNMapping struct {

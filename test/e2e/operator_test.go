@@ -278,7 +278,7 @@ func TestPodDeletedAfterExpectedDelay(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	_, err := e2eutil.ResizeCluster(0, constants.Size2, kubernetes, cluster, 1*time.Minute)
+	_, err := e2eutil.ResizeCluster(0, constants.Size2, kubernetes, cluster, 2*time.Minute)
 	if err != nil {
 		t.Errorf("TestPodDeletedAfterExpectedDelay failed")
 	}
@@ -307,7 +307,7 @@ func TestPodDeleteDelayRespected(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	_, err := e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 1*time.Minute)
+	_, err := e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 2*time.Minute)
 	if err != nil {
 		t.Errorf("TestPodDeleteDelayRespected failed: " + err.Error())
 	}

@@ -149,7 +149,7 @@ func TestFTSWithScopesAndCollections(t *testing.T) {
 
 	// insert docs in the created scope.collection.
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, collectionName).MustCreate(t, kubernetes, cluster)
-	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
+	e2eutil.MustVerifyDocCountInCollectionSum(t, kubernetes, cluster, bucket.GetName(), scopeName, collectionName, numOfDocs, 10*time.Minute)
 
 	// insert docs in the default_scope.default_collection.
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)

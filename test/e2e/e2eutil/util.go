@@ -1411,32 +1411,23 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 }
 
 func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, timeout time.Duration) error {
-	pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
-	if err != nil {
-		return fmt.Errorf("unable to get couchbase pods: %w", err)
-	}
+	return retryutil.RetryFor(timeout, func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
+		if err != nil {
+			return fmt.Errorf("unable to get couchbase pods: %w", err)
+		}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+		// TLS handshake with pods
+		for i := range pods.Items {
+			pod := pods.Items[i]
 
-	// TLS handshake with pods
-	for i := range pods.Items {
-		pod := pods.Items[i]
-
-		callback := func() error {
 			if err := tlsCheckForPod(k8s, cluster, pod.GetName(), tls); err != nil {
 				return fmt.Errorf("TLS verification failed: %w", err)
 			}
-
-			return nil
 		}
 
-		if err := retryutil.Retry(ctx, time.Second, callback); err != nil {
-			return err
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
