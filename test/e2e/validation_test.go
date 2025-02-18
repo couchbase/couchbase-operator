@@ -2899,12 +2899,6 @@ func TestNegValidationConstraintsCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
-		{
-			name:           "TestValidateMaxTwoImages",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/image", "couchbase/server:7.2.1").Add("/spec/servers/1/image", "couchbase/server:7.2.2")},
-			shouldFail:     true,
-			expectedErrors: []string{"a maximum of two couchbase server images"},
-		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
@@ -3720,4 +3714,44 @@ func TestNegValidationClusterMigrationApply(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
+}
+
+func TestInvalidImageCombinations(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "IncompatibleImagesTest",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.3").Add("/spec/servers/0/image", "couchbase/server:7.0.5")},
+			shouldFail: true,
+		},
+		{
+			name:       "ServerClassHigherImageThan",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.0").Add("/spec/servers/0/image", "couchbase/server:7.6.3")},
+			shouldFail: true,
+		},
+		{
+			name:           "NewMultiVersionCluster",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.0").Add("/spec/servers/0/image", "couchbase/server:7.6.3")},
+			shouldFail:     true,
+			expectedErrors: []string{"must match cluster image version"},
+		},
+		{
+			name:       "TestValidateMaxTwoImages",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/image", "couchbase/server:7.2.1").Add("/spec/servers/1/image", "couchbase/server:7.2.2")},
+			shouldFail: true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestMidUpgradeImageValidations(t *testing.T) {
+	midUpgradeTestDefs := []testDef{
+		{
+			name:       "UpgradeDuringGranularUpgrade",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4")},
+			shouldFail: true,
+		},
+	}
+
+	runValidationTest(t, midUpgradeTestDefs, validationContext{operation: operationApply, validationFile: "mid-upgrade.yaml"})
 }

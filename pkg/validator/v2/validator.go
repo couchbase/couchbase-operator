@@ -1332,6 +1332,19 @@ func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.Cou
 		}
 	}
 
+	clusterImageVersion, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	for image := range versionSet {
+		if classImageVersion, err := k8sutil.CouchbaseVersion(image); err != nil {
+			return err
+		} else if classImageVersion != clusterImageVersion && classImageVersion != cluster.Status.CurrentVersion {
+			return fmt.Errorf("server class image version (%s) must match cluster image version (%s) or current version (%s)", classImageVersion, clusterImageVersion, cluster.Status.CurrentVersion)
+		}
+	}
+
 	if len(versionSet) > 2 {
 		versions := []string{}
 		for version := range versionSet {
@@ -1339,6 +1352,59 @@ func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.Cou
 		}
 
 		return fmt.Errorf("a maximum of two couchbase server images can be used in a single cluster, %v images are in use: %v", len(versionSet), versions)
+	}
+
+	if err := checkComatibleImages(cluster); err != nil {
+		return err
+	}
+
+	if err := checkClusterImageHighest(cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkComatibleImages(cluster *couchbasev2.CouchbaseCluster) error {
+	lowImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	highImage, err := cluster.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	lowVersion, err := k8sutil.CouchbaseVersion(lowImage)
+	if err != nil {
+		return err
+	}
+
+	highVersion, err := couchbaseutil.CouchbaseImageVersion(highImage)
+	if err != nil {
+		return err
+	}
+
+	return couchbaseutil.CheckUpgradePath(lowVersion, highVersion)
+}
+
+func checkClusterImageHighest(cluster *couchbasev2.CouchbaseCluster) error {
+	clusterImageVersion, err := couchbaseutil.NewVersionFromImage(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	for _, sc := range cluster.Spec.Servers {
+		if sc.Image == "" || sc.Image == cluster.Spec.Image {
+			continue
+		}
+
+		if classImageVersion, err := couchbaseutil.NewVersionFromImage(sc.Image); err != nil {
+			return err
+		} else if clusterImageVersion.Less(classImageVersion) {
+			return fmt.Errorf("server class image version (%s) cannot be higher than cluster image version (%s)", classImageVersion, clusterImageVersion)
+		}
 	}
 
 	return nil
@@ -3580,8 +3646,14 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	migratingCondition := current.Status.GetCondition(couchbasev2.ClusterConditionMigrating)
 
+	fullyUpgraded, err := isFullyUpgraded(current)
+
+	if err != nil {
+		return err
+	}
+
 	// Condition is not set, therefore we are starting an upgrade.
-	if upgradeCondition == nil && migratingCondition == nil {
+	if (upgradeCondition == nil && migratingCondition == nil) && fullyUpgraded {
 		if updatedVersion == "9.9.9" {
 			// we have no idea what this is so we trust the user
 			return nil
@@ -3596,6 +3668,15 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 	}
 
 	return nil
+}
+
+func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
+	imageVersion, err := k8sutil.CouchbaseVersion(c.Spec.Image)
+	if err != nil {
+		return false, err
+	}
+
+	return imageVersion == c.Status.CurrentVersion, nil
 }
 
 // checkImmutableVolumeTemplateSize checks that you aren't downscaling volumes
