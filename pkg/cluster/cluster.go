@@ -618,7 +618,6 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
-	c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
@@ -641,6 +640,7 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTim
 
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
 		c.logUpdate(c.cluster.Spec, cluster.Spec)
+		c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	}
 
 	c.cluster = cluster
