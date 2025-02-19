@@ -391,11 +391,17 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					continue
 				}
 
-				equalizeBucketAutoCompactionSettings(&r, &a)
+				if a.BucketType != r.BucketType {
+					log.Info("Bucket type cannot be changed so recreating with requested type", "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
+					remove = append(remove, a)
+					create = append(create, r)
+				} else {
+					equalizeBucketAutoCompactionSettings(&r, &a)
 
-				if !reflect.DeepEqual(r, a) {
-					update = append(update, r)
-					c.logUpdate(a, r)
+					if !reflect.DeepEqual(r, a) {
+						update = append(update, r)
+						c.logUpdate(a, r)
+					}
 				}
 
 				found = true
@@ -463,6 +469,15 @@ func (c *Cluster) reconcileBuckets() error {
 		return err
 	}
 
+	for _, bucket := range remove {
+		if err := couchbaseutil.DeleteBucket(bucket.BucketName).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		log.Info("Bucket deleted", "cluster", c.namespacedName(), "name", bucket.BucketName)
+		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
+	}
+
 	for i := range create {
 		bucket := &create[i]
 
@@ -494,15 +509,6 @@ func (c *Cluster) reconcileBuckets() error {
 
 		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
-	}
-
-	for _, bucket := range remove {
-		if err := couchbaseutil.DeleteBucket(bucket.BucketName).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		log.Info("Bucket deleted", "cluster", c.namespacedName(), "name", bucket.BucketName)
-		c.raiseEvent(k8sutil.BucketDeleteEvent(bucket.BucketName, c.cluster))
 	}
 
 	// To avoid API updates, we record the name of each bucket on the system (this will
