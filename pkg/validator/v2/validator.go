@@ -44,6 +44,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
+		checkConstraintClusterName,
 		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
@@ -156,6 +157,14 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if len(cluster.Name) > 58 {
+		return fmt.Errorf("cluster name must be less than 58 characters")
+	}
+
+	return nil
 }
 
 func checkConstraintPerServiceClassPDB(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
