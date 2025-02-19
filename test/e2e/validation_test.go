@@ -2184,6 +2184,22 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2`},
 		},
+		{
+			name: "TestValidateMultipleBucketsSameName",
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "bucket0"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"defined multiple times for cluster"},
+		},
+		{
+			name: "TestValidateMultipleBucketTypesSameName",
+			mutations: patchMap{
+				"bucket3": jsonpatch.NewPatchSet().Add("/spec/name", "bucket0"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"defined multiple times for cluster"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

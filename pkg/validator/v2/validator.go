@@ -2882,16 +2882,25 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 // validateBucketNameConstraints takes a cluster and finds all buckets, or
 // a bucket and finds all clusters referencing it, checking that bucket names
 // are not reused.
+//
+//nolint:gocognit
 func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cluster *couchbasev2.CouchbaseCluster) error {
 	// Gather the clusters affected by this change (either adding a cluster or
 	// a bucket -- bucket names are immutable).
 	clusters := []*couchbasev2.CouchbaseCluster{}
+
+	var abstractBucket couchbasev2.AbstractBucket
 
 	switch t := object.(type) {
 	case *couchbasev2.CouchbaseBucket, *couchbasev2.CouchbaseEphemeralBucket, *couchbasev2.CouchbaseMemcachedBucket:
 		bucket, ok := object.(metav1.Object)
 		if !ok {
 			return fmt.Errorf("failed to type assert bucket to meta object")
+		}
+
+		abstractBucket, ok = object.(couchbasev2.AbstractBucket)
+		if !ok {
+			return fmt.Errorf("failed to type assert bucket to abstract bucket")
 		}
 
 		var namespacedClusters = new(couchbasev2.CouchbaseClusterList)
@@ -2928,6 +2937,22 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 		buckets, err := getClusterBuckets(v, cluster)
 		if err != nil {
 			return err
+		}
+
+		// Include the bucket in the name duplicate check if it's a new bucket
+		if abstractBucket != nil {
+			bucketFound := false
+
+			for _, b := range buckets {
+				if b.GetCouchbaseName() == abstractBucket.GetCouchbaseName() && b.GetType() == abstractBucket.GetType() {
+					bucketFound = true
+					break
+				}
+			}
+
+			if !bucketFound {
+				buckets = append(buckets, abstractBucket)
+			}
 		}
 
 		// Gather the names in an associative array (a set essentially) and look for duplicates.
