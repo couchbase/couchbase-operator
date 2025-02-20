@@ -26,6 +26,7 @@ const (
 	SupportedBackendMagma
 	SupportedHistoryRetention
 	SupportedRank
+	SupportedBlockSize
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -39,6 +40,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
 	supportedHistoryRetention := supportedFeatures[SupportedHistoryRetention]
 	supportedRank := supportedFeatures[SupportedRank]
+	supportedBlockSize := supportedFeatures[SupportedBlockSize]
 
 	for _, bucket := range k8sBuckets {
 		if client != nil {
@@ -107,8 +109,10 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
 			// MagmaSeqTreeDataBlockSize/MagmaKeyTreeDataBlockSize only supported on Magma
-			b.MagmaSeqTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaSeqTreeDataBlockSize, constants.MagmaSeqTreeDataDefaultBlockSize)
-			b.MagmaKeyTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaKeyTreeDataBlockSize, constants.MagmaKeyTreeDataDefaultBlockSize)
+			if supportedBlockSize {
+				b.MagmaSeqTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaSeqTreeDataBlockSize, constants.MagmaSeqTreeDataDefaultBlockSize)
+				b.MagmaKeyTreeDataBlockSize = notNilOrDefault(bucket.Spec.MagmaKeyTreeDataBlockSize, constants.MagmaKeyTreeDataDefaultBlockSize)
+			}
 
 			// CDC is only supported on Magma
 			if supportedHistoryRetention && bucket.Spec.HistoryRetentionSettings != nil {
@@ -263,12 +267,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	supportedFeatures[SupportedBackendMagma] = magmaStorageBackendSupported
 
-	historyRetentionSupported, err := c.IsAtLeastVersion("7.2.0")
+	atleast720, err := c.IsAtLeastVersion("7.2.0")
 	if err != nil {
 		return nil, err
 	}
 
-	supportedFeatures[SupportedHistoryRetention] = historyRetentionSupported
+	supportedFeatures[SupportedHistoryRetention] = atleast720
+	supportedFeatures[SupportedBlockSize] = atleast720
 
 	rankSupported, err := c.IsAtLeastVersion("7.6.0")
 	if err != nil {
