@@ -47,6 +47,23 @@ In-place upgrades are a volatile process that can lead to interruptions in servi
 may occur.
 ====
 
+=== How to Upgrade a cluster
+
+To upgrade a cluster, you need to modify the CouchbaseCluster resource to specify the new version of Couchbase Server that you want to upgrade to.
+This can be done by updating the `spec.image` field in the CouchbaseCluster manifest to the new version.
+
+For example, if you were upgrading from version 7.2.4 to 7.6.0 then the CouchbaseCluster resource needs to be updated as follows:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: my-couchbase-cluster
+spec:
+  image: couchbase/server:7.6.0
+----
+
 === Couchbase Server Upgrade Constraints
 
 Not all upgrade paths are supported by Couchbase Server.
@@ -66,6 +83,242 @@ Refer to the Couchbase Server xref:server:install:upgrade.adoc[upgrade documenta
 ====
 Modifying the Couchbase Server version during an upgrade is permitted only if the end result is a roll-back to the previous version.
 ====
+
+=== Rollback
+
+The Couchbase Operator provides the capability to roll back while it is in progress. A rollback can only be performed if the upgrade is in progress and has not yet completed. Once a cluster has fully upgraded to the new version the cluster can no longer be downgraded to a previous version. A rollback will simply replace the nodes on the new version and replace them with nodes with the version they had before an upgrade was started.
+
+==== How to Roll Back an Upgrade
+
+To initiate a rollback, you need to modify the CouchbaseCluster resource to specify the previous version of Couchbase Server that was running before the upgrade started. This can be done by updating the `spec.image` field in the CouchbaseCluster manifest to the previous version.
+
+For example, if you were upgrading from version 7.2.4 to 7.6.0 and encountered issues, you can roll back to version 7.2.4 by updating the manifest as follows:
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: my-couchbase-cluster
+spec:
+  image: couchbase/server:7.2.4
+----
+
+After applying this change, the operator will begin the rollback process.
+
+=== Controlled Upgrades
+
+The Operator provides the capability to control the upgrade process by upgrading specific server classes at a time, this gives the ability to control the upgrade process and ensure that the upgrade process is controlled. For example, it is possible to upgrade the data nodes first, then the query nodes, and finally the index nodes.
+
+Whilst performing a controlled upgrade the cluster will be in a mixed state with different versions of Couchbase Server running at the same time. This time should be kept to a minimum to avoid potential issues with the cluster.
+
+==== How to Perform a Controlled Upgrade
+To perform a controlled upgrade you need to first mofify the CouchbaseCluster Image to specify the image that you want to upgrade to. This can be done by updating the `spec.image` field in the CouchbaseCluster manifest. You can then specify the server classes that you want to upgrade first by updating the `spec.servers.image` to the older image for the server classes you dont want to be upgraded first. You can explicitly update `spec.servers.image` for the server classes that you want to upgrade first, alternatively if the image is not specified for a server class then the image specified in `spec.image` will be used.
+
+.Example `CouchbaseCluster` Resource with three Server Classes
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.2.4
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      services:
+        - index
+    - size: 3
+      name: query
+      services:
+        - query
+----
+
+For the example above if you want to upgrade the data nodes first, then the query nodes, and finally the index nodes you can update the `CouchbaseCluster` resource as follows:
+
+.Example `CouchbaseCluster` Resource with Controlled Upgrade data nodes first
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.6.0 # <.>
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      image: couchbase/server:7.2.4 # <.>
+      services:
+        - index
+    - size: 3
+      image: couchbase/server:7.2.4 # <.>
+      name: query
+      services:
+        - query
+----
+
+<.> The cluster image needs to be the latest version that you want to upgrade to.
+
+<.> The image for the index server class is set to the older version to ensure that the index nodes are not upgraded yet.
+
+<.> The image for the query server class is set to the older version to ensure that the query nodes are not upgraded yet.
+
+.Example `CouchbaseCluster` Resource with Controlled Upgrade Upgrading query nodes second
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.6.0
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      image: couchbase/server:7.2.4 # <.>
+      services:
+        - index
+    - size: 3
+      name: query
+      services:
+        - query
+----
+
+<.> The image for the index server class is set to the older version to ensure that the index nodes are not upgraded yet.
+
+.Example `CouchbaseCluster` Resource with Controlled Upgrade Upgrading index nodes last
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.6.0
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      services:
+        - index
+    - size: 3
+      name: query
+      services:
+        - query
+----
+
+==== How to Perform a Controlled Rollback
+
+The Operator also allows you to perform a controlled rollback. To perform a controlled rollback you would performed the controlled rollback steps in reverse. The following examples shows how to perform a controlled rollback on a example cluster where all the server classes but one have upgraded to the new version. Note that once a cluster is fully upgraded to the new version a rollback is no longer possible.
+
+.Example Starting `CouchbaseCluster` Resource for Controlled Rollback 
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.6.0 # <.>
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      image: couchbase/server:7.2.4 # <.>
+      services:
+        - index
+    - size: 3
+      name: query
+      services:
+        - query
+----
+
+<.> The cluster image is the latest version that is being upgraded to.
+
+<.> The image for the index server class is set to the older version indicating that the index nodes are not upgraded yet.
+
+.Example `CouchbaseCluster` Resource Controlled Rollback Query Nodes 
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.6.0 # <.>
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      image: couchbase/server:7.2.4
+      services:
+        - index
+    - size: 3
+      name: query
+      image: couchbase/server:7.2.4 # <.>
+      services:
+        - query
+----
+
+<.> During a controlled rollback the cluster image should stay as the version that was being upgraded to. If this is changed to the older version then the cluster will all be rolled back to the older version without controll over the server classe order.
+
+<.> The image for the query server class is set to the older version indicating that the query nodes should be rolled back next.
+
+.Example `CouchbaseCluster` Resource Controlled Rollback Remaining Data Nodes 
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:7.2.4 # <.>
+  ...
+  servers:
+    - size: 3
+      name: data
+      services:
+        - data
+    - size: 3
+      name: index
+      services:
+        - index
+    - size: 3
+      name: query
+      services:
+        - query
+----
+
+<.> As there is only one server class left to rollback the cluster image can be set to the older version and the remaining server nodes in the data class will be rolled back.
 
 == Upgrading Pods
 
