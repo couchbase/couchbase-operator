@@ -39,8 +39,8 @@ var upgradeSequence = eventschema.Sequence{
 	},
 }
 
-// rollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
-func rollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {
+// RollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
+func RollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
@@ -993,7 +993,7 @@ func TestUpgradeImmediate(t *testing.T) {
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		rollingUpgradeSequence(clusterSize, clusterSize),
+		RollingUpgradeSequence(clusterSize, clusterSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1041,7 +1041,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		rollingUpgradeSequence(clusterSize, upgradeChunkSize),
+		RollingUpgradeSequence(clusterSize, upgradeChunkSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

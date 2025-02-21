@@ -364,7 +364,7 @@ func TestQuerySettings(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}}, // One optional one to make up for defaults
-		eventschema.Repeat{Times: upgradeCycles, Validator: rollingUpgradeSequence(clusterSize, clusterSize)},
+		eventschema.Repeat{Times: upgradeCycles, Validator: RollingUpgradeSequence(clusterSize, clusterSize)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

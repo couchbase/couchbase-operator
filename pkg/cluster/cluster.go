@@ -1079,22 +1079,18 @@ func (c *Cluster) logStatus(status *MemberState) {
 	c.scheduler.LogStatus(c.namespacedName())
 }
 
-// hibernate puts the cluster to sleep, zzzz.
-func (c *Cluster) hibernate() error {
-	// Don't hibernate if the cluster is rebalancing otherwise things go bad
-	if isRebalancing, err := c.isClusterRebalancing(); err != nil {
-		return err
-	} else if isRebalancing {
-		log.Info("[WARN] The cluster is currently rebalancing. Waiting for rebalance to complete before hibernating cluster")
-		return nil
-	}
+// hibernate checks if the cluster can enter hibernation and if so, hibernates it.
+func (c *Cluster) hibernate() (bool, error) {
+	// If the cluster isn't already hibernating, we should check that we can enter hibernation and warn if it's not possible.
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		canHibernate, reason := c.cluster.CanHibernate()
 
-	// Don't hibernate during an upgrade. This should also have been prevented by the dac, but this is a belt and braces check.
-	if isUpgrading, err := c.isUpgrading(); err != nil {
-		return err
-	} else if isUpgrading {
-		log.Info("[WARN] The cluster is currently upgrading. Waiting for upgrade to complete before hibernating cluster")
-		return nil
+		if !canHibernate {
+			log.Info("[WARN] Hibernation requested. Cluster will enter hibernation once it is stable", "reason", reason)
+			return false, nil
+		} else {
+			log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
+		}
 	}
 
 	members := podsToMemberSet(c.getClusterPods())
@@ -1103,11 +1099,11 @@ func (c *Cluster) hibernate() error {
 		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
 
 		if err := c.removePod(member.Name(), false); err != nil {
-			return err
+			return true, err
 		}
 
 		if err := c.clusterRemoveMember(member.Name()); err != nil {
-			return err
+			return true, err
 		}
 	}
 
@@ -1116,30 +1112,10 @@ func (c *Cluster) hibernate() error {
 	c.cluster.Status.SetHibernatingCondition("Cluster hibernating")
 
 	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
-
-	return nil
-}
-
-func (c *Cluster) isClusterRebalancing() (bool, error) {
-	rebalanceProgress := couchbaseutil.RebalanceProgress{}
-
-	members := c.readyMembers()
-	if len(members) == 0 {
-		return false, nil
-	}
-
-	if err := couchbaseutil.GetRebalanceProgress(&rebalanceProgress).On(c.api, c.readyMembers()); err != nil {
 		return true, err
 	}
 
-	switch rebalanceProgress.Status {
-	case couchbaseutil.RebalanceStatusNone, couchbaseutil.RebalanceStatusNotRunning:
-		return false, nil
-	}
+	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
 	return true, nil
 }

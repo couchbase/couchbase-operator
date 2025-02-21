@@ -95,7 +95,9 @@ func (c *Cluster) reconcile() error {
 
 	// Hibernation trumps all.
 	if c.cluster.Spec.Hibernate {
-		return c.hibernate()
+		if hibernated, err := c.hibernate(); hibernated {
+			return err
+		}
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 var (
@@ -62,6 +63,8 @@ type testDef struct {
 	validations    patchMap
 	shouldFail     bool
 	expectedErrors []string
+	// expectedWarnings is a list of expected warnings for the test. Warnings are only collected for the resources that are being patched.
+	expectedWarnings []string
 }
 
 type (
@@ -149,11 +152,15 @@ func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema
 }
 
 // createResources iterates over every resource and creates them in the requested namespace.
-func createResources(k8s *types.Cluster, resources resourceList) error {
+func createResources(k8s *types.Cluster, resources resourceList, wc *types.KubeWarningCollector) error {
 	for i, resource := range resources {
 		object := &unstructured.Unstructured{}
 		if err := json.Unmarshal(resource, object); err != nil {
 			return err
+		}
+
+		if wc != nil {
+			wc.SetResource(object.GetName())
 		}
 
 		groupVersion, err := getResource(k8s, object)
@@ -182,11 +189,16 @@ func createResources(k8s *types.Cluster, resources resourceList) error {
 }
 
 // updateResources updates all defined resources.
-func updateResources(k8s *types.Cluster, resources resourceList) error {
+func updateResources(k8s *types.Cluster, resources resourceList, wc *types.KubeWarningCollector) error {
 	for i, resource := range resources {
 		object := &unstructured.Unstructured{}
 		if err := json.Unmarshal(resource, object); err != nil {
 			return err
+		}
+
+		// If we have a warning collector, set the resource name so we can collect warnings.
+		if wc != nil {
+			wc.SetResource(object.GetName())
 		}
 
 		groupVersion, err := getResource(k8s, object)
@@ -358,12 +370,27 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 
 		// Run each test case defined as a separate test so we have a way
 		// of running them individually.
+
+		var wc *types.KubeWarningCollector
+		if len(test.expectedWarnings) > 0 {
+			wc = types.NewKubeWarningCollector()
+			kubernetes.Config.WarningHandler = wc
+			kubernetes.DynamicClient = dynamic.NewForConfigOrDie(kubernetes.Config)
+		}
+
+		// nil checks in the validation test.
+
 		t.Run(test.name, func(t *testing.T) {
 			objects := objectsPristine.DeepCopy()
 
 			// Delete anything we created.
 			defer func() {
 				_ = deleteResources(kubernetes, objects)
+
+				// We initialise a new warning collector for each test, but let's reset it here to be safe.
+				if wc != nil {
+					wc.Reset()
+				}
 			}()
 
 			for i, resource := range objects {
@@ -464,9 +491,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				objects[i] = raw
 			}
 
-			// If we are applying a change or deleting a cluster we first need to create it...
+			// If we are applying a change or deleting a cluster we first need to create it. We don't need to set a warning collector here as we don't want to collect warnings for the initial resource creation.
 			if validation.operation == operationApply {
-				if err := createResources(kubernetes, objects); err != nil {
+				if err := createResources(kubernetes, objects, nil); err != nil {
 					e2eutil.Die(t, err)
 				}
 			}
@@ -476,14 +503,21 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				if err := patchResources(objects, test.mutations); err != nil {
 					e2eutil.Die(t, err)
 				}
+
+				// If we have a warning collector, track the resources that are being patched so we collect warnings for them.
+				if wc != nil {
+					for resource := range test.mutations {
+						wc.TrackResource(resource)
+					}
+				}
 			}
 
 			// Execute the main test, update the new resource for verification.
 			switch validation.operation {
 			case operationCreate:
-				err = createResources(kubernetes, objects)
+				err = createResources(kubernetes, objects, wc)
 			case operationApply:
-				err = updateResources(kubernetes, objects)
+				err = updateResources(kubernetes, objects, wc)
 			}
 
 			// Handle successes when it shoud have failed.
@@ -519,8 +553,37 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 					}
 				}
 			}
+
+			// If we have initialised a warning collector, check we have received the expected warnings.
+			if wc != nil {
+				validateWarnings(t, wc, test.expectedWarnings)
+			}
 		})
 	}
+}
+
+func validateWarnings(t *testing.T, wc *types.KubeWarningCollector, expectedWarnings []string) {
+	actualWarnings := wc.Warnings()
+
+	for _, expectedWarning := range expectedWarnings {
+		re := regexp.MustCompile(expectedWarning)
+		if !hasMatchingWarning(actualWarnings, re) {
+			t.Logf("expected warning message: %v", expectedWarning)
+			t.Logf("actual warnings: %v", actualWarnings)
+			e2eutil.Die(t, fmt.Errorf("expected warning not encountered"))
+		}
+	}
+}
+
+// Helper function to check if any actual warning matches the expected pattern.
+func hasMatchingWarning(actualWarnings []string, pattern *regexp.Regexp) bool {
+	for _, actual := range actualWarnings {
+		if pattern.MatchString(actual) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TestValidationCreate(t *testing.T) {
@@ -3678,10 +3741,28 @@ func TestHibernationChangeConstraints(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name:           "HibernateDuringUpgradeIsInvalid",
-			mutations:      patchMap{"cluster-upgrading": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
-			shouldFail:     true,
-			expectedErrors: []string{"cluster cannot be hibernated during an upgrade"},
+			name:             "HibernateDuringUpgradeExpectsWarning",
+			mutations:        patchMap{"cluster-upgrading": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
+			shouldFail:       false,
+			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is upgrading"},
+		},
+		{
+			name:             "HibernateOnMigrationClusterExpectsWarning",
+			mutations:        patchMap{"cluster-migrating": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
+			shouldFail:       false,
+			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is a migration cluster"},
+		},
+		{
+			name:             "HibernateDuringBucketMigrationExpectsWarning",
+			mutations:        patchMap{"cluster-bucket-migrating": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
+			shouldFail:       false,
+			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is migrating buckets"},
+		},
+		{
+			name:             "HibernateDuringScalingExpectsWarning",
+			mutations:        patchMap{"cluster-scaling": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
+			shouldFail:       false,
+			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is scaling"},
 		},
 	}
 
@@ -3706,7 +3787,7 @@ func TestClusterMigrationAddition(t *testing.T) {
 func TestClusterMigrationInvalidMigration(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name: "AddingMigrationToExistingCluster",
+			name: "AddMigrationWithInvalidNumUnmanagedNodes",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
 				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
 				NumUnmanagedNodes:    199,

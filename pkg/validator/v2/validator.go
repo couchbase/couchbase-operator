@@ -4205,16 +4205,10 @@ func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.
 
 // checkForClusterChangesDuringHibernation validates whether there have been any changes to a cluster while hibernate is enabled.
 func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseCluster) error {
-	if current.Spec.Hibernate && updated.Spec.Hibernate {
+	if current.Spec.Hibernate && updated.Spec.Hibernate && current.HasCondition(couchbasev2.ClusterConditionHibernating) {
 		current.Spec.Hibernate = updated.Spec.Hibernate
 		if !reflect.DeepEqual(updated.Spec, current.Spec) {
 			return fmt.Errorf("cluster spec cannot be changed during hibernation")
-		}
-	}
-
-	if updated.Spec.Hibernate {
-		if cond := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading); cond != nil && cond.Status == v1.ConditionTrue {
-			return fmt.Errorf("cluster cannot be hibernated during an upgrade")
 		}
 	}
 

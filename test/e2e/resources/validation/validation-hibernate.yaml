@@ -1,6 +1,40 @@
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
+  name: cluster-balanced-available
+  namespace: default
+spec:
+  hibernate: true
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+status:
+  currentVersion: 7.2.2
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: Balanced
+      reason: Data is equally distributed across all nodes in the cluster
+      status: "True"
+      type: Balanced
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      reason: Available
+      status: "True"
+      type: Available
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
   name: cluster
   namespace: default
 spec:
@@ -16,6 +50,16 @@ spec:
         - query
         - search
         - eventing
+status:
+  currentVersion: 7.2.2
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: Cluster hibernating
+      reason: Hibernating
+      status: "True"
+      type: Hibernating
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
@@ -45,3 +89,82 @@ status:
       reason: Upgrading
       status: "True"
       type: Upgrading
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-migrating
+  namespace: default
+spec:
+  migration:
+    unmanagedClusterHost: "some-unmanaged-host.default.local"
+  hibernate: false
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-bucket-migrating
+  namespace: default
+spec:
+  hibernate: false
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+status:
+  currentVersion: 7.2.2
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: Migrating buckets
+      reason: BucketMigration
+      status: "True"
+      type: BucketMigrating
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-scaling
+  namespace: default
+spec:
+  hibernate: false
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+status:
+  currentVersion: 7.2.2
+  size: 0
+  conditions:
+    - lastTransitionTime: "2025-02-12T13:49:09Z"
+      lastUpdateTime: "2025-02-12T13:49:09Z"
+      message: The operator is attempting to scale the cluster
+      reason: ClusterScaling
+      status: "True"
+      type: Scaling

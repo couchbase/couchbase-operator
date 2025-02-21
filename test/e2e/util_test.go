@@ -54,6 +54,7 @@ const (
 	TagFeatureBucketMigration   = "bucketmigration"
 	TagFeatureAssimilation      = "assimilation"
 	TagFeatureAdmission         = "admission"
+	TagFeatureHibernation       = "hibernation"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -110,7 +111,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketMinReplicasCountApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestVersionUpgradePath).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestHibernationChangeConstraints).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestHibernationChangeConstraints).WithTags(TagSuiteValidation, TagFeatureHibernation),
 		framework.NewTestDef(TestClusterMigrationAddition).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestClusterMigrationInvalidMigration).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
@@ -358,8 +359,9 @@ func registerTests() {
 		framework.NewTestDef(TestRotateAdminPasswordDuringRestart).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestPodReadiness).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestSDK).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestHibernateEphemeralImmediate).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestHibernateSupportableImmediate).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestHibernateEphemeralImmediate).WithTags(TagSuiteP0, TagFeatureHibernation),
+		framework.NewTestDef(TestHibernateSupportableImmediate).WithTags(TagSuiteP0, TagFeatureHibernation),
+		framework.NewTestDef(TestHibernateOccursAfterUpgrade).WithTags(TagSuiteP0, TagFeatureHibernation),
 		framework.NewTestDef(TestCreateDurableBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestEditDurableBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestLoadDurableBucket).WithTags(TagSuiteP0),
