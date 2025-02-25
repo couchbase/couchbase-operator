@@ -1034,6 +1034,10 @@ func applyPodNetworking(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, m co
 		pod.Annotations[constants.PodTLSAnnotation] = constants.EnabledValue
 	}
 
+	if cluster.Spec.Networking.ImprovedHostNetwork && cluster.Spec.Networking.InitPodsWithNodeHostname {
+		pod.Spec.HostNetwork = true
+	}
+
 	// If we are in istio mode, add in DNS configuration to avoid hairpinning
 	// which causes death with mTLS enabled.  Also note that Analytics is broke
 	// with this until 6.5.1.

@@ -17,7 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
@@ -322,6 +322,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleAutoscaleServerConfigs,
 		(*ReconcileMachine).handleRebalance,
 		(*ReconcileMachine).handleDeadMembers,
+		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleNotifyFinished,
 	}
 
@@ -341,6 +342,41 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
+	// var hostnameDNSRequired bool
+	// if c.cluster.Spec.Networking.ImprovedHostNetwork && c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+	//	hostnameDNSRequired = true
+	// }
+	//
+	// membersToSwapRebalance := couchbaseutil.MemberSet{}
+	//
+	// for _, member := range c.members {
+	//	pod, ok := c.k8s.Pods.Get(member.Name())
+	//	if !ok {
+	//		return fmt.Errorf("pod not found: %s", member.Name())
+	//	}
+	//
+	//	if hostnameDNSRequired {
+	//		if member.GetDNSName() != pod.Spec.NodeName {
+	//			member.SetDNSName(pod.Spec.NodeName)
+	//			membersToSwapRebalance.Add(member)
+	//		}
+	//	} else {
+	//		if member.GetDNSName() == pod.Spec.NodeName {
+	//			member.SetDNSName("")
+	//			membersToSwapRebalance.Add(member)
+	//		}
+	//	}
+	// }
+	//
+	// fmt.Println(membersToSwapRebalance.Size())
+	//
+	// if membersToSwapRebalance.Size() > 0 {
+	//	return r.swapRebalanceMembers(c, membersToSwapRebalance)
+	// }
+	return nil
 }
 
 // If we have nodes that are warming up then we need to wait for them to finish
@@ -1462,7 +1498,7 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				for _, volume := range pvcState.List() {
 					volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
 					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
-					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, v1.UpdateOptions{})
+					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, metav1.UpdateOptions{})
 
 					if err != nil {
 						metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()

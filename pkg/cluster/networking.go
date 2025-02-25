@@ -221,7 +221,7 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 
 	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
 
-	if c.cluster.Spec.Networking.ImprovedHostNetwork {
+	if c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
 		for _, member := range c.members {
 			existingAddresses, err := c.getAlternateAddressesExternal(member)
 			if err != nil {

@@ -138,6 +138,7 @@ func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.
 
 // getStatusFromClusterInfo parses the Couchbase cluster status and makes it easier
 // to use.
+// nolint:gocognit
 func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, members couchbaseutil.MemberSet) (*Status, error) {
 	status := &Status{
 		NodeStates:     NodeStateMap{},
@@ -147,7 +148,18 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 	for i := range info.Nodes {
 		node := info.Nodes[i]
 
-		name := node.HostName.GetMemberName()
+		var name string
+
+		if c.cluster.Spec.Networking.InitPodsWithNodeHostname && c.cluster.Spec.Networking.ImprovedHostNetwork {
+			for _, member := range members {
+				if member.GetHostName() == node.HostName {
+					name = member.Name()
+					break
+				}
+			}
+		} else {
+			name = node.HostName.GetMemberName()
+		}
 
 		// See if the member exists, if so the node is managed, otherwise it's come from
 		// some source we don't trust.

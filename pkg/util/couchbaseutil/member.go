@@ -66,6 +66,7 @@ type Member interface { //nolint: interfacebloat
 	UseTLS() bool
 	SetVersion(string)
 	Version() string
+	SetDNSName(string)
 	GetDNSName() string
 	GetHostPort() string
 	GetHostPortTLS() string
@@ -138,12 +139,29 @@ func NewExtConnectedMember(namespace, cluster, name, version, config string, use
 	}
 }
 
+func NewHostNetworkMember(namespace, cluster, name, version, config string, useTLS bool, dnsName string) Member {
+	return &memberImpl{
+		namespace:   namespace,
+		cluster:     cluster,
+		name:        name,
+		version:     version,
+		config:      config,
+		useTLS:      useTLS,
+		dnsHostName: dnsName,
+	}
+}
+
 // SetVersion is used when a member has been created,
 // but it's version has not yet been realised.
 // i.e unknown SHA256 but we've queried the pod
 // after launch to work out a version.
 func (m *memberImpl) SetVersion(version string) {
 	m.version = version
+}
+
+// SetDNSName is used to set the member's DNS name.
+func (m *memberImpl) SetDNSName(hostname string) {
+	m.dnsHostName = hostname
 }
 
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
@@ -163,13 +181,13 @@ func (m *memberImpl) GetLocalDNSName() string {
 // GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
 // configuration, if TLS is enabled, we will use the TLS admin port.
 func (m *memberImpl) GetHostPort() string {
-	return fmt.Sprintf("%s:%d", m.GetLocalDNSName(), m.clientPort())
+	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
 }
 
 // GetHostPortTLS is used to force the use of TLS, in particular for probing the TLS
 // state before upgrading client connections.
 func (m *memberImpl) GetHostPortTLS() string {
-	return fmt.Sprintf("%s:18091", m.GetLocalDNSName())
+	return fmt.Sprintf("%s:18091", m.GetDNSName())
 }
 
 // GetHostURL return the member's host URL (without a path).  The scheme and port are
@@ -515,6 +533,10 @@ func (m *externamMemberImpl) UseTLS() bool {
 }
 
 func (m *externamMemberImpl) SetVersion(string) {
+	return
+}
+
+func (m *externamMemberImpl) SetDNSName(string) {
 	return
 }
 

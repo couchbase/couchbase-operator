@@ -1604,3 +1604,12 @@ func (l CloudNativeGatewayDataAPIProxyServiceList) StringSlice() []string {
 
 	return out
 }
+
+// IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).
+func IsFQDN(nodeName string) bool {
+	// Regular expression to match a valid FQDN
+	fqdnRegex := `^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(fqdnRegex)
+
+	return re.MatchString(nodeName)
+}

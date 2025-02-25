@@ -113,6 +113,11 @@ func (c *PodCache) Get(name string) (*corev1.Pod, bool) {
 	return obj.(*corev1.Pod), true
 }
 
+// Update updates the pod in the cache.
+func (c *PodCache) Update(resource *corev1.Pod) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
 // list returns pods by label matchers.
 func (c *PodCache) List(label string) (pods []*corev1.Pod) {
 	objs := c.resourceCache.informer.GetStore().List()

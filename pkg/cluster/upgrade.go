@@ -111,7 +111,9 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		// Don't force upgrades when we switch from migration mode to normal
 		// reconciliation.
-		ignoreMigratedHostnameAlias(actual, requestedSpec)
+		if !c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+			ignoreMigratedHostnameAlias(actual, requestedSpec)
+		}
 
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 

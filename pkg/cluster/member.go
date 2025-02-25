@@ -302,6 +302,18 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 		}
 	}()
 
+	pod, ok := c.k8s.Pods.Get(newMember.Name())
+	if ok {
+		if c.cluster.Spec.Networking.InitPodsWithNodeHostname && c.cluster.Spec.Networking.ImprovedHostNetwork {
+			newMember.SetDNSName(pod.Spec.NodeName)
+			pod.Annotations[constants.CouchbaseHostnameAnnotation] = pod.Spec.NodeName
+
+			if err := c.k8s.Pods.Update(pod); err != nil {
+				return err
+			}
+		}
+	}
+
 	// Setup networking.
 	if err = c.initMemberNetworking(newMember); err != nil {
 		return err

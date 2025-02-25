@@ -3053,6 +3053,9 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// ImprovedHostNetwork is used to set the alternate address of the pod to the node name
 	ImprovedHostNetwork bool `json:"-" annotation:"improvedHostNetwork"`
+
+	// InitPodsWithNodeHostname is used to set the hostname of the pod to the node name
+	InitPodsWithNodeHostname bool `json:"-" annotation:"initPodsWithNodeHostname"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
