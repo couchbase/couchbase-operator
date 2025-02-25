@@ -58,6 +58,9 @@ var (
 
 	// ErrUnknownCondition is raised when unexpectedly encountered condition with unknown status.
 	ErrUnknownCondition = errors.New("encountered unknown condition")
+
+	// ErrPodNotFound is raised when a pod is not found for a member.
+	ErrPodNotFound = errors.New("pod not found for member")
 )
 
 // Couchbase server specific errors.

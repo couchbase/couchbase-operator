@@ -129,7 +129,7 @@ func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
 // to use.
 func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.MemberSet) (*Status, error) {
 	info := &couchbaseutil.ClusterInfo{}
-	if err := couchbaseutil.GetPoolsDefault(info).RetryFor(RetryPeriod).On(c.api, target); err != nil {
+	if err := couchbaseutil.GetPoolsDefault(info).RetryFor(2*time.Minute).On(c.api, target); err != nil {
 		return nil, err
 	}
 

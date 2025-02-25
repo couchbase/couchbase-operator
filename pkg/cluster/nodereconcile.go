@@ -313,6 +313,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleUnknownServerConfigs,
 		(*ReconcileMachine).handleVolumeExpansion,
 		(*ReconcileMachine).handleMoveNodes,
+		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleUpgradeNode,
 		(*ReconcileMachine).handleBucketStorageBackendMigration,
 		(*ReconcileMachine).handleRemoveNode,
@@ -345,37 +346,34 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 }
 
 func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
-	// var hostnameDNSRequired bool
-	// if c.cluster.Spec.Networking.ImprovedHostNetwork && c.cluster.Spec.Networking.InitPodsWithNodeHostname {
-	//	hostnameDNSRequired = true
-	// }
-	//
-	// membersToSwapRebalance := couchbaseutil.MemberSet{}
-	//
-	// for _, member := range c.members {
-	//	pod, ok := c.k8s.Pods.Get(member.Name())
-	//	if !ok {
-	//		return fmt.Errorf("pod not found: %s", member.Name())
-	//	}
-	//
-	//	if hostnameDNSRequired {
-	//		if member.GetDNSName() != pod.Spec.NodeName {
-	//			member.SetDNSName(pod.Spec.NodeName)
-	//			membersToSwapRebalance.Add(member)
-	//		}
-	//	} else {
-	//		if member.GetDNSName() == pod.Spec.NodeName {
-	//			member.SetDNSName("")
-	//			membersToSwapRebalance.Add(member)
-	//		}
-	//	}
-	// }
-	//
-	// fmt.Println(membersToSwapRebalance.Size())
-	//
-	// if membersToSwapRebalance.Size() > 0 {
-	//	return r.swapRebalanceMembers(c, membersToSwapRebalance)
-	// }
+	var hostnameDNSRequired bool
+	if c.cluster.Spec.Networking.ImprovedHostNetwork && c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+		hostnameDNSRequired = true
+	}
+
+	membersToSwapRebalance := couchbaseutil.MemberSet{}
+
+	for _, member := range c.members {
+		pod, ok := c.k8s.Pods.Get(member.Name())
+		if !ok {
+			return errors.ErrPodNotFound
+		}
+
+		if hostnameDNSRequired {
+			if member.GetDNSName() != pod.Spec.NodeName {
+				membersToSwapRebalance.Add(member)
+			}
+		} else {
+			if member.GetDNSName() == pod.Spec.NodeName {
+				membersToSwapRebalance.Add(member)
+			}
+		}
+	}
+
+	if membersToSwapRebalance.Size() > 0 {
+		return r.swapRebalanceMembers(c, membersToSwapRebalance)
+	}
+
 	return nil
 }
 

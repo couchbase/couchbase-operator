@@ -16,7 +16,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-
 	v1 "k8s.io/api/core/v1"
 )
 

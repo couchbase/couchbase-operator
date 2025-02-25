@@ -1042,6 +1042,7 @@ func applyPodNetworking(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, m co
 
 	if cluster.Spec.Networking.ImprovedHostNetwork && cluster.Spec.Networking.InitPodsWithNodeHostname {
 		pod.Spec.HostNetwork = true
+		pod.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
 	}
 
 	// If we are in istio mode, add in DNS configuration to avoid hairpinning
