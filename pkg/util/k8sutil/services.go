@@ -1276,6 +1276,9 @@ func GetAlternateAddressExternalPorts(c *client.Client, name string) (*couchbase
 			ports.IndexServicePort = port.NodePort
 		case indexServicePortNameTLS:
 			ports.IndexServicePortTLS = port.NodePort
+		// Reconfiguration of the ports below aren't supported. Skip these.
+		case managementExchangePortName, managementExchangePortNameTLS, memcachedDedicatedPortName, memcachedDedicatedPortNameTLS:
+			continue
 		default:
 			return nil, fmt.Errorf("%w: unexpected port name %s", errors.NewStackTracedError(errors.ErrInternalError), port.Name)
 		}
