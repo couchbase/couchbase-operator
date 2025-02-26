@@ -9,7 +9,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -19,12 +18,11 @@ var (
 )
 
 type KubernetesDestroyConfig struct {
-	Description []string         `yaml:"description"`
-	ClusterName string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	EKSRegion   string           `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
-	AKSRegion   string           `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
-	GKERegion   string           `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
+	Description []string `yaml:"description"`
+	ClusterName string   `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	EKSRegion   string   `yaml:"eksRegion" caoCli:"context" env:"EKS_REGION"`
+	AKSRegion   string   `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
+	GKERegion   string   `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
 	ms          *managedk8sservices.ManagedServiceProvider
 }
 
@@ -102,24 +100,6 @@ func (action *DestroyKubernetes) CheckConfig() error {
 	_, ok := action.yamlConfig.(*KubernetesDestroyConfig)
 	if !ok {
 		return ErrDecodeKubernetesConfig
-	}
-
-	return nil
-}
-
-func (action *DestroyKubernetes) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*KubernetesDestroyConfig)
-	if !ok {
-		return ErrDecodeKubernetesConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

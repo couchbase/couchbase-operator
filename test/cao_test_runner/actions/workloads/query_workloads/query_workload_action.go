@@ -208,7 +208,3 @@ func (d *QueryWorkload) CheckConfig() error {
 
 	return nil
 }
-
-func (d *QueryWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

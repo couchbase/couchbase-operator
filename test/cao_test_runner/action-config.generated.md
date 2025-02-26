@@ -40,7 +40,6 @@ Config symbol: `BareMetalChaosConfig`
 | `CloudRegion` | `string` | `yaml:cloudRegion` | `caoCli:required`  |
 | `InstanceDNS` | `slice` | `yaml:instanceDNS` | `caoCli:required`  |
 | `ChaosList` | `slice` | `yaml:chaosList` | `caoCli:required`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Change Current Namespace
@@ -51,7 +50,6 @@ Config symbol: `NamespaceChangeConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `Namespace` | `string` | `yaml:namespace` | `caoCli:required,context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Change Kubeconfig Context
@@ -62,7 +60,6 @@ Config symbol: `KubeConfigContextChangeConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `K8SContext` | `string` | `yaml:k8sContext` | `caoCli:required,context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Chaos
@@ -74,7 +71,6 @@ Config symbol: `ChaosConfig`
 | `Description` | `slice` | `yaml:description` |  |
 | `ClusterName` | `string` | `yaml:clusterName` | `caoCli:required,context`  |
 | `ChaosList` | `slice` | `yaml:chaosList` | `caoCli:required`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 | `PortForward` | `bool` | `yaml:portForward` | `caoCli:context`  |
 | `ms` | `ptr` | |  |
 
@@ -87,7 +83,6 @@ Config symbol: `SetupNamespaceConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `Namespace` | `string` | `yaml:namespace` | `caoCli:context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Data Workload
@@ -129,7 +124,6 @@ Config symbol: `CRDDestroyConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `ClusterName` | `string` | `yaml:clusterName` | `caoCli:required,context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Delta Upgrade
@@ -140,7 +134,6 @@ Config symbol: `DeltaRecoveryUpgradeConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `CBClusterSpecPath` | `string` | `yaml:cbClusterSpecPath` | `caoCli:required`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Deploy Couchbase
@@ -155,7 +148,6 @@ Config symbol: `CouchbaseConfig`
 | `CBSecretsSpecPath` | `string` | `yaml:cbSecretsSpecPath` |  |
 | `ApplyClusterSpecChanges` | `map` | `yaml:applyClusterSpecChanges` |  |
 | `ApplyBucketSpecChanges` | `map` | `yaml:applyBucketSpecChanges` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Destroy Admission Controller
@@ -166,7 +158,6 @@ Config symbol: `AdmissionControllerConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `Scope` | `string` | `yaml:scope` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Destroy Kubernetes Cluster
@@ -180,7 +171,6 @@ Config symbol: `KubernetesDestroyConfig`
 | `EKSRegion` | `string` | `yaml:eksRegion` | `caoCli:context`  |
 | `AKSRegion` | `string` | `yaml:aksRegion` | `caoCli:context`  |
 | `GKERegion` | `string` | `yaml:gkeRegion` | `caoCli:context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 | `ms` | `ptr` | |  |
 
 ---
@@ -192,7 +182,6 @@ Config symbol: `OperatorConfig`
 | ---- | ---- | -------- | ----------- |
 | `Description` | `slice` | `yaml:description` |  |
 | `Scope` | `string` | `yaml:scope` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Generic Workload
@@ -291,7 +280,6 @@ Config symbol: `AdmissionControllerConfig`
 | `Scope` | `string` | `yaml:scope` |  |
 | `ValidateSecrets` | `bool` | `yaml:validateSecrets` | `caoCli:required`  |
 | `ValidateStorageClasses` | `bool` | `yaml:validateStorageClasses` | `caoCli:required`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Setup CAO Binary and Deploy CRDs
@@ -303,7 +291,6 @@ Config symbol: `CaoCrdSetupConfig`
 | `Description` | `slice` | `yaml:description` |  |
 | `OperatorVersion` | `string` | `yaml:operatorVersion` | `caoCli:required`  |
 | `ClusterName` | `string` | `yaml:clusterName` | `caoCli:required,context`  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Setup Kubernetes Cluster
@@ -342,7 +329,6 @@ Config symbol: `KubernetesSetupConfig`
 | `ImageType` | `string` | `yaml:imageType` |  |
 | `DiskType` | `string` | `yaml:diskType` |  |
 | `ReleaseChannel` | `string` | `yaml:releaseChannel` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 | `kubeconfigPath` | `ptr` | |  |
 | `ms` | `ptr` | |  |
 | `resultsDirectory` | `ptr` | |  |
@@ -368,7 +354,6 @@ Config symbol: `OperatorConfig`
 | `PodReadinessDelay` | `string` | `yaml:podReadinessDelay` |  |
 | `PodReadinessPeriod` | `string` | `yaml:podReadinessPeriod` |  |
 | `Scope` | `string` | `yaml:scope` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 
 ---
 #### Sleep
@@ -402,7 +387,6 @@ Config symbol: `KubernetesUpgradeConfig`
 | `WaitForGKEMasterUpgrade` | `bool` | `yaml:waitForGKEMasterUpgrade` |  |
 | `UpgradeGKENodePool` | `bool` | `yaml:upgradeGKENodePool` |  |
 | `GKENodePoolsToUpgrade` | `slice` | `yaml:gkeNodePoolsToUpgrade` |  |
-| `Validators` | `slice` | `yaml:validators,omitempty` |  |
 | `ms` | `ptr` | |  |
 
 ---

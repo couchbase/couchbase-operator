@@ -10,7 +10,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,10 +21,9 @@ var (
 )
 
 type CaoCrdSetupConfig struct {
-	Description     []string         `yaml:"description"`
-	OperatorVersion string           `yaml:"operatorVersion" caoCli:"required" env:"OPERATOR_VERSION"`
-	ClusterName     string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Validators      []map[string]any `yaml:"validators,omitempty"`
+	Description     []string `yaml:"description"`
+	OperatorVersion string   `yaml:"operatorVersion" caoCli:"required" env:"OPERATOR_VERSION"`
+	ClusterName     string   `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 }
 
 type SetupCaoCrd struct {
@@ -109,24 +107,6 @@ func (action *SetupCaoCrd) CheckConfig() error {
 	_, ok := action.yamlConfig.(*CaoCrdSetupConfig)
 	if !ok {
 		return ErrDecodeCAOSetupConfig
-	}
-
-	return nil
-}
-
-func (action *SetupCaoCrd) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*CaoCrdSetupConfig)
-	if !ok {
-		return ErrDecodeCAOSetupConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

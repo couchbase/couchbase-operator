@@ -36,6 +36,7 @@ type taskIn struct {
 	TimeoutInMins float64                `yaml:"timeoutInMins,omitempty"`
 	Blocking      bool                   `yaml:"blocking,omitempty"`
 	Config        map[string]interface{} `yaml:"config,omitempty"`
+	Validators    []map[string]any       `yaml:"validators,omitempty"`
 	ScenarioName  string                 `yaml:"-"`
 }
 

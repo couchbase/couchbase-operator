@@ -10,7 +10,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,9 +20,8 @@ var (
 )
 
 type KubeConfigContextChangeConfig struct {
-	Description []string         `yaml:"description"`
-	K8SContext  string           `yaml:"k8sContext" caoCli:"required,context"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
+	Description []string `yaml:"description"`
+	K8SContext  string   `yaml:"k8sContext" caoCli:"required,context"`
 }
 
 type ChangeKubeConfigContext struct {
@@ -93,23 +91,6 @@ func (action *ChangeKubeConfigContext) Do(ctx *context.Context, testAssets asset
 
 func (action *ChangeKubeConfigContext) Config() interface{} {
 	return action.yamlConfig
-}
-
-func (action *ChangeKubeConfigContext) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*KubeConfigContextChangeConfig)
-	if !ok {
-		return ErrNoConfigFound
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
-	}
-
-	return nil
 }
 
 func (action *ChangeKubeConfigContext) CheckConfig() error {

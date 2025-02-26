@@ -10,7 +10,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,9 +20,8 @@ var (
 )
 
 type DeltaRecoveryUpgradeConfig struct {
-	Description       []string         `yaml:"description"`
-	CBClusterSpecPath string           `yaml:"cbClusterSpecPath" caoCli:"required"`
-	Validators        []map[string]any `yaml:"validators,omitempty"`
+	Description       []string `yaml:"description"`
+	CBClusterSpecPath string   `yaml:"cbClusterSpecPath" caoCli:"required"`
 }
 
 func NewDeltaRecoveryUpgrade(conf interface{}) (actions.Action, error) {
@@ -55,24 +53,6 @@ func (d *DeltaRecoveryUpgrade) CheckConfig() error {
 	_, ok := d.yamlConfig.(*DeltaRecoveryUpgradeConfig)
 	if !ok {
 		return ErrDeltaUpgradeDecodeFailed
-	}
-
-	return nil
-}
-
-func (d *DeltaRecoveryUpgrade) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if d.yamlConfig == nil {
-		return ErrDeltaUpgradeConfig
-	}
-
-	c, ok := d.yamlConfig.(*DeltaRecoveryUpgradeConfig)
-	if !ok {
-		return ErrDeltaUpgradeDecodeFailed
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

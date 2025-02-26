@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,7 +80,6 @@ type AdmissionControllerConfig struct {
 	Scope                       ScopeType           `yaml:"scope"`
 	ValidateSecrets             bool                `yaml:"validateSecrets" caoCli:"required"`
 	ValidateStorageClasses      bool                `yaml:"validateStorageClasses" caoCli:"required"`
-	Validators                  []map[string]any    `yaml:"validators,omitempty"`
 }
 
 func NewSetupAdmissionControllerConfig(config interface{}) (actions.Action, error) {
@@ -163,24 +161,6 @@ func (action *SetupAdmissionController) CheckConfig() error {
 
 	if c.Replicas == 0 {
 		c.Replicas = DefaultReplicas
-	}
-
-	return nil
-}
-
-func (action *SetupAdmissionController) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoAdmissionConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*AdmissionControllerConfig)
-	if !ok {
-		return ErrUnableToDecodeAdmissionConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

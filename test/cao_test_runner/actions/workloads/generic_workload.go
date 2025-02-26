@@ -138,7 +138,3 @@ func (g *GenericWorkload) CheckConfig() error {
 
 	return nil
 }
-
-func (g *GenericWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

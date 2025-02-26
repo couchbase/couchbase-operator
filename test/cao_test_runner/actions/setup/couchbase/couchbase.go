@@ -15,7 +15,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
 	yamlutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/yaml"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,13 +26,12 @@ var (
 )
 
 type CouchbaseConfig struct {
-	Description             []string         `yaml:"description"`
-	CBClusterSpecPath       string           `yaml:"cbClusterSpecPath" caoCli:"required"`
-	CBBucketsSpecPath       string           `yaml:"cbBucketsSpecPath"`
-	CBSecretsSpecPath       string           `yaml:"cbSecretsSpecPath"`
-	ApplyClusterSpecChanges map[string]any   `yaml:"applyClusterSpecChanges"`
-	ApplyBucketSpecChanges  map[string]any   `yaml:"applyBucketSpecChanges"`
-	Validators              []map[string]any `yaml:"validators,omitempty"`
+	Description             []string       `yaml:"description"`
+	CBClusterSpecPath       string         `yaml:"cbClusterSpecPath" caoCli:"required"`
+	CBBucketsSpecPath       string         `yaml:"cbBucketsSpecPath"`
+	CBSecretsSpecPath       string         `yaml:"cbSecretsSpecPath"`
+	ApplyClusterSpecChanges map[string]any `yaml:"applyClusterSpecChanges"`
+	ApplyBucketSpecChanges  map[string]any `yaml:"applyBucketSpecChanges"`
 }
 
 func NewCouchbaseConfig(config interface{}) (actions.Action, error) {
@@ -69,24 +67,6 @@ func (s *Couchbase) CheckConfig() error {
 
 	if c.CBClusterSpecPath == "" {
 		return ErrMissingYaml
-	}
-
-	return nil
-}
-
-func (s *Couchbase) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if s.yamlConfig == nil {
-		return ErrConfigCouchbase
-	}
-
-	c, ok := s.yamlConfig.(*CouchbaseConfig)
-	if !ok {
-		return ErrCouchbaseConfigDecode
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

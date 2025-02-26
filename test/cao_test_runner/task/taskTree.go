@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 type Tree struct {
 	Trees         []*Tree
 	Action        actions.Action
+	Validators    []map[string]any
 	Iterations    int
 	MaxConcurrent int
 	Timeout       time.Duration
@@ -35,6 +37,12 @@ func newTree() *Tree {
 // Execute runs through the tasks in the Tree.
 func (t *Tree) Execute(ctx context.Context, testAssets *assets.TestAssets) []error {
 	tCtx := icontext.NewContext(ctx)
+
+	state := validations.Pre
+	if ok, err := validations.RunValidator(tCtx, t.Validators, state, testAssets); !ok {
+		return []error{fmt.Errorf("run %s validations: %w", state, err)}
+	}
+
 	if t.Action != nil {
 		if _, err := tCtx.ReconcileConfig(t.Action.Config()); err != nil {
 			return []error{err}
@@ -44,17 +52,14 @@ func (t *Tree) Execute(ctx context.Context, testAssets *assets.TestAssets) []err
 			return []error{err}
 		}
 
-		if err := t.Action.RunValidators(tCtx, validations.Pre, testAssets); err != nil {
-			return []error{err}
-		}
-
 		if err := t.Action.Do(tCtx, testAssets); err != nil {
 			return []error{err}
 		}
+	}
 
-		if err := t.Action.RunValidators(tCtx, validations.Post, testAssets); err != nil {
-			return []error{err}
-		}
+	state = validations.Post
+	if ok, err := validations.RunValidator(tCtx, t.Validators, state, testAssets); !ok {
+		return []error{fmt.Errorf("run %s validations: %w", state, err)}
 	}
 
 	// If the scenario has only one action but iterations > 1

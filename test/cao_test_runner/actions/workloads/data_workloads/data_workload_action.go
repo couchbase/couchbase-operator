@@ -198,7 +198,3 @@ func (d *DataWorkload) CheckConfig() error {
 
 	return nil
 }
-
-func (d *DataWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

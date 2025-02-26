@@ -135,6 +135,7 @@ func (r Register) populate(task taskIn, out *Tree, depth int) error {
 
 	out.Blocking = task.Blocking
 	out.ScenarioName = task.ScenarioName
+	out.Validators = task.Validators
 
 	if err := r.createAction(task, out); err != nil {
 		return err

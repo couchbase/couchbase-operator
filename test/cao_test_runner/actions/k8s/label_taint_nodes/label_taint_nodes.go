@@ -165,7 +165,3 @@ func (ltn *LabelTaintNode) CheckConfig() error {
 
 	return nil
 }
-
-func (ltn *LabelTaintNode) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

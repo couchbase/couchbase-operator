@@ -9,7 +9,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -39,7 +38,6 @@ type KubernetesUpgradeConfig struct {
 	WaitForGKEMasterUpgrade bool                        `yaml:"waitForGKEMasterUpgrade"`
 	UpgradeGKENodePool      bool                        `yaml:"upgradeGKENodePool"`
 	GKENodePoolsToUpgrade   []GKENodePoolUpgradeConfig  `yaml:"gkeNodePoolsToUpgrade"`
-	Validators              []map[string]any            `yaml:"validators,omitempty"`
 	ms                      *managedk8sservices.ManagedServiceProvider
 }
 
@@ -107,24 +105,6 @@ func (action *KubernetesUpgrade) Do(ctx *context.Context, testAssets assets.Test
 
 func (action *KubernetesUpgrade) Config() interface{} {
 	return action.yamlConfig
-}
-
-func (action *KubernetesUpgrade) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*KubernetesUpgradeConfig)
-	if !ok {
-		return ErrDecodeKubernetesConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
-	}
-
-	return nil
 }
 
 func (action *KubernetesUpgrade) CheckConfig() error {

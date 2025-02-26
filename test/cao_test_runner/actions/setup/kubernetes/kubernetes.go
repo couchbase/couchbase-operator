@@ -2,7 +2,6 @@ package setupkubernetes
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -52,7 +50,6 @@ type KubernetesSetupConfig struct {
 	ImageType                string                             `yaml:"imageType"`
 	DiskType                 string                             `yaml:"diskType"`
 	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"`
-	Validators               []map[string]any                   `yaml:"validators,omitempty"`
 	kubeconfigPath           *fileutils.File
 	ms                       *managedk8sservices.ManagedServiceProvider
 	resultsDirectory         *fileutils.Directory
@@ -134,24 +131,6 @@ func (action *SetupKubernetes) CheckConfig() error {
 
 	if err := managedk8sservices.ValidateManagedServices(c.ms); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (action *SetupKubernetes) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*KubernetesSetupConfig)
-	if !ok {
-		return ErrDecodeKubernetesConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

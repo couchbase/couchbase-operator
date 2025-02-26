@@ -10,7 +10,6 @@ import (
 	managedsvcs "github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	cbpodfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/k8s/cb_pod_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -21,11 +20,10 @@ var (
 )
 
 type ChaosConfig struct {
-	Description []string         `yaml:"description"`
-	ClusterName string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	ChaosList   []ChaosList      `yaml:"chaosList" caoCli:"required"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
-	PortForward bool             `yaml:"portForward" caoCli:"context"`
+	Description []string    `yaml:"description"`
+	ClusterName string      `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
+	ChaosList   []ChaosList `yaml:"chaosList" caoCli:"required"`
+	PortForward bool        `yaml:"portForward" caoCli:"context"`
 	ms          *managedsvcs.ManagedServiceProvider
 }
 
@@ -89,27 +87,6 @@ func (c *Chaos) CheckConfig() error {
 			return fmt.Errorf("new chaos config: %w", err)
 		}
 	}
-
-	return nil
-}
-
-func (c *Chaos) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
-	if c.yamlConfig == nil {
-		return ErrChaosConfigNotFound
-	}
-
-	chaosConfig, ok := c.yamlConfig.(*ChaosConfig)
-	if !ok {
-		return ErrChaosConfigDecode
-	}
-
-	logrus.Infof("%s validators running for the chaos action desc `%v`", state, chaosConfig.Description)
-
-	if ok, err := validations.RunValidator(ctx, chaosConfig.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations for the chaos action desc `%v`: %w", state, chaosConfig.Description, err)
-	}
-
-	logrus.Infof("%s validators successful for the chaos action desc `%v`", state, chaosConfig.Description)
 
 	return nil
 }

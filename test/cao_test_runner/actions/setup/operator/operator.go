@@ -13,7 +13,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -85,7 +84,6 @@ type OperatorConfig struct {
 	PodReadinessDelay  string              `yaml:"podReadinessDelay"`
 	PodReadinessPeriod string              `yaml:"podReadinessPeriod"`
 	Scope              ScopeType           `yaml:"scope"`
-	Validators         []map[string]any    `yaml:"validators,omitempty"`
 }
 
 func NewSetupOperatorConfig(config interface{}) (actions.Action, error) {
@@ -111,24 +109,6 @@ type SetupOperator struct {
 
 func (action *SetupOperator) Describe() string {
 	return action.desc
-}
-
-func (action *SetupOperator) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoOperatorConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*OperatorConfig)
-	if !ok {
-		return ErrUnableToDecodeOperatorConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
-	}
-
-	return nil
 }
 
 func (action *SetupOperator) CheckConfig() error {

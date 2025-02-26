@@ -225,7 +225,3 @@ func (d *IndexWorkload) CheckConfig() error {
 
 	return nil
 }
-
-func (d *IndexWorkload) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

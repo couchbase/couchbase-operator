@@ -10,7 +10,6 @@ import (
 	baremetal "github.com/couchbase/couchbase-operator/test/cao_test_runner/bare_metal_sdks"
 	cbbaremetalfilter "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cb_bare_metal_filter"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/triggers"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,7 +25,6 @@ type BareMetalChaosConfig struct {
 	CloudRegion   string                  `yaml:"cloudRegion" caoCli:"required"`
 	InstanceDNS   []string                `yaml:"instanceDNS" caoCli:"required"`
 	ChaosList     []ChaosList             `yaml:"chaosList" caoCli:"required"`
-	Validators    []map[string]any        `yaml:"validators,omitempty"`
 }
 
 type ChaosList struct {
@@ -68,27 +66,6 @@ func NewChaosBareMetalConfig(config interface{}) (actions.Action, error) {
 		desc:       fmt.Sprintf("perform chaos action desc: %v", chaosConfig.Description),
 		yamlConfig: chaosConfig,
 	}, nil
-}
-
-func (c *ChaosBareMetal) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
-	if c.yamlConfig == nil {
-		return ErrChaosBareMetalConfigNotFound
-	}
-
-	chaosConfig, ok := c.yamlConfig.(*BareMetalChaosConfig)
-	if !ok {
-		return ErrChaosBareMetalConfigDecode
-	}
-
-	logrus.Infof("%s validators running for the bare metal chaos action desc `%v`", state, chaosConfig.Description)
-
-	if ok, err := validations.RunValidator(ctx, chaosConfig.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations for the bare metal chaos action desc `%v`: %w", state, chaosConfig.Description, err)
-	}
-
-	logrus.Infof("%s validators successful for the bare metal chaos action desc `%v`", state, chaosConfig.Description)
-
-	return nil
 }
 
 func (c *ChaosBareMetal) CheckConfig() error {

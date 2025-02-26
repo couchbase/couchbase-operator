@@ -9,7 +9,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/cao"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -32,9 +31,8 @@ const (
 )
 
 type OperatorConfig struct {
-	Description []string         `yaml:"description"`
-	Scope       ScopeType        `yaml:"scope"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
+	Description []string  `yaml:"description"`
+	Scope       ScopeType `yaml:"scope"`
 }
 
 func NewDeleteOperatorConfig(config interface{}) (actions.Action, error) {
@@ -79,24 +77,6 @@ func (action *DeleteOperator) CheckConfig() error {
 		// No-op
 	default:
 		return ErrIllegalScope
-	}
-
-	return nil
-}
-
-func (action *DeleteOperator) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoOperatorConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*OperatorConfig)
-	if !ok {
-		return ErrUnableToDecodeOperatorConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

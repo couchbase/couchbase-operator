@@ -8,7 +8,6 @@ import (
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,9 +19,8 @@ var (
 )
 
 type SetupNamespaceConfig struct {
-	Description []string         `yaml:"description"`
-	Namespace   string           `yaml:"namespace" caoCli:"context" env:"NAMESPACE"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
+	Description []string `yaml:"description"`
+	Namespace   string   `yaml:"namespace" caoCli:"context" env:"NAMESPACE"`
 }
 
 func NewSetupNamespaceConfig(config interface{}) (actions.Action, error) {
@@ -58,24 +56,6 @@ func (action *SetupNamespace) CheckConfig() error {
 	_, ok := action.yamlConfig.(*SetupNamespaceConfig)
 	if !ok {
 		return ErrUnableToDecodeSetupNamespaceConfig
-	}
-
-	return nil
-}
-
-func (action *SetupNamespace) RunValidators(ctx *context.Context,
-	state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoSetupNamespaceConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*SetupNamespaceConfig)
-	if !ok {
-		return ErrUnableToDecodeSetupNamespaceConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
 	}
 
 	return nil

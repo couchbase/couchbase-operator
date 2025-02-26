@@ -10,5 +10,4 @@ type Action interface {
 	Do(ctx *context.Context, testAssets assets.TestAssetGetter) error
 	Config() interface{}
 	CheckConfig() error
-	RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error
 }

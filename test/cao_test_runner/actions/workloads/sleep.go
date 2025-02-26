@@ -87,7 +87,3 @@ func (s *SleepAction) CheckConfig() error {
 
 	return nil
 }
-
-func (s *SleepAction) RunValidators(_ *context.Context, _ string, _ assets.TestAssetGetterSetter) error {
-	return nil
-}

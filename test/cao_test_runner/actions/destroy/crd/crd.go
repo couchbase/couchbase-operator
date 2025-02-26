@@ -9,7 +9,6 @@ import (
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/actions/context"
-	"github.com/couchbase/couchbase-operator/test/cao_test_runner/validations"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,9 +20,8 @@ var (
 )
 
 type CRDDestroyConfig struct {
-	Description []string         `yaml:"description"`
-	ClusterName string           `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
-	Validators  []map[string]any `yaml:"validators,omitempty"`
+	Description []string `yaml:"description"`
+	ClusterName string   `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 }
 
 type DestroyCRD struct {
@@ -82,23 +80,6 @@ func (action *DestroyCRD) Do(ctx *context.Context, testAssets assets.TestAssetGe
 
 func (action *DestroyCRD) Config() interface{} {
 	return action.yamlConfig
-}
-
-func (action *DestroyCRD) RunValidators(ctx *context.Context, state string, testAssets assets.TestAssetGetterSetter) error {
-	if action.yamlConfig == nil {
-		return ErrNoConfigFound
-	}
-
-	c, ok := action.yamlConfig.(*CRDDestroyConfig)
-	if !ok {
-		return ErrDecodeCRDSetupConfig
-	}
-
-	if ok, err := validations.RunValidator(ctx, c.Validators, state, testAssets); !ok {
-		return fmt.Errorf("run %s validations: %w", state, err)
-	}
-
-	return nil
 }
 
 func (action *DestroyCRD) CheckConfig() error {
