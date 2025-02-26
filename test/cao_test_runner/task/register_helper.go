@@ -133,8 +133,6 @@ func (r Register) populate(task taskIn, out *Tree, depth int) error {
 		out.Timeout = time.Duration(task.TimeoutInMins) * time.Minute
 	}
 
-	out.RetryOnError = task.RetryOnError
-	out.MaxRetries = task.MaxRetries
 	out.Blocking = task.Blocking
 	out.ScenarioName = task.ScenarioName
 

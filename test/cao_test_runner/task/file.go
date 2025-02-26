@@ -34,12 +34,7 @@ type taskIn struct {
 	Iterations    int                    `yaml:"iterations,omitempty"`
 	MaxConcurrent int                    `yaml:"maxConcurrent,omitempty"`
 	TimeoutInMins float64                `yaml:"timeoutInMins,omitempty"`
-	ErrorExpected bool                   `yaml:"errorExpected,omitempty"`
-	ErrorType     string                 `yaml:"errorType,omitempty"`
-	RetryOnError  bool                   `yaml:"retry,omitempty"`
-	MaxRetries    int                    `yaml:"maxRetries,omitempty"`
 	Blocking      bool                   `yaml:"blocking,omitempty"`
-	Tags          []string               `yaml:"tags,omitempty"`
 	Config        map[string]interface{} `yaml:"config,omitempty"`
 	ScenarioName  string                 `yaml:"-"`
 }

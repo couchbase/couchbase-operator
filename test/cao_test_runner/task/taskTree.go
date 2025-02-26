@@ -19,10 +19,6 @@ type Tree struct {
 	Iterations    int
 	MaxConcurrent int
 	Timeout       time.Duration
-	ErrorExpected bool
-	ErrorType     string
-	RetryOnError  bool
-	MaxRetries    int
 	Blocking      bool
 	ScenarioName  string
 }
