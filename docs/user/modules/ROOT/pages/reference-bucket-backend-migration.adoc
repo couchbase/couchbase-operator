@@ -5,7 +5,7 @@ In Couchbase Server 7.6.0 the backend of a storage bucket can be migrated betwee
 
 
 == Migrating Couchbase Bucket storage Backends
-The migration of a bucket requires each node the bucket is using to be swap-rebalanced out of a cluster. Once each node has been replaced then the bucket will be completely using the new storage backend. The Couchbase Operator can perform this migration. The migration for buckets can be triggered in a number of ways.
+The migration of a bucket requires each node the bucket is using to be swap-rebalanced out of a cluster. Once each node has been replaced, the bucket will have been rebuilt using the new storage backend. In order for the Couchbase Operator to perform this migration, the `cao.couchbase.com/buckets.enableBucketMigrationRoutines` annotation must be set to `true`. The migration for buckets can be triggered in a number of ways.
 
 === Using managed CouchbaseBuckets
 To migrate a CouchbaseBucket resource that is managed by the operator the spec.storageBackend for a CouchbaseBucket resource can be modified to the new storage backend. This feature is only available in Couchbase Operator versions 2.6.1+. 

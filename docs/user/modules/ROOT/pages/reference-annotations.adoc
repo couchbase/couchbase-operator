@@ -17,6 +17,15 @@ When configured the Couchbase Operator will attempt to force all buckets in a cl
 This config is only used with Couchbase Server 7.6.0.
 Accepts either `couchstore` or `magma`.
 
+=== Bucket Migrations
+
+==== `cao.couchbase.com/buckets.enableBucketMigrationRoutines`
+By default, bucket storage backend migrations are not enabled as they will result in a swap-rebalance of every effected couchbase node. This means changing the bucket storage backend will be prevented unless this annotation is set to "true".
+Accepts either `true` or `false`.
+
+==== `cao.couchbase.com/buckets.maxConcurrentPodSwaps`
+Used to change the number of pods affected by a bucket storage backend migration. By default, only one pod will be migrated at a time. This field must be a number greater than 0.
+
 == Sample buckets
 ==== `cao.couchbase.com/sampleBucket`
 SampleBucket indicates whether the bucket should be treated as a sample bucket.
