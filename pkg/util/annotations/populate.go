@@ -147,9 +147,45 @@ func (state *PopulateState) setField(field *reflect.Value, value string) error {
 		}
 
 		field.SetBool(boolVal)
+	case reflect.Slice:
+		arrayVal := strings.Split(value, ",")
+		sliceVal := reflect.MakeSlice(field.Type(), 0, 0)
+
+		for _, e := range arrayVal {
+			elemType := field.Type().Elem()
+			newValue := reflect.New(elemType)
+			convertAppropriately(newValue, e, elemType)
+			sliceVal = reflect.Append(sliceVal, newValue.Elem())
+		}
+
+		field.Set(sliceVal)
 	}
 
 	return nil
+}
+
+func convertAppropriately(v reflect.Value, s string, t reflect.Type) {
+	switch t.Kind() {
+	case reflect.String:
+		v.Elem().Set(reflect.ValueOf(s).Convert(t))
+	case reflect.Bool:
+		boolVal, err := strconv.ParseBool(s)
+		if err != nil {
+			panic(err)
+		}
+
+		v.Elem().Set(reflect.ValueOf(boolVal).Convert(t))
+	case reflect.Int:
+		intVal, err := strconv.Atoi(s)
+		if err != nil {
+			panic(err)
+		}
+
+		v.Elem().Set(reflect.ValueOf(intVal).Convert(t))
+	case reflect.Ptr:
+		// This works with indirect strings?
+		v.Elem().Set(reflect.ValueOf(s).Convert(t))
+	}
 }
 
 // given a path peforms a recursive search until the final field is found.

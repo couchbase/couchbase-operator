@@ -22,7 +22,7 @@ This allows the cluster to be recovered at the point of hibernation with existin
 
 [WARNING]
 ====
-Upgrading a Kubernetes Cluster or Couchbase Operator should not be attempted while any couchbase clusters are in hibernation.
+The couchbase cluster spec cannot be changed while the cluster is hibernated.
 ====
 
 === Hibernation Strategies
@@ -30,7 +30,7 @@ Upgrading a Kubernetes Cluster or Couchbase Operator should not be attempted whi
 At present there is only one hibernation strategy:
 
 Immediate hibernation::
-This immediately terminates any pods associated with the cluster.
+This immediately terminates any pods associated with the cluster. If the cluster is upgrading, migrating buckets, scaling, unbalanced or unavailable, hibernation will occur once this process has finished. Likewise, a cluster that is migrating cannot enter hibernation until the migration has completed and been removed from the spec.
 Any writes to the database that reside in a store queue, but not persisted to disk, will be lost.
 Any writes that must be persisted to disk should use durable writes that guarantee to the client the data has been persisted and potentially replicated.
 

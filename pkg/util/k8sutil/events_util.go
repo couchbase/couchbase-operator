@@ -589,11 +589,11 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, name string, from int,
 	return event
 }
 
-func ReconcileFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func ReconcileFailedEvent(cl *couchbasev2.CouchbaseCluster, err error) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonReconcileFailed
-	event.Message = fmt.Sprintf("Reconciliation failed")
+	event.Message = err.Error()
 
 	return event
 }

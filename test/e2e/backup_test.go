@@ -1096,6 +1096,8 @@ func TestBackupAutoscaling(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).ExpandableStorage()
+
 	clusterSize := 3
 	initialVolumeSize := e2espec.NewResourceQuantityMi(1024)
 	volumeSizeLimit := e2espec.NewResourceQuantityMi(1024 + 512)
@@ -2338,7 +2340,9 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 	}
 

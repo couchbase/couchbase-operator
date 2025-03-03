@@ -51,6 +51,10 @@ func EqualEvent(e1, e2 *v1.Event) bool {
 	return (e1.Type == e2.Type && e1.Reason == e2.Reason && e1.Message == e2.Message)
 }
 
+func LooseEqualEvent(e1, e2 *v1.Event) bool {
+	return (e1.Type == e2.Type && e1.Reason == e2.Reason)
+}
+
 func NewMemberCreationFailedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.Event {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	return k8sutil.MemberCreationFailedEvent(name, cl)
@@ -145,7 +149,7 @@ func AutoscaleDownEvent(cl *couchbasev2.CouchbaseCluster, configName string, fro
 }
 
 func ReconcileFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
-	return k8sutil.ReconcileFailedEvent(cl)
+	return k8sutil.ReconcileFailedEvent(cl, fmt.Errorf("dummy error"))
 }
 
 func NewVolumeExpandStartedEvent(volumeName string, from string, to string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
@@ -294,6 +298,9 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Optional{
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			},
+			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
@@ -359,9 +366,9 @@ func KubernetesUpgradeSequenceEphemeral(clusterSize int) eventschema.Validatable
 	}
 }
 
-// ServerCrashRecoverySequence is generated when you kill NS server.
-func ServerCrashRecoverySequence(cluster *couchbasev2.CouchbaseCluster) eventschema.Validatable {
-	if ok, err := cluster.IsAtLeastVersion("7.6.2"); ok && err == nil {
+// ServerCrashRecoverySequence is generated when you kill NS server. Some older server versions may wait for a rebalance during recovery.
+func ServerCrashRecoverySequence(waitForRebalance bool) eventschema.Validatable {
+	if !waitForRebalance {
 		return eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				// The server instance may come back before being registered as down,
@@ -398,6 +405,9 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 
 	events.Validators = append(events.Validators, eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			},
 			eventschema.Repeat{
 				Times:     victims,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
@@ -411,6 +421,9 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+						eventschema.Optional{
+							Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+						},
 					},
 				},
 			},
@@ -427,6 +440,39 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 	})
 
 	return events
+}
+
+// PodFailedOverWithPVCRecoverySequence is a common sequence when some pods are nuked with PVC
+// storage attached and they can delta-recover after a failover event occurs.
+func PodFailedOverWithPVCRecoverySequence(victims int) eventschema.Validatable {
+	return eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			// Depending on either server version, auto-failover timeout and where the reconciliation loop
+			// is at when pods are failed over, we may or may not see member down events for the victims
+			eventschema.Optional{
+				Validator: eventschema.Repeat{
+					Times:     victims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+				},
+			},
+			eventschema.Repeat{
+				Times:     victims,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+			},
+			eventschema.Repeat{
+				Times: victims,
+				Validator: eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+						eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					},
+				},
+			},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
 }
 
 // PodDownWithPVCRecoverySequenceWithEphemeral is shat to expect when the platform
@@ -457,6 +503,10 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, pers
 				eventschema.Repeat{
 					Times:     persistentVictims - 1,
 					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
+				},
+				eventschema.Repeat{
+					Times:     ephemeralVictims,
+					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 				},
 				eventschema.Repeat{
 					Times:     ephemeralVictims,
@@ -502,6 +552,9 @@ func PodDownWithPVCRecoverySequenceWithEphemeral(t *testing.T, clusterSize, pers
 func PodDownFailedWithPVCRecoverySequence(victims int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			eventschema.Optional{
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			},
 			eventschema.Optional{
 				Validator: eventschema.Repeat{
 					Times:     victims,

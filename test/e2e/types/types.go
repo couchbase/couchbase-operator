@@ -3,6 +3,8 @@ package types
 
 import (
 	"net/url"
+	"sync"
+	"sync/atomic"
 
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
 
@@ -114,4 +116,73 @@ func (c *Cluster) APIHostname() (string, error) {
 	}
 
 	return u.Hostname(), nil
+}
+
+// KubeWarningCollector is an implementation of the k8s warning handler that collects warnings returned by the k8s api for given resources.
+// The collector requires the resource name to be set before each call to the k8s api, and a list of which resources to collect warnings for.
+type KubeWarningCollector struct {
+	warnings map[string][]string
+	resource atomic.Value
+	mu       sync.Mutex
+}
+
+func NewKubeWarningCollector() *KubeWarningCollector {
+	return &KubeWarningCollector{
+		warnings: make(map[string][]string),
+	}
+}
+
+func (w *KubeWarningCollector) TrackResource(resource string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.warnings[resource] = []string{}
+}
+
+func (w *KubeWarningCollector) SetResource(resource string) {
+	w.resource.Store(resource)
+}
+
+func (w *KubeWarningCollector) HandleWarningHeader(code int, agent string, message string) {
+	// Skip if not a warning or empty message
+	if code != 299 || message == "" {
+		return
+	}
+
+	resource := w.resource.Load()
+	if resource == nil {
+		return
+	}
+
+	resourceString, ok := resource.(string)
+	if !ok || resourceString == "" {
+		return
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Add warning if resource is being tracked.
+	if _, exists := w.warnings[resourceString]; exists {
+		w.warnings[resourceString] = append(w.warnings[resourceString], message)
+	}
+}
+
+func (w *KubeWarningCollector) Warnings() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	warnings := []string{}
+	for _, warning := range w.warnings {
+		warnings = append(warnings, warning...)
+	}
+
+	return warnings
+}
+
+func (w *KubeWarningCollector) Reset() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.warnings = make(map[string][]string)
+	w.resource.Store("")
 }

@@ -496,7 +496,7 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 //
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
-func (c *Cluster) RunReconcile() {
+func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
 
@@ -542,7 +542,7 @@ func (c *Cluster) RunReconcile() {
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
 		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
-		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
@@ -572,6 +572,10 @@ func (c *Cluster) RunReconcile() {
 		}
 
 		return
+	}
+
+	if err := c.checkUpdateTime(operatorStartTime); err != nil {
+		log.Error(err, "Error when checking time of last update", "cluster", c.namespacedName())
 	}
 
 	var err error
@@ -605,7 +609,7 @@ func (c *Cluster) RunReconcile() {
 			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
-		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster))
+		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
 		metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Inc()
@@ -624,7 +628,7 @@ func (c *Cluster) RunReconcile() {
 
 // Update is called periodically or on a CR change, print out any diffs in the spec
 // then update the specification and unconditionally reconcile.
-func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
+func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTime time.Time) {
 	if cluster.Generation < c.generation {
 		log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
 		return
@@ -636,10 +640,11 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster) {
 
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
 		c.logUpdate(c.cluster.Spec, cluster.Spec)
+		c.cluster.Status.LastUpdateTime = time.Now().Format(time.RFC3339)
 	}
 
 	c.cluster = cluster
-	c.RunReconcile()
+	c.RunReconcile(operatorStartTime)
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {
@@ -941,6 +946,11 @@ func (c *Cluster) clusterRemoveMember(name string) error {
 
 	c.cluster.Status.Size = c.members.Size()
 
+	// If there are no members left, we don't need to update their status
+	if c.members.Empty() {
+		return nil
+	}
+
 	return c.updateMemberStatus(false)
 }
 
@@ -1069,21 +1079,31 @@ func (c *Cluster) logStatus(status *MemberState) {
 	c.scheduler.LogStatus(c.namespacedName())
 }
 
-// hibernate puts the cluster to sleep, zzzz.
-func (c *Cluster) hibernate() error {
-	// Don't hibernate if the cluster is rebalancing otherwise things go bad
-	if isRebalancing, err := c.isClusterRebalancing(); err != nil {
-		return err
-	} else if isRebalancing {
-		log.Info("[WARN] The cluster is currently rebalancing, waiting for rebalance to complete before hibernating cluster")
-		return nil
+// hibernate checks if the cluster can enter hibernation and if so, hibernates it.
+func (c *Cluster) hibernate() (bool, error) {
+	// If the cluster isn't already hibernating, we should check that we can enter hibernation and warn if it's not possible.
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		canHibernate, reason := c.cluster.CanHibernate()
+
+		if !canHibernate {
+			log.Info("[WARN] Hibernation requested. Cluster will enter hibernation once it is stable", "reason", reason)
+			return false, nil
+		} else {
+			log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
+		}
 	}
 
-	for _, pod := range c.getClusterPods() {
-		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", pod.Name)
+	members := podsToMemberSet(c.getClusterPods())
 
-		if err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Delete(context.Background(), pod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-			return err
+	for _, member := range members {
+		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
+
+		if err := c.removePod(member.Name(), false); err != nil {
+			return true, err
+		}
+
+		if err := c.clusterRemoveMember(member.Name()); err != nil {
+			return true, err
 		}
 	}
 
@@ -1092,25 +1112,45 @@ func (c *Cluster) hibernate() error {
 	c.cluster.Status.SetHibernatingCondition("Cluster hibernating")
 
 	if err := c.updateCRStatus(); err != nil {
-		return err
+		return true, err
 	}
 
 	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
-	return nil
+	return true, nil
 }
 
-func (c *Cluster) isClusterRebalancing() (bool, error) {
-	rebalanceProgress := couchbaseutil.RebalanceProgress{}
-
-	if err := couchbaseutil.GetRebalanceProgress(&rebalanceProgress).On(c.api, c.readyMembers()); err != nil {
-		return true, err
+func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
+	// If there's no value, it must be a brand new cluster so ignore this step for now.
+	if c.cluster.Status.LastUpdateTime == "" {
+		return nil
 	}
 
-	switch rebalanceProgress.Status {
-	case couchbaseutil.RebalanceStatusNone, couchbaseutil.RebalanceStatusNotRunning:
-		return false, nil
+	timeOfChange, parseErr := time.Parse(time.RFC3339, c.cluster.Status.LastUpdateTime)
+	if parseErr != nil {
+		return parseErr
 	}
 
-	return true, nil
+	if !timeOfChange.IsZero() {
+		if timeOfChange.Before(operatorStartTime) {
+			log.Info("Operator started after changes made. Revert your changes to avoid errors.")
+			c.cluster.Status.SetErrorCondition("Operator started after changes made. Revert your changes to avoid errors.")
+
+			if err := c.state.Upsert(persistence.ChangesMadeBeforeOperatorStart, "true"); err != nil {
+				return err
+			}
+
+			return nil
+		}
+
+		if _, err := c.state.Get(persistence.ChangesMadeBeforeOperatorStart); err == nil {
+			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+
+			if err := c.state.Update(persistence.ChangesMadeBeforeOperatorStart, "false"); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

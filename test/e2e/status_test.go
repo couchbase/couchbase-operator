@@ -37,6 +37,9 @@ func TestStatusRecovery(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
 
+	// Let for the cluster status stabilize between K8s + Operator.
+	time.Sleep(20 * time.Second)
+
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/status"), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/status", couchbasev2.ClusterStatus{ControlPaused: true}), time.Minute)
 

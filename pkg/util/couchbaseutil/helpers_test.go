@@ -1,9 +1,12 @@
 package couchbaseutil
 
 import (
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type versionTest struct {
@@ -175,6 +178,65 @@ func TestDoStringSlicesContainEqualValues(t *testing.T) {
 		result := DoStringSlicesContainEqualValues(strings.Join(testcase.sliceA, ","), strings.Join(testcase.sliceB, ","), ",")
 		if result != testcase.expected {
 			t.Errorf("expected DoStringSlicesContainEqualValues to return %v, but got %v", testcase.expected, result)
+		}
+	}
+}
+
+func TestAddAnnotation(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name                string
+		k                   string
+		v                   string
+		existingAnnotations map[string]string
+		expectedAnnotations map[string]string
+	}{
+		{
+			name:                "no existing annotations",
+			k:                   "some-key",
+			v:                   "some-value",
+			existingAnnotations: nil,
+			expectedAnnotations: map[string]string{
+				"some-key": "some-value",
+			},
+		},
+		{
+			name: "existing annotations",
+			k:    "some-key",
+			v:    "some-value",
+			existingAnnotations: map[string]string{
+				"existing-key-1": "existing-value",
+				"existing-key-2": "existing-value",
+			},
+			expectedAnnotations: map[string]string{
+				"existing-key-1": "existing-value",
+				"existing-key-2": "existing-value",
+				"some-key":       "some-value",
+			},
+		},
+		{
+			name: "existing annotation with same key",
+			k:    "some-key",
+			v:    "some-value",
+			existingAnnotations: map[string]string{
+				"some-key": "existing-value",
+			},
+			expectedAnnotations: map[string]string{
+				"some-key": "some-value",
+			},
+		},
+	}
+
+	for _, testcase := range testcases {
+		meta := &v1.ObjectMeta{}
+
+		meta.SetAnnotations(testcase.existingAnnotations)
+
+		AddAnnotation(meta, testcase.k, testcase.v)
+
+		if eq := reflect.DeepEqual(meta.Annotations, testcase.expectedAnnotations); !eq {
+			t.Errorf("test %v expected annotations to be %v, but got %v", testcase.name, testcase.expectedAnnotations, meta.Annotations)
 		}
 	}
 }

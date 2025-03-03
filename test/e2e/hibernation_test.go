@@ -92,3 +92,51 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestHibernateOccursAfterUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster.
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Upgrade the cluster to the new version.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the cluster to start upgrading then enable hibernation.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+
+	patchset := jsonpatch.NewPatchSet().Add("/spec/hibernate", true)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+
+	// Expect the cluster to enter hibernation at some point.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionHibernating, v1.ConditionTrue, cluster, 10*time.Minute)
+
+	// Disable hibernation and expect the cluster to recover back to the upgraded version.
+	patchset = jsonpatch.NewPatchSet().Remove("/spec/hibernate")
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Validate the events match what we expect:
+	// * Cluster created
+	// * Cluster upgraded
+	// * Cluster recreated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		RollingUpgradeSequence(clusterSize, 1),
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

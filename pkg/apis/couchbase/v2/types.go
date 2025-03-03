@@ -1919,11 +1919,11 @@ const (
 	RoleQueryDelete                         RoleName = "query_delete"
 	RoleQueryManageIndex                    RoleName = "query_manage_index"
 	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
-	RoleSyncGatewayApplication              RoleName = "mobile_sync_gateway_application"
-	RoleSyncGatewayApplicationReadOnly      RoleName = "mobile_sync_gateway_application_read_only"
-	RoleSyncGatewayArchitect                RoleName = "mobile_sync_gateway_architect"
-	RoleSyncDevOps                          RoleName = "mobile_sync_gateway_dev_ops"
-	RoleSyncReplicator                      RoleName = "mobile_sync_gateway_replicator"
+	RoleSyncGatewayApplication              RoleName = "sync_gateway_app"
+	RoleSyncGatewayApplicationReadOnly      RoleName = "sync_gateway_app_ro"
+	RoleSyncGatewayArchitect                RoleName = "sync_gateway_configurator"
+	RoleSyncDevOps                          RoleName = "sync_gateway_dev_ops"
+	RoleSyncReplicator                      RoleName = "sync_gateway_replicator"
 	RoleBackupAdmin                         RoleName = "backup_admin"
 	RoleAnalyticsSelect                     RoleName = "analytics_select"
 	RoleAnalyticsAdmin                      RoleName = "analytics_admin"
@@ -1936,7 +1936,7 @@ const (
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;mobile_sync_gateway_application;mobile_sync_gateway_application_read_only;mobile_sync_gateway_architect;mobile_sync_gateway_dev_ops;mobile_sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader;eventing_manage_functions;query_use_sequential_scans;query_use_sequences;query_manage_sequences
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;sync_gateway_app;sync_gateway_app_ro;sync_gateway_configurator;sync_gateway_dev_ops;sync_gateway_replicator;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_select;query_system_catalog;query_update;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;views_admin;views_reader;eventing_manage_functions;query_use_sequential_scans;query_use_sequences;query_manage_sequences
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
@@ -2553,7 +2553,7 @@ type Backup struct {
 	Managed bool `json:"managed,omitempty"`
 
 	// The Backup Image to run on backup pods.
-	// +kubebuilder:default="couchbase/operator-backup:1.3.1"
+	// +kubebuilder:default="couchbase/operator-backup:1.4.1"
 	Image string `json:"image"`
 
 	// The Service Account to run backup (and restore) pods under.
@@ -2641,8 +2641,9 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// AuthenticationEnabled allows users who attempt to access Couchbase Server without having been
 	// added as local users to be authenticated against the specified LDAP Host(s).
+	// +optional
 	// +kubebuilder:default=true
-	AuthenticationEnabled bool `json:"authenticationEnabled,omitempty"`
+	AuthenticationEnabled bool `json:"authenticationEnabled"`
 
 	// AuthorizationEnabled allows authenticated LDAP users to be authorized with RBAC roles granted to
 	// any Couchbase Server group associated with the user.
@@ -2709,8 +2710,9 @@ type CouchbaseClusterLDAPSpec struct {
 
 	// Sets middlebox compatibility mode for LDAP. This option is only available on
 	// Couchbase Server 7.6.0+.
+	// +optional
 	// +kubebuilder:default=true
-	MiddleboxCompMode bool `json:"middleboxCompMode,omitempty"`
+	MiddleboxCompMode bool `json:"middleboxCompMode"`
 }
 
 type LDAPUserDNMapping struct {
@@ -2875,13 +2877,13 @@ type CloudNativeGatewayDataAPI struct {
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// Enabled defines whether the data api will be available through cloud native gateway.
 	// This defaults to false. If set to true, the data api will be available on port 18008 of the cloud native gateway service.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"-" annotation:"enabled"`
 
 	// DEVELOPER PREVIEW - This feature is in developer preview.
 	// ProxyServices is a list of services that the Cloud Native Gateway can proxy via the data api.
 	// If this field is used, it must be one of "mgmt", "query", "search" or "analytics". By default, none of these services will
 	// be available through the data api if it has been enabled.
-	ProxyServices *CloudNativeGatewayDataAPIProxyServiceList `json:"proxyServices,omitempty"`
+	ProxyServices *CloudNativeGatewayDataAPIProxyServiceList `json:"-" annotation:"proxyServices"`
 }
 
 type CloudNativeGateway struct {
@@ -2919,7 +2921,7 @@ type CloudNativeGateway struct {
 	// The DataAPI settings control whether the Cloud Native Gateway can be used to access the data api. Adding or changing
 	// this configuration on an existing cluster with cloud native gateway will add the rescheduling annotation to each of the pods, which
 	// will trigger a restart depending on the configured UpgradeProcess.
-	DataAPI *CloudNativeGatewayDataAPI `json:"dataAPI,omitempty"`
+	DataAPI *CloudNativeGatewayDataAPI `json:"-" annotation:"dataAPI"`
 }
 
 type CloudNativeGatewayOTLP struct {
@@ -3805,11 +3807,11 @@ type Buckets struct {
 	// This value defaults to false.
 	EnableBucketMigrationRoutines bool `json:"-" annotation:"enableBucketMigrationRoutines"`
 
-	// MaxMigratableBuckets allows the number of pods affected by a bucket migration at any
+	// MaxConcurrentPodSwaps allows the number of pods affected by a bucket migration at any
 	// one time to be increased.
 	// By default a migration will affect one pod at a time.
 	// This field must be greater than zero.
-	MaxMigratableBuckets uint64 `json:"-" annotation:"maxMigratableBuckets"`
+	MaxConcurrentPodSwaps uint64 `json:"-" annotation:"maxConcurrentPodSwaps"`
 }
 
 type RBAC struct {
@@ -4239,6 +4241,7 @@ const (
 	ClusterConditionMigrating                ClusterConditionType = "Migrating"
 	ClusterConditionRebalancing              ClusterConditionType = "Rebalancing"
 	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"
+	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration          ClusterConditionType = "BucketMigrating"
 )
 
@@ -4282,6 +4285,9 @@ type ClusterStatus struct {
 
 	// Autscalers describes all the autoscalers managed by the cluster.
 	Autoscalers []string `json:"autoscalers,omitempty"`
+
+	// LastUpdateTime is the time that the cluster object was last updated.
+	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
 }
 
 // ServerClassStatus summarizes memory allocations to make configuration easier.
@@ -4473,7 +4479,7 @@ type LogShipperSidecarSpec struct {
 	// Image is the image to be used to deal with logging as a sidecar.
 	// No validation is carried out as this can be any arbitrary repo and tag.
 	// It will default to the latest supported version of Fluent Bit.
-	// +kubebuilder:default="couchbase/fluent-bit:1.2.1"
+	// +kubebuilder:default="couchbase/fluent-bit:1.2.9"
 	Image string `json:"image,omitempty"`
 
 	// ConfigurationMountPath is the location to mount the ConfigurationName Secret into the image.

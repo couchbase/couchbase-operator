@@ -616,6 +616,14 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			return err
 		}
 
+		for _, name := range r.couchbase.DownNodes.Names() {
+			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
+		}
+
+		for _, name := range r.couchbase.FailedNodes.Names() {
+			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
+		}
+
 		r.abort("pods are failing over")
 
 		return nil
@@ -798,6 +806,12 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 	for name, m := range r.clusteredMembers {
 		if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
 			log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+
+			// Check the node is actually active before we attempt to delete the log volumes.
+			info := &couchbaseutil.PoolsInfo{}
+			if err := couchbaseutil.GetPools(info).RetryFor(10*time.Second).On(c.api, m); err != nil {
+				r.abort("unknown node is going down")
+			}
 
 			r.removeMemberUser(m)
 		}
@@ -1260,8 +1274,6 @@ func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member,
 			if goerrors.As(err, &failedReqErr) {
 				switch failedReqErr.StatusCode {
 				case http.StatusServiceUnavailable, http.StatusInternalServerError:
-					fmt.Println("Retrying graceful failover")
-					fmt.Println("failedReqErr.StatusCode: ", failedReqErr.StatusCode)
 					return nil, false
 				}
 			}
@@ -1612,10 +1624,40 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	return nil
 }
 
+func (r *ReconcileMachine) checkIfValidUpgradePath() error {
+	currentVersion, err := r.c.state.Get(persistence.Version)
+	if err != nil {
+		return err
+	}
+
+	newVersionImage, err := r.c.cluster.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	newVersion, err := couchbaseutil.NewVersionFromImage(newVersionImage)
+	if err != nil {
+		return err
+	}
+
+	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
+}
+
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
 		return nil
+	}
+
+	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
+	if CheckNodesToCreate(c.cluster, r.clusteredMembers) {
+		return nil
+	}
+
+	// check if the upgrade is a valid upgrade path
+
+	if err := r.checkIfValidUpgradePath(); err != nil {
+		return err
 	}
 
 	// Nothing to do, move along.
@@ -1704,6 +1746,20 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	return nil
+}
+
+// CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
+func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet) bool {
+	for _, serverSpec := range cluster.Spec.Servers {
+		existingNodes := clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		nodesToCreate := serverSpec.Size - existingNodes
+
+		if nodesToCreate > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // handleServerGroups moves nodes from their current server group into the one
@@ -1914,7 +1970,7 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 
 	migrationCandidates := couchbaseutil.MemberSet{}
 
-	explicitNumber := min(max(1, int(c.cluster.Spec.Buckets.MaxMigratableBuckets)), len(candidatesNoOrchestrator))
+	explicitNumber := min(max(1, int(c.cluster.Spec.Buckets.MaxConcurrentPodSwaps)), len(candidatesNoOrchestrator))
 
 	// Add candidates up to the explicitNumber or the orchestrator if no others are available.
 	for _, candidateName := range candidatesNoOrchestrator.Names()[:explicitNumber] {

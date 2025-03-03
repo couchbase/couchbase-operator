@@ -70,6 +70,8 @@ const (
 	RebalanceEjectMembers = "rebalanceEjectMembers"
 
 	RebalanceClusteredMembers = "rebalanceClusteredMembers"
+
+	ChangesMadeBeforeOperatorStart = "changesMadeBeforeOperatorStart"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

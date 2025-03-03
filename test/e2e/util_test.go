@@ -54,6 +54,7 @@ const (
 	TagFeatureBucketMigration   = "bucketmigration"
 	TagFeatureAssimilation      = "assimilation"
 	TagFeatureAdmission         = "admission"
+	TagFeatureHibernation       = "hibernation"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -101,18 +102,21 @@ func registerTests() {
 		framework.NewTestDef(TestRBACValidationLDAP).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCNGVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestBucketMigrationPre76Invalid).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestBucketMigrationPost76Validation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketMigrationPre76Invalid).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureBucketMigration),
+		framework.NewTestDef(TestBucketMigrationPost76Validation).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureBucketMigration),
+		framework.NewTestDef(TestBlockChangingMigrationProcessDuringMigration).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureBucketMigration),
 		framework.NewTestDef(TestAnnotationValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAnnotationVersionValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestDefaultStorageBackendChangeValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketMinReplicasCountCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestVersionUpgradePath).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestClusterChangesDuringHibernation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestHibernationChangeConstraints).WithTags(TagSuiteValidation, TagFeatureHibernation),
 		framework.NewTestDef(TestClusterMigrationAddition).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestClusterMigrationInvalidMigration).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestInvalidImageCombinations).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestMidUpgradeImageValidations).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -356,8 +360,9 @@ func registerTests() {
 		framework.NewTestDef(TestRotateAdminPasswordDuringRestart).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestPodReadiness).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestSDK).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestHibernateEphemeralImmediate).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestHibernateSupportableImmediate).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestHibernateEphemeralImmediate).WithTags(TagSuiteP0, TagFeatureHibernation),
+		framework.NewTestDef(TestHibernateSupportableImmediate).WithTags(TagSuiteP0, TagFeatureHibernation),
+		framework.NewTestDef(TestHibernateOccursAfterUpgrade).WithTags(TagSuiteP0, TagFeatureHibernation),
 		framework.NewTestDef(TestCreateDurableBucket).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestEditDurableBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestLoadDurableBucket).WithTags(TagSuiteP0),
@@ -622,7 +627,6 @@ func registerTests() {
 		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
-		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationRoutineDisabled).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationWithMultiMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestPodDisruptionBudgets).WithTags(TagSuiteP1),
 

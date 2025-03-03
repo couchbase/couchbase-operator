@@ -27,6 +27,8 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	recoveryPolicy := couchbasev2.PrioritizeUptime
+
 	framework.Requires(t, kubernetes).StaticCluster().ServerGroups(3)
 
 	availableServerGroupList := getAvailabilityZones(t, kubernetes)
@@ -43,6 +45,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(10)
 	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 2
 	cluster.Spec.ClusterSettings.AutoFailoverServerGroup = true
+	cluster.Spec.RecoveryPolicy = &recoveryPolicy
 	cluster.Spec.ServerGroups = availableServerGroupList
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
@@ -75,11 +78,11 @@ func TestServerGroupAutoFailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
@@ -130,6 +133,9 @@ func TestMultiNodeAutoFailover(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
 		eventschema.Repeat{Times: victimCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
 		eventschema.Repeat{Times: victimCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},

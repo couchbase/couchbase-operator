@@ -1,0 +1,63 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+  annotations:
+    cao.couchbase.com/buckets.enableBucketMigrationRoutines: "true"
+spec:
+  image: couchbase/server:7.6.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  servers:
+    - size: 2
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+  cluster:
+    dataServiceMemoryQuota: 4048Mi  
+status:
+  conditions:
+  - lastTransitionTime: "2025-02-12T12:51:57Z"
+    lastUpdateTime: "2025-02-12T12:51:57Z"
+    message: Migrating buckets
+    reason: BucketMigration
+    status: "True"
+    type: BucketMigrating
+  size: 1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 1024Mi
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket2
+  annotations:
+    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"
+spec:
+  storageBackend: magma
+  memoryQuota: 1024Mi
+  evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket3
+spec:
+  storageBackend: magma
+  memoryQuota: 1024Mi
+  evictionPolicy: fullEviction

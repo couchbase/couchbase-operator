@@ -515,6 +515,8 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 				c.raiseEvent(k8sutil.GroupEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
+
+			existingGroupNames = append(existingGroupNames, e.ID)
 		} else {
 			// delete unrequested group
 			if err := couchbaseutil.DeleteGroup(&e).On(c.api, c.readyMembers()); err != nil {
@@ -524,8 +526,6 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 			c.raiseEvent(k8sutil.GroupDeleteEvent(e.ID, c.cluster))
 			log.Info("delete CouchbaseGroup", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 		}
-
-		existingGroupNames = append(existingGroupNames, e.ID)
 	}
 
 	// create requested groups that do not exist
@@ -580,8 +580,9 @@ func (c *Cluster) gatherSubjectsForRoleBinding(roleBinding *couchbasev2.Couchbas
 // generateUsers generates all the user configurations that can be created, under the
 // control of the groups parameter (e.g. the group must exist before creating the dependent
 // user).
-func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User, error) {
+func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User, map[string]bool, error) {
 	users := map[string]couchbaseutil.User{}
+	unReconcilableUsers := map[string]bool{}
 
 	// For every rolebinding (SM: this is not filtered, why??) check if the
 	// group exists, if it does, then accumulate the subjects, that are selected
@@ -597,7 +598,7 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 
 		subjects, err := c.gatherSubjectsForRoleBinding(binding)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// For each user we've found for the binding, either use the existing
@@ -605,12 +606,14 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		// group (thus accumulating multiple groups for a specific user).
 		for _, subject := range subjects {
 			apiUser, found := c.k8s.CouchbaseUsers.Get(subject.Name)
-			if found && !couchbaseutil.ShouldReconcile(apiUser.GetAnnotations()) {
-				continue
-			}
 
 			if subject.Spec.Name == "" {
 				subject.Spec.Name = subject.Name
+			}
+
+			if found && !couchbaseutil.ShouldReconcile(apiUser.GetAnnotations()) {
+				unReconcilableUsers[subject.Name] = true
+				continue
 			}
 
 			user, ok := users[subject.Name]
@@ -624,7 +627,7 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 				if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
 					password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
 					if err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 
 					user.Password = password
@@ -651,7 +654,7 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		password, err := c.getRBACAuthPassword(secretName)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		cngUser.Password = password
@@ -661,14 +664,14 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		users[cngUser.Name] = cngUser
 	}
 
-	return users, nil
+	return users, unReconcilableUsers, nil
 }
 
 // reconcileUsers creates, edits, removes server users according to requested configuration.
 // The groups parameters is a list of groups that are known to exist at this moment in
 // time in Couchbase server, this is used to only add users to an existing group.
 func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
-	requestedUsers, err := c.generateUsers(groups)
+	requestedUsers, unreconcilableUsers, err := c.generateUsers(groups)
 	if err != nil {
 		return nil, err
 	}
@@ -695,20 +698,22 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 				c.raiseEvent(k8sutil.UserEditEvent(e.ID, c.cluster))
 				log.Info("edit CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
 			}
+
+			existingUserNames = append(existingUserNames, e.ID)
 		} else {
-			userA, found := c.k8s.CouchbaseUsers.Get(e.Name)
-			if found && couchbaseutil.ShouldReconcile(userA.Annotations) {
-				// delete unrequested user
-				if err := couchbaseutil.DeleteUser(&e).On(c.api, c.readyMembers()); err != nil {
-					return existingUserNames, err
-				}
-
-				c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
-				log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
+			// If this is a user that is not reconcilable, we should not delete it
+			if _, ok := unreconcilableUsers[e.ID]; ok {
+				continue
 			}
-		}
 
-		existingUserNames = append(existingUserNames, e.ID)
+			// delete unrequested user
+			if err := couchbaseutil.DeleteUser(&e).On(c.api, c.readyMembers()); err != nil {
+				return existingUserNames, err
+			}
+
+			c.raiseEvent(k8sutil.UserDeleteEvent(e.ID, c.cluster))
+			log.Info("delete CouchbaseUser", "cluster", c.cluster.NamespacedName(), "name", e.ID)
+		}
 	}
 
 	// create requested groups that do not exist

@@ -280,14 +280,16 @@ func TestCNGDataAPI(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	// Create the DAPI config with the mgmt service enabled
-	dConfig := &couchbasev2.CloudNativeGatewayDataAPI{
-		Enabled:       true,
-		ProxyServices: &couchbasev2.CloudNativeGatewayDataAPIProxyServiceList{couchbasev2.CloudNativeGatewayDataAPIProxyServiceMgmt},
+	// Create the cluster spec
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
 	}
 
-	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, dConfig).Generate(kubernetesCluster)
+	// Create the DAPI config with the mgmt service enabled
+	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.dataAPI.enabled"] = "true"
+	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.dataAPI.proxyServices"] = "mgmt"
 
 	// We are going to use CNG to create a bucket, so we should disable operator management.
 	cluster.Spec.Buckets.Managed = false
@@ -333,14 +335,14 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 	// Static configuration.
 	clusterSize := 2
 
-	// Create the DAPI config with no proxy services enabled
-	dConfig := &couchbasev2.CloudNativeGatewayDataAPI{
-		Enabled: true,
-	}
-
 	// Create the cluster spec
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, dConfig).Generate(k8sCluster)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(k8sCluster)
 
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	// Create the DAPI config with the mgmt service enabled
+	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.dataAPI.enabled"] = "true"
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, k8sCluster, cluster, 5)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
@@ -354,15 +356,23 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusNotFound)
 
 	// Update the DAPI config to enable the mgmt service
-	ps := &couchbasev2.CloudNativeGatewayDataAPIProxyServiceList{couchbasev2.CloudNativeGatewayDataAPIProxyServiceMgmt}
 
-	cluster = e2eutil.MustPatchCluster(t, k8sCluster, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/cloudNativeGateway/dataAPI/proxyServices", ps), time.Minute)
+	cluster, err := e2eutil.GetCouchbaseCluster(k8sCluster.CRClient, cluster)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.dataAPI.proxyServices"] = "mgmt"
+
+	cluster, err = e2eutil.UpdateCouchbaseCluster(k8sCluster.CRClient, cluster)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
 	// Check the update triggers a restart of the pods
 	e2eutil.MustWaitForClusterEvent(t, k8sCluster, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, k8sCluster, cluster, 5*time.Minute)
-
 	// Check the mgmt service is now available
 	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusOK)
 }

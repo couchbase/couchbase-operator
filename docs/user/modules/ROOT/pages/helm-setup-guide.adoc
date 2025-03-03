@@ -241,11 +241,11 @@ specify the `groups` and `rolebindings` resources.
 == Deploying Sync Gateway
 
 Sync Gateway is disabled by default in the Couchbase Helm Chart.
-To install the chart with Sync Gateway _enabled_, you will need to <<custom-installation,customize the installation>> to include it:
+To install the chart with Sync Gateway _enabled_, you will need to <<custom-installation,customize the installation>> to include it. To use TLS with Sync Gateway, you will need to consider <<tls-certificate-gen,certificate generation>> or <<tls-certificate-byo,bringing your own>>. To install Sync Gateway with TLS disabled: 
 
 [source,console,subs="attributes,verbatim"]
 ----
-helm install mobile --set install.syncGateway=true {helm-repo}
+helm install mobile --set install.syncGateway=true --set syncGateway.config.use_tls_server=false {helm-repo}
 ----
 
 By default, Sync Gateway is only exposed to the internal Kubernetes network with a `ClusterIP` service.
@@ -253,7 +253,7 @@ To change the type of service that is used to expose Sync Gateway, you can speci
 
 [source,console,subs="attributes,verbatim"]
 ----
-helm install mobile --set install.syncGateway=true --set syncGateway.exposeServiceType=LoadBalancer {helm-repo}
+helm install mobile --set install.syncGateway=true --set syncGateway.config.use_tls_server=false --set syncGateway.exposeServiceType=LoadBalancer {helm-repo}
 ----
 
 For more information about using Sync Gateway with the Autonomous Operator, you can refer to the xref:tutorial-sync-gateway.adoc[Sync Gateway Tutorial].
@@ -266,6 +266,7 @@ For more information about using Sync Gateway with the Autonomous Operator, you 
 Production deployments should enable TLS to encrypt traffic between the Autonomous Operator and the Couchbase cluster.
 TLS certificates can be auto-generated, or provided by the user.
 
+[#tls-certificate-gen]
 ==== Auto-Generated Certificates
 
 Install the chart with `tls` enabled:
@@ -306,6 +307,7 @@ kubectl apply -f secrets.yaml
 The Autonomous Operator should now pick up the new certificates and proceed through the upgrade process.
 ====
 
+[#tls-certificate-byo]
 ==== Bring Your Own Certificates
 
 Create a file named `tls_values.yaml` with the following <<custom-installation,custom override values>> for the Couchbase Helm Chart:

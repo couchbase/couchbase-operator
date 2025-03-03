@@ -1443,10 +1443,28 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	// Verifying the persistence of log PVs are preserved by operator
 	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
 
-	atleast762, err := cbCluster.IsAtLeastVersion("7.6.2")
+	// If the couchbase server version is below 7.2.6, or 7.6.0/7.6.1, we need to wait for rebalance after killing the members. This is no longer an issue in 7.2.6 and 7.6.2 onwards.
+	isAtLeast726, err := cbCluster.IsAtLeastVersion("7.2.6")
 
 	if err != nil {
 		e2eutil.Die(t, err)
+	}
+
+	waitForRebalance := !isAtLeast726
+
+	// If at least 7.2.6, check if the version is between 7.6.0 and 7.6.2.
+	if isAtLeast726 {
+		isAtLeast760, err := cbCluster.IsAtLeastVersion("7.6.0")
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		isAtLeast762, err := cbCluster.IsAtLeastVersion("7.6.2")
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		waitForRebalance = isAtLeast760 && !isAtLeast762
 	}
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
@@ -1467,7 +1485,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, victim)
 			e2eutil.MustExecShellInPod(t, kubernetes, podNameToKill, "pkill beam.smp")
 
-			if !atleast762 {
+			if waitForRebalance {
 				e2eutil.MustWaitForClusterEvent(t, kubernetes, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
 			} else {
 				time.Sleep(15 * time.Second)
@@ -1486,7 +1504,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	case "deletePod":
 		validator = e2eutil.PodDownFailoverRecoverySequence()
 	case "killServerProcess":
-		validator = e2eutil.ServerCrashRecoverySequence(cbCluster)
+		validator = e2eutil.ServerCrashRecoverySequence(waitForRebalance)
 	default:
 		e2eutil.Die(t, fmt.Errorf("invalid murder weapon: %s", podDownMethod))
 	}
@@ -1551,6 +1569,7 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 		},
@@ -1656,7 +1675,7 @@ func TestEphemeralLogCollectResizeCluster(t *testing.T) {
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 4, kubernetes, cbCluster, 5*time.Minute)
 	cbCluster = e2eutil.MustResizeCluster(t, scaledService, 1, kubernetes, cbCluster, 5*time.Minute)
 
-	mustVerifyPvcPerPod(t, kubernetes, cbCluster.Name, 4)
+	mustVerifyPvcPerPod(t, kubernetes, cbCluster.Name, 4, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
