@@ -41,6 +41,8 @@
   *** xref:concept-hibernation.adoc[Couchbase Cluster Hibernation]
  ** Logging
   *** xref:concept-couchbase-logging.adoc[Couchbase Logging]
+ ** Migration
+  *** xref:concept-migration.adoc[Cluster Migration]
  ** Networking
   *** xref:concept-couchbase-networking.adoc[Couchbase Networking]
   *** xref:concept-cloud-native-gateway.adoc[Cloud Native Gateway]
