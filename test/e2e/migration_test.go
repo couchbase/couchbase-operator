@@ -7,6 +7,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -46,7 +47,7 @@ func TestMigrateCluster(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 3*time.Minute)
 
 	// Check that all nodes from the initial cluster have been ejected
-	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
 
 	// Check that we've removed the migrating condition from the cluster
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
@@ -75,13 +76,9 @@ func TestMigrateLeaveUnmanagedCluster(t *testing.T) {
 
 	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
 
-	if managedNodes := MustGetNumManagedNodes(t, kubernetes, dstCluster); managedNodes+unmanagedNodes != clusterSize {
-		e2eutil.Die(t, fmt.Errorf("expected %d managed nodes in the cluster, got %d", clusterSize-unmanagedNodes, managedNodes))
-	}
+	MustValidateNumManagedNodes(t, kubernetes, dstCluster, clusterSize-unmanagedNodes)
 
-	if actualSize := e2eutil.MustGetClusterSize(t, kubernetes, dstCluster); actualSize != clusterSize {
-		e2eutil.Die(t, fmt.Errorf("expected %d nodes in the cluster, got %d", clusterSize, actualSize))
-	}
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
 }
 
 func TestPremigrationNodes(t *testing.T) {
@@ -115,9 +112,7 @@ func TestPremigrationNodes(t *testing.T) {
 
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, dstCluster, e2eutil.NewMemberAddedEvent(dstCluster, preMigrationSize-1), 10*time.Minute)
 
-	if actualSize := e2eutil.MustGetClusterSize(t, kubernetes, dstCluster); actualSize != clusterSize+preMigrationSize {
-		e2eutil.Die(t, fmt.Errorf("expected %d nodes in the cluster, got %d", clusterSize+preMigrationSize, actualSize))
-	}
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize+preMigrationSize)
 }
 
 func TestStabilizationPeriod(t *testing.T) {
@@ -160,7 +155,7 @@ func TestStabilizationPeriod(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 3*time.Minute)
 
 	// Check that all nodes from the initial cluster have been ejected
-	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
 
 	// Check that we've removed the migrating and stabilization period condition from the cluster
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating, couchbasev2.ClusterConditionWaitingBetweenMigrations)
@@ -190,7 +185,7 @@ func TestMaxConcurrency(t *testing.T) {
 	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
 
 	// Check that all nodes from the initial cluster have been ejected
-	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -233,7 +228,7 @@ func TestMigrateClusterWithMultipleServerGroups(t *testing.T) {
 	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
 
 	// Check that all nodes from the initial cluster have been ejected
-	e2eutil.MustBeUnitializedCluster(t, kubernetes, srcCluster)
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
 
 	// Check that we've removed the migrating condition from the cluster
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
@@ -246,6 +241,153 @@ func TestMigrateClusterWithMultipleServerGroups(t *testing.T) {
 	e2eutil.MustWaitUntilCouchbaseServerGroupsExist(t, kubernetes, dstCluster, serverGroups)
 }
 
+func TestMigrationByServerClass(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	serverClassSize := 2
+	clusterSize := serverClassSize * 2
+	unmanagedNodes := serverClassSize
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	dstCluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+		NumUnmanagedNodes:    unmanagedNodes,
+		MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+			MigrationOrderOverrideStrategy: couchbasev2.ByServerClass,
+			ServerClassOrder:               []string{srcCluster.Spec.Servers[1].Name, srcCluster.Spec.Servers[0].Name},
+		},
+	}
+
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	MustValidateNumManagedNodes(t, kubernetes, dstCluster, clusterSize-unmanagedNodes)
+
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
+
+	expectedRemovedNodes := []int{2, 3}
+
+	for _, nodeID := range expectedRemovedNodes {
+		e2eutil.MustObserveClusterEvent(t, kubernetes, dstCluster, e2eutil.NewMemberRemovedEvent(srcCluster, nodeID), 3*time.Minute)
+	}
+
+	unmanagedNodes = 0
+	dstCluster = e2eutil.MustPatchCluster(t, kubernetes, dstCluster, jsonpatch.NewPatchSet().Replace("/spec/migration/numUnmanagedNodes", unmanagedNodes), time.Minute)
+
+	e2eutil.MustWaitUntilClusterUninitialized(t, kubernetes, srcCluster, 10*time.Minute)
+
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
+}
+
+func TestMigrationByNode(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 4
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	migrationOrderIds := []int{3, 1, 0, 2}
+	nodeOrder := []string{}
+
+	for _, id := range migrationOrderIds {
+		nodeOrder = append(nodeOrder, GetMemberHostname(srcCluster, id))
+	}
+
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+		MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+			MigrationOrderOverrideStrategy: couchbasev2.ByNode,
+			NodeOrder:                      nodeOrder,
+		},
+	}
+
+	dstCluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, dstCluster, -1)
+
+	for _, id := range migrationOrderIds {
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, dstCluster, e2eutil.NewMemberRemovedEvent(srcCluster, id), 3*time.Minute)
+	}
+
+	// Check that the cluster goes to healthy
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 3*time.Minute)
+
+	// Check that all nodes from the initial cluster have been ejected
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
+}
+
+func TestMigrationByServerGroup(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	clusterSize := 4
+
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	srcCluster.Spec.ServerGroups = availableServerGroups[:2]
+
+	srcCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, srcCluster)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.ServerGroups = availableServerGroups[:2]
+
+	unmanagedNodes := 1
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+		NumUnmanagedNodes:    unmanagedNodes,
+		MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+			MigrationOrderOverrideStrategy: couchbasev2.ByServerGroup,
+			ServerGroupOrder:               []string{availableServerGroups[1], availableServerGroups[0]},
+		},
+	}
+
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	MustValidateNumManagedNodes(t, kubernetes, dstCluster, clusterSize-unmanagedNodes)
+
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
+
+	expectedRemovedNodes := MustGetPodIDsInServerGroup(t, kubernetes, srcCluster, availableServerGroups[1])
+
+	for _, nodeID := range expectedRemovedNodes {
+		e2eutil.MustObserveClusterEvent(t, kubernetes, dstCluster, e2eutil.NewMemberRemovedEvent(srcCluster, nodeID), 3*time.Minute)
+	}
+
+	unmanagedNodes = 0
+	dstCluster = e2eutil.MustPatchCluster(t, kubernetes, dstCluster, jsonpatch.NewPatchSet().Replace("/spec/migration/numUnmanagedNodes", unmanagedNodes), time.Minute)
+
+	e2eutil.MustWaitUntilClusterUninitialized(t, kubernetes, srcCluster, 10*time.Minute)
+
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
+}
+
+func GetMemberHostname(cluster *couchbasev2.CouchbaseCluster, nodeID int) string {
+	return fmt.Sprintf("%s.%s.%s.svc", couchbaseutil.CreateMemberName(cluster.Name, nodeID), cluster.Name, cluster.Namespace)
+}
+
 func MustGetNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster) int {
 	selector := labels.SelectorFromSet(labels.Set(k8sutil.LabelsForCluster(cluster)))
 
@@ -256,4 +398,41 @@ func MustGetNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *co
 	}
 
 	return len(pods.Items)
+}
+
+func MustValidateNumManagedNodes(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expected int) {
+	if actual := MustGetNumManagedNodes(t, kubernetes, cluster); actual != expected {
+		e2eutil.Die(t, fmt.Errorf("expected %d managed nodes in the cluster, got %d", expected, actual))
+	}
+}
+
+func MustValidateClusterSize(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expected int) {
+	if actual := e2eutil.MustGetClusterSize(t, kubernetes, cluster); actual != expected {
+		e2eutil.Die(t, fmt.Errorf("expected %d nodes in the cluster, got %d", expected, actual))
+	}
+}
+
+func MustGetPodIDsInServerGroup(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, serverGroup string) []int {
+	selector := labels.SelectorFromSet(labels.Set(k8sutil.LabelsForCluster(cluster)))
+
+	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	nodeIds := []int{}
+
+	for _, pod := range pods.Items {
+		if sg, ok := pod.Spec.NodeSelector["topology.kubernetes.io/zone"]; ok && sg == serverGroup {
+			id, err := couchbaseutil.GetIndexFromMemberName(pod.Name)
+			if err != nil {
+				e2eutil.Die(t, err)
+			}
+
+			nodeIds = append(nodeIds, id)
+		}
+	}
+
+	return nodeIds
 }

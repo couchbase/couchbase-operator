@@ -1754,7 +1754,24 @@ func MustDeleteUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 	}
 }
 
-func MustBeUnitializedCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+func MustWaitUntilClusterUninitialized(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := retryutil.RetryFor(timeout, func() error {
+		return checkClusterUninitialized(t, k8s, couchbase)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func MustBeUninitializedCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	err := checkClusterUninitialized(t, k8s, couchbase)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkClusterUninitialized(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) error {
 	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
 
 	err := client.client.Get(newRequest("/pools/default", nil, nil), client.host)
@@ -1762,12 +1779,14 @@ func MustBeUnitializedCluster(t *testing.T, k8s *types.Cluster, couchbase *couch
 	var failedReqErr couchbaseutil.FailedRequestError
 
 	if !errors.As(err, &failedReqErr) {
-		Die(t, fmt.Errorf("expected failed request error but succeeded"))
+		return fmt.Errorf("expected failed request error but succeeded")
 	}
 
 	if failedReqErr.StatusCode != http.StatusNotFound {
-		Die(t, fmt.Errorf("expected 404, got %d", failedReqErr.StatusCode))
+		return fmt.Errorf("expected 404, got %d", failedReqErr.StatusCode)
 	}
+
+	return nil
 }
 
 func MustGetClusterSize(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) int {

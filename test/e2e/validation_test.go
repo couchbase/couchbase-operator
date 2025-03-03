@@ -3819,13 +3819,25 @@ func TestClusterMigrationInvalidMigration(t *testing.T) {
 			expectedErrors: []string{"spec.migration.numUnmanagedNodes must be less than"},
 		},
 		{
-
 			name: "HibernateEnabledDuringMigrationInvalid",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
 				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
 			}).Add("/spec/hibernate", true)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.hibernate cannot be enabled when spec.migration is configured"},
+		},
+		{
+			name: "AddMigrationWithInvalidServerClasses",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+				NumUnmanagedNodes:    1,
+				MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+					MigrationOrderOverrideStrategy: couchbasev2.ByServerClass,
+					ServerClassOrder:               []string{"all_services", "totally_real_service"},
+				},
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"contains an invalid server class"},
 		},
 	}
 

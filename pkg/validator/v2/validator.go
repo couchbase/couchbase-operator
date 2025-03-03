@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -300,6 +301,24 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 
 	if cluster.Spec.Migration.NumUnmanagedNodes >= cluster.Spec.TotalSize() {
 		return fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
+	}
+
+	if cluster.Spec.Migration.MigrationOrderOverride == nil {
+		return nil
+	}
+
+	if len(cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder) != 0 {
+		validServerConfigs := []string{}
+
+		for _, server := range cluster.Spec.Servers {
+			validServerConfigs = append(validServerConfigs, server.Name)
+		}
+
+		for _, sc := range cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder {
+			if !slices.Contains(validServerConfigs, sc) {
+				return fmt.Errorf("spec.migration.migrationOrderOverride.serverClassOrder contains an invalid server class: %s", sc)
+			}
+		}
 	}
 
 	return nil

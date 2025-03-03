@@ -734,6 +734,9 @@ func registerTests() {
 		framework.NewTestDef(TestStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateClusterWithMultipleServerGroups).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrationByServerClass).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrationByNode).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrationByServerGroup).WithTags(TagSuiteP1, TagFeatureAssimilation),
 
 		// Bucket auto-compaction settings tests
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings).WithTags(TagSuiteSanity),

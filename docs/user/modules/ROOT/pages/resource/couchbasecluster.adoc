@@ -164,6 +164,14 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
   <<couchbaseclusters-spec-migration,migration>>:
     <<couchbaseclusters-spec-migration-maxconcurrentmigrations,maxConcurrentMigrations>>: 1
+    <<couchbaseclusters-spec-migration-migrationorderoverride,migrationOrderOverride>>:
+      <<couchbaseclusters-spec-migration-migrationorderoverride-migrationorderoverridestrategy,migrationOrderOverrideStrategy>>: ""
+      <<couchbaseclusters-spec-migration-migrationorderoverride-nodeorder,nodeOrder>>:
+      - ""
+      <<couchbaseclusters-spec-migration-migrationorderoverride-serverclassorder,serverClassOrder>>:
+      - ""
+      <<couchbaseclusters-spec-migration-migrationorderoverride-servergrouporder,serverGroupOrder>>:
+      - ""
     <<couchbaseclusters-spec-migration-numunmanagednodes,numUnmanagedNodes>>: 0
     <<couchbaseclusters-spec-migration-stabilizationperiod,stabilizationPeriod>>: ""
     <<couchbaseclusters-spec-migration-unmanagedclusterhost,unmanagedClusterHost>>: ""
@@ -2554,6 +2562,59 @@ cluster to a managed Kubernetes cluster.
 ==== Description
 
 MaxConcurrentMigrations is the maximum number of nodes migrations the operator will run concurrently.
+
+=== couchbaseclusters.spec.migration.migrationOrderOverride
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+MigrationOrderOverride defines the strategy for migration order.
+If not set then the operator will choose nodes at random.
+
+=== couchbaseclusters.spec.migration.migrationOrderOverride.migrationOrderOverrideStrategy
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `ByServerGroup, ByServerClass, ByNode`
+
+==== Description
+
+MigrationOrderOverrideStrategy defines the strategy for migration order.
+
+=== couchbaseclusters.spec.migration.migrationOrderOverride.nodeOrder
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+NodeOrder defines the order of nodes for migration.
+
+=== couchbaseclusters.spec.migration.migrationOrderOverride.serverClassOrder
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+ServerClassOrder defines the order of server classes for migration.
+
+=== couchbaseclusters.spec.migration.migrationOrderOverride.serverGroupOrder
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+ServerGroupOrder defines the order of server groups for migration.
 
 === couchbaseclusters.spec.migration.numUnmanagedNodes
 

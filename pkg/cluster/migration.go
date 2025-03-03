@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"fmt"
+	"slices"
+	"sort"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -263,6 +265,7 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleMigrateNodes,
 		(*MigrationReconcileMachine).handleServerGroups,
 		(*MigrationReconcileMachine).handleNodeServices,
+		(*MigrationReconcileMachine).handleServerGroups,
 		(*MigrationReconcileMachine).handleRebalance,
 		(*MigrationReconcileMachine).handleMarkReady,
 		(*MigrationReconcileMachine).handleMigrateCondition,
@@ -453,7 +456,10 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 	performDataNodesCheck := (numDataNodes > 1 && maxNodes >= numDataNodes)
 	allDataNodes := true
 
-	allCandidates := r.getMigrationCandidates()
+	allCandidates, err := r.getMigrationCandidates()
+	if err != nil {
+		return err
+	}
 
 	for _, member := range allCandidates {
 		// Prevent migration of all data nodes at once if we have more than one data node.
@@ -496,12 +502,41 @@ func (r *MigrationReconcileMachine) isDataNode(m couchbaseutil.Member) bool {
 	return couchbasev2.ServiceList(config.Services).Contains(couchbasev2.DataService)
 }
 
-func (r *MigrationReconcileMachine) getMigrationCandidates() couchbaseutil.MemberSet {
+func (r *MigrationReconcileMachine) getMigrationCandidates() (couchbaseutil.MemberSet, error) {
+	if r.externalMembers.Empty() || len(r.externalMembers) <= r.c.cluster.Spec.Migration.NumUnmanagedNodes {
+		return couchbaseutil.NewMemberSet(), nil
+	}
+
+	// Default behavior if no strategy is set
+	allNextCandidates := r.externalMembers
+
 	numToMigrate := r.externalMembers.Size() - r.c.cluster.Spec.Migration.NumUnmanagedNodes
+
+	// Check if a migration order override strategy is set
+	if r.c.cluster.Spec.Migration.MigrationOrderOverride != nil {
+		switch r.c.cluster.Spec.Migration.MigrationOrderOverride.MigrationOrderOverrideStrategy {
+		case couchbasev2.ByServerGroup:
+			if !r.c.cluster.Spec.ServerGroupsEnabled() {
+				break
+			}
+
+			var err error
+
+			allNextCandidates, err = r.getMigrationCandidatesByServerGroup()
+
+			if err != nil {
+				return couchbaseutil.NewMemberSet(), err
+			}
+		case couchbasev2.ByServerClass:
+			allNextCandidates = r.getMigrationCandidatesByServerClass()
+		case couchbasev2.ByNode:
+			allNextCandidates = r.getMigrationCandidatesByNode(numToMigrate)
+		}
+	}
 
 	migrationCandidates := couchbaseutil.NewMemberSet()
 
-	for _, member := range r.externalMembers {
+	for _, member := range allNextCandidates {
 		if migrationCandidates.Size() >= numToMigrate {
 			break
 		}
@@ -509,7 +544,135 @@ func (r *MigrationReconcileMachine) getMigrationCandidates() couchbaseutil.Membe
 		migrationCandidates.Add(member)
 	}
 
-	return migrationCandidates
+	return migrationCandidates, nil
+}
+
+func (r *MigrationReconcileMachine) getMigrationCandidatesByServerClass() couchbaseutil.MemberSet {
+	serverClassOrder := r.c.cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder
+
+	if len(serverClassOrder) == 0 {
+		for _, sc := range r.c.cluster.Spec.Servers {
+			serverClassOrder = append(serverClassOrder, sc.Name)
+		}
+	} else if len(serverClassOrder) < len(r.c.cluster.Spec.Servers) {
+		for _, sc := range r.c.cluster.Spec.Servers {
+			if !slices.Contains(serverClassOrder, sc.Name) {
+				serverClassOrder = append(serverClassOrder, sc.Name)
+			}
+		}
+	}
+
+	groupedExtMembers := r.externalMembers.GroupByServerConfigs()
+	for _, sc := range serverClassOrder {
+		if members, ok := groupedExtMembers[sc]; ok {
+			if members.Size() > 0 {
+				return members
+			}
+		}
+	}
+
+	return couchbaseutil.NewMemberSet()
+}
+
+func (r *MigrationReconcileMachine) getMigrationCandidatesByServerGroup() (couchbaseutil.MemberSet, error) {
+	serverGroupOrder := r.c.cluster.Spec.Migration.MigrationOrderOverride.ServerGroupOrder
+
+	// Poll the server for existing information
+	existingGroups := &couchbaseutil.ServerGroups{}
+	if err := couchbaseutil.ListServerGroups(existingGroups).On(r.c.api, r.c.getMigratingReadyTarget()); err != nil {
+		return couchbaseutil.NewMemberSet(), err
+	}
+
+	// Get all the existing server groups and sort them alphabetically
+	alphabeticalGroups := make([]string, 0, len(existingGroups.Groups))
+
+	for _, group := range existingGroups.Groups {
+		alphabeticalGroups = append(alphabeticalGroups, group.Name)
+	}
+
+	sort.Strings(alphabeticalGroups)
+
+	// Group the external members by server group
+	groupedExtNodes := map[string]couchbaseutil.MemberSet{}
+
+	for _, group := range existingGroups.Groups {
+		for _, node := range group.Nodes {
+			nodeName := node.HostName.GetMemberName()
+			m, ok := r.externalMembers[nodeName]
+
+			if !ok {
+				continue
+			}
+
+			if _, ok := groupedExtNodes[group.Name]; !ok {
+				groupedExtNodes[group.Name] = couchbaseutil.NewMemberSet(m)
+			} else {
+				groupedExtNodes[group.Name].Add(m)
+			}
+		}
+	}
+
+	// Make sure all server groups are in the order, and if not, add them
+	if len(serverGroupOrder) == 0 {
+		serverGroupOrder = alphabeticalGroups
+	} else if len(serverGroupOrder) < len(alphabeticalGroups) {
+		for _, sg := range alphabeticalGroups {
+			if !slices.Contains(serverGroupOrder, sg) {
+				serverGroupOrder = append(serverGroupOrder, sg)
+			}
+		}
+	}
+
+	// Go through the server group order and return the first group that has external members
+	for _, sc := range serverGroupOrder {
+		if members, ok := groupedExtNodes[sc]; ok {
+			if members.Size() > 0 {
+				return members, nil
+			}
+		}
+	}
+
+	return couchbaseutil.NewMemberSet(), nil
+}
+
+func (r *MigrationReconcileMachine) getMigrationCandidatesByNode(numCandidates int) couchbaseutil.MemberSet {
+	if r.c.cluster.Spec.Migration.MaxConcurrentMigrations < numCandidates {
+		numCandidates = r.c.cluster.Spec.Migration.MaxConcurrentMigrations
+	}
+
+	candidates := couchbaseutil.NewMemberSet()
+
+	// Go through the provided names and return the first ones that needs to be migrated.
+	for _, hostName := range r.c.cluster.Spec.Migration.MigrationOrderOverride.NodeOrder {
+		for _, extMember := range r.externalMembers {
+			// Confusingly, we don't use GetHostName as that includes the port
+			if extMember.GetDNSName() == hostName {
+				candidates.Add(extMember)
+				break
+			}
+		}
+
+		if candidates.Size() >= numCandidates {
+			return candidates
+		}
+	}
+
+	// Go through the rest in alphabetical order
+	sortedNodes := r.externalMembers.Names()
+	sort.Strings(sortedNodes)
+
+	for _, nodeName := range sortedNodes {
+		m := r.externalMembers[nodeName]
+		if !candidates.Contains(m.Name()) {
+			candidates.Add(m)
+		}
+
+		if candidates.Size() >= numCandidates {
+			return candidates
+		}
+	}
+
+	return candidates
 }
 
 func (r *MigrationReconcileMachine) migrateNode(m couchbaseutil.Member) error {
@@ -573,7 +736,9 @@ func (r *MigrationReconcileMachine) removeMemberUser(m couchbaseutil.Member) {
 }
 
 func (r *MigrationReconcileMachine) handleMarkReady(c *Cluster) error {
-	if r.getMigrationCandidates().Empty() {
+	if candidates, err := r.getMigrationCandidates(); err != nil {
+		return err
+	} else if candidates.Empty() {
 		c.cluster.Status.SetReadyCondition()
 	}
 

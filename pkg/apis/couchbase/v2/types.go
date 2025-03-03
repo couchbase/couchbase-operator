@@ -2518,6 +2518,9 @@ type ClusterSpec struct {
 	Migration *ClusterAssimilationSpec `json:"migration,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=None;StartTLSExtension;TLS
+type MigrationOrderStrategy string
+
 // ClusterAssimilationSpec defines the specification for a CouchbaseCluster assimilation of an unmanaged
 // cluster to a managed Kubernetes cluster
 type ClusterAssimilationSpec struct {
@@ -2541,6 +2544,45 @@ type ClusterAssimilationSpec struct {
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
 	MaxConcurrentMigrations int `json:"maxConcurrentMigrations,omitempty"`
+
+	// MigrationOrderOverride defines the strategy for migration order. If not set then the operator will choose nodes at random.
+	// +optional
+	MigrationOrderOverride *MigrationOrderOverrideSpec `json:"migrationOrderOverride,omitempty"`
+}
+
+// MigrationOrderOverrideStrategy defines the strategy for overriding the default migration order.
+// +kubebuilder:validation:Enum=ByServerGroup;ByServerClass;ByNode
+type MigrationOrderOverrideStrategy string
+
+const (
+	// ByServerGroup indicates that the migration order is based on server groups.
+	ByServerGroup MigrationOrderOverrideStrategy = "ByServerGroup"
+
+	// ByServerClass indicates that the migration order is based on server classes.
+	ByServerClass MigrationOrderOverrideStrategy = "ByServerClass"
+
+	// ByNode indicates that the migration order is based on individual nodes.
+	ByNode MigrationOrderOverrideStrategy = "ByNode"
+)
+
+// MigrationOrderOverrideSpec defines the specification for overriding the default migration order.
+// It allows specifying the order of server groups, server classes, or individual nodes for migration.
+type MigrationOrderOverrideSpec struct {
+	// MigrationOrderOverrideStrategy defines the strategy for migration order.
+	// +optional
+	MigrationOrderOverrideStrategy MigrationOrderOverrideStrategy `json:"migrationOrderOverrideStrategy,omitempty"`
+
+	// ServerGroupOrder defines the order of server groups for migration.
+	// +optional
+	ServerGroupOrder []string `json:"serverGroupOrder,omitempty"`
+
+	// ServerClassOrder defines the order of server classes for migration.
+	// +optional
+	ServerClassOrder []string `json:"serverClassOrder,omitempty"`
+
+	// NodeOrder defines the order of nodes for migration.
+	// +optional
+	NodeOrder []string `json:"nodeOrder,omitempty"`
 }
 
 type PersistentVolumeClaimTemplate struct {
