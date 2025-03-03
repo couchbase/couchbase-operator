@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"fmt"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 )
 
@@ -17,7 +19,7 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 		warnings = append(warnings, "CouchbaseCluster spec.antiAffinity is disabled. It is recommended this is enabled for production clusters.")
 	}
 
-	if cluster.Spec.ClusterSettings.Indexer != nil && cluster.Spec.ClusterSettings.Indexer.StorageMode != couchbasev2.CouchbaseClusterIndexStorageSettingStandard {
+	if cluster.Spec.ClusterSettings.Indexer == nil || cluster.Spec.ClusterSettings.Indexer.StorageMode == couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized {
 		warnings = append(warnings, "CouchbaseCluster spec.cluster.indexer.storageMode is not set to plasma. This is recommended for production clusters.")
 	}
 
@@ -31,6 +33,13 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 
 	if !checkLogVolumeMountConfigured(cluster.Spec.Servers) {
 		warnings = append(warnings, "CouchbaseCluster spec.servers.volumeMounts.default or spec.servers.volumeMounts.logs is not configured for at least one server resource. To ensure logs are persisted, it is recommended one of these is configured for production clusters.")
+	}
+
+	// If hibernate is enabled and the cluster is not already hibernating, we should warn if we will not enter hibernation immediately.
+	if cluster.Spec.Hibernate && !cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		if willHibernate, reason := cluster.CanHibernate(); !willHibernate {
+			warnings = append(warnings, fmt.Sprintf("CouchbaseCluster spec.hibernate is enabled, but the cluster cannot enter hibernation: %s. Hibernation will occur once the cluster is stable.", reason))
+		}
 	}
 
 	return warnings

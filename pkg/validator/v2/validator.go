@@ -44,6 +44,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
+		checkConstraintClusterName,
 		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
@@ -94,12 +95,13 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLDAPAuthorization,
 		checkConstraintAutoscalingStabilizationPeriod,
 		checkConstraintBackupObjectEndpointSecret,
-		checkConstraintBucketStorageBackend,
+		checkClusterConstraintMagmaStorageBackend,
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
 		checkMigrationConstraints,
 		checkAdminServiceConstraints,
+		checkClusterRBACConstraints,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -155,6 +157,14 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if len(cluster.Name) > 58 {
+		return fmt.Errorf("cluster name must be less than 58 characters")
+	}
+
+	return nil
 }
 
 func checkConstraintPerServiceClassPDB(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -248,11 +258,7 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 		return checkValidStorageBackend(backend, annotation)
 	}
 
-	enableBucketMigrationRoutinesValidation := func(val, annotation string) error {
-		if cond := cluster.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
-			return fmt.Errorf("%s annotation cannot be changed whilst a bucket migration routine is in progress", annotation)
-		}
-
+	checkStringToBoolBucketAnnotation := func(val, _ string) error {
 		return checkStringToBool(val)
 	}
 
@@ -263,8 +269,8 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 	bucketAnnotations := map[string]func(string, string) error{
 		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
-		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       enableBucketMigrationRoutinesValidation,
-		"cao.couchbase.com/buckets.maxMigratableBuckets":                checkStringToUintBucketAnnotation,
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       checkStringToBoolBucketAnnotation,
+		"cao.couchbase.com/buckets.maxConcurrentPodSwaps":               checkStringToUintBucketAnnotation,
 	}
 
 	for k, v := range cluster.Annotations {
@@ -301,9 +307,20 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 
 func checkAdminServiceConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	for i, config := range cluster.Spec.Servers {
+		tag, err := k8sutil.CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(&config))
+		if err != nil {
+			return err
+		}
+
 		serviceList := couchbasev2.ServiceList(config.Services)
-		if serviceList.Contains(couchbasev2.AdminService) && len(serviceList) > 1 {
-			return fmt.Errorf("spec.servers[%d].services cannot contain the admin service and other services", i)
+		if serviceList.Contains(couchbasev2.AdminService) {
+			if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); !after76 && err == nil {
+				return fmt.Errorf("couchbase server version must be greater than 7.6.0 to enable the admin service")
+			}
+
+			if len(serviceList) > 1 {
+				return fmt.Errorf("spec.servers[%d].services cannot contain the admin service and other services", i)
+			}
 		}
 	}
 
@@ -799,7 +816,7 @@ func checkConstraintXDCRMigrationMappings(m couchbasev2.CouchbaseMigrationReplic
 	return nil
 }
 
-func isScopesAndCollectionsSupported(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
+func isVersion7OrAbove(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 	// Minimum supported version for scopes and collections is 7
 	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 	if err != nil {
@@ -880,7 +897,7 @@ func checkConstraintXDCRReplicationScopesAndCollectionsSupported(v *types.Valida
 		return nil
 	}
 
-	supportedXDCRScopesAndCollections, err := isScopesAndCollectionsSupported(cluster)
+	supportedXDCRScopesAndCollections, err := isVersion7OrAbove(cluster)
 	if err != nil {
 		return fmt.Errorf("unable to check server version %s for scopes and collections support: %w", cluster.Spec.Image, err)
 	}
@@ -1210,10 +1227,25 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 		errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since no volume claim templates have been definied"))
 	}
 
-	for _, template := range cluster.Spec.VolumeClaimTemplates {
+	// If volumeClaimTemplates have been set, we should check a default exists on the cluster in case the storageClassName is omitted from any templates.
+	var hasDefaultStorageClass bool
+
+	if len(cluster.Spec.VolumeClaimTemplates) > 0 {
+		scList, err := v.Abstraction.GetStorageClasses()
+
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		hasDefaultStorageClass = util.CheckDefaultStorageClassExists(scList)
+	}
+
+	for i, template := range cluster.Spec.VolumeClaimTemplates {
 		if template.Spec.StorageClassName == nil {
-			// Not so fast skippy, you can lookup the default storage class
-			// and continue with the checks...
+			if !hasDefaultStorageClass {
+				errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates[%d].spec.storageClassName has not been configured and no default exists in the cluster", i))
+			}
+
 			continue
 		}
 
@@ -1313,6 +1345,19 @@ func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.Cou
 		}
 	}
 
+	clusterImageVersion, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	for image := range versionSet {
+		if classImageVersion, err := k8sutil.CouchbaseVersion(image); err != nil {
+			return err
+		} else if classImageVersion != clusterImageVersion && classImageVersion != cluster.Status.CurrentVersion {
+			return fmt.Errorf("server class image version (%s) must match cluster image version (%s) or current version (%s)", classImageVersion, clusterImageVersion, cluster.Status.CurrentVersion)
+		}
+	}
+
 	if len(versionSet) > 2 {
 		versions := []string{}
 		for version := range versionSet {
@@ -1320,6 +1365,59 @@ func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.Cou
 		}
 
 		return fmt.Errorf("a maximum of two couchbase server images can be used in a single cluster, %v images are in use: %v", len(versionSet), versions)
+	}
+
+	if err := checkComatibleImages(cluster); err != nil {
+		return err
+	}
+
+	if err := checkClusterImageHighest(cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkComatibleImages(cluster *couchbasev2.CouchbaseCluster) error {
+	lowImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	highImage, err := cluster.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	lowVersion, err := k8sutil.CouchbaseVersion(lowImage)
+	if err != nil {
+		return err
+	}
+
+	highVersion, err := couchbaseutil.CouchbaseImageVersion(highImage)
+	if err != nil {
+		return err
+	}
+
+	return couchbaseutil.CheckUpgradePath(lowVersion, highVersion)
+}
+
+func checkClusterImageHighest(cluster *couchbasev2.CouchbaseCluster) error {
+	clusterImageVersion, err := couchbaseutil.NewVersionFromImage(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	for _, sc := range cluster.Spec.Servers {
+		if sc.Image == "" || sc.Image == cluster.Spec.Image {
+			continue
+		}
+
+		if classImageVersion, err := couchbaseutil.NewVersionFromImage(sc.Image); err != nil {
+			return err
+		} else if clusterImageVersion.Less(classImageVersion) {
+			return fmt.Errorf("server class image version (%s) cannot be higher than cluster image version (%s)", classImageVersion, clusterImageVersion)
+		}
 	}
 
 	return nil
@@ -1797,6 +1895,16 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 
 	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
 		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
+	}
+
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+		if err := checkBucketClustersMagmaStorageBackend(v, bucket); err != nil {
+			errs = append(errs, err)
+		}
+
+		if bucket.Spec.EnableIndexReplica {
+			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
+		}
 	}
 
 	if bucket.Spec.MaxTTL != nil {
@@ -2440,7 +2548,7 @@ func checkContraintRestoreData(_ *types.Validator, restore *couchbasev2.Couchbas
 	return nil
 }
 
-func CheckConstraintsCouchbaseGroup(_ *types.Validator, group *couchbasev2.CouchbaseGroup) error {
+func CheckConstraintsCouchbaseGroup(v *types.Validator, group *couchbasev2.CouchbaseGroup) error {
 	var errs []error
 
 	if checkAnnotationSkipValidation(group.Annotations) {
@@ -2454,6 +2562,10 @@ func CheckConstraintsCouchbaseGroup(_ *types.Validator, group *couchbasev2.Couch
 		if role.Bucket != "" && isCluterRole {
 			errs = append(errs, errors.PropertyNotAllowed(fmt.Sprintf("spec.roles[%d].bucket for cluster role", index), "", string(role.Name)))
 		}
+	}
+
+	if err := checkCouchbaseGroupRBACConstraints(v, group); err != nil {
+		errs = append(errs, err)
 	}
 
 	if errs != nil {
@@ -2664,7 +2776,7 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		chain, key, _, decodeErr = util_x509.DecodePKCS12file(keystore, passphrase, cluster)
 
 		if decodeErr != nil {
-			return []error{err}
+			return []error{decodeErr}
 		}
 	}
 
@@ -2783,16 +2895,25 @@ func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster
 // validateBucketNameConstraints takes a cluster and finds all buckets, or
 // a bucket and finds all clusters referencing it, checking that bucket names
 // are not reused.
+//
+//nolint:gocognit
 func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cluster *couchbasev2.CouchbaseCluster) error {
 	// Gather the clusters affected by this change (either adding a cluster or
 	// a bucket -- bucket names are immutable).
 	clusters := []*couchbasev2.CouchbaseCluster{}
+
+	var abstractBucket couchbasev2.AbstractBucket
 
 	switch t := object.(type) {
 	case *couchbasev2.CouchbaseBucket, *couchbasev2.CouchbaseEphemeralBucket, *couchbasev2.CouchbaseMemcachedBucket:
 		bucket, ok := object.(metav1.Object)
 		if !ok {
 			return fmt.Errorf("failed to type assert bucket to meta object")
+		}
+
+		abstractBucket, ok = object.(couchbasev2.AbstractBucket)
+		if !ok {
+			return fmt.Errorf("failed to type assert bucket to abstract bucket")
 		}
 
 		var namespacedClusters = new(couchbasev2.CouchbaseClusterList)
@@ -2829,6 +2950,22 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 		buckets, err := getClusterBuckets(v, cluster)
 		if err != nil {
 			return err
+		}
+
+		// Include the bucket in the name duplicate check if it's a new bucket
+		if abstractBucket != nil {
+			bucketFound := false
+
+			for _, b := range buckets {
+				if b.GetCouchbaseName() == abstractBucket.GetCouchbaseName() && b.GetType() == abstractBucket.GetType() {
+					bucketFound = true
+					break
+				}
+			}
+
+			if !bucketFound {
+				buckets = append(buckets, abstractBucket)
+			}
 		}
 
 		// Gather the names in an associative array (a set essentially) and look for duplicates.
@@ -3463,11 +3600,29 @@ func checkImmutableServerClass(current, updated *couchbasev2.CouchbaseCluster) e
 	var errs []error
 
 	for _, cur := range current.Spec.Servers {
+		before76 := true
+
+		tag, err := k8sutil.CouchbaseVersion(current.Spec.ServerClassCouchbaseImage(&cur))
+		if err != nil {
+			return err
+		}
+
+		if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); after76 && err == nil {
+			before76 = false
+		}
+
 		for i, up := range updated.Spec.Servers {
 			if cur.Name == up.Name {
 				if !util.StringArrayCompare(couchbasev2.ServiceList(cur.Services).StringSlice(), couchbasev2.ServiceList(up.Services).StringSlice()) {
 					errs = append(errs, util.NewUpdateError(fmt.Sprintf("spec.servers[%d].services", i), "body"))
 					continue
+				}
+			}
+
+			if before76 {
+				serviceList := couchbasev2.ServiceList(up.Services)
+				if serviceList.Contains(couchbasev2.AdminService) || serviceList.Len() == 0 {
+					errs = append(errs, fmt.Errorf("cannot enable admin service until cluster is upgraded to 7.6.x+"))
 				}
 			}
 		}
@@ -3529,8 +3684,14 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	migratingCondition := current.Status.GetCondition(couchbasev2.ClusterConditionMigrating)
 
+	fullyUpgraded, err := isFullyUpgraded(current)
+
+	if err != nil {
+		return err
+	}
+
 	// Condition is not set, therefore we are starting an upgrade.
-	if upgradeCondition == nil && migratingCondition == nil {
+	if (upgradeCondition == nil && migratingCondition == nil) && fullyUpgraded {
 		if updatedVersion == "9.9.9" {
 			// we have no idea what this is so we trust the user
 			return nil
@@ -3545,6 +3706,15 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 	}
 
 	return nil
+}
+
+func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
+	imageVersion, err := k8sutil.CouchbaseVersion(c.Spec.Image)
+	if err != nil {
+		return false, err
+	}
+
+	return imageVersion == c.Status.CurrentVersion, nil
 }
 
 // checkImmutableVolumeTemplateSize checks that you aren't downscaling volumes
@@ -3672,11 +3842,15 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	}
 
 	// If the cluster is in hibernation, we should prohibit any changes
-	if err := checkForClusterChangesDuringHibernation(prev, curr); err != nil {
+	if err := checkChangeConstraintsHibernate(prev, curr); err != nil {
 		return err
 	}
 
 	if err := checkChangeConstraintsMigration(prev, curr); err != nil {
+		return err
+	}
+
+	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
 		return err
 	}
 
@@ -3709,23 +3883,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	if validUpgrade, err := couchbaseutil.ValidUpgrade(oldVersion, newVersion); err != nil {
-		return err
-	} else if !validUpgrade {
-		if isDowngrade, err := couchbaseutil.VersionBefore(newVersion, oldVersion); err != nil {
-			return err
-		} else if isDowngrade {
-			return fmt.Errorf("cannot upgrade from %s to %s. Downgrades are not supported", oldVersion, newVersion)
-		}
-		upperboundVersion, err := couchbaseutil.GetUpgradeUpperbound(oldVersion)
-		if err != nil {
-			return err
-		}
-
-		return fmt.Errorf("cannot upgrade from %s to %s. Version must be less than %s", oldVersion, newVersion, upperboundVersion)
-	}
-
-	return nil
+	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
 }
 
 func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
@@ -3760,6 +3918,12 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			if err := CheckBucketHistoryDisabled(prev); err != nil {
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
+		}
+	}
+
+	if curr.Spec.StorageBackend == "magma" {
+		if curr.Spec.EnableIndexReplica {
+			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
 		}
 	}
 
@@ -3978,25 +4142,10 @@ func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollec
 	return nil
 }
 
-func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Buckets aren't managed by Cluster.
 	if !cluster.Spec.Buckets.Managed {
 		return nil
-	}
-
-	lowestImageVer, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	srvImgTag, err := k8sutil.CouchbaseVersion(lowestImageVer)
-	if err != nil {
-		return err
-	}
-
-	srvVerAfter712, err := couchbaseutil.VersionAfter(srvImgTag, "7.1.2")
-	if err != nil {
-		return err
 	}
 
 	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
@@ -4006,9 +4155,22 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 
 	var hasMagma bool
 
+	// // storageBackend is only allowed above CB version 7.0.0.
+	storageBackendSupported, err := cluster.IsAtLeastVersion("7.0.0")
+	if err != nil {
+		return err
+	}
+
+	// // magma storageBackend is only allowed above CB version 7.1.0.
+	magmaStorageBackendSupported, err := cluster.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
 	// find if any bucket has storage backend as "magma"
 	for _, cbBucket := range couchbaseBuckets.Items {
-		if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+		backend := k8sutil.GetBucketStorageBackend(&cbBucket, storageBackendSupported, magmaStorageBackendSupported, cluster)
+		if backend == couchbasev2.CouchbaseStorageBackendMagma {
 			hasMagma = true
 			break
 		}
@@ -4018,15 +4180,7 @@ func checkConstraintBucketStorageBackend(v *types.Validator, cluster *couchbasev
 		return nil
 	}
 
-	// check if any server class has FTS, Eventing, or Analytics.
-	for _, config := range cluster.Spec.Servers {
-		services := couchbasev2.ServiceList(config.Services)
-		if !srvVerAfter712 && (services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService)) {
-			return fmt.Errorf("search, eventing or analytics services cannot be used in magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v", services.StringSlice())
-		}
-	}
-
-	return nil
+	return checkBucketConstraintMagmaStorageBackend(cluster)
 }
 
 func validateCloudNativeGatewayServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -4076,8 +4230,8 @@ func checkConstraintK8sSecurityContext(_ *types.Validator, cluster *couchbasev2.
 }
 
 // checkForClusterChangesDuringHibernation validates whether there have been any changes to a cluster while hibernate is enabled.
-func checkForClusterChangesDuringHibernation(current, updated *couchbasev2.CouchbaseCluster) error {
-	if current.Spec.Hibernate && updated.Spec.Hibernate {
+func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseCluster) error {
+	if current.Spec.Hibernate && updated.Spec.Hibernate && current.HasCondition(couchbasev2.ClusterConditionHibernating) {
 		current.Spec.Hibernate = updated.Spec.Hibernate
 		if !reflect.DeepEqual(updated.Spec, current.Spec) {
 			return fmt.Errorf("cluster spec cannot be changed during hibernation")
@@ -4160,4 +4314,123 @@ func checkForVersionChange(current, updated *couchbasev2.CouchbaseCluster) (bool
 	}
 
 	return currentVersion != updatedVersion, nil
+}
+
+// checkBucketClustersMagmaStorageBackend checks all clusters that will use a given bucket for magma storage backend constraints.
+func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range clusters.Items {
+		if !c.Spec.Buckets.Managed {
+			return nil
+		}
+
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
+		if err != nil {
+			return err
+		}
+
+		if c.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			if err := checkBucketConstraintMagmaStorageBackend(&c); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintBucketMagmaStorageBackend checks a cluster is able to support the magma storage backend.
+func checkBucketConstraintMagmaStorageBackend(cluster *couchbasev2.CouchbaseCluster) error {
+	lowestImageVer, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
+	if err != nil {
+		return err
+	}
+
+	srvImgTag, err := k8sutil.CouchbaseVersion(lowestImageVer)
+	if err != nil {
+		return err
+	}
+
+	srvVerAfter712, err := couchbaseutil.VersionAfter(srvImgTag, "7.1.2")
+	if err != nil {
+		return err
+	}
+
+	// We shouldn't allow FTS, Eventing or Analytics services on magma buckets when the cb version is < 7.1.2
+	for _, config := range cluster.Spec.Servers {
+		services := couchbasev2.ServiceList(config.Services)
+		if !srvVerAfter712 && (services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService)) {
+			return fmt.Errorf("search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v, for cluster: %s", services.StringSlice(), cluster.NamespacedName())
+		}
+	}
+
+	return nil
+}
+
+// checkClusterRBACConstraints checks RBAC settings constraints for a cluster. Every CouchbaseGroup which qualifies for the RBAC selector for the cluster will be checked.
+func checkClusterRBACConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	return checkClusterGroupRBACConstraints(v, cluster, nil)
+}
+
+// checkCouchbaseGroupRBACConstraints checks RBAC settings constraints, such as supported cluster versions, for a CouchbaseGroup. Every CouchbaseCluster which will reconcile the group will be checked.
+func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.CouchbaseGroup) error {
+	allClusters, err := v.Abstraction.GetCouchbaseClusters(group.Namespace)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range allClusters.Items {
+		return checkClusterGroupRBACConstraints(v, &c, group)
+	}
+
+	return nil
+}
+
+// checkClusterGroupRBACConstraints checks that the security_admin role is not used in any CouchbaseGroup for a cluster running a server version above 7.0.0. If a specific group is passed in, we will only validate against that group. If this is omitted, we will validate against every group for the cluster.
+func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, group *couchbasev2.CouchbaseGroup) error {
+	if !cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	if v, err := isVersion7OrAbove(cluster); err != nil {
+		return err
+	} else if !v {
+		return nil
+	}
+
+	couchbaseGroups := &couchbasev2.CouchbaseGroupList{}
+	// If we pass a group into the func, we should validate against that group. If this is omitted, we will fetch and validate against every group for the cluster.
+	if group != nil {
+		couchbaseGroups.Items = []couchbasev2.CouchbaseGroup{*group}
+	} else {
+		groups, err := v.Abstraction.GetCouchbaseGroups(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return err
+		}
+		couchbaseGroups = groups
+	}
+
+	for _, g := range couchbaseGroups.Items {
+		for _, r := range g.Spec.Roles {
+			if r.Name == couchbasev2.RoleSecurityAdmin {
+				return fmt.Errorf("security_admin role is configured in group %s and cannot be used with Couchbase Server 7.0.0 and above", g.Name)
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
+	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
+		if cond := prev.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
+			return fmt.Errorf("cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
+		}
+	}
+
+	return nil
 }

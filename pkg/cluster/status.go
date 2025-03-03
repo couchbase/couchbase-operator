@@ -9,7 +9,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
-var RetryPeriod = 100 * time.Millisecond
+var RetryPeriod = 5 * time.Second
 
 // NodeState is the human readable state a Couchbase cluster
 // node is in.

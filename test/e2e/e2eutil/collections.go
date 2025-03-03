@@ -818,7 +818,7 @@ func MustDeleteCollectionManually(t *testing.T, kubernetes *types.Cluster, clust
 }
 
 // verifyDocCountInCollection uses Server 7.0's metrics to check that the current number of items in a collection is equal to a given number.
-func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) error {
+func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration, sumMetrics bool) error {
 	return retryutil.RetryFor(timeout, func() error {
 		// Labels are passed to specify which collection we're looking at.
 		labels := make(map[string]string)
@@ -834,23 +834,33 @@ func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 			return err
 		}
 
-		// We're only getting a single metric, so we can just get the first 'Data'.
 		if len(metrics.Data) == 0 {
 			return fmt.Errorf("metrics response had no data")
 		}
-		values := metrics.Data[0].Values
-		// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
-		if len(values) == 0 {
-			return fmt.Errorf("metrics response had no values")
+
+		totalItemCount := 0
+		for _, d := range metrics.Data {
+			values := d.Values
+
+			if len(values) == 0 {
+				return fmt.Errorf("metrics response had no values")
+			}
+			// Server returns multiple values, and we want the most recent/last one, and turn it into an int from a string.
+			itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
+			if err != nil {
+				return err
+			}
+
+			totalItemCount += itemCount
+
+			// If we're not summing metrics, we can break early.
+			if !sumMetrics {
+				break
+			}
 		}
 
-		itemCount, err := strconv.Atoi(values[len(values)-1][1].(string))
-		if err != nil {
-			return err
-		}
-
-		if itemCount != items {
-			return fmt.Errorf("document count %d, expected %d", itemCount, items)
+		if totalItemCount != items {
+			return fmt.Errorf("document count %d, expected %d", totalItemCount, items)
 		}
 
 		return nil
@@ -858,7 +868,13 @@ func verifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couch
 }
 
 func MustVerifyDocCountInCollection(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
-	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout); err != nil {
+	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout, false); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustVerifyDocCountInCollectionSum(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, scope string, collection string, items int, timeout time.Duration) {
+	if err := verifyDocCountInCollection(t, k8s, cluster, bucket, scope, collection, items, timeout, true); err != nil {
 		Die(t, err)
 	}
 }

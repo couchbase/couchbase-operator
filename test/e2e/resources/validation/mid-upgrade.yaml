@@ -1,0 +1,57 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+spec:
+  image: couchbase/server:7.6.2
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  servers:
+    - size: 2
+      name: data
+      image: couchbase/server:7.6.0
+      services:
+        - data
+    - size: 2
+      name: index
+      services:
+        - index
+status:
+  allocations:
+  - allocatedMemory: 256Mi
+    dataServiceAllocation: 256Mi
+    name: data
+  - allocatedMemory: 256Mi
+    indexServiceAllocation: 256Mi
+    name: index
+  clusterId: 65f7b9c9ae5f66d0ab5206ec3cfca473
+  conditions:
+  - lastTransitionTime: "2025-02-17T12:35:50Z"
+    lastUpdateTime: "2025-02-17T12:35:50Z"
+    reason: Available
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-02-17T14:13:36Z"
+    lastUpdateTime: "2025-02-17T14:13:36Z"
+    message: Data is equally distributed across all nodes in the cluster
+    reason: Balanced
+    status: "True"
+    type: Balanced
+  currentVersion: 7.6.0
+  lastUpdateTime: "2025-02-17T14:58:20Z"
+  members:
+    ready:
+    - cb-example-0000
+    - cb-example-0001
+    - cb-example-0006
+    - cb-example-0007
+  size: 4

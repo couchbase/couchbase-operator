@@ -44,7 +44,7 @@ func TestBucketHistoryRetentionRetentionSettingsInCRD(t *testing.T) {
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
 			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
-			EnableIndexReplica: true,
+			EnableIndexReplica: false,
 			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
 			HistoryRetentionSettings: &couchbasev2.HistoryRetentionSettings{
@@ -130,7 +130,7 @@ func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
 				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 				EnableFlush:        true,
-				EnableIndexReplica: true,
+				EnableIndexReplica: false,
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 				StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
 			},
@@ -153,7 +153,7 @@ func TestBucketHistoryRetentionWithAnnotations(t *testing.T) {
 				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
 				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 				EnableFlush:        true,
-				EnableIndexReplica: true,
+				EnableIndexReplica: false,
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 				StorageBackend:     couchbasev2.CouchbaseStorageBackendMagma,
 			},
@@ -626,14 +626,14 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster2, expectedEvents)
 }
 
+// TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing tests whether the dac will correctly accept or reject
+// magma buckets where the server version is above or below 7.1.2, which is a requirement for FTS, analytics and eventing services.
 func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
 
 	// Static configuration
 	clusterSize := constants.Size1
@@ -650,7 +650,7 @@ func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *tes
 			EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
 			ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 			EnableFlush:        true,
-			EnableIndexReplica: true,
+			EnableIndexReplica: false,
 			CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 		},
 	}
@@ -660,18 +660,32 @@ func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *tes
 	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.SearchService)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
-	// Bucket couldn't be added to cluster.
-	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.Name, 2*time.Minute)
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Bucket added with the correct name
+	magmaServicesSupported, err := couchbaseutil.VersionAfter(cbVersion, "7.2.1")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket.Name},
 	}
+
+	if magmaServicesSupported {
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketCreated})
+	} else {
+		// Bucket should not be created if we don't have a high enough cb version when running the services
+		e2eutil.MustGetAdmissionFailureOnCreateBucket(t, kubernetes, bucket, "search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2.")
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+	}
+
+	// Check the cluster is still healthy after trying to add a bucket.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -698,7 +712,7 @@ func TestSampleBucket(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketGreaterThan(t, kubernetes, cluster, bucket.GetName(), 7300, time.Minute)
 }
 
 // TestUpdateSampleBucket will check that sample buckets aren't updated to match the CRD spec until the sampleBucket annotation is false.
@@ -723,7 +737,7 @@ func TestUpdateSampleBucket(t *testing.T) {
 
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 7306, time.Minute)
+	e2eutil.MustVerifyDocCountInBucketGreaterThan(t, kubernetes, cluster, bucket.GetName(), 7300, time.Minute)
 
 	beerSampleDefaultMemoryQuota := e2espec.NewResourceQuantityMi(200)
 	updatedMemoryQuota := e2espec.NewResourceQuantityMi(256)

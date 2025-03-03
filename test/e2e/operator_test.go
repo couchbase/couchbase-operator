@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -207,17 +209,35 @@ func TestImageVersionEnvPrecedence(t *testing.T) {
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	// Patching the clustr to give precedence to Env Var should result in an upgrade.
+	// Patching the cluster to give precedence to Env Var should result in an upgrade.
 	_ = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/envImagePrecedence", true), time.Minute)
 
-	// Since this test isn't going to be running in OpenShift then we cannot expect
-	// upgrade to succeed because the images refer to the redhat registry.
-	// The point is simply to demonstrate that the env var has taken precedence.
-	expectedEvents := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	getEventSequence := func(t *testing.T, cluster *v2.CouchbaseCluster) ([]eventschema.Validatable, error) {
+		// Since this test isn't going to be running in OpenShift then we cannot expect
+		// upgrade to succeed because the images refer to the redhat registry.
+		// The point is simply to demonstrate that the env var has taken precedence.
+		if before, err := couchbaseutil.VersionBefore(e2eutil.MustGetCouchbaseVersion(t, cluster.Spec.Image, ""), "7.0.4"); err == nil && before {
+			return []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+			}, nil
+		} else if err == nil {
+			// We expect this to fail with the addition of operator validation due to the
+			// upgrade not being valid.
+			return []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+			}, nil
+		} else {
+			return nil, err
+		}
 	}
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	if expectedEvents, err := getEventSequence(t, cluster); err == nil {
+		ValidateEvents(t, kubernetes, cluster, expectedEvents)
+	} else {
+		e2eutil.Die(t, err)
+	}
 }
 
 func TestNoPodDeleteDelayRespected(t *testing.T) {
@@ -258,7 +278,7 @@ func TestPodDeletedAfterExpectedDelay(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	_, err := e2eutil.ResizeCluster(0, constants.Size2, kubernetes, cluster, 1*time.Minute)
+	_, err := e2eutil.ResizeCluster(0, constants.Size2, kubernetes, cluster, 2*time.Minute)
 	if err != nil {
 		t.Errorf("TestPodDeletedAfterExpectedDelay failed")
 	}
@@ -287,7 +307,7 @@ func TestPodDeleteDelayRespected(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
-	_, err := e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 1*time.Minute)
+	_, err := e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 2*time.Minute)
 	if err != nil {
 		t.Errorf("TestPodDeleteDelayRespected failed: " + err.Error())
 	}

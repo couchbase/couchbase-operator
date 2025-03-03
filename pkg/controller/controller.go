@@ -26,9 +26,10 @@ var log = logf.Log.WithName("controller")
 // CouchbaseClusterReconciler is a reconciler object that implements to Reconciler interface
 // as defined by the controller-runtime.
 type CouchbaseClusterReconciler struct {
-	client        client.Client
-	clusters      *ManagedClusters
-	clusterConfig cluster.Config
+	client            client.Client
+	clusters          *ManagedClusters
+	clusterConfig     cluster.Config
+	operatorStartTime time.Time
 }
 
 // Reconcile is triggered when an event occurs on a watched resource.
@@ -101,7 +102,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			validationErrors = append(validationErrors, err.Error())
 		}
 
-		c.RunReconcile()
+		c.RunReconcile(r.operatorStartTime)
 
 		r.clusters.Store(request.NamespacedName.String(), c)
 
@@ -150,9 +151,9 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	if validationFailed {
-		c.Update(c.GetCouchbaseCluster())
+		c.RunReconcile(r.operatorStartTime)
 	} else {
-		c.Update(couchbase)
+		c.Update(couchbase, r.operatorStartTime)
 	}
 
 	return requeueResult, nil
@@ -162,9 +163,10 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 // when CouchbaseCluster objects are modified.
 func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Config) error {
 	r := &CouchbaseClusterReconciler{
-		client:        mgr.GetClient(),
-		clusters:      CreateManagedClusters(),
-		clusterConfig: clusterConfig,
+		client:            mgr.GetClient(),
+		clusters:          CreateManagedClusters(),
+		clusterConfig:     clusterConfig,
+		operatorStartTime: time.Now(),
 	}
 
 	options := controller.Options{

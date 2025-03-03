@@ -39,8 +39,8 @@ var upgradeSequence = eventschema.Sequence{
 	},
 }
 
-// rollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
-func rollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {
+// RollingUpgradeSequence is what to expect when a cluster is upgraded all at once.
+func RollingUpgradeSequence(clusterSize, maxNumber int) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
@@ -132,9 +132,11 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 						},
 					},
 					// ... or the operator notices it's gone pop, aborts the topology reconcile
-					// and next time around the pod is already in failed add.
+					// and next time around the pod is already in failed add. This is logged as
+					// a reconcile failed event.
 					eventschema.Sequence{
 						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
 							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 						},
 					},
@@ -163,6 +165,7 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			eventschema.AnyOf{
 				Validators: []eventschema.Validatable{
 					// In the first incarnation, the candidate has already been
@@ -990,7 +993,7 @@ func TestUpgradeImmediate(t *testing.T) {
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		rollingUpgradeSequence(clusterSize, clusterSize),
+		RollingUpgradeSequence(clusterSize, clusterSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1038,7 +1041,7 @@ func TestUpgradeConstrained(t *testing.T) {
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		rollingUpgradeSequence(clusterSize, upgradeChunkSize),
+		RollingUpgradeSequence(clusterSize, upgradeChunkSize),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1492,18 +1495,18 @@ func TestPartialUpgrade(t *testing.T) {
 	framework.Requires(t, kubernetes).Upgradable()
 
 	// Static configuration.
-	clusterSize := constants.Size1
+	classSize := constants.Size1
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).MustCreate(t, kubernetes)
 
 	class1Name := cluster.Spec.Servers[0].Name
 	class2Name := cluster.Spec.Servers[1].Name
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/0/image", f.CouchbaseServerImage), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/1/image", f.CouchbaseServerImageUpgrade).Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)

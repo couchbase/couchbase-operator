@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/spf13/cobra"
 )
 
@@ -186,7 +187,7 @@ func (o *generateBackupOptions) GetBackupServiceAccount() *v1.ServiceAccount {
 	}
 
 	if o.backupIAMRoleARN != "" {
-		serviceAccount.Annotations[BackupIAMAnnotation] = o.backupIAMRoleARN
+		couchbaseutil.AddAnnotation(&serviceAccount.ObjectMeta, BackupIAMAnnotation, o.backupIAMRoleARN)
 	}
 
 	return serviceAccount

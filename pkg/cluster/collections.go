@@ -381,6 +381,7 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 		requestedCollection.MaxTTL = &maxTTL
 	} else if !canEditTTL {
 		requestedCollection.MaxTTL = nil
+		existingCollection.MaxTTL = nil
 	}
 
 	if !reflect.DeepEqual(existingCollection, requestedCollection) {

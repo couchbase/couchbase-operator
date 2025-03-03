@@ -42,12 +42,12 @@ It will ensure that, if present, any storage class templates reference existing 
 +
 You can opt out of this requirement with the xref:tools/cao.adoc[`--validate-storage-classes` `cao` flag].
 +
-_Required Permissions_: `get`
+_Required Permissions_: `get`, `list`
 
 [NOTE]
 ====
 `Secret` and `StorageClass` resources are only interrogated -- as described -- for existence and correctness.
-The admission controller only performs `get` operations based on the names specified in the `CouchbaseCluster` specification.
+The admission controller only performs `get` operations based on the names specified in the `CouchbaseCluster` specification. The `list` operation is only used by the admission controller to validate, if applicable, that a default storage class exists.
 These resources will never be leaked through logs and are never persisted by the admission controller.
 
 If, however, your security policies declare that such permissions cannot be granted to an application, then they can be safely removed from the admission controller's role.

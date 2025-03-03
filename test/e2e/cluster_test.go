@@ -364,7 +364,7 @@ func TestQuerySettings(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}}, // One optional one to make up for defaults
-		eventschema.Repeat{Times: upgradeCycles, Validator: rollingUpgradeSequence(clusterSize, clusterSize)},
+		eventschema.Repeat{Times: upgradeCycles, Validator: RollingUpgradeSequence(clusterSize, clusterSize)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -573,7 +573,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -852,6 +852,7 @@ func TestSwapNodesBetweenServices(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 2, Validator: e2eutil.ClusterScaleUpSequence(1)},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		e2eutil.ClusterScaleUpSequence(2),
 		eventschema.Repeat{
 			Times: 3,
@@ -1183,6 +1184,7 @@ func TestMovePod(t *testing.T) {
 
 	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, podsList.Items[0])
 
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{

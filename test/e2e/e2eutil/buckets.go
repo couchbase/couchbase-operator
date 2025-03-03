@@ -672,6 +672,29 @@ func MustVerifyDocCountInBucket(t *testing.T, k8s *types.Cluster, cluster *couch
 	}
 }
 
+// This is only really useful for sample buckets since we don't define the doc count for them...
+// Server seems to randomly decide how many docs to put in them across different versions...
+func MustVerifyDocCountInBucketGreaterThan(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) {
+	if err := verifyDocCountInBucketGreaterThan(t, k8s, cluster, bucket, items, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func verifyDocCountInBucketGreaterThan(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, items int, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, bucket)
+		if err != nil {
+			return err
+		}
+
+		if info.BasicStats.ItemCount < items {
+			return fmt.Errorf("document count %d, expected %d", info.BasicStats.ItemCount, items)
+		}
+
+		return nil
+	})
+}
+
 // getLatestMetric takes the 2D array that server returns - an array of [timestamp, value] - and gets the last/most recent one.
 // Naturally, the returned value is a string, so we convert it to an int, then return it as the value we're looking for.
 // Sorry.

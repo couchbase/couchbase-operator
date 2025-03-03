@@ -35,6 +35,11 @@ func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2esp
 	// Begin with basic autoscale enabled cluster
 	clusterSpec := MustNewAutoscaleCluster(t, k8s, couchbaseOptions)
 
+	// Create the metric server for metric generation
+	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name, istioEnabled)
+
+	// Wait for the metrics to register
+	time.Sleep(20 * time.Second)
 	// Create HPA to target specified metric
 	for i, serverConfig := range clusterSpec.Spec.Servers {
 		// HPA references CouchbaseAutoscaler reference which must exist
@@ -49,9 +54,6 @@ func MustNewHPAManager(t *testing.T, k8s *types.Cluster, couchbaseOptions *e2esp
 
 		MustCreateAverageValueHPA(t, k8s, clusterSpec.Namespace, autoscalerName, config)
 	}
-
-	// Create the metric server for metric generation
-	cleanup := MustCreateCustomMetricServer(t, k8s, clusterSpec.Namespace, clusterSpec.Name, istioEnabled)
 
 	return &HPAManager{
 		CouchbaseCluster: clusterSpec,

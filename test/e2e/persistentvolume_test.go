@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const VolumeExpansionWaitTimeout = 10 * time.Minute
+
 // This will create a Persistent volume claim data
 // for adding into the cluster CRD.
 func createPersistentVolumeClaimSpec(storageClass string, pvcName string, lpv bool, resourceQtyVal int64) couchbasev2.PersistentVolumeClaimTemplate {
@@ -87,8 +89,8 @@ func mustVerifyPvcMappingForPods(t *testing.T, k8s *types.Cluster, expectedPvcMa
 	}
 }
 
-func mustVerifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int) {
-	if err := verifyPvcPerPod(t, k8s, clusterName, expectedPods); err != nil {
+func mustVerifyPvcPerPod(t *testing.T, k8s *types.Cluster, clusterName string, expectedPods int, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, func() error { return verifyPvcPerPod(t, k8s, clusterName, expectedPods) }); err != nil {
 		e2eutil.Die(t, err)
 	}
 }
@@ -195,7 +197,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 	// When ready terminate the victims, expect the Operator auto recover the nodes.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim1, false)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim2, false)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim1), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events are as expected:
@@ -207,20 +209,7 @@ func TestPersistentVolumeAutoRecovery(t *testing.T) {
 		eventschema.AnyOf{
 			Validators: []eventschema.Validatable{
 				e2eutil.PodDownWithPVCRecoverySequence(clusterSize, 2),
-				eventschema.Sequence{
-					Validators: []eventschema.Validatable{
-						eventschema.Repeat{
-							Times:     2,
-							Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-						},
-						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
-						eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
-						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
-						eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-					},
-				},
+				e2eutil.PodFailedOverWithPVCRecoverySequence(2),
 			},
 		},
 	}
@@ -808,7 +797,7 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 
 	// Verify resize state
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Events indirectly verify that upgrade did not occur
 	// since no scale up events should be present
@@ -871,16 +860,16 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, VolumeExpansionWaitTimeout)
 	// Verify index service volumes are still 2Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(2)
 	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
 	// Scale index service volumes to 4Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(4)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/1/spec/resources/requests/storage", requestedQuantity), time.Minute)
 	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 6*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
@@ -928,11 +917,11 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, VolumeExpansionWaitTimeout)
 	// Verify index service volumes are still 2Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(2)
 	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
@@ -981,7 +970,7 @@ func TestOnlinePersistentVolumeResizeNop(t *testing.T) {
 	requestedQuantity := e2espec.NewResourceQuantityGi(2)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Verify events
 	expectedEvents := []eventschema.Validatable{
@@ -1030,7 +1019,7 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 
 	// Verify resize state
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 5*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Check all docs were added during resize
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -1089,7 +1078,7 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Verify resize state
-	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, 10*time.Minute)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Verify pod recovery during expansion events
 	expectedEvents := []eventschema.Validatable{

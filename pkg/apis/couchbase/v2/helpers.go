@@ -1005,6 +1005,7 @@ var clusterRoles = []RoleName{
 	RoleExternalStatsReader,
 	RoleEventingAdmin,
 	RoleEventingManageFunctions,
+	RoleSyncDevOps,
 }
 
 // bucketRoles can be bucket scoped.
@@ -1047,7 +1048,6 @@ var collectionRoles = []RoleName{
 	RoleSyncGatewayApplication,
 	RoleSyncGatewayApplicationReadOnly,
 	RoleSyncGatewayArchitect,
-	RoleSyncDevOps,
 	RoleSyncReplicator,
 	RoleQueryUseSequentialScans,
 }
@@ -1190,6 +1190,26 @@ func (c *CouchbaseCluster) IsAtLeastVersion(v string) (bool, error) {
 	}
 
 	tag, err := couchbaseutil.CouchbaseImageVersion(lowestImage)
+	if err != nil {
+		return false, err
+	}
+
+	available, err := couchbaseutil.VersionAfter(tag, v)
+	if err != nil {
+		return false, err
+	}
+
+	return available, nil
+}
+
+// Checks cluster version is above minimum version requirement.
+func (c *CouchbaseCluster) HighestIsAtLeastVersion(v string) (bool, error) {
+	image, err := c.Spec.HighestInUseCouchbaseVersionImage()
+	if err != nil {
+		return false, err
+	}
+
+	tag, err := couchbaseutil.CouchbaseImageVersion(image)
 	if err != nil {
 		return false, err
 	}
@@ -1603,6 +1623,40 @@ func (l CloudNativeGatewayDataAPIProxyServiceList) StringSlice() []string {
 	}
 
 	return out
+}
+
+// canHibernate checks if the cluster be hibernated. If we cannot hibernate, this method should return false and a reason why.
+func (c *CouchbaseCluster) CanHibernate() (bool, string) {
+	// Check if cluster is migrating
+	if c.IsMigrationCluster() {
+		return false, "Cluster is a migration cluster"
+	}
+
+	if c.HasCondition(ClusterConditionUpgrading) {
+		return false, "Cluster is upgrading"
+	}
+
+	if c.HasCondition(ClusterConditionBucketMigration) {
+		return false, "Cluster is migrating buckets"
+	}
+
+	if c.HasCondition(ClusterConditionScaling) {
+		return false, "Cluster is scaling"
+	}
+
+	if !c.HasCondition(ClusterConditionBalanced) {
+		return false, "Cluster is unbalanced"
+	}
+
+	if !c.HasCondition(ClusterConditionAvailable) {
+		return false, "Cluster is unavailable"
+	}
+
+	return true, ""
+}
+
+func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
+	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
 }
 
 // IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).

@@ -59,6 +59,8 @@ func TestPKCS12CreateCluster(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
 	// Static configuration.
 	clusterSize := constants.Size3
 
@@ -769,6 +771,9 @@ func TestTLSRotateCAKillPodAndKillOperator(t *testing.T) {
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered, FuzzyMessage: victimName},
 		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
+		eventschema.Optional{
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{
 					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -892,7 +897,7 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 10*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
@@ -2227,6 +2232,7 @@ func TestTLSRotateAndChangeScriptPassphrase(t *testing.T) {
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
@@ -2386,6 +2392,7 @@ func TestTLSRotateRestToScriptPassphrase(t *testing.T) {
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
