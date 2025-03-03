@@ -113,7 +113,7 @@ The Operator provides the capability to control the upgrade process by upgrading
 Whilst performing a controlled upgrade the cluster will be in a mixed state with different versions of Couchbase Server running at the same time. This time should be kept to a minimum to avoid potential issues with the cluster.
 
 ==== How to Perform a Controlled Upgrade
-To perform a controlled upgrade you need to first mofify the CouchbaseCluster Image to specify the image that you want to upgrade to. This can be done by updating the `spec.image` field in the CouchbaseCluster manifest. You can then specify the server classes that you want to upgrade first by updating the `spec.servers.image` to the older image for the server classes you dont want to be upgraded first. You can explicitly update `spec.servers.image` for the server classes that you want to upgrade first, alternatively if the image is not specified for a server class then the image specified in `spec.image` will be used.
+To perform a controlled upgrade you need to first modify the CouchbaseCluster Image to specify the image that you want to upgrade to. This can be done by updating the `spec.image` field in the CouchbaseCluster manifest. You can then specify the server classes that you want to upgrade first by updating the `spec.servers.image` to the older image for the server classes you do not want to be upgraded first. You can explicitly update `spec.servers.image` for the server classes that you want to upgrade first, alternatively if the image is not specified for a server class then the image specified in `spec.image` will be used.
 
 .Example `CouchbaseCluster` Resource with three Server Classes
 [source,yaml]
@@ -289,7 +289,7 @@ spec:
         - query
 ----
 
-<.> During a controlled rollback the cluster image should stay as the version that was being upgraded to. If this is changed to the older version then the cluster will all be rolled back to the older version without controll over the server classe order.
+<.> During a controlled rollback the cluster image should stay as the version that was being upgraded to. If this is changed to the older version then the cluster will all be rolled back to the older version without control over the server class order.
 
 <.> The image for the query server class is set to the older version indicating that the query nodes should be rolled back next.
 

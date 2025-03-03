@@ -30,6 +30,8 @@ gopath
 /venv/
 scripts/venv/
 /node-*/
+lib/
+pyvenv.cfg
 
 *terraform.*
 package-lock.json
