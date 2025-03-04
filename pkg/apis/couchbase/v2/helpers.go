@@ -1330,7 +1330,7 @@ func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) Couchbase
 		return b.getStorageBackend()
 	}
 
-	if !magmaSupported {
+	if !magmaSupported || b.IsSampleBucket() {
 		return CouchbaseStorageBackendCouchstore
 	}
 
