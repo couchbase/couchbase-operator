@@ -14,13 +14,13 @@ See xref:concept-migration.adoc[Couchbase Cluster Migration] for more details.
 The Dynamic Admission Controller (DAC) will now warn if any cluster settings don't match our xref:best-practices.adoc#production-deployments[Best Practices for Production Deployments].
 
 The DAC will now prevent changes to the `CouchbaseCluster` spec while a hibernation is taking place.
-If hibernation is enabled while a cluster is migrating, upgrading, scaling or rebalancing, that process will conclude before the cluster enters hibernation. The DAC will warn when this is the case, and it will be visible in the operator logs.
+If hibernation is enabled while a cluster is migrating, upgrading, scaling, or rebalancing, that process will conclude before the cluster enters hibernation. The DAC will warn when this is the case, and it will be visible in the operator logs.
 
 To prevent any invalid resources failing to reconcile (i.e. if the DAC is not deployed in the current environment), the DAC Validation is now run at the beginning of the reconciliation loop.
-Any invalid resources will be skipped for reconciliation, marked as `NotValid` and logged.
+Any invalid resources will be skipped for reconciliation, marked as `NotValid`, and logged.
 
 == Miscellaneous Improvements
 
 * Pod Disruption Budgets can now be set per-Server Class by enabling xref:resource/couchbasecluster.adoc#couchbaseclusters-spec-perserviceclasspdb[`couchbaseclusters.spec.perServiceClassPDB`].
 * Sample Buckets can now be loaded via the xref:resource/couchbasebucket.adoc[`CouchbaseBucket`] resource, by using the xref:reference-annotations.adoc#cao-couchbase-comsamplebucket[`cao.couchbase.com/sampleBucket`] annotation.
-* Query-related RBAC roles (`query_use_sequential_scans`, `query_use_sequences`, and`query_manage_sequences`) have now been added to  xref:resource/couchbasegroup.adoc#couchbasegroups-spec-roles-name[`couchbasegroups.spec.roles.name`].
+* Query-related RBAC roles (`query_use_sequential_scans`, `query_use_sequences`, and `query_manage_sequences`) have now been added to  xref:resource/couchbasegroup.adoc#couchbasegroups-spec-roles-name[`couchbasegroups.spec.roles.name`].

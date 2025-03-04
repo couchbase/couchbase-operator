@@ -27,7 +27,6 @@ Refer to the xref:2.4@operator::howto-operator-upgrade.adoc[Operator 2.4 upgrade
 There are no additional upgrade steps when upgrading from these versions, and you may follow the xref:howto-operator-upgrade.adoc[standard upgrade process].
 
 For further information read the xref:concept-upgrade.adoc[Couchbase Upgrade] concepts page.
-====
 
 [#release-v280]
 == Release 2.8.0
