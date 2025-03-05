@@ -339,7 +339,7 @@ metadata:
   name: cluster
   namespace: default
 spec:
-  image: couchbase/server:7.0.0
+  image: couchbase/server:7.0.1
   antiAffinity: false
   paused: false
   upgradeStrategy: RollingUpgrade
@@ -532,6 +532,10 @@ spec:
     prometheus:
       enabled: true
       image: couchbase/exporter:6.6.6
+status:
+  currentVersion: 7.0.1
+  size: 5
+
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBackup

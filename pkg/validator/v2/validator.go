@@ -2941,8 +2941,15 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 			namespacedClusters = allClusters
 		}
 
-		for i := range namespacedClusters.Items {
-			clusters = append(clusters, &namespacedClusters.Items[i])
+		for i, cluster := range namespacedClusters.Items {
+			clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+			if err != nil {
+				return err
+			}
+
+			if clusterBucketSelector.Matches(labels.Set(bucket.GetLabels())) {
+				clusters = append(clusters, &namespacedClusters.Items[i])
+			}
 		}
 	case *couchbasev2.CouchbaseCluster:
 		clusters = append(clusters, t)

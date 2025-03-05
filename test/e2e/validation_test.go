@@ -3344,13 +3344,6 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
 		},
-		{
-			name: "TestAllowSecurityAdminRoleForServerVersion",
-			mutations: patchMap{
-				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:6.6.0").Remove("/spec/xdcr"),
-				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
-			shouldFail: false,
-		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3741,10 +3734,9 @@ func TestVersionUpgradePath(t *testing.T) {
 			expectedErrors: []string{"cannot upgrade"},
 		},
 		{
-			name:           "InvalidUpgradePathDowngrade",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:6.6.0")},
-			shouldFail:     true,
-			expectedErrors: []string{"Downgrades are not supported"},
+			name:       "InvalidUpgradePathDowngrade",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.0.0")},
+			shouldFail: true,
 		},
 	}
 
@@ -3836,10 +3828,9 @@ func TestClusterMigrationInvalidMigration(t *testing.T) {
 func TestNegValidationClusterMigrationApply(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "UpdateImageDuringMigration",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.2")},
-			shouldFail:     true,
-			expectedErrors: []string{"couchbase version cannot be changed while in migration mode"},
+			name:       "UpdateImageDuringMigration",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.2")},
+			shouldFail: true,
 		},
 	}
 

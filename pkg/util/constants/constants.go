@@ -199,9 +199,9 @@ const (
 	// CommunityEditionImage is a version of CE that exists.  Sadly we have to
 	// hard code this (not do a regex replace) as this only gets major releases,
 	// mo minors or patches.
-	CommunityEditionImage = "couchbase/server:community-6.6.0"
+	CommunityEditionImage = "couchbase/server:community-" + CouchbaseVersionMin
 	// InvalidBaseImage is an invalid/nonexistant base image used for testing.
-	InvalidBaseImage = "basecouch/123:enterprise-6.6.2"
+	InvalidBaseImage = "basecouch/123:enterprise-" + CouchbaseVersionMin
 
 	// MinimumCouchbaseVersionForCNG is the minimum CB version for CNG support.
 	MinimumCouchbaseVersionForCNG = "7.2.2"
