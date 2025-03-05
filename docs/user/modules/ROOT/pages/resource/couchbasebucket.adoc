@@ -127,14 +127,14 @@ DatabaseFragmentationThreshold defines triggers for when database compaction sho
 
 *Type*: `integer`
 
-*Minimum*: `0`
+*Minimum*: `2`
 
 *Maximum*: `100`
 
 ==== Description
 
 Percent specifies the level of view fragmentation that must be reached for View compaction to be automatically triggered.
-This field must be in the range 0-100, defaulting to the cluster level value.
+This field must be in the range 2-100, defaulting to the cluster level value.
 
 === couchbasebuckets.spec.autoCompaction.databaseFragmentationThreshold.size
 
@@ -223,14 +223,14 @@ ViewFragmentationThreshold defines triggers for when view compaction should star
 
 *Type*: `integer`
 
-*Minimum*: `0`
+*Minimum*: `2`
 
 *Maximum*: `100`
 
 ==== Description
 
 Percent specifies the percentage level of View fragmentation that must be reached for View compaction to be automatically triggered on the bucket
-This field must be in the range 0-100, defaulting to the cluster level value.
+This field must be in the range 2-100, defaulting to the cluster level value.
 
 === couchbasebuckets.spec.autoCompaction.viewFragmentationThreshold.size
 

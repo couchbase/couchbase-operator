@@ -2201,6 +2201,30 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{`autoCompaction.timeWindow.start: Invalid value`},
 		},
 		{
+			name:           "TestValidateBucketAutoCompactionDatabaseFragmentationThresholdSizeZero",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{DatabaseFragmentationThreshold: &couchbasev2.DatabaseFragmentationThresholdBucket{Size: k8sutil.NewResourceQuantityMi(0)}})},
+			shouldFail:     true,
+			expectedErrors: []string{`autoCompaction.databaseFragmentationThreshold.size should be greater than 0Mi`},
+		},
+		{
+			name:           "TestValidateBucketAutoCompactionDatabaseFragmentationThresholdSizeNegative",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{DatabaseFragmentationThreshold: &couchbasev2.DatabaseFragmentationThresholdBucket{Size: k8sutil.NewResourceQuantityMi(-1)}})},
+			shouldFail:     true,
+			expectedErrors: []string{`autoCompaction.databaseFragmentationThreshold.size should be greater than 0Mi`},
+		},
+		{
+			name:           "TestValidateBucketAutoCompactionViewFragmentationThresholdSizeZero",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{ViewFragmentationThreshold: &couchbasev2.ViewFragmentationThresholdBucket{Size: k8sutil.NewResourceQuantityMi(0)}})},
+			shouldFail:     true,
+			expectedErrors: []string{`autoCompaction.viewFragmentationThreshold.size should be greater than 0Mi`},
+		},
+		{
+			name:           "TestValidateBucketAutoCompactionViewFragmentationThresholdSizeNegative",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{ViewFragmentationThreshold: &couchbasev2.ViewFragmentationThresholdBucket{Size: k8sutil.NewResourceQuantityMi(-1)}})},
+			shouldFail:     true,
+			expectedErrors: []string{`autoCompaction.viewFragmentationThreshold.size should be greater than 0Mi`},
+		},
+		{
 			name: "TestValidateSampleBucketConflictResolutionInvalid",
 			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
 				Add("/metadata/annotations", map[string]string{

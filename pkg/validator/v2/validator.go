@@ -1606,6 +1606,18 @@ func checkConstraintAutoCompactionBucket(autoCompaction *couchbasev2.AutoCompact
 		}
 	}
 
+	if autoCompaction.DatabaseFragmentationThreshold != nil && autoCompaction.DatabaseFragmentationThreshold.Size != nil {
+		if autoCompaction.DatabaseFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(1)) <= 0 {
+			return fmt.Errorf("autoCompaction.databaseFragmentationThreshold.size should be greater than 0Mi")
+		}
+	}
+
+	if autoCompaction.ViewFragmentationThreshold != nil && autoCompaction.ViewFragmentationThreshold.Size != nil {
+		if autoCompaction.ViewFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(1)) <= 0 {
+			return fmt.Errorf("autoCompaction.viewFragmentationThreshold.size should be greater than 0Mi")
+		}
+	}
+
 	return checkConstraintAutoCompactionPurgeInterval(autoCompaction.TombstonePurgeInterval)
 }
 

@@ -3600,8 +3600,8 @@ type ViewFragmentationThreshold struct {
 // DatabaseFragmentationThresholdBucket lists triggers for when database compaction at the bucket level. This has different defaults and documentation than cluster level.
 type DatabaseFragmentationThresholdBucket struct {
 	// Percent specifies the level of view fragmentation that must be reached for View compaction to be automatically triggered.
-	// This field must be in the range 0-100, defaulting to the cluster level value.
-	// +kubebuilder:validation:Minimum=0
+	// This field must be in the range 2-100, defaulting to the cluster level value.
+	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
@@ -3615,8 +3615,8 @@ type DatabaseFragmentationThresholdBucket struct {
 // ViewFragmentationThresholdBucket lists triggers for when view compaction should start at the bucket level. This has different defaults and documentation than cluster level.
 type ViewFragmentationThresholdBucket struct {
 	// Percent specifies the percentage level of View fragmentation that must be reached for View compaction to be automatically triggered on the bucket
-	// This field must be in the range 0-100, defaulting to the cluster level value.
-	// +kubebuilder:validation:Minimum=0
+	// This field must be in the range 2-100, defaulting to the cluster level value.
+	// +kubebuilder:validation:Minimum=2
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
 
