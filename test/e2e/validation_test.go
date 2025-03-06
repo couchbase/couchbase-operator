@@ -1266,13 +1266,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			name:           "TestValidateAutoCompactionInvalidStartEqualsEnd",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "07:30")},
 			shouldFail:     true,
-			expectedErrors: []string{`autoCompaction.timeWindow.start`},
-		},
-		{
-			name:           "TestValidateAutoCompactionInvalidStartAfterEnd",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "08:00")},
-			shouldFail:     true,
-			expectedErrors: []string{`autoCompaction.timeWindow.start`},
+			expectedErrors: []string{`autoCompaction.timeWindow.start cannot be the same as autoCompaction.timeWindow.end`},
 		},
 		{
 			name:           "TestValidateAutoCompactionInvalidStartMissing",

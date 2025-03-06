@@ -1607,13 +1607,13 @@ func checkConstraintAutoCompactionBucket(autoCompaction *couchbasev2.AutoCompact
 	}
 
 	if autoCompaction.DatabaseFragmentationThreshold != nil && autoCompaction.DatabaseFragmentationThreshold.Size != nil {
-		if autoCompaction.DatabaseFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(1)) <= 0 {
+		if autoCompaction.DatabaseFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
 			return fmt.Errorf("autoCompaction.databaseFragmentationThreshold.size should be greater than 0Mi")
 		}
 	}
 
 	if autoCompaction.ViewFragmentationThreshold != nil && autoCompaction.ViewFragmentationThreshold.Size != nil {
-		if autoCompaction.ViewFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(1)) <= 0 {
+		if autoCompaction.ViewFragmentationThreshold.Size.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
 			return fmt.Errorf("autoCompaction.viewFragmentationThreshold.size should be greater than 0Mi")
 		}
 	}
@@ -1632,21 +1632,7 @@ func checkConstraintAutoCompactionTimeWindow(timeWindow couchbasev2.TimeWindow) 
 
 		// cluster will not start if start and end times are the same
 		if *timeWindow.Start == *timeWindow.End {
-			return fmt.Errorf("autoCompaction.timeWindow.start in body cannot be the same as timeWindow.end")
-		}
-
-		// parse out hours and minutes.
-		// the crd already validates the format is HH:MM
-		startWindow := strings.Split(*timeWindow.Start, ":")
-		startHH, _ := strconv.Atoi(startWindow[0])
-		startMM, _ := strconv.Atoi(startWindow[1])
-		endWindow := strings.Split(*timeWindow.End, ":")
-		endHH, _ := strconv.Atoi(endWindow[0])
-		endMM, _ := strconv.Atoi(endWindow[1])
-
-		// start must be before end
-		if startHH*60+startMM > endHH*60+endMM {
-			return fmt.Errorf("autoCompaction.timeWindow.start in body must be less than timeWindow.end")
+			return fmt.Errorf("autoCompaction.timeWindow.start cannot be the same as autoCompaction.timeWindow.end")
 		}
 	} else if timeWindow.End != nil {
 		// cannot have end without start
