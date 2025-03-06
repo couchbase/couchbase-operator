@@ -2914,6 +2914,10 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 			return fmt.Errorf("failed to type assert bucket to abstract bucket")
 		}
 
+		if len(bucket.GetName()) > 100 {
+			return fmt.Errorf("bucket name %s exceeds the maximum length of 100 characters", bucket.GetName())
+		}
+
 		var namespacedClusters = new(couchbasev2.CouchbaseClusterList)
 
 		if cluster != nil {
