@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,7 +22,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
 					AutoFailoverMaxCount: 2,
-					AutoCompaction:       &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},
@@ -38,7 +38,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 					AutoFailoverMaxCount:                   1,
 					AutoFailoverOnDataDiskIssues:           false,
 					AutoFailoverOnDataDiskIssuesTimePeriod: &metav1.Duration{Duration: 120 * time.Second},
-					AutoCompaction:                         &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},
@@ -53,7 +52,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 				AntiAffinity: false,
 				ClusterSettings: v2.ClusterConfig{
 					AutoFailoverMaxCount: 2,
-					AutoCompaction:       &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},
@@ -69,7 +67,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingMemoryOptimized,
 					},
 					AutoFailoverMaxCount: 2,
-					AutoCompaction:       &v2.AutoCompaction{},
 				},
 				AntiAffinity: true,
 			},
@@ -79,8 +76,7 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			name: "spec.cluster.indexer.storageMode is not plasma by default",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction: &v2.AutoCompaction{},
-					Indexer:        nil,
+					Indexer: nil,
 				},
 				AntiAffinity: true,
 			},
@@ -93,7 +89,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 					Synchronize: true,
 				},
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction: &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},
@@ -103,12 +98,20 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"spec.buckets.synchronize"},
 		},
 		{
-			name: "spec.cluster.autoCompaction is nil",
+			name: "spec.cluster.autoCompaction settings left as defaults",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction: nil,
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
+					},
+					AutoCompaction: &v2.AutoCompaction{
+						DatabaseFragmentationThreshold: v2.DatabaseFragmentationThreshold{
+							Percent: util.IntPtr(30),
+						},
+						ViewFragmentationThreshold: v2.ViewFragmentationThreshold{
+							Percent: util.IntPtr(30),
+						},
+						TombstonePurgeInterval: &metav1.Duration{Duration: 72 * time.Hour},
 					},
 				},
 				AntiAffinity: true,
@@ -116,13 +119,21 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"spec.cluster.autoCompaction"},
 		},
 		{
-			name: "spec.cluster.autoCompaction is nil and spec.antiAffinity is disabled",
+			name: "spec.cluster.autoCompaction left as defaults and spec.antiAffinity is disabled",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction:       nil,
 					AutoFailoverMaxCount: 2,
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
+					},
+					AutoCompaction: &v2.AutoCompaction{
+						DatabaseFragmentationThreshold: v2.DatabaseFragmentationThreshold{
+							Percent: util.IntPtr(30),
+						},
+						ViewFragmentationThreshold: v2.ViewFragmentationThreshold{
+							Percent: util.IntPtr(30),
+						},
+						TombstonePurgeInterval: &metav1.Duration{Duration: 72 * time.Hour},
 					},
 				},
 				AntiAffinity: false,
@@ -133,7 +144,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			name: "spec.servers.volumeMounts logs are not set",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction: &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},
@@ -154,7 +164,6 @@ func TestCheckFieldsCouchbaseCluster(t *testing.T) {
 			name: "spec.servers.volumeMounts log claim is set",
 			clusterSpec: v2.ClusterSpec{
 				ClusterSettings: v2.ClusterConfig{
-					AutoCompaction: &v2.AutoCompaction{},
 					Indexer: &v2.CouchbaseClusterIndexerSettings{
 						StorageMode: v2.CouchbaseClusterIndexStorageSettingStandard,
 					},

@@ -2,8 +2,11 @@ package validator
 
 import (
 	"fmt"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // checkFieldsCouchbaseCluster will return a slice of strings, each representing a warning that should not block
@@ -27,8 +30,8 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 		warnings = append(warnings, "CouchbaseCluster spec.buckets.synchronize is enabled. This is intended for development and should not be used for production clusters.")
 	}
 
-	if cluster.Spec.ClusterSettings.AutoCompaction == nil {
-		warnings = append(warnings, "CouchbaseCluster spec.cluster.autoCompaction settings have not been configured. It is recommended these are used for production clusters.")
+	if checkAutoCompactionDefaults(cluster.Spec.ClusterSettings.AutoCompaction) {
+		warnings = append(warnings, "CouchbaseCluster spec.cluster.autoCompaction settings have been left as their defaults. It is recommended these are tuned for production clusters.")
 	}
 
 	if !checkLogVolumeMountConfigured(cluster.Spec.Servers) {
@@ -43,6 +46,10 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 	}
 
 	return warnings
+}
+
+func checkAutoCompactionDefaults(autoCompaction *couchbasev2.AutoCompaction) bool {
+	return autoCompaction != nil && *autoCompaction.DatabaseFragmentationThreshold.Percent == 30 && *autoCompaction.ViewFragmentationThreshold.Percent == 30 && autoCompaction.DatabaseFragmentationThreshold.Size == nil && autoCompaction.ViewFragmentationThreshold.Size == nil && *autoCompaction.TombstonePurgeInterval == metav1.Duration{Duration: 72 * time.Hour}
 }
 
 func checkAutoFailoverDefaults(clusterSettings couchbasev2.ClusterConfig) bool {

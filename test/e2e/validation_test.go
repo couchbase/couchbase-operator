@@ -3743,6 +3743,19 @@ func TestVersionUpgradePath(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
 }
 
+func TestCouchbaseClusterWarnings(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:             "TestAutoCompactionDefaultsWarning",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction")},
+			shouldFail:       false,
+			expectedWarnings: []string{"CouchbaseCluster spec.cluster.autoCompaction settings have been left as their defaults. It is recommended these are tuned for production clusters."},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
 func TestHibernationChangeConstraints(t *testing.T) {
 	testDefs := []testDef{
 		{
