@@ -139,7 +139,7 @@ func (c *Cluster) reconcileMigrationCluster() error {
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
 
 	c.cluster.Status.Size = c.members.Size()
-	log.Info("Migration cluster reconciled", "cluster", c.namespacedName(), "members", c.members)
+	log.Info("Migration cluster reconciled", "cluster", c.namespacedName(), "members", c.members.Names())
 	c.cluster.Status.SetBalancedCondition()
 
 	return nil
@@ -295,6 +295,9 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 	allManagedMembers := r.getManagedK8sMembers()
 	allManagedClustedMembers := r.clusteredMembers.Intersect(allManagedMembers)
 
+	allUnmanagedMembers := r.externalMembers
+	allUnmanagedClusteredMembers := r.clusteredMembers.Intersect(allUnmanagedMembers)
+
 	for _, serverSpec := range c.cluster.Spec.Servers {
 		// Check to see if we need to remove anything
 		members := r.clusteredMembers.GroupByServerConfig(serverSpec.Name)
@@ -307,8 +310,9 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 		}
 
 		managedMembers := allManagedClustedMembers.GroupByServerConfig(serverSpec.Name)
+		unmanagedMembers := allUnmanagedClusteredMembers.GroupByServerConfig(serverSpec.Name)
 
-		if managedMembers.Size() < nodesToRemove {
+		if (managedMembers.Size() + unmanagedMembers.Size()) < nodesToRemove {
 			nodesToRemove = managedMembers.Size()
 		}
 
@@ -328,13 +332,27 @@ func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {
 	c.cluster.Status.SetScalingDownCondition(scheduledScaling.BuildMessage())
 
 	for _, serverSpec := range deletions {
-		server, err := c.scheduler.Delete(serverSpec.Name)
-		if err != nil {
-			return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
+		// Remove unmanaged first as they need to get ejected anyway
+		unmanagedMembers := allUnmanagedClusteredMembers.GroupByServerConfig(serverSpec.Name)
+
+		var server string
+
+		if unmanagedMembers.Size() > 0 {
+			server = unmanagedMembers.Names()[0]
+		}
+
+		if server == "" {
+			var err error
+
+			server, err = c.scheduler.Delete(serverSpec.Name)
+			if err != nil {
+				return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
+			}
 		}
 
 		if m := c.members[server]; m != nil {
 			r.removeMemberUser(m)
+			allUnmanagedClusteredMembers.Remove(m.Name())
 		}
 	}
 
