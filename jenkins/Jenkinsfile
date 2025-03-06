@@ -3,6 +3,10 @@ pipeline {
     label 'docker'
   }
 
+  options {
+    timestamps()
+  }
+
   environment {
     GOBIN = "${env.WORKSPACE}/bin"
     GOVERSION = '1.22.1'
