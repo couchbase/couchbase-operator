@@ -116,17 +116,18 @@ const (
 	LabelServicePrefix      = "couchbase_service_"
 	LabelCloudNativeGateway = "couchbase_cloud_native_gateway"
 
-	AnnotationVolumeNodeConf             = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
-	AnnotationVolumeMountPath            = "path"
-	AnnotationVolumeMountSubPaths        = "subpaths" // Additional paths associated with mount (internal use by only)
-	AnnotationPrometheusScrape           = "prometheus.io/scrape"
-	AnnotationPrometheusPath             = "prometheus.io/path"
-	AnnotationPrometheusPort             = "prometheus.io/port"
-	AnnotationPrometheusScheme           = "prometheus.io/scheme"
-	AnnotationReschedule                 = "cao.couchbase.com/reschedule"
-	AnnotationUnreconcilable             = "dac.couchbase.com/unreconcilable"
-	AnnotationSkipDACValidation          = "dac.couchbase.com/skipvalidation"
-	AnnotationDisableAdmissionController = "dac.couchbase.com/skipDAC"
+	AnnotationVolumeNodeConf                  = "serverConfig" // TODO: perhaps change to LabelNodeConf for parity?
+	AnnotationVolumeMountPath                 = "path"
+	AnnotationVolumeMountSubPaths             = "subpaths" // Additional paths associated with mount (internal use by only)
+	AnnotationPrometheusScrape                = "prometheus.io/scrape"
+	AnnotationPrometheusPath                  = "prometheus.io/path"
+	AnnotationPrometheusPort                  = "prometheus.io/port"
+	AnnotationPrometheusScheme                = "prometheus.io/scheme"
+	AnnotationReschedule                      = "cao.couchbase.com/reschedule"
+	AnnotationUnreconcilable                  = "dac.couchbase.com/unreconcilable"
+	AnnotationSkipDACValidation               = "dac.couchbase.com/skipvalidation"
+	AnnotationDisableAdmissionController      = "dac.couchbase.com/skipDAC"
+	AnnotationSkipClusterNameLengthValidation = "dac.couchbase.com/skipClusterNameLengthValidation"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion

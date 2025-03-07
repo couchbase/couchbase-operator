@@ -718,6 +718,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"unsupported Couchbase version: 6.6.5, minimum version required: 7.0.0"},
 		},
+		{
+			name: "TestInvalidCouchbaseClusterNameTooLong",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/metadata/name", "this-cluster-name-is-43-characters-long-now")},
+			shouldFail:     true,
+			expectedErrors: []string{"cluster name this-cluster-name-is-43-characters-long-now cannot be longer than 42 characters"},
+		},
+		{
+			name: "TestInvalidCouchbaseClusterGenerateNameTooLong",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Remove("/metadata/name").Add("/metadata/generateName", "this-generated-name-will-be-too-long-now")},
+			shouldFail:     true,
+			expectedErrors: []string{" cannot be longer than 42 characters"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

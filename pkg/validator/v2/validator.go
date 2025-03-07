@@ -162,8 +162,12 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 }
 
 func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if len(cluster.Name) > 58 {
-		return fmt.Errorf("cluster name must be less than 58 characters")
+	if checkAnnotationSkipClusterNameLengthValidation(cluster.Annotations) {
+		return nil
+	}
+
+	if len(cluster.Name) > 42 {
+		return fmt.Errorf("cluster name %s cannot be longer than 42 characters", cluster.Name)
 	}
 
 	return nil
@@ -2953,10 +2957,6 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 			return fmt.Errorf("failed to type assert bucket to abstract bucket")
 		}
 
-		if len(bucket.GetName()) > 100 {
-			return fmt.Errorf("bucket name %s exceeds the maximum length of 100 characters", bucket.GetName())
-		}
-
 		var namespacedClusters = new(couchbasev2.CouchbaseClusterList)
 
 		if cluster != nil {
@@ -4316,7 +4316,15 @@ func checkChangeConstraintsHibernate(current, updated *couchbasev2.CouchbaseClus
 }
 
 func checkAnnotationSkipValidation(annotations map[string]string) bool {
-	value, found := annotations[constants.AnnotationDisableAdmissionController]
+	return checkAnnotationTrue(annotations, constants.AnnotationDisableAdmissionController)
+}
+
+func checkAnnotationSkipClusterNameLengthValidation(annotations map[string]string) bool {
+	return checkAnnotationTrue(annotations, constants.AnnotationSkipClusterNameLengthValidation)
+}
+
+func checkAnnotationTrue(annotations map[string]string, annotation string) bool {
+	value, found := annotations[annotation]
 	if found {
 		return strings.EqualFold(value, "true")
 	}
