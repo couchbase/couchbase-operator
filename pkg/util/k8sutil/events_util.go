@@ -102,6 +102,10 @@ const (
 	// Note, this is kept artificially vague as flooding the system with thousands
 	// of events won't win us any fans.
 	EventScopesAndCollectionsUpdated = "EventScopesAndCollectionsUpdated"
+
+	// Hibernation.
+	EventReasonHibernationStarted = "HibernationStarted"
+	EventReasonHibernationEnded   = "HibernationEnded"
 )
 
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
@@ -618,6 +622,24 @@ func NetworkSettingsModifiedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventNetworkSettingsModified
 	event.Message = "Network settings were updated"
+
+	return event
+}
+
+func HibernationStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonHibernationStarted
+	event.Message = "Cluster entered hibernation"
+
+	return event
+}
+
+func HibernationEndedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonHibernationEnded
+	event.Message = "Cluster left hibernation"
 
 	return event
 }

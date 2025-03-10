@@ -1090,6 +1090,7 @@ func (c *Cluster) hibernate() (bool, error) {
 			return false, nil
 		} else {
 			log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
+			c.raiseEvent(k8sutil.HibernationStartedEvent(c.cluster))
 		}
 	}
 

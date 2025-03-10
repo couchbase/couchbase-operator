@@ -98,6 +98,9 @@ func (c *Cluster) reconcile() error {
 		if hibernated, err := c.hibernate(); hibernated {
 			return err
 		}
+	} else if c.cluster.HasCondition(couchbasev2.ClusterConditionHibernating) {
+		// If the cluster has the hibernating condition but the flag is not set, the cluster is leaving hibernation.
+		c.raiseEvent(k8sutil.HibernationEndedEvent(c.cluster))
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionHibernating)

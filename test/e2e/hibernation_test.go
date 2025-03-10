@@ -7,6 +7,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -44,9 +45,13 @@ func TestHibernateEphemeralImmediate(t *testing.T) {
 
 	// Check the events match what we expect:
 	// * Cluster created
+	// * Cluster entered hibernation
+	// * Cluster left hibernation
 	// * Cluster recreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
@@ -85,9 +90,13 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 
 	// Check the events match what we expect:
 	// * Cluster created
+	// * Cluster entered hibernation
+	// * Cluster left hibernation
 	// * Cluster recovered
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(t, clusterSize, mdsGroupSize, mdsGroupSize, f.CouchbaseServerImage),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -131,10 +140,14 @@ func TestHibernateOccursAfterUpgrade(t *testing.T) {
 	// Validate the events match what we expect:
 	// * Cluster created
 	// * Cluster upgraded
+	// * Cluster entered hibernation
+	// * Cluster left hibernation
 	// * Cluster recreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		RollingUpgradeSequence(clusterSize, 1),
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
