@@ -435,7 +435,7 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 
 		log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 
-		if err := couchbaseutil.AddNode(url, c.username, c.password, services).RetryFor(retryPeriod).On(c.api, target); err != nil { // we're hitting this too hard i think so its erroring.
+		if err := c.AddNodeWithPodReadyCheck(memberResult.Member, url, services, target, retryPeriod); err != nil {
 			log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
 			memberResult.Err = err
 
@@ -468,6 +468,22 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 	}
 
 	return memberResults, nil
+}
+
+// AddNodeWithPodReadyCheck adds a node to the cluster but checks that the pod is ready before making the API call.
+func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url string, services couchbaseutil.ServiceList, target interface{}, retryPeriod time.Duration) error {
+	return retryutil.RetryUntilSuccess(retryPeriod, 1*time.Second, func() error {
+		pod, ok := c.k8s.Pods.Get(member.Name())
+		if !ok {
+			return fmt.Errorf("%w: pod not found", errors.ErrPodNotFound)
+		}
+
+		if !k8sutil.ArePodContainersReady(pod) {
+			return fmt.Errorf("%w: pod containers not ready", errors.ErrResourceRequired)
+		}
+
+		return couchbaseutil.AddNode(url, c.username, c.password, services).On(c.api, target)
+	})
 }
 
 // Destroys a Couchbase cluster member.
