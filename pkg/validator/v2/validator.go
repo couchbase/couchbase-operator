@@ -108,6 +108,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintDeltaRecoveryDeprecated,
+		checkConstraintServicelessOverAdminService,
 	}
 
 	var errs []error
@@ -4461,4 +4462,18 @@ func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.
 	}
 
 	return nil
+}
+
+// checkConstraintServicelessOverAdminService returns a warning if the AdminService is used, recommending
+// using a serviceless server class instead.
+func checkConstraintServicelessOverAdminService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	for _, server := range cluster.Spec.Servers {
+		for _, service := range server.Services {
+			if service == couchbasev2.AdminService {
+				return []string{fmt.Sprintf("Server class %s uses the admin service - it is recommended to use a serviceless server class ('[]') instead", server.Name)}, nil
+			}
+		}
+	}
+
+	return nil, nil
 }
