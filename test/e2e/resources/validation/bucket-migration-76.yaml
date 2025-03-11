@@ -21,7 +21,10 @@ spec:
         - eventing
         - analytics
   cluster:
-    dataServiceMemoryQuota: 4048Mi  
+    dataServiceMemoryQuota: 4048Mi
+status:
+  currentVersion: 7.6.0
+  size: 1
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
@@ -35,12 +38,12 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket2
-  annotations:
-    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"
 spec:
   storageBackend: magma
   memoryQuota: 1024Mi
   evictionPolicy: fullEviction
+  historyRetention:
+    collectionHistoryDefault: false
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseBucket

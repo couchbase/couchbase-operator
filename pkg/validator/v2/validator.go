@@ -268,8 +268,27 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 		return checkStringToUint(backend)
 	}
 
+	magmaStorageBackendSupported, err := cluster.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
+	checkDefaultStorageBackend := func(backend, annotation string) error {
+		if err := checkValidStorageBackend(backend, annotation); err != nil {
+			return err
+		}
+
+		if !magmaStorageBackendSupported {
+			if couchbasev2.CouchbaseStorageBackend(backend) == couchbasev2.CouchbaseStorageBackendMagma {
+				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
+			}
+		}
+
+		return checkValidStorageBackend(backend, annotation)
+	}
+
 	bucketAnnotations := map[string]func(string, string) error{
-		"cao.couchbase.com/buckets.defaultStorageBackend":               checkValidStorageBackend,
+		"cao.couchbase.com/buckets.defaultStorageBackend":               checkDefaultStorageBackend,
 		"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": targetUnmanagedBucketStorageBackendValidation,
 		"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       checkStringToBoolBucketAnnotation,
 		"cao.couchbase.com/buckets.maxConcurrentPodSwaps":               checkStringToUintBucketAnnotation,
@@ -4041,6 +4060,10 @@ func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchb
 				return err
 			}
 
+			if cluster.Status.CurrentVersion == "" {
+				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have current version 7.6.0 or greater")
+			}
+
 			currentVersionAfter76, err := couchbaseutil.VersionAfter(cluster.Status.CurrentVersion, "7.6.0")
 
 			if err != nil {
@@ -4194,6 +4217,14 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	magmaStorageBackendSupported, err := cluster.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
+	}
+
+	if !magmaStorageBackendSupported {
+		for _, cbBucket := range couchbaseBuckets.Items {
+			if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
+			}
+		}
 	}
 
 	// find if any bucket has storage backend as "magma"

@@ -2281,6 +2281,20 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"defined multiple times for cluster"},
 		},
+		{
+			name: "TestValidateCreateMagmaBucketInvalidVersion",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1024Mi").
+					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.0.0").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "2Gi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`magma storage backend requires Couchbase Server version 7.1.0 or later`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3567,8 +3581,7 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
 				}),
 				"bucket2": jsonpatch.NewPatchSet().
-					Replace("/spec/storageBackend", "couchstore").
-					Remove("/metadata/annotations"),
+					Replace("/spec/storageBackend", "couchstore"),
 			},
 			shouldFail: false,
 		},
@@ -3593,8 +3606,7 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			name: "TestBucketMigrationToCouchstoreInvalidAnnotation",
 			mutations: patchMap{
 				"bucket2": jsonpatch.NewPatchSet().
-					Replace("/spec/storageBackend", "couchstore").
-					Remove("/metadata/annotations")},
+					Replace("/spec/storageBackend", "couchstore")},
 			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true"},
 			shouldFail:     true,
 		},
@@ -3618,6 +3630,16 @@ func TestAnnotationValidation(t *testing.T) {
 					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
 				})},
 			shouldFail: false,
+		},
+		{
+			name: "TestClusterAnnotationsDefaultBackendMagmaInvalidVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.0.0").
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"magma storage backend requires Couchbase Server version 7.1.0 or later"},
 		},
 		{
 			name: "TestClusterAnnotationsBackendValuesInvalid",
@@ -3770,10 +3792,10 @@ func TestHibernationChangeConstraints(t *testing.T) {
 			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is upgrading"},
 		},
 		{
-			name:             "HibernateOnMigrationClusterExpectsWarning",
-			mutations:        patchMap{"cluster-migrating": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
-			shouldFail:       false,
-			expectedWarnings: []string{"but the cluster cannot enter hibernation: Cluster is a migration cluster"},
+			name:           "HibernateOnMigrationClusterExpectsWarning",
+			mutations:      patchMap{"cluster-migrating": jsonpatch.NewPatchSet().Replace("/spec/hibernate", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.hibernate cannot be enabled when spec.migration is configured"},
 		},
 		{
 			name:             "HibernateDuringBucketMigrationExpectsWarning",
