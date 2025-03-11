@@ -478,6 +478,23 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 			return fmt.Errorf("%w: pod not found", errors.ErrPodNotFound)
 		}
 
+		clusterInfo := couchbaseutil.ClusterInfo{}
+
+		// Check if the node is already added to the cluster. This can
+		// happen if the node was already added to the cluster but API
+		// call failed.
+		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, target); err != nil {
+			return err
+		}
+
+		// Check if node already exists in cluster
+		for _, node := range clusterInfo.Nodes {
+			if string(node.HostName) == url {
+				log.V(1).Info("node already exists in cluster", "hostname", url)
+				return nil
+			}
+		}
+
 		if !k8sutil.ArePodContainersReady(pod) {
 			return fmt.Errorf("%w: pod containers not ready", errors.ErrResourceRequired)
 		}
