@@ -1045,7 +1045,7 @@ to all existing buckets that have not had their auto-compaction settings individ
 
 ==== Description
 
-DatabaseFragmentationThreshold defines triggers for when database compaction should start.
+DatabaseFragmentationThreshold defines the default database fragmentation level to determine the point when compaction is triggered for buckets with a couchstore storage backend.
 
 === couchbaseclusters.spec.cluster.autoCompaction.databaseFragmentationThreshold.percent
 

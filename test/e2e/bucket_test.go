@@ -764,16 +764,16 @@ func TestUpdateSampleBucket(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings tests that auto-compaction settings configured at the bucket level are set on the couchbase bucket
-// and that editing and removing settings will be correctly reflected by the bucket.
-func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings(t *testing.T) {
+// TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend tests that auto-compaction settings configured at the bucket level are set on the couchbase bucket
+// and that editing and removing settings will be correctly reflected by the bucket when it has a couchstore storage backend.
+func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend(t *testing.T) {
 	// Platform configuration
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
 
 	clusterSize := constants.Size1
 
@@ -805,10 +805,11 @@ func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings(t *testing.T) {
 	// Initial requested bucket as CRD
 	bucket := &couchbasev2.CouchbaseBucket{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "couchbase-bucket-autocompaction",
+			Name: "couchbase-bucket-autocompaction-couchstore",
 		},
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			AutoCompaction: &crdAutoCompactionSettings,
+			StorageBackend: couchbasev2.CouchbaseStorageBackendCouchstore,
 		},
 	}
 
@@ -826,18 +827,102 @@ func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings(t *testing.T) {
 	e2eutil.MustVerifyCouchbaseBucketAutoCompactionSettings(t, kubernetes, cluster, bucket.Name, expectedAutoCompactionSettings, expectedPurgeInterval, time.Minute)
 
 	// Mutate the bucket auto-compaction setting
-	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Remove("/spec/autoCompaction/databaseFragmentationThreshold/percent").Remove("/spec/autoCompaction/viewFragmentationThreshold/size").Replace("/spec/autoCompaction/viewFragmentationThreshold/percent", 65).Remove("/spec/autoCompaction/tombstonePurgeInterval").Replace("/spec/autoCompaction/timeWindow/end", "17:30"), time.Minute)
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Remove("/spec/autoCompaction/databaseFragmentationThreshold/percent").Remove("/spec/autoCompaction/viewFragmentationThreshold/size").Replace("/spec/autoCompaction/viewFragmentationThreshold/percent", 65).Replace("/spec/autoCompaction/timeWindow/end", "17:30").Remove("/spec/autoCompaction/tombstonePurgeInterval"), time.Minute)
 
 	// Update the expected settings to the new values. Values removed from the CRD should not be changed on the bucket
-	expectedAutoCompactionSettings.Settings.ViewFragmentationThreshold.Size = 0
-	expectedAutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage = 65
-	expectedAutoCompactionSettings.Settings.AllowedTimePeriod.ToHour = 17
+	expectedAutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage = 0 // Removed databaseFragmentationThreshold/percent
+	expectedAutoCompactionSettings.Settings.ViewFragmentationThreshold.Size = 0           // Removed viewFragmentationThreshold/size
+	expectedAutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage = 65    // Replaced viewFragmentationThreshold/percent with 65
+	expectedAutoCompactionSettings.Settings.AllowedTimePeriod.ToHour = 17                 // Replaced timeWindow/end with 17:30
+	expectedPurgeInterval = to.Ptr(float64(3))                                            // Removed tombstonePurgeInterval, value will be set to cluster default
 
 	// Verify the settings have been correctly updated, with those that are removed inheriting values from the cluster
 	e2eutil.MustVerifyCouchbaseBucketAutoCompactionSettings(t, kubernetes, cluster, bucket.Name, expectedAutoCompactionSettings, expectedPurgeInterval, time.Minute)
 
 	// Delete the auto-compaction settings from the bucket CRD and expected settings
 	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Remove("/spec/autoCompaction"), time.Minute)
+
+	expectedAutoCompactionSettings.Enabled = false
+	expectedAutoCompactionSettings.Settings = nil
+
+	// Verify the auto-compaction settings have been removed from the cb bucket
+	e2eutil.MustVerifyCouchbaseBucketAutoCompactionSettings(t, kubernetes, cluster, bucket.Name, expectedAutoCompactionSettings, nil, time.Minute)
+
+	// Check the events match what we expect
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited, FuzzyMessage: bucket.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited, FuzzyMessage: bucket.Name},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsMagmaBackend tests that auto-compaction settings configured at the bucket level are set on the couchbase bucket
+// and that editing and removing settings will be correctly reflected by the bucket when it has a magma storage backend.
+func TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsMagmaBackend(t *testing.T) {
+	// Platform configuration
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+
+	clusterSize := constants.Size1
+
+	// Expected bucket details after creation on couchbase server
+	expectedAutoCompactionSettings := couchbaseutil.BucketAutoCompactionSettings{
+		Enabled: true,
+		Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+			MagmaFragmentationThresholdPercentage: 15,
+		}}
+
+	// Initial requested bucket as CRD
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "couchbase-bucket-autocompaction-magma",
+			Annotations: map[string]string{
+				"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "15",
+			},
+		},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    e2espec.NewResourceQuantityMi(1024),
+			EvictionPolicy: couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+		},
+	}
+
+	// The default purge interval is 3 days.
+	expectedPurgeInterval := to.Ptr(float64(3))
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Create the bucket
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Verify the initial settings are correct
+	e2eutil.MustVerifyCouchbaseBucketAutoCompactionSettings(t, kubernetes, cluster, bucket.Name, expectedAutoCompactionSettings, expectedPurgeInterval, time.Minute)
+
+	// Mutate the bucket auto-compaction setting
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "45"}).
+		Add("/spec/autoCompaction", &couchbasev2.AutoCompactionSpecBucket{TombstonePurgeInterval: &metav1.Duration{Duration: time.Duration(24) * time.Hour}}), time.Minute)
+
+	// Update the expected settings to the new values.
+	expectedAutoCompactionSettings.Settings.MagmaFragmentationThresholdPercentage = 45 // Updated the expected magma fragmentation percentage to the new expected value
+	expectedPurgeInterval = to.Ptr(float64(1))                                         // Updated the expected purge interval to the new expected value
+
+	// Verify the settings have been correctly updated, with those that are removed inheriting values from the cluster
+	e2eutil.MustVerifyCouchbaseBucketAutoCompactionSettings(t, kubernetes, cluster, bucket.Name, expectedAutoCompactionSettings, expectedPurgeInterval, time.Minute)
+
+	// Delete the auto-compaction settings from the bucket CRD and expected settings
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().Remove("/spec/autoCompaction").Remove("/metadata/annotations"), time.Minute)
 
 	expectedAutoCompactionSettings.Enabled = false
 	expectedAutoCompactionSettings.Settings = nil

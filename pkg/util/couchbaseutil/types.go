@@ -958,21 +958,15 @@ func encodeBucketAutoCompactionSettings(settings AutoCompactionAutoCompactionSet
 	data := make(map[string]string)
 	data["parallelDBAndViewCompaction"] = BoolAsStr(settings.ParallelDBAndViewCompaction)
 
-	if settings.DatabaseFragmentationThreshold.Size > 0 {
-		data["databaseFragmentationThreshold[size]"] = strconv.FormatInt(settings.DatabaseFragmentationThreshold.Size, 10)
-	}
+	handleUndefinedInt64(&data, "databaseFragmentationThreshold[size]", settings.DatabaseFragmentationThreshold.Size)
 
-	if settings.DatabaseFragmentationThreshold.Percentage > 0 {
-		data["databaseFragmentationThreshold[percentage]"] = strconv.Itoa(settings.DatabaseFragmentationThreshold.Percentage)
-	}
+	handleUndefinedInt(&data, "databaseFragmentationThreshold[percentage]", settings.DatabaseFragmentationThreshold.Percentage)
 
-	if settings.ViewFragmentationThreshold.Size > 0 {
-		data["viewFragmentationThreshold[size]"] = strconv.FormatInt(settings.ViewFragmentationThreshold.Size, 10)
-	}
+	handleUndefinedInt64(&data, "viewFragmentationThreshold[size]", settings.ViewFragmentationThreshold.Size)
 
-	if settings.ViewFragmentationThreshold.Percentage > 0 {
-		data["viewFragmentationThreshold[percentage]"] = strconv.Itoa(settings.ViewFragmentationThreshold.Percentage)
-	}
+	handleUndefinedInt(&data, "viewFragmentationThreshold[percentage]", settings.ViewFragmentationThreshold.Percentage)
+
+	handleUndefinedInt(&data, "magmaFragmentationPercentage", settings.MagmaFragmentationThresholdPercentage)
 
 	if settings.AllowedTimePeriod != nil {
 		data["allowedTimePeriod[fromMinute]"] = strconv.Itoa(settings.AllowedTimePeriod.FromMinute)
@@ -983,6 +977,28 @@ func encodeBucketAutoCompactionSettings(settings AutoCompactionAutoCompactionSet
 	}
 
 	return data
+}
+
+func handleUndefinedInt(data *map[string]string, key string, val int) {
+	switch val {
+	case -1:
+		return
+	case 0:
+		(*data)[key] = "undefined"
+	default:
+		(*data)[key] = strconv.Itoa(val)
+	}
+}
+
+func handleUndefinedInt64(data *map[string]string, key string, val int64) {
+	switch val {
+	case -1:
+		return
+	case 0:
+		(*data)[key] = "undefined"
+	default:
+		(*data)[key] = strconv.FormatInt(val, 10)
+	}
 }
 
 // SettingsStats is the data structure returned by /settings/stats.
@@ -1049,8 +1065,8 @@ type ServerGroupsUpdate struct {
 // AutoCompactionDatabaseFragmentationThreshold indicates the percentage or size before a bucket
 // compaction is triggered.
 type AutoCompactionDatabaseFragmentationThreshold struct {
-	Percentage int   `json:"percentage" url:"databaseFragmentationThreshold[percentage],omitempty"`
-	Size       int64 `json:"size" url:"databaseFragmentationThreshold[size],omitempty"`
+	Percentage int   `json:"percentage" url:"databaseFragmentationThreshold[percentage],handleundefined"`
+	Size       int64 `json:"size" url:"databaseFragmentationThreshold[size],handleundefined"`
 }
 
 // UnmarshalJSON handles some *&$^ing moron's decision to have size as either an
@@ -1083,8 +1099,8 @@ func (r *AutoCompactionDatabaseFragmentationThreshold) UnmarshalJSON(b []byte) e
 // AutoCompactionViewFragmentationThreshold indicates the percentage or size before a view
 // compaction is triggered.
 type AutoCompactionViewFragmentationThreshold struct {
-	Percentage int   `json:"percentage" url:"viewFragmentationThreshold[percentage],omitempty"`
-	Size       int64 `json:"size" url:"viewFragmentationThreshold[size],omitempty"`
+	Percentage int   `json:"percentage" url:"viewFragmentationThreshold[percentage],handleundefined"`
+	Size       int64 `json:"size" url:"viewFragmentationThreshold[size],handleundefined"`
 }
 
 // UnmarshalJSON handles some *&$^ing moron's decision to have size as either an
@@ -1124,11 +1140,38 @@ type AutoCompactionAllowedTimePeriod struct {
 }
 
 type AutoCompactionAutoCompactionSettings struct {
-	DatabaseFragmentationThreshold AutoCompactionDatabaseFragmentationThreshold `json:"databaseFragmentationThreshold" url:""`
-	ViewFragmentationThreshold     AutoCompactionViewFragmentationThreshold     `json:"viewFragmentationThreshold" url:""`
-	ParallelDBAndViewCompaction    bool                                         `json:"parallelDBAndViewCompaction" url:"parallelDBAndViewCompaction"`
-	IndexCompactionMode            string                                       `json:"indexCompactionMode" url:"indexCompactionMode"`
-	AllowedTimePeriod              *AutoCompactionAllowedTimePeriod             `json:"allowedTimePeriod,omitempty" url:""`
+	DatabaseFragmentationThreshold        AutoCompactionDatabaseFragmentationThreshold `json:"databaseFragmentationThreshold" url:""`
+	ViewFragmentationThreshold            AutoCompactionViewFragmentationThreshold     `json:"viewFragmentationThreshold" url:""`
+	MagmaFragmentationThresholdPercentage int                                          `json:"magmaFragmentationPercentage" url:"magmaFragmentationPercentage,handleundefined"`
+	ParallelDBAndViewCompaction           bool                                         `json:"parallelDBAndViewCompaction" url:"parallelDBAndViewCompaction"`
+	IndexCompactionMode                   string                                       `json:"indexCompactionMode" url:"indexCompactionMode"`
+	AllowedTimePeriod                     *AutoCompactionAllowedTimePeriod             `json:"allowedTimePeriod,omitempty" url:""`
+}
+
+// handleAutoCompactionUndefinedFields sets the fragmentation threshold fields that are not set in the CRD to a value that the encoder can interpret in order to correctly clear the value from the settings regardless of server version.
+// Omitting the value from the update auto-compaction settings request for server versions < 7.1 will clear the value. Later versions require "undefined" to be set as the field value in the request in order to clear the value.
+// The "handleundefined" option in the urlencoding of the AutoCompactionAutoCompactionSettings struct manages this for us at a cluster level and the bucket encoding method handles this at a bucket level, however both require us to
+// manually set the value to -1 for server versions < 7.1 before the request is encoded. This should be called before updating or creating a couchbasebucket when auto-compaction is enabled.
+func (a *AutoCompactionAutoCompactionSettings) SetAutoCompactionUndefinedFieldsForEncoding(isOver71 bool) {
+	if isOver71 {
+		return
+	}
+
+	if a.DatabaseFragmentationThreshold.Percentage == 0 {
+		a.DatabaseFragmentationThreshold.Percentage = -1
+	}
+
+	if a.DatabaseFragmentationThreshold.Size == 0 {
+		a.DatabaseFragmentationThreshold.Size = -1
+	}
+
+	if a.ViewFragmentationThreshold.Percentage == 0 {
+		a.ViewFragmentationThreshold.Percentage = -1
+	}
+
+	if a.ViewFragmentationThreshold.Size == 0 {
+		a.ViewFragmentationThreshold.Size = -1
+	}
 }
 
 // AutoCompactionSettings is the cluster wide auto-compaction settings for a

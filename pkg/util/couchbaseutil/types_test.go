@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
@@ -441,5 +442,138 @@ func TestRolesToStrConvertsMultipleRolesCorrectlyAndSortsAccordingly(t *testing.
 
 	if sortedStrings[3] != "replication_admin" {
 		t.Errorf("Expected: %s - Got: %s", "replication_admin", sortedStrings[3])
+	}
+}
+
+func TestHandleUndefinedInt64(t *testing.T) {
+	testcases := []struct {
+		value       int64
+		expected    string
+		shouldExist bool
+	}{
+		{
+			value:       0,
+			expected:    "undefined",
+			shouldExist: true,
+		},
+		{
+			value:       -1,
+			shouldExist: false,
+		},
+		{
+			value:       10000,
+			expected:    "10000",
+			shouldExist: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		data := make(map[string]string)
+		handleUndefinedInt64(&data, "urlFieldKey", testcase.value)
+		testUndefinedMapTestCases(t, data, "urlFieldKey", testcase.expected, testcase.shouldExist)
+	}
+}
+
+func TestHandleUndefinedInt(t *testing.T) {
+	testcases := []struct {
+		value       int
+		expected    string
+		shouldExist bool
+	}{
+		{
+			value:       0,
+			expected:    "undefined",
+			shouldExist: true,
+		},
+		{
+			value:       -1,
+			shouldExist: false,
+		},
+		{
+			value:       10000,
+			expected:    "10000",
+			shouldExist: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		data := make(map[string]string)
+		handleUndefinedInt(&data, "urlFieldKey", testcase.value)
+		testUndefinedMapTestCases(t, data, "urlFieldKey", testcase.expected, testcase.shouldExist)
+	}
+}
+
+func testUndefinedMapTestCases(t *testing.T, data map[string]string, key, expected string, shouldExist bool) {
+	result, exists := data[key]
+
+	if shouldExist {
+		if !exists {
+			t.Errorf("expected key 'urlFieldKey' to exist in map but it doesn't")
+		} else if result != expected {
+			t.Errorf("expected %q but got %q", expected, result)
+		}
+	} else {
+		if exists {
+			t.Errorf("expected key 'urlFieldKey' to not exist in map, but it exists with value %q", result)
+		}
+	}
+}
+
+func TestSetAutoCompactionUndefinedFieldsForEncoding(t *testing.T) {
+	testcases := []struct {
+		isOver71 bool
+		settings AutoCompactionAutoCompactionSettings
+		expected AutoCompactionAutoCompactionSettings
+	}{
+		{
+			isOver71: false,
+			settings: AutoCompactionAutoCompactionSettings{},
+			expected: AutoCompactionAutoCompactionSettings{
+				DatabaseFragmentationThreshold: AutoCompactionDatabaseFragmentationThreshold{
+					Percentage: -1,
+					Size:       -1,
+				},
+				ViewFragmentationThreshold: AutoCompactionViewFragmentationThreshold{
+					Percentage: -1,
+					Size:       -1,
+				},
+			},
+		},
+		{
+			isOver71: false,
+			settings: AutoCompactionAutoCompactionSettings{
+				DatabaseFragmentationThreshold: AutoCompactionDatabaseFragmentationThreshold{
+					Percentage: 50,
+					Size:       104857600,
+				},
+				ViewFragmentationThreshold: AutoCompactionViewFragmentationThreshold{
+					Size: 104857600,
+				},
+			},
+			expected: AutoCompactionAutoCompactionSettings{
+				DatabaseFragmentationThreshold: AutoCompactionDatabaseFragmentationThreshold{
+					Percentage: 50,
+					Size:       104857600,
+				},
+				ViewFragmentationThreshold: AutoCompactionViewFragmentationThreshold{
+					Percentage: -1,
+					Size:       104857600,
+				},
+			},
+		},
+		{
+			isOver71: true,
+			// We don't need to set explicitly set anything here as the default values are 0
+			settings: AutoCompactionAutoCompactionSettings{},
+			expected: AutoCompactionAutoCompactionSettings{},
+		},
+	}
+
+	for _, testcase := range testcases {
+		testcase.settings.SetAutoCompactionUndefinedFieldsForEncoding(testcase.isOver71)
+
+		if !reflect.DeepEqual(testcase.settings, testcase.expected) {
+			t.Errorf("expected settings did not match actual settings")
+		}
 	}
 }

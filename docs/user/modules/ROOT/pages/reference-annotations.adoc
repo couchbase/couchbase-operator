@@ -51,9 +51,16 @@ Accepts either `true` or `false`.
 === Improved Host Network Support
 ==== `cao.couchbase.com/networking.improvedHostNetwork`
 Used to enable improved host network support. This annotation is used to enable improved host network support for Couchbase Server pods.
-When enabled on a cluster the operator will skip SAN validation and will add the underlying Kubernetes hostname a pod is running on to the alternate addresses list. 
+When enabled on a cluster the operator will skip SAN validation and will add the underlying Kubernetes hostname a pod is running on to the alternate addresses list.
 
 == Cloud Native Gateway
 === OTLP Endpoint
 ==== `cao.couchbase.com/networking.cloudNativeGateway.otlp.endpoint`
 Used to set a custom OTLP endpoint for on Cloud Native Gateway. This annotation is applied to the cluster, and takes a string value (e.g. "https://otel:1234"). The value is passed directly to the Cloud Native Gateway container.
+
+== Auto Compaction
+=== Magma Fragmentation Percentage
+==== `cao.couchbase.com/autoCompaction.magmaFragmentationPercentage`
+Used to set the auto-compaction magma fragmentation percentage, which determines the point when database compaction is triggered for buckets with a magma storage backend. This annotation can be applied to clusters and buckets and takes a number value between 10 and 100. If applied to a cluster, it must be running Couchbase Server 7.1.0 or later or the annotation will be rejected. If set on a bucket, it will override the cluster level auto-compaction settings when the bucket is using the magma storage engine, or it will be ignored. If this annotation is not set, magma fragmentation percentage will default to 50.
+
+

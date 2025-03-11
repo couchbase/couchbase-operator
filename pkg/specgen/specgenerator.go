@@ -160,6 +160,7 @@ func (s *SpecGenerator) applyAutoCompactionSettings() error {
 		TombstonePurgeInterval: &metav1.Duration{
 			Duration: time.Hour * time.Duration(24.0*acSettings.PurgeInterval),
 		},
+		MagmaFragmentationThresholdPercentage: &acSettings.AutoCompactionSettings.MagmaFragmentationThresholdPercentage,
 	}
 
 	if acSettings.AutoCompactionSettings.AllowedTimePeriod != nil {

@@ -3,6 +3,7 @@ package cluster
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
@@ -39,7 +40,7 @@ func TestHistoryRetention(t *testing.T) {
 		SupportedHistoryRetention:  true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil)
 	if newBuckets[0].HistoryRetentionBytes != 50 {
 		t.Fatalf("expected HistoryRetentionBytes=50, found %d", newBuckets[0].HistoryRetentionBytes)
 	}
@@ -71,7 +72,7 @@ func TestMagmaNoDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil)
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 4096 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=4096, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}
@@ -102,7 +103,7 @@ func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil)
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 5555 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=5555, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}
@@ -112,159 +113,190 @@ func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 	}
 }
 
-func TestEqualizeBucketAutoCompactionSettings(t *testing.T) {
-	testcases := []struct {
-		name        string
-		requested   couchbaseutil.Bucket
-		actual      couchbaseutil.Bucket
-		shouldEqual bool
-	}{
-		{
-			name:        "Auto-compaction disabled",
-			requested:   couchbaseutil.Bucket{},
-			actual:      couchbaseutil.Bucket{},
-			shouldEqual: true,
-		},
-		{
-			name: "Purge interval not set on requested",
-			requested: couchbaseutil.Bucket{
-				AutoCompactionSettings: couchbaseutil.BucketAutoCompactionSettings{Enabled: true},
-				PurgeInterval:          nil,
-			},
-			actual: couchbaseutil.Bucket{
-				AutoCompactionSettings: couchbaseutil.BucketAutoCompactionSettings{Enabled: true},
-				PurgeInterval:          floatPtr(2.5),
-			},
-			shouldEqual: true,
-		},
-		{
-			name: "Threshold percentages not set on requested bucket",
-			requested: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(0, 256), cbDatabaseThreshold(0, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			actual: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(10, 256), cbDatabaseThreshold(10, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			shouldEqual: true,
-		},
-		{
-			name: "Threshold percentages changed on requested bucket",
-			requested: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(10, 256), cbDatabaseThreshold(60, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			actual: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(15, 256), cbDatabaseThreshold(30, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			shouldEqual: false,
-		},
-		{
-			name: "Threshold size changed on requested bucket",
-			requested: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(30, 512), cbDatabaseThreshold(30, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			actual: couchbaseutil.Bucket{
-				AutoCompactionSettings: cbEnabledAutoCompactionSettings(cbViewThreshold(30, 256), cbDatabaseThreshold(30, 256)),
-				PurgeInterval:          floatPtr(1.5),
-			},
-			shouldEqual: false,
-		},
-	}
-
-	for _, testcase := range testcases {
-		equalizeBucketAutoCompactionSettings(&testcase.requested, &testcase.actual)
-
-		result := reflect.DeepEqual(testcase.requested, testcase.actual)
-		if result != testcase.shouldEqual {
-			t.Errorf("test %v failed. Expected DeepEqual to be %v but got %v", testcase.name, testcase.shouldEqual, result)
-		}
-	}
-}
-
 func TestGatherBucketAutoCompactionSettings(t *testing.T) {
-	cluster := couchbasev2.CouchbaseCluster{
-		Spec: couchbasev2.ClusterSpec{
-			ClusterSettings: couchbasev2.ClusterConfig{
-				AutoCompaction: &couchbasev2.AutoCompaction{},
-			},
-		},
+	type expected struct {
+		settings      couchbaseutil.BucketAutoCompactionSettings
+		purgeInterval *float64
 	}
 
 	testcases := []struct {
-		name                      string
-		clusterParallelCompaction bool
-		bucketCRDSpec             couchbasev2.AutoCompactionSpecBucket
-		expected                  couchbaseutil.AutoCompactionAutoCompactionSettings
+		name            string
+		crdSettings     *couchbasev2.AutoCompactionSpecBucket
+		storageBackend  couchbaseutil.CouchbaseStorageBackend
+		clusterSettings *couchbasev2.AutoCompaction
+		expected        expected
 	}{
 		{
-			name:                      "Parallel compaction only",
-			clusterParallelCompaction: false,
-			bucketCRDSpec:             couchbasev2.AutoCompactionSpecBucket{},
-			expected: couchbaseutil.AutoCompactionAutoCompactionSettings{
-				ParallelDBAndViewCompaction: false,
+			name:            "no crd settings",
+			crdSettings:     nil,
+			storageBackend:  couchbaseutil.CouchbaseStorageBackendCouchstore,
+			clusterSettings: &couchbasev2.AutoCompaction{},
+			expected:        expected{settings: couchbaseutil.BucketAutoCompactionSettings{}},
+		},
+		{
+			name:           "no cluster settings",
+			crdSettings:    &couchbasev2.AutoCompactionSpecBucket{},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendCouchstore,
+			expected:       expected{settings: couchbaseutil.BucketAutoCompactionSettings{}},
+		},
+		{
+			name: "couchstore with crd settings",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				ViewFragmentationThreshold:     crdViewThreshold(intPtr(10), intPtr(100)),
+				DatabaseFragmentationThreshold: crdDatabaseThreshold(intPtr(10), intPtr(100)),
+				TimeWindow:                     crdTimeWindow(true, "00:00", "23:59"),
+				TombstonePurgeInterval:         &v1.Duration{Duration: 24 * time.Hour},
+			},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendCouchstore,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction: true,
+			},
+			expected: expected{
+				settings: couchbaseutil.BucketAutoCompactionSettings{
+					Enabled: true,
+					Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+						ViewFragmentationThreshold:     cbViewThreshold(10, 100),
+						DatabaseFragmentationThreshold: cbDatabaseThreshold(10, 100),
+						AllowedTimePeriod:              cbTimeWindow(true, 0, 0, 23, 59),
+						ParallelDBAndViewCompaction:    true,
+					},
+				},
+				purgeInterval: floatPtr(1),
 			},
 		},
 		{
-			name:                      "View threshold in CRD only",
-			clusterParallelCompaction: false,
-			bucketCRDSpec: couchbasev2.AutoCompactionSpecBucket{
-				ViewFragmentationThreshold: crdViewThreshold(intPtr(10), intPtr(256)),
+			name: "couchstore with limited crd settings including magma using cluster purge interval",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				ViewFragmentationThreshold:     crdViewThreshold(intPtr(10), nil),
+				DatabaseFragmentationThreshold: crdDatabaseThreshold(nil, intPtr(150)),
 			},
-			expected: couchbaseutil.AutoCompactionAutoCompactionSettings{
-				ParallelDBAndViewCompaction: false,
-				ViewFragmentationThreshold:  cbViewThreshold(10, 256),
+			storageBackend: couchbaseutil.CouchbaseStorageBackendCouchstore,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction:                    false,
+				TombstonePurgeInterval:                &v1.Duration{Duration: 96 * time.Hour},
+				MagmaFragmentationThresholdPercentage: intPtr(50),
 			},
-		},
-		{
-			name:                      "Database threshold in CRD only",
-			clusterParallelCompaction: true,
-			bucketCRDSpec: couchbasev2.AutoCompactionSpecBucket{
-				DatabaseFragmentationThreshold: crdDatabaseThreshold(intPtr(25), intPtr(512)),
-			},
-			expected: couchbaseutil.AutoCompactionAutoCompactionSettings{
-				ParallelDBAndViewCompaction:    true,
-				DatabaseFragmentationThreshold: cbDatabaseThreshold(25, 512),
-			},
-		},
-		{
-			name:                      "Time window in CRD only",
-			clusterParallelCompaction: true,
-			bucketCRDSpec: couchbasev2.AutoCompactionSpecBucket{
-				TimeWindow: crdTimeWindow(true, "10:15", "12:30"),
-			},
-			expected: couchbaseutil.AutoCompactionAutoCompactionSettings{
-				ParallelDBAndViewCompaction: true,
-				AllowedTimePeriod:           cbTimeWindow(true, 15, 10, 30, 12),
+			expected: expected{
+				settings: couchbaseutil.BucketAutoCompactionSettings{
+					Enabled: true,
+					Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+						ViewFragmentationThreshold:     cbViewThreshold(10, 0),
+						DatabaseFragmentationThreshold: cbDatabaseThreshold(0, 150),
+						ParallelDBAndViewCompaction:    false,
+					},
+				},
+				purgeInterval: floatPtr(4),
 			},
 		},
 		{
-			name:                      "Multiple settings in CRD",
-			clusterParallelCompaction: true,
-			bucketCRDSpec: couchbasev2.AutoCompactionSpecBucket{
-				DatabaseFragmentationThreshold: crdDatabaseThreshold(intPtr(16), intPtr(300)),
-				ViewFragmentationThreshold:     crdViewThreshold(nil, intPtr(128)),
-				TimeWindow:                     crdTimeWindow(false, "12:30", "17:45"),
+			name: "magma with crd settings",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				MagmaFragmentationThresholdPercentage: intPtr(50),
 			},
-			expected: couchbaseutil.AutoCompactionAutoCompactionSettings{
-				ParallelDBAndViewCompaction:    true,
-				DatabaseFragmentationThreshold: cbDatabaseThreshold(16, 300),
-				ViewFragmentationThreshold:     cbViewThreshold(0, 128),
-				AllowedTimePeriod:              cbTimeWindow(false, 30, 12, 45, 17),
+			storageBackend: couchbaseutil.CouchbaseStorageBackendMagma,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction: true,
+			},
+			expected: expected{settings: couchbaseutil.BucketAutoCompactionSettings{
+				Enabled: true,
+				Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+					ParallelDBAndViewCompaction:           true,
+					MagmaFragmentationThresholdPercentage: 50,
+				},
+			}},
+		},
+		{
+			name: "magma missing on bucket crd takes default from cluster settings",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				MagmaFragmentationThresholdPercentage: intPtr(85),
+			},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendMagma,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction: true,
+			},
+			expected: expected{settings: couchbaseutil.BucketAutoCompactionSettings{
+				Enabled: true,
+				Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+					ParallelDBAndViewCompaction:           true,
+					MagmaFragmentationThresholdPercentage: 85,
+				},
+			}},
+		},
+		{
+			name: "magma missing on bucket crd and cluster settings defaults to 50",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				TombstonePurgeInterval: &v1.Duration{Duration: 48 * time.Hour},
+			},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendMagma,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction: true,
+			},
+			expected: expected{
+				settings: couchbaseutil.BucketAutoCompactionSettings{
+					Enabled: true,
+					Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+						ParallelDBAndViewCompaction:           true,
+						MagmaFragmentationThresholdPercentage: 50,
+					},
+				},
+				purgeInterval: floatPtr(2),
+			},
+		},
+		{
+			name: "magma with crd settings ignores couchstore settings",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				ViewFragmentationThreshold:            crdViewThreshold(intPtr(10), intPtr(100)),
+				DatabaseFragmentationThreshold:        crdDatabaseThreshold(intPtr(10), intPtr(100)),
+				TimeWindow:                            crdTimeWindow(true, "00:00", "23:59"),
+				TombstonePurgeInterval:                &v1.Duration{Duration: 36 * time.Hour},
+				MagmaFragmentationThresholdPercentage: intPtr(15),
+			},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendMagma,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				ParallelCompaction: true,
+			},
+			expected: expected{
+				settings: couchbaseutil.BucketAutoCompactionSettings{
+					Enabled: true,
+					Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
+						ParallelDBAndViewCompaction:           true,
+						MagmaFragmentationThresholdPercentage: 15,
+					},
+				},
+				purgeInterval: floatPtr(1.5),
+			},
+		},
+		{
+			name: "magma with cluster settings but no bucket settings",
+			crdSettings: &couchbasev2.AutoCompactionSpecBucket{
+				ViewFragmentationThreshold: crdViewThreshold(intPtr(10), intPtr(100)),
+			},
+			storageBackend: couchbaseutil.CouchbaseStorageBackendMagma,
+			clusterSettings: &couchbasev2.AutoCompaction{
+				MagmaFragmentationThresholdPercentage: intPtr(75),
+				TombstonePurgeInterval:                &v1.Duration{Duration: 120 * time.Hour},
+			},
+			expected: expected{
+				settings: couchbaseutil.BucketAutoCompactionSettings{
+					Enabled:  false,
+					Settings: nil,
+				},
 			},
 		},
 	}
 
 	for _, testcase := range testcases {
-		cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction = testcase.clusterParallelCompaction
+		t.Run(testcase.name, func(t *testing.T) {
+			settings, purgeInterval := gatherBucketAutoCompactionSettings(testcase.crdSettings, testcase.storageBackend, testcase.clusterSettings)
 
-		result := gatherBucketAutoCompactionSettings(&testcase.bucketCRDSpec, &cluster)
-		if !reflect.DeepEqual(testcase.expected, *result) {
-			t.Errorf("test %v failed. Unable to correctly set bucket auto-compaction settings, expected %v but got %v", testcase.name, testcase.expected, result)
-		}
+			if !reflect.DeepEqual(settings, testcase.expected.settings) {
+				t.Fatalf("test %s failed, expected settings %v, but got %v", testcase.name, testcase.expected.settings.Settings, settings.Settings)
+			}
+
+			if !reflect.DeepEqual(purgeInterval, testcase.expected.purgeInterval) {
+				t.Fatalf("test %s failed, expected purgeInterval %v, but got %v", testcase.name, &testcase.expected.purgeInterval, &purgeInterval)
+			}
+		})
 	}
 }
 
@@ -276,24 +308,13 @@ func cbDatabaseThreshold(percent, sizeMi int) couchbaseutil.AutoCompactionDataba
 	return couchbaseutil.AutoCompactionDatabaseFragmentationThreshold{Percentage: percent, Size: int64(sizeMi * 1024 * 1024)}
 }
 
-func cbTimeWindow(abortCompaction bool, fromMin, fromHour, toMin, toHour int) *couchbaseutil.AutoCompactionAllowedTimePeriod {
+func cbTimeWindow(abortCompaction bool, fromHour, fromMin, toHour, toMin int) *couchbaseutil.AutoCompactionAllowedTimePeriod {
 	return &couchbaseutil.AutoCompactionAllowedTimePeriod{
 		AbortOutside: abortCompaction,
 		FromMinute:   fromMin,
 		FromHour:     fromHour,
 		ToMinute:     toMin,
 		ToHour:       toHour,
-	}
-}
-
-func cbEnabledAutoCompactionSettings(viewThreshold couchbaseutil.AutoCompactionViewFragmentationThreshold, databaseThreshold couchbaseutil.AutoCompactionDatabaseFragmentationThreshold) couchbaseutil.BucketAutoCompactionSettings {
-	return couchbaseutil.BucketAutoCompactionSettings{
-		Enabled: true,
-		Settings: &couchbaseutil.AutoCompactionAutoCompactionSettings{
-			ViewFragmentationThreshold:     viewThreshold,
-			DatabaseFragmentationThreshold: databaseThreshold,
-			AllowedTimePeriod:              nil,
-		},
 	}
 }
 

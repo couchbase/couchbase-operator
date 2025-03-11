@@ -34,6 +34,28 @@ func isEmptyValue(v reflect.Value) bool {
 	return false
 }
 
+// isNegativeOne checks if the value is -1.
+func isNegativeOne(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return false
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == -1
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return false
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == -1
+	case reflect.Bool:
+		return false
+	case reflect.Slice:
+		return false
+	case reflect.Ptr:
+		return false
+	}
+
+	return false
+}
+
 // encode takes a value and casts it to a string.
 func encode(v reflect.Value) (string, error) {
 	switch v.Kind() {
@@ -196,6 +218,17 @@ func checkEmptyValues(options tagOptions, fv reflect.Value) string {
 
 	if options.contains("emptyisnull") && isEmptyValue(fv) {
 		return ""
+	}
+
+	// Handle server versions that accept "undefined" or omit the value if not. This requires the value to be set to "-1" when a server version can't handle "undefined" (<7.1.0)
+	if options.contains("handleundefined") {
+		if isEmptyValue(fv) {
+			return "undefined"
+		}
+
+		if isNegativeOne(fv) {
+			return "nil"
+		}
 	}
 
 	// Pass custom option

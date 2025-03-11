@@ -119,7 +119,8 @@ Excluding this field (which is the default), will set the autoCompactionSettings
 
 ==== Description
 
-DatabaseFragmentationThreshold defines triggers for when database compaction should start.
+DatabaseFragmentationThreshold defines triggers for when database compaction should start on buckets with a couchstore storage backend.
+This field will be ignored if the bucket has a magma storage backend.
 
 === couchbasebuckets.spec.autoCompaction.databaseFragmentationThreshold.percent
 
@@ -159,6 +160,7 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 ==== Description
 
 TimeWindow allows restriction of when compaction can occur.
+This field will be ignored if the bucket has a magma storage backend.
 
 === couchbasebuckets.spec.autoCompaction.timeWindow.abortCompactionOutsideWindow
 
@@ -216,6 +218,7 @@ More info:  https://golang.org/pkg/time/#ParseDuration.
 ==== Description
 
 ViewFragmentationThreshold defines triggers for when view compaction should start.
+This field will be ignored if the bucket has a magma storage backend.
 
 === couchbasebuckets.spec.autoCompaction.viewFragmentationThreshold.percent
 

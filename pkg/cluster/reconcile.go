@@ -925,6 +925,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	databaseFragmentationThresholdSize := int64(0)
 	viewFragmentationThresholdPercentage := 0
 	viewFragmentationThresholdSize := int64(0)
+	magmaFragmentationThresholdPercentage := 0
 
 	if c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent != nil {
 		databaseFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.DatabaseFragmentationThreshold.Percent
@@ -942,6 +943,13 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 		viewFragmentationThresholdSize = c.cluster.Spec.ClusterSettings.AutoCompaction.ViewFragmentationThreshold.Size.Value()
 	}
 
+	if c.cluster.Spec.ClusterSettings.AutoCompaction.MagmaFragmentationThresholdPercentage != nil {
+		magmaFragmentationThresholdPercentage = *c.cluster.Spec.ClusterSettings.AutoCompaction.MagmaFragmentationThresholdPercentage
+	} else if current.AutoCompactionSettings.MagmaFragmentationThresholdPercentage > 0 {
+		// If the magmaFragmentationThreshold is not specified in the CRD, but does exist as a value on server (i.e. above 0), use 50% as default
+		magmaFragmentationThresholdPercentage = 50
+	}
+
 	requested := &couchbaseutil.AutoCompactionSettings{
 		AutoCompactionSettings: couchbaseutil.AutoCompactionAutoCompactionSettings{
 			DatabaseFragmentationThreshold: couchbaseutil.AutoCompactionDatabaseFragmentationThreshold{
@@ -952,8 +960,9 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 				Percentage: viewFragmentationThresholdPercentage,
 				Size:       viewFragmentationThresholdSize,
 			},
-			ParallelDBAndViewCompaction: c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
-			IndexCompactionMode:         "circular",
+			ParallelDBAndViewCompaction:           c.cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
+			IndexCompactionMode:                   "circular",
+			MagmaFragmentationThresholdPercentage: magmaFragmentationThresholdPercentage,
 		},
 		PurgeInterval: c.cluster.Spec.ClusterSettings.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0,
 	}
@@ -980,6 +989,13 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	if reflect.DeepEqual(current, requested) {
 		return nil
 	}
+
+	over71, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
+
+	requested.AutoCompactionSettings.SetAutoCompactionUndefinedFieldsForEncoding(over71)
 
 	log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
 

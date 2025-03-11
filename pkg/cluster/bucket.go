@@ -126,21 +126,9 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.Rank = &bucket.Spec.Rank
 		}
 
-		autoCompactionSettings := couchbaseutil.BucketAutoCompactionSettings{
-			Enabled:  bucket.Spec.AutoCompaction != nil,
-			Settings: nil,
-		}
-
-		if bucket.Spec.AutoCompaction != nil {
-			autoCompactionSettings.Settings = gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, cluster)
-
-			if bucket.Spec.AutoCompaction.TombstonePurgeInterval != nil {
-				val := bucket.Spec.AutoCompaction.TombstonePurgeInterval.Hours() / 24.0
-				b.PurgeInterval = &val
-			}
-		}
-
+		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
 		b.AutoCompactionSettings = autoCompactionSettings
+		b.PurgeInterval = purgeInterval
 
 		outputBuckets = append(outputBuckets, b)
 	}
@@ -310,8 +298,6 @@ func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.B
 	for _, r := range requested {
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				equalizeBucketAutoCompactionSettings(&r, &a)
-
 				if !reflect.DeepEqual(r, a) {
 					updateBuckets[a] = r
 				}
@@ -345,11 +331,7 @@ func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 		}
 	}
 
-	if !couchbaseutil.ShouldReconcile(annotations) {
-		return true
-	}
-
-	return false
+	return !couchbaseutil.ShouldReconcile(annotations)
 }
 
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
@@ -376,6 +358,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 	}
 
+	isOver71, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	create := []couchbaseutil.Bucket{}
 	update := []couchbaseutil.Bucket{}
 	remove := []couchbaseutil.Bucket{}
@@ -400,13 +387,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					log.Info("Bucket type cannot be changed so recreating with requested type", "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
 					remove = append(remove, a)
 					create = append(create, r)
-				} else {
-					equalizeBucketAutoCompactionSettings(&r, &a)
+				} else if !reflect.DeepEqual(r, a) {
+					setBucketFieldsForEncoding(&r, isOver71)
 
-					if !reflect.DeepEqual(r, a) {
-						update = append(update, r)
-						c.logUpdate(a, r)
-					}
+					update = append(update, r)
+					c.logUpdate(a, r)
 				}
 
 				found = true
@@ -416,6 +401,8 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 
 		if !found {
+			setBucketFieldsForEncoding(&r, isOver71)
+
 			create = append(create, r)
 		}
 	}
@@ -620,55 +607,77 @@ func (c *Cluster) canBucketBeMigrated(b couchbaseutil.Bucket, backend couchbaseu
 	return true, ""
 }
 
-// equalizeBucketAutoCompactionSettings compares the auto-compaction settings in the requested bucket to those in the actual bucket.
-// If values for the purge interval and/or threshold percentages have not been set on the requested bucket, those values will be set to the
-// current value in the actual bucket in order to avoid unnecessary updates when the values don't need updating.
-func equalizeBucketAutoCompactionSettings(requested, actual *couchbaseutil.Bucket) {
-	if !requested.AutoCompactionSettings.Enabled {
-		return
-	}
-
-	if requested.PurgeInterval == nil {
-		requested.PurgeInterval = actual.PurgeInterval
-	}
-
-	if requested.AutoCompactionSettings.Settings != nil && actual.AutoCompactionSettings.Settings != nil {
-		if requested.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage == 0 {
-			requested.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage = actual.AutoCompactionSettings.Settings.DatabaseFragmentationThreshold.Percentage
-		}
-
-		if requested.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage == 0 {
-			requested.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage = actual.AutoCompactionSettings.Settings.ViewFragmentationThreshold.Percentage
-		}
-	}
-}
-
 // gatherBucketAutoCompactionSettings will convert auto-compaction settings defined on bucket CRD's into auto-compaction settings that can be recognised
-// and mapped to by the couchbase server. This method assumes that at least one auto-compaction setting has been configured
-// on the k8s bucket.
-func gatherBucketAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionSpecBucket, cluster *couchbasev2.CouchbaseCluster) *couchbaseutil.AutoCompactionAutoCompactionSettings {
+// and mapped to by the couchbase server. The enabled flag is set to true if any auto-compaction settings are set at a bucket level.
+func gatherBucketAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionSpecBucket, storageBackend couchbaseutil.CouchbaseStorageBackend, clusterSettings *couchbasev2.AutoCompaction) (couchbaseutil.BucketAutoCompactionSettings, *float64) {
+	if crdSettings == nil || clusterSettings == nil {
+		return couchbaseutil.BucketAutoCompactionSettings{Enabled: false, Settings: nil}, nil
+	}
+
 	settings := couchbaseutil.AutoCompactionAutoCompactionSettings{
 		// ParallelDBAndViewCompaction is a global settings and required for setting bucket level auto-compaction settings, so we should just use the cluster level value
-		ParallelDBAndViewCompaction: cluster.Spec.ClusterSettings.AutoCompaction.ParallelCompaction,
+		ParallelDBAndViewCompaction: clusterSettings.ParallelCompaction,
 	}
+
+	// Whether auto-compaction is enabled for the bucket. We only care about magma fields when a magma storage backend is used and vice versa for couchstore buckets and therefore
+	// only want to set the auto-compaction settings at a bucket level when the correct fields are being used.
+	enabled := false
+
+	switch storageBackend {
+	case couchbaseutil.CouchbaseStorageBackendCouchstore:
+		enabled = configureCouchstoreAutoCompactionSettings(crdSettings, &settings)
+	case couchbaseutil.CouchbaseStorageBackendMagma:
+		enabled = configureMagmaAutoCompactionSettings(crdSettings, &settings, clusterSettings)
+	}
+
+	var purgeInterval *float64
+
+	// If the bucket CRD has not set a value for the purge interval, we should use the cluster level value.
+	if crdSettings.TombstonePurgeInterval != nil {
+		pi := crdSettings.TombstonePurgeInterval.Hours() / 24.0
+		purgeInterval = &pi
+		enabled = true
+	} else if clusterSettings.TombstonePurgeInterval != nil {
+		pi := clusterSettings.TombstonePurgeInterval.Hours() / 24.0
+		purgeInterval = &pi
+	}
+
+	// If no relevant auto-compaciton fields have been set in the CRD, we can ignore the bucket level auto-compaction settings
+	if !enabled {
+		return couchbaseutil.BucketAutoCompactionSettings{Enabled: false, Settings: nil}, nil
+	}
+
+	return couchbaseutil.BucketAutoCompactionSettings{
+		Enabled:  enabled,
+		Settings: &settings,
+	}, purgeInterval
+}
+
+// configureCouchstoreAutoCompactionSettings handles auto-compaction settings that are unique to Couchstore buckets.
+func configureCouchstoreAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionSpecBucket, settings *couchbaseutil.AutoCompactionAutoCompactionSettings) bool {
+	enabled := false
 
 	if crdSettings.DatabaseFragmentationThreshold != nil {
 		if crdSettings.DatabaseFragmentationThreshold.Percent != nil {
 			settings.DatabaseFragmentationThreshold.Percentage = *crdSettings.DatabaseFragmentationThreshold.Percent
+			enabled = true
 		}
 
 		if crdSettings.DatabaseFragmentationThreshold.Size != nil {
 			settings.DatabaseFragmentationThreshold.Size = crdSettings.DatabaseFragmentationThreshold.Size.Value()
+			enabled = true
 		}
 	}
 
 	if crdSettings.ViewFragmentationThreshold != nil {
 		if crdSettings.ViewFragmentationThreshold.Percent != nil {
 			settings.ViewFragmentationThreshold.Percentage = *crdSettings.ViewFragmentationThreshold.Percent
+			enabled = true
 		}
 
 		if crdSettings.ViewFragmentationThreshold.Size != nil {
 			settings.ViewFragmentationThreshold.Size = crdSettings.ViewFragmentationThreshold.Size.Value()
+			enabled = true
 		}
 	}
 
@@ -684,7 +693,30 @@ func gatherBucketAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionS
 		autoCompactionTimePeriod.ToHour, _ = strconv.Atoi(parts[0])
 		autoCompactionTimePeriod.ToMinute, _ = strconv.Atoi(parts[1])
 		settings.AllowedTimePeriod = &autoCompactionTimePeriod
+		enabled = true
 	}
 
-	return &settings
+	return enabled
+}
+
+// configureMagmaAutoCompactionSettings handles auto-compaction settings that are unique to Magma buckets.
+func configureMagmaAutoCompactionSettings(crdSettings *couchbasev2.AutoCompactionSpecBucket, settings *couchbaseutil.AutoCompactionAutoCompactionSettings, defaults *couchbasev2.AutoCompaction) bool {
+	switch {
+	case crdSettings.MagmaFragmentationThresholdPercentage != nil:
+		settings.MagmaFragmentationThresholdPercentage = *crdSettings.MagmaFragmentationThresholdPercentage
+		return true
+	case defaults.MagmaFragmentationThresholdPercentage != nil:
+		settings.MagmaFragmentationThresholdPercentage = *defaults.MagmaFragmentationThresholdPercentage
+	default:
+		// If not defined in CRD, use cluster level or default value of 50.
+		settings.MagmaFragmentationThresholdPercentage = 50
+	}
+
+	return false
+}
+
+func setBucketFieldsForEncoding(b *couchbaseutil.Bucket, isOver71 bool) {
+	if b.AutoCompactionSettings.Enabled {
+		b.AutoCompactionSettings.Settings.SetAutoCompactionUndefinedFieldsForEncoding(isOver71)
+	}
 }

@@ -739,7 +739,8 @@ func registerTests() {
 		framework.NewTestDef(TestMigrationByServerGroup).WithTags(TagSuiteP1, TagFeatureAssimilation),
 
 		// Bucket auto-compaction settings tests
-		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettings).WithTags(TagSuiteSanity),
+		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend).WithTags(TagSuiteSanity),
+		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsMagmaBackend).WithTags(TagSuiteSanity),
 	}
 }
 
