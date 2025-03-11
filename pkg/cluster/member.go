@@ -161,7 +161,7 @@ func addMissingNodesToSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.
 	}
 
 	for _, node := range nodes {
-		if members.Contains(node.HostName.GetMemberName()) {
+		if members.Contains(node.HostName.GetMemberName()) || members.ContainsOTP(node.HostName.GetOTPNode()) {
 			continue
 		}
 

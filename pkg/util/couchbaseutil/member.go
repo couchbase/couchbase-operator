@@ -139,18 +139,6 @@ func NewExtConnectedMember(namespace, cluster, name, version, config string, use
 	}
 }
 
-func NewHostNetworkMember(namespace, cluster, name, version, config string, useTLS bool, dnsName string) Member {
-	return &memberImpl{
-		namespace:   namespace,
-		cluster:     cluster,
-		name:        name,
-		version:     version,
-		config:      config,
-		useTLS:      useTLS,
-		dnsHostName: dnsName,
-	}
-}
-
 // SetVersion is used when a member has been created,
 // but it's version has not yet been realised.
 // i.e unknown SHA256 but we've queried the pod
@@ -275,6 +263,16 @@ func NewMemberSet(ms ...Member) MemberSet {
 func (ms MemberSet) Contains(name string) bool {
 	_, ok := ms[name]
 	return ok
+}
+
+func (ms MemberSet) ContainsOTP(node OTPNode) bool {
+	for _, m := range ms {
+		if m.GetOTPNode() == node {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Copy clones a member set into a new map.
