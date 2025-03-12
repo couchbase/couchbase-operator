@@ -1007,6 +1007,11 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	var scheduledScaling couchbasev2.ScalingMessageList
 
+	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	if err != nil {
+		return err
+	}
+
 	for _, serverSpec := range c.cluster.Spec.Servers {
 		whereEqualsServerConfig := func(m couchbaseutil.Member) bool {
 			return m.Config() == serverSpec.Name
@@ -1015,6 +1020,11 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 		nodesToCreate := serverSpec.Size - existingNodes
 		if nodesToCreate <= 0 {
+			continue
+		}
+
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
+			log.Info("[WARN] Serviceless nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
 			continue
 		}
 
@@ -1647,8 +1657,13 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
+	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	if err != nil {
+		return nil
+	}
+
 	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
-	if CheckNodesToCreate(c.cluster, r.clusteredMembers) {
+	if CheckNodesToCreate(c.cluster, r.clusteredMembers, servicelessNodesSupported) {
 		return nil
 	}
 
@@ -1747,8 +1762,12 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
-func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet) bool {
+func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, servicelessNodesSupported bool) bool {
 	for _, serverSpec := range cluster.Spec.Servers {
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
+			continue
+		}
+
 		existingNodes := clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
 		nodesToCreate := serverSpec.Size - existingNodes
 
