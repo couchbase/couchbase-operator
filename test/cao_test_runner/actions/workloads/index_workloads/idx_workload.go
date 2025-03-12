@@ -34,10 +34,10 @@ type IndexWorkloadInterface interface {
 	DeleteJobs() error
 }
 
-func NewIndexWorkload(name IndexWorkloadName, namespace string, jobDuration time.Duration) (IndexWorkloadInterface, error) {
+func NewIndexWorkload(name IndexWorkloadName, namespace, resultDir string, jobDuration time.Duration) (IndexWorkloadInterface, error) {
 	switch name {
 	case CBQIndexWorkload:
-		return ConfigCBQIndexWorkload(namespace, jobDuration), nil
+		return ConfigCBQIndexWorkload(namespace, resultDir, jobDuration), nil
 	default:
 		return nil, ErrInvalidIndexWorkloadName
 	}

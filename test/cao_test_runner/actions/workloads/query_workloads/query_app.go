@@ -54,12 +54,13 @@ type QueryAppArgs struct {
 	PrintDuration   string `args:"--print_duration"`
 }
 
-func ConfigQueryAppWorkload(namespace string, jobDuration time.Duration) *QueryApp {
+func ConfigQueryAppWorkload(namespace, resultDir string, jobDuration time.Duration) *QueryApp {
 	return &QueryApp{
-		Jobs:        make([]*jobs.Job, 0),
-		FilePaths:   make([]string, 0),
-		JobDuration: jobDuration,
-		Namespace:   namespace,
+		Jobs:                 make([]*jobs.Job, 0),
+		FilePaths:            make([]string, 0),
+		JobDuration:          jobDuration,
+		Namespace:            namespace,
+		queryWorkloadYAMLDir: fileutils.NewDirectory(filepath.Join(resultDir, "/query_workload"), os.ModePerm),
 	}
 }
 

@@ -32,10 +32,10 @@ type QueryWorkloadInterface interface {
 	DeleteJobs() error
 }
 
-func NewQueryWorkload(name QueryWorkloadName, namespace string, jobDuration time.Duration) (QueryWorkloadInterface, error) {
+func NewQueryWorkload(name QueryWorkloadName, namespace, resultDir string, jobDuration time.Duration) (QueryWorkloadInterface, error) {
 	switch name {
 	case QueryAppWorkload:
-		return ConfigQueryAppWorkload(namespace, jobDuration), nil
+		return ConfigQueryAppWorkload(namespace, resultDir, jobDuration), nil
 	default:
 		return nil, ErrInvalidQueryWorkloadName
 	}

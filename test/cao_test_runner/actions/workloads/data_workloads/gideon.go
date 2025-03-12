@@ -47,11 +47,12 @@ type GideonArgs struct {
 	Bucket   string `args:"--bucket"`
 }
 
-func ConfigGideonDataWorkload(namespace string) *Gideon {
+func ConfigGideonDataWorkload(namespace, resultDir string) *Gideon {
 	return &Gideon{
-		Jobs:      make([]*jobs.Job, 0),
-		FilePaths: make([]string, 0),
-		Namespace: namespace,
+		Jobs:                make([]*jobs.Job, 0),
+		FilePaths:           make([]string, 0),
+		Namespace:           namespace,
+		dataWorkloadYAMLDir: fileutils.NewDirectory(filepath.Join(resultDir, "/data_workloads"), os.ModePerm),
 	}
 }
 

@@ -123,7 +123,7 @@ func (d *IndexWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter
 		return fmt.Errorf("index workload: %w", err)
 	}
 
-	indexWorkload, err := NewIndexWorkload(workloadConfig.IndexWorkloadName, workloadConfig.Namespace, workloadConfig.RunDuration)
+	indexWorkload, err := NewIndexWorkload(workloadConfig.IndexWorkloadName, workloadConfig.Namespace, testAssets.GetResultsDirectory().DirectoryPath, workloadConfig.RunDuration)
 	if err != nil {
 		return fmt.Errorf("index workload: %w", err)
 	}

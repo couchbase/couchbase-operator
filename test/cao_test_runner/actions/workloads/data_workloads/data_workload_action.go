@@ -112,7 +112,7 @@ func (d *DataWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter)
 		return fmt.Errorf("data workload: %w", err)
 	}
 
-	dataWorkload, err := NewDataWorkload(workloadConfig.DataWorkloadName, workloadConfig.Namespace, workloadConfig.RunDuration)
+	dataWorkload, err := NewDataWorkload(workloadConfig.DataWorkloadName, workloadConfig.Namespace, testAssets.GetResultsDirectory().DirectoryPath, workloadConfig.RunDuration)
 	if err != nil {
 		return fmt.Errorf("data workload: %w", err)
 	}

@@ -7,77 +7,56 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	ErrCantAssign          = errors.New("cannot assign to the config of, shall be a pointer")
+	ErrConfigNotAddr       = errors.New("config not addressable it shall be a pointer")
 	ErrUnsupportedTag      = errors.New("unsupported tag")
-	ErrFieldNotRegistered  = errors.New("field not register")
+	ErrFieldNotRegistered  = errors.New("field not registered")
 	ErrConfigZeroValue     = errors.New("required config field has zero value")
 	ErrValueNotConvertable = errors.New("could not convert value to required type")
 	ErrFailedToSetValue    = errors.New("failed to set env var value")
+	ErrFieldNil            = errors.New("field is nil")
+	ErrFieldZeroValue      = errors.New("field has zero value")
+	ErrEmptyEnvValue       = errors.New("env value is empty")
+	ErrEmptyCtxEnvValue    = errors.New("context and env are empty")
 )
 
 const (
-	// caoCliTagString holds the tag string for the custom context unmarshaller.
-	caoCliTagString = "caoCli"
+	// caoCliTagName holds the tag name for the cao test runner custom unmarshaller.
+	caoCliTagName = "caoCli"
 
-	/* the below are the specific tags that are defined under caoCliTagString.
-	contextTag specifies that a field can reside in the context,the context value takes priority over the yaml value.
-	*/
-
-	// The yaml value is to be placed into the context if the context is empty.
-	contextTag = "context"
-	// requiredTag specifies that a field must not be the zero value after checking the config and context.
-	requiredTag = "required"
-	// loggerTag specifies that a field should be added to the logger.
-	// loggerTag = "logger"
-	// envTag specifies that a field should be pulled from an environment variable.
-	envTag = "env"
+	// envTagName specifies that a field should be fetched from an environment variable.
+	envTagName = "env"
 )
 
-func (c *Context) ReconcileConfigComplexStruct(fieldType *reflect.StructField, fieldValue *reflect.Value) error {
-	if fieldType.Type.Kind() == reflect.Struct {
-		if fieldValue.Addr().CanInterface() {
-			if _, err := c.ReconcileConfig(fieldValue.Addr().Interface()); err != nil {
-				return err
-			}
-		}
-	} else if fieldType.Type.Kind() == reflect.Ptr && fieldType.Type.Elem().Kind() == reflect.Struct {
-		if fieldValue.IsNil() && fieldValue.CanSet() {
-			fieldValue.Set(reflect.New(fieldType.Type.Elem()))
-		}
-		if fieldValue.CanInterface() {
-			if _, err := c.ReconcileConfig(fieldValue.Interface()); err != nil {
-				return err
-			}
-		}
-	} else if fieldType.Type.Kind() == reflect.Slice {
-		elemType := fieldType.Type.Elem()
-		if elemType.Kind() == reflect.Struct || (elemType.Kind() == reflect.Ptr && elemType.Elem().Kind() == reflect.Struct) {
-			for i := 0; i < fieldValue.Len(); i++ {
-				elemValue := fieldValue.Index(i)
-				if elemValue.CanAddr() {
-					if err := c.ReconcileConfigComplexStruct(&reflect.StructField{Type: elemType}, &elemValue); err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
+// Tags below are defined under caoCliTagName. `caoCli:"required,context"`
+const (
+	// caoCliRequired specifies that a field must not be the zero value after reconciling config
+	// i.e. after checking from yaml > context > env.
+	caoCliRequired = "required"
 
-	return nil
-}
+	// caoCliContext specifies that a field must be taken from the context.
+	caoCliContext = "context"
+)
 
-// ReconcileConfig takes in an action config and applies context values to it.
+// ReconcileConfig takes in an action config and appropriately gets the value for the config fields.
+/*
+ * Check for the following tags: `caoCli:"required, context"` and `env:"ENV_VAR_NAME"`.
+ * Recursively check for the tags in the struct fields. Checks in all nested supported types e.g. slices, structs and maps.
+ * Reconciliation precedence: yaml > context > env.
+ */
 func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 	// catch any panics just in case it ever happens.
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("recovered from a panic while attempting to unmarshal", r)
+			logrus.Errorf("recover from a panic while reconciling config: %+v", r)
 		}
 	}()
-	// some actions have nil configs.
+
+	// some actions can have nil configs.
 	if config == nil {
 		return nil, nil
 	}
@@ -86,128 +65,224 @@ func (c *Context) ReconcileConfig(config interface{}) (interface{}, error) {
 	v := reflect.ValueOf(config).Elem()
 
 	if !v.CanAddr() || !v.CanSet() {
-		return nil, fmt.Errorf("%w : %s", ErrCantAssign, t)
+		return nil, fmt.Errorf("%w : %s", ErrConfigNotAddr, v.Type())
 	}
 
-	// iterate over all available fields and read the tag value.
-	for i := 0; i < t.NumField(); i++ { //nolint:intrange
-		fieldType := t.Field(i)
-		fieldValue := v.Field(i)
+	errList := make([]error, 0)
 
-		// When the config holds structs or ptr to other structs, those structs are reconciled recursively.
-		if err := c.ReconcileConfigComplexStruct(&fieldType, &fieldValue); err != nil {
-			return nil, err
+	for i := range v.NumField() {
+		if err := c.ReconcileStructField(t.Field(i), v.Field(i)); err != nil {
+			errList = append(errList, err)
+		}
+	}
+
+	if len(errList) != 0 {
+		logrus.Errorf("Errors during reconciling:")
+		for i, err := range errList {
+			logrus.Errorf("%d: %v", i+1, err)
 		}
 
-		// get the field tag value
-		tagString := fieldType.Tag.Get(caoCliTagString)
-		if tagString == "" {
-			// no tag we care about here.
-			continue
-		}
-
-		envTag := fieldType.Tag.Get(envTag)
-
-		// multiple tags are comma separated.
-		tags := strings.Split(tagString, ",")
-
-		// go through and work out what actions we must complete.
-		contextTagFound := false
-		requiredTagFound := false
-
-		for _, tag := range tags {
-			switch tag {
-			case contextTag:
-				contextTagFound = true
-			case requiredTag:
-				requiredTagFound = true
-			default:
-				return nil, fmt.Errorf("%w : %s", ErrUnsupportedTag, tag)
-			}
-		}
-
-		name := fieldType.Name
-
-		takeFromEnv := envTag != ""
-
-		if contextTagFound {
-			// this value is tagged as context
-			// check that the field name is registered
-			key, ok := contextUnmarshalKeys[name]
-			if !ok {
-				return nil, fmt.Errorf("%w :%s", ErrFieldNotRegistered, name)
-			}
-
-			ctxVal := ValueIDInterface(c.ctx, key)
-
-			// If context value is nil and value already present in field (from yaml), the context will be set with fieldValue
-
-			// If the context value is not nil and field value is nil, then the field value will be set from context
-
-			// If the context value is not nil and field value is not nil, then the field value takes precedence.
-			// Also this does not override the context value. The previous context value remains.
-			// The override of the context value has to be taken care of by the action
-			// What this implies is that the context value will be set the first time a fieldValue is encountered.
-			// Further, the context value will not be overridden by the new fieldValues and that has to be taken care by the action.
-
-			switch {
-			case ctxVal == nil:
-				// nothing is set in the context so we should put our config value in there.
-				if !fieldValue.IsZero() {
-					c.WithIDInterface(key, fieldValue.Interface())
-
-					takeFromEnv = false
-				}
-			case !fieldValue.IsZero():
-				takeFromEnv = false
-			default:
-				// values set via context take precedent over env vars.
-				takeFromEnv = false
-
-				if fieldValue.CanSet() {
-					/* set our config value with the context value for types such as `type Volume string` we need to
-					convert to allow setting the value.
-					*/
-					fieldValueType := fieldValue.Type()
-					ctxValueType := reflect.ValueOf(ctxVal).Type()
-
-					value, err := maybeConvertValue(fieldValueType, ctxValueType, ctxVal)
-					if err != nil {
-						return nil, fmt.Errorf("failed to set context value '%s' into field '%s': %w", ctxVal, name, err)
-					}
-
-					fieldValue.Set(value)
-				}
-			}
-		}
-
-		if takeFromEnv {
-			envVal, ok := os.LookupEnv(envTag)
-			if ok && envVal != "" && fieldValue.CanSet() {
-				fieldValueType := fieldValue.Type()
-				envValueType := reflect.ValueOf(envVal).Type()
-				value, err := maybeConvertValue(fieldValueType, envValueType, envVal)
-
-				if err != nil {
-					return nil, fmt.Errorf("%w %s %s %w", ErrFailedToSetValue, envVal, name, err)
-				}
-
-				fieldValue.Set(value)
-
-				key, ok := contextUnmarshalKeys[name]
-				// set value in context if it's a context value.
-				if ok {
-					c.WithIDInterface(key, fieldValue.Interface())
-				}
-			}
-		}
-
-		if requiredTagFound && fieldValue.IsZero() {
-			return nil, fmt.Errorf("%w:%s", ErrConfigZeroValue, name)
-		}
+		return config, errList[0]
 	}
 
 	return config, nil
+}
+
+// ReconcileStructField reconciles the config fields based on the caoCli and env tags present in the struct fields.
+// NOTE: if the value is req and takes a zero value then it will be not be reconciled - it will throw an error.
+// TODO add errList here otherwise only first error in recursion will be returned.
+// TODO check if t can be removed.
+func (c *Context) ReconcileStructField(t reflect.StructField, v reflect.Value) error {
+	if v.CanSet() {
+		logrus.Debugf("Start reconciling: %s %s = %+v", v.Type().String(), t.Name, v.Interface())
+	}
+
+	caoCliTagValue := t.Tag.Get(caoCliTagName)
+	envTagValue := t.Tag.Get(envTagName)
+
+	var isReq bool    // True if `caoCli:"required"` is present.
+	var fromYaml bool // True if the value is present in yaml.
+	var fromCtx bool  // True if the value is to be taken from context `caoCli:"context"`.
+	var fromEnv bool  // True if the value is to be taken from env `env:"ENV_VAR_NAME"`.
+
+	if caoCliTagValue != "" {
+		caoCliValues := strings.Split(caoCliTagValue, ",")
+
+		for _, caoCliValue := range caoCliValues {
+			switch caoCliValue {
+			case caoCliRequired:
+				isReq = true
+			case caoCliContext:
+				fromCtx = true
+			}
+		}
+	}
+
+	if envTagValue != "" {
+		fromEnv = true
+	}
+
+	// If it is a pointer we dereference it.
+	if v.Kind() == reflect.Ptr {
+		// If v is nil, but it is either required or to be filled from ctx / env then we assign an address to it.
+		if v.IsNil() && (fromEnv || fromCtx || isReq) {
+			v.Set(reflect.New(v.Type().Elem()))
+		} else if v.IsNil() {
+			return nil
+		}
+
+		v = v.Elem()
+	}
+
+	switch v.Kind() {
+	case reflect.Struct:
+		{
+			if v.IsZero() && isReq {
+				return fmt.Errorf("reconcile var %s %s : %w", t.Name, v.Type().String(), ErrFieldZeroValue)
+			} else if v.IsZero() {
+				return nil
+			}
+
+			tempV := v
+			tempT := tempV.Type()
+
+			for i := range tempT.NumField() {
+				if err := c.ReconcileStructField(tempT.Field(i), tempV.Field(i)); err != nil {
+					return fmt.Errorf("reconcile struct %s: %w", tempV.Type().String(), err)
+				}
+			}
+
+			return nil
+		}
+	case reflect.Slice:
+		{
+			if v.IsNil() && isReq {
+				return fmt.Errorf("reconcile var %s %s : %w", t.Name, v.Type().String(), ErrFieldNil)
+			} else if v.IsNil() {
+				return nil
+			}
+
+			for j := 0; j < v.Len(); j++ {
+				tempV := v.Index(j)
+
+				if err := c.ReconcileStructField(t, tempV); err != nil {
+					return fmt.Errorf("reconcile var %s %s for idx %d : %w", t.Name, v.Type().String(), j, err)
+				}
+			}
+
+			return nil
+		}
+	case reflect.Map:
+		{
+			if v.IsNil() && isReq {
+				return fmt.Errorf("reconcile var %s %s : %w", t.Name, v.Type().String(), ErrFieldNil)
+			} else if v.IsNil() {
+				return nil
+			}
+
+			for _, mapKey := range v.MapKeys() {
+				mapValue := v.MapIndex(mapKey)
+
+				if err := c.ReconcileStructField(t, mapValue); err != nil {
+					return fmt.Errorf("reconcile var %s %s for key %s: %w", t.Name, v.Type().String(), mapKey.String(), err)
+				}
+			}
+
+			return nil
+		}
+	}
+
+	// Precedence is yaml > ctx > env.
+	// If context is empty then its value will be set using yaml/env. It will never be overridden.
+	// If in the end the field has ZeroValue & field is required then we will throw an error.
+	// Stating the combinations for yaml, context and env:
+	/*
+	 * yaml=true: yaml has value; ctx=true: take value from ctx (it may or may not have it); env=true: take value from env (it may or may not have it).
+	 *
+	 * yaml=true ; ctx=false; env=false - yaml.
+	 * yaml=true ; ctx=true ; env=false - yaml; if context empty then set it.
+	 * yaml=true ; ctx=true ; env=true  - yaml; if context empty then set it.
+	 * yaml=true ; ctx=false; env=true  - yaml;
+	 * yaml=false; ctx=true ; env=false - context.
+	 * yaml=false; ctx=true ; env=true  - context > env; if ctx empty then set it.
+	 * yaml=false; ctx=false; env=true  - env.
+	 * yaml=false; ctx=false; env=false - none.
+	 */
+
+	// Here we come with the v and t having a struct field value and type. It won't be a slice, map, or struct.
+	logrus.Debugf("Reconciling: %s %s = %+v", v.Type().Name(), t.Name, v.Interface())
+
+	if !v.IsZero() {
+		fromYaml = true
+	}
+
+	if !v.CanSet() {
+		return fmt.Errorf("field %s %s: %w", t.Name, v.Type().String(), ErrFailedToSetValue)
+	}
+
+	if fromCtx {
+		fieldName := t.Name
+
+		fieldCtxKey, ok := contextUnmarshalKeys[fieldName]
+		if !ok {
+			return fmt.Errorf("%w :%s", ErrFieldNotRegistered, fieldName)
+		}
+
+		fieldCtxValue := ValueIDInterface(c.ctx, fieldCtxKey)
+
+		if fieldCtxValue == nil && fromYaml {
+			// If we have value from yaml and context is nil then we set it.
+			c.WithIDInterface(fieldCtxKey, v.Interface())
+		} else if fieldCtxValue != nil && !fromYaml {
+			// If we don't have value from yaml and context is not nil then we take context value.
+			fieldValueType := v.Type()
+			ctxValueType := reflect.ValueOf(fieldCtxValue).Type()
+
+			convertedValue, err := maybeConvertValue(fieldValueType, ctxValueType, fieldCtxValue)
+			if err != nil {
+				return fmt.Errorf("set context value '%s' into field '%s': %w", fieldCtxValue, fieldName, err)
+			}
+
+			v.Set(convertedValue)
+		}
+	}
+
+	if fromEnv {
+		if envValue, ok := os.LookupEnv(envTagValue); ok && envValue != "" && v.IsZero() {
+			fieldValueType := v.Type()
+			envValueType := reflect.ValueOf(envValue).Type()
+
+			value, err := maybeConvertValue(fieldValueType, envValueType, envValue)
+			if err != nil {
+				return fmt.Errorf("field %s %s and env = %s: %w", t.Name, v.Type().String(), envValue, err)
+			}
+
+			v.Set(value)
+
+			// If value has to be added into context
+			if fromCtx {
+				fieldName := t.Name
+
+				fieldCtxKey, ok := contextUnmarshalKeys[fieldName]
+				if !ok {
+					return fmt.Errorf("%w :%s", ErrFieldNotRegistered, fieldName)
+				}
+
+				fieldCtxValue := ValueIDInterface(c.ctx, fieldCtxKey)
+				if fieldCtxValue == nil && !v.IsZero() {
+					c.WithIDInterface(fieldCtxKey, v.Interface())
+				}
+			}
+		}
+	}
+
+	if isReq && v.IsZero() {
+		return fmt.Errorf("required field %s %s: %w", t.Name, v.Type().String(), ErrFieldZeroValue)
+	}
+
+	logrus.Debugf("Reconciled: %s %s = %+v", v.Type().Name(), t.Name, v.Interface())
+
+	return nil
 }
 
 func maybeConvertValue(expectedType, actualType reflect.Type, value interface{}) (reflect.Value, error) {
@@ -219,7 +294,7 @@ func maybeConvertValue(expectedType, actualType reflect.Type, value interface{})
 	if actualType.String() == "string" && expectedType.String() == "int" {
 		val, err := strconv.Atoi(value.(string))
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, fmt.Errorf("maybe convert value: %w", err)
 		}
 
 		return reflect.ValueOf(val).Convert(expectedType), nil
@@ -228,7 +303,7 @@ func maybeConvertValue(expectedType, actualType reflect.Type, value interface{})
 	if actualType.String() == "string" && expectedType.String() == "bool" {
 		val, err := strconv.ParseBool(value.(string))
 		if err != nil {
-			return reflect.Value{}, err
+			return reflect.Value{}, fmt.Errorf("maybe convert value: %w", err)
 		}
 
 		return reflect.ValueOf(val).Convert(expectedType), nil
@@ -239,5 +314,5 @@ func maybeConvertValue(expectedType, actualType reflect.Type, value interface{})
 		return reflect.ValueOf(value).Convert(expectedType), nil
 	}
 
-	return reflect.Value{}, ErrValueNotConvertable
+	return reflect.Value{}, fmt.Errorf("maybe convert value: %w", ErrValueNotConvertable)
 }

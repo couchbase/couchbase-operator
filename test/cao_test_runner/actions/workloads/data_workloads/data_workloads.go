@@ -34,10 +34,10 @@ type DataWorkloadInterface interface {
 	DeleteJobs() error
 }
 
-func NewDataWorkload(name DataWorkloadName, namespace string, jobDuration time.Duration) (DataWorkloadInterface, error) {
+func NewDataWorkload(name DataWorkloadName, namespace, resultDir string, jobDuration time.Duration) (DataWorkloadInterface, error) {
 	switch name {
 	case GideonDataWorkload:
-		return ConfigGideonDataWorkload(namespace), nil
+		return ConfigGideonDataWorkload(namespace, resultDir), nil
 	default:
 		return nil, ErrInvalidDataWorkloadName
 	}

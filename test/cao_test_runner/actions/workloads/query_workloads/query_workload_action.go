@@ -42,15 +42,15 @@ type QueryWorkloadConfig struct {
 }
 
 type QueryConfig struct {
-	NumQueries       int    `yaml:"numQueries" caoCli:"required"`    // QueryApp
-	QueryDuration    int    `yaml:"queryDuration" caoCli:"required"` // QueryApp
-	Threads          int    `yaml:"threads"`                         // QueryApp
-	QueryFile        string `yaml:"queryFile"`                       // QueryApp
-	AnalyticsQueries bool   `yaml:"analyticsQueries"`                // QueryApp
-	QueryTimeout     int    `yaml:"queryTimeout"`                    // QueryApp
-	ScanConsistency  string `yaml:"scanConsistency"`                 // QueryApp
-	Dataset          string `yaml:"dataset"`                         // QueryApp
-	PrintDuration    int    `yaml:"printDuration"`                   // QueryApp
+	NumQueries       int    `yaml:"numQueries" caoCli:"required"` // QueryApp
+	QueryDuration    int    `yaml:"queryDuration"`                // QueryApp had to remove the required tag as zero value can be used with it.
+	Threads          int    `yaml:"threads"`                      // QueryApp
+	QueryFile        string `yaml:"queryFile"`                    // QueryApp
+	AnalyticsQueries bool   `yaml:"analyticsQueries"`             // QueryApp
+	QueryTimeout     int    `yaml:"queryTimeout"`                 // QueryApp
+	ScanConsistency  string `yaml:"scanConsistency"`              // QueryApp
+	Dataset          string `yaml:"dataset"`                      // QueryApp
+	PrintDuration    int    `yaml:"printDuration"`                // QueryApp
 }
 
 func NewQueryWorkloadConfig(config interface{}) (actions.Action, error) {
@@ -112,7 +112,7 @@ func (d *QueryWorkload) Do(_ *context.Context, testAssets assets.TestAssetGetter
 		return fmt.Errorf("query workload: %w", err)
 	}
 
-	queryWorkload, err := NewQueryWorkload(queryConfig.QueryWorkloadName, queryConfig.Namespace, queryConfig.RunDuration)
+	queryWorkload, err := NewQueryWorkload(queryConfig.QueryWorkloadName, queryConfig.Namespace, testAssets.GetResultsDirectory().DirectoryPath, queryConfig.RunDuration)
 	if err != nil {
 		return fmt.Errorf("query workload: %w", err)
 	}

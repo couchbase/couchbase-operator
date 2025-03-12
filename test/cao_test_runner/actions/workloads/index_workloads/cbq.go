@@ -45,12 +45,13 @@ type CBQArgs struct {
 	Bucket string
 }
 
-func ConfigCBQIndexWorkload(namespace string, jobDuration time.Duration) *CBQ {
+func ConfigCBQIndexWorkload(namespace, resultDir string, jobDuration time.Duration) *CBQ {
 	return &CBQ{
-		Jobs:        make([]*jobs.Job, 0),
-		FilePaths:   make([]string, 0),
-		JobDuration: jobDuration,
-		Namespace:   namespace,
+		Jobs:               make([]*jobs.Job, 0),
+		FilePaths:          make([]string, 0),
+		JobDuration:        jobDuration,
+		Namespace:          namespace,
+		idxWorkloadYAMLDir: fileutils.NewDirectory(filepath.Join(resultDir, "/index_workloads"), os.ModePerm),
 	}
 }
 
