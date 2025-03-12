@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // updateMembers is the canonical source of truth for all membership information.
@@ -308,6 +309,10 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 			pod.Annotations[constants.CouchbaseHostnameAnnotation] = pod.Spec.NodeName
 
 			if err := c.k8s.Pods.Update(pod); err != nil {
+				return err
+			}
+
+			if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(c.ctx, pod, metav1.UpdateOptions{}); err != nil {
 				return err
 			}
 		}
