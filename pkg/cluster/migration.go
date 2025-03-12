@@ -122,6 +122,10 @@ func (c *Cluster) reconcileMigrationCluster() error {
 
 	mrm, err := NewMigrationReconcileMachine(c)
 
+	if err != nil {
+		return err
+	}
+
 	if !mrm.externalMembers.Empty() {
 		c.cluster.Status.SetMigratingCondition()
 	}
