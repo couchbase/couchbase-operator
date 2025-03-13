@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
-	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -34,22 +33,17 @@ type KubernetesSetupConfig struct {
 	AKSRegion                string                             `yaml:"aksRegion" caoCli:"context" env:"AKS_REGION"`
 	GKERegion                string                             `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
 	KubernetesVersion        string                             `yaml:"kubernetesVersion"`
-	InstanceType             string                             `yaml:"instanceType"`
-	NumNodeGroups            int                                `yaml:"numNodeGroups"`
-	MinSize                  int                                `yaml:"minSize"`
-	MaxSize                  int                                `yaml:"maxSize"`
-	DesiredSize              int                                `yaml:"desiredSize"`
-	DiskSize                 int                                `yaml:"diskSize"`
-	AMI                      ekstypes.AMITypes                  `yaml:"ami"`
-	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`
-	OSType                   armcontainerservice.OSType         `yaml:"osType"`
-	VMSize                   string                             `yaml:"vmSize"`
-	Count                    int                                `yaml:"count"`
-	NumNodePools             int                                `yaml:"numNodePools"`
-	MachineType              string                             `yaml:"machineType"`
-	ImageType                string                             `yaml:"imageType"`
-	DiskType                 string                             `yaml:"diskType"`
-	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"`
+	EKSNodegroups            []*EKSNodegroup                    `yaml:"eksNodegroups"`
+	DiskSize                 int                                `yaml:"diskSize"`       // AKS, GKE
+	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`          // AKS
+	OSType                   armcontainerservice.OSType         `yaml:"osType"`         // AKS
+	VMSize                   string                             `yaml:"vmSize"`         // AKS
+	Count                    int                                `yaml:"count"`          // AKS, GKE
+	NumNodePools             int                                `yaml:"numNodePools"`   // AKS, GKE
+	MachineType              string                             `yaml:"machineType"`    // GKE
+	ImageType                string                             `yaml:"imageType"`      // GKE
+	DiskType                 string                             `yaml:"diskType"`       // GKE
+	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"` // GKE
 	kubeconfigPath           *fileutils.File
 	ms                       *managedk8sservices.ManagedServiceProvider
 	resultsDirectory         *fileutils.Directory

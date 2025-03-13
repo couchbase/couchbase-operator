@@ -38,15 +38,18 @@ type CreateEKSCluster struct {
 	ClusterName            string
 	Region                 string
 	KubernetesVersion      string
-	InstanceType           string
-	NumNodeGroups          int
-	MinSize                int
-	MaxSize                int
-	DesiredSize            int
-	DiskSize               int
-	AMI                    ekstypes.AMITypes
+	EKSNodegroups          []*EKSNodegroup
 	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+}
+
+type EKSNodegroup struct {
+	InstanceType string            `yaml:"instanceType"`
+	MinSize      int               `yaml:"minSize"`
+	MaxSize      int               `yaml:"maxSize"`
+	DesiredSize  int               `yaml:"desiredSize"`
+	DiskSize     int               `yaml:"diskSize"`
+	AMI          ekstypes.AMITypes `yaml:"ami"`
 }
 
 func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
@@ -144,11 +147,11 @@ func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {
 
 	logrus.Info("Created EKS Cluster")
 
-	for i := 0; i < cec.NumNodeGroups; i++ {
+	for i, nodeGroup := range cec.EKSNodegroups {
 		nodeGroupName := fmt.Sprintf("%s-node-group-%d", cec.ClusterName, i)
-		if _, err = eksSession.CreateNodeGroup(ctx, cec.InstanceType, nodeGroupName,
-			sshKey, subnetIds, []string{*securityGroup.GroupId}, int32(cec.MinSize), int32(cec.DesiredSize),
-			int32(cec.MaxSize), int32(cec.DiskSize), cec.AMI, true); err != nil {
+		if _, err = eksSession.CreateNodeGroup(ctx, nodeGroup.InstanceType, nodeGroupName,
+			sshKey, subnetIds, []string{*securityGroup.GroupId}, int32(nodeGroup.MinSize), int32(nodeGroup.DesiredSize),
+			int32(nodeGroup.MaxSize), int32(nodeGroup.DiskSize), nodeGroup.AMI, true); err != nil {
 			return fmt.Errorf("create eks cluster: %w", err)
 		}
 	}
@@ -248,28 +251,30 @@ func (cec *CreateEKSCluster) updateKubeconfig(cluster *ekstypes.Cluster, region 
 }
 
 func (cec *CreateEKSCluster) ValidateParams(ctx context.Context) error {
-	if cec.NumNodeGroups <= 0 {
+	if len(cec.EKSNodegroups) <= 0 {
 		return ErrNumNodeGroupsInvalid
 	}
 
-	if cec.DesiredSize <= 0 {
-		return ErrDesiredSizeInvalid
-	}
+	for _, nodeGroup := range cec.EKSNodegroups {
+		if nodeGroup.DesiredSize <= 0 {
+			return ErrDesiredSizeInvalid
+		}
 
-	if cec.MinSize <= 0 {
-		return ErrMinSizeInvalid
-	}
+		if nodeGroup.MinSize <= 0 {
+			return ErrMinSizeInvalid
+		}
 
-	if cec.MaxSize <= 0 {
-		return ErrMaxSizeInvalid
-	}
+		if nodeGroup.MaxSize <= 0 {
+			return ErrMaxSizeInvalid
+		}
 
-	if cec.DiskSize <= 0 {
-		return ErrDiskSizeInvalid
-	}
+		if nodeGroup.DiskSize <= 0 {
+			return ErrDiskSizeInvalid
+		}
 
-	if ok, err := managedk8sservices.ValidateAMIType(cec.AMI); !ok || err != nil {
-		return err
+		if ok, err := managedk8sservices.ValidateAMIType(nodeGroup.AMI); !ok || err != nil {
+			return err
+		}
 	}
 
 	svc, err := managedk8sservices.NewManagedServiceCredentials(
