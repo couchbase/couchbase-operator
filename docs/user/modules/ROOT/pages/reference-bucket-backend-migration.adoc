@@ -86,3 +86,45 @@ spec:
 ----
 
 Whilst this annotation is on the cluster, the Couchbase Operator will try to migrate all unmanaged buckets to the specified backend. When the annotation is removed then the Operator will stop attempting the migrations. If any buckets fail migration due to not meeting the requirements then the annotation can be removed until the buckets have been modified to meet the requirements, then reapplied at a later time to attempt migration again.
+
+=== Migrating from Magma to Couchstore
+When migrating from Magma to Couchstore, you must first set the `cao.couchbase.com/historyRetention.collectionHistoryDefault` annotation to `false` on the bucket.
+This must be done before the migration is started.
+
+Therefore, the migration must be done in two steps. First, apply the annotation to the yaml and apply the yaml to the cluster.
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+  annotations:
+    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"
+spec:
+  memoryQuota: 1024Mi
+  enableIndexReplica: false
+  evictionPolicy: fullEviction
+  storageBackend: magma
+----
+
+Then, change the storage backend to couchstore and apply the yaml again.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket0
+  annotations:
+    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"
+spec:
+  memoryQuota: 1024Mi
+  enableIndexReplica: false
+  evictionPolicy: fullEviction
+  storageBackend: couchstore
+----
+
+If this is not done, the admission controller will reject the yaml change with the error below. If this occurs, change
+the storage backend back to magma and then follow the steps above.
+
+`spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false`
