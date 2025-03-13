@@ -543,9 +543,12 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 	}
 
 	for crdName, crd := range crdsMap {
-		couchbaseCRD := &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
-		if err := kc.SetCouchbaseCRD(couchbaseCRD); err != nil {
-			return fmt.Errorf("populate k8s cluster: %w", err)
+		// Filtering out the couchbase CRDs
+		if crd.Metadata.Annotations["config.couchbase.com/version"] != nil {
+			couchbaseCRD := &CouchbaseCRD{crdName: crdName, version: crd.Metadata.Annotations["config.couchbase.com/version"].(string)}
+			if err := kc.SetCouchbaseCRD(couchbaseCRD); err != nil {
+				return fmt.Errorf("populate k8s cluster: %w", err)
+			}
 		}
 	}
 
