@@ -321,7 +321,7 @@ func (gks *GKESession) CreateCluster(ctx context.Context, networkName, subnetwor
 					ImageType:   imageType,
 				},
 				Autoscaling: &containerpb.NodePoolAutoscaling{
-					Enabled: true,
+					Enabled: false,
 				},
 			},
 		},
@@ -371,7 +371,7 @@ func (gks *GKESession) CreateNodePool(ctx context.Context, nodePoolName, machine
 			ImageType:   imageType,
 		},
 		Autoscaling: &containerpb.NodePoolAutoscaling{
-			Enabled: true,
+			Enabled: false,
 		},
 	}
 
@@ -385,7 +385,7 @@ func (gks *GKESession) CreateNodePool(ctx context.Context, nodePoolName, machine
 		return fmt.Errorf("failed to create node pool: %w", err)
 	}
 
-	if err := gks.WaitForOperation(ctx, op.Name); err != nil {
+	if err := gks.WaitForClusterOperation(ctx, op.Name); err != nil {
 		return fmt.Errorf("node pool %s creation operation failed: %w", nodePoolName, err)
 	}
 

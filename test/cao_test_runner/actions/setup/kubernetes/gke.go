@@ -83,13 +83,13 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 
 	logrus.Infof("Created subnet %s in virtual network %s", subnetName, networkName)
 
-	nodePoolName := cgc.ClusterName + "np-0"
+	nodePoolName := cgc.ClusterName + "-np-0"
 	if err := gkeSession.CreateCluster(ctx, networkName, subnetName, cgc.MachineType, cgc.ImageType,
 		cgc.DiskType, cgc.KubernetesVersion, nodePoolName, cgc.DiskSize, cgc.Count, cgc.ReleaseChannel); err != nil {
 		return fmt.Errorf("error creating cluster %s: %w", cgc.ClusterName, err)
 	}
 
-	logrus.Infof("Created cluster %s with 1 node pool %s", cgc.ClusterName, nodePoolName)
+	logrus.Infof("Created cluster %s with default node pool %s", cgc.ClusterName, nodePoolName)
 
 	for i := 1; i < cgc.NumNodePools; i++ {
 		nodePoolName = fmt.Sprintf("%s-np-%d", cgc.ClusterName, i)
@@ -181,6 +181,7 @@ func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
 	}
 
 	if len(possibleVersions) == 0 {
+		logrus.Warn("Available K8S Versions:\n", validKubernetesVersions)
 		return fmt.Errorf("invalid kubernetes version, not available in GKE: %w", ErrInvalidKubernetesVersion)
 	}
 

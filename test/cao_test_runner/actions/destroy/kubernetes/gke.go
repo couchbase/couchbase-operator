@@ -60,7 +60,7 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	firewallRuleName := dgc.ClusterName + "-firewall"
 	contextName := fmt.Sprintf("gke_%s_%s", dgc.Region, dgc.ClusterName)
 	userName := fmt.Sprintf("gke_%s_%s", dgc.Region, dgc.ClusterName)
-	kubeconfigClusterName := fmt.Sprintf("gke_%s_%s", dgc.Region, dgc.ClusterName)
+	kubeconfigClusterName := dgc.ClusterName
 
 	if err := gkeSession.DeleteSubnet(ctx, subnetName, true); err != nil {
 		return fmt.Errorf("failed to delete subnet %s of virtual network %s: %w", subnetName, networkName, err)
