@@ -118,7 +118,7 @@ The recommended deployment method for the Operator is a single instance per-name
 This allows staged upgrades of the Operator, only affecting a subset of Couchbase clusters at any one time.
 
 The Operator may be deployed at the cluster scope, where a single Operator controls all Couchbase clusters on the platform.
-While requiring less operational overhead, and upgrade of the Operator will affect all Couchbase clusters running on the platform, so use this deployment method with caution.
+While requiring less operational overhead, and upgrade of the Operator will affect all Couchbase clusters running on the platform, including other Couchbase clusters managed by Operators that are namespace scoped. If this is the case then both Operators will attempt to manage the cluster resulting in the cluster being in a bad state. So use this deployment method with caution.
 In the following <<operator-resources,operator resources section>>, `Roles` and `RoleBindings` are replaced with `ClusterRoles` and `ClusterRoleBindings` respectively.
 ====
 
