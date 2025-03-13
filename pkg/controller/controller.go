@@ -84,8 +84,18 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	// See if we know about the cluster already.
-	c, ok := r.clusters.Load(request.NamespacedName.String())
-	if !ok {
+	c, existingCluster := r.clusters.Load(request.NamespacedName.String())
+
+	// Check if this is actually the same cluster or if was delete and recreated
+	if c != nil && c.GetCouchbaseCluster().UID != couchbase.UID {
+		log.V(2).Info("Deleting recreated cluster", "cluster", request.NamespacedName)
+		c.Delete()
+		r.clusters.Delete(request.NamespacedName.String())
+
+		existingCluster = false
+	}
+
+	if !existingCluster {
 		// Cluster created or detected during a restart, start a new management routine.
 		log.V(2).Info("Creating cluster", "cluster", request.NamespacedName)
 
