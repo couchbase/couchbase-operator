@@ -2,11 +2,13 @@ package k8sclustervalidator
 
 import (
 	"errors"
+	"fmt"
 
 	"context"
 
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -35,29 +37,31 @@ func NewValidateClusterUtil(v *KubernetesClusterValidator, testAssets assets.Tes
 				case managedk8sservices.GCP:
 					return &ValidateGKECluster{ClusterName: v.ClusterName, GKEConfig: v.GKEConfig}, nil
 				default:
-					return nil, ErrNotImplemented
+					return nil, fmt.Errorf("new validate cluster util: %w", ErrNotImplemented)
 				}
 			default:
-				return nil, ErrNotImplemented
+				return nil, fmt.Errorf("new validate cluster util: %w", ErrNotImplemented)
 			}
 		case managedk8sservices.Openshift:
-			return nil, ErrNotImplemented
+			return nil, fmt.Errorf("new validate cluster util: %w", ErrNotImplemented)
 		default:
-			return nil, ErrNotImplemented
+			return nil, fmt.Errorf("new validate cluster util: %w", ErrNotImplemented)
 		}
 	} else {
-		if _, err := checkConfigIsNil(v.KindConfig); err != nil {
+		logrus.Debugf("KubernetesClusterValidator = %+v\n", v)
+
+		if v.KindConfig != nil {
 			return &ValidateKindCluster{ClusterName: v.ClusterName, KindConfig: v.KindConfig}, nil
 		}
-		if _, err := checkConfigIsNil(v.EKSConfig); err != nil {
+		if v.EKSConfig != nil {
 			return &ValidateEKSCluster{ClusterName: v.ClusterName, EKSConfig: v.EKSConfig}, nil
 		}
-		if _, err := checkConfigIsNil(v.AKSConfig); err != nil {
+		if v.AKSConfig != nil {
 			return &ValidateAKSCluster{ClusterName: v.ClusterName, AKSConfig: v.AKSConfig}, nil
 		}
-		if _, err := checkConfigIsNil(v.GKEConfig); err != nil {
+		if v.GKEConfig != nil {
 			return &ValidateGKECluster{ClusterName: v.ClusterName, GKEConfig: v.GKEConfig}, nil
 		}
 	}
-	return nil, ErrInvalidConfig
+	return nil, fmt.Errorf("new validate cluster util: %w", ErrInvalidConfig)
 }

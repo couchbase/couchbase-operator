@@ -45,11 +45,11 @@ type CreateEKSCluster struct {
 
 type EKSNodegroup struct {
 	InstanceType string            `yaml:"instanceType"`
+	DesiredSize  int               `yaml:"desiredSize"`
 	MinSize      int               `yaml:"minSize"`
 	MaxSize      int               `yaml:"maxSize"`
-	DesiredSize  int               `yaml:"desiredSize"`
-	DiskSize     int               `yaml:"diskSize"`
 	AMI          ekstypes.AMITypes `yaml:"ami"`
+	DiskSize     int               `yaml:"diskSize"`
 }
 
 func (cec *CreateEKSCluster) CreateCluster(ctx context.Context) error {

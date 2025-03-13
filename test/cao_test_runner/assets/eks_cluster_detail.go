@@ -18,7 +18,6 @@ var (
 
 type EKSClusterDetail struct {
 	eksClusterName      string
-	nodegroupNames      []*string
 	kubernetesVersion   string
 	eksNodegroupDetails map[string]*EKSNodegroupDetail
 	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
@@ -28,20 +27,19 @@ type EKSClusterDetail struct {
 type EKSNodegroupDetail struct {
 	ngName       *string
 	ngK8SVersion string
+	instanceType string
 	desiredSize  int32
 	minSize      int32
 	maxSize      int32
-	instanceType string
 	ami          ekstypes.AMITypes
 	diskSize     int32
 	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
 
-func NewEKSClusterDetail(eksClusterName string, nodegroupNames []*string, kubernetesVersion string, nodegroupDetails map[string]*EKSNodegroupDetail) *EKSClusterDetail {
+func NewEKSClusterDetail(eksClusterName, kubernetesVersion string, nodegroupDetails map[string]*EKSNodegroupDetail) *EKSClusterDetail {
 	return &EKSClusterDetail{
 		eksClusterName:      eksClusterName,
-		nodegroupNames:      nodegroupNames,
 		kubernetesVersion:   kubernetesVersion,
 		eksNodegroupDetails: nodegroupDetails,
 	}
@@ -73,7 +71,6 @@ func NewEKSNodegroupDetail(nodegroupName *string, k8sVersion, instanceType strin
 
 type EKSClusterDetailGetter interface {
 	GetEKSClusterName() string
-	GetAllNodegroupNames() []*string
 	GetKubernetesVersion() string
 	GetNodegroupDetailGetter(nodegroupName *string) EKSNodegroupDetailGetter
 }
@@ -81,13 +78,11 @@ type EKSClusterDetailGetter interface {
 type EKSClusterDetailGetterSetter interface {
 	// Getters
 	GetEKSClusterName() string
-	GetAllNodegroupNames() []*string
 	GetKubernetesVersion() string
 	GetNodegroupDetailGetterSetter(nodegroupName *string) EKSNodegroupDetailGetterSetter
 
 	// Setters
 	SetEKSClusterName(eksClusterName string) error
-	SetNodegroupNames(nodeGroups []*string) error
 	SetKubernetesVersion(kubernetesVersion string) error
 	SetNodegroup(nodegroup *EKSNodegroupDetail) error
 }
@@ -142,12 +137,6 @@ func (ekscd *EKSClusterDetail) GetEKSClusterName() string {
 	return ekscd.eksClusterName
 }
 
-func (ekscd *EKSClusterDetail) GetAllNodegroupNames() []*string {
-	ekscd.mu.Lock()
-	defer ekscd.mu.Unlock()
-	return ekscd.nodegroupNames
-}
-
 func (ekscd *EKSClusterDetail) GetKubernetesVersion() string {
 	ekscd.mu.Lock()
 	defer ekscd.mu.Unlock()
@@ -186,13 +175,6 @@ func (ekscd *EKSClusterDetail) SetEKSClusterName(eksClusterName string) error {
 	}
 
 	ekscd.eksClusterName = eksClusterName
-	return nil
-}
-
-func (ekscd *EKSClusterDetail) SetNodegroupNames(nodeGroups []*string) error {
-	ekscd.mu.Lock()
-	defer ekscd.mu.Unlock()
-	ekscd.nodegroupNames = nodeGroups
 	return nil
 }
 
@@ -395,12 +377,8 @@ func (kc *EKSClusterDetail) PopulateEKSClusterDetail() error {
 
 	kc.mu.Unlock()
 
-	var nodeGroupNames []*string
-
 	// Populate the nodegroup details
 	for _, ng := range nodeGroups {
-		nodeGroupNames = append(nodeGroupNames, ng.NodegroupName)
-
 		eksNgDetail := &EKSNodegroupDetail{
 			ngName: ng.NodegroupName,
 		}
@@ -414,10 +392,6 @@ func (kc *EKSClusterDetail) PopulateEKSClusterDetail() error {
 		if err != nil {
 			return fmt.Errorf("populate eks cluster: %w", err)
 		}
-	}
-
-	if err := kc.SetNodegroupNames(nodeGroupNames); err != nil {
-		return fmt.Errorf("populate eks cluster: %w", err)
 	}
 
 	return nil

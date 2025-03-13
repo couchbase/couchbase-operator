@@ -19,28 +19,34 @@ const (
 )
 
 var (
-	ErrInvalidEKSConfig                 = errors.New("eks config is nil, testAssets does not hold cluster details. Validator does not know what to validate")
-	ErrEKSK8SVersionMismatch            = errors.New("eks k8s version mismatch")
-	ErrEKSNodeGroupsMismatch            = errors.New("eks node groups mismatch")
-	ErrEKSAMINodeGroupMismatch          = errors.New("eks ami node group mismatch")
-	ErrEKSInstanceTypeNodeGroupMismatch = errors.New("eks instance type node group mismatch")
-	ErrEKSDiskSizeNodeGroupMismatch     = errors.New("eks disk size node group mismatch")
-	ErrEKSDesiredSizeNodeGroupMismatch  = errors.New("eks desired size node group mismatch")
-	ErrEKSMaxSizeNodeGroupMismatch      = errors.New("eks max size node group mismatch")
-	ErrEKSMinSizeNodeGroupMismatch      = errors.New("eks min size node group mismatch")
-	ErrEKSK8SVersionNodeGroupMismatch   = errors.New("eks k8s version node group mismatch")
-	ErrEKSNodesMismatch                 = errors.New("eks cluster nodes mismatch")
+	ErrInvalidEKSConfig               = errors.New("EKSConfig is nil and testAssets does not hold eks cluster details, validator does not know what to validate")
+	ErrInvalidEKSNodegroupConfig      = errors.New("EKSNodegroupConfig is nil and testAssets does not hold eks nodegroup details, validator does not know what to validate")
+	ErrEKSNodegroupGSIsNil            = errors.New("EKSNodegroupDetailGetterSetter is nil")
+	ErrEKSK8SVersionMismatch          = errors.New("eks cluster k8s version mismatch")
+	ErrEKSNodesMismatch               = errors.New("eks cluster nodes mismatch")
+	ErrEKSNodeGroupsMismatch          = errors.New("eks node group name mismatch")
+	ErrEKSNodeGroupK8SVersionMismatch = errors.New("eks node group k8s version mismatch")
+	ErrEKSInstanceTypeMismatch        = errors.New("eks node group instance type mismatch")
+	ErrEKSDesiredSizeMismatch         = errors.New("eks node group desired size mismatch")
+	ErrEKSMaxSizeMismatch             = errors.New("eks node group max size mismatch")
+	ErrEKSMinSizeMismatch             = errors.New("eks node group min size mismatch")
+	ErrEKSAMIMismatch                 = errors.New("eks node group ami mismatch")
+	ErrEKSDiskSizeMismatch            = errors.New("eks node group disk size mismatch")
 )
 
 type EKSConfig struct {
-	KubernetesVersion *string            `yaml:"kubernetesVersion"`
-	InstanceType      *string            `yaml:"instanceType"`
-	NumNodeGroups     *int               `yaml:"numNodeGroups"`
-	MinSize           *int32             `yaml:"minSize"`
-	MaxSize           *int32             `yaml:"maxSize"`
-	DesiredSize       *int32             `yaml:"desiredSize"`
-	DiskSize          *int32             `yaml:"diskSize"`
-	AMI               *ekstypes.AMITypes `yaml:"ami"`
+	KubernetesVersion  *string                        `yaml:"kubernetesVersion"`
+	EKSNodegroupConfig map[string]*EKSNodegroupConfig `yaml:"eksNodegroupConfig"`
+}
+
+type EKSNodegroupConfig struct {
+	K8SVersion   *string            `yaml:"kubernetesVersion"`
+	InstanceType *string            `yaml:"instanceType"`
+	DesiredSize  *int32             `yaml:"desiredSize"`
+	MinSize      *int32             `yaml:"minSize"`
+	MaxSize      *int32             `yaml:"maxSize"`
+	AMI          *ekstypes.AMITypes `yaml:"ami"`
+	DiskSize     *int32             `yaml:"diskSize"`
 }
 
 type ValidateEKSCluster struct {
@@ -80,6 +86,8 @@ func (c *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 		 - If the eks environment is as per the testAssets state
 	*/
 
+	logrus.Infof("Starting validation of EKS cluster `%s`", c.ClusterName)
+
 	_, errConfig := checkConfigIsNil(c.EKSConfig)
 
 	// When EKSConfig is nil and testAssets does not hold eksClusterDetail
@@ -103,7 +111,7 @@ func (c *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 
 	// When EKSConfig is nil and testAssets does hold eksClusterDetail
 	if errConfig == nil && k8sCluster != nil {
-		logrus.Infof("Validating prev state")
+		logrus.Infof("Validating the previous state of EKS cluster `%s`", c.ClusterName)
 		if err := c.ValidatePrevState(ctx, testAssets); err != nil {
 			return fmt.Errorf("validate cluster: %w", err)
 		}
@@ -111,7 +119,7 @@ func (c *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 
 	// When EKSConfig is not nil and testAssets does not hold eksClusterDetail
 	if errConfig != nil && k8sCluster == nil {
-		logrus.Infof("Validating new cluster")
+		logrus.Infof("Validating the new EKS cluster `%s`", c.ClusterName)
 		if err := c.ValidateNewCluster(ctx, testAssets); err != nil {
 			return fmt.Errorf("validate cluster: %w", err)
 		}
@@ -119,13 +127,13 @@ func (c *ValidateEKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 
 	// When EKSConfig is not nil and testAssets does hold eksClusterDetail
 	if errConfig != nil && k8sCluster != nil {
-		logrus.Infof("Validating cluster post updates")
+		logrus.Infof("Validating the updates to EKS cluster `%s`", c.ClusterName)
 		if err := c.ValidateUpdateCluster(ctx, testAssets); err != nil {
 			return fmt.Errorf("validate cluster: %w", err)
 		}
 	}
 
-	logrus.Infof("Cluster %s successfully validated in EKS", c.ClusterName)
+	logrus.Infof("Validated EKS cluster %s successfully", c.ClusterName)
 
 	return nil
 }
@@ -171,6 +179,12 @@ func (c *ValidateEKSCluster) ValidatePrevState(ctx context.Context, testAssets a
 		return fmt.Errorf("validate prev state: %w", err)
 	}
 
+	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("validate prev state: %w", err)
+	}
+
+	// Validating the EKS Cluster Details
 	if err := checkIfClusterExistsInKubeconfig(c.ClusterName); err != nil {
 		return fmt.Errorf("validate prev state: %w", err)
 	}
@@ -179,45 +193,47 @@ func (c *ValidateEKSCluster) ValidatePrevState(ctx context.Context, testAssets a
 		return fmt.Errorf("validate prev state: %w", ErrEKSK8SVersionMismatch)
 	}
 
-	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
-	if err != nil {
-		return fmt.Errorf("validate prev state: %w", err)
-	}
-
-	if len(nodeGroups) != len(cluster.GetAllNodeGroups()) {
-		return fmt.Errorf("validate prev state: %w", ErrEKSNodeGroupsMismatch)
-	}
-
+	// Validating the EKS Nodegroup Details
 	for _, nodeGroup := range nodeGroups {
-		if *nodeGroup.ScalingConfig.DesiredSize != cluster.GetDesiredSize() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSDesiredSizeNodeGroupMismatch)
+		ngGS := cluster.GetNodegroupDetailGetterSetter(nodeGroup.NodegroupName)
+		if ngGS == nil {
+			return fmt.Errorf("validate prev state: %w", ErrEKSNodegroupGSIsNil)
 		}
 
-		if *nodeGroup.ScalingConfig.MinSize != cluster.GetMinSize() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSMinSizeNodeGroupMismatch)
+		if *nodeGroup.NodegroupName != *ngGS.GetNodegroupName() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSNodeGroupsMismatch)
 		}
 
-		if *nodeGroup.ScalingConfig.MaxSize != cluster.GetMaxSize() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSMaxSizeNodeGroupMismatch)
+		if *nodeGroup.Version != ngGS.GetK8SVersion() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSNodeGroupK8SVersionMismatch)
 		}
 
-		if nodeGroup.AmiType != cluster.GetAMI() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSAMINodeGroupMismatch)
+		if nodeGroup.InstanceTypes[0] != ngGS.GetInstanceType() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSInstanceTypeMismatch)
 		}
 
-		if nodeGroup.InstanceTypes[0] != cluster.GetInstanceType() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSInstanceTypeNodeGroupMismatch)
+		if *nodeGroup.ScalingConfig.DesiredSize != ngGS.GetDesiredSize() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSDesiredSizeMismatch)
 		}
 
-		if *nodeGroup.DiskSize != cluster.GetDiskSize() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSDiskSizeNodeGroupMismatch)
+		if *nodeGroup.ScalingConfig.MinSize != ngGS.GetMinSize() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSMinSizeMismatch)
 		}
 
-		if *nodeGroup.Version != cluster.GetKubernetesVersion() {
-			return fmt.Errorf("validate prev state: %w", ErrEKSK8SVersionNodeGroupMismatch)
+		if *nodeGroup.ScalingConfig.MaxSize != ngGS.GetMaxSize() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSMaxSizeMismatch)
+		}
+
+		if nodeGroup.AmiType != ngGS.GetAMI() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSAMIMismatch)
+		}
+
+		if *nodeGroup.DiskSize != ngGS.GetDiskSize() {
+			return fmt.Errorf("validate prev state: %w", ErrEKSDiskSizeMismatch)
 		}
 	}
 
+	// TODO FIX if multiple contexts are present, then set the context correctly before fetching the node names
 	allNodes, err := nodes.GetNodeNames()
 	if err != nil {
 		return fmt.Errorf("validate prev state: %w", err)
@@ -261,70 +277,85 @@ func (c *ValidateEKSCluster) ValidateNewCluster(ctx context.Context, testAssets 
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	if err := checkIfClusterExistsInKubeconfig(c.ClusterName); err != nil {
-		return fmt.Errorf("validate new state: %w", err)
-	}
-
-	if *eksCluster.Version != *c.EKSConfig.KubernetesVersion {
-		return fmt.Errorf("validate new cluster: %w", ErrEKSK8SVersionMismatch)
-	}
-
 	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
 	if err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	if len(nodeGroups) != *c.EKSConfig.NumNodeGroups {
+	// Validating EKS Cluster Details
+	if err := checkIfClusterExistsInKubeconfig(c.ClusterName); err != nil {
+		return fmt.Errorf("validate new state: %w", err)
+	}
+
+	if c.EKSConfig.KubernetesVersion == nil || *eksCluster.Version != *c.EKSConfig.KubernetesVersion {
+		return fmt.Errorf("validate new cluster: %w", ErrEKSK8SVersionMismatch)
+	}
+
+	if len(nodeGroups) != len(c.EKSConfig.EKSNodegroupConfig) {
 		return fmt.Errorf("validate new cluster: %w", ErrEKSNodeGroupsMismatch)
 	}
 
-	var nodeGroupNames []*string
+	// Validating EKS Nodegroup Details
+	totalEKSNodes := 0
 
 	for _, nodeGroup := range nodeGroups {
-		nodeGroupNames = append(nodeGroupNames, nodeGroup.NodegroupName)
+		totalEKSNodes += int(*nodeGroup.ScalingConfig.DesiredSize)
 
-		if *nodeGroup.ScalingConfig.DesiredSize != *c.EKSConfig.DesiredSize {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSDesiredSizeNodeGroupMismatch)
+		ngConfig := c.EKSConfig.EKSNodegroupConfig[*nodeGroup.NodegroupName]
+		if ngConfig == nil {
+			return fmt.Errorf("validate new cluster: %w", ErrInvalidEKSNodegroupConfig)
 		}
 
-		if *nodeGroup.ScalingConfig.MinSize != *c.EKSConfig.MinSize {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSMinSizeNodeGroupMismatch)
+		if ngConfig.K8SVersion == nil || *nodeGroup.Version != *ngConfig.K8SVersion {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSNodeGroupK8SVersionMismatch)
 		}
 
-		if *nodeGroup.ScalingConfig.MaxSize != *c.EKSConfig.MaxSize {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSMaxSizeNodeGroupMismatch)
+		if ngConfig.InstanceType == nil || nodeGroup.InstanceTypes[0] != *ngConfig.InstanceType {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSInstanceTypeMismatch)
 		}
 
-		if nodeGroup.AmiType != *c.EKSConfig.AMI {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSAMINodeGroupMismatch)
+		if ngConfig.DesiredSize == nil || *nodeGroup.ScalingConfig.DesiredSize != *ngConfig.DesiredSize {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSDesiredSizeMismatch)
 		}
 
-		if nodeGroup.InstanceTypes[0] != *c.EKSConfig.InstanceType {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSInstanceTypeNodeGroupMismatch)
+		if ngConfig.MinSize == nil || *nodeGroup.ScalingConfig.MinSize != *ngConfig.MinSize {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSMinSizeMismatch)
 		}
 
-		if *nodeGroup.DiskSize != *c.EKSConfig.DiskSize {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSDiskSizeNodeGroupMismatch)
+		if ngConfig.MaxSize == nil || *nodeGroup.ScalingConfig.MaxSize != *ngConfig.MaxSize {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSMaxSizeMismatch)
 		}
 
-		if *nodeGroup.Version != *c.EKSConfig.KubernetesVersion {
-			return fmt.Errorf("validate new cluster: %w", ErrEKSK8SVersionNodeGroupMismatch)
+		if ngConfig.AMI == nil || nodeGroup.AmiType != *ngConfig.AMI {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSAMIMismatch)
+		}
+
+		if ngConfig.DiskSize == nil || *nodeGroup.DiskSize != *ngConfig.DiskSize {
+			return fmt.Errorf("validate new cluster: %w", ErrEKSDiskSizeMismatch)
 		}
 	}
 
+	// TODO FIX if multiple contexts are present, then set the context correctly before fetching the node names
 	allNodes, err := nodes.GetNodeNames()
 	if err != nil {
-		return fmt.Errorf("validate prev state: %w", err)
+		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
-	if len(allNodes) != *c.EKSConfig.NumNodeGroups*int(*c.EKSConfig.DesiredSize) {
-		return fmt.Errorf("validate prev state: %w", ErrEKSDesiredSizeNodeGroupMismatch)
+	if len(allNodes) != totalEKSNodes {
+		return fmt.Errorf("validate new cluster: %w", ErrEKSNodesMismatch)
+	}
+
+	// Saving the EKS Cluster (and Nodegroups) Details to TestAssets
+	eksNodegroupDetailsMap := make(map[string]*assets.EKSNodegroupDetail)
+
+	for _, nodeGroup := range nodeGroups {
+		eksNodegroupDetailsMap[*nodeGroup.NodegroupName] = assets.NewEKSNodegroupDetail(nodeGroup.NodegroupName,
+			*nodeGroup.Version, nodeGroup.InstanceTypes[0], *nodeGroup.ScalingConfig.DesiredSize,
+			*nodeGroup.ScalingConfig.MinSize, *nodeGroup.ScalingConfig.MaxSize, *nodeGroup.DiskSize, nodeGroup.AmiType)
 	}
 
 	if err := testAssets.GetK8SClustersGetterSetter().SetEKSClusterDetail(
-		assets.NewEKSClusterDetail(c.ClusterName, nodeGroupNames, *c.EKSConfig.KubernetesVersion,
-			*c.EKSConfig.InstanceType, *c.EKSConfig.DesiredSize, *c.EKSConfig.MinSize,
-			*c.EKSConfig.MaxSize, *c.EKSConfig.DiskSize, *c.EKSConfig.AMI)); err != nil {
+		assets.NewEKSClusterDetail(c.ClusterName, *c.EKSConfig.KubernetesVersion, eksNodegroupDetailsMap)); err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
 
@@ -381,11 +412,16 @@ func (c *ValidateEKSCluster) ValidateUpdateCluster(ctx context.Context, testAsse
 		return fmt.Errorf("validate update cluster: %w", err)
 	}
 
+	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
+	if err != nil {
+		return fmt.Errorf("validate update cluster: %w", err)
+	}
+
+	// Validating EKS Cluster Details
 	if err := checkIfClusterExistsInKubeconfig(c.ClusterName); err != nil {
 		return fmt.Errorf("validate update cluster: %w", err)
 	}
 
-	// Check if the k8s version is correct
 	if c.EKSConfig.KubernetesVersion != nil {
 		if *eksCluster.Version != *c.EKSConfig.KubernetesVersion {
 			return fmt.Errorf("validate update cluster: %w", ErrEKSK8SVersionMismatch)
@@ -400,138 +436,205 @@ func (c *ValidateEKSCluster) ValidateUpdateCluster(ctx context.Context, testAsse
 		}
 	}
 
-	nodeGroups, err := eksSession.GetNodegroupsForCluster(ctx)
-	if err != nil {
-		return fmt.Errorf("validate update cluster: %w", err)
-	}
-
-	if c.EKSConfig.NumNodeGroups != nil {
-		if len(nodeGroups) != *c.EKSConfig.NumNodeGroups {
-			return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupsMismatch)
-		}
-	} else {
-		if len(nodeGroups) != len(cluster.GetAllNodeGroups()) {
-			return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupsMismatch)
-		}
-	}
-
-	var nodeGroupNames []*string
+	// Validating EKS Nodegroup Details
+	totalEKSNodes := 0
 
 	for _, nodeGroup := range nodeGroups {
-		nodeGroupNames = append(nodeGroupNames, nodeGroup.NodegroupName)
+		totalEKSNodes += int(*nodeGroup.ScalingConfig.DesiredSize)
 
-		if c.EKSConfig.DesiredSize != nil {
-			if *nodeGroup.ScalingConfig.DesiredSize != *c.EKSConfig.DesiredSize {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeNodeGroupMismatch)
-			}
+		ngConfig := c.EKSConfig.EKSNodegroupConfig[*nodeGroup.NodegroupName]
+		ngGetterSetter := cluster.GetNodegroupDetailGetterSetter(nodeGroup.NodegroupName)
 
-			if err := cluster.SetDesiredSize(*c.EKSConfig.DesiredSize); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
-			}
-
-		} else {
-			if *nodeGroup.ScalingConfig.DesiredSize != cluster.GetDesiredSize() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeNodeGroupMismatch)
-			}
+		if ngConfig == nil && ngGetterSetter == nil {
+			// Nodegroup does not exist in config and asset
+			return fmt.Errorf("validate update cluster: %w", ErrInvalidEKSNodegroupConfig)
 		}
 
-		if c.EKSConfig.MinSize != nil {
-			if *nodeGroup.ScalingConfig.MinSize != *c.EKSConfig.MinSize {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeNodeGroupMismatch)
+		if ngConfig != nil && ngGetterSetter != nil {
+			// Nodegroup exists in both config and asset.
+			// Possibly the nodegroup config has been updated.
+			// Validator checks if the nodegroup is same as validator config.
+
+			if c.EKSConfig.KubernetesVersion != nil {
+				if *nodeGroup.Version != *c.EKSConfig.KubernetesVersion {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupK8SVersionMismatch)
+				}
+
+				if err := cluster.SetKubernetesVersion(*c.EKSConfig.KubernetesVersion); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if *nodeGroup.Version != cluster.GetKubernetesVersion() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupK8SVersionMismatch)
+				}
 			}
 
-			if err := cluster.SetMinSize(*c.EKSConfig.MinSize); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
+			if ngConfig.InstanceType != nil {
+				if nodeGroup.InstanceTypes[0] != *ngConfig.InstanceType {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeMismatch)
+				}
+
+				if err := ngGetterSetter.SetInstanceType(*ngConfig.InstanceType); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if nodeGroup.InstanceTypes[0] != ngGetterSetter.GetInstanceType() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeMismatch)
+				}
+			}
+
+			if ngConfig.DesiredSize != nil {
+				if *nodeGroup.ScalingConfig.DesiredSize != *ngConfig.DesiredSize {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeMismatch)
+				}
+
+				if err := ngGetterSetter.SetDesiredSize(*ngConfig.DesiredSize); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if *nodeGroup.ScalingConfig.DesiredSize != ngGetterSetter.GetDesiredSize() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeMismatch)
+				}
+			}
+
+			if ngConfig.MinSize != nil {
+				if *nodeGroup.ScalingConfig.MinSize != *ngConfig.MinSize {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeMismatch)
+				}
+
+				if err := ngGetterSetter.SetMinSize(*ngConfig.MinSize); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if *nodeGroup.ScalingConfig.MinSize != ngGetterSetter.GetMinSize() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeMismatch)
+				}
+			}
+
+			if ngConfig.MaxSize != nil {
+				if *nodeGroup.ScalingConfig.MaxSize != *ngConfig.MaxSize {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeMismatch)
+				}
+
+				if err := ngGetterSetter.SetMaxSize(*ngConfig.MaxSize); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if *nodeGroup.ScalingConfig.MaxSize != ngGetterSetter.GetMaxSize() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeMismatch)
+				}
+			}
+
+			if ngConfig.AMI != nil {
+				if nodeGroup.AmiType != *ngConfig.AMI {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSAMIMismatch)
+				}
+
+				if err := ngGetterSetter.SetAMI(*ngConfig.AMI); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if nodeGroup.AmiType != ngGetterSetter.GetAMI() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSAMIMismatch)
+				}
+			}
+
+			if ngConfig.DiskSize != nil {
+				if *nodeGroup.DiskSize != *ngConfig.DiskSize {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeMismatch)
+				}
+
+				if err := ngGetterSetter.SetDiskSize(*ngConfig.DiskSize); err != nil {
+					return fmt.Errorf("validate update cluster: %w", err)
+				}
+			} else {
+				if *nodeGroup.DiskSize != ngGetterSetter.GetDiskSize() {
+					return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeMismatch)
+				}
+			}
+		} else if ngConfig == nil {
+			// Nodegroup exists in asset but not in validator config.
+			// Validator verifies the previous state.
+
+			if *nodeGroup.NodegroupName != *ngGetterSetter.GetNodegroupName() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupsMismatch)
+			}
+
+			if *nodeGroup.Version != ngGetterSetter.GetK8SVersion() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupK8SVersionMismatch)
+			}
+
+			if nodeGroup.InstanceTypes[0] != ngGetterSetter.GetInstanceType() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.DesiredSize != ngGetterSetter.GetDesiredSize() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.MinSize != ngGetterSetter.GetMinSize() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.MaxSize != ngGetterSetter.GetMaxSize() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeMismatch)
+			}
+
+			if nodeGroup.AmiType != ngGetterSetter.GetAMI() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSAMIMismatch)
+			}
+
+			if *nodeGroup.DiskSize != ngGetterSetter.GetDiskSize() {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeMismatch)
 			}
 		} else {
-			if *nodeGroup.ScalingConfig.MinSize != cluster.GetMinSize() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeNodeGroupMismatch)
-			}
-		}
-
-		if c.EKSConfig.MaxSize != nil {
-			if *nodeGroup.ScalingConfig.MaxSize != *c.EKSConfig.MaxSize {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeNodeGroupMismatch)
+			// Nodegroup exists in config but not in asset.
+			// This is potentially a new nodegroup.
+			// Validator checks if the nodegroup params are same as in validator config.
+			if *nodeGroup.Version != *ngConfig.K8SVersion {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSNodeGroupK8SVersionMismatch)
 			}
 
-			if err := cluster.SetMaxSize(*c.EKSConfig.MaxSize); err != nil {
+			if nodeGroup.InstanceTypes[0] != *ngConfig.InstanceType {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.DesiredSize != *ngConfig.DesiredSize {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSDesiredSizeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.MinSize != *ngConfig.MinSize {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSMinSizeMismatch)
+			}
+
+			if *nodeGroup.ScalingConfig.MaxSize != *ngConfig.MaxSize {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeMismatch)
+			}
+
+			if nodeGroup.AmiType != *ngConfig.AMI {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSAMIMismatch)
+			}
+
+			if *nodeGroup.DiskSize != *ngConfig.DiskSize {
+				return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeMismatch)
+			}
+
+			if err := cluster.SetNodegroup(assets.NewEKSNodegroupDetail(nodeGroup.NodegroupName, *ngConfig.K8SVersion,
+				*ngConfig.InstanceType, *ngConfig.DesiredSize, *ngConfig.MinSize, *ngConfig.MaxSize, *ngConfig.DiskSize,
+				*ngConfig.AMI)); err != nil {
 				return fmt.Errorf("validate update cluster: %w", err)
-			}
-		} else {
-			if *nodeGroup.ScalingConfig.MaxSize != cluster.GetMaxSize() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSMaxSizeNodeGroupMismatch)
-			}
-		}
-
-		if c.EKSConfig.AMI != nil {
-			if nodeGroup.AmiType != *c.EKSConfig.AMI {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSAMINodeGroupMismatch)
-			}
-
-			if err := cluster.SetAMI(*c.EKSConfig.AMI); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
-			}
-		} else {
-			if nodeGroup.AmiType != cluster.GetAMI() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSAMINodeGroupMismatch)
-			}
-		}
-
-		if c.EKSConfig.InstanceType != nil {
-			if nodeGroup.InstanceTypes[0] != *c.EKSConfig.InstanceType {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeNodeGroupMismatch)
-			}
-
-			if err := cluster.SetInstanceType(*c.EKSConfig.InstanceType); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
-			}
-		} else {
-			if nodeGroup.InstanceTypes[0] != cluster.GetInstanceType() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSInstanceTypeNodeGroupMismatch)
-			}
-		}
-
-		if c.EKSConfig.DiskSize != nil {
-			if *nodeGroup.DiskSize != *c.EKSConfig.DiskSize {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeNodeGroupMismatch)
-			}
-
-			if err := cluster.SetDiskSize(*c.EKSConfig.DiskSize); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
-			}
-		} else {
-			if *nodeGroup.DiskSize != cluster.GetDiskSize() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSDiskSizeNodeGroupMismatch)
-			}
-		}
-
-		if c.EKSConfig.KubernetesVersion != nil {
-			if *nodeGroup.Version != *c.EKSConfig.KubernetesVersion {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSK8SVersionNodeGroupMismatch)
-			}
-
-			if err := cluster.SetKubernetesVersion(*c.EKSConfig.KubernetesVersion); err != nil {
-				return fmt.Errorf("validate update cluster: %w", err)
-
-			}
-		} else {
-			if *nodeGroup.Version != cluster.GetKubernetesVersion() {
-				return fmt.Errorf("validate update cluster: %w", ErrEKSK8SVersionNodeGroupMismatch)
 			}
 		}
 	}
 
-	if err := cluster.SetNodeGroups(nodeGroupNames); err != nil {
-		return fmt.Errorf("validate update cluster: %w", err)
-	}
-
+	// TODO FIX if multiple contexts are present, then set the context correctly before fetching the node names
 	allNodes, err := nodes.GetNodeNames()
 	if err != nil {
 		return fmt.Errorf("validate update cluster: %w", err)
 	}
 
-	if c.EKSConfig.NumNodeGroups != nil || c.EKSConfig.DesiredSize != nil {
-		if len(allNodes) != len(cluster.GetAllNodeGroups())*int(cluster.GetDesiredSize()) {
+	if c.EKSConfig.EKSNodegroupConfig != nil {
+		if len(allNodes) != totalEKSNodes {
 			return fmt.Errorf("validate update cluster: %w", ErrEKSNodesMismatch)
 		}
 
@@ -545,7 +648,7 @@ func (c *ValidateEKSCluster) ValidateUpdateCluster(ctx context.Context, testAsse
 			return fmt.Errorf("validate update cluster: %w", err)
 		}
 	} else {
-		if len(allNodes) != len(cluster.GetAllNodeGroups())*int(cluster.GetDesiredSize()) {
+		if len(allNodes) != totalEKSNodes {
 			return fmt.Errorf("validate update cluster: %w", ErrEKSNodesMismatch)
 		}
 
