@@ -13,6 +13,7 @@ pipeline {
     NODEVERSION = '16.0.0'
     GOPATH = "${env.WORKSPACE}/gopath"
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
+    MAKEFLAGS = "--no-builtin-rules"
   }
 
   stages {
