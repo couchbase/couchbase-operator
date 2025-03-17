@@ -287,6 +287,12 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// addresses (i.e. you must be using anti affinity or kubernetes
 	// has no way of addressing individual cluster nodes).
 	for _, member := range c.members {
+		// Skip if the member doesn't have a pod (external member)
+		_, exists := c.k8s.Pods.Get(member.Name())
+		if !exists {
+			continue
+		}
+
 		// Grab the current configuration
 		existingAddresses, err := c.getAlternateAddressesExternal(member)
 		if err != nil {

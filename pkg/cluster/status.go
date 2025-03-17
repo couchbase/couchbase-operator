@@ -148,7 +148,7 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 	for i := range info.Nodes {
 		node := info.Nodes[i]
 
-		var name string
+		name := node.HostName.GetMemberName()
 
 		if c.cluster.Spec.Networking.InitPodsWithNodeHostname && c.cluster.Spec.Networking.ImprovedHostNetwork {
 			for _, member := range members {
@@ -157,10 +157,7 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 					break
 				}
 			}
-		} else {
-			name = node.HostName.GetMemberName()
 		}
-
 		// See if the member exists, if so the node is managed, otherwise it's come from
 		// some source we don't trust.
 		if _, ok := members[name]; !ok {

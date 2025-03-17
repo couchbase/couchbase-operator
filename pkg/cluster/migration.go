@@ -82,6 +82,18 @@ func (c *Cluster) reconcileMigrationCluster() error {
 			return err
 		}
 
+		lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
+		if err != nil {
+			return err
+		}
+
+		version, err := k8sutil.CouchbaseVersion(lowestImage)
+		if err != nil {
+			return err
+		}
+
+		c.cluster.Status.CurrentVersion = version
+
 		target := c.getMigratingReadyTarget()
 		if err := c.initalizeClusterKubernetesResources(target); err != nil {
 			log.Error(err, "Failed to initialize cluster kubernetes resources", "cluster", c.namespacedName())
@@ -405,14 +417,8 @@ func (r *MigrationReconcileMachine) handleMigrateCondition(c *Cluster) error {
 		return nil
 	}
 
-	// Initialize the condition if it doesn't exist.
-	if waitingCond == nil {
-		c.cluster.Status.SetNotWaitingBetweenMigrations()
-		return nil
-	}
-
 	// If we are waiting then check if the stabilization period has passed.
-	if waitingCond.Status == v1.ConditionTrue {
+	if waitingCond != nil && waitingCond.Status == v1.ConditionTrue {
 		lastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
 
 		if err != nil {
