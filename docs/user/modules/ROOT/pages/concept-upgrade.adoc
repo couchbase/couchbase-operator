@@ -77,6 +77,12 @@ The Operator enforces the following constraints on Couchbase Server version upgr
 ** 5.x.x to 7.x.x is not allowed
 * Couchbase Server versions cannot be changed during an upgrade
 
+[NOTE]
+====
+In-Place Upgrades are not supported from versions lower than 7.2.0 to versions 7.2.0 and higher.
+The DAC will reject this change if it is attempted.
+====
+
 Refer to the Couchbase Server xref:server:install:upgrade.adoc[upgrade documentation] for more information about direct upgrade paths.
 
 [NOTE]

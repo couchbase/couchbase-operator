@@ -3931,6 +3931,20 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
+	versionBefore72, err := couchbaseutil.VersionBefore(oldVersion, "7.2.0")
+	if err != nil {
+		return err
+	}
+
+	versionAfter72, err := couchbaseutil.VersionAfter(newVersion, "7.2.0")
+	if err != nil {
+		return err
+	}
+
+	if *curr.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && versionBefore72 && versionAfter72 {
+		return fmt.Errorf("in-place upgrades not supported from pre-7.2.0 to versions 7.2.0 and above")
+	}
+
 	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
 }
 
