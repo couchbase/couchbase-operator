@@ -24,7 +24,7 @@ ARCH=("amd64" "arm64")
 OS=("macos" "windows" "linux")
 FOLDER="couchbase-autonomous-operator-"
 DEFAULT_TAG=latest
-BACKUP_TAG="1.3.5-101"
+BACKUP_TAG="latest"
 DAC_TAG="$DEFAULT_TAG"
 EXPORTER_TAG="$DEFAULT_TAG"
 FLUENT_BIT_TAG="$DEFAULT_TAG"
@@ -34,6 +34,8 @@ OPERATOR_TAG="$DEFAULT_TAG"
 EXPIRES="86400"
 HELP=0
 GA=0
+ARM=0
+CONTAINER_ARCH=amd64
 
 while getopts r:o:e:f:b:g:t:x:hn flag
 do
@@ -48,6 +50,7 @@ do
         x) EXPIRES=${OPTARG};;
         h) HELP=1;;
         n) GA=1;;
+        a) ARM=1;;
         *) exit 1;;
     esac
 done
@@ -108,6 +111,10 @@ if [[ -z "$BUCKET" ]]; then
     exit 1
 fi
 
+if [[ "$ARM" == "1" ]]; then
+    CONTAINER_ARCH=arm64
+fi
+
 WORK_DIR=$(mktemp -d)
 
 echo "$WORK_DIR"
@@ -146,17 +153,17 @@ for image in "${IMAGES[@]}"; do
             TAG="$CNG_TAG"
     esac
     echo "Pulling $REPOSITORY/$image:$TAG"
-    docker pull --quiet "$REPOSITORY/$image:$TAG" &
+    docker pull --quiet --platform "linux/$CONTAINER_ARCH" "$REPOSITORY/$image:$TAG" &
     PULLED_IMAGES="$PULLED_IMAGES $REPOSITORY/$image:$TAG"
 done
 
 wait # waiting on all the docker pull commands to finish
 SPLIT_TAG=${OPERATOR_TAG/-/"/"}
 VERSION=${OPERATOR_TAG%%-*}
-OUTPUT="couchbase-autonomous-operator_${OPERATOR_TAG}-images.tar.gz"
+OUTPUT="couchbase-autonomous-operator_${OPERATOR_TAG}-images-$CONTAINER_ARCH.tar.gz"
 
 if [[ "$GA" == "1" ]]; then
-    OUTPUT="couchbase-autonomous-operator_${VERSION}-images.tar.gz"
+    OUTPUT="couchbase-autonomous-operator_${VERSION}-images-$CONTAINER_ARCH.tar.gz"
     FOLDER="${FOLDER}${VERSION}"
 else 
     FOLDER="${FOLDER}${OPERATOR_TAG}"
