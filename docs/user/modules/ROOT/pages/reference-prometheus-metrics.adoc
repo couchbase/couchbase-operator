@@ -1,9 +1,0 @@
-= Prometheus Metrics Reference
-
-[abstract]
-This page captures the metrics supplied to Prometheus by the Couchbase Autonomous Operator.
-
-[template,attachment$cao_metrics_metadata.json]
---
-include::partial$metrics.hbs[]
---
