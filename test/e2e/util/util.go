@@ -55,3 +55,5 @@ func StrPtr(s string) *string {
 func IntPtr(i int) *int {
 	return &i
 }
+
+var FrameworkBackupStorageClass func() string

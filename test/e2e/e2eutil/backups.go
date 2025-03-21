@@ -8,6 +8,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -333,6 +334,10 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 
 	if b.storageClass != "" {
 		backup.Spec.StorageClassName = &b.storageClass
+	} else if util.FrameworkBackupStorageClass != nil {
+		if frameworkStorageClass := util.FrameworkBackupStorageClass(); frameworkStorageClass != "" {
+			backup.Spec.StorageClassName = &frameworkStorageClass
+		}
 	}
 
 	if b.withoutFTAlias {

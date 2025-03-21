@@ -470,6 +470,10 @@ func configure() (err error) {
 		"How many tests to run in parallel, must match -test.parallel exactly.")
 	flag.Var(tlsVersion, "tls-version",
 		"TLS version to use.  Either 1.0, 1.1, 1.2, or 1.3. 1.3 requires at least Couchbase Server 7.1")
+	flag.StringVar(&params.BackupStorageClassName, "backup-storage-class",
+		"",
+		"Storage class to use for backup volumes. Falls back to the storage-class flag value if not specified. If neither are set, the platform default storage class is used.")
+
 	params.SharedTestFlags.BindSharedFlags(nil)
 	flag.Parse()
 
@@ -596,6 +600,9 @@ func setup() error {
 			return err
 		}
 	}
+
+	// Assign the FrameworkBackupStorageClass function to util.FrameworkBackupStorageClass to avoid circular dependency issues.
+	util.FrameworkBackupStorageClass = FrameworkBackupStorageClass
 
 	return nil
 }
@@ -1644,4 +1651,16 @@ func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestReq
 	}
 
 	return r
+}
+
+// FrameworkBackupStorageClass returns the storage class that should be used for backup resources during certification tests.
+// Individual tests may override this value if a specific storage class is required.
+func FrameworkBackupStorageClass() string {
+	if Global.BackupStorageClassName != "" {
+		return Global.BackupStorageClassName
+	} else if Global.StorageClassName != "" {
+		return Global.StorageClassName
+	}
+
+	return ""
 }

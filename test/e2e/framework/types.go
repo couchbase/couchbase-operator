@@ -103,6 +103,9 @@ type Framework struct {
 
 	// Parallelism is essentially a copy of -test.parallel that we can acually see.
 	Parallelism int
+
+	// BackupStorageClassName is the name of the storage class to use for test volumes.
+	BackupStorageClassName string
 }
 
 // RegistryConfig defines a container image registry.  Registry configurations will
