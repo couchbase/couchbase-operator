@@ -8,6 +8,7 @@ pipeline {
     GOVERSION = '1.20'
     NODEVERSION = '14.15.4'
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/node-v${env.NODEVERSION}-linux-x64/bin:${PATH}"
+    MAKEFLAGS = "--no-builtin-rules"
   }
 
   stages {
