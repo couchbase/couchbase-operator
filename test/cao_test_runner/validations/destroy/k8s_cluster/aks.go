@@ -69,7 +69,7 @@ func (v *ValidateAKSCluster) ValidateCluster(ctx context.Context, testAssets ass
 		return fmt.Errorf("validate cluster: %w", ErrClusterAKSExists)
 	}
 
-	out, _, err := kubectl.GetClusters().ExecWithOutputCapture()
+	out, _, err := kubectl.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}

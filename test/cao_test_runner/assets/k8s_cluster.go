@@ -514,7 +514,7 @@ func (kc *K8SCluster) PopulateK8SCluster() error {
 		return fmt.Errorf("populate k8s cluster: %w", err)
 	}
 
-	out, _, err := kubectl.GetNamespaces().ExecWithOutputCapture()
+	out, _, err := kubectl.GetNamespaces().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("populate k8s cluster: %w", err)
 	}

@@ -66,7 +66,7 @@ func (ckc *CreateKindCluster) CreateCluster(ctx context.Context) error {
 
 	ckc.ConfigPath = filepath.Join(ckc.ConfigDirectory.DirectoryPath, fmt.Sprintf("kind-cluster-%s.yaml", time.Now().Format(time.RFC3339)))
 
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("cannot fetch clusters in kind environment: %w", err)
 	}

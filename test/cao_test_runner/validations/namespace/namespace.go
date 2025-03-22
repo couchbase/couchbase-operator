@@ -110,7 +110,7 @@ func (c *NamespaceValidator) ValidatePreviousState(ctx *context.Context, namespa
 		return fmt.Errorf("validate previous state: %w", ErrNamespaceNameMismatch)
 	}
 
-	out, _, err := kubectl.GetNamespaces().ExecWithOutputCapture()
+	out, _, err := kubectl.GetNamespaces().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate previous state: %w", err)
 	}
@@ -178,7 +178,7 @@ func (c *NamespaceValidator) ValidateNewNamespace(ctx *context.Context, namespac
 		return fmt.Errorf("validate new namespace: %w", ErrIllegalConfig)
 	}
 
-	out, _, err := kubectl.GetNamespaces().ExecWithOutputCapture()
+	out, _, err := kubectl.GetNamespaces().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate new namespace: %w", err)
 	}

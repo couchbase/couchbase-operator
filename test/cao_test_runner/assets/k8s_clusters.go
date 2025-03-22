@@ -532,7 +532,7 @@ func DetectServiceProvider(kubeconfigPath *fileutils.File, clusterName string) (
 }
 
 func (ks *K8SClusters) PopulateAllClusters(kubeconfigPath *fileutils.File) error {
-	out, _, err := kubectl.GetClusters().ExecWithOutputCapture()
+	out, _, err := kubectl.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("populate all clusters: %w", err)
 	}

@@ -29,7 +29,7 @@ type ValidateKindCluster struct {
 }
 
 func (v *ValidateKindCluster) ValidateCluster(ctx context.Context, testAssets assets.TestAssetGetterSetter) error {
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}
@@ -43,7 +43,7 @@ func (v *ValidateKindCluster) ValidateCluster(ctx context.Context, testAssets as
 		return fmt.Errorf("validate cluster: %w", ErrClusterKindExists)
 	}
 
-	out, _, err = kubectl.GetClusters().ExecWithOutputCapture()
+	out, _, err = kubectl.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate cluster: %w", err)
 	}

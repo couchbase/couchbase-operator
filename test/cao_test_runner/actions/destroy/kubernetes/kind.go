@@ -41,7 +41,7 @@ func (dkc *DeleteKindCluster) DeleteCluster(ctx context.Context) error {
 }
 
 func (dkc *DeleteKindCluster) ValidateParams(_ context.Context) error {
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("cannot fetch clusters in kind environment: %w", err)
 	}

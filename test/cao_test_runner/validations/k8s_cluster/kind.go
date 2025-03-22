@@ -116,7 +116,7 @@ func (c *ValidateKindCluster) ValidateCluster(_ context.Context, testAssets asse
 }
 
 func (c *ValidateKindCluster) ValidatePrevState(testAssets assets.TestAssetGetterSetter) error {
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate prev state: %w", err)
 	}
@@ -195,7 +195,7 @@ func (c *ValidateKindCluster) ValidatePrevState(testAssets assets.TestAssetGette
 }
 
 func (c *ValidateKindCluster) ValidateNewCluster(testAssets assets.TestAssetGetterSetter) error {
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate new cluster: %w", err)
 	}
@@ -252,7 +252,7 @@ func (c *ValidateKindCluster) ValidateNewCluster(testAssets assets.TestAssetGett
 }
 
 func (c *ValidateKindCluster) ValidateUpdateCluster(testAssets assets.TestAssetGetterSetter) error {
-	out, _, err := kind.GetClusters().ExecWithOutputCapture()
+	out, _, err := kind.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("validate update cluster: %w", err)
 	}
@@ -319,7 +319,7 @@ func (c *ValidateKindCluster) ValidateUpdateCluster(testAssets assets.TestAssetG
 }
 
 func checkIfKindClusterExistsInKubeconfig(clusterName string) error {
-	out, _, err := kubectl.GetClusters().ExecWithOutputCapture()
+	out, _, err := kubectl.GetClusters().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("check if kind cluster exists in kubeconfig: %w", err)
 	}

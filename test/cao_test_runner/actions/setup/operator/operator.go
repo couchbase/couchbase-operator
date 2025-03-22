@@ -227,7 +227,7 @@ func generateImagePullSecret(imagePullSecret *ImagePullSecret, ignoreAlreadyExis
 		return nil
 	}
 
-	out, _, err := kubectl.GetSecretNames().ExecWithOutputCapture()
+	out, _, err := kubectl.GetSecretNames().Exec(true, false)
 	if err != nil {
 		return fmt.Errorf("cannot fetch secrets: %w", err)
 	}
