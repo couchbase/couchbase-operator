@@ -65,12 +65,7 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					ClusterName:            p.ClusterName,
 					Region:                 p.GKERegion,
 					KubernetesVersion:      p.KubernetesVersion,
-					MachineType:            p.MachineType,
-					ImageType:              p.ImageType,
-					DiskType:               p.DiskType,
-					DiskSize:               p.DiskSize,
-					NumNodePools:           p.NumNodePools,
-					Count:                  p.Count,
+					GKENodePools:           p.GKENodePools,
 					ReleaseChannel:         p.ReleaseChannel,
 					KubeConfigPath:         p.kubeconfigPath,
 					ManagedServiceProvider: p.ms,
@@ -78,7 +73,6 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 			default:
 				return nil, fmt.Errorf("unknown provider type %s: %w", p.Provider, ErrUnknownProviderType)
 			}
-
 		default:
 			return nil, fmt.Errorf("unknown environment type %s: %w", p.Environment, ErrUnknownEnvironmentType)
 		}

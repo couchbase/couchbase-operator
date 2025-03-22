@@ -34,6 +34,7 @@ type KubernetesSetupConfig struct {
 	GKERegion                string                             `yaml:"gkeRegion" caoCli:"context" env:"GKE_REGION"`
 	KubernetesVersion        string                             `yaml:"kubernetesVersion"`
 	EKSNodegroups            []*EKSNodegroup                    `yaml:"eksNodegroups"`
+	GKENodePools             []*GKENodePool                     `yaml:"gkeNodePools"`
 	DiskSize                 int                                `yaml:"diskSize"`       // AKS, GKE
 	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`          // AKS
 	OSType                   armcontainerservice.OSType         `yaml:"osType"`         // AKS

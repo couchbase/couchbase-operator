@@ -21,15 +21,18 @@ type CreateGKECluster struct {
 	ClusterName            string
 	Region                 string
 	KubernetesVersion      string
-	MachineType            string
-	ImageType              string
-	DiskType               string
-	DiskSize               int
-	NumNodePools           int
-	Count                  int
+	GKENodePools           []*GKENodePool
 	ReleaseChannel         managedk8sservices.ReleaseChannel
 	KubeConfigPath         *fileutils.File
 	ManagedServiceProvider *managedk8sservices.ManagedServiceProvider
+}
+
+type GKENodePool struct {
+	NumNodesPerZone int    `yaml:"numNodesPerZone"` // 3 Zones are there for GKE
+	MachineType     string `yaml:"machineType"`
+	ImageType       string `yaml:"imageType"`
+	DiskType        string `yaml:"diskType"`
+	DiskSize        int    `yaml:"diskSize"`
 }
 
 const (
@@ -37,12 +40,12 @@ const (
 )
 
 var (
-	ErrKubeConfigFileInvalid    = errors.New("kubeconfig file does not exist")
-	ErrGKECountInvalid          = errors.New("for environment type 'cloud' and provider 'gcp', Count must be greater than 0")
-	ErrGKENumNodePoolsInvalid   = errors.New("for environment type 'cloud' and provider 'gcp', NumNodePools must be greater than 0")
-	ErrGKEDiskSizeInvalid       = errors.New("for environment type 'cloud' and provider 'gcp', DiskSize must be greater than 0")
-	ErrGKEClusterAlreadyExists  = errors.New("aks cluster already exists")
-	ErrInvalidKubernetesVersion = errors.New("for environment type 'cloud' and provider 'gcp', kubernetes version is invalid")
+	ErrKubeConfigFileInvalid         = errors.New("kubeconfig file does not exist")
+	ErrGKEDefaultNodePoolNotProvided = errors.New("default node pool not provided")
+	ErrGKECountInvalid               = errors.New("for environment type 'cloud' and provider 'gcp', Count must be greater than 0")
+	ErrGKEDiskSizeInvalid            = errors.New("for environment type 'cloud' and provider 'gcp', DiskSize must be greater than 0")
+	ErrGKEClusterAlreadyExists       = errors.New("aks cluster already exists")
+	ErrInvalidKubernetesVersion      = errors.New("for environment type 'cloud' and provider 'gcp', kubernetes version is invalid")
 )
 
 func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
@@ -84,17 +87,18 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 	logrus.Infof("Created subnet %s in virtual network %s", subnetName, networkName)
 
 	nodePoolName := cgc.ClusterName + "-np-0"
-	if err := gkeSession.CreateCluster(ctx, networkName, subnetName, cgc.MachineType, cgc.ImageType,
-		cgc.DiskType, cgc.KubernetesVersion, nodePoolName, cgc.DiskSize, cgc.Count, cgc.ReleaseChannel); err != nil {
+	if err := gkeSession.CreateCluster(ctx, networkName, subnetName, cgc.GKENodePools[0].MachineType, cgc.GKENodePools[0].ImageType,
+		cgc.GKENodePools[0].DiskType, cgc.KubernetesVersion, nodePoolName, cgc.GKENodePools[0].DiskSize, cgc.GKENodePools[0].NumNodesPerZone, cgc.ReleaseChannel); err != nil {
 		return fmt.Errorf("error creating cluster %s: %w", cgc.ClusterName, err)
 	}
 
 	logrus.Infof("Created cluster %s with default node pool %s", cgc.ClusterName, nodePoolName)
 
-	for i := 1; i < cgc.NumNodePools; i++ {
+	for i := 1; i < len(cgc.GKENodePools); i++ {
 		nodePoolName = fmt.Sprintf("%s-np-%d", cgc.ClusterName, i)
 
-		if err := gkeSession.CreateNodePool(ctx, nodePoolName, cgc.MachineType, cgc.DiskType, cgc.ImageType, cgc.DiskSize, cgc.Count); err != nil {
+		if err := gkeSession.CreateNodePool(ctx, nodePoolName, cgc.GKENodePools[i].MachineType, cgc.GKENodePools[i].DiskType,
+			cgc.GKENodePools[i].ImageType, cgc.GKENodePools[i].DiskSize, cgc.GKENodePools[i].NumNodesPerZone); err != nil {
 			return fmt.Errorf("error creating node pool %s: %w", nodePoolName, err)
 		}
 
@@ -131,16 +135,18 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 }
 
 func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
-	if cgc.NumNodePools <= 0 {
-		return ErrGKENumNodePoolsInvalid
+	if cgc.GKENodePools == nil || len(cgc.GKENodePools) == 0 {
+		return fmt.Errorf("validate create gke params: %w", ErrGKEDefaultNodePoolNotProvided)
 	}
 
-	if cgc.DiskSize <= 0 {
-		return ErrGKEDiskSizeInvalid
-	}
+	for _, nodePool := range cgc.GKENodePools {
+		if nodePool.NumNodesPerZone <= 0 {
+			return fmt.Errorf("validate create gke params: %w", ErrGKECountInvalid)
+		}
 
-	if cgc.Count <= 0 {
-		return ErrGKECountInvalid
+		if nodePool.DiskSize <= 0 {
+			return fmt.Errorf("validate create gke params: %w", ErrGKEDiskSizeInvalid)
+		}
 	}
 
 	if ok, err := managedk8sservices.ValidateReleaseChannel(cgc.ReleaseChannel); !ok || err != nil {
