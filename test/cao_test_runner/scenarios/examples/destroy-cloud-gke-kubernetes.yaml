@@ -1,7 +1,4 @@
 action: "Destroy Kubernetes Cluster"
 config:
-  clusterName: testing
-  platform: kubernetes
-  environment: cloud
-  provider: gcp
+  clusterName: gke-cluster
   gkeRegion: us-central1

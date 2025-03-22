@@ -1,17 +1,22 @@
 action: "Setup Kubernetes Cluster"
 config:
-  clusterName: test
+  clusterName: gke-cluster
   platform: kubernetes
   environment: cloud
   provider: gcp
   gkeRegion: us-central1
-  kubernetesVersion: 1.28.14
-  machineType: n1-standard-16
-  count: 7
-  diskSize: 100
-  diskType: pd-standard
-  imageType: ubuntu_containerd
-  releaseChannel: REGULAR
-  numNodePools: 1
+  kubernetesVersion: 1.31.6
+  releaseChannel: REGULAR # UNSPECIFIED, REGULAR, RAPID or STABLE
+  gkeNodePools:
+    - numNodesPerZone: 1 # Name: gke-cluster-np-0 (Default Node Pool)
+      machineType: n1-standard-2
+      imageType: ubuntu_containerd
+      diskType: pd-standard
+      diskSize: 50
+    - numNodesPerZone: 1 # Name: gke-cluster-np-1
+      machineType: n1-standard-4
+      imageType: ubuntu_containerd
+      diskType: pd-standard
+      diskSize: 50
   operatorImage: couchbase/admission-controller:2.7.0
   admissionControllerImage: couchbase/operator:2.7.0
