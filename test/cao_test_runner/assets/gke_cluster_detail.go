@@ -4,42 +4,60 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
+	"cloud.google.com/go/container/apiv1/containerpb"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 )
 
 var (
 	ErrGKEClusterNameAlreadySet = errors.New("gke cluster name already set, cannot be changed")
 	ErrGKEClusterNameNotSet     = errors.New("gke cluster name not set")
+	ErrGKENodePoolNameNotSet    = errors.New("gke node pool name not set")
 )
 
 type GKEClusterDetail struct {
 	gkeClusterName    string
-	nodePools         []*string
 	kubernetesVersion string
-	machineType       string
-	imageType         string
-	diskType          string
-	count             int32
-	diskSize          int32
 	releaseChannel    managedk8sservices.ReleaseChannel
-	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
+	nodePoolDetails   map[string]*GKENodePoolDetail
+	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
 
-func NewGKEClusterDetail(gkeClusterName string, nodePools []*string, kubernetesVersion, machineType, imageType, diskType string,
-	diskSize, count int32, releaseChannel managedk8sservices.ReleaseChannel) *GKEClusterDetail {
+type GKENodePoolDetail struct {
+	nodePoolName    string
+	k8sVersion      string
+	machineType     string
+	imageType       string
+	diskType        string
+	numNodesPerZone int32
+	diskSize        int32
+	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
+	mu sync.Mutex
+}
+
+func NewGKEClusterDetail(gkeClusterName string, kubernetesVersion string,
+	releaseChannel managedk8sservices.ReleaseChannel, nodePoolDetails map[string]*GKENodePoolDetail) *GKEClusterDetail {
 	return &GKEClusterDetail{
 		gkeClusterName:    gkeClusterName,
-		nodePools:         nodePools,
 		kubernetesVersion: kubernetesVersion,
-		machineType:       machineType,
-		imageType:         imageType,
-		diskType:          diskType,
-		count:             count,
-		diskSize:          diskSize,
 		releaseChannel:    releaseChannel,
+		nodePoolDetails:   nodePoolDetails,
+	}
+}
+
+func NewGKENodePoolDetail(npName string, k8sVersion, machineType, imageType, diskType string,
+	numNodesPerZone, diskSize int32) *GKENodePoolDetail {
+	return &GKENodePoolDetail{
+		nodePoolName:    npName,
+		k8sVersion:      k8sVersion,
+		machineType:     machineType,
+		imageType:       imageType,
+		diskType:        diskType,
+		numNodesPerZone: numNodesPerZone,
+		diskSize:        diskSize,
 	}
 }
 
@@ -55,38 +73,53 @@ func NewGKEClusterDetail(gkeClusterName string, nodePools []*string, kubernetesV
 
 type GKEClusterDetailGetter interface {
 	GetGKEClusterName() string
-	GetAllNodePools() []*string
 	GetKubernetesVersion() string
-	GetMachineType() string
-	GetImageType() string
-	GetDiskType() string
-	GetCount() int32
-	GetDiskSize() int32
 	GetReleaseChannel() managedk8sservices.ReleaseChannel
+	GetNodePoolDetailGetter(nodePoolName string) GKENodePoolDetailGetter
 }
 
 type GKEClusterDetailGetterSetter interface {
 	// Getters
 	GetGKEClusterName() string
-	GetAllNodePools() []*string
+	GetKubernetesVersion() string
+	GetReleaseChannel() managedk8sservices.ReleaseChannel
+	GetNodePoolDetailGetterSetter(nodePoolName string) GKENodePoolDetailGetterSetter
+
+	// Setters
+	SetGKEClusterName(gkeClusterName string) error
+	SetKubernetesVersion(kubernetesVersion string) error
+	SetReleaseChannel(releaseChannel managedk8sservices.ReleaseChannel) error
+	SetNodePoolDetail(nodePoolDetail *GKENodePoolDetail) error
+}
+
+type GKENodePoolDetailGetter interface {
+	GetNodePoolName() string
 	GetKubernetesVersion() string
 	GetMachineType() string
 	GetImageType() string
 	GetDiskType() string
-	GetCount() int32
+	GetNumNodesPerZone() int32
 	GetDiskSize() int32
-	GetReleaseChannel() managedk8sservices.ReleaseChannel
+}
+
+type GKENodePoolDetailGetterSetter interface {
+	// Getters
+	GetNodePoolName() string
+	GetKubernetesVersion() string
+	GetMachineType() string
+	GetImageType() string
+	GetDiskType() string
+	GetNumNodesPerZone() int32
+	GetDiskSize() int32
 
 	// Setters
-	SetGKEClusterName(gkeClusterName string) error
-	SetNodePools(nodePools []*string) error
+	SetNodePoolName(npName string) error
 	SetKubernetesVersion(kubernetesVersion string) error
 	SetMachineType(machineType string) error
 	SetImageType(imageType string) error
-	SetCount(count int32) error
+	SetNumNodesPerZone(count int32) error
 	SetDiskSize(diskSize int32) error
 	SetDiskType(diskType string) error
-	SetReleaseChannel(releaseChannel managedk8sservices.ReleaseChannel) error
 }
 
 /*
@@ -106,13 +139,6 @@ func (ac *GKEClusterDetail) GetGKEClusterName() string {
 	return ac.gkeClusterName
 }
 
-func (ac *GKEClusterDetail) GetAllNodePools() []*string {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.nodePools
-}
-
 func (ac *GKEClusterDetail) GetKubernetesVersion() string {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
@@ -120,46 +146,25 @@ func (ac *GKEClusterDetail) GetKubernetesVersion() string {
 	return ac.kubernetesVersion
 }
 
-func (ac *GKEClusterDetail) GetMachineType() string {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.machineType
-}
-
-func (ac *GKEClusterDetail) GetImageType() string {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.imageType
-}
-
-func (ac *GKEClusterDetail) GetDiskType() string {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.diskType
-}
-
-func (ac *GKEClusterDetail) GetCount() int32 {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.count
-}
-
-func (ac *GKEClusterDetail) GetDiskSize() int32 {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	return ac.diskSize
-}
-
 func (ac *GKEClusterDetail) GetReleaseChannel() managedk8sservices.ReleaseChannel {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
 	return ac.releaseChannel
+}
+
+func (ac *GKEClusterDetail) GetNodePoolDetailGetter(nodePoolName string) GKENodePoolDetailGetter {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	return ac.nodePoolDetails[nodePoolName]
+}
+
+func (ac *GKEClusterDetail) GetNodePoolDetailGetterSetter(nodePoolName string) GKENodePoolDetailGetterSetter {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	return ac.nodePoolDetails[nodePoolName]
 }
 
 /*
@@ -185,65 +190,11 @@ func (ac *GKEClusterDetail) SetGKEClusterName(gkeClusterName string) error {
 	return nil
 }
 
-func (ac *GKEClusterDetail) SetNodePools(nodePools []*string) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.nodePools = nodePools
-
-	return nil
-}
-
 func (ac *GKEClusterDetail) SetKubernetesVersion(kubernetesVersion string) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
 	ac.kubernetesVersion = kubernetesVersion
-
-	return nil
-}
-
-func (ac *GKEClusterDetail) SetMachineType(machineType string) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.machineType = machineType
-
-	return nil
-}
-
-func (ac *GKEClusterDetail) SetImageType(imageType string) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.imageType = imageType
-
-	return nil
-}
-
-func (ac *GKEClusterDetail) SetDiskType(diskType string) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.diskType = diskType
-
-	return nil
-}
-
-func (ac *GKEClusterDetail) SetCount(count int32) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.count = count
-
-	return nil
-}
-
-func (ac *GKEClusterDetail) SetDiskSize(diskSize int32) error {
-	ac.mu.Lock()
-	defer ac.mu.Unlock()
-
-	ac.diskSize = diskSize
 
 	return nil
 }
@@ -257,6 +208,143 @@ func (ac *GKEClusterDetail) SetReleaseChannel(releaseChannel managedk8sservices.
 	}
 
 	ac.releaseChannel = releaseChannel
+
+	return nil
+}
+
+func (ac *GKEClusterDetail) SetNodePoolDetail(nodePoolDetail *GKENodePoolDetail) error {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	ac.nodePoolDetails[nodePoolDetail.GetNodePoolName()] = nodePoolDetail
+
+	return nil
+}
+
+// =================================================================================
+// =================================================================================
+// =================================================================================
+// ========================== GKENodePoolDetail Getters ============================
+// =================================================================================
+// =================================================================================
+// =================================================================================
+
+func (gnpd *GKENodePoolDetail) GetNodePoolName() string {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.nodePoolName
+}
+
+func (gnpd *GKENodePoolDetail) GetKubernetesVersion() string {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.k8sVersion
+}
+
+func (gnpd *GKENodePoolDetail) GetMachineType() string {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.machineType
+}
+
+func (gnpd *GKENodePoolDetail) GetImageType() string {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.imageType
+}
+
+func (gnpd *GKENodePoolDetail) GetDiskType() string {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.diskType
+}
+
+func (gnpd *GKENodePoolDetail) GetNumNodesPerZone() int32 {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.numNodesPerZone
+}
+
+func (gnpd *GKENodePoolDetail) GetDiskSize() int32 {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	return gnpd.diskSize
+}
+
+// =================================================================================
+// =================================================================================
+// =================================================================================
+// ========================== GKENodePoolDetail Setters ============================
+// =================================================================================
+// =================================================================================
+// =================================================================================
+
+func (gnpd *GKENodePoolDetail) SetNodePoolName(npName string) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.nodePoolName = npName
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetKubernetesVersion(kubernetesVersion string) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.k8sVersion = kubernetesVersion
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetMachineType(machineType string) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.machineType = machineType
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetImageType(imageType string) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.imageType = imageType
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetDiskType(diskType string) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.diskType = diskType
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetNumNodesPerZone(count int32) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.numNodesPerZone = count
+
+	return nil
+}
+
+func (gnpd *GKENodePoolDetail) SetDiskSize(diskSize int32) error {
+	gnpd.mu.Lock()
+	defer gnpd.mu.Unlock()
+
+	gnpd.diskSize = diskSize
 
 	return nil
 }
@@ -303,47 +391,73 @@ func (kc *GKEClusterDetail) PopulateGKEClusterDetail() error {
 		return fmt.Errorf("populate gke cluster detail: %w", err)
 	}
 
-	var nodePoolNames []*string
-
 	nodePools, err := gkeSession.ListNodePools(ctx)
 	if err != nil {
 		return fmt.Errorf("populate gke cluster detail: %w", err)
 	}
 
-	for _, nodePool := range nodePools.NodePools {
-		nodePoolNames = append(nodePoolNames, &nodePool.Name)
-	}
-
-	if err := kc.SetNodePools(nodePoolNames); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
+	// Populate the GKE Cluster Details
 	if err := kc.SetKubernetesVersion(gkeCluster.CurrentMasterVersion); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
-	if err := kc.SetMachineType(nodePools.NodePools[0].Config.MachineType); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
-	if err := kc.SetImageType(nodePools.NodePools[0].Config.ImageType); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
-	if err := kc.SetDiskType(nodePools.NodePools[0].Config.DiskType); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
-	if err := kc.SetCount(nodePools.NodePools[0].InitialNodeCount); err != nil {
-		return fmt.Errorf("populate gke cluster detail: %w", err)
-	}
-
-	if err := kc.SetDiskSize(nodePools.NodePools[0].Config.DiskSizeGb); err != nil {
 		return fmt.Errorf("populate gke cluster detail: %w", err)
 	}
 
 	if err := kc.SetReleaseChannel(managedk8sservices.ReverseReleaseChannelMap[int(gkeCluster.ReleaseChannel.Channel)]); err != nil {
 		return fmt.Errorf("populate gke cluster detail: %w", err)
+	}
+
+	kc.mu.Lock()
+
+	kc.nodePoolDetails = make(map[string]*GKENodePoolDetail)
+
+	kc.mu.Unlock()
+
+	// Populate the GKE Node Pool Details
+	for _, nodePool := range nodePools.NodePools {
+		gkeNodePoolDetail := &GKENodePoolDetail{
+			nodePoolName: nodePool.Name,
+		}
+
+		err := gkeNodePoolDetail.populateGKENodePoolDetail(nodePool)
+		if err != nil {
+			return fmt.Errorf("populate gke cluster detail: %w", err)
+		}
+
+		err = kc.SetNodePoolDetail(gkeNodePoolDetail)
+		if err != nil {
+			return fmt.Errorf("populate gke cluster detail: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (pgnpd *GKENodePoolDetail) populateGKENodePoolDetail(nodePool *containerpb.NodePool) error {
+	if pgnpd.GetNodePoolName() == "" {
+		return fmt.Errorf("populate gke nodepool detail: %w", ErrGKENodePoolNameNotSet)
+	}
+
+	if err := pgnpd.SetKubernetesVersion(strings.Split(nodePool.Version, "-")[0]); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
+	}
+
+	if err := pgnpd.SetMachineType(nodePool.Config.MachineType); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
+	}
+
+	if err := pgnpd.SetImageType(nodePool.Config.ImageType); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
+	}
+
+	if err := pgnpd.SetDiskType(nodePool.Config.DiskType); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
+	}
+
+	if err := pgnpd.SetNumNodesPerZone(nodePool.InitialNodeCount); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
+	}
+
+	if err := pgnpd.SetDiskSize(nodePool.Config.DiskSizeGb); err != nil {
+		return fmt.Errorf("populate gke nodepool detail: %w", err)
 	}
 
 	return nil
