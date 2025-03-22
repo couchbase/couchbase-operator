@@ -1,7 +1,4 @@
 action: "Destroy Kubernetes Cluster"
 config:
-  clusterName: testing-raghav
-  platform: kubernetes
-  environment: cloud
-  provider: aws
-  eksRegion: us-east-2
+  clusterName: eks-cluster
+  eksRegion: us-east-2 # Can be taken from context / env as well

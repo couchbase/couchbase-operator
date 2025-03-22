@@ -1,17 +1,25 @@
 action: "Setup Kubernetes Cluster"
 config:
-  clusterName: testing
+  description:
+    - Setup EKS Cluster with K8S 1.31 AL2_x86_64
+  clusterName: eks-cluster
   platform: kubernetes
   environment: cloud
   provider: aws
   eksRegion: us-east-2
-  kubernetesVersion: 1.27
-  instanceType: m5.xlarge
-  numNodeGroups: 1
-  minSize: 10
-  maxSize: 12
-  desiredSize: 11
-  diskSize: 100
-  ami: AL2_x86_64
+  kubernetesVersion: 1.31
+  eksNodegroups:
+    - instanceType: m5.large # Name of the Nodegroup: eks-cluster-node-group-0
+      desiredSize: 3
+      minSize: 3
+      maxSize: 4
+      ami: AL2_x86_64
+      diskSize: 20 # In GBs
+    - instanceType: m5.xlarge # Name of the Nodegroup: eks-cluster-node-group-1
+      desiredSize: 3
+      minSize: 3
+      maxSize: 4
+      ami: AL2_x86_64
+      diskSize: 20 # In GBs
   operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
   admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64

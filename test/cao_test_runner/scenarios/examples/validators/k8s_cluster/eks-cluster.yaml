@@ -1,0 +1,24 @@
+# This validator must be used with "Setup Kubernetes Cluster" and "Upgrade Kubernetes Cluster" actions.
+validators:
+  - name: "KubernetesClusterValidator"
+    clusterName: "eks-cluster"
+    state: "POST"
+    eksConfig:
+      kubernetesVersion: "1.31"
+      eksNodegroupConfig:
+        "eks-cluster-node-group-0":
+          kubernetesVersion: "1.31"
+          instanceType: m5.xlarge
+          desiredSize: 3
+          minSize: 3
+          maxSize: 4
+          ami: AL2_x86_64
+          diskSize: 20
+        "eks-cluster-node-group-1":
+          kubernetesVersion: "1.31"
+          instanceType: m5.large
+          desiredSize: 3
+          minSize: 3
+          maxSize: 4
+          ami: AL2_x86_64
+          diskSize: 20
