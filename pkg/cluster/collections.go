@@ -397,29 +397,6 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	return nil
 }
 
-func (c *Cluster) GatherCollectionGroupUpdates() (map[*couchbasev2.CouchbaseCollectionGroup]*couchbasev2.CouchbaseCollectionGroup, error) {
-	var collectionGroupUpdates = make(map[*couchbasev2.CouchbaseCollectionGroup]*couchbasev2.CouchbaseCollectionGroup)
-
-	currentCollectionGroups, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(c.cluster.Namespace).List(c.ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	requestedCollectionGroups := c.k8s.CouchbaseCollectionGroups.List()
-
-	for _, req := range requestedCollectionGroups {
-		for _, curr := range currentCollectionGroups.Items {
-			if req.Name == curr.Name {
-				if !reflect.DeepEqual(req, curr) {
-					collectionGroupUpdates[&curr] = req
-				}
-			}
-		}
-	}
-
-	return collectionGroupUpdates, nil
-}
-
 // reconcileCollections magaes collection state for a specific scope within
 // a specific bucket.
 //
@@ -484,9 +461,23 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			Name: collection.CouchbaseName(),
 		}
 
+		// Check if the collection has a maxTTL and if it does, check if the cluster version supports it.
 		if collection.Spec.MaxTTL != nil {
 			maxTTL := int(collection.Spec.MaxTTL.Seconds())
-			apiCollection.MaxTTL = &maxTTL
+			if maxTTL < 0 {
+				allowNegMaxTTL, err := c.IsAtLeastVersion("7.6.0")
+				if err != nil {
+					return err
+				}
+
+				if allowNegMaxTTL {
+					apiCollection.MaxTTL = &maxTTL
+				} else {
+					log.V(2).Info("Creating collection without maxTTL as cluster does not support the requested value", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
+				}
+			} else {
+				apiCollection.MaxTTL = &maxTTL
+			}
 		}
 
 		cdcEnabled, err := c.IsAtLeastVersion("7.2.0")

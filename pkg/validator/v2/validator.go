@@ -4206,36 +4206,6 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	return nil
 }
 
-func CheckImmutableFieldsCollectionGroup(prev, curr *couchbasev2.CouchbaseCollectionGroup) error {
-	var errs []error
-
-	if checkAnnotationSkipValidation(curr.Annotations) {
-		return nil
-	}
-
-	prevTTL := &metav1.Duration{}
-
-	if prev.Spec.MaxTTL != nil {
-		prevTTL = prev.Spec.MaxTTL
-	}
-
-	currTTL := &metav1.Duration{}
-
-	if curr.Spec.MaxTTL != nil {
-		currTTL = curr.Spec.MaxTTL
-	}
-
-	if prevTTL.Duration != currTTL.Duration {
-		errs = append(errs, util.NewUpdateError("spec.maxTTL", "body"))
-	}
-
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
-	}
-
-	return nil
-}
-
 func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Buckets aren't managed by Cluster.
 	if !cluster.Spec.Buckets.Managed {

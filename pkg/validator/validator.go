@@ -84,8 +84,8 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 			return fmt.Errorf("failed to update couchbase collection")
 		}
 	case *couchbasev2.CouchbaseCollectionGroup:
-		if t2, ok := updated.(*couchbasev2.CouchbaseCollectionGroup); ok {
-			return validationv2.CheckImmutableFieldsCollectionGroup(t, t2)
+		if _, ok := updated.(*couchbasev2.CouchbaseCollectionGroup); !ok {
+			return fmt.Errorf("failed to update couchbase collection group")
 		}
 	}
 

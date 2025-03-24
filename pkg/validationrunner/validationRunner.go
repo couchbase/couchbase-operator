@@ -101,34 +101,6 @@ func ValidateImmutableFields(currentCluster *cluster.Cluster) []error {
 	errs = append(errs, validateReplicationsImmutableFields(currentCluster)...)
 	errs = append(errs, validateBackupsImmutableFields(currentCluster)...)
 	errs = append(errs, validateAutoscalersImmutableField(currentCluster)...)
-	errs = append(errs, validateCollectionGroupsImmutableFields(currentCluster)...)
-
-	return errs
-}
-
-func validateCollectionGroupsImmutableFields(currentCluster *cluster.Cluster) []error {
-	var errs []error
-
-	updates, err := currentCluster.GatherCollectionGroupUpdates()
-	if err != nil {
-		if checkIsMemberError(err) {
-			return nil
-		}
-
-		return append(errs, err)
-	}
-
-	for current, update := range updates {
-		if err := validationv2.CheckImmutableFieldsCollectionGroup(current, update); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if updateErr := currentCluster.GetK8sClient().CouchbaseCollectionGroups.Update(update); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
-
-			errs = append(errs, err)
-		}
-	}
 
 	return errs
 }

@@ -886,7 +886,7 @@ func TestUpdateCollection(t *testing.T) {
 	scopeName := "pinky"
 	collectionName := "brain"
 
-	// Create a collection and collection group.
+	// Create a collection.
 	collection := e2eutil.NewCollection(collectionName).Generate()
 	collection.Spec.MaxTTL = e2espec.NewDurationS(100)
 
@@ -943,6 +943,84 @@ func TestUpdateCollection(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: expectedUpdates, Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestUpdateCollectionMaxTTLAgainstClusterVersion tests that the collection and collection group maxTTL cannot be set to -1 and cannot be updated when the cluster version is less than 7.6.0.
+func TestUpdateImmutableCollectionMaxTTLWithLowClusterVersion(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).BeforeVersion("7.6.0").CouchbaseBucket().Upgradable()
+
+	clusterSize := 1
+	scopeName := "mytestscope"
+	collectionName := "mytestcollection"
+	collectionGroupName := "mytestcollectiongroup"
+	collectionGroupNames := []string{"mytestcollectiongroup1"}
+
+	// Create a collection.
+	collection := e2eutil.NewCollection(collectionName).Generate()
+	collection.Spec.MaxTTL = e2espec.NewDurationS(-1)
+	collection = e2eutil.MustCreateCollection(t, kubernetes, collection)
+
+	// Create a collection group.
+	collectionGroup := e2eutil.NewCollectionGroup(collectionGroupName, collectionGroupNames...).Generate()
+	collection.Spec.MaxTTL = e2espec.NewDurationS(-1)
+	collectionGroup = e2eutil.MustCreateCollectionGroup(t, kubernetes, collectionGroup)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection, collectionGroup).MustCreate(t, kubernetes)
+
+	// Link to a bucket and create the bucket.
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
+	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(2048)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Wait for all scopes to be created as expected.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(collectionName, collectionGroupNames[0])
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, cluster, bucket, expected, time.Minute)
+
+	expectedCouchbaseCollection := *collection
+
+	// We expect the maxTTL to be set to the default value of 0 and not -1 AA defined. The collection created
+	// from the collection group will be the same as the standalone collection, other than the name.
+	expectedCouchbaseCollection.Spec.MaxTTL = e2espec.NewDurationS(0)
+	expectedCouchbaseCollectionFromGroup := expectedCouchbaseCollection
+	expectedCouchbaseCollectionFromGroup.Name = collectionGroupNames[0]
+
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), expectedCouchbaseCollection, time.Minute)
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), expectedCouchbaseCollectionFromGroup, time.Minute)
+
+	// Update the collection.
+	collection.Spec.MaxTTL = e2espec.NewDurationS(1000)
+	e2eutil.MustUpdateCollection(t, kubernetes, collection)
+
+	// Update the collection group.
+	collectionGroup.Spec.MaxTTL = e2espec.NewDurationS(1000)
+	e2eutil.MustUpdateCollectionGroup(t, kubernetes, collectionGroup)
+
+	// We don't expect the maxTTL to be updated for the collection or the collection group.
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), expectedCouchbaseCollection, 3*time.Minute)
+
+	e2eutil.MustVerifyCollection(t, kubernetes, cluster, bucket.GetName(), expectedCouchbaseCollectionFromGroup, 3*time.Minute)
+
+	// Because the collection and collection group are created before the cluster is created,
+	// we expect a single event as they are both created in the same reconciliation loop.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

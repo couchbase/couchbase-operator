@@ -3170,12 +3170,6 @@ func TestNegValidationApply(t *testing.T) {
 			expectedErrors: []string{`specify just one value, either Str or Int`},
 		},
 		{
-			name:           "TestValidateCollectionGroupTTLImmutable",
-			mutations:      patchMap{"collectiongroup0": jsonpatch.NewPatchSet().Add("/spec/maxTTL", "30s")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.maxTTL"},
-		},
-		{
 			name:           "TestValidateUpdateBucketMemoryQuotaOverflow",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
