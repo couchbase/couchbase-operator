@@ -73,10 +73,6 @@ func checkLogVolumeMountConfigured(servers []couchbasev2.ServerConfig) bool {
 func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 	warnings := make([]string, 0)
 
-	if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
-		warnings = append(warnings, "CouchbaseBucket spec.storageBackend is not set to magma, which is the storage mechanism recommended for production clusters.")
-	}
-
 	if bucket.Spec.SampleBucket {
 		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While enabled, the bucket will not be updated to match the CRD specification.")
 	}

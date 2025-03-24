@@ -203,16 +203,18 @@ func TestCheckFieldsCouchbaseBuckets(t *testing.T) {
 		expectedWarnings []string
 	}{
 		{
-			name: "no warning expected",
+			name: "no warning expected for magma backend",
 			bucketSpec: v2.CouchbaseBucketSpec{
 				StorageBackend: v2.CouchbaseStorageBackendMagma,
 			},
 			expectedWarnings: []string{},
 		},
 		{
-			name:             "spec.storageBackend not set to magma",
-			bucketSpec:       v2.CouchbaseBucketSpec{StorageBackend: v2.CouchbaseStorageBackendCouchstore},
-			expectedWarnings: []string{"spec.storageBackend"},
+			name: "warning expected for couchstore backend",
+			bucketSpec: v2.CouchbaseBucketSpec{
+				StorageBackend: v2.CouchbaseStorageBackendCouchstore,
+			},
+			expectedWarnings: []string{},
 		},
 		{
 			name: "spec.sampleBucket is set to true ",
