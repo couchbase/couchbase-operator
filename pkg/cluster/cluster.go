@@ -496,6 +496,7 @@ func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
 //
 // It accepts a flag forcing it update internal state from Kubernetes, and returns a
 // similar flag to indicate we require a forced update with the next invocation.
+// nolint:gocognit
 func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
@@ -509,6 +510,16 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 
 		metrics.ReconcileDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Observe(reconcileTime.Seconds())
 	}()
+
+	if _, err := c.state.Get(persistence.RebalanceRetries); err != nil {
+		// If the key doesn't exist, create it.
+		// We don't want to do this every time we reconcile.
+		if goerrors.Is(err, persistence.ErrKeyError) {
+			if err := c.state.Insert(persistence.RebalanceRetries, "3"); err != nil {
+				return
+			}
+		}
+	}
 
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {

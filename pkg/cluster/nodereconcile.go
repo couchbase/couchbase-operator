@@ -266,6 +266,18 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		}
 	}
 
+	var reconcileRetries = 1
+
+	val, err := c.state.Get(persistence.RebalanceRetries)
+	if err == nil {
+		rr, err := strconv.Atoi(val)
+		if err != nil {
+			reconcileRetries = 1
+		} else {
+			reconcileRetries = rr
+		}
+	}
+
 	fsm := &ReconcileMachine{
 		// c.members contains all members we know about from Kubernetes or from
 		// Couchbase server.  By removing all the ones that Couchbase doesn't know
@@ -288,7 +300,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 		c: c,
 
-		rebalanceRetries: 1,
+		rebalanceRetries: uint(reconcileRetries),
 	}
 
 	// Reset any timeout counters if nodes have recovered.
