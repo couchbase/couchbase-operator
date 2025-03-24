@@ -277,7 +277,9 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 
 	if allErr {
 		err = c.setPodIndex(availableIndexes[0])
-		log.Error(err, "failed to rollback index", "index", availableIndexes[0], "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
+		if err != nil {
+			log.Error(err, "failed to rollback index", "index", availableIndexes[0], "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
+		}
 	}
 
 	return results, nil
