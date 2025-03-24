@@ -103,6 +103,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkMigrationConstraints,
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
+		checkClusterBackupConstraints,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -4550,4 +4551,16 @@ func checkConstraintServicelessOverAdminService(_ *types.Validator, cluster *cou
 	}
 
 	return nil, nil
+}
+
+func checkClusterBackupConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.Backup.Managed {
+		return nil
+	}
+
+	if cluster.Spec.Backup.Image == "" {
+		return fmt.Errorf("spec.backup.image cannot be empty when spec.backup.managed is true")
+	}
+
+	return nil
 }

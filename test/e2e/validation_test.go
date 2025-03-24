@@ -732,6 +732,17 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{" cannot be longer than 42 characters"},
 		},
+		{
+			name: "TestInvalidCouchbaseClusterBackupImageEmptyWhenManaged",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/backup", couchbasev2.Backup{
+					Managed: true,
+					Image:   "",
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.backup.image cannot be empty when spec.backup.managed is true"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3092,6 +3103,23 @@ func TestValidationApply(t *testing.T) {
 		{
 			name:       "TestValidateUpdateBucketMemoryQuota",
 			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "200Mi")},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidationUpdateClusterBackupImageLeftEmpty",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/backup", couchbasev2.Backup{
+				Image:   "",
+				Managed: true,
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.backup.image cannot be empty when spec.backup.managed is true"},
+		},
+		{
+			name: "TestValidationUpdateClusterBackupImageLeftEmptyWhenNotManaged",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/backup", couchbasev2.Backup{
+				Image:   "",
+				Managed: false,
+			})},
 			shouldFail: false,
 		},
 	}
