@@ -692,7 +692,7 @@ $(TOOLS_ARTIFACT_BUILDDIR)/crd.yaml: $(CRD_FILE) | $(TOOLS_ARTIFACT_BUILDDIR)
 	cp $< $@
 $(TOOLS_ARTIFACT_BUILDDIR)/bin/%$(EXE_SUFFIX): $(TARGET_BINDIR)/% | $(TOOLS_ARTIFACT_BUILDDIR)/bin
 	cp $< $@
-$(TOOLS_ARTIFACT_BUILDDIR)/%.yaml: docs/user/modules/ROOT/examples/$(TARGET_PLATFORM)/%.yaml | $(TOOLS_ARTIFACT_BUILDDIR)
+$(TOOLS_ARTIFACT_BUILDDIR)/%.yaml: docs/dev/examples/$(TARGET_PLATFORM)/%.yaml | $(TOOLS_ARTIFACT_BUILDDIR)
 	cp $< $@
 
 # This group of rules defines individual image artifact files, and their direct
