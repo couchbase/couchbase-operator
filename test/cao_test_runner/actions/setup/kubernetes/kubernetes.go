@@ -3,7 +3,6 @@ package setupkubernetes
 import (
 	"errors"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/assets"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	fileutils "github.com/couchbase/couchbase-operator/test/cao_test_runner/util/file_utils"
@@ -23,9 +22,9 @@ type KubernetesSetupConfig struct {
 	ClusterName              string                             `yaml:"clusterName" caoCli:"required,context" env:"CLUSTER_NAME"`
 	Platform                 managedk8sservices.PlatformType    `yaml:"platform" caoCli:"required" env:"PLATFORM"`
 	Environment              managedk8sservices.EnvironmentType `yaml:"environment" caoCli:"required" env:"ENVIRONMENT"`
-	NumControlPlane          int                                `yaml:"numControlPlane"`
-	NumWorkers               int                                `yaml:"numWorkers"`
-	LoadDockerImageToKind    bool                               `yaml:"loadDockerImageToKind"`
+	NumControlPlane          int                                `yaml:"numControlPlane"`       // Kind
+	NumWorkers               int                                `yaml:"numWorkers"`            // Kind
+	LoadDockerImageToKind    bool                               `yaml:"loadDockerImageToKind"` // Kind
 	OperatorImage            string                             `yaml:"operatorImage" caoCli:"required" env:"OPERATOR_IMAGE"`
 	AdmissionControllerImage string                             `yaml:"admissionControllerImage" caoCli:"required" env:"ADMISSION_CONTROLLER_IMAGE"`
 	Provider                 managedk8sservices.ProviderType    `yaml:"provider" env:"PROVIDER"`
@@ -35,15 +34,8 @@ type KubernetesSetupConfig struct {
 	KubernetesVersion        string                             `yaml:"kubernetesVersion"`
 	EKSNodegroups            []*EKSNodegroup                    `yaml:"eksNodegroups"`
 	GKENodePools             []*GKENodePool                     `yaml:"gkeNodePools"`
-	DiskSize                 int                                `yaml:"diskSize"`       // AKS, GKE
-	OSSKU                    armcontainerservice.OSSKU          `yaml:"osSKU"`          // AKS
-	OSType                   armcontainerservice.OSType         `yaml:"osType"`         // AKS
-	VMSize                   string                             `yaml:"vmSize"`         // AKS
-	Count                    int                                `yaml:"count"`          // AKS, GKE
-	NumNodePools             int                                `yaml:"numNodePools"`   // AKS, GKE
-	MachineType              string                             `yaml:"machineType"`    // GKE
-	ImageType                string                             `yaml:"imageType"`      // GKE
-	DiskType                 string                             `yaml:"diskType"`       // GKE
+	AKSSystemNodePools       []*AKSSystemNodePool               `yaml:"aksSystemNodePools"`
+	AKSUserNodePools         []*AKSUserNodePool                 `yaml:"aksUserNodePools"`
 	ReleaseChannel           managedk8sservices.ReleaseChannel  `yaml:"releaseChannel"` // GKE
 	kubeconfigPath           *fileutils.File
 	ms                       *managedk8sservices.ManagedServiceProvider

@@ -51,13 +51,9 @@ func NewCreateClusterUtil(p *KubernetesSetupConfig) (CreateClusterUtil, error) {
 					ClusterName:            p.ClusterName,
 					Region:                 p.AKSRegion,
 					KubernetesVersion:      p.KubernetesVersion,
-					DiskSize:               int32(p.DiskSize),
+					AKSSystemNodePools:     p.AKSSystemNodePools,
+					AKSUserNodePools:       p.AKSUserNodePools,
 					KubeConfigPath:         p.kubeconfigPath,
-					NumNodePools:           p.NumNodePools,
-					OSSKU:                  p.OSSKU,
-					OSType:                 p.OSType,
-					VMSize:                 p.VMSize,
-					Count:                  int32(p.Count),
 					ManagedServiceProvider: p.ms,
 				}, nil
 			case managedk8sservices.GCP:

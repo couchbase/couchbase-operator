@@ -135,7 +135,7 @@ func (cgc *CreateGKECluster) CreateCluster(ctx context.Context) error {
 }
 
 func (cgc *CreateGKECluster) ValidateParams(ctx context.Context) error {
-	if cgc.GKENodePools == nil || len(cgc.GKENodePools) == 0 {
+	if len(cgc.GKENodePools) == 0 {
 		return fmt.Errorf("validate create gke params: %w", ErrGKEDefaultNodePoolNotProvided)
 	}
 

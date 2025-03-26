@@ -248,7 +248,7 @@ func (aksSession *AKSSession) CreateSubnet(ctx context.Context, resourceGroupNam
 }
 
 func (aksSession *AKSSession) CreateCluster(ctx context.Context, kubernetesVersion, resourceGroupName, subnetID, vmSize string,
-	osType *armcontainerservice.OSType, osSKU *armcontainerservice.OSSKU, waitForClusterCreation bool) error {
+	count, diskSize int32, osSKU *armcontainerservice.OSSKU, waitForClusterCreation bool) error {
 	// TODO : Take all IPs as params
 	clusterParams := armcontainerservice.ManagedCluster{
 		Location: &aksSession.region,
@@ -268,13 +268,13 @@ func (aksSession *AKSSession) CreateCluster(ctx context.Context, kubernetesVersi
 			},
 			AgentPoolProfiles: []*armcontainerservice.ManagedClusterAgentPoolProfile{
 				{
-					Name:         to.Ptr("systempool1"),
-					Count:        to.Ptr(int32(5)),
+					Name:         to.Ptr("systempool0"),
+					Count:        to.Ptr(count),
 					VMSize:       &vmSize,
-					OSDiskSizeGB: to.Ptr(int32(100)),
-					OSSKU:        osSKU,
+					OSDiskSizeGB: to.Ptr(diskSize),
 					Mode:         to.Ptr(armcontainerservice.AgentPoolModeSystem),
-					OSType:       osType,
+					OSType:       to.Ptr(armcontainerservice.OSTypeLinux),
+					OSSKU:        osSKU,
 					Type:         to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 					AvailabilityZones: []*string{
 						to.Ptr("1"),
@@ -293,7 +293,7 @@ func (aksSession *AKSSession) CreateCluster(ctx context.Context, kubernetesVersi
 
 	poller, err := aksSession.aksClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.clusterName, clusterParams, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes cluster: %w", err)
+		return fmt.Errorf("begin create cluster: %w", err)
 	}
 
 	if !waitForClusterCreation {
@@ -301,24 +301,24 @@ func (aksSession *AKSSession) CreateCluster(ctx context.Context, kubernetesVersi
 	}
 
 	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
-		return fmt.Errorf("failed to wait for Kubernetes cluster creation to complete: %w", err)
+		return fmt.Errorf("wait for cluster creation: %w", err)
 	}
 
 	return nil
 }
 
 func (aksSession *AKSSession) CreateNodePool(ctx context.Context, resourceGroupName, nodePoolName, subnetID, vmSize string,
-	count, diskSize int32, osType *armcontainerservice.OSType, osSKU *armcontainerservice.OSSKU, waitForNodeGroupCreation bool) error {
+	count, diskSize int32, osType *armcontainerservice.OSType, osSKU *armcontainerservice.OSSKU, poolMode *armcontainerservice.AgentPoolMode, waitForNodeGroupCreation bool) error {
 	if err := ValidateOSType(osType); err != nil {
-		return fmt.Errorf("invalid os type: %w", err)
+		return fmt.Errorf("create node pool %s: %w", nodePoolName, err)
 	}
 
 	if *osType == armcontainerservice.OSTypeWindows && *osSKU != "" {
-		return fmt.Errorf("invalid os sku type for os type windows: %w", ErrInvalidOSSKUType)
+		return fmt.Errorf("create node pool %s: %w", nodePoolName, ErrInvalidOSSKUType)
 	}
 
 	if err := ValidateOSSKUType(osSKU); *osType != armcontainerservice.OSTypeWindows && err != nil {
-		return fmt.Errorf("invalid os sku type: %w", err)
+		return fmt.Errorf("create node pool %s: %w", nodePoolName, err)
 	}
 
 	nodePoolParams := armcontainerservice.AgentPool{
@@ -328,7 +328,7 @@ func (aksSession *AKSSession) CreateNodePool(ctx context.Context, resourceGroupN
 			OSDiskSizeGB: &diskSize,
 			OSSKU:        osSKU,
 			OSType:       osType,
-			Mode:         to.Ptr(armcontainerservice.AgentPoolModeUser),
+			Mode:         poolMode,
 			Type:         to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 			AvailabilityZones: []*string{
 				to.Ptr("1"),
@@ -341,7 +341,7 @@ func (aksSession *AKSSession) CreateNodePool(ctx context.Context, resourceGroupN
 
 	poller, err := aksSession.nodePoolClient.BeginCreateOrUpdate(ctx, resourceGroupName, aksSession.clusterName, nodePoolName, nodePoolParams, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create node pool: %w", err)
+		return fmt.Errorf("create node pool %s: %w", nodePoolName, err)
 	}
 
 	if !waitForNodeGroupCreation {
@@ -349,7 +349,7 @@ func (aksSession *AKSSession) CreateNodePool(ctx context.Context, resourceGroupN
 	}
 
 	if _, err := poller.PollUntilDone(ctx, nil); err != nil {
-		return fmt.Errorf("failed to wait for Kubernetes node pool creation to complete: %w", err)
+		return fmt.Errorf("create node pool %s: wait for node pool creation: %w", nodePoolName, err)
 	}
 
 	return nil
