@@ -17,43 +17,43 @@ var (
 
 type AKSClusterDetail struct {
 	aksClusterName    string
-	nodePools         map[string]*AKSNodePool
 	kubernetesVersion string
-	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
+	nodePools         map[string]*AKSNodePool
+	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
 
 type AKSNodePool struct {
-	name     string
-	osSKU    armcontainerservice.OSSKU
-	osType   armcontainerservice.OSType
-	count    int32
-	vmSize   string
-	diskSize int32
-	// Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
+	name       string
+	k8sVersion string
+	count      int32
+	poolMode   armcontainerservice.AgentPoolMode
+	osSKU      armcontainerservice.OSSKU
+	osType     armcontainerservice.OSType
+	vmSize     string
+	diskSize   int32
+	// TODO Assess the necessity of a lock over ReadWrites. Can be replaced by RWMutex then.
 	mu sync.Mutex
 }
 
-func NewAKSNodePool(name string, osSKU armcontainerservice.OSSKU, osType armcontainerservice.OSType, count int32, vmSize string, diskSize int32) *AKSNodePool {
+func NewAKSNodePool(name, k8sVersion string, count int32, poolMode armcontainerservice.AgentPoolMode,
+	osSKU armcontainerservice.OSSKU, osType armcontainerservice.OSType, vmSize string, diskSize int32) *AKSNodePool {
 	return &AKSNodePool{
-		name:     name,
-		osSKU:    osSKU,
-		osType:   osType,
-		count:    count,
-		vmSize:   vmSize,
-		diskSize: diskSize,
+		name:       name,
+		k8sVersion: k8sVersion,
+		poolMode:   poolMode,
+		osSKU:      osSKU,
+		osType:     osType,
+		count:      count,
+		vmSize:     vmSize,
+		diskSize:   diskSize,
 	}
 }
 
-func NewAKSClusterDetail(aksClusterName string, nodePools []*AKSNodePool, kubernetesVersion string) *AKSClusterDetail {
-	var nodePoolsMap = make(map[string]*AKSNodePool)
-	for _, nodePool := range nodePools {
-		nodePoolsMap[nodePool.name] = nodePool
-	}
-
+func NewAKSClusterDetail(aksClusterName, kubernetesVersion string, nodePools map[string]*AKSNodePool) *AKSClusterDetail {
 	return &AKSClusterDetail{
 		aksClusterName:    aksClusterName,
-		nodePools:         nodePoolsMap,
+		nodePools:         nodePools,
 		kubernetesVersion: kubernetesVersion,
 	}
 }
@@ -70,28 +70,34 @@ func NewAKSClusterDetail(aksClusterName string, nodePools []*AKSNodePool, kubern
 
 type AKSNodePoolGetter interface {
 	GetNodePoolName() string
-	GetOsSKU() armcontainerservice.OSSKU
-	GetOsType() armcontainerservice.OSType
-	GetCount() int32
+	GetKubernetesVersion() string
 	GetVMSize() string
+	GetCount() int32
+	GetNodePoolMode() armcontainerservice.AgentPoolMode
+	GetOsType() armcontainerservice.OSType
+	GetOsSKU() armcontainerservice.OSSKU
 	GetDiskSize() int32
 }
 
 type AKSNodePoolGetterSetter interface {
 	// Getters
 	GetNodePoolName() string
-	GetOsSKU() armcontainerservice.OSSKU
-	GetOsType() armcontainerservice.OSType
-	GetCount() int32
+	GetKubernetesVersion() string
 	GetVMSize() string
+	GetCount() int32
+	GetNodePoolMode() armcontainerservice.AgentPoolMode
+	GetOsType() armcontainerservice.OSType
+	GetOsSKU() armcontainerservice.OSSKU
 	GetDiskSize() int32
 
 	// Setters
 	SetNodePoolName(nodePoolName string) error
-	SetOsSKU(osSKU armcontainerservice.OSSKU) error
-	SetOsType(osType armcontainerservice.OSType) error
-	SetCount(count int32) error
+	SetKubernetesVersion(k8sVersion string) error
 	SetVMSize(vmSize string) error
+	SetCount(count int32) error
+	SetNodePoolMode(poolMode armcontainerservice.AgentPoolMode) error
+	SetOsType(osType armcontainerservice.OSType) error
+	SetOsSKU(osSKU armcontainerservice.OSSKU) error
 	SetDiskSize(diskSize int32) error
 }
 
@@ -232,16 +238,16 @@ func (ac *AKSNodePool) GetNodePoolName() string {
 	return ac.name
 }
 
-func (ac *AKSNodePool) GetOsSKU() armcontainerservice.OSSKU {
+func (ac *AKSNodePool) GetKubernetesVersion() string {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
-	return ac.osSKU
+	return ac.k8sVersion
 }
 
-func (ac *AKSNodePool) GetOsType() armcontainerservice.OSType {
+func (ac *AKSNodePool) GetVMSize() string {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
-	return ac.osType
+	return ac.vmSize
 }
 
 func (ac *AKSNodePool) GetCount() int32 {
@@ -250,10 +256,22 @@ func (ac *AKSNodePool) GetCount() int32 {
 	return ac.count
 }
 
-func (ac *AKSNodePool) GetVMSize() string {
+func (ac *AKSNodePool) GetNodePoolMode() armcontainerservice.AgentPoolMode {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
-	return ac.vmSize
+	return ac.poolMode
+}
+
+func (ac *AKSNodePool) GetOsType() armcontainerservice.OSType {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+	return ac.osType
+}
+
+func (ac *AKSNodePool) GetOsSKU() armcontainerservice.OSSKU {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+	return ac.osSKU
 }
 
 func (ac *AKSNodePool) GetDiskSize() int32 {
@@ -281,20 +299,20 @@ func (ac *AKSNodePool) SetNodePoolName(nodePoolName string) error {
 	return nil
 }
 
-func (ac *AKSNodePool) SetOsSKU(osSKU armcontainerservice.OSSKU) error {
+func (ac *AKSNodePool) SetKubernetesVersion(k8sVersion string) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
-	ac.osSKU = osSKU
+	ac.k8sVersion = k8sVersion
 
 	return nil
 }
 
-func (ac *AKSNodePool) SetOsType(osType armcontainerservice.OSType) error {
+func (ac *AKSNodePool) SetVMSize(vmSize string) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
-	ac.osType = osType
+	ac.vmSize = vmSize
 
 	return nil
 }
@@ -308,11 +326,29 @@ func (ac *AKSNodePool) SetCount(count int32) error {
 	return nil
 }
 
-func (ac *AKSNodePool) SetVMSize(vmSize string) error {
+func (ac *AKSNodePool) SetNodePoolMode(poolMode armcontainerservice.AgentPoolMode) error {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
 
-	ac.vmSize = vmSize
+	ac.poolMode = poolMode
+
+	return nil
+}
+
+func (ac *AKSNodePool) SetOsType(osType armcontainerservice.OSType) error {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	ac.osType = osType
+
+	return nil
+}
+
+func (ac *AKSNodePool) SetOsSKU(osSKU armcontainerservice.OSSKU) error {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	ac.osSKU = osSKU
 
 	return nil
 }
@@ -382,8 +418,8 @@ func (kc *AKSClusterDetail) PopulateAKSClusterDetail() error {
 	}
 
 	for _, nodePool := range nodePools {
-		assetNodePool := NewAKSNodePool(*nodePool.Name, *nodePool.Properties.OSSKU,
-			*nodePool.Properties.OSType, *nodePool.Properties.Count, *nodePool.Properties.VMSize, *nodePool.Properties.OSDiskSizeGB)
+		assetNodePool := NewAKSNodePool(*nodePool.Name, *nodePool.Properties.OrchestratorVersion, *nodePool.Properties.Count,
+			*nodePool.Properties.Mode, *nodePool.Properties.OSSKU, *nodePool.Properties.OSType, *nodePool.Properties.VMSize, *nodePool.Properties.OSDiskSizeGB)
 
 		if err := kc.SetNodePool(assetNodePool); err != nil {
 			return fmt.Errorf("populate aks cluster detail: %w", err)
