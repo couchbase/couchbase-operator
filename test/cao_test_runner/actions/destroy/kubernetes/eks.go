@@ -190,22 +190,28 @@ func (dec *DeleteEKSCluster) DeleteCluster(ctx context.Context) error {
 
 	contextName := fmt.Sprintf("eks-%s@%s", dec.ClusterName, dec.Region)
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("unable to delete context from kubectl %s: %w", contextName, err)
+		return fmt.Errorf("delete eks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted context %s from kubectl contexts", contextName)
+	logrus.Infof("Deleted context %s from kubeconfig", contextName)
 
 	if err := kubectl.DeleteCluster(dec.ClusterName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("unable to delete cluster from kubectl %s: %w", dec.ClusterName, err)
+		return fmt.Errorf("delete eks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted cluster %s from kubectl clusters", dec.ClusterName)
+	logrus.Infof("Deleted cluster %s from kubeconfig", dec.ClusterName)
 
 	if err := kubectl.DeleteUser(dec.ClusterName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("unable to delete user from kubectl %s: %w", dec.ClusterName, err)
+		return fmt.Errorf("delete eks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted user %s from kubectl users", dec.ClusterName)
+	logrus.Infof("Deleted user %s from kubeconfig", dec.ClusterName)
+
+	if _, _, err := kubectl.UnsetCurrentContext().Exec(false, false); err != nil {
+		return fmt.Errorf("delete eks cluster: %w", err)
+	}
+
+	logrus.Info("Unset the current-context in kubeconfig")
 
 	return nil
 }

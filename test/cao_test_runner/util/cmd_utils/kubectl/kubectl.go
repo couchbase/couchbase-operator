@@ -423,6 +423,12 @@ func SetContext(args ...string) *KubectlCmd {
 	panic("Not Implemented")
 }
 
+func UnsetCurrentContext() *KubectlCmd {
+	args := []string{"unset", "current-context"}
+	cmd := "config"
+	return NewKubectlCmd(cmd, args, nil)
+}
+
 func UseContext(contextName string) *KubectlCmd {
 	args := []string{"use-context", contextName}
 	cmd := "config"

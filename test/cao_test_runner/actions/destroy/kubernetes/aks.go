@@ -88,22 +88,28 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
 	userName := "clusterUser_" + resourceGroupName + "_" + dac.ClusterName
 
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("error deleting context %s from kubectl: %w", contextName, err)
+		return fmt.Errorf("delete aks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted kubectl context %s", contextName)
+	logrus.Infof("Deleted kubeconfig context %s", contextName)
 
 	if err := kubectl.DeleteCluster(dac.ClusterName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("error deleting cluster %s from kubectl: %w", dac.ClusterName, err)
+		return fmt.Errorf("delete aks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted kubectl cluster %s", dac.ClusterName)
+	logrus.Infof("Deleted kubeconfig cluster %s", dac.ClusterName)
 
 	if err := kubectl.DeleteUser(userName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("error deleting user %s from kubectl: %w", userName, err)
+		return fmt.Errorf("delete aks cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted kubectl user %s", userName)
+	logrus.Infof("Deleted kubeconfig user %s", userName)
+
+	if _, _, err := kubectl.UnsetCurrentContext().Exec(false, false); err != nil {
+		return fmt.Errorf("delete aks cluster: %w", err)
+	}
+
+	logrus.Info("Unset the current-context in kubeconfig")
 
 	return nil
 }

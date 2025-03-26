@@ -81,20 +81,28 @@ func (dgc *DeleteGKECluster) DeleteCluster(ctx context.Context) error {
 	logrus.Infof("Deleted virtual network %s", networkName)
 
 	if err := kubectl.DeleteContext(contextName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("failed to delete context %s from kube config: %w", contextName, err)
+		return fmt.Errorf("delete gke cluster: %w", err)
 	}
+
+	logrus.Infof("Deleted kubeconfig context %s", contextName)
 
 	if err := kubectl.DeleteCluster(kubeconfigClusterName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("error deleting cluster %s from kubectl: %w", kubeconfigClusterName, err)
+		return fmt.Errorf("delete gke cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted kubectl cluster %s", kubeconfigClusterName)
+	logrus.Infof("Deleted kubeconfig cluster %s", kubeconfigClusterName)
 
 	if err := kubectl.DeleteUser(userName).ExecWithoutOutputCapture(); err != nil {
-		return fmt.Errorf("error deleting user %s from kubectl: %w", userName, err)
+		return fmt.Errorf("delete gke cluster: %w", err)
 	}
 
-	logrus.Infof("Deleted kubectl user %s", userName)
+	logrus.Infof("Deleted kubeconfig user %s", userName)
+
+	if _, _, err := kubectl.UnsetCurrentContext().Exec(false, false); err != nil {
+		return fmt.Errorf("delete gke cluster: %w", err)
+	}
+
+	logrus.Info("Unset the current-context in kubeconfig")
 
 	return nil
 }
