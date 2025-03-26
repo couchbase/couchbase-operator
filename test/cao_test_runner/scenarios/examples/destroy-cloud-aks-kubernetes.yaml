@@ -1,7 +1,4 @@
 action: "Destroy Kubernetes Cluster"
 config:
-  clusterName: testing
-  platform: kubernetes
-  environment: cloud
-  provider: azure
+  clusterName: aks-cluster
   aksRegion: eastus2

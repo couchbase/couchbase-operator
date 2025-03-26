@@ -1,0 +1,32 @@
+# This validator must be used with "Setup Kubernetes Cluster" and "Upgrade Kubernetes Cluster" actions.
+validators:
+  - name: "KubernetesClusterValidator"
+    clusterName: "aks-cluster"
+    state: "POST"
+    aksConfig:
+      kubernetesVersion: 1.31.4
+      aksNodePoolConfig:
+        "systempool0":
+          kubernetesVersion: 1.31.4
+          count: 5
+          vmSize: Standard_B2ms
+          poolMode: System
+          osType: Linux
+          osSKU: AzureLinux
+          diskSize: 100
+        "nodepool0":
+          kubernetesVersion: 1.31.4
+          count: 3
+          vmSize: Standard_B2ms
+          poolMode: User
+          osType: Linux
+          osSKU: AzureLinux
+          diskSize: 50
+        "nodepool1":
+          kubernetesVersion: 1.31.4
+          count: 3
+          vmSize: Standard_B2ms
+          poolMode: User
+          osType: Linux
+          osSKU: AzureLinux
+          diskSize: 50

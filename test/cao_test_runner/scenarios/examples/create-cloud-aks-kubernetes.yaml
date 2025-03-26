@@ -1,16 +1,27 @@
 action: "Setup Kubernetes Cluster"
 config:
-  clusterName: test
+  clusterName: aks-cluster
   platform: kubernetes
   environment: cloud
   provider: azure
   aksRegion: eastus2
-  kubernetesVersion: 1.28.0
-  vmSize: Standard_B2ms
-  count: 7
-  diskSize: 100
-  osType: Linux
-  osSKU: AzureLinux
-  numNodePools: 1
+  kubernetesVersion: 1.31.4
+  aksSystemNodePools:
+    - count: 5 # Name: systempool0
+      vmSize: Standard_B2ms
+      osSKU: AzureLinux
+      diskSize: 100
+      dedicatedSysNP: true # Makes this node pool a Dedicated System Node Pool. No application pods will be scheduled.
+  aksUserNodePools:
+    - count: 3 # Name: nodepool0
+      vmSize: Standard_B2ms
+      osType: Linux
+      osSKU: AzureLinux
+      diskSize: 50
+    - count: 3 # Name: nodepool1
+      vmSize: Standard_B2ms
+      osType: Linux
+      osSKU: AzureLinux
+      diskSize: 50
   operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
   admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64
