@@ -3,8 +3,8 @@ package destroykubernetes
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/managedk8sservices"
 	"github.com/couchbase/couchbase-operator/test/cao_test_runner/util/cmd_utils/kubectl"
 	"github.com/sirupsen/logrus"
@@ -46,7 +46,8 @@ func (dac *DeleteAKSCluster) DeleteCluster(ctx context.Context) error {
 	}
 
 	for _, nodePool := range nodePools {
-		if strings.Contains(*nodePool.Name, "system") {
+		// We do not delete the System Node Pools. It will be deleted when the cluster is deleted.
+		if *nodePool.Properties.Mode == armcontainerservice.AgentPoolModeSystem {
 			continue
 		}
 
