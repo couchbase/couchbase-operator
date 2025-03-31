@@ -2275,6 +2275,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = append(errs, fmt.Errorf("spec.ephemeralVolume is only useable with spec.objectStore.uri or spec.s3Bucket"))
 	}
 
+	if backup.Spec.EphemeralVolume && backup.Spec.DefaultRecoveryMethod == couchbasev2.DefaultRecoveryTypeResume {
+		errs = append(errs, fmt.Errorf("spec.defaultRecoveryMethod cannot be resume when using ephemeral volume"))
+	}
+
 	if backup.Spec.Size.Value() <= 0 {
 		errs = append(errs, fmt.Errorf("spec.size %d must be greater than 0", backup.Spec.Size.Value()))
 	}
