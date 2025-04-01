@@ -77,7 +77,12 @@ func (c *Cluster) addOptionalLabelValues(existingLabels []string) []string {
 	case metrics.UUIDonly:
 		existingLabels = append(existingLabels, string(c.cluster.GetUID()))
 	case metrics.UUIDandName:
-		existingLabels = append(existingLabels, string(c.cluster.GetUID()), c.cluster.Spec.ClusterSettings.ClusterName)
+		clusterInfo := couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, c.readyMembers()); err != nil {
+			return nil
+		}
+
+		existingLabels = append(existingLabels, string(c.cluster.GetUID()), clusterInfo.ClusterName)
 	default:
 		break
 	}
