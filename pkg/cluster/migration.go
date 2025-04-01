@@ -276,6 +276,7 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*MigrationReconcileMachine).handleFailedAddNodes,
 		(*MigrationReconcileMachine).handleAddBackNodes,
 		(*MigrationReconcileMachine).handleFailedNodes,
+		(*MigrationReconcileMachine).handleUnknownServerConfigs,
 		(*MigrationReconcileMachine).handleRemoveNode,
 		(*MigrationReconcileMachine).handleAddNode,
 		(*MigrationReconcileMachine).handleMigrateNodes,
@@ -304,6 +305,17 @@ func (r *MigrationReconcileMachine) exec(c *Cluster) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (r *MigrationReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
+	// If a server configuration was deleted in a spec update then we will clean
+	// up all the nodes from that server config here.
+	managedClusteredMembers := r.clusteredMembers.Intersect(r.getManagedK8sMembers())
+	for name, member := range managedClusteredMembers {
+		r.removeMemberIfUnknownServerConfig(c, name, member)
+	}
+
+	return nil
 }
 
 func (r *MigrationReconcileMachine) handleRemoveNode(c *Cluster) error {

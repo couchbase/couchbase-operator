@@ -802,20 +802,24 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 	// If a server configuration was deleted in a spec update then we will clean
 	// up all of the nodes from that server config here.
 	for name, m := range r.clusteredMembers {
-		if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
-			log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
-
-			// Check the node is actually active before we attempt to delete the log volumes.
-			info := &couchbaseutil.PoolsInfo{}
-			if err := couchbaseutil.GetPools(info).RetryFor(10*time.Second).On(c.api, m); err != nil {
-				r.abort("unknown node is going down")
-			}
-
-			r.removeMemberUser(m)
-		}
+		r.removeMemberIfUnknownServerConfig(c, name, m)
 	}
 
 	return nil
+}
+
+func (r *ReconcileMachine) removeMemberIfUnknownServerConfig(c *Cluster, name string, m couchbaseutil.Member) {
+	if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
+		log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+
+		// Check the node is actually active before we attempt to delete the log volumes.
+		info := &couchbaseutil.PoolsInfo{}
+		if err := couchbaseutil.GetPools(info).RetryFor(10*time.Second).On(c.api, m); err != nil {
+			r.abort("unknown node is going down")
+		}
+
+		r.removeMemberUser(m)
+	}
 }
 
 type allMetrics struct {

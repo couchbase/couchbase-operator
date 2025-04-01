@@ -384,6 +384,41 @@ func TestMigrationByServerGroup(t *testing.T) {
 	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
 }
 
+func TestMigrationRemovingServerClassInMigrationMode(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	serverClassSize := 2
+	clusterSize := serverClassSize * 2
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	dstCluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+	}
+
+	dstCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, dstCluster)
+
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
+
+	// Remove a server class.
+	dstCluster = e2eutil.MustPatchCluster(t, kubernetes, dstCluster, jsonpatch.NewPatchSet().Remove("/spec/servers/1"), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, dstCluster, e2eutil.RebalanceStartedEvent(dstCluster), 5*time.Minute)
+
+	// Check that the cluster enteres a healthy state.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 5*time.Minute)
+
+	// Validate that there are now the correct number of nodes in the cluster.
+	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize-serverClassSize)
+}
+
 func GetMemberHostname(cluster *couchbasev2.CouchbaseCluster, nodeID int) string {
 	return fmt.Sprintf("%s.%s.%s.svc", couchbaseutil.CreateMemberName(cluster.Name, nodeID), cluster.Name, cluster.Namespace)
 }
