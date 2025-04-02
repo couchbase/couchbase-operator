@@ -237,6 +237,9 @@ func (c *Cluster) reconcilePods() error {
 		// what we are told to enforce.
 		k8sutil.MaintainMutablePodConfiguration(actual, requested)
 
+		memoryUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceMemory))
+		cpuUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceCPU))
+
 		if reflect.DeepEqual(actual.Labels, requested.Labels) && reflect.DeepEqual(actual.Annotations, requested.Annotations) {
 			continue
 		}
@@ -249,9 +252,6 @@ func (c *Cluster) reconcilePods() error {
 		if _, err := c.k8s.KubeClient.CoreV1().Pods(c.cluster.Namespace).Update(context.Background(), updated, metav1.UpdateOptions{}); err != nil {
 			return err
 		}
-
-		memoryUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceMemory))
-		cpuUnderManagement.Add(k8sutil.GetResourceRequestQuantity(actual, v1.ResourceCPU))
 	}
 
 	metrics.MemoryUnderManagementBytesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(memoryUnderManagement.AsApproximateFloat64())
