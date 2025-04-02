@@ -365,7 +365,7 @@ func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
 
 	membersToSwapRebalance := couchbaseutil.MemberSet{}
 
-	for _, member := range c.members {
+	for _, member := range r.clusteredMembers {
 		pod, ok := c.k8s.Pods.Get(member.Name())
 		if !ok {
 			return errors.ErrPodNotFound

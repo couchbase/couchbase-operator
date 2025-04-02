@@ -502,7 +502,7 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 			}
 		}
 
-		if !k8sutil.ArePodContainersReady(pod) {
+		if !k8sutil.IsPodMainContainerReady(pod) {
 			return fmt.Errorf("%w: pod containers not ready", errors.ErrResourceRequired)
 		}
 
