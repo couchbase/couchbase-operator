@@ -186,6 +186,7 @@ func MustCheckPodsForVersion(t *testing.T, k8s *types.Cluster, couchbase *couchb
 		Die(t, err)
 	}
 }
+
 func CheckPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedImage, expectedVersion string) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
@@ -206,6 +207,35 @@ func CheckPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		} else if podVersion != expectedVersion {
 			return fmt.Errorf("expected pod (%s) version to be %s but found %s", pod.Name, expectedVersion, podVersion)
 		}
+	}
+
+	return nil
+}
+
+func MustCheckPodForVersion(t *testing.T, k8s *types.Cluster, podName string, expectedImage, expectedVersion string) {
+	err := retryutil.RetryFor(15*time.Second, func() error {
+		return CheckPodForVersion(k8s, podName, expectedImage, expectedVersion)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func CheckPodForVersion(k8s *types.Cluster, podName string, expectedImage, expectedVersion string) error {
+	pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	if pod.Spec.Containers[0].Image != expectedImage {
+		return fmt.Errorf("expected pod (%s) image to be: %s but found: %s", pod.Name, expectedImage, pod.Spec.Containers[0].Image)
+	}
+
+	if podVersion, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok {
+		return fmt.Errorf("expected pod (%s) to have %s annotation", pod.Name, constants.CouchbaseVersionAnnotationKey)
+	} else if podVersion != expectedVersion {
+		return fmt.Errorf("expected pod (%s) version to be %s but found %s", pod.Name, expectedVersion, podVersion)
 	}
 
 	return nil

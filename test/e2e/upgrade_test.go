@@ -1524,3 +1524,47 @@ func TestPartialUpgrade(t *testing.T) {
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class1Name, f.CouchbaseServerImage, upgradeVersion)
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class2Name, f.CouchbaseServerImage, upgradeVersion)
 }
+
+// TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade tests that when a pod is deleted during
+// an upgrade, the replacement pod is not implicitly upgraded.
+func TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := constants.Size4
+	victimIndex := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	// Create the cluster with persistent storage
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Start the upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for upgrade to start
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	// e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+
+	// Delete victim pod before it gets upgraded
+	e2eutil.MustKillMemberWithDefaultGracePeriod(t, kubernetes, cluster, victimIndex)
+
+	// Wait for pod to be recreated and verify it's still running the initial version
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.MemberRecoveredEvent(cluster, victimIndex), 5*time.Minute)
+	e2eutil.MustCheckPodForVersion(t, kubernetes, victimName, f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Let upgrade complete
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Verify all pods are now on the upgraded version
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
+}

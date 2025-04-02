@@ -970,6 +970,21 @@ func KillMember(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseClus
 	return nil
 }
 
+// Kill member deletes Pod and optionally checks for any associated Volume to delete.
+func KillMemberWithDefaultGracePeriod(kubecli kubernetes.Interface, cluster *couchbasev2.CouchbaseCluster, name string, removeVolumes bool) error {
+	if err := kubecli.CoreV1().Pods(cluster.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{}); err != nil {
+		return err
+	}
+
+	if removeVolumes {
+		if err := kubecli.CoreV1().PersistentVolumeClaims(cluster.Namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, NodeListOpt(cluster, name)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func WriteLogs(k8s *types.Cluster, logDir string) error {
 	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
 		return err
@@ -1080,6 +1095,15 @@ func KillPodForMember(kubeCli kubernetes.Interface, cl *couchbasev2.CouchbaseClu
 func MustKillPodForMember(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int, removeVolumes bool) {
 	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
 	if err := KillMember(k8s.KubeClient, cl, name, removeVolumes); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustKillMemberWithDefaultGracePeriod kills a member pod with the default grace period.
+// If an error occurs, it fails the test.
+func MustKillMemberWithDefaultGracePeriod(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int) {
+	name := couchbaseutil.CreateMemberName(cl.Name, memberID)
+	if err := KillMemberWithDefaultGracePeriod(k8s.KubeClient, cl, name, false); err != nil {
 		Die(t, err)
 	}
 }

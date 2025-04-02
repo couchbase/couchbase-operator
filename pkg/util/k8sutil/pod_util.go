@@ -83,11 +83,15 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	// set then we use the scheduler to balance the load across AZs.
 	serverGroup := ""
 
+	image := cluster.Spec.ServerClassCouchbaseImage(&config)
+
 	if pvcState != nil {
 		serverGroup = pvcState.availabilityZone
-	}
 
-	image := cluster.Spec.ServerClassCouchbaseImage(&config)
+		if pvcState.Image != "" {
+			image = pvcState.Image
+		}
+	}
 
 	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image, "serverGroup", serverGroup, "config", config)
 
