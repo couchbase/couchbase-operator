@@ -212,14 +212,26 @@ pipeline {
                 try {
                   sh "tar xf ${suite}.tar.bz2"
                 } catch (Exception e) {
-                  echo "Extract ${suite}.tar.bz2: ${e.message}"
-                  currentBuild.result = 'FAILURE'
-                  return
+                  echo "Caught Exception: extract ${suite}.tar.bz2: ${e.message}"
+                  currentBuild.result = 'UNSTABLE'
                 }
                 try {
                   sh 'tar xf results.tar.bz'
                 } catch (Exception e) {
-                  echo "Extract ${suite}.tar.bz2/results.tar.bz: ${e.message}"
+                  echo "Caught Exception: extract ${suite}.tar.bz2/results.tar.bz: ${e.message}"
+                  currentBuild.result = 'UNSTABLE'
+                }
+
+                try {
+                  // Check if XML file exists
+                  def xmlExists = sh(script: "ls artifacts/*.xml", returnStatus: true)
+                  if (xmlExists != 0) {
+                    echo "Error: results.xml file not found in artifacts directory"
+                    currentBuild.result = 'FAILURE'
+                    return
+                  }
+                } catch (Exception e) {
+                  echo "Caught Exception: check for results.xml file: ${e.message}"
                   currentBuild.result = 'FAILURE'
                   return
                 }
@@ -234,7 +246,7 @@ pipeline {
                   archiveArtifacts artifacts: "${suite}.tar.gz", fingerprint: true
                 }
                 catch (Exception e) {
-                  echo "compress ${suite}.tar.gz: ${e.message}"
+                  echo "Caught Exception: compress ${suite}.tar.gz: ${e.message}"
                   currentBuild.result = 'FAILURE'
                   return
                 }
@@ -323,17 +335,30 @@ pipeline {
           try {
             sh 'tar xf custom.tar.bz2'
           } catch (Exception e) {
-            echo "Extract custom.tar.bz2: ${e.message}"
-            currentBuild.result = 'FAILURE'
-            return
+            echo "Caught Exception: extract custom.tar.bz2: ${e.message}"
+            currentBuild.result = 'UNSTABLE'
           }
           try {
             sh 'tar xf results.tar.bz'
           } catch (Exception e) {
-            echo "Extract custom.tar.bz2/results.tar.bz: ${e.message}"
+            echo "Caught Exception: extract custom.tar.bz2/results.tar.bz: ${e.message}"
+            currentBuild.result = 'UNSTABLE'
+          }
+
+          try {
+            // Check if XML file exists
+            def xmlExists = sh(script: "ls artifacts/*.xml", returnStatus: true)
+            if (xmlExists != 0) {
+              echo "Error: results.xml file not found in artifacts directory"
+              currentBuild.result = 'FAILURE'
+              return
+            }
+          } catch (Exception e) {
+            echo "Caught Exception: check for results.xml file: ${e.message}"
             currentBuild.result = 'FAILURE'
             return
           }
+
 
           // ===========================
           // ========== POST ===========
@@ -346,7 +371,7 @@ pipeline {
             archiveArtifacts artifacts: 'custom.tar.gz', fingerprint: true
           }
           catch (Exception e) {
-            echo "compress custom.tar.gz: ${e.message}"
+            echo "Caught Exception: compress custom.tar.gz: ${e.message}"
             currentBuild.result = 'FAILURE'
             return
           }
@@ -404,7 +429,7 @@ pipeline {
             echo "failedTestsStr for First Rerun: ${failedTestsStr}"
           }
           catch (Exception e) {
-            echo "Read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
+            echo "Caught Exception: read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
             currentBuild.result = 'FAILURE'
             echo "Cannot execute Test Rerun 1"
             return
@@ -454,14 +479,26 @@ pipeline {
             try {
               sh 'tar xf first_rerun.tar.bz2'
             } catch (Exception e) {
-              echo "Extract first_rerun.tar.bz2: ${e.message}"
-              currentBuild.result = 'FAILURE'
-              return
+              echo "Caught Exception: extract first_rerun.tar.bz2: ${e.message}"
+              currentBuild.result = 'UNSTABLE'
             }
             try {
               sh 'tar xf results.tar.bz'
             } catch (Exception e) {
-              echo "Extract first_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              echo "Caught Exception: extract first_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              currentBuild.result = 'UNSTABLE'
+            }
+
+            try {
+              // Check if XML file exists
+              def xmlExists = sh(script: "ls artifacts/*.xml", returnStatus: true)
+              if (xmlExists != 0) {
+                echo "Error: results.xml file not found in artifacts directory"
+                currentBuild.result = 'FAILURE'
+                return
+              }
+            } catch (Exception e) {
+              echo "Caught Exception: check for results.xml file: ${e.message}"
               currentBuild.result = 'FAILURE'
               return
             }
@@ -470,7 +507,7 @@ pipeline {
             echo "All tests passed :)"
             return
           }
-          
+
           // ===========================
           // ====== POST ACTIONS =======
           // ===========================
@@ -483,18 +520,18 @@ pipeline {
               archiveArtifacts artifacts: 'first_rerun.tar.gz', fingerprint: true
             }
             catch (Exception e) {
-              echo "compress first_rerun.tar.gz: ${e.message}"
+              echo "Caught Exception: compress first_rerun.tar.gz: ${e.message}"
               currentBuild.result = 'FAILURE'
               return
             }
-            
+
             // Renaming the results-timestamp.xml to the ${env.BUILD_NUMBER}_first_rerun.xml
             def xmlFile = sh(script: "ls artifacts/results-*.xml", returnStdout: true).trim()
             sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_rerun_1.xml"
 
             // Moving the xml file from artifacts folder to the workspace
             sh "mv artifacts/${env.BUILD_NUMBER}_rerun_1.xml ./"
-            
+
             // Deleting the files and folders which are not required.
             /*
             * The first_rerun.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
@@ -532,7 +569,7 @@ pipeline {
             echo "failedTestsStr for Second Rerun: ${failedTestsStr}"
           }
           catch (Exception e) {
-            echo "Read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
+            echo "Caught Exception: read ${env.BUILD_NUMBER}_failed_tests.txt: ${e.message}"
             currentBuild.result = 'FAILURE'
             echo "Cannot execute Test Rerun 2"
             return
@@ -582,14 +619,26 @@ pipeline {
             try {
               sh 'tar xf second_rerun.tar.bz2'
             } catch (Exception e) {
-              echo "Extract second_rerun.tar.bz2: ${e.message}"
-              currentBuild.result = 'FAILURE'
-              return
+              echo "Caught Exception: extract second_rerun.tar.bz2: ${e.message}"
+              currentBuild.result = 'UNSTABLE'
             }
             try {
               sh 'tar xf results.tar.bz'
             } catch (Exception e) {
-              echo "Extract second_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              echo "Caught Exception: extract second_rerun.tar.bz2/results.tar.bz: ${e.message}"
+              currentBuild.result = 'UNSTABLE'
+            }
+
+            try {
+              // Check if XML file exists
+              def xmlExists = sh(script: "ls artifacts/*.xml", returnStatus: true)
+              if (xmlExists != 0) {
+                echo "Error: results.xml file not found in artifacts directory"
+                currentBuild.result = 'FAILURE'
+                return
+              }
+            } catch (Exception e) {
+              echo "Caught Exception: check for results.xml file: ${e.message}"
               currentBuild.result = 'FAILURE'
               return
             }
@@ -612,19 +661,18 @@ pipeline {
               archiveArtifacts artifacts: 'second_rerun.tar.gz', fingerprint: true
             }
             catch (Exception e) {
-              echo "compress second_rerun.tar.gz: ${e.message}"
+              echo "Caught Exception: compress second_rerun.tar.gz: ${e.message}"
               currentBuild.result = 'FAILURE'
               return
             }
-            
+
             // Renaming the results-timestamp.xml to ${env.BUILD_NUMBER}_rerun_2.xml
             def xmlFile = sh(script: "ls artifacts/results-*.xml", returnStdout: true).trim()
             sh "mv ${xmlFile} artifacts/${env.BUILD_NUMBER}_rerun_2.xml"
 
             // Moving the xml file from artifacts folder to the workspace
             sh "mv artifacts/${env.BUILD_NUMBER}_rerun_2.xml ./"
-            
-            
+
             // Deleting the files and folders which are not required.
             /*
             * The second_rerun.tar.bz2 file (extracted) contains results.tar.bz; results.tar.bz (extracted) contains the artifacts folder.
@@ -634,7 +682,7 @@ pipeline {
             sh 'rm -rf second_rerun.tar.bz2'
             sh 'rm -rf results.tar.bz'
             sh 'rm -rf artifacts'
-          }          
+          }
         }
       }
     }
@@ -655,7 +703,7 @@ pipeline {
           }
         }
         catch (Exception e) {
-          echo "Cannot build the final results: ${e.message}"
+          echo "Caught Exception: cannot build the final results: ${e.message}"
           currentBuild.result = 'FAILURE'
           return
         }
