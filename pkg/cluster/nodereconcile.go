@@ -622,7 +622,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			otpNodes = append(otpNodes, member.GetOTPNode())
 		}
 
-		if err := couchbaseutil.Failover(otpNodes, true).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.Failover(otpNodes, true).On(c.api, c.getMigratingReadyTarget()); err != nil {
 			return err
 		}
 
