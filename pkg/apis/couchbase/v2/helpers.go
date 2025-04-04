@@ -878,6 +878,11 @@ func (cs *ClusterStatus) SetErrorCondition(message string) {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetUnreconcilableCondition(message string) {
+	c := newClusterCondition(ClusterUnreconcilable, v1.ConditionTrue, "Unreconcilable", message)
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetAutoscalerReadyCondition(message string) {
 	c := newClusterCondition(ClusterConditionAutoscaleReady, v1.ConditionTrue, "AutoscaleReady", message)
 	cs.setClusterCondition(c)
