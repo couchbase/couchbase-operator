@@ -113,6 +113,11 @@ func (c *Cluster) reconcileMigrationCluster() error {
 		c.cluster.Status.CurrentVersion = version
 
 		target := c.getMigratingReadyTarget()
+
+		if err := c.checkUnmanagedClusterReadiness(target); err != nil {
+			return err
+		}
+
 		if err := c.initalizeClusterKubernetesResources(target); err != nil {
 			log.Error(err, "Failed to initialize cluster kubernetes resources", "cluster", c.namespacedName())
 			return err
@@ -183,6 +188,32 @@ func (c *Cluster) reconcileMigrationCluster() error {
 	c.cluster.Status.SetBalancedCondition()
 
 	return nil
+}
+
+func (c *Cluster) checkUnmanagedClusterReadiness(target interface{}) error {
+	var clusterInfo couchbaseutil.ClusterInfo
+
+	if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, target); err != nil {
+		return fmt.Errorf("failed to get cluster info: %w", err)
+	}
+
+	for _, node := range clusterInfo.Nodes {
+		if node.Status != string(NodeStateActive) {
+			c.cluster.Status.SetErrorCondition(fmt.Sprintf("node is not active: %s", node.HostName))
+			log.Error(errors.ErrNodeNotActive, "Node is not active", "cluster", c.namespacedName(), "node", node.HostName)
+
+			return errors.ErrNodeNotActive
+		}
+	}
+
+	if clusterInfo.Balanced {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+		return nil
+	}
+
+	c.cluster.Status.SetErrorCondition("remote cluster needs rebalance")
+
+	return errors.ErrRemoteClusterUnbalanced
 }
 
 type MigrationReconcileMachine struct {

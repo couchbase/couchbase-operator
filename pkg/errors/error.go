@@ -91,6 +91,12 @@ var (
 	// ErrIndexStorageModeMismatch is raised when the index storage mode of the source
 	// cluster doesn't match the index storage mode of the target cluster.
 	ErrIndexStorageModeMismatch = errors.New("index storage mode mismatch")
+
+	// ErrNodeNotActive is raised when a node is not active in the remote cluster.
+	ErrNodeNotActive = errors.New("node not active")
+
+	// ErrRemoteClusterUnbalanced is raised when the remote cluster is unbalanced.
+	ErrRemoteClusterUnbalanced = errors.New("remote cluster unbalanced")
 )
 
 // Logging errors
