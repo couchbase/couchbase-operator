@@ -133,7 +133,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	for _, existingGroup := range existingGroups.Groups {
 		for _, existingMember := range existingGroup.Nodes {
 			// Extract the scheduled server group for the node
-			podName := existingMember.HostName.GetMemberName()
+			podName := c.getPodName(existingMember)
 
 			// Just reuse the old server group location on error, the pod is likely down
 			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
@@ -175,4 +175,20 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 	}
 
 	return true, couchbaseutil.UpdateServerGroups(existingGroups.GetRevision(), &newGroups).On(c.api, c.readyMembers())
+}
+
+func (c *Cluster) getPodName(node couchbaseutil.NodeInfo) string {
+	if !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+		return node.HostName.GetMemberName()
+	}
+
+	// Loop through members to find matching OTP node
+	for _, member := range c.members {
+		if member.GetOTPNode() == node.OTPNode {
+			return member.Name()
+		}
+	}
+
+	// Fall back to member name from hostname if no match found
+	return node.HostName.GetMemberName()
 }
