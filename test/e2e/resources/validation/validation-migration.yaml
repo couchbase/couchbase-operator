@@ -17,3 +17,31 @@ spec:
         - query
         - search
         - eventing
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster-index-mismatch
+  namespace: default
+spec:
+  migration:
+    unmanagedClusterHost: "some-unmanaged-host.default.local"
+  cluster:
+    indexer:
+      storageMode: memory_optimized
+  image: couchbase/server:7.6.0
+  servers:
+    - size: 1
+      name: idx_data
+      services:
+        - index
+        - data
+status:
+  size: 1
+  conditions:
+    - lastTransitionTime: "2025-04-08T11:31:00Z"
+      lastUpdateTime: "2025-04-08T11:31:00Z"
+      reason: ErrorEncountered
+      status: "True"
+      type: Error
+      message: index storage mode mismatch

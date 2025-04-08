@@ -3961,6 +3961,18 @@ func TestNegValidationClusterMigrationApply(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
 }
 
+func TestValidationClusterMigrationApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestValidationUpdateIndexStorageModeWhenInErrorState",
+			mutations:  patchMap{"cluster-index-mismatch": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
+}
+
 func TestInvalidImageCombinations(t *testing.T) {
 	testDefs := []testDef{
 		{

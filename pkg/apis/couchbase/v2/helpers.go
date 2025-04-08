@@ -1660,6 +1660,12 @@ func (c *CouchbaseCluster) CanHibernate() (bool, string) {
 	return true, ""
 }
 
+func (c *CouchbaseCluster) IsInIndexMismatchErrorState() bool {
+	cond := c.Status.GetCondition(ClusterConditionError)
+
+	return cond != nil && cond.Status == v1.ConditionTrue && cond.Message == errors.ErrIndexStorageModeMismatch.Error()
+}
+
 func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
 	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
 }

@@ -86,6 +86,13 @@ var (
 	ErrNodeNotAdded = errors.New("node not added")
 )
 
+// Migration specific errors.
+var (
+	// ErrIndexStorageModeMismatch is raised when the index storage mode of the source
+	// cluster doesn't match the index storage mode of the target cluster.
+	ErrIndexStorageModeMismatch = errors.New("index storage mode mismatch")
+)
+
 // Logging errors
 
 var (

@@ -51,6 +51,24 @@ func (c *Cluster) checkTargetClusterVersion() error {
 	return errors.ErrClusterVersionMismatch
 }
 
+func (c *Cluster) checkIndexerStorageMode() error {
+	if !c.cluster.IsIndexerEnabled() {
+		return nil
+	}
+
+	indexSettings := couchbaseutil.IndexSettings{}
+
+	if err := couchbaseutil.GetIndexSettings(&indexSettings).On(c.api, c.getMigratingReadyTarget()); err != nil {
+		return err
+	}
+
+	if c.cluster.Spec.ClusterSettings.Indexer != nil && indexSettings.StorageMode != couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.Indexer.StorageMode) {
+		return errors.ErrIndexStorageModeMismatch
+	}
+
+	return nil
+}
+
 func (c *Cluster) reconcileMigrationCluster() error {
 	log.Info("Reconciling migration cluster", "cluster", c.namespacedName())
 
@@ -108,6 +126,10 @@ func (c *Cluster) reconcileMigrationCluster() error {
 	}
 
 	if err := c.checkTargetClusterVersion(); err != nil {
+		return err
+	}
+
+	if err := c.checkIndexerStorageMode(); err != nil {
 		return err
 	}
 

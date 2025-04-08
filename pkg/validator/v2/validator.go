@@ -3732,7 +3732,8 @@ func checkImmutableIndexStorage(current, updated *couchbasev2.CouchbaseCluster) 
 		curr = updated.Spec.ClusterSettings.Indexer.StorageMode
 	}
 
-	if prev != curr {
+	// The index storage mode cannot be changed unless the cluster is in an index mismatch error state, which can be caused when starting a migration.
+	if prev != curr && !current.IsInIndexMismatchErrorState() {
 		return fmt.Errorf("spec.cluster.indexStorageSetting/spec.cluster.indexer.storageMode in body cannot be modified if there are any nodes in the cluster running the index service")
 	}
 
