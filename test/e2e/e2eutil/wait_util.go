@@ -125,7 +125,7 @@ func resourceConditionExistsWithMessage(conditionType, conditionStatus, conditio
 			}
 
 			re := regexp.MustCompile(conditionMessage)
-			if re.Match([]byte(concreteMessage)) {
+			if !re.Match([]byte(concreteMessage)) {
 				return fmt.Errorf("condition message mismatch, expected %v, got %v", conditionMessage, concreteMessage)
 			}
 

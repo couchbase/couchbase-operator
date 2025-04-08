@@ -419,6 +419,50 @@ func TestMigrationRemovingServerClassInMigrationMode(t *testing.T) {
 	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize-serverClassSize)
 }
 
+func TestMigrationWaitsForIndexStorageModeToMatch(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	// Create the source cluster.
+	srcCluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Pause the source cluster.
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), time.Minute)
+
+	// Initialise the destination cluster.
+	dstCluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+	}
+
+	// Set the index storage mode of the destination cluster to a non-default value.
+	dstCluster.Spec.ClusterSettings.Indexer = &couchbasev2.CouchbaseClusterIndexerSettings{
+		StorageMode: couchbasev2.CouchbaseClusterIndexStorageSettingStandard,
+	}
+
+	dstCluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, dstCluster, -1)
+
+	// Expect the cluster to enter an error state with the index storage mismatch message.
+	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "index storage mode mismatch", dstCluster, 5*time.Minute)
+
+	// Update the index storage mode of the destination cluster to the default value which matches the source cluster. Ordinarily this would
+	// be rejected by the DAC.
+	dstCluster = e2eutil.MustPatchCluster(t, kubernetes, dstCluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized), time.Minute)
+
+	// Check that the cluster is able to migrate successfully now that the index storage mode matches.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, dstCluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionError)
+	e2eutil.MustBeUninitializedCluster(t, kubernetes, srcCluster)
+
+	// Check that we've removed the migrating condition from the cluster.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
+}
+
 func GetMemberHostname(cluster *couchbasev2.CouchbaseCluster, nodeID int) string {
 	return fmt.Sprintf("%s.%s.%s.svc", couchbaseutil.CreateMemberName(cluster.Name, nodeID), cluster.Name, cluster.Namespace)
 }
