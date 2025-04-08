@@ -1,6 +1,7 @@
 package annotations
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -274,5 +275,78 @@ func TestInlineEncode(t *testing.T) {
 
 	if !cmp.Equal(simple, expected) {
 		t.Fatalf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
+	}
+}
+
+func TestPopulateWithOverwriteWarnings(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/foo":  "foo",
+		"cao.couchbase.com/bar":  "5",
+		"cao.couchbase.com/buzz": "10s",
+	}
+
+	simple := SimpleStruct{Foo: "not foo", Bar: -1}
+	expected := SimpleStruct{
+		Foo:  "foo",
+		Bar:  5,
+		Buzz: aboutTen,
+	}
+
+	warnings, err := PopulateWithWarnings(&simple, annotations)
+
+	if err != nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(simple, expected) {
+		t.Fatalf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
+	}
+
+	if len(warnings) != 2 {
+		t.Fatalf("Expected 2 warnings, got %d", len(warnings))
+	}
+
+	expectedWarningPrefix := "Overwriting existing value for annotation"
+	for _, warning := range warnings {
+		if !strings.HasPrefix(warning, expectedWarningPrefix) {
+			t.Fatalf("Expected warning (%s) to start with: %s", warning, expectedWarningPrefix)
+		}
+	}
+}
+
+func TestPopulateWithMissingFieldWarnings(t *testing.T) {
+	annotations := map[string]string{
+		"cao.couchbase.com/foo":   "foo",
+		"cao.couchbase.com/bar":   "5",
+		"cao.couchbase.com/buzz":  "10s",
+		"cao.couchbase.com/field": "field",
+	}
+
+	simple := SimpleStruct{}
+	expected := SimpleStruct{
+		Foo:  "foo",
+		Bar:  5,
+		Buzz: aboutTen,
+	}
+
+	warnings, err := PopulateWithWarnings(&simple, annotations)
+
+	if err != nil {
+		t.Fatalf("unexpected error. %v", err)
+	}
+
+	if !cmp.Equal(simple, expected) {
+		t.Fatalf("Failed to annotate simple struct. found %v, expected %v", simple, expected)
+	}
+
+	if len(warnings) != 1 {
+		t.Fatalf("Expected 1 warning, got %d", len(warnings))
+	}
+
+	expectedWarningPrefix := "No target found for annotation"
+	for _, warning := range warnings {
+		if !strings.HasPrefix(warning, expectedWarningPrefix) {
+			t.Fatalf("Expected warning (%s) to start with: %s", warning, expectedWarningPrefix)
+		}
 	}
 }

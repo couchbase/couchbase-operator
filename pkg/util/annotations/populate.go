@@ -68,7 +68,9 @@ func Populate(a interface{}, annotations map[string]string) error {
 	return err
 }
 
-// PopulateWithWarnings is the same as Populate but returns a list of warnings for each CAO annotation that could not be applied.
+// PopulateWithWarnings is the same as Populate but returns a list of warnings for:
+// * Each CAO annotation that could not be applied.
+// * Each field that was overwritten by an annotation.
 func PopulateWithWarnings(a interface{}, annotations map[string]string) ([]string, error) {
 	rv := reflect.ValueOf(a)
 	if rv.Kind() != reflect.Ptr {
@@ -97,6 +99,10 @@ func PopulateWithWarnings(a interface{}, annotations map[string]string) ([]strin
 
 		if field := state.FindField(a, strings.Split(path, AnnotationDelim)); field != nil {
 			if field.IsValid() && field.CanSet() {
+				if !field.IsZero() {
+					warnings = append(warnings, fmt.Sprintf("Overwriting existing value for annotation '%s'", path))
+				}
+
 				if err := state.setField(field, v); err != nil {
 					failed = true
 					return warnings, err

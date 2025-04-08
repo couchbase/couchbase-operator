@@ -3855,6 +3855,34 @@ func TestCouchbaseClusterWarnings(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestAnnotationWarnings(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestHistoryRetentionSecondsOverwrite",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
+				Add("/spec/historyRetention", couchbasev2.HistoryRetentionSettings{
+					Seconds: 1000,
+				}).
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/historyRetention.seconds": "4",
+				})},
+			shouldFail:       false,
+			expectedWarnings: []string{"Overwriting existing value for annotation"},
+		},
+		{
+			name: "TestNoTargetFoundForAnnotation",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/nonexistent.field": "value",
+				})},
+			shouldFail:       false,
+			expectedWarnings: []string{"No target found for annotation"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
 func TestHibernationChangeConstraints(t *testing.T) {
 	testDefs := []testDef{
 		{

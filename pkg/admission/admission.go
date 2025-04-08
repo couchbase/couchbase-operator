@@ -218,6 +218,17 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 		DefaultFileSystemGroup: config.DefaultFileSystemGroup,
 	}
 
+	// Get any annotation population warnings
+	// We need to do this first as populate may get called multiple times ans the warnings are
+	// only valid for the first call.
+	// [WARNING] DO NOT CALL annotation.Populate/PopulateWithWarnings before this
+	if warnings, err := validator.GetAnnotationPopulationWarnings(couchbaseCluster); err != nil {
+		log.Error(err, "Rejecting resource")
+		return errorResponseWithWarnings(err, warnings)
+	} else if len(warnings) != 0 {
+		reviewResponse.Warnings = append(reviewResponse.Warnings, warnings...)
+	}
+
 	// Check that the CouchbaseCluster is correctly configured with respect to an existing resource
 	if ar.Request.Operation == admissionv1.Update {
 		// Ignore errors here as we could be upgrading from v1 to v2.  In this scenario

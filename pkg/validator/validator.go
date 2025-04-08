@@ -5,6 +5,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	validationv2 "github.com/couchbase/couchbase-operator/pkg/validator/v2"
 
@@ -12,6 +13,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+func GetAnnotationPopulationWarnings(resource runtime.Object) ([]string, error) {
+	switch t := resource.(type) {
+	case *couchbasev2.CouchbaseCluster:
+		return annotations.PopulateWithWarnings(&t.Spec, t.Annotations)
+	case *couchbasev2.CouchbaseBucket:
+		return annotations.PopulateWithWarnings(&t.Spec, t.Annotations)
+	}
+
+	return nil, nil
+}
 func New(client kubernetes.Interface, couchbaseClient versioned.Interface, options *types.ValidatorOptions) *types.Validator {
 	return types.New(client, couchbaseClient, options)
 }

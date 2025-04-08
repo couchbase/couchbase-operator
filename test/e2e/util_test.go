@@ -119,6 +119,7 @@ func registerTests() {
 		framework.NewTestDef(TestInvalidImageCombinations).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestMidUpgradeImageValidations).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCouchbaseClusterWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestAnnotationWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
