@@ -365,6 +365,13 @@ func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
 
 	membersToSwapRebalance := couchbaseutil.MemberSet{}
 
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
 	for _, member := range r.clusteredMembers {
 		pod, ok := c.k8s.Pods.Get(member.Name())
 		if !ok {
@@ -382,8 +389,13 @@ func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
 		}
 	}
 
+	constrained, err := c.selectUpgradeCandidates(membersToSwapRebalance, orchestratorName)
+	if err != nil {
+		return err
+	}
+
 	if membersToSwapRebalance.Size() > 0 {
-		return r.swapRebalanceMembers(c, membersToSwapRebalance)
+		return r.swapRebalanceMembers(c, constrained)
 	}
 
 	return nil
