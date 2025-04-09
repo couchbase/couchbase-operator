@@ -3435,6 +3435,23 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
 		},
+		{
+			name: "TestWarnDuplicateUserNameInSpec",
+			mutations: patchMap{
+				"user1": jsonpatch.NewPatchSet().Replace("/spec/name", "duplicate-user"),
+				"user2": jsonpatch.NewPatchSet().Replace("/spec/name", "duplicate-user"),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{"user name duplicate-user is already in use"},
+		},
+		{
+			name: "TestWarnDuplicateUserNameInSpecAndMetadata",
+			mutations: patchMap{
+				"user2": jsonpatch.NewPatchSet().Replace("/spec/name", "user1"),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{"user name user1 is already in use"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

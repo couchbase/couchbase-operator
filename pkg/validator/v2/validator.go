@@ -2130,11 +2130,11 @@ func CheckConstraintsReplication(_ *types.Validator, _ *couchbasev2.CouchbaseRep
 	return nil
 }
 
-func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
+func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) ([]string, error) {
 	var errs []error
 
 	if checkAnnotationSkipValidation(user.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	// only 'local' and 'ldap' auth domains accepted
@@ -2163,14 +2163,54 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 			errs = append(errs, fmt.Errorf("secret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
 		}
 	default:
-		return fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
+		return nil, fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return nil, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	warnings, err := validateCouchbaseUserNameConstraints(v, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return warnings, nil
+}
+
+// validateCouchbaseUserNameConstraints checks that no other CouchbaseUser resources
+// share the same name as the provided user.
+func validateCouchbaseUserNameConstraints(v *types.Validator, user *couchbasev2.CouchbaseUser) ([]string, error) {
+	// Get all CouchbaseUsers in the same namespace
+	existingUsers, err := v.Abstraction.GetCouchbaseUsers(user.Namespace, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	userName := user.Spec.Name
+	if userName == "" {
+		userName = user.Name
+	}
+
+	// Check each existing user
+	for _, existingUser := range existingUsers.Items {
+		// Skip comparing against self
+		if existingUser.Name == user.Name {
+			continue
+		}
+
+		existingUserName := existingUser.Spec.Name
+		if existingUserName == "" {
+			existingUserName = existingUser.Name
+		}
+
+		// Check if names match
+		if existingUserName == userName {
+			return []string{fmt.Sprintf("user name %s is already in use by CouchbaseUser %s", user.Spec.Name, existingUser.Name)}, nil
+		}
+	}
+
+	return nil, nil
 }
 
 // commonArrayPrefixMatchString takes two arrays, it picks the longest common length

@@ -693,7 +693,8 @@ func CheckCouchbaseClusterResourceImmutableFields(update *couchbasev2.CouchbaseC
 }
 
 func checkCouchbaseUserResourceConstraints(user *couchbasev2.CouchbaseUser) error {
-	return validationv2.CheckConstraintsCouchbaseUser(v, user)
+	_, err := validationv2.CheckConstraintsCouchbaseUser(v, user)
+	return err
 }
 
 func checkCouchbaseGroupResourceConstraints(group *couchbasev2.CouchbaseGroup) error {

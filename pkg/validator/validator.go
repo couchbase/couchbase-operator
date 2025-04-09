@@ -40,7 +40,7 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 	case *couchbasev2.CouchbaseReplication:
 		return []string{}, validationv2.CheckConstraintsReplication(v, t)
 	case *couchbasev2.CouchbaseUser:
-		return []string{}, validationv2.CheckConstraintsCouchbaseUser(v, t)
+		return validationv2.CheckConstraintsCouchbaseUser(v, t)
 	case *couchbasev2.CouchbaseGroup:
 		return []string{}, validationv2.CheckConstraintsCouchbaseGroup(v, t)
 	case *couchbasev2.CouchbaseBackup:
