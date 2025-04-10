@@ -4013,6 +4013,42 @@ func TestValidationClusterMigrationApply(t *testing.T) {
 			mutations:  patchMap{"cluster-index-mismatch": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard)},
 			shouldFail: false,
 		},
+		{
+			name: "TestMigrationOrderOverrideServerGroupOrder",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+				MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+					MigrationOrderOverrideStrategy: couchbasev2.ByNode,
+					ServerGroupOrder:               []string{"sg-1", "sg-2"},
+				},
+			})},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.migration.migrationOrderOverride.serverGroupOrder will be ignored when using ByNode or ByServerClass strategy"},
+		},
+		{
+			name: "TestMigrationOrderOverrideServerClassOrder",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+				MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+					MigrationOrderOverrideStrategy: couchbasev2.ByServerGroup,
+					ServerClassOrder:               []string{"all_services"},
+				},
+			})},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.migration.migrationOrderOverride.serverClassOrder will be ignored when using ByNode or ByServerGroup strategy"},
+		},
+		{
+			name: "TestMigrationOrderOverrideNodeOrder",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/migration", couchbasev2.ClusterAssimilationSpec{
+				UnmanagedClusterHost: "unmanaged-cluster.cbnet",
+				MigrationOrderOverride: &couchbasev2.MigrationOrderOverrideSpec{
+					MigrationOrderOverrideStrategy: couchbasev2.ByServerClass,
+					NodeOrder:                      []string{"node1", "node2"},
+				},
+			})},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.migration.migrationOrderOverride.nodeOrder will be ignored when using ByServerClass or ByServerGroup strategy"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})

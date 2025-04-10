@@ -100,7 +100,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
-		checkMigrationConstraints,
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
@@ -110,6 +109,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintDeltaRecoveryDeprecated,
 		checkConstraintServicelessOverAdminService,
+		checkMigrationConstraints,
 	}
 
 	var errs []error
@@ -315,21 +315,50 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 	return nil
 }
 
-func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.Migration == nil {
-		return nil
+		return nil, nil
 	}
 
 	if cluster.Spec.Hibernate {
-		return fmt.Errorf("spec.hibernate cannot be enabled when spec.migration is configured")
+		return nil, fmt.Errorf("spec.hibernate cannot be enabled when spec.migration is configured")
 	}
 
 	if cluster.Spec.Migration.NumUnmanagedNodes >= cluster.Spec.TotalSize() {
-		return fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
+		return nil, fmt.Errorf("spec.migration.numUnmanagedNodes must be less than the total size of the cluster")
 	}
 
-	if cluster.Spec.Migration.MigrationOrderOverride == nil {
-		return nil
+	warnings := []string{}
+
+	if ws, err := checkMigrationOrderOverride(cluster); err != nil {
+		return nil, err
+	} else {
+		warnings = append(warnings, ws...)
+	}
+
+	return warnings, nil
+}
+
+func checkMigrationOrderOverride(cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.Migration == nil || cluster.Spec.Migration.MigrationOrderOverride == nil {
+		return nil, nil
+	}
+
+	warnings := []string{}
+
+	if len(cluster.Spec.Migration.MigrationOrderOverride.NodeOrder) > 0 &&
+		cluster.Spec.Migration.MigrationOrderOverride.MigrationOrderOverrideStrategy != couchbasev2.ByNode {
+		warnings = append(warnings, "spec.migration.migrationOrderOverride.nodeOrder will be ignored when using ByServerClass or ByServerGroup strategy")
+	}
+
+	if len(cluster.Spec.Migration.MigrationOrderOverride.ServerGroupOrder) > 0 &&
+		cluster.Spec.Migration.MigrationOrderOverride.MigrationOrderOverrideStrategy != couchbasev2.ByServerGroup {
+		warnings = append(warnings, "spec.migration.migrationOrderOverride.serverGroupOrder will be ignored when using ByNode or ByServerClass strategy")
+	}
+
+	if len(cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder) > 0 &&
+		cluster.Spec.Migration.MigrationOrderOverride.MigrationOrderOverrideStrategy != couchbasev2.ByServerClass {
+		warnings = append(warnings, "spec.migration.migrationOrderOverride.serverClassOrder will be ignored when using ByNode or ByServerGroup strategy")
 	}
 
 	if len(cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder) != 0 {
@@ -341,12 +370,12 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 
 		for _, sc := range cluster.Spec.Migration.MigrationOrderOverride.ServerClassOrder {
 			if !slices.Contains(validServerConfigs, sc) {
-				return fmt.Errorf("spec.migration.migrationOrderOverride.serverClassOrder contains an invalid server class: %s", sc)
+				return warnings, fmt.Errorf("spec.migration.migrationOrderOverride.serverClassOrder contains an invalid server class: %s", sc)
 			}
 		}
 	}
 
-	return nil
+	return warnings, nil
 }
 
 func checkAdminServiceConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
