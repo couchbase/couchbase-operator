@@ -4276,6 +4276,8 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	return nil
 }
 
+// checkClusterConstraintMagmaStorageBackend checks if any buckets selected by the cluster have a magma storage backend
+// and if so, checks if the cluster is able to support it.
 func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	// Buckets aren't managed by Cluster.
 	if !cluster.Spec.Buckets.Managed {
@@ -4283,14 +4285,6 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	}
 
 	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
-	var hasMagma bool
-
-	// // storageBackend is only allowed above CB version 7.0.0.
-	storageBackendSupported, err := cluster.IsAtLeastVersion("7.0.0")
 	if err != nil {
 		return err
 	}
@@ -4307,19 +4301,6 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
 			}
 		}
-	}
-
-	// find if any bucket has storage backend as "magma"
-	for _, cbBucket := range couchbaseBuckets.Items {
-		backend := k8sutil.GetBucketStorageBackend(&cbBucket, storageBackendSupported, magmaStorageBackendSupported, cluster)
-		if backend == couchbasev2.CouchbaseStorageBackendMagma {
-			hasMagma = true
-			break
-		}
-	}
-
-	if !hasMagma {
-		return nil
 	}
 
 	return checkBucketConstraintMagmaStorageBackend(cluster)
@@ -4484,6 +4465,15 @@ func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbas
 		}
 
 		if c.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			srvVerAfter71, err := c.IsAtLeastVersion("7.1.0")
+			if err != nil {
+				return err
+			}
+
+			if !srvVerAfter71 {
+				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
+			}
+
 			if err := checkBucketConstraintMagmaStorageBackend(&c); err != nil {
 				return err
 			}
@@ -4495,25 +4485,15 @@ func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbas
 
 // checkConstraintBucketMagmaStorageBackend checks a cluster is able to support the magma storage backend.
 func checkBucketConstraintMagmaStorageBackend(cluster *couchbasev2.CouchbaseCluster) error {
-	lowestImageVer, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	srvImgTag, err := k8sutil.CouchbaseVersion(lowestImageVer)
-	if err != nil {
-		return err
-	}
-
-	srvVerAfter712, err := couchbaseutil.VersionAfter(srvImgTag, "7.1.2")
-	if err != nil {
+	srvVerAfter712, err := cluster.IsAtLeastVersion("7.1.2")
+	if err != nil || srvVerAfter712 {
 		return err
 	}
 
 	// We shouldn't allow FTS, Eventing or Analytics services on magma buckets when the cb version is < 7.1.2
 	for _, config := range cluster.Spec.Servers {
 		services := couchbasev2.ServiceList(config.Services)
-		if !srvVerAfter712 && (services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService)) {
+		if services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService) {
 			return fmt.Errorf("search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v, for cluster: %s", services.StringSlice(), cluster.NamespacedName())
 		}
 	}

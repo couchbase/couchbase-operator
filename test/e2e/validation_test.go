@@ -2320,6 +2320,20 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{`search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2`},
 		},
 		{
+			name: "TestValidateCreateMagmaBucketInvalidClusterVersion",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1024Mi").
+					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.0.0").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "2Gi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`magma storage backend requires Couchbase Server version 7.1.0 or later`},
+		},
+		{
 			name: "TestValidateMultipleBucketsSameName",
 			mutations: patchMap{
 				"bucket2": jsonpatch.NewPatchSet().Add("/spec/name", "bucket0"),
