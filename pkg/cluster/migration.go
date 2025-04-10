@@ -498,7 +498,7 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 
 	numDataNodes := c.cluster.GetNumberOfDataServiceNodes()
 	performDataNodesCheck := (numDataNodes > 1 && maxNodes >= numDataNodes)
-	allDataNodes := true
+	numDataNodeCandidates := 0
 
 	allCandidates, err := r.getMigrationCandidates()
 	if err != nil {
@@ -507,12 +507,12 @@ func (r *MigrationReconcileMachine) handleMigrateNodes(c *Cluster) error {
 
 	for _, member := range allCandidates {
 		// Prevent migration of all data nodes at once if we have more than one data node.
-		if performDataNodesCheck && allDataNodes {
-			if !r.isDataNode(member) {
-				allDataNodes = false
-			} else if migrationCandidates.Size() == (maxNodes - 1) {
+		if performDataNodesCheck && r.isDataNode(member) {
+			if numDataNodeCandidates >= (numDataNodes - 1) {
 				continue
 			}
+
+			numDataNodeCandidates++
 		}
 
 		migrationCandidates.Add(member)
