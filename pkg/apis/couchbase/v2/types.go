@@ -2525,9 +2525,6 @@ type ClusterSpec struct {
 	Migration *ClusterAssimilationSpec `json:"migration,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=None;StartTLSExtension;TLS
-type MigrationOrderStrategy string
-
 // ClusterAssimilationSpec defines the specification for a CouchbaseCluster assimilation of an unmanaged
 // cluster to a managed Kubernetes cluster
 type ClusterAssimilationSpec struct {
@@ -2575,7 +2572,13 @@ const (
 // MigrationOrderOverrideSpec defines the specification for overriding the default migration order.
 // It allows specifying the order of server groups, server classes, or individual nodes for migration.
 type MigrationOrderOverrideSpec struct {
-	// MigrationOrderOverrideStrategy defines the strategy for migration order.
+	// MigrationOrderOverrideStrategy defines the strategy for migration order. When not set, the operator will choose nodes at random.
+	// When ByServerGroup is set, the operator will migrate nodes in the order of the server groups defined in spec.migration.migrationOrderOverride.serverGroupOrder.
+	// If spec.migration.migrationOrderOverride.serverGroupOrder is not set, the operator will migrate the server groups in alphabetical order.
+	// When ByServerClass is set, the operator will migrate nodes in the order of the server classes defined in spec.migration.migrationOrderOverride.serverClassOrder.
+	// If spec.migration.migrationOrderOverride.serverClassOrder is not set, the operator will migrate the server classes in the order of the server classes defined in spec.servers.
+	// When ByNode is set, the operator will migrate nodes in the order of the nodes defined in spec.migration.migrationOrderOverride.nodeOrder.
+	// If spec.migration.migrationOrderOverride.nodeOrder is not set, the operator will migrate the nodes in alphabetical order.
 	// +optional
 	MigrationOrderOverrideStrategy MigrationOrderOverrideStrategy `json:"migrationOrderOverrideStrategy,omitempty"`
 
