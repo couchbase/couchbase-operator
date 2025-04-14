@@ -103,6 +103,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
+		checkConstraintsIndexerSettings,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -4586,6 +4587,36 @@ func checkClusterBackupConstraints(v *types.Validator, cluster *couchbasev2.Couc
 
 	if cluster.Spec.Backup.Image == "" {
 		return fmt.Errorf("spec.backup.image cannot be empty when spec.backup.managed is true")
+	}
+
+	return nil
+}
+
+func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Indexer == nil {
+		return nil
+	}
+
+	if cluster.Spec.ClusterSettings.Indexer.EnablePageBloomFilter {
+		pageBloomFilterSupported, err := cluster.IsAtLeastVersion("7.1.0")
+		if err != nil {
+			return err
+		}
+
+		if !pageBloomFilterSupported {
+			return fmt.Errorf("spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later")
+		}
+	}
+
+	if cluster.Spec.ClusterSettings.Indexer.EnableShardAffinity {
+		shardAffinitySupported, err := cluster.IsAtLeastVersion("7.6.0")
+		if err != nil {
+			return err
+		}
+
+		if !shardAffinitySupported {
+			return fmt.Errorf("spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later")
+		}
 	}
 
 	return nil
