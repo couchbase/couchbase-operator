@@ -15,6 +15,8 @@ var RetryPeriod = 5 * time.Second
 // node is in.
 type NodeState string
 
+type NodeStatus string
+
 const (
 	// Active nodes are clustered and healthy.
 	NodeStateActive NodeState = "Active"
@@ -43,6 +45,9 @@ const (
 	// Add back nodes are nodes that were manually failed over and
 	// can be added back into the cluster.
 	NodeStateAddBack NodeState = "AddBack"
+
+	// Active node is in a healthy state.
+	NodeStatusHealthy NodeStatus = "healthy"
 )
 
 // NodeStateMap translates a pod/member name to a node state.

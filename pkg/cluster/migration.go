@@ -198,9 +198,9 @@ func (c *Cluster) checkUnmanagedClusterReadiness(target interface{}) error {
 	}
 
 	for _, node := range clusterInfo.Nodes {
-		if node.Status != string(NodeStateActive) {
-			c.cluster.Status.SetErrorCondition(fmt.Sprintf("node is not active: %s", node.HostName))
-			log.Error(errors.ErrNodeNotActive, "Node is not active", "cluster", c.namespacedName(), "node", node.HostName)
+		if node.Status != string(NodeStatusHealthy) {
+			c.cluster.Status.SetErrorCondition(fmt.Sprintf("node is not healthy: %s", node.HostName))
+			log.Error(errors.ErrNodeNotActive, "Node is not healthy", "cluster", c.namespacedName(), "node", node.HostName)
 
 			return errors.ErrNodeNotActive
 		}
