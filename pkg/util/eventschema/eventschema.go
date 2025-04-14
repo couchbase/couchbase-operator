@@ -45,8 +45,13 @@ func (c *Validator) Validate(out io.Writer) error {
 		// Calculate the widths for tabulation
 		reasonWidth := 0
 		messageWidth := 0
+		timestampWidth := 0
 
 		for _, event := range c.Events {
+			if timestampWidth == 0 {
+				timestampWidth = len(event.LastTimestamp.Format("02 Jan 15:04:05"))
+			}
+
 			if w := len(event.Reason); w > reasonWidth {
 				reasonWidth = w
 			}
@@ -57,7 +62,7 @@ func (c *Validator) Validate(out io.Writer) error {
 		}
 
 		// Generate the format string
-		format := fmt.Sprintf("| %%-%ds | %%-%ds |", reasonWidth, messageWidth)
+		format := fmt.Sprintf("| %%-%ds | %%-%ds | %%-%ds |", timestampWidth, reasonWidth, messageWidth)
 
 		// Print out the event list with the error embedded in the correct place
 		if _, err := out.Write([]byte("Event schema validation failed:\n")); err != nil {
@@ -65,7 +70,7 @@ func (c *Validator) Validate(out io.Writer) error {
 		}
 
 		for index, event := range c.Events {
-			line := fmt.Sprintf(format, event.Reason, event.Message)
+			line := fmt.Sprintf(format, event.LastTimestamp.Format("02 Jan 15:04:05"), event.Reason, event.Message)
 			if index == c.index {
 				line += fmt.Sprintf(" <== %v", err)
 			}
