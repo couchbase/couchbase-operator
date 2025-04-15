@@ -7,6 +7,11 @@ spec:
   migration:
     unmanagedClusterHost: "some-unmanaged-host.default.local"
   image: couchbase/server:7.6.0
+  buckets:
+    managed: true
+  security:
+    rbac:
+      managed: true
   servers:
     - size: 1
       name: all_services

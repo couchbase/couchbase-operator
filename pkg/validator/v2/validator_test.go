@@ -2,7 +2,6 @@ package v2
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-
 	v1 "k8s.io/api/core/v1"
 
 	"testing"
@@ -70,7 +69,7 @@ func TestCheckChangeConstraintsMigration(t *testing.T) {
 				Image: "couchbase/server:7.6.2"},
 		}
 
-		err := checkChangeConstraintsMigration(currentCluster, updatedCluster)
+		err := checkChangeConstraintsMigration(nil, currentCluster, updatedCluster)
 
 		if (err == nil && testcase.expectedErr != "") || (err != nil && (testcase.expectedErr == "" || err.Error() != testcase.expectedErr)) {
 			t.Errorf("test %s failed, expected error %s, got %s", testcase.name, testcase.expectedErr, err)

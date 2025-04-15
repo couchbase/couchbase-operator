@@ -337,6 +337,14 @@ func checkMigrationConstraints(_ *types.Validator, cluster *couchbasev2.Couchbas
 		warnings = append(warnings, ws...)
 	}
 
+	if cluster.Spec.Buckets.Managed {
+		warnings = append(warnings, "spec.Buckets.Managed is true. Any bucket not defined as a kubernetes resource will be deleted once migration is completed")
+	}
+
+	if cluster.Spec.Security.RBAC.Managed {
+		warnings = append(warnings, "spec.Security.RBAC.Managed is true. Any user, group or role not defined as a kubernetes resource will be deleted once migration is completed")
+	}
+
 	return warnings, nil
 }
 
@@ -4081,7 +4089,7 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		return err
 	}
 
-	if err := checkChangeConstraintsMigration(prev, curr); err != nil {
+	if err := checkChangeConstraintsMigration(v, prev, curr); err != nil {
 		return err
 	}
 
@@ -4508,7 +4516,8 @@ func checkAnnotationTrue(annotations map[string]string, annotation string) bool 
 	return false
 }
 
-func checkChangeConstraintsMigration(current, updated *couchbasev2.CouchbaseCluster) error {
+//nolint:gocognit
+func checkChangeConstraintsMigration(v *types.Validator, current, updated *couchbasev2.CouchbaseCluster) error {
 	if current.Spec.Migration == nil && updated.Spec.Migration != nil {
 		return fmt.Errorf("spec.migration cannot be added to a pre-existing cluster")
 	}
@@ -4530,6 +4539,32 @@ func checkChangeConstraintsMigration(current, updated *couchbasev2.CouchbaseClus
 			if current.Spec.Migration.UnmanagedClusterHost != updated.Spec.Migration.UnmanagedClusterHost {
 				return fmt.Errorf("spec.migration.unmanagedClusterHost cannot be changed during migration")
 			}
+		}
+	}
+
+	if current.Spec.Migration != nil && updated.Spec.Migration == nil {
+		// Put this here to allow the rest of our tests to run.
+		// We can't import the validator package here as it would cause a circular dependency in the test.
+		if v == nil {
+			return nil
+		}
+
+		users, err := v.Abstraction.GetCouchbaseUsers(updated.Namespace, updated.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return err
+		}
+
+		buckets, err := v.Abstraction.GetBuckets(updated.Namespace, updated.Spec.Buckets.Selector)
+		if err != nil {
+			return err
+		}
+
+		if len(buckets) == 0 && updated.Spec.Buckets.Managed {
+			return fmt.Errorf("cannot remove migration spec as buckets were not migrated")
+		}
+
+		if len(users.Items) == 0 && updated.Spec.Security.RBAC.Managed {
+			return fmt.Errorf("cannot remove migration spec as users were not migrated")
 		}
 	}
 

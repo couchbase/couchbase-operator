@@ -4113,6 +4113,16 @@ func TestNegValidationClusterMigrationApply(t *testing.T) {
 			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.2")},
 			shouldFail: true,
 		},
+		{
+			name:       "RemoveMigrationSpecWithNoBuckets",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/migration")},
+			shouldFail: true,
+		},
+		{
+			name:       "RemoveMigrationSpecWithNoUsers",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/migration")},
+			shouldFail: true,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
@@ -4160,6 +4170,21 @@ func TestValidationClusterMigrationApply(t *testing.T) {
 			})},
 			shouldFail:       false,
 			expectedWarnings: []string{"spec.migration.migrationOrderOverride.nodeOrder will be ignored when using ByServerClass or ByServerGroup strategy"},
+		},
+		{
+			name: "TestMigrationBucketsManaged",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/buckets", couchbasev2.Buckets{
+				Managed: true,
+			},
+			)},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.Buckets.Managed is true. Any bucket not defined as a kubernetes resource will be deleted once migration is completed"},
+		},
+		{
+			name:             "TestMigrationRBACManaged",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/security/rbac", couchbasev2.RBAC{Managed: true})},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.Security.RBAC.Managed is true. Any user, group or role not defined as a kubernetes resource will be deleted once migration is completed"},
 		},
 	}
 
