@@ -124,13 +124,13 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			continue
 		}
 
-		log.V(2).Info("Pod diff", "diff", d, "podEqual", podsEqual, "pvcEqual", pvcsEqual)
+		log.V(1).Info("Pod diff", "diff", d, "podEqual", podsEqual, "pvcEqual", pvcsEqual)
 
 		prettyDiff := diff.PrettyDiff(actualSpec, requestedSpec)
 
 		if !pvcsEqual {
 			prettyDiff += pvcState.Diff()
-			log.V(2).Info("PVC diff", "diff", prettyDiff)
+			log.V(1).Info("PVC diff", "diff", prettyDiff)
 		}
 
 		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
