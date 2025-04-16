@@ -13,6 +13,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -91,6 +92,7 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 			CompressionType:  settings.CompressionType,
 			FilterExpression: task.FilterExpression,
 			PauseRequested:   settings.PauseRequested,
+			Mobile:           settings.Mobile,
 		}
 
 		// Deal with any additional mappings for scopes and collections
@@ -256,6 +258,8 @@ func (c *Cluster) isScopesAndCollectionsSupported() (bool, error) {
 
 // generateXDCRReplications uses the remote's label selector to pick all the replications
 // to create for this remote cluster connection.
+//
+//nolint:gocognit
 func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteCluster) ([]couchbaseutil.Replication, error) {
 	var replications []couchbaseutil.Replication
 
@@ -284,6 +288,12 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 				continue
 			}
 
+			err := annotations.Populate(&migration.Spec, migration.Annotations)
+			if err != nil {
+				// we failed but its not worth stopping. log the error and continue
+				log.Error(err, "failed to populate migration with annotation")
+			}
+
 			newMigration := couchbaseutil.Replication{
 				FromBucket:       string(migration.Spec.Bucket),
 				ToCluster:        remoteCluster.Name,
@@ -294,6 +304,13 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 				FilterExpression: migration.Spec.FilterExpression,
 				PauseRequested:   migration.Spec.Paused,
 				MigrationMapping: true,
+			}
+
+			if isAtleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
+				log.Error(err, "Failed to check server version for mobile replication")
+				return nil, err
+			} else if isAtleast76 {
+				newMigration.Mobile = string(migration.Spec.Mobile)
 			}
 
 			replicationKey := replicationKey(newMigration)
@@ -321,6 +338,12 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 			continue
 		}
 
+		err := annotations.Populate(&replication.Spec, replication.Annotations)
+		if err != nil {
+			// we failed but its not worth stopping. log the error and continue
+			log.Error(err, "failed to populate replication with annotation")
+		}
+
 		newReplication := couchbaseutil.Replication{
 			FromBucket:       string(replication.Spec.Bucket),
 			ToCluster:        remoteCluster.Name,
@@ -330,6 +353,13 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 			CompressionType:  string(replication.Spec.CompressionType),
 			FilterExpression: replication.Spec.FilterExpression,
 			PauseRequested:   replication.Spec.Paused,
+		}
+
+		if isAtleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
+			log.Error(err, "Failed to check server version for mobile replication")
+			return nil, err
+		} else if isAtleast76 {
+			newReplication.Mobile = string(replication.Spec.Mobile)
 		}
 
 		replicationKey := replicationKey(newReplication)

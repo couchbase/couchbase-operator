@@ -493,6 +493,8 @@ type Bucket struct {
 	Rank                              *int                         `json:"rank"`
 	PurgeInterval                     *float64                     `json:"purgeInterval,omitempty"`
 	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
+	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
+	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
 }
 
 type BucketList []Bucket
@@ -548,6 +550,8 @@ type BucketStatus struct {
 	Rank                              *int                         `json:"rank"`
 	PurgeInterval                     *float64                     `json:"purgeInterval,omitempty"`
 	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
+	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
+	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -855,6 +859,8 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.DurabilityMinLevel = status.DurabilityMinLevel
 	b.MaxTTL = status.MaxTTL
 	b.Rank = status.Rank
+	b.EnableCrossClusterVersioning = status.EnableCrossClusterVersioning
+	b.VersionPruningWindowHrs = status.VersionPruningWindowHrs
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -872,6 +878,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	return nil
 }
 
+//nolint:gocognit
 func (b *Bucket) FormEncode(update bool) []byte {
 	data := url.Values{}
 	data.Set("name", b.BucketName)
@@ -949,6 +956,19 @@ func (b *Bucket) FormEncode(update bool) []byte {
 		if b.MagmaKeyTreeDataBlockSize != nil {
 			data.Set("magmaKeyTreeDataBlockSize", strconv.FormatUint(*b.MagmaKeyTreeDataBlockSize, 10))
 		}
+	}
+
+	if b.EnableCrossClusterVersioning != nil {
+		// We can only set this to true if the bucket has already been created.
+		if update {
+			data.Set("enableCrossClusterVersioning", BoolAsStr(*b.EnableCrossClusterVersioning))
+		} else {
+			data.Set("enableCrossClusterVersioning", "false")
+		}
+	}
+
+	if b.VersionPruningWindowHrs != nil {
+		data.Set("versionPruningWindowHrs", strconv.FormatUint(*b.VersionPruningWindowHrs, 10))
 	}
 
 	return []byte(data.Encode())
@@ -1242,6 +1262,7 @@ type Replication struct {
 	MigrationMapping bool `url:"collectionsMigrationMode,omitempty"`
 	// This is really a map of strings to strings or pointers to strings but easier to handle here this way then deal with explicitly in code.
 	MappingRules string `url:"colMappingRules,omitempty"`
+	Mobile       string `url:"mobile,omitempty"`
 }
 
 type ReplicationList []Replication
@@ -1256,6 +1277,7 @@ type ReplicationSettings struct {
 	MigrationMapping bool `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
 	// One API uses a map, the other wants it as a JSON-ified string already.
 	MappingRules map[string]*string `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
+	Mobile       string             `json:"mobile,omitempty" url:"mobile,omitempty"`
 }
 
 // Convert from one API call to the other.

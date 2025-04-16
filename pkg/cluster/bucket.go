@@ -27,6 +27,7 @@ const (
 	SupportedHistoryRetention
 	SupportedRank
 	SupportedBlockSize
+	SupportedCrossClusterVersioning
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -41,6 +42,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	supportedHistoryRetention := supportedFeatures[SupportedHistoryRetention]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedBlockSize := supportedFeatures[SupportedBlockSize]
+	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 
 	for _, bucket := range k8sBuckets {
 		if client != nil {
@@ -99,13 +101,6 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		// Although, the API doesn't need us to pass default values
 		// but, our reconciler comparison fails, when nil. So, setting default values.
-		notNilOrDefault := func(val *uint64, defaultVal uint64) *uint64 {
-			if val != nil {
-				return val
-			}
-
-			return &defaultVal
-		}
 
 		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
 			// MagmaSeqTreeDataBlockSize/MagmaKeyTreeDataBlockSize only supported on Magma
@@ -126,6 +121,17 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.Rank = &bucket.Spec.Rank
 		}
 
+		if supportedCrossClusterVersioning {
+			if bucket.Spec.EnableCrossClusterVersioning != nil {
+				b.EnableCrossClusterVersioning = bucket.Spec.EnableCrossClusterVersioning
+			} else {
+				defaultCrossClusterVersioning := false
+				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
+			}
+
+			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
+		}
+
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
 		b.AutoCompactionSettings = autoCompactionSettings
 		b.PurgeInterval = purgeInterval
@@ -136,6 +142,14 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	return outputBuckets
 }
 
+func notNilOrDefault(val *uint64, defaultVal uint64) *uint64 {
+	if val != nil {
+		return val
+	}
+
+	return &defaultVal
+}
+
 func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseBucket, storageBackendCouchstoreSupported, storageBackendMagmaSupported bool, cluster *couchbasev2.CouchbaseCluster) {
 	b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(k8sutil.GetBucketStorageBackend(bucket, storageBackendCouchstoreSupported, storageBackendMagmaSupported, cluster))
 }
@@ -144,11 +158,18 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
+	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 
 	for _, bucket := range k8sEphemeralBuckets {
 		bucketA, found := client.CouchbaseEphemeralBuckets.Get(bucket.Name)
 		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
 			continue
+		}
+
+		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
+		if err != nil {
+			// we failed but its not worth stopping. log the error and continue
+			log.Error(err, "failed to populate bucket with annotation")
 		}
 
 		if !selector.Matches(labels.Set(bucket.Labels)) {
@@ -184,6 +205,17 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		if supportedRank {
 			b.Rank = &bucket.Spec.Rank
+		}
+
+		if supportedCrossClusterVersioning {
+			if bucket.Spec.EnableCrossClusterVersioning != nil {
+				b.EnableCrossClusterVersioning = bucket.Spec.EnableCrossClusterVersioning
+			} else {
+				defaultCrossClusterVersioning := false
+				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
+			}
+
+			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -269,6 +301,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	}
 
 	supportedFeatures[SupportedRank] = rankSupported
+
+	atleast76, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
 
 	allBuckets := []couchbaseutil.Bucket{}
 
@@ -383,6 +422,8 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					continue
 				}
 
+				doCrossClusterVersioningChecks(&r, &a, c.cluster)
+
 				if a.BucketType != r.BucketType {
 					log.Info("Bucket type cannot be changed so recreating with requested type", "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
 					remove = append(remove, a)
@@ -445,6 +486,25 @@ func matchBackendsIfBefore76(r, a *couchbaseutil.Bucket, cluster *couchbasev2.Co
 
 			log.Info("[WARN] spec.storageBackend cannot be changed for server version below 7.6.0")
 		}
+	}
+}
+
+func doCrossClusterVersioningChecks(r, a *couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster) {
+	if isAtleast762, err := cluster.IsAtLeastVersion("7.6.2"); err != nil {
+		log.Error(err, "Failed to check server version for cross cluster versioning")
+		return
+	} else if !isAtleast762 {
+		return
+	}
+
+	if a.EnableCrossClusterVersioning != nil && *a.EnableCrossClusterVersioning {
+		if r.EnableCrossClusterVersioning == nil || !*r.EnableCrossClusterVersioning {
+			log.Info("[WARN] spec.enableCrossClusterVersioning cannot be disabled once enabled")
+		}
+
+		// For some reason, the API doesn't like us setting this to ever again if it's true.
+		r.EnableCrossClusterVersioning = nil
+		a.EnableCrossClusterVersioning = nil
 	}
 }
 

@@ -282,4 +282,7 @@ const (
 	MagmaSeqTreeDataDefaultBlockSize = 4096
 	// MagmaKeyTreeDataDefaultBlockSize default block size for Magma keyIndex.
 	MagmaKeyTreeDataDefaultBlockSize = 4096
+
+	// VersionPruningWindowHrsDefault default number of hours to retain version history for a bucket.
+	VersionPruningWindowHrsDefault = 720
 )

@@ -1023,8 +1023,13 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		}
 
 		for _, replication := range replications.Items {
-			if err := validateBucketExists(v, cluster, string(replication.Spec.Bucket)); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must exist: %w", replication.Spec.Bucket, replication.Name, err))
+			err = annotations.Populate(&replication.Spec, replication.Annotations)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
 			}
 		}
 
@@ -1035,8 +1040,13 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		}
 
 		for _, migration := range migrations.Items {
-			if err := validateBucketExists(v, cluster, string(migration.Spec.Bucket)); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must exist: %w", migration.Spec.Bucket, migration.Name, err))
+			err = annotations.Populate(&migration.Spec, migration.Annotations)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
 			}
 		}
 	}
@@ -2038,11 +2048,55 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		}
 	}
 
+	if err := checkBucketCrossClusterVersioning(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
+}
+
+// checkCrossClusterVersioning checks if the bucket's cross cluster versioning is compatible with the cluster version.
+func checkCrossClusterVersioning(v *types.Validator, namespace string, bucketLabels map[string]string, enableCrossClusterVersioning *bool) error {
+	if enableCrossClusterVersioning == nil {
+		return nil
+	}
+
+	clusters, err := v.Abstraction.GetCouchbaseClusters(namespace)
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusters.Items {
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return err
+		}
+
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucketLabels)) {
+			srvVerAfter76, err := cluster.IsAtLeastVersion("7.6.0")
+			if err != nil {
+				return err
+			}
+
+			if !srvVerAfter76 {
+				return fmt.Errorf("enableCrossClusterVersioning requires Couchbase Server version 7.6.0 or later")
+			}
+		}
+	}
+
+	return nil
+}
+
+func checkBucketCrossClusterVersioning(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+	return checkCrossClusterVersioning(v, bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
+}
+
+func checkEphemeralBucketCrossClusterVersioning(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
+	return checkCrossClusterVersioning(v, bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
 }
 
 func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
@@ -2121,6 +2175,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		}
 	}
 
+	if err := checkEphemeralBucketCrossClusterVersioning(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -2156,7 +2214,22 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return nil
 }
 
-func CheckConstraintsReplication(_ *types.Validator, _ *couchbasev2.CouchbaseReplication) error {
+func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseReplication) error {
+	if checkAnnotationSkipValidation(r.Annotations) {
+		return nil
+	}
+
+	err := annotations.Populate(&r.Spec, r.Annotations)
+	if err != nil {
+		return err
+	}
+
+	switch r.Spec.Mobile {
+	case "", "Active", "Off":
+	default:
+		return fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
+	}
+
 	return nil
 }
 
@@ -3230,26 +3303,43 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	return nil
 }
 
-// validateBucketExists ensures the specified Couchbase bucket exists.
-func validateBucketExists(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, name string) error {
+// validateReplicationBucketValid ensures the specified Couchbase bucket exists.
+func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, rs *couchbasev2.CouchbaseReplicationSpec) error {
 	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
 	}
 
+	bucketName := string(rs.Bucket)
+
 	for _, bucket := range buckets {
-		if bucket.GetCouchbaseName() != name {
+		if bucket.GetCouchbaseName() != bucketName {
 			continue
 		}
 
 		if bucket.GetType() == couchbasev2.BucketTypeMemcached {
-			return fmt.Errorf("memcached bucket %s cannot be replicated", name)
+			return fmt.Errorf("memcached bucket %s cannot be replicated", bucketName)
+		}
+
+		if rs.Mobile == "Active" {
+			mobileSupported, err := cluster.IsAtLeastVersion("7.6.4")
+			if err != nil {
+				return err
+			}
+
+			if !mobileSupported {
+				return fmt.Errorf("mobile replication requires cluster version 7.6.4 or greater")
+			}
+
+			if !bucket.HasCrossClusterVersioningEnabled() {
+				return fmt.Errorf("bucket %s must have cross cluster versioning enabled to be used with mobile replication", bucketName)
+			}
 		}
 
 		return nil
 	}
 
-	return fmt.Errorf("bucket %s not found", name)
+	return fmt.Errorf("bucket %s not found", bucketName)
 }
 
 // validateBackupCronSchedules ensures that the correct cronjob schedules are valid for the desired backup strategy.
@@ -4090,6 +4180,42 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 
 	if !prev.Spec.SampleBucket && curr.Spec.SampleBucket {
 		errs = append(errs, fmt.Errorf("cao.couchbase.com/sampleBucket annotation cannot be added to an existing bucket"))
+	}
+
+	if prev.Spec.EnableCrossClusterVersioning != nil && *prev.Spec.EnableCrossClusterVersioning {
+		if curr.Spec.EnableCrossClusterVersioning == nil || !*curr.Spec.EnableCrossClusterVersioning {
+			errs = append(errs, fmt.Errorf("enableCrossClusterVersioning cannot be disabled once enabled"))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func CheckChangeConstraintsEphemeralBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
+	err := annotations.Populate(&prev.Spec, prev.Annotations)
+	if err != nil {
+		return err
+	}
+
+	err = annotations.Populate(&curr.Spec, curr.Annotations)
+	if err != nil {
+		return err
+	}
+
+	if prev.Spec.EnableCrossClusterVersioning != nil && *prev.Spec.EnableCrossClusterVersioning {
+		if curr.Spec.EnableCrossClusterVersioning == nil || !*curr.Spec.EnableCrossClusterVersioning {
+			errs = append(errs, fmt.Errorf("enableCrossClusterVersioning cannot be disabled once enabled"))
+		}
 	}
 
 	if errs != nil {

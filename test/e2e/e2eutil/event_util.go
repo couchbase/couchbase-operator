@@ -128,6 +128,10 @@ func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remoteClusterName,
 	return k8sutil.ReplicationRemovedEvent(c, name)
 }
 
+func BucketEditedEvent(c *couchbasev2.CouchbaseCluster, bucket string) *v1.Event {
+	return k8sutil.BucketEditEvent(bucket, c)
+}
+
 func BackupStartedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
 	return k8sutil.BackupStartEvent(backup, c)
 }

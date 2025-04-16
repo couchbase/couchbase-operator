@@ -21,6 +21,11 @@ func (in *AutoCompaction) DeepCopyInto(out *AutoCompaction) {
 	*out = *in
 	in.DatabaseFragmentationThreshold.DeepCopyInto(&out.DatabaseFragmentationThreshold)
 	in.ViewFragmentationThreshold.DeepCopyInto(&out.ViewFragmentationThreshold)
+	if in.MagmaFragmentationThresholdPercentage != nil {
+		in, out := &in.MagmaFragmentationThresholdPercentage, &out.MagmaFragmentationThresholdPercentage
+		*out = new(int)
+		**out = **in
+	}
 	in.TimeWindow.DeepCopyInto(&out.TimeWindow)
 	if in.TombstonePurgeInterval != nil {
 		in, out := &in.TombstonePurgeInterval, &out.TombstonePurgeInterval
@@ -52,6 +57,11 @@ func (in *AutoCompactionSpecBucket) DeepCopyInto(out *AutoCompactionSpecBucket) 
 		in, out := &in.ViewFragmentationThreshold, &out.ViewFragmentationThreshold
 		*out = new(ViewFragmentationThresholdBucket)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.MagmaFragmentationThresholdPercentage != nil {
+		in, out := &in.MagmaFragmentationThresholdPercentage, &out.MagmaFragmentationThresholdPercentage
+		*out = new(int)
+		**out = **in
 	}
 	if in.TombstonePurgeInterval != nil {
 		in, out := &in.TombstonePurgeInterval, &out.TombstonePurgeInterval
@@ -1558,6 +1568,16 @@ func (in *CouchbaseBucketSpec) DeepCopyInto(out *CouchbaseBucketSpec) {
 		*out = new(AutoCompactionSpecBucket)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.EnableCrossClusterVersioning != nil {
+		in, out := &in.EnableCrossClusterVersioning, &out.EnableCrossClusterVersioning
+		*out = new(bool)
+		**out = **in
+	}
+	if in.VersionPruningWindowHrs != nil {
+		in, out := &in.VersionPruningWindowHrs, &out.VersionPruningWindowHrs
+		*out = new(uint64)
+		**out = **in
+	}
 	return
 }
 
@@ -2390,6 +2410,16 @@ func (in *CouchbaseEphemeralBucketSpec) DeepCopyInto(out *CouchbaseEphemeralBuck
 		in, out := &in.Scopes, &out.Scopes
 		*out = new(ScopeSelector)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.EnableCrossClusterVersioning != nil {
+		in, out := &in.EnableCrossClusterVersioning, &out.EnableCrossClusterVersioning
+		*out = new(bool)
+		**out = **in
+	}
+	if in.VersionPruningWindowHrs != nil {
+		in, out := &in.VersionPruningWindowHrs, &out.VersionPruningWindowHrs
+		*out = new(uint64)
+		**out = **in
 	}
 	return
 }

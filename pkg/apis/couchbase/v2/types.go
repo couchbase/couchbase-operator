@@ -1422,6 +1422,14 @@ type CouchbaseBucketSpec struct {
 	// Excluding this field (which is the default), will set the autoCompactionSettings to false and the bucket will use cluster defaults.
 	// +optional
 	AutoCompaction *AutoCompactionSpecBucket `json:"autoCompaction,omitempty" annotation:"autoCompaction"`
+
+	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
+	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
+	EnableCrossClusterVersioning *bool `json:"-" annotation:"enableCrossClusterVersioning"`
+
+	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
+	// This field must be an integer larger than 23, defaulting to 720 (30 days).
+	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
 }
 
 type HistoryRetentionSettings struct {
@@ -1573,6 +1581,14 @@ type CouchbaseEphemeralBucketSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1000
 	Rank int `json:"rank,omitempty"`
+
+	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
+	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
+	EnableCrossClusterVersioning *bool `json:"-" annotation:"enableCrossClusterVersioning"`
+
+	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
+	// This field must be an integer larger than 23, defaulting to 720 (30 days).
+	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1797,7 +1813,18 @@ type CouchbaseReplicationSpec struct {
 	// Paused allows a replication to be stopped and restarted without having to
 	// restart the replication from the beginning.
 	Paused bool `json:"paused,omitempty"`
+
+	// Mobile is the configuration for the mobile replication.
+	// This feature is available in Couchbase Server 7.6.4 and later.
+	Mobile MobileReplication `json:"-" annotation:"mobile"`
 }
+
+type MobileReplication string
+
+const (
+	Active MobileReplication = "Active"
+	Off    MobileReplication = "Off"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseReplicationList struct {

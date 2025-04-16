@@ -1,0 +1,86 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster1
+spec:
+  image: couchbase/server:7.6.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+  cluster:
+    dataServiceMemoryQuota: 4048Mi
+status:
+  currentVersion: 7.6.0
+  size: 1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+  annotations:
+    cao.couchbase.com/enableCrossClusterVersioning: "false"
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseEphemeralBucket
+metadata:
+  name: bucket2
+  annotations:
+    cao.couchbase.com/enableCrossClusterVersioning: "true"
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication0
+  annotations:
+    cao.couchbase.com/mobile: "Active"
+spec:
+  bucket: bucket1
+  remoteBucket: bucket1
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster2
+spec:
+  image: couchbase/server:7.6.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  xdcr:
+    managed: true
+    remoteClusters:
+      - name: starsky
+        uuid: 246bb8fb53a75e37819cb50b98ac3b65
+        hostname: couchbases://starsky-and-hutch.tv:8091?network=nbc
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+  cluster:
+    dataServiceMemoryQuota: 4048Mi
+status:
+  currentVersion: 7.6.0
+  size: 1
+---

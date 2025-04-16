@@ -10,6 +10,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 
@@ -1284,6 +1285,9 @@ type AbstractBucket interface {
 
 	// IsSampleBucket() returns true if the bucket is a sample bucket.
 	IsSampleBucket() bool
+
+	// HasCrossClusterVersioningEnabled returns true if the bucket has cross cluster versioning enabled.
+	HasCrossClusterVersioningEnabled() bool
 }
 
 func (b *CouchbaseBucket) GetCouchbaseName() string {
@@ -1358,6 +1362,18 @@ func (b *CouchbaseBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+func (b *CouchbaseBucket) HasCrossClusterVersioningEnabled() bool {
+	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
+		log.Error(err, "failed to populate annotations")
+	}
+
+	if b.Spec.EnableCrossClusterVersioning == nil {
+		return false
+	}
+
+	return *b.Spec.EnableCrossClusterVersioning
+}
+
 func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
 	name := b.Name
 
@@ -1396,6 +1412,18 @@ func (b *CouchbaseEphemeralBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+func (b *CouchbaseEphemeralBucket) HasCrossClusterVersioningEnabled() bool {
+	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
+		log.Error(err, "failed to populate annotations")
+	}
+
+	if b.Spec.EnableCrossClusterVersioning == nil {
+		return false
+	}
+
+	return *b.Spec.EnableCrossClusterVersioning
+}
+
 func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 	name := b.Name
 
@@ -1431,6 +1459,10 @@ func (b *CouchbaseMemcachedBucket) AddScopeResource(_ ScopeLocalObjectReference)
 
 func (b *CouchbaseMemcachedBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
+}
+
+func (b *CouchbaseMemcachedBucket) HasCrossClusterVersioningEnabled() bool {
+	return false
 }
 
 // Abstractions for scopes and collections.

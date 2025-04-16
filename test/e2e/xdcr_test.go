@@ -1894,3 +1894,47 @@ func TestXDCRWithMandatoryTLSAndMultipleCAs(t *testing.T) {
 	e2eutil.NewDocumentSet(bucket.GetName(), f.DocsCount).MustCreate(t, kubernetes, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, targetCluster, bucket.GetName(), f.DocsCount, 10*time.Minute)
 }
+
+// TestXDCRMobileActive checks that the mobile setting is correctly set.
+func TestXDCRMobileActive(t *testing.T) {
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().AtLeastVersion("7.6.4").IstioDisabled()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the Buckets.
+	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
+	bucket.SetAnnotations(map[string]string{
+		"cao.couchbase.com/mobile": "Active",
+	})
+
+	e2eutil.MustNewBucket(t, kubernetes1, bucket)
+
+	if kubernetes1.Config.Host != kubernetes2.Config.Host || kubernetes1.Namespace != kubernetes2.Namespace {
+		e2eutil.MustNewBucket(t, kubernetes2, bucket)
+	}
+
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes1, sourceCluster, e2eutil.BucketEditedEvent(sourceCluster, bucket.GetName()), time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, e2eutil.BucketEditedEvent(targetCluster, bucket.GetName()), time.Minute)
+
+	// When ready, establish the XDCR connection
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	replication.SetAnnotations(map[string]string{
+		"cao.couchbase.com/mobile": "Active",
+	})
+
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	settings := e2eutil.MustGetReplicationSettings(t, kubernetes1, sourceCluster, replication, &sourceCluster.Spec.XDCR.RemoteClusters[0])
+	if settings.Mobile != "Active" {
+		e2eutil.Die(t, fmt.Errorf("Mobile is not Active: %s", settings.Mobile))
+	}
+}

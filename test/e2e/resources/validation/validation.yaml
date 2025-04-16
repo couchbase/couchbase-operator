@@ -632,3 +632,8 @@ spec:
 status:
   labelSelector:  "couchbase_cluster = test-couchbase-cluster"
   size: 3
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket7

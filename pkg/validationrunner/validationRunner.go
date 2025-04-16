@@ -313,6 +313,27 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 					}
 				}
 			}
+		case *couchbasev2.CouchbaseEphemeralBucket:
+			if t2, ok := newBucket.(*couchbasev2.CouchbaseEphemeralBucket); ok {
+				if err := validationv2.CheckChangeConstraintsEphemeralBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
+					errs = append(errs, err)
+
+					ephemeralBucket, found := currentCluster.GetK8sClient().CouchbaseEphemeralBuckets.Get(update.BucketName)
+					if !found {
+						errs = append(errs, errResourceNotFound)
+					}
+
+					couchbaseutil.AddAnnotation(&ephemeralBucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
+
+					if updateErr := currentCluster.GetK8sClient().CouchbaseEphemeralBuckets.Update(ephemeralBucket); updateErr != nil {
+						if errors.Is(err, couchbaseutil.ErrMemberError) {
+							return nil
+						}
+
+						errs = append(errs, err)
+					}
+				}
+			}
 
 		default:
 			// It must be a couchbase bucket so continue if it's somehow something else.

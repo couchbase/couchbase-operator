@@ -155,7 +155,7 @@ func PatchBucketInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster
 			return err
 		}
 
-		if reflect.DeepEqual(before, after) {
+		if reflect.DeepEqual(*before, after) {
 			return nil
 		}
 
@@ -1798,4 +1798,24 @@ func MustGetClusterSize(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2
 	}
 
 	return len(info.Nodes)
+}
+
+func GetReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, remoteCluster *couchbasev2.RemoteCluster) (*couchbaseutil.ReplicationSettings, error) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	settings := &couchbaseutil.ReplicationSettings{}
+	if err := couchbaseutil.GetReplicationSettings(settings, remoteCluster.UUID, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	return settings, nil
+}
+
+func MustGetReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, remoteCluster *couchbasev2.RemoteCluster) *couchbaseutil.ReplicationSettings {
+	settings, err := GetReplicationSettings(t, k8s, couchbase, replication, remoteCluster)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return settings
 }

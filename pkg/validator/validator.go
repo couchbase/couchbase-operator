@@ -113,6 +113,10 @@ func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object)
 		if t2, ok := updated.(*couchbasev2.CouchbaseBucket); ok {
 			return validationv2.CheckChangeConstraintsBucket(v, t, t2, nil)
 		}
+	case *couchbasev2.CouchbaseEphemeralBucket:
+		if t2, ok := updated.(*couchbasev2.CouchbaseEphemeralBucket); ok {
+			return validationv2.CheckChangeConstraintsEphemeralBucket(v, t, t2, nil)
+		}
 	}
 
 	return nil

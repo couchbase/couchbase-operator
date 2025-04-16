@@ -369,9 +369,9 @@ func TestEditBucket(t *testing.T) {
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
-	if rankSupported, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+	if atleast76, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if rankSupported {
+	} else if atleast76 {
 		rank := 100
 		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/rank", rank), time.Minute)
 		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/Rank", &rank), time.Minute)
@@ -380,7 +380,20 @@ func TestEditBucket(t *testing.T) {
 		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/rank", rank), time.Minute)
 		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/Rank", &rank), time.Minute)
 
-		patchCycles += 2
+		enableCrossClusterVersioning := true
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{
+			"cao.couchbase.com/enableCrossClusterVersioning": couchbaseutil.BoolToStr(enableCrossClusterVersioning),
+		}), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableCrossClusterVersioning", &enableCrossClusterVersioning), time.Minute)
+
+		versionPruningWindowHrs := uint64(360)
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{
+			"cao.couchbase.com/enableCrossClusterVersioning": couchbaseutil.BoolToStr(enableCrossClusterVersioning),
+			"cao.couchbase.com/versionPruningWindowHrs":      couchbaseutil.IntToStr(int(versionPruningWindowHrs)),
+		}), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/VersionPruningWindowHrs", &versionPruningWindowHrs), time.Minute)
+
+		patchCycles += 4
 	}
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
