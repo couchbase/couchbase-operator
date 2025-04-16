@@ -1374,7 +1374,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 		},
 		{
 			name:           "TestValidateAutoFailoverMaxCountOver4On71+",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.1.0")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverMaxCount", 4).Replace("/spec/image", "couchbase/server:7.2.6")},
 			shouldFail:     false,
 			expectedErrors: []string{},
 		},
@@ -1441,6 +1441,18 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 		{
 			name:           "TestValidateIndexerNumberOfReplicaInValid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", "-1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.numReplica`},
+		},
+		{
+			name:           "TestValidateIndexerNumberOfReplicaGreaterThanIndexPods",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", "10")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.numReplica`},
+		},
+		{
+			name:           "TestValidateIndexerNumberOfReplicaEqualIndexPods",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", "3")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.numReplica`},
 		},

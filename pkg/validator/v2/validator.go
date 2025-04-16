@@ -4780,5 +4780,19 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 		}
 	}
 
+	if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica > 0 {
+		totalIndexPodsAvailable := 0
+
+		for _, serverClass := range cluster.Spec.Servers {
+			if slices.Contains(serverClass.Services, couchbasev2.IndexService) {
+				totalIndexPodsAvailable += serverClass.Size
+			}
+		}
+
+		if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica >= totalIndexPodsAvailable {
+			return fmt.Errorf("spec.cluster.indexer.numReplica %d cannot be greater or equal to the number of index pods %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica, totalIndexPodsAvailable)
+		}
+	}
+
 	return nil
 }
