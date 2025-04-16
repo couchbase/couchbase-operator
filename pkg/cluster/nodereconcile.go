@@ -335,7 +335,6 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleAutoscaleServerConfigs,
 		(*ReconcileMachine).handleRebalance,
 		(*ReconcileMachine).handleDeadMembers,
-		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleNotifyFinished,
 	}
 
