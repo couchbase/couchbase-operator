@@ -515,7 +515,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		// If the key doesn't exist, create it.
 		// We don't want to do this every time we reconcile.
 		if goerrors.Is(err, persistence.ErrKeyError) {
-			if err := c.state.Insert(persistence.RebalanceRetries, "3"); err != nil {
+			if err := c.state.Insert(persistence.RebalanceRetries, "1"); err != nil {
 				return
 			}
 		}
