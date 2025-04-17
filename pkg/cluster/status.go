@@ -213,7 +213,8 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 		for _, node := range nodes {
 			nodeCurrentVersion, _, found = strings.Cut(node.Version, "-")
 			if !found {
-				return nil, errors.ErrImageVersionUnretrievable
+				log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "node", node.HostName)
+				continue
 			}
 
 			verBelow72, err = c.VersionBefore(nodeCurrentVersion, "7.2.0")
@@ -226,10 +227,7 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 			}
 		}
 
-		isVersionUpgrade, err := areNodesVersionUpgrading(nodes)
-		if err != nil {
-			return nil, err
-		}
+		isVersionUpgrade := areNodesVersionUpgrading(nodes)
 
 		if verBelow72 && isVersionUpgrade {
 			status.Balanced = status.Balanced || (!info.Balanced && info.RebalanceStatus == couchbaseutil.RebalanceStatusNone)
@@ -241,21 +239,22 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 	return status, nil
 }
 
-func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) (bool, error) {
+func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) bool {
 	version := ""
 
 	for _, node := range nodes {
 		nodeCurrentVersion, _, found := strings.Cut(node.Version, "-")
 		if !found {
-			return false, errors.ErrImageVersionUnretrievable
+			log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "node", node.HostName)
+			continue
 		}
 
 		if version == "" {
 			version = nodeCurrentVersion
 		} else if version != nodeCurrentVersion {
-			return true, nil
+			return true
 		}
 	}
 
-	return false, nil
+	return false
 }
