@@ -924,26 +924,34 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		return fmt.Errorf("server class not found %s: %w", serverClass, errors.NewStackTracedError(errors.ErrServerClassNotFound))
 	}
 
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
-	if err != nil {
-		return err
-	}
-
 	var queueMembers []string
 
-	// appending the member names which are NOT already on target version.
-	membersNamesNotOnTargetVersion := clusteredMembers.GroupBy(
-		func(m couchbaseutil.Member) bool {
-			return m.Version() != targetVersion && m.Config() == serverClass
-		}).Names()
+	prioritizedRemoveCandidates := couchbaseutil.NewMemberSet()
 
-	// added as the first members to get culled.
-	queueMembers = append(queueMembers, membersNamesNotOnTargetVersion...)
+	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
+		c.needsUpgrade,
+		c.getBackendMigrationCandidates,
+	}
 
-	membersOnTargetVersion := clusteredMembers.GroupBy(
-		func(m couchbaseutil.Member) bool {
-			return m.Version() == targetVersion
-		})
+	for _, getCandidatesFunc := range getCandidatesFuncs {
+		// Get any candidates that need to be removed.
+		candidates, err := getCandidatesFunc()
+		if err != nil {
+			return err
+		}
+
+		// Only keep candidates that are in the server class.
+		candidates = candidates.Intersect(clusteredMembers)
+
+		// Add the candidates to the list of candidates to be removed.
+		prioritizedRemoveCandidates.Merge(candidates)
+	}
+
+	// Add the candidates to the list of candidates to be removed.
+	queueMembers = append(queueMembers, prioritizedRemoveCandidates.Names()...)
+
+	// Get remaining members that aren't in the above list.
+	remainingMembers := clusteredMembers.Diff(prioritizedRemoveCandidates)
 
 	// map used to avoid any chance of duplicate member names.
 	memberToSize := map[string]float64{}
@@ -954,7 +962,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		return err
 	}
 
-	for name := range membersOnTargetVersion {
+	for name := range remainingMembers {
 		size, err := parseSizePerMember(name, allm)
 		if err != nil {
 			return fmt.Errorf("%w: error calculating member disk size", err)
@@ -1958,6 +1966,36 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 	return false
 }
 
+func (c *Cluster) getBackendMigrationCandidates() (couchbaseutil.MemberSet, error) {
+	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	if err != nil {
+		return nil, err
+	}
+
+	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
+	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+		return nil, nil
+	}
+
+	clusterBuckets := couchbaseutil.BucketStatusList{}
+	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	var candidates = couchbaseutil.MemberSet{}
+
+	for _, bucket := range clusterBuckets {
+		for _, node := range bucket.Nodes {
+			// node.StorageBackend is empty if it matches the bucket storageMode
+			if node.StorageBackend != "" {
+				candidates.Add(c.members[node.HostName.GetMemberName()])
+			}
+		}
+	}
+
+	return candidates, nil
+}
+
 func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance {
@@ -1986,21 +2024,9 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	// Get all buckets
-	clusterBuckets := couchbaseutil.BucketStatusList{}
-	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
+	candidates, err := c.getBackendMigrationCandidates()
+	if err != nil {
 		return err
-	}
-
-	var candidates = couchbaseutil.MemberSet{}
-
-	for _, bucket := range clusterBuckets {
-		for _, node := range bucket.Nodes {
-			// node.StorageBackend is empty if it matches the bucket storageMode
-			if node.StorageBackend != "" {
-				candidates.Add(c.members[node.HostName.GetMemberName()])
-			}
-		}
 	}
 
 	candidatesNoOrchestrator, orchestrator := separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
