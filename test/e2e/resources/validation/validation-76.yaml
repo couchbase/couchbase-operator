@@ -44,8 +44,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseReplication
 metadata:
   name: replication0
-  annotations:
-    cao.couchbase.com/mobile: "Active"
 spec:
   bucket: bucket1
   remoteBucket: bucket1

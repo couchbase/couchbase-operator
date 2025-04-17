@@ -4434,12 +4434,21 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 		return err
 	}
 
-	if !magmaStorageBackendSupported {
-		for _, cbBucket := range couchbaseBuckets.Items {
-			if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
-			}
+	magmaBucketFound := false
+
+	for _, cbBucket := range couchbaseBuckets.Items {
+		if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+			magmaBucketFound = true
+			break
 		}
+	}
+
+	if !magmaBucketFound {
+		return nil
+	}
+
+	if !magmaStorageBackendSupported {
+		return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
 	}
 
 	return checkBucketConstraintMagmaStorageBackend(cluster)

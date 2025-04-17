@@ -339,7 +339,7 @@ metadata:
   name: cluster
   namespace: default
 spec:
-  image: couchbase/server:7.0.1
+  image: couchbase/server:7.1.4
   antiAffinity: false
   paused: false
   upgradeStrategy: RollingUpgrade
@@ -533,7 +533,7 @@ spec:
       enabled: true
       image: couchbase/exporter:6.6.6
 status:
-  currentVersion: 7.0.1
+  currentVersion: 7.1.4
   size: 5
 
 ---

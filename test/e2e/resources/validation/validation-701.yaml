@@ -1,0 +1,28 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+spec:
+  image: couchbase/server:7.0.1
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  logging:
+    logRetentionTime: "24h"
+    logRetentionCount: 10
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+status:
+  currentVersion: 7.0.1
+  size: 3

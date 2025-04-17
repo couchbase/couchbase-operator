@@ -629,7 +629,7 @@ func TestValidationCreate(t *testing.T) {
 		testDefs = append(testDefs, testDefCase)
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-701.yaml"})
 }
 
 func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
@@ -1487,7 +1487,8 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/metadata/annotations", map[string]string{
 					"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "15",
-				})},
+				}).
+				Replace("/spec/image", "couchbase/server:7.0.1")},
 			shouldFail:     true,
 			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+`},
 		},
@@ -3226,7 +3227,7 @@ func TestValidationApply(t *testing.T) {
 		},
 		{
 			name:       "TestValidateUpdateBucketMemoryQuota",
-			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "200Mi")},
+			mutations:  patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "100Mi")},
 			shouldFail: false,
 		},
 		{
@@ -3297,7 +3298,7 @@ func TestNegValidationApply(t *testing.T) {
 			name:           "TestValidateUpdateBucketMemoryQuotaOverflow",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
+			expectedErrors: []string{`bucket memory allocation \(1101Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name: "TestValidateAddSampleBucketAnnotation",
@@ -3980,7 +3981,7 @@ func TestVersionUpgradePath(t *testing.T) {
 		},
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationApply})
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-701.yaml"})
 }
 
 func TestCouchbaseClusterWarnings(t *testing.T) {
