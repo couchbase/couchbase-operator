@@ -103,7 +103,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
-		checkConstraintsIndexerSettings,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -111,6 +110,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintDeltaRecoveryDeprecated,
 		checkConstraintServicelessOverAdminService,
 		checkMigrationConstraints,
+		checkConstraintsIndexerSettings,
 	}
 
 	var errs []error
@@ -4766,30 +4766,30 @@ func checkClusterBackupConstraints(v *types.Validator, cluster *couchbasev2.Couc
 	return nil
 }
 
-func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.ClusterSettings.Indexer == nil {
-		return nil
+		return nil, nil
 	}
 
 	if cluster.Spec.ClusterSettings.Indexer.EnablePageBloomFilter {
 		pageBloomFilterSupported, err := cluster.IsAtLeastVersion("7.1.0")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !pageBloomFilterSupported {
-			return fmt.Errorf("spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later")
+			return []string{fmt.Sprintf("spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later")}, nil
 		}
 	}
 
 	if cluster.Spec.ClusterSettings.Indexer.EnableShardAffinity {
 		shardAffinitySupported, err := cluster.IsAtLeastVersion("7.6.0")
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !shardAffinitySupported {
-			return fmt.Errorf("spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later")
+			return []string{fmt.Sprintf("spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later")}, nil
 		}
 	}
 
@@ -4803,9 +4803,9 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 		}
 
 		if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica >= totalIndexPodsAvailable {
-			return fmt.Errorf("spec.cluster.indexer.numReplica %d cannot be greater or equal to the number of index pods %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica, totalIndexPodsAvailable)
+			return []string{fmt.Sprintf("spec.cluster.indexer.numReplica %d cannot be greater or equal to the number of index pods %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica, totalIndexPodsAvailable)}, nil
 		}
 	}
 
-	return nil
+	return nil, nil
 }
