@@ -97,13 +97,3 @@ func (c *Cluster) GetCouchbaseCluster() *couchbasev2.CouchbaseCluster {
 func (c *Cluster) GetK8sClient() *client.Client {
 	return c.k8s
 }
-
-func (c *Cluster) UpdateFailedValidation(err error) error {
-	c.cluster.Status.SetUnreconcilableCondition(err.Error())
-
-	if err := c.updateCRStatus(); err != nil {
-		return err
-	}
-
-	return nil
-}

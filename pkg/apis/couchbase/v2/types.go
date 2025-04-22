@@ -4310,7 +4310,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;
 type ClusterConditionType string
 
 const (
@@ -4331,7 +4331,6 @@ const (
 	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"
 	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration          ClusterConditionType = "BucketMigrating"
-	ClusterUnreconcilable                    ClusterConditionType = "Unreconcilable"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

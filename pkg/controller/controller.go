@@ -76,7 +76,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 	results, err := validationrunner.CheckCouchbaseClusterResource(couchbase)
 	if err != nil {
-		return r.reconcileFailedValidationCluster(couchbase, err)
+		return reconcile.Result{}, err
 	}
 
 	if results != nil {
@@ -167,38 +167,6 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	return requeueResult, nil
-}
-
-func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(couchbase *couchbasev2.CouchbaseCluster, validationErr error) (reconcile.Result, error) {
-	c, existingCluster := r.clusters.Load(couchbase.NamespacedName())
-	reconcileResult := reconcile.Result{}
-
-	if !existingCluster {
-		// Cluster created or detected during a restart, start a new management routine.
-		log.V(2).Info("Creating cluster", "cluster", couchbase.NamespacedName())
-
-		var err error
-		c, err = cluster.New(r.clusterConfig, couchbase)
-
-		if err != nil {
-			log.Error(err, "Failed to create Couchbase cluster", "cluster", couchbase.NamespacedName())
-			return reconcileResult, err
-		}
-
-		r.clusters.Store(couchbase.NamespacedName(), c)
-
-		reconcileResult = reconcile.Result{
-			RequeueAfter: 10 * time.Second,
-		}
-	}
-
-	log.Error(validationErr, "Validation failed.", "cluster", couchbase.NamespacedName())
-
-	if err := c.UpdateFailedValidation(validationErr); err != nil {
-		log.Error(err, "Failed to update cluster status", "cluster", couchbase.NamespacedName())
-	}
-
-	return reconcileResult, validationErr
 }
 
 // AddToManager registers a controller reconciler with the manager and triggers updates
