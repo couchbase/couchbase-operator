@@ -287,6 +287,10 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		d := diff.PrettyDiff(nil, required.Spec)
 		p.diff += d
 
+		if d == "" {
+			log.V(1).Info("PVC Diff is empty, but deepEqual has detected a difference and will attempt to create", "member", member.Name(), "required", required)
+		}
+
 		return nil
 	}
 
@@ -324,6 +328,10 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		d := diff.PrettyDiff(existingSpec, required.Spec)
 		p.diff += d
 
+		if d == "" {
+			log.V(1).Info("PVC Diff is empty, but deepEqual has detected a difference and will attempt an update", "member", member.Name(), "existingSpec", existingSpec, "requiredSpec", required.Spec, "existingClaim", pvc, "updatedClaim", updatedClaim)
+		}
+
 		return nil
 	}
 
@@ -343,6 +351,8 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	if actualSize.Equal(requestedSize) {
 		return nil
 	}
+
+	log.V(1).Info("Volume expansion is enabled and PVC size is not equal", "member", member.Name(), "actualSize", actualSize, "requestedSize", requestedSize)
 
 	if err := checkVolumeResizeFailure(client, pvc, expansionTimeout); err != nil {
 		if !goerrors.Is(err, errors.ErrVolumeResizeError) {
