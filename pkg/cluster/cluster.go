@@ -166,6 +166,8 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		return nil, err
 	}
 
+	c.InitCounterMetrics()
+
 	// Once the client is setup, everything goes though this creation function so
 	// we can catch errors and set the cluster error condition.
 	if err := c.newCluster(); err != nil {
@@ -1165,4 +1167,18 @@ func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) InitCounterMetrics() {
+	metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Add(0)
+	metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Add(0)
+	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 }
