@@ -33,6 +33,7 @@ var (
 const (
 	defaultMigrationFilter                    = couchbasev2.DefaultScopeOrCollection + "." + couchbasev2.DefaultScopeOrCollection
 	RemoteClusterOperatorManagedSuffix string = "-operator-managed"
+	defaultMobileReplicationValue      string = "Off"
 )
 
 // replicationKey returns a unique identifier per replication.
@@ -311,6 +312,10 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 				return nil, err
 			} else if isAtleast76 {
 				newMigration.Mobile = string(migration.Spec.Mobile)
+				// Use default value if not set
+				if newMigration.Mobile == "" {
+					newMigration.Mobile = defaultMobileReplicationValue
+				}
 			}
 
 			replicationKey := replicationKey(newMigration)
@@ -360,6 +365,9 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 			return nil, err
 		} else if isAtleast76 {
 			newReplication.Mobile = string(replication.Spec.Mobile)
+			if newReplication.Mobile == "" {
+				newReplication.Mobile = "Off"
+			}
 		}
 
 		replicationKey := replicationKey(newReplication)

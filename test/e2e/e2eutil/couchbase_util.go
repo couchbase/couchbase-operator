@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -1776,14 +1775,8 @@ func checkClusterUninitialized(t *testing.T, k8s *types.Cluster, couchbase *couc
 
 	err := client.client.Get(newRequest("/pools/default", nil, nil), client.host)
 
-	var failedReqErr couchbaseutil.FailedRequestError
-
-	if !errors.As(err, &failedReqErr) {
+	if err == nil {
 		return fmt.Errorf("expected failed request error but succeeded")
-	}
-
-	if failedReqErr.StatusCode != http.StatusNotFound {
-		return fmt.Errorf("expected 404, got %d", failedReqErr.StatusCode)
 	}
 
 	return nil

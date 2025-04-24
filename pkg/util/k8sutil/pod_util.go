@@ -2544,5 +2544,11 @@ func IsPodMainContainerReady(pod *v1.Pod) bool {
 		return false
 	}
 
-	return pod.Status.ContainerStatuses[0].Ready
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == constants.CouchbaseContainerName {
+			return containerStatus.Ready
+		}
+	}
+
+	return false
 }
