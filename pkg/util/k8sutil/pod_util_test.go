@@ -1,6 +1,7 @@
 package k8sutil
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -262,4 +263,164 @@ func TestGetResourceRequestQuantity(t *testing.T) {
 			t.Errorf("expected resource %s by pod to be %s, got %s", testcase.resource.String(), testcase.expected.String(), result.String())
 		}
 	}
+}
+
+func TestCheckIfPVCRequiresUpdate(t *testing.T) {
+	type testcase struct {
+		name         string
+		existingSpec v1.PersistentVolumeClaimSpec
+		requiredSpec v1.PersistentVolumeClaimSpec
+		expected     bool
+	}
+
+	testcases := []testcase{
+		{
+			name: "equal specs, different format for resource fields",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1Gi")},
+					Limits:   map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2Gi")},
+				},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1024Mi")},
+					Limits:   map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2048Mi")},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "equal specs, different parsing methods",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					// 1024 * 1024 * 1024 = 1Gi
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: *resource.NewQuantity(1024*1024*1024, resource.BinarySI)},
+				},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					// 1Gi in decimal SI = "1073741824m"
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: *resource.NewQuantity(1073741824, resource.DecimalSI)},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "different specs for resource requests",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1Gi")},
+				},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("5Gi")},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "different specs for resource limits",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Limits: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2Gi")},
+				},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Limits: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("10Gi")},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:         "different specs, existing from json string",
+			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("100Mi")},
+				},
+				StorageClassName: strPtr("static-local-path"),
+			},
+			expected: true,
+		},
+		{
+			name:         "equal specs, existing from json string",
+			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2.8Ti")},
+				},
+				StorageClassName: strPtr("static-local-path"),
+			},
+			expected: false,
+		},
+		{
+			name: "equal specs, empty resources",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources:   v1.ResourceRequirements{},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources:   v1.ResourceRequirements{},
+			},
+			expected: false,
+		},
+		{
+			name: "equal specs, different access mode",
+			existingSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources:   v1.ResourceRequirements{},
+			},
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
+				Resources:   v1.ResourceRequirements{},
+			},
+			expected: true,
+		},
+		{
+			name:         "equal resources, different storage class name",
+			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
+			requiredSpec: v1.PersistentVolumeClaimSpec{
+				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+				Resources: v1.ResourceRequirements{
+					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("3078632557772800m")},
+				},
+				StorageClassName: strPtr("dynamic-local-path"),
+			},
+			expected: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		result := checkIfPVCRequiresUpdate(testcase.existingSpec, testcase.requiredSpec)
+		if result != testcase.expected {
+			t.Errorf("test %v failed, expected %v, got %v", testcase.name, testcase.expected, result)
+		}
+	}
+}
+
+func pvcClaimFromJSON(jsonString string, t *testing.T) v1.PersistentVolumeClaimSpec {
+	var pvcClaim v1.PersistentVolumeClaimSpec
+	if err := json.Unmarshal([]byte(jsonString), &pvcClaim); err != nil {
+		t.Fatal(err)
+	}
+
+	return pvcClaim
+}
+
+func strPtr(s string) *string {
+	return &s
 }

@@ -317,7 +317,7 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	// update: due to mis-match between requested and existing specs.
 	// expanding: due to mis-match between requested and existing status.
 	// resizeFailed: volume is reporting resize failure events.
-	if !reflect.DeepEqual(existingSpec, required.Spec) {
+	if checkIfPVCRequiresUpdate(existingSpec, required.Spec) {
 		// Applying required attributes to list of update PVC's to allow in place updates.
 		// BUG: what if I change my storage class???
 		updatedClaim := pvc.DeepCopy()
@@ -2551,4 +2551,33 @@ func IsPodMainContainerReady(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+// checkIfPVCRequiresUpdate compares the existing PVC spec to the requested PVC spec and returns true if they are not equal. This check first compares the resource requests and limits as quantities,
+// as different formats may cause DeepEqual to return false when the quantities are actually equal. If the quantities are equal, the rest of the PVC spec's are compared using DeepEquals.
+func checkIfPVCRequiresUpdate(existingSpec, requiredSpec v1.PersistentVolumeClaimSpec) bool {
+	if newResourceRequest := requiredSpec.Resources.Requests.Storage(); newResourceRequest != nil {
+		// If the requested PVC contains a resource request for storage, check if it is a different quantity to the existing PVC.
+		if existingResourceRequest := existingSpec.Resources.Requests.Storage(); existingResourceRequest == nil || !existingResourceRequest.Equal(*newResourceRequest) {
+			// Either the existing PVC does not have a resource request for storage, or the requested quantity is different to the existing PVC and therefore
+			// we need to update the PVC.
+			return true
+		}
+
+		// The resource requests are equal, so we should set the requested resource to an empty quantity to avoid comparing them again when using DeepEqual.
+		requiredSpec.Resources.Requests = make(v1.ResourceList)
+		existingSpec.Resources.Requests = make(v1.ResourceList)
+	}
+
+	// Do the same as above but for resource limits.
+	if newResourceLimit := requiredSpec.Resources.Limits.Storage(); newResourceLimit != nil {
+		if existingResourceLimit := existingSpec.Resources.Limits.Storage(); existingResourceLimit == nil || !existingResourceLimit.Equal(*newResourceLimit) {
+			return true
+		}
+
+		requiredSpec.Resources.Limits = make(v1.ResourceList)
+		existingSpec.Resources.Limits = make(v1.ResourceList)
+	}
+
+	return !reflect.DeepEqual(existingSpec, requiredSpec)
 }
