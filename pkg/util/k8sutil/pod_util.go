@@ -2564,9 +2564,9 @@ func checkIfPVCRequiresUpdate(existingSpec, requiredSpec v1.PersistentVolumeClai
 			return true
 		}
 
-		// The resource requests are equal, so we should set the requested resource to an empty quantity to avoid comparing them again when using DeepEqual.
-		requiredSpec.Resources.Requests = make(v1.ResourceList)
-		existingSpec.Resources.Requests = make(v1.ResourceList)
+		// The resource requests are equal, so we should clear the resource request for storage to avoid comparing them again when using DeepEqual.
+		delete(requiredSpec.Resources.Requests, v1.ResourceStorage)
+		delete(existingSpec.Resources.Requests, v1.ResourceStorage)
 	}
 
 	// Do the same as above but for resource limits.
@@ -2575,8 +2575,8 @@ func checkIfPVCRequiresUpdate(existingSpec, requiredSpec v1.PersistentVolumeClai
 			return true
 		}
 
-		requiredSpec.Resources.Limits = make(v1.ResourceList)
-		existingSpec.Resources.Limits = make(v1.ResourceList)
+		delete(requiredSpec.Resources.Limits, v1.ResourceStorage)
+		delete(existingSpec.Resources.Limits, v1.ResourceStorage)
 	}
 
 	return !reflect.DeepEqual(existingSpec, requiredSpec)
