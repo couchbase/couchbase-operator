@@ -1496,7 +1496,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 			}
 		}
 
-		return c.rebalance(c.members, nil)
+		return c.rebalance(c.members)
 	}
 
 	return nil
@@ -1863,9 +1863,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 		c.cluster.Status.SetRebalancingCondition()
 
-		// Eject nodes that we want to discard.
-		eject := r.ejectMembers.OTPNodes()
-
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
 			return err
 		}
@@ -1874,7 +1871,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			return err
 		}
 
-		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, eject, r.rebalanceRetries); err != nil {
+		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, r.ejectMembers, r.rebalanceRetries); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop
