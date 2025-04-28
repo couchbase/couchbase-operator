@@ -307,6 +307,7 @@ func TestCouchstoreBucketToMagmaUpdateUnmanagedBucket(t *testing.T) {
 	}), time.Minute)
 
 	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
