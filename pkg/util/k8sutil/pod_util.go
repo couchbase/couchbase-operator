@@ -287,10 +287,6 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		d := diff.PrettyDiff(nil, required.Spec)
 		p.diff += d
 
-		if d == "" {
-			log.V(1).Info("PVC Diff is empty, but deepEqual has detected a difference and will attempt to create", "member", member.Name(), "required", required)
-		}
-
 		return nil
 	}
 
@@ -327,10 +323,6 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 
 		d := diff.PrettyDiff(existingSpec, required.Spec)
 		p.diff += d
-
-		if d == "" {
-			log.V(1).Info("PVC Diff is empty, but deepEqual has detected a difference and will attempt an update", "member", member.Name(), "existingSpec", existingSpec, "requiredSpec", required.Spec, "existingClaim", pvc, "updatedClaim", updatedClaim)
-		}
 
 		return nil
 	}

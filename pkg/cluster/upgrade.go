@@ -115,7 +115,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			ignoreMigratedHostnameAlias(actual, requestedSpec)
 		}
 
-		podsEqual, d := c.resourcesEqual(actualSpec, requestedSpec)
+		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
@@ -124,13 +124,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			continue
 		}
 
-		log.V(1).Info("Pod diff", "diff", d, "podEqual", podsEqual, "pvcEqual", pvcsEqual)
-
 		prettyDiff := diff.PrettyDiff(actualSpec, requestedSpec)
 
 		if !pvcsEqual {
 			prettyDiff += pvcState.Diff()
-			log.V(1).Info("PVC diff", "diff", prettyDiff)
 		}
 
 		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
