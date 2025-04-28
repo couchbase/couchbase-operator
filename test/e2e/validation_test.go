@@ -743,18 +743,6 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.backup.image cannot be empty when spec.backup.managed is true"},
 		},
-		{
-			name:           "TestValidateEnablePageBloomFilterPre71Illegal",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", true).Replace("/spec/image", "couchbase/server:7.0.1")},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
-		},
-		{
-			name:           "TestValidateEnableShardAffinityPre76Illegal",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enableShardAffinity", true).Replace("/spec/image", "couchbase/server:7.1.0")},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later`},
-		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1455,6 +1443,18 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", 3)},
 			shouldFail:       false,
 			expectedWarnings: []string{"spec.cluster.indexer.numReplica 3 cannot be greater or equal to the number of index pods 3"},
+		},
+		{
+			name:             "TestValidateEnablePageBloomFilterPre71Warning",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", true).Replace("/spec/image", "couchbase/server:7.0.1")},
+			shouldFail:       false,
+			expectedWarnings: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
+		},
+		{
+			name:             "TestValidateEnableShardAffinityPre76Warning",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enableShardAffinity", true).Replace("/spec/image", "couchbase/server:7.1.0")},
+			shouldFail:       false,
+			expectedWarnings: []string{`spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later`},
 		},
 		{
 			name:           "TestValidateIndexerRedistributeIndexesInValid",
