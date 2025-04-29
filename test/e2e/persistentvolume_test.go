@@ -1047,6 +1047,7 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 1
+	volumeExpansionTimeoutMinutes := 4
 
 	// PV configuration
 	pvcName := e2eutil.GetPvcName(f.LocalPV)
@@ -1055,6 +1056,7 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster.Spec.OnlineVolumeExpansionTimeoutInMins = &volumeExpansionTimeoutMinutes
 	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
 		DefaultClaim: pvcName,
 		DataClaim:    pvcName,
@@ -1075,7 +1077,7 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
 	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.NewVolumeExpandStartedEvent(k8sutil.NameForPersistentVolumeClaim(memberName, 0, "data"), "2Gi", "3Gi", cluster), 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, 0, false)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Verify resize state
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, VolumeExpansionWaitTimeout)
