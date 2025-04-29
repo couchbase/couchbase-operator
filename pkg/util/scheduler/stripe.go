@@ -219,16 +219,16 @@ func (sched *stripeSchedulerImpl) getSmallesGroupForClass(class string) string {
 		return sched.serverClasses[class].smallestGroup()
 	}
 
-	smallestGroups := sched.serverClasses[class].smallestGroups()
+	orderedGroups := sched.serverClasses[class].sizeOrderedGroups()
 
-	for _, group := range smallestGroups {
+	for _, group := range orderedGroups {
 		if _, ok := sched.avoidGroups[group]; !ok {
 			return group
 		}
 	}
 
 	// We can't find any that we can't avoid so pick randomly
-	return smallestGroups[rand.Intn(len(smallestGroups))]
+	return orderedGroups[rand.Intn(len(orderedGroups))]
 }
 
 func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {

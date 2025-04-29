@@ -2449,8 +2449,7 @@ type ClusterSpec struct {
 	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
 
 	// RescheduleDifferentServerGroup allows the Operator to attempt to  reschedule pods
-	// to a different server group that has the same number of pods in itwhen a pod fails
-	// scheduling.
+	// to a different server group a pod scheduling.
 	// +kubebuilder:default=true
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 

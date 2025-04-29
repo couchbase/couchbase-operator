@@ -355,8 +355,42 @@ func (c *Cluster) addFailedSchedulingServerGroups(serverGroup string) error {
 	return c.state.Upsert(persistence.FailedSchedulingServerGroups, strings.Join(failedGroups, ServerGroupAvoidDelimiter))
 }
 
-func (c *Cluster) clearFailedSchedulingServerGroups() {
+var readyConditions = []couchbasev2.ClusterConditionType{
+	couchbasev2.ClusterConditionBalanced,
+	couchbasev2.ClusterConditionAvailable,
+}
+
+var notReadyConditions = []couchbasev2.ClusterConditionType{
+	couchbasev2.ClusterConditionScaling,
+	couchbasev2.ClusterConditionScalingDown,
+	couchbasev2.ClusterConditionScalingUp,
+	couchbasev2.ClusterConditionUpgrading,
+}
+
+func (c *Cluster) clearFailedSchedulingServerGroupsIfReady() {
 	if !c.isSGReschedulingEnabled() {
+		return
+	}
+
+	for _, condition := range readyConditions {
+		if !c.cluster.HasCondition(condition) {
+			return
+		}
+	}
+
+	for _, condition := range notReadyConditions {
+		if c.cluster.HasCondition(condition) {
+			return
+		}
+	}
+
+	desiredSize := 0
+
+	for _, server := range c.cluster.Spec.Servers {
+		desiredSize += server.Size
+	}
+
+	if c.cluster.Status.Size != desiredSize {
 		return
 	}
 

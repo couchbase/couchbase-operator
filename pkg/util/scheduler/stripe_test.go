@@ -496,7 +496,7 @@ func TestStripeCreateGlobalMultipleWithAvoid(t *testing.T) {
 
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
-	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup2)
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup1)
 
 	s.AvoidGroups(serverGroup1)
 

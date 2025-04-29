@@ -813,6 +813,63 @@ func TestServerGroupReschedulingInitialNode(t *testing.T) {
 	expected.mustValidateRzaMap(t, kubernetes, cluster)
 }
 
+func TestServerGroupReschedulingIgnoreUnschedulable(t *testing.T) {
+	f := framework.Global
+	f.PodCreateTimeout = 1 * time.Minute
+
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	clusterSize := 2
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	// Taint the first server group to make it unschedulable
+	defer e2eutil.MustUntaintAll(t, kubernetes)
+	e2eutil.MustTaintZoneNoSchedule(t, kubernetes, availableServerGroups[0])
+
+	// Create the cluster with specific server groups
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/rescheduleDifferentServerGroup": "true",
+	}
+
+	// Create the cluster and wait for it to be healthy
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify initial distribution across server groups
+	expectedMap := rzaMap{
+		availableServerGroups[1]: 2,
+	}
+	expectedMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Remove the Taint from the first server group to make it schedulable
+	e2eutil.MustUntaintAll(t, kubernetes)
+
+	clusterSize++
+	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize, kubernetes, cluster, 5*time.Minute)
+
+	// Verify that the new pod is scheduled into the first server group
+	expectedMap = rzaMap{
+		availableServerGroups[0]: 1,
+		availableServerGroups[1]: 2,
+	}
+	expectedMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed},
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
+		e2eutil.ClusterCreateSequence(2),
+		e2eutil.ClusterScaleUpSequence(1),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func getRegionFromNodeWithFailureDomainRegionLabel(nodes []*corev1.Node) string {
 	for _, node := range nodes {
 		// All nodes must have a region

@@ -73,6 +73,9 @@ type serverGroups interface {
 
 	// smallestGroups returns a list of the smallest server groups is order.
 	smallestGroups() []string
+
+	// sizeOrderedGroups returns a list of server groups in ascending size order.
+	sizeOrderedGroups() []string
 }
 
 func newOrderedServerGroups() orderedServerGroups {
@@ -141,6 +144,17 @@ func (s orderedServerGroups) largestGroups() []string {
 func (s orderedServerGroups) largestGroup() string {
 	groups := s.largestGroups()
 	return groups[len(groups)-1]
+}
+
+// sizeOrderedGroups returns a list of server groups in size order.
+func (s orderedServerGroups) sizeOrderedGroups() []string {
+	groups := append([]string(nil), *s.groupsOrder...)
+
+	sort.SliceStable(groups, func(i, j int) bool {
+		return len(s.getGroup(groups[i]).servers) < len(s.getGroup(groups[j]).servers)
+	})
+
+	return groups
 }
 
 // serverGroups maps server group names to a list of servers.
@@ -236,6 +250,24 @@ func (s groupMap) filter(predicate filterPredicate) []string {
 			groups = append(groups, group)
 		}
 	}
+
+	return groups
+}
+
+func (s lexicalServerGroups) sizeOrderedGroups() []string {
+	groups := []string{}
+
+	for group := range s.groupMap {
+		groups = append(groups, group)
+	}
+
+	// First sort the groups alphabetically
+	sort.Strings(groups)
+
+	// Then sort the groups by size
+	sort.SliceStable(groups, func(i, j int) bool {
+		return len(s.getGroup(groups[i]).servers) < len(s.getGroup(groups[j]).servers)
+	})
 
 	return groups
 }

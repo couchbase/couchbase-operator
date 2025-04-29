@@ -40,12 +40,14 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
+//
+//nolint:gocognit
 func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	candidates := couchbaseutil.MemberSet{}
 
 	var moves []scheduler.Move
 
-	if c.cluster.Spec.ServerGroupsEnabled() {
+	if c.cluster.Spec.ServerGroupsEnabled() && !c.cluster.Spec.RescheduleDifferentServerGroup {
 		m, err := c.scheduler.Reschedule()
 		if err != nil {
 			return nil, err

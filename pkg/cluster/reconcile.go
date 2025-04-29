@@ -234,7 +234,7 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
-	c.clearFailedSchedulingServerGroups()
+	c.clearFailedSchedulingServerGroupsIfReady()
 
 	c.cluster.Status.Size = c.members.Size()
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
