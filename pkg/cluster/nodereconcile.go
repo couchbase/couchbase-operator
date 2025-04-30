@@ -254,7 +254,9 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		case NodeStateDown:
 			state.DownNodes.Add(c.members[name])
 		case NodeStateFailed:
-			state.FailedNodes.Add(c.members[name])
+			if member, ok := c.members[name]; ok {
+				state.FailedNodes.Add(member)
+			}
 		case NodeStateAddBack:
 			state.AddBackNodes.Add(c.members[name])
 		}
