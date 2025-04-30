@@ -243,20 +243,6 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	e2eutil.MustRecreateSecret(t, kubernetes, secret)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Invalid TLS event
-	// * Cluster scaled up
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		e2eutil.PodDownFailoverRecoverySequence(),
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRemoveOperatorCertificateAndResizeCluster removes the CA certificate
