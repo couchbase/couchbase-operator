@@ -186,7 +186,7 @@ type IndexSettings struct {
 	StableSnapInterval    int              `url:"stableSnapshotInterval" json:"stableSnapshotInterval"`
 	MaxRollbackPoints     int              `url:"maxRollbackPoints" json:"maxRollbackPoints"`
 	LogLevel              IndexLogLevel    `url:"logLevel" json:"logLevel"`
-	NumberOfReplica       int              `url:"numReplica,omitempty" json:"numReplica"`
+	NumberOfReplica       int              `url:"numReplica" json:"numReplica"`
 	RedistributeIndexes   bool             `url:"redistributeIndexes" json:"redistributeIndexes"`
 	EnableShardAffinity   *bool            `url:"enableShardAffinity,omitempty" json:"enableShardAffinity"`
 	EnablePageBloomFilter *bool            `url:"enablePageBloomFilter,omitempty" json:"enablePageBloomFilter"`
