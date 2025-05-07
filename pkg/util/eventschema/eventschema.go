@@ -85,7 +85,7 @@ func (c *Validator) Validate(out io.Writer) error {
 		// If we are expecting more events than actually happened, then
 		// tell us about it.
 		if c.index >= len(c.Events) {
-			line := fmt.Sprintf(format, "", "")
+			line := fmt.Sprintf(format, "", "", "")
 			line += fmt.Sprintf(" <== %v", err)
 			line += "\n"
 

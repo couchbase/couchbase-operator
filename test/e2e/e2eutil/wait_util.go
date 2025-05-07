@@ -1057,6 +1057,8 @@ func WaitUntilAllNodeStorageBackendMatch(k8s *types.Cluster, couchbase *couchbas
 		clusterBuckets := couchbaseutil.BucketStatusList{}
 		if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(client.client, client.host); err != nil {
 			return err
+		} else if len(clusterBuckets) == 0 {
+			return fmt.Errorf("no buckets found")
 		}
 
 		for _, bucket := range clusterBuckets {
