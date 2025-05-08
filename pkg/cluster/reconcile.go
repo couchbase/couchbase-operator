@@ -195,6 +195,10 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	if err := c.reconcileReadiness(); err != nil {
+		return err
+	}
+
 	// If the cluster is upgrading, then don't interfere with anything else
 	// as the data returned from Couchbase will vary depending on the version
 	// leading to some very strange and possibly dangerous behaviour.
@@ -217,7 +221,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileScopesAndCollections,
 		(*Cluster).reconcileSynchronizeBuckets,
 		(*Cluster).reconcileXDCR,
-		(*Cluster).reconcileReadiness,
+		(*Cluster).reconcilePDB,
 		(*Cluster).reconcileAdminService,
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileBuckets,
@@ -1053,8 +1057,7 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 }
 
 // reconcileReadiness marks the pods as "ready" once everything is repaired, scaled and
-// balanced.  It also reconciles a pod disruption budget so we only tolerate a certain
-// number of evictions during a drain i.e. k8s upgrade.
+// balanced.
 func (c *Cluster) reconcileReadiness() error {
 	for name := range c.callableMembers {
 		if err := k8sutil.FlagPodReady(c.k8s, name); err != nil {
@@ -1062,6 +1065,12 @@ func (c *Cluster) reconcileReadiness() error {
 		}
 	}
 
+	return nil
+}
+
+// Reconciles a pod disruption budget so we only tolerate a certain
+// number of evictions during a drain i.e. k8s upgrade.
+func (c *Cluster) reconcilePDB() error {
 	return k8sutil.ReconcilePDB(c.k8s, c.cluster)
 }
 
