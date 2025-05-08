@@ -177,8 +177,6 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 			return err
 		}
 
-		log.Info(startTimeNoMono)
-
 		if err := c.state.Insert(persistence.UpgradeTime, startTimeNoMono); err != nil {
 			return err
 		}

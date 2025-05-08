@@ -1269,7 +1269,6 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 
 		for _, name := range candidates.Names()[:maxUpgradable] {
 			constrained.Add(candidates[name])
-			log.Info(candidates[name].Name())
 		}
 
 		candidates = constrained

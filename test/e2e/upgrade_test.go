@@ -1410,20 +1410,18 @@ func TestResilientDeltaRecovery(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	// Start upgrade
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-
-	// Wait for graceful failover to be running
-	e2eutil.MustWaitForGracefulFailoverToBeRunning(t, kubernetes, cluster, 5*time.Minute)
+	// Start the upgrade and wait for graceful failover to start
+	cluster = e2eutil.MustPatchClusterAndWaitForGracefulFailoverToStart(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
 	// Kill the orchestrator node
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, index, false)
 
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-
+	// Wait for graceful failover to fall over
 	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "graceful failover failed:", cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check the version and document counts are as we expect
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
