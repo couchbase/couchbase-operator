@@ -1,3 +1,0 @@
-action: "Change Current Namespace"
-config:
-  namespace: "test"

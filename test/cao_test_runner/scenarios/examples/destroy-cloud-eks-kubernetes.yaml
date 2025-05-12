@@ -1,4 +1,0 @@
-action: "Destroy Kubernetes Cluster"
-config:
-  clusterName: eks-cluster
-  eksRegion: us-east-2 # Can be taken from context / env as well

@@ -1,4 +1,0 @@
-action: "Destroy Operator"
-config:
-  caoBinaryPath: "./couchbase-operator/build/bin/kubernetes-darwin-arm64/cao"
-  scope: namespace

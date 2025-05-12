@@ -1,4 +1,0 @@
-action: "Destroy Kubernetes Cluster"
-config:
-  clusterName: aks-cluster
-  aksRegion: eastus2
