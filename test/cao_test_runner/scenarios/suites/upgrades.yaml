@@ -1,5 +1,0 @@
-timeoutInMins: 120
-scenarios:
-  -
-    - "./scenarios/upgrade/delta_recovery.yaml"
-    - "./scenarios/upgrade/swap_rebalance.yaml"
