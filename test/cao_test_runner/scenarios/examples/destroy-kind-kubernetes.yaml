@@ -1,5 +1,0 @@
-action: "Destroy Kubernetes Cluster"
-config:
-  clusterName: testing
-  platform: kubernetes
-  environment: kind

@@ -1,9 +1,0 @@
-action: "Setup Kubernetes Cluster"
-config:
-  clusterName: testing
-  platform: kubernetes
-  environment: kind
-  numControlPlane: 1
-  numWorkers: 2
-  operatorImage: couchbase/couchbase-admission-controller:2.7.0-arm64
-  admissionControllerImage: couchbase/couchbase-operator:2.7.0-arm64

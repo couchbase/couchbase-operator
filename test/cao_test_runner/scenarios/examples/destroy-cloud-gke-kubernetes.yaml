@@ -1,4 +1,0 @@
-action: "Destroy Kubernetes Cluster"
-config:
-  clusterName: gke-cluster
-  gkeRegion: us-central1
