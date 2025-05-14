@@ -639,6 +639,16 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 		}
 	}
 
+	if util.FrameworkBackupStorageClass != nil {
+		if frameworkStorageClass := util.FrameworkBackupStorageClass(); frameworkStorageClass != "" {
+			if restore.Spec.StagingVolume == nil {
+				restore.Spec.StagingVolume = &couchbasev2.CouchbaseBackupStagingVolume{}
+			}
+
+			restore.Spec.StagingVolume.StorageClassName = &frameworkStorageClass
+		}
+	}
+
 	restoreUsers := r.users
 	restore.Spec.Services.Users = &restoreUsers
 

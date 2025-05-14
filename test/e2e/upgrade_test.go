@@ -1541,7 +1541,9 @@ func TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade(t *testing.T) {
 	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 
 	// Create the cluster with persistent storage
-	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
+	clusterOptions := clusterOptionsUpgrade().WithPersistentTopology(clusterSize)
+	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(120)
+	cluster := clusterOptions.MustCreate(t, kubernetes)
 
 	// Start the upgrade
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)

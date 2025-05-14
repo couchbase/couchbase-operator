@@ -171,12 +171,13 @@ func createRemoteClusterGeneric(srcK8s, dstK8s *types.Cluster, source, target *c
 		},
 	}
 
-	_, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr/managed", true), time.Minute)
+	src, err := patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr/managed", true), time.Minute)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Add("/spec/xdcr/remoteClusters", remoteClusters), time.Minute)
+	src, err = patchCluster(srcK8s, src, jsonpatch.NewPatchSet().Add("/spec/xdcr/remoteClusters", remoteClusters), time.Minute)
+	*source = *src
 
 	return remoteClusterName, err
 }

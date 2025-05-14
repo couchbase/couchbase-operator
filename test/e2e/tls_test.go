@@ -2150,6 +2150,7 @@ func TestTLSRotateScriptPassphrase(t *testing.T) {
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
@@ -2475,6 +2476,8 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
 		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},

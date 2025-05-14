@@ -1908,7 +1908,7 @@ func TestXDCRMobileActive(t *testing.T) {
 	// Create the Buckets.
 	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	bucket.SetAnnotations(map[string]string{
-		"cao.couchbase.com/mobile": "Active",
+		"cao.couchbase.com/enableCrossClusterVersioning": "true",
 	})
 
 	e2eutil.MustNewBucket(t, kubernetes1, bucket)
