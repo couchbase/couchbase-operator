@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -121,6 +122,8 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 			if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 				return nil, err
 			}
+
+			metrics.VolumeExpansionMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pvc.Name})...).Add(0)
 		}
 
 		// If we are creating a default mount, then also create an init container to
@@ -136,6 +139,9 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod, cluster.AsOwner())
+
+	metrics.PodRecoveryFailuresMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
+	metrics.PodRecoveriesMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
 
 	return CreatePod(ctx, client, cluster.Namespace, pod)
 }
@@ -2579,4 +2585,22 @@ func checkIfPVCRequiresUpdate(existingSpec, requiredSpec v1.PersistentVolumeClai
 	}
 
 	return !reflect.DeepEqual(existingSpec, requiredSpec)
+}
+
+func addOptionalLabelsToPodMetric(cluster *couchbasev2.CouchbaseCluster, existingLabels []string) []string {
+	switch metrics.OptionalLabels {
+	case metrics.UUIDonly:
+		existingLabels = append(existingLabels, string(cluster.GetUID()))
+	case metrics.UUIDandName:
+		clusterName := cluster.Spec.ClusterSettings.ClusterName
+		if clusterName == "" {
+			clusterName = cluster.GetName()
+		}
+
+		existingLabels = append(existingLabels, string(cluster.GetUID()), clusterName)
+	default:
+		break
+	}
+
+	return existingLabels
 }
