@@ -1907,6 +1907,13 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 // shared with with the Pod's main container.
 func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image string) v1.Container {
 	initContainer := couchbaseContainer(cluster, &config, image)
+	initContainer.Resources = v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+			v1.ResourceCPU:    resource.MustParse("500m"),
+		},
+	}
+
 	initContainer.Ports = []v1.ContainerPort{}
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
