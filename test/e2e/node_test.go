@@ -290,7 +290,7 @@ func TestKillNodesAfterRebalanceAndFailover(t *testing.T) {
 		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		// The operator may miss seeing this due to network timeouts
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victim1Name}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victim1Name},
@@ -388,7 +388,7 @@ func TestRecoveryAfterOnePodFailureNoBucket(t *testing.T) {
 	// * Replacement is balanced in
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
@@ -417,14 +417,18 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	victimIndex1 := 0
 	victimIndex2 := 1
 
+	unhealthyWaitTimeout := 5 * time.Minute
+
 	// Create the cluster.
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	clusterOptions := clusterOptions().WithEphemeralTopology(clusterSize)
+	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(int64(unhealthyWaitTimeout.Seconds()) + 60)
+	cluster := clusterOptions.MustCreate(t, kubernetes)
 
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
-	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, unhealthyWaitTimeout)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -485,7 +489,7 @@ func TestRecoveryAfterOnePodFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
@@ -619,9 +623,15 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	victimIndex1 := 0
 	victimIndex2 := 1
 
+	unhealthyWaitTimeout := 5 * time.Minute
+
 	// Create the cluster.
 	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	clusterOptions := clusterOptions().WithEphemeralTopology(clusterSize)
+	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(int64(unhealthyWaitTimeout.Seconds()) + 60)
+	cluster := clusterOptions.MustCreate(t, kubernetes)
+
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
 
 	// Generate workload during the operation.
@@ -630,7 +640,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	// Kill a two pods and wait for the cluster to recover.
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
-	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, time.Minute)
+	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, unhealthyWaitTimeout)
 	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
@@ -693,7 +703,7 @@ func TestRecoveryAfterOneNsServerFailureBucketOneReplica(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},

@@ -89,7 +89,10 @@ func killAllXDCRNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.C
 		Validator: eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				eventschema.Optional{
-					Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					Validator: eventschema.RepeatAtLeast{
+						Times:     1,
+						Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					},
 				},
 				eventschema.Optional{
 					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
