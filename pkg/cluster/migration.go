@@ -22,6 +22,8 @@ func (c *Cluster) getMigratingReadyTarget() interface{} {
 	return c.readyMembers()
 }
 
+// checkTargetClusterVersion checks that the target cluster version is one that can be migrated to. A migration can occur to the source cluster version or when an upgrade is taking place
+// as new pods are being created with the new version, however the migration will fail if the target cluster version would constitute a rollback.
 func (c *Cluster) checkTargetClusterVersion() error {
 	var clusterInfo couchbaseutil.ClusterInfo
 
@@ -31,11 +33,13 @@ func (c *Cluster) checkTargetClusterVersion() error {
 		return err
 	}
 
-	imageVersion, err := couchbaseutil.NewVersionFromImage(c.cluster.Spec.Image)
+	targetClusterVersion, err := couchbaseutil.NewVersionFromImage(c.cluster.Spec.Image)
 
 	if err != nil {
 		return err
 	}
+
+	hasEqualVersion := false
 
 	for _, node := range clusterInfo.Nodes {
 		nodeVersion, err := couchbaseutil.NewVersion(node.Version)
@@ -43,12 +47,20 @@ func (c *Cluster) checkTargetClusterVersion() error {
 			return err
 		}
 
-		if imageVersion.Equal(nodeVersion) {
-			return nil
+		// If the target cluster version is less than any node in the source cluster, we should error out of the migration.
+		if targetClusterVersion.Less(nodeVersion) {
+			return errors.ErrRollbackDuringMigration
+		} else if targetClusterVersion.Equal(nodeVersion) {
+			hasEqualVersion = true
 		}
 	}
 
-	return errors.ErrClusterVersionMismatch
+	// If no nodes have the same version as the target cluster version, we should error out of the migration.
+	if !hasEqualVersion {
+		return errors.ErrClusterVersionMismatch
+	}
+
+	return nil
 }
 
 func (c *Cluster) checkIndexerStorageMode() error {

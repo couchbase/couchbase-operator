@@ -747,6 +747,7 @@ func registerTests() {
 		framework.NewTestDef(TestMigrationByServerGroup).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationRemovingServerClassInMigrationMode).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationWaitsForIndexStorageModeToMatch).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrationNotAllowedWithRollbackVersion).WithTags(TagSuiteP1, TagFeatureAssimilation),
 
 		// Bucket auto-compaction settings tests
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend).WithTags(TagSuiteSanity),
