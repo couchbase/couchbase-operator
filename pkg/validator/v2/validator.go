@@ -41,6 +41,7 @@ const (
 func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintServerImagesSet,
+		checkDataServiceConstraints,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
 		checkConstraintIndexServiceMemoryQuota,
@@ -150,6 +151,16 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkDataServiceConstraints(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Data != nil {
+		if cluster.Spec.ClusterSettings.Data.MinReplicasCount < 0 || cluster.Spec.ClusterSettings.Data.MinReplicasCount > 3 {
+			return fmt.Errorf("spec.clusterSettings.data.minReplicasCount must be between 0 and 3")
+		}
+	}
+
+	return nil
 }
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
