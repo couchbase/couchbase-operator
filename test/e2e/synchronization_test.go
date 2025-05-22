@@ -43,7 +43,7 @@ func TestDataSynchronizationBasic(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Add some data topology.
-	e2eutil.NewBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
+	e2eutil.NewCouchstoreBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
 	e2eutil.MustCreateScopeManually(t, kubernetes, cluster, bucketName, scopeName)
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucketName, scopeName, collectionName)
 
@@ -124,7 +124,11 @@ func testDataSynchronizationBucketConfig(t *testing.T, bucket *e2eutil.Bucket) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
+	testRequirement := framework.Requires(t, kubernetes).AtLeastVersion("7.0.0")
+
+	if bucket.GetBucketType() == e2eutil.BucketTypeMemcached {
+		testRequirement.BeforeVersion("8.0.0")
+	}
 
 	// Static configuration.
 	clusterSize := 3
@@ -243,7 +247,7 @@ func TestDataSynchronizationDefaultCollectionDeleted(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Add some data topology.
-	e2eutil.NewBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
+	e2eutil.NewCouchstoreBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
 	e2eutil.MustCreateScopeManually(t, kubernetes, cluster, bucketName, scopeName)
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucketName, scopeName, collectionName)
 
@@ -292,7 +296,7 @@ func TestDataSynchronizationErrorTopologyChange(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Add some data topology.
-	e2eutil.NewBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
+	e2eutil.NewCouchstoreBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
 	e2eutil.MustCreateScopeManually(t, kubernetes, cluster, bucketName, scopeName)
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucketName, scopeName, collectionName)
 
@@ -336,7 +340,7 @@ func TestDataSynchronizationOperatorRestart(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Add some data topology.
-	e2eutil.NewBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
+	e2eutil.NewCouchstoreBucket(f.BucketType).MustCreateManually(t, kubernetes, cluster, bucketName)
 	e2eutil.MustCreateScopeManually(t, kubernetes, cluster, bucketName, scopeName)
 	e2eutil.MustCreateCollectionManually(t, kubernetes, cluster, bucketName, scopeName, collectionName)
 

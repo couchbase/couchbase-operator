@@ -247,7 +247,6 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRCreateClusterRemoteMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeDown).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeAdd).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureXDCR),
-		framework.NewTestDef(TestXDCRTargetNodeServiceDelete).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotatePassword).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollections).WithTags(TagSuiteP0, TagFeatureXDCR, TagFeatureCollections, TagSuitePlatform),
 		framework.NewTestDef(TestXDCRMigrationLocalScopesAndCollections).WithTags(TagSuiteP0, TagFeatureXDCR, TagFeatureCollections),

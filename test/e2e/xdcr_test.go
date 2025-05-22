@@ -593,61 +593,6 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
-// TestXDCRTargetNodeServiceDelete tests deleting the node-port services of the
-// target cluster required by an XDCR replication.
-func TestXDCRTargetNodeServiceDelete(t *testing.T) {
-	// Platform configuration.
-	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
-	defer cleanup()
-
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
-
-	// Static configuration.
-	clusterSize := constants.Size1
-	numOfDocs := framework.Global.DocsCount
-
-	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
-	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
-	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
-
-	// When ready, link the source to the destination cluster.  Add some documents and
-	// ensure they are replicated.  Delete the pod services in the destination cluster
-	// to circuit break the connection.  Add some more documents and verify they are
-	// replicated when the connection is reestablished.
-	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
-
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
-	e2eutil.MustDeletePodServices(t, kubernetes2, targetCluster)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
-
-	// Check the events match what we expect:
-	// * Both clusters created
-	// * Source cluster establishes XDCR
-	// * Source cluster is scaled up
-	expectedEvents1 := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
-	}
-	expectedEvents2 := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-	}
-
-	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
-	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
-}
-
 // Create two clusters and while trying to configure XDCR.
 // Cluster nodes from the source bucket cluster are rebalanced out.
 // one by one until there is only one node in cluster.

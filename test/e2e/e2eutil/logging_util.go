@@ -97,7 +97,7 @@ func enableAuditLogging(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClus
 
 		data := url.Values{}
 		data.Add("auditdEnabled", "true")
-		data.Add("rotateSize", "1024")
+		data.Add("rotateSize", "1048576")
 		data.Add("disabled", "")
 
 		request := newRequest("/settings/audit", []byte(data.Encode()), nil)

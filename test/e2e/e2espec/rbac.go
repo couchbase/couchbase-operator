@@ -10,7 +10,11 @@ import (
 
 func GetAllClusterRoles(v *couchbaseutil.Version) ([]string, error) {
 	version7, err := couchbaseutil.NewVersion("7.0.0")
+	if err != nil {
+		return nil, err
+	}
 
+	version8, err := couchbaseutil.NewVersion("8.0.0")
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +23,11 @@ func GetAllClusterRoles(v *couchbaseutil.Version) ([]string, error) {
 		return clusterRoles6, nil
 	}
 
-	return clusterRoles7, nil
+	if v.Less(version8) {
+		return clusterRoles7, nil
+	}
+
+	return clusterRoles8, nil
 }
 
 var clusterRoles6 = []string{
@@ -44,6 +52,27 @@ var clusterRoles7 = []string{
 	e2e_constants.RoleAnalyticsReader,
 	e2e_constants.RoleSecurityAdminExternal,
 	e2e_constants.RoleSecurityAdminLocal,
+	e2e_constants.RoleBackupAdmin,
+	e2e_constants.RoleQueryManageGlobalFunctions,
+	e2e_constants.RoleQueryExecuteGlobalFunctions,
+	e2e_constants.RoleQueryManageGlobalExternalFunctions,
+	e2e_constants.RoleQueryExecuteGlobalExternalFunctions,
+	e2e_constants.RoleAnalyticsAdmin,
+	e2e_constants.RoleExternalStatsReader,
+	e2e_constants.RoleEventingAdmin,
+}
+
+// TODO: Use new 8.0.0 roles once couchbase-operator is updated.
+var clusterRoles8 = []string{
+	e2e_constants.RoleFullAdmin,
+	e2e_constants.ClusterAdminRole,
+	e2e_constants.RoleReadOnlyAdmin,
+	e2e_constants.RoleXDCRAdmin,
+	e2e_constants.RoleQueryCurlAccess,
+	e2e_constants.RoleQuestySystemAccess,
+	e2e_constants.RoleAnalyticsReader,
+	// e2e_constants.RoleUserAdminExternal,
+	// e2e_constants.RoleUserAdminLocal,
 	e2e_constants.RoleBackupAdmin,
 	e2e_constants.RoleQueryManageGlobalFunctions,
 	e2e_constants.RoleQueryExecuteGlobalFunctions,
