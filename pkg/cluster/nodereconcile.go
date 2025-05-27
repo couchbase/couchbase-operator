@@ -1533,6 +1533,11 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
+	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
+	if CheckNodesToCreate(c.cluster, r.clusteredMembers) {
+		return nil
+	}
+
 	// check if the upgrade is a valid upgrade path
 
 	if err := r.checkIfValidUpgradePath(); err != nil {
@@ -1625,6 +1630,20 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	return nil
+}
+
+// CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
+func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet) bool {
+	for _, serverSpec := range cluster.Spec.Servers {
+		existingNodes := clusteredMembers.GroupByServerConfig(serverSpec.Name).Size()
+		nodesToCreate := serverSpec.Size - existingNodes
+
+		if nodesToCreate > 0 {
+			return true
+		}
+	}
+
+	return false
 }
 
 // handleServerGroups moves nodes from their current server group into the one
