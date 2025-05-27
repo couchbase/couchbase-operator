@@ -124,11 +124,6 @@ func (c *PodCache) List(label string) (pods []*corev1.Pod) {
 	for _, obj := range objs {
 		pod, ok := obj.(*corev1.Pod)
 		if ok {
-			// Avoid polling deleted pods
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
-
 			if _, exists := pod.Labels[label]; exists {
 				pods = append(pods, pod)
 			}
