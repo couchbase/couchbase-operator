@@ -2331,7 +2331,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version) error {
+func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2359,10 +2359,17 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, me
 			} else if targetVersion.Less(pvcServerVersion) {
 				return fmt.Errorf("%w: pvc server version higher than target version", errors.NewStackTracedError(errors.ErrInvalidVersion))
 			}
+		} else if checkForLPV && isLPV(pvc) {
+			return fmt.Errorf("%w: pvc is a LPV", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 	}
 
 	return nil
+}
+
+func isLPV(pvc *v1.PersistentVolumeClaim) bool {
+	_, ok := pvc.Annotations[constants.LocalStorageAnnotation]
+	return ok
 }
 
 // IsLogPVC returns whether this is a volume containing Couchbase logs.

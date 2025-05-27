@@ -1623,7 +1623,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	candidates = constrained
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
-	pvcPresent := true
+	canDoInPlaceReschedule := true
 
 	var targetVersion string
 
@@ -1631,8 +1631,8 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
 
-		if c.isPodRecoverable(candidate) == false {
-			pvcPresent = false
+		if c.isPodReschedulable(candidate) == false {
+			canDoInPlaceReschedule = false
 			break
 		}
 	}
@@ -1644,14 +1644,14 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	// Carry out the move
 	// We can use the upgrade methods to do this (even though we're not changing the version)
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && pvcPresent {
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
 		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
 	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !pvcPresent {
-			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
+			log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
 		return r.swapRebalanceMembers(c, candidates)
