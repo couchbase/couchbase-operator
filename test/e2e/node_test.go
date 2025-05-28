@@ -770,9 +770,19 @@ func TestGracefulShutdown(t *testing.T) {
 	victimID := 0
 	victimeName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
 
+	fileName := "memcached.log.000000.txt"
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if isVersionAfter8, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if isVersionAfter8 {
+		fileName = "memcached.log.000001.txt"
+	}
+
 	output := &e2eutil.ExecOutput{}
 
-	asyncOp := e2eutil.MustStartExecCommandOnPod(t, kubernetes, victimeName, "tail -f /opt/couchbase/var/lib/couchbase/logs/memcached.log.000000.txt", output, 5*time.Minute)
+	asyncOp := e2eutil.MustStartExecCommandOnPod(t, kubernetes, victimeName, "tail -f /opt/couchbase/var/lib/couchbase/logs/"+fileName, output, 5*time.Minute)
 	defer asyncOp.Cancel()
 
 	// Give the exec some time to start
@@ -780,7 +790,7 @@ func TestGracefulShutdown(t *testing.T) {
 
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimID, false)
 
-	if err := asyncOp.WaitForCompletion(); err != nil && !strings.Contains(err.Error(), "terminated with exit code 137") {
+	if err := asyncOp.WaitForCompletion(); err != nil && len(output.Stdout) == 0 {
 		e2eutil.Die(t, err)
 	}
 

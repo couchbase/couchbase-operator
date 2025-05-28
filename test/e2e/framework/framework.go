@@ -1314,9 +1314,17 @@ func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 	return r
 }
 
+func (t *TestRequirement) InplaceUpgradeable() *TestRequirement {
+	return t.upgradable(true)
+}
+
 // Upgradable skips the test if the upgrade version is greater than or equal to the
 // test version.
 func (r *TestRequirement) Upgradable() *TestRequirement {
+	return r.upgradable(false)
+}
+
+func (r *TestRequirement) upgradable(inplaceUpgrade bool) *TestRequirement {
 	if Global.CouchbaseServerImageUpgrade == "" {
 		r.t.Skip("Upgrade version not specified")
 	}
@@ -1362,6 +1370,19 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 
 	if upgrade.GreaterEqual(version) {
 		r.t.Skip("Upgrade from version greater than or equal to upgrade to version")
+	}
+
+	if !inplaceUpgrade {
+		return r
+	}
+
+	version720, err := couchbaseutil.NewVersion("7.2.0")
+	if err != nil {
+		r.t.Skipf("malformed version: %s: %v", "7.2.0", err)
+	}
+
+	if upgrade.Less(version720) && version.GreaterEqual(version720) {
+		r.t.Skip("Inplace upgrade is not supported from pre-7.2.0 to versions 7.2.0 and above")
 	}
 
 	return r

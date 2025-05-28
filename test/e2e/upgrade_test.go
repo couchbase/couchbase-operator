@@ -165,7 +165,9 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			eventschema.Optional{
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			},
 			eventschema.AnyOf{
 				Validators: []eventschema.Validatable{
 					// In the first incarnation, the candidate has already been
@@ -1139,6 +1141,8 @@ func TestDeltaRecovery(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
 	clusterSize := 3
 	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
@@ -1183,6 +1187,8 @@ func TestDeltaRecoveryWithoutDataService(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
 	groupSize1 := 2
 	groupSize2 := 1
 	clusterSize := groupSize1 + groupSize2
@@ -1226,6 +1232,8 @@ func TestDeltaRecoveryWithVariousServices(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
 
 	groupSize1 := 2
 	groupSize2 := 1
@@ -1385,6 +1393,8 @@ func TestResilientDeltaRecovery(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
 
 	clusterSize := 3
 	upgradeProcess := couchbasev2.InPlaceUpgrade
