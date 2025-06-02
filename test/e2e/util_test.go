@@ -55,6 +55,7 @@ const (
 	TagFeatureAssimilation      = "assimilation"
 	TagFeatureAdmission         = "admission"
 	TagFeatureHibernation       = "hibernation"
+	TagFeatureInitNodeHostName  = "initnodehostname"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -424,6 +425,8 @@ func registerTests() {
 		framework.NewTestDef(TestBackupCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupLegacyCustomObjEndpoint).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupLegacyCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestCreateInitNodeHostNameCluster).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
+		framework.NewTestDef(TestCreateInitNodeHostNameClusterServerGroups).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
 
 		// Old P0s now P1s
 		framework.NewTestDef(TestAutoscaleUpMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling, TagSuitePlatform),

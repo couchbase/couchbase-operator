@@ -589,3 +589,48 @@ func TestNetworkAddressFamily(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestCreateInitNodeHostNameCluster(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+	framework.Requires(t, kubernetes).InitNodeHostName(clusterSize)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/networking.improvedHostNetwork":      "true",
+		"cao.couchbase.com/networking.initPodsWithNodeHostname": "true",
+	}
+
+	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+}
+
+func TestCreateInitNodeHostNameClusterServerGroups(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 2
+	serverGroups := 2
+	framework.Requires(t, kubernetes).InitNodeHostName(clusterSize).ServerGroups(serverGroups)
+
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = availableServerGroups[:serverGroups]
+
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/networking.improvedHostNetwork":      "true",
+		"cao.couchbase.com/networking.initPodsWithNodeHostname": "true",
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+}

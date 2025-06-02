@@ -1696,12 +1696,3 @@ func (c *CouchbaseCluster) IsInIndexMismatchErrorState() bool {
 func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
 	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
 }
-
-// IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).
-func IsFQDN(nodeName string) bool {
-	// Regular expression to match a valid FQDN
-	fqdnRegex := `^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}$`
-	re := regexp.MustCompile(fqdnRegex)
-
-	return re.MatchString(nodeName)
-}

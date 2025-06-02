@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -1672,6 +1673,36 @@ func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestReq
 	}
 
 	return r
+}
+
+func (r *TestRequirement) InitNodeHostName(requiredNodeCount int) *TestRequirement {
+	client := r.kubernetes.KubeClient
+
+	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(r.t, err)
+	}
+
+	if len(nodes.Items) < requiredNodeCount {
+		r.t.Skipf("Not enough nodes to test InitNodeHostName")
+	}
+
+	for _, node := range nodes.Items {
+		if !isFQDN(node.Name) {
+			r.t.Skipf("Node name %s is not a valid FQDN", node.Name)
+		}
+	}
+
+	return r
+}
+
+// IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).
+func isFQDN(nodeName string) bool {
+	// Regular expression to match a valid FQDN
+	fqdnRegex := `^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(fqdnRegex)
+
+	return re.MatchString(nodeName)
 }
 
 // FrameworkBackupStorageClass returns the storage class that should be used for backup resources during certification tests.
