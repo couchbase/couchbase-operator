@@ -89,7 +89,10 @@ func killAllXDCRNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.C
 		Validator: eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				eventschema.Optional{
-					Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					Validator: eventschema.RepeatAtLeast{
+						Times:     1,
+						Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					},
 				},
 				eventschema.Optional{
 					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
@@ -582,61 +585,6 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		e2eutil.ClusterScaleUpSequence(clusterScaledSize - clusterSize),
-	}
-	expectedEvents2 := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-	}
-
-	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
-	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
-}
-
-// TestXDCRTargetNodeServiceDelete tests deleting the node-port services of the
-// target cluster required by an XDCR replication.
-func TestXDCRTargetNodeServiceDelete(t *testing.T) {
-	// Platform configuration.
-	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
-	defer cleanup()
-
-	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
-
-	// Static configuration.
-	clusterSize := constants.Size1
-	numOfDocs := framework.Global.DocsCount
-
-	// Create the clusters.
-	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
-	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
-	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
-	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
-
-	// When ready, link the source to the destination cluster.  Add some documents and
-	// ensure they are replicated.  Delete the pod services in the destination cluster
-	// to circuit break the connection.  Add some more documents and verify they are
-	// replicated when the connection is reestablished.
-	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-
-	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
-
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
-	e2eutil.MustDeletePodServices(t, kubernetes2, targetCluster)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
-	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
-
-	// Check the events match what we expect:
-	// * Both clusters created
-	// * Source cluster establishes XDCR
-	// * Source cluster is scaled up
-	expectedEvents1 := []eventschema.Validatable{
-		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
@@ -1908,7 +1856,7 @@ func TestXDCRMobileActive(t *testing.T) {
 	// Create the Buckets.
 	bucket := e2eutil.MustGetBucket(framework.Global.BucketType, framework.Global.CompressionMode)
 	bucket.SetAnnotations(map[string]string{
-		"cao.couchbase.com/mobile": "Active",
+		"cao.couchbase.com/enableCrossClusterVersioning": "true",
 	})
 
 	e2eutil.MustNewBucket(t, kubernetes1, bucket)

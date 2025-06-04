@@ -887,8 +887,9 @@ type MaxTTLWithNegativeOverride struct {
 	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
 	// expired by default.  This field must either be a duration in the range 0-2147483648s or "-1",
 	// defaulting to 0. If set to "-1", the collection's bucket will be prevented from setting a
-	// default expiration on the collection's documents. More info:
-	// https://golang.org/pkg/time/#ParseDuration
+	// default expiration on the collection's documents. While this field can be changed on the CRD,
+	// it will not be updated on the collection if the Couchbase Server version is pre 7.6.0.
+	// More info: https://golang.org/pkg/time/#ParseDuration.
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
 }
 
@@ -2449,8 +2450,7 @@ type ClusterSpec struct {
 	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
 
 	// RescheduleDifferentServerGroup allows the Operator to attempt to  reschedule pods
-	// to a different server group that has the same number of pods in itwhen a pod fails
-	// scheduling.
+	// to a different server group a pod scheduling.
 	// +kubebuilder:default=true
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 
@@ -4310,7 +4310,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;
 type ClusterConditionType string
 
 const (
@@ -4331,7 +4331,6 @@ const (
 	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"
 	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration          ClusterConditionType = "BucketMigrating"
-	ClusterUnreconcilable                    ClusterConditionType = "Unreconcilable"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

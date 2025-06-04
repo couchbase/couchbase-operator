@@ -159,15 +159,16 @@ func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {
 	return k8sutil.WaitForDeletePod(ctx, c.k8s.KubeClient, c.cluster.Namespace, podName)
 }
 
-func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
+// checkPodRecoverability checks if a pod can be recovered or rescheduled based on the checkReschedulability parameter.
+// If checkReschedulability is true, it will also verify that the pod can be rescheduled (e.g., no LPVs).
+// Returns true if the pod is recoverable/reschedulable, false otherwise.
+func (c *Cluster) checkPodRecoverability(m couchbaseutil.Member, checkReschedulability bool) bool {
 	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
 		return false
 	}
 
-	serverConf := c.cluster.Spec.GetServerConfigByName(m.Config())
-
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(config))
 	if err != nil {
 		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		return false
@@ -179,12 +180,30 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 		return false
 	}
 
-	if err := k8sutil.IsPodRecoverable(c.k8s, *config, m, targetSemVersion); err != nil {
-		log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+	if err := k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, checkReschedulability); err != nil {
+		status := "unrecoverable"
+		if checkReschedulability {
+			status = "un-reschedulable"
+		}
+
+		log.Info("Pod "+status, "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+
 		return false
 	}
 
 	return true
+}
+
+// isPodRecoverable checks if a pod can be recovered after a failure.
+func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
+	return c.checkPodRecoverability(m, false)
+}
+
+// isPodReschedulable checks if a pod can be rescheduled to a different node.
+// This includes all recoverability checks plus additional checks for rescheduling constraints
+// such as Local Persistent Volumes.
+func (c *Cluster) isPodReschedulable(m couchbaseutil.Member) bool {
+	return c.checkPodRecoverability(m, true)
 }
 
 // reconcilePods updates pod metadata only, this is mutable.  All other changes are done

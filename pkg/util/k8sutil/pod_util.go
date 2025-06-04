@@ -17,6 +17,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
@@ -121,6 +122,8 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 			if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
 				return nil, err
 			}
+
+			metrics.VolumeExpansionMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pvc.Name})...).Add(0)
 		}
 
 		// If we are creating a default mount, then also create an init container to
@@ -136,6 +139,9 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 	// Add ownership information only if we are going to create the resource.
 	addOwnerRefToObject(pod, cluster.AsOwner())
+
+	metrics.PodRecoveryFailuresMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
+	metrics.PodRecoveriesMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
 
 	return CreatePod(ctx, client, cluster.Namespace, pod)
 }
@@ -313,7 +319,7 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	// update: due to mis-match between requested and existing specs.
 	// expanding: due to mis-match between requested and existing status.
 	// resizeFailed: volume is reporting resize failure events.
-	if !reflect.DeepEqual(existingSpec, required.Spec) {
+	if checkIfPVCRequiresUpdate(existingSpec, required.Spec) {
 		// Applying required attributes to list of update PVC's to allow in place updates.
 		// BUG: what if I change my storage class???
 		updatedClaim := pvc.DeepCopy()
@@ -343,6 +349,8 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	if actualSize.Equal(requestedSize) {
 		return nil
 	}
+
+	log.V(1).Info("Volume expansion is enabled and PVC size is not equal", "member", member.Name(), "actualSize", actualSize, "requestedSize", requestedSize)
 
 	if err := checkVolumeResizeFailure(client, pvc, expansionTimeout); err != nil {
 		if !goerrors.Is(err, errors.ErrVolumeResizeError) {
@@ -1905,6 +1913,13 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 // shared with with the Pod's main container.
 func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image string) v1.Container {
 	initContainer := couchbaseContainer(cluster, &config, image)
+	initContainer.Resources = v1.ResourceRequirements{
+		Limits: v1.ResourceList{
+			v1.ResourceMemory: resource.MustParse("128Mi"),
+			v1.ResourceCPU:    resource.MustParse("500m"),
+		},
+	}
+
 	initContainer.Ports = []v1.ContainerPort{}
 	initContainer.Name = fmt.Sprintf("%s-init", constants.CouchbaseContainerName)
 	// NOTE: we originally did a [[ ! -e /mnt/etc ]] but alas some people insist on
@@ -2316,7 +2331,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version) error {
+func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2344,10 +2359,17 @@ func IsPodRecoverable(client *client.Client, config couchbasev2.ServerConfig, me
 			} else if targetVersion.Less(pvcServerVersion) {
 				return fmt.Errorf("%w: pvc server version higher than target version", errors.NewStackTracedError(errors.ErrInvalidVersion))
 			}
+		} else if checkForLPV && isLPV(pvc) {
+			return fmt.Errorf("%w: pvc is a LPV", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 	}
 
 	return nil
+}
+
+func isLPV(pvc *v1.PersistentVolumeClaim) bool {
+	_, ok := pvc.Annotations[constants.LocalStorageAnnotation]
+	return ok
 }
 
 // IsLogPVC returns whether this is a volume containing Couchbase logs.
@@ -2534,5 +2556,58 @@ func IsPodMainContainerReady(pod *v1.Pod) bool {
 		return false
 	}
 
-	return pod.Status.ContainerStatuses[0].Ready
+	for _, containerStatus := range pod.Status.ContainerStatuses {
+		if containerStatus.Name == constants.CouchbaseContainerName {
+			return containerStatus.Ready
+		}
+	}
+
+	return false
+}
+
+// checkIfPVCRequiresUpdate compares the existing PVC spec to the requested PVC spec and returns true if they are not equal. This check first compares the resource requests and limits as quantities,
+// as different formats may cause DeepEqual to return false when the quantities are actually equal. If the quantities are equal, the rest of the PVC spec's are compared using DeepEquals.
+func checkIfPVCRequiresUpdate(existingSpec, requiredSpec v1.PersistentVolumeClaimSpec) bool {
+	if newResourceRequest := requiredSpec.Resources.Requests.Storage(); newResourceRequest != nil {
+		// If the requested PVC contains a resource request for storage, check if it is a different quantity to the existing PVC.
+		if existingResourceRequest := existingSpec.Resources.Requests.Storage(); existingResourceRequest == nil || !existingResourceRequest.Equal(*newResourceRequest) {
+			// Either the existing PVC does not have a resource request for storage, or the requested quantity is different to the existing PVC and therefore
+			// we need to update the PVC.
+			return true
+		}
+
+		// The resource requests are equal, so we should clear the resource request for storage to avoid comparing them again when using DeepEqual.
+		delete(requiredSpec.Resources.Requests, v1.ResourceStorage)
+		delete(existingSpec.Resources.Requests, v1.ResourceStorage)
+	}
+
+	// Do the same as above but for resource limits.
+	if newResourceLimit := requiredSpec.Resources.Limits.Storage(); newResourceLimit != nil {
+		if existingResourceLimit := existingSpec.Resources.Limits.Storage(); existingResourceLimit == nil || !existingResourceLimit.Equal(*newResourceLimit) {
+			return true
+		}
+
+		delete(requiredSpec.Resources.Limits, v1.ResourceStorage)
+		delete(existingSpec.Resources.Limits, v1.ResourceStorage)
+	}
+
+	return !reflect.DeepEqual(existingSpec, requiredSpec)
+}
+
+func addOptionalLabelsToPodMetric(cluster *couchbasev2.CouchbaseCluster, existingLabels []string) []string {
+	switch metrics.OptionalLabels {
+	case metrics.UUIDonly:
+		existingLabels = append(existingLabels, string(cluster.GetUID()))
+	case metrics.UUIDandName:
+		clusterName := cluster.Spec.ClusterSettings.ClusterName
+		if clusterName == "" {
+			clusterName = cluster.GetName()
+		}
+
+		existingLabels = append(existingLabels, string(cluster.GetUID()), clusterName)
+	default:
+		break
+	}
+
+	return existingLabels
 }

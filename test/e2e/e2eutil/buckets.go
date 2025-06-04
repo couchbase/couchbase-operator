@@ -83,6 +83,14 @@ func NewBucket(kind BucketType) *Bucket {
 	}
 }
 
+// NewBucket creates a bucket with any required parameters.
+func NewCouchstoreBucket(kind BucketType) *Bucket {
+	return &Bucket{
+		kind:           kind,
+		storageBackend: couchbasev2.CouchbaseStorageBackendCouchstore,
+	}
+}
+
 func (b *Bucket) WithMemoryQuota(memory int) *Bucket {
 	b.memoryQuota = int64(memory)
 

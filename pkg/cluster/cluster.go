@@ -166,6 +166,8 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		return nil, err
 	}
 
+	c.InitCounterMetrics()
+
 	// Once the client is setup, everything goes though this creation function so
 	// we can catch errors and set the cluster error condition.
 	if err := c.newCluster(); err != nil {
@@ -353,8 +355,42 @@ func (c *Cluster) addFailedSchedulingServerGroups(serverGroup string) error {
 	return c.state.Upsert(persistence.FailedSchedulingServerGroups, strings.Join(failedGroups, ServerGroupAvoidDelimiter))
 }
 
-func (c *Cluster) clearFailedSchedulingServerGroups() {
+var readyConditions = []couchbasev2.ClusterConditionType{
+	couchbasev2.ClusterConditionBalanced,
+	couchbasev2.ClusterConditionAvailable,
+}
+
+var notReadyConditions = []couchbasev2.ClusterConditionType{
+	couchbasev2.ClusterConditionScaling,
+	couchbasev2.ClusterConditionScalingDown,
+	couchbasev2.ClusterConditionScalingUp,
+	couchbasev2.ClusterConditionUpgrading,
+}
+
+func (c *Cluster) clearFailedSchedulingServerGroupsIfReady() {
 	if !c.isSGReschedulingEnabled() {
+		return
+	}
+
+	for _, condition := range readyConditions {
+		if !c.cluster.HasCondition(condition) {
+			return
+		}
+	}
+
+	for _, condition := range notReadyConditions {
+		if c.cluster.HasCondition(condition) {
+			return
+		}
+	}
+
+	desiredSize := 0
+
+	for _, server := range c.cluster.Spec.Servers {
+		desiredSize += server.Size
+	}
+
+	if c.cluster.Status.Size != desiredSize {
 		return
 	}
 
@@ -1165,4 +1201,18 @@ func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) InitCounterMetrics() {
+	metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Add(0)
+	metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.ReconcileFailureMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Add(0)
+	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Add(0)
+	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 }

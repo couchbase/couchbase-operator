@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -1297,26 +1298,34 @@ func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
-	v1, err := couchbaseutil.NewVersion(parts[1])
+	testVersion, err := couchbaseutil.NewVersion(parts[1])
 	if err != nil {
 		r.t.Skipf("malformed version: %s: %v", parts[1], err)
 	}
 
-	v2, err := couchbaseutil.NewVersion(v)
+	upperBoundVersion, err := couchbaseutil.NewVersion(v)
 	if err != nil {
 		r.t.Skipf("malformed version: %s: %v", v, err)
 	}
 
-	if v2.Less(v1) {
+	if testVersion.GreaterEqual(upperBoundVersion) {
 		r.t.Skip("Couchbase Server Image version not supported (too new)")
 	}
 
 	return r
 }
 
+func (t *TestRequirement) InplaceUpgradeable() *TestRequirement {
+	return t.upgradable(true)
+}
+
 // Upgradable skips the test if the upgrade version is greater than or equal to the
 // test version.
 func (r *TestRequirement) Upgradable() *TestRequirement {
+	return r.upgradable(false)
+}
+
+func (r *TestRequirement) upgradable(inplaceUpgrade bool) *TestRequirement {
 	if Global.CouchbaseServerImageUpgrade == "" {
 		r.t.Skip("Upgrade version not specified")
 	}
@@ -1362,6 +1371,19 @@ func (r *TestRequirement) Upgradable() *TestRequirement {
 
 	if upgrade.GreaterEqual(version) {
 		r.t.Skip("Upgrade from version greater than or equal to upgrade to version")
+	}
+
+	if !inplaceUpgrade {
+		return r
+	}
+
+	version720, err := couchbaseutil.NewVersion("7.2.0")
+	if err != nil {
+		r.t.Skipf("malformed version: %s: %v", "7.2.0", err)
+	}
+
+	if upgrade.Less(version720) && version.GreaterEqual(version720) {
+		r.t.Skip("Inplace upgrade is not supported from pre-7.2.0 to versions 7.2.0 and above")
 	}
 
 	return r
@@ -1651,6 +1673,36 @@ func (r *TestRequirement) PlatformIs(platform couchbasev2.PlatformType) *TestReq
 	}
 
 	return r
+}
+
+func (r *TestRequirement) InitNodeHostName(requiredNodeCount int) *TestRequirement {
+	client := r.kubernetes.KubeClient
+
+	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(r.t, err)
+	}
+
+	if len(nodes.Items) < requiredNodeCount {
+		r.t.Skipf("Not enough nodes to test InitNodeHostName")
+	}
+
+	for _, node := range nodes.Items {
+		if !isFQDN(node.Name) {
+			r.t.Skipf("Node name %s is not a valid FQDN", node.Name)
+		}
+	}
+
+	return r
+}
+
+// IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).
+func isFQDN(nodeName string) bool {
+	// Regular expression to match a valid FQDN
+	fqdnRegex := `^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(fqdnRegex)
+
+	return re.MatchString(nodeName)
 }
 
 // FrameworkBackupStorageClass returns the storage class that should be used for backup resources during certification tests.

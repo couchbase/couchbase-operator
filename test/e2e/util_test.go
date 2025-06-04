@@ -55,6 +55,7 @@ const (
 	TagFeatureAssimilation      = "assimilation"
 	TagFeatureAdmission         = "admission"
 	TagFeatureHibernation       = "hibernation"
+	TagFeatureInitNodeHostName  = "initnodehostname"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -149,6 +150,7 @@ func registerTests() {
 		framework.NewTestDef(TestServerGroupShuffling).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestServerGroupRescheduling).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestServerGroupReschedulingInitialNode).WithTags(TagSuiteSanity, TagFeatureServerGroups),
+		framework.NewTestDef(TestServerGroupReschedulingIgnoreUnschedulable).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestRzaCreateClusterWithStaticConfig).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestRzaCreateClusterWithClassBasedConfig).WithTags(TagSuiteSanity, TagFeatureServerGroups),
 		framework.NewTestDef(TestPersistentVolumeCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeaturePersistentVolumes),
@@ -246,7 +248,6 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRCreateClusterRemoteMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeDown).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeAdd).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureXDCR),
-		framework.NewTestDef(TestXDCRTargetNodeServiceDelete).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotatePassword).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRReplicateLocalScopesAndCollections).WithTags(TagSuiteP0, TagFeatureXDCR, TagFeatureCollections, TagSuitePlatform),
 		framework.NewTestDef(TestXDCRMigrationLocalScopesAndCollections).WithTags(TagSuiteP0, TagFeatureXDCR, TagFeatureCollections),
@@ -424,6 +425,8 @@ func registerTests() {
 		framework.NewTestDef(TestBackupCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupLegacyCustomObjEndpoint).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestBackupLegacyCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
+		framework.NewTestDef(TestCreateInitNodeHostNameCluster).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
+		framework.NewTestDef(TestCreateInitNodeHostNameClusterServerGroups).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
 
 		// Old P0s now P1s
 		framework.NewTestDef(TestAutoscaleUpMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling, TagSuitePlatform),
@@ -746,6 +749,7 @@ func registerTests() {
 		framework.NewTestDef(TestMigrationByServerGroup).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationRemovingServerClassInMigrationMode).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationWaitsForIndexStorageModeToMatch).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrationNotAllowedWithRollbackVersion).WithTags(TagSuiteP1, TagFeatureAssimilation),
 
 		// Bucket auto-compaction settings tests
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend).WithTags(TagSuiteSanity),

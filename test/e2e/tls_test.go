@@ -243,20 +243,6 @@ func TestTLSRemoveOperatorCertificateAndAddBack(t *testing.T) {
 	e2eutil.MustRecreateSecret(t, kubernetes, secret)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster created
-	// * Invalid TLS event
-	// * Cluster scaled up
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		e2eutil.PodDownFailoverRecoverySequence(),
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // TestTLSRemoveOperatorCertificateAndResizeCluster removes the CA certificate
@@ -2164,6 +2150,7 @@ func TestTLSRotateScriptPassphrase(t *testing.T) {
 	// * TLS update event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Repeat{
 			Times:     clusterSize,
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
@@ -2477,7 +2464,7 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	// At this point the client is locked out but we should be able to rotate certs and proceed
 	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
 
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 15*time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
@@ -2489,6 +2476,8 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
 		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},

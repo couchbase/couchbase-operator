@@ -169,13 +169,13 @@ func (m *memberImpl) GetLocalDNSName() string {
 // GetHostPort returns the member's host and port.  The port is dynamic based on the TLS
 // configuration, if TLS is enabled, we will use the TLS admin port.
 func (m *memberImpl) GetHostPort() string {
-	return fmt.Sprintf("%s:%d", m.GetDNSName(), m.clientPort())
+	return fmt.Sprintf("%s:%d", m.GetLocalDNSName(), m.clientPort())
 }
 
 // GetHostPortTLS is used to force the use of TLS, in particular for probing the TLS
 // state before upgrading client connections.
 func (m *memberImpl) GetHostPortTLS() string {
-	return fmt.Sprintf("%s:18091", m.GetDNSName())
+	return fmt.Sprintf("%s:18091", m.GetLocalDNSName())
 }
 
 // GetHostURL return the member's host URL (without a path).  The scheme and port are

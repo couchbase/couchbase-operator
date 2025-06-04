@@ -104,7 +104,8 @@ const (
 	RoleAnalyticsAdmin                      = "analytics_admin"
 	RoleExternalStatsReader                 = "external_stats_reader"
 	RoleEventingAdmin                       = "eventing_admin"
-
+	RoleUserAdminExternal                   = "user_admin_external"
+	RoleUserAdminLocal                      = "user_admin_local"
 	// Couchbase specific bucket roles.
 	BucketAdminRole = "bucket_admin"
 

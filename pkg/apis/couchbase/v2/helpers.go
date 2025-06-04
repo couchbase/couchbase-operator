@@ -879,11 +879,6 @@ func (cs *ClusterStatus) SetErrorCondition(message string) {
 	cs.setClusterCondition(c)
 }
 
-func (cs *ClusterStatus) SetUnreconcilableCondition(message string) {
-	c := newClusterCondition(ClusterUnreconcilable, v1.ConditionTrue, "Unreconcilable", message)
-	cs.setClusterCondition(c)
-}
-
 func (cs *ClusterStatus) SetAutoscalerReadyCondition(message string) {
 	c := newClusterCondition(ClusterConditionAutoscaleReady, v1.ConditionTrue, "AutoscaleReady", message)
 	cs.setClusterCondition(c)
@@ -1700,13 +1695,4 @@ func (c *CouchbaseCluster) IsInIndexMismatchErrorState() bool {
 
 func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
 	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
-}
-
-// IsFQDN checks if the given node name is a Fully Qualified Domain Name (FQDN).
-func IsFQDN(nodeName string) bool {
-	// Regular expression to match a valid FQDN
-	fqdnRegex := `^([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\.)+[a-zA-Z]{2,}$`
-	re := regexp.MustCompile(fqdnRegex)
-
-	return re.MatchString(nodeName)
 }

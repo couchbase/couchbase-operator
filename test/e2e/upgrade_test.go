@@ -165,7 +165,9 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			eventschema.Optional{
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			},
 			eventschema.AnyOf{
 				Validators: []eventschema.Validatable{
 					// In the first incarnation, the candidate has already been
@@ -1139,6 +1141,8 @@ func TestDeltaRecovery(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
 	clusterSize := 3
 	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
@@ -1183,6 +1187,8 @@ func TestDeltaRecoveryWithoutDataService(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
 	groupSize1 := 2
 	groupSize2 := 1
 	clusterSize := groupSize1 + groupSize2
@@ -1226,6 +1232,8 @@ func TestDeltaRecoveryWithVariousServices(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
 
 	groupSize1 := 2
 	groupSize2 := 1
@@ -1386,6 +1394,8 @@ func TestResilientDeltaRecovery(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
 	clusterSize := 3
 	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
@@ -1410,20 +1420,18 @@ func TestResilientDeltaRecovery(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 
-	// Start upgrade
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-
-	// Wait for graceful failover to be running
-	e2eutil.MustWaitForGracefulFailoverToBeRunning(t, kubernetes, cluster, 5*time.Minute)
+	// Start the upgrade and wait for graceful failover to start
+	cluster = e2eutil.MustPatchClusterAndWaitForGracefulFailoverToStart(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
 	// Kill the orchestrator node
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, index, false)
 
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-
+	// Wait for graceful failover to fall over
 	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "graceful failover failed:", cluster, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check the version and document counts are as we expect
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -1543,7 +1551,9 @@ func TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade(t *testing.T) {
 	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 
 	// Create the cluster with persistent storage
-	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
+	clusterOptions := clusterOptionsUpgrade().WithPersistentTopology(clusterSize)
+	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(120)
+	cluster := clusterOptions.MustCreate(t, kubernetes)
 
 	// Start the upgrade
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)

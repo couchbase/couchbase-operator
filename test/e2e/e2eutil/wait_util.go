@@ -11,6 +11,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -778,6 +779,39 @@ func MustWaitForClusterWithErrorMessage(t *testing.T, k8s *types.Cluster, errMes
 	}
 }
 
+func MustPatchClusterAndWaitForGracefulFailoverToStart(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patchset jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseCluster {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	// Get the initial counters
+	clusterInfoInitial := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(clusterInfoInitial).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	// Apply the patch to the cluster
+	couchbase = MustPatchCluster(t, k8s, couchbase, patchset, time.Minute)
+
+	// Wait for the graceful failover start counter to be incremented
+	err := retryutil.RetryFor(timeout, func() error {
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if info.Counters["graceful_failover_start"] != (clusterInfoInitial.Counters["graceful_failover_start"] + 1) {
+			return fmt.Errorf("graceful failover start counter not incremented")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	return couchbase
+}
+
 // MustWaitForGracefulFailoverToBeRunning waits until a graceful failover task is running.
 func MustWaitForGracefulFailoverToBeRunning(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
@@ -1057,6 +1091,8 @@ func WaitUntilAllNodeStorageBackendMatch(k8s *types.Cluster, couchbase *couchbas
 		clusterBuckets := couchbaseutil.BucketStatusList{}
 		if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(client.client, client.host); err != nil {
 			return err
+		} else if len(clusterBuckets) == 0 {
+			return fmt.Errorf("no buckets found")
 		}
 
 		for _, bucket := range clusterBuckets {

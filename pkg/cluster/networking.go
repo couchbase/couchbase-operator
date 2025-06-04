@@ -219,9 +219,9 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 		return c.state.Upsert(persistence.MembersWithHostnameAAadded, "false")
 	}
 
-	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
-
 	if c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+		indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
+
 		for _, member := range c.members {
 			existingAddresses, err := c.getAlternateAddressesExternal(member)
 			if err != nil {
@@ -250,9 +250,13 @@ func (c *Cluster) handleHostnameAA(ctx context.Context) error {
 }
 
 func (c *Cluster) handleExposedFeatures(member couchbaseutil.Member, existingAddresses *couchbaseutil.AlternateAddressesExternal) error {
+	if existingAddresses == nil {
+		return nil
+	}
+
 	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
 
-	if existingAddresses != nil && !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
+	if !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
 		if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
 			return err
 		}

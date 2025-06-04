@@ -40,12 +40,14 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 // needsUpgrade does an ordered walk down the list of members, if a member is not
 // the correct version then return it as an upgrade canididate  It also returns the
 // counts of members in the various versions.
+//
+//nolint:gocognit
 func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	candidates := couchbaseutil.MemberSet{}
 
 	var moves []scheduler.Move
 
-	if c.cluster.Spec.ServerGroupsEnabled() {
+	if c.cluster.Spec.ServerGroupsEnabled() && !c.cluster.Spec.RescheduleDifferentServerGroup {
 		m, err := c.scheduler.Reschedule()
 		if err != nil {
 			return nil, err
@@ -115,7 +117,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			ignoreMigratedHostnameAlias(actual, requestedSpec)
 		}
 
-		podsEqual, d := c.resourcesEqual(actualSpec, requestedSpec)
+		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
@@ -124,13 +126,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			continue
 		}
 
-		log.V(1).Info("Pod diff", "diff", d, "podEqual", podsEqual, "pvcEqual", pvcsEqual)
-
 		prettyDiff := diff.PrettyDiff(actualSpec, requestedSpec)
 
 		if !pvcsEqual {
 			prettyDiff += pvcState.Diff()
-			log.V(1).Info("PVC diff", "diff", prettyDiff)
 		}
 
 		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
@@ -177,8 +176,6 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 		if !found {
 			return err
 		}
-
-		log.Info(startTimeNoMono)
 
 		if err := c.state.Insert(persistence.UpgradeTime, startTimeNoMono); err != nil {
 			return err

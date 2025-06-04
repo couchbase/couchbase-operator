@@ -220,16 +220,6 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
-
-		&couchbasev2.CouchbaseMemcachedBucket{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: names[1],
-			},
-			Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
-				MemoryQuota: e2espec.NewResourceQuantityMi(256),
-				EnableFlush: false,
-			},
-		},
 		&couchbasev2.CouchbaseEphemeralBucket{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: names[2],
@@ -244,6 +234,23 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},
+	}
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if memcachedBucketSupported, err := couchbaseutil.VersionBefore(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if memcachedBucketSupported {
+		buckets = append(buckets,
+			&couchbasev2.CouchbaseMemcachedBucket{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: names[1],
+				},
+				Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
+					MemoryQuota: e2espec.NewResourceQuantityMi(256),
+					EnableFlush: false,
+				},
+			})
 	}
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
@@ -290,7 +297,15 @@ func TestBucketAddRemoveExtended(t *testing.T) {
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	bucketTypes := []string{"couchbase", "memcached", "ephemeral"}
+	bucketTypes := []string{"couchbase", "ephemeral"}
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	if memcachedBucketSupported, err := couchbaseutil.VersionBefore(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if memcachedBucketSupported {
+		bucketTypes = append(bucketTypes, "memcached")
+	}
 
 	buckets := e2espec.GenerateValidBucketSettings(bucketTypes)
 	for _, bucket := range buckets {
@@ -736,7 +751,8 @@ func TestUpdateSampleBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0")
+	// TODO: Remove this and fix the test once we implement magma vbucket config support.
+	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0").BeforeVersion("8.0.0")
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 

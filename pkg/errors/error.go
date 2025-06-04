@@ -97,6 +97,9 @@ var (
 
 	// ErrRemoteClusterUnbalanced is raised when the remote cluster is unbalanced.
 	ErrRemoteClusterUnbalanced = errors.New("remote cluster unbalanced")
+
+	// ErrRollbackDuringMigration is raised when the target cluster version is lower than a node in the source cluster.
+	ErrRollbackDuringMigration = errors.New("upgrades cannot be rolled back during migration")
 )
 
 // Logging errors

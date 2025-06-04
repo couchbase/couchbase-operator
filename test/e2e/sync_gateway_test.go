@@ -27,7 +27,7 @@ func testSyncGatewayCreate(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, cluster, bucket, time.Minute)
 
 	// Create the sync gateway in the source cluster and insert a document.
-	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), nil, dns, tls, time.Minute)
+	e2eutil.MustCreateSyncGateway(t, kubernetes1, cluster, framework.Global.SyncGatewayImage, bucket.GetName(), nil, dns, tls, 2*time.Minute)
 
 	// Ensure meta-data documents appear in the Couchbase cluster.
 	e2eutil.MustVerifyDocCountInBucketNonZero(t, kubernetes2, cluster, bucket.GetName(), 5*time.Minute)

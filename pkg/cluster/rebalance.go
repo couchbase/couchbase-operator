@@ -183,13 +183,15 @@ WitnessLoop:
 	return nil, nil, errors.NewStackTracedError(errors.ErrRebalanceIncomplete)
 }
 
-func (c *Cluster) rebalance(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList) error {
-	return c.rebalanceWithRetriesOnVerifyFails(ms, eject, 1)
+func (c *Cluster) rebalance(ms couchbaseutil.MemberSet) error {
+	return c.rebalanceWithRetriesOnVerifyFails(ms, nil, 1)
 }
 
 // rebalanceWithRetriesOnVerifyFails will retry the rebalance if the verifyRebalance fails.
 // nolint:gocognit
-func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, eject couchbaseutil.OTPNodeList, maxRetries uint) error {
+func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, ejectMembers couchbaseutil.MemberSet, maxRetries uint) error {
+	eject := ejectMembers.OTPNodes()
+
 	// Ensure we have a minimum of one retry.
 	if maxRetries == 0 {
 		maxRetries = 1
@@ -273,10 +275,22 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	sort.Strings(ejectedOTPNodeStringSlice)
 
 	for _, otpNode := range ejectedOTPNodeStringSlice {
-		// TODO: this feels dirty!!  If everything was a Member, then this would
-		// be trivial...
-		hostname := strings.Split(otpNode, "@")[1]
-		memberName := strings.Split(hostname, ".")[0]
+		memberName := ""
+
+		for _, member := range ejectMembers {
+			if string(member.GetOTPNode()) == otpNode {
+				memberName = member.Name()
+				break
+			}
+		}
+
+		if memberName == "" {
+			// TODO: this feels dirty!!  If everything was a Member, then this would
+			// be trivial...
+			hostname := strings.Split(otpNode, "@")[1]
+			memberName = strings.Split(hostname, ".")[0]
+		}
+
 		c.raiseEvent(k8sutil.MemberRemoveEvent(memberName, c.cluster))
 	}
 

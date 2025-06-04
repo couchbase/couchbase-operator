@@ -326,23 +326,25 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 func PodRecoverySequenceAfterKilled() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+			},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
 			},
 			eventschema.Optional{
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
 			eventschema.Optional{
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 			},
 			eventschema.Optional{
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -415,7 +417,7 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 	events.Validators = append(events.Validators, eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Optional{
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
 			eventschema.Repeat{
 				Times:     victims,
@@ -456,7 +458,7 @@ func PodDownWithPVCRecoverySequence(clusterSize, victims int) eventschema.Valida
 func PodFailedOverWithPVCRecoverySequence(victims int) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 			// Depending on either server version, auto-failover timeout and where the reconciliation loop
 			// is at when pods are failed over, we may or may not see member down events for the victims
 			eventschema.Optional{

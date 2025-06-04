@@ -37,7 +37,7 @@ GA=0
 ARM=0
 CONTAINER_ARCH=amd64
 
-while getopts r:o:e:f:b:g:t:x:hn flag
+while getopts r:o:e:f:b:g:t:x:hna flag
 do
     case "${flag}" in
         r) REPOSITORY=${OPTARG};;

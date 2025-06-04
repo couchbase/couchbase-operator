@@ -254,7 +254,9 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		case NodeStateDown:
 			state.DownNodes.Add(c.members[name])
 		case NodeStateFailed:
-			state.FailedNodes.Add(c.members[name])
+			if member, ok := c.members[name]; ok {
+				state.FailedNodes.Add(member)
+			}
 		case NodeStateAddBack:
 			state.AddBackNodes.Add(c.members[name])
 		}
@@ -1275,7 +1277,6 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 
 		for _, name := range candidates.Names()[:maxUpgradable] {
 			constrained.Add(candidates[name])
-			log.Info(candidates[name].Name())
 		}
 
 		candidates = constrained
@@ -1504,7 +1505,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 			}
 		}
 
-		return c.rebalance(c.members, nil)
+		return c.rebalance(c.members)
 	}
 
 	return nil
@@ -1630,7 +1631,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	candidates = constrained
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
-	pvcPresent := true
+	canDoInPlaceReschedule := true
 
 	var targetVersion string
 
@@ -1638,8 +1639,8 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
 
-		if c.isPodRecoverable(candidate) == false {
-			pvcPresent = false
+		if c.isPodReschedulable(candidate) == false {
+			canDoInPlaceReschedule = false
 			break
 		}
 	}
@@ -1651,14 +1652,14 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	// Carry out the move
 	// We can use the upgrade methods to do this (even though we're not changing the version)
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && pvcPresent {
+	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
 		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
 	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !pvcPresent {
-			log.Info("No persistent volumes in cluster. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
+			log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
 		return r.swapRebalanceMembers(c, candidates)
@@ -1871,9 +1872,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 		c.cluster.Status.SetRebalancingCondition()
 
-		// Eject nodes that we want to discard.
-		eject := r.ejectMembers.OTPNodes()
-
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
 			return err
 		}
@@ -1882,7 +1880,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			return err
 		}
 
-		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, eject, r.rebalanceRetries); err != nil {
+		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, r.ejectMembers, r.rebalanceRetries); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop

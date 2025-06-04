@@ -463,6 +463,39 @@ func TestMigrationWaitsForIndexStorageModeToMatch(t *testing.T) {
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating)
 }
 
+func TestMigrationNotAllowedWithRollbackVersion(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	clusterSize := 3
+
+	// Create the source cluster.
+	srcCluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Check that the cluster is healthy then start an upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, srcCluster, 2*time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// When the upgrade starts, pause the source cluster, leaving it in mixed mode.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, srcCluster, 5*time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
+	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), 5*time.Minute)
+	// Create the destination cluster with the original server version of the source cluster before it was upgraded.
+	dstCluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	dstCluster.Spec.Migration = &couchbasev2.ClusterAssimilationSpec{
+		UnmanagedClusterHost: fmt.Sprintf("%s.%s.svc.cluster.local", srcCluster.Name, srcCluster.Namespace),
+	}
+	// Create the destination cluster.
+	dstCluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, dstCluster, -1)
+
+	// Check that the destination cluster enters an error state with a rollback version error message.
+	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "upgrades cannot be rolled back during migration", dstCluster, 5*time.Minute)
+}
+
 func GetMemberHostname(cluster *couchbasev2.CouchbaseCluster, nodeID int) string {
 	return fmt.Sprintf("%s.%s.%s.svc", couchbaseutil.CreateMemberName(cluster.Name, nodeID), cluster.Name, cluster.Namespace)
 }
