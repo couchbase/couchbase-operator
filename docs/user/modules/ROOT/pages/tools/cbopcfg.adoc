@@ -99,7 +99,7 @@ Image pull secret to allow access to the operator image
 +
 *Default*: info
 +
-Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
+Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information.
 
 --memory-limit::
 *Type*: quantity
@@ -439,7 +439,7 @@ Image pull secret to allow access to the operator image.
 +
 *Default*: info
 +
-Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
+Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
 
 --memory-limit::
 *Type*: quantity
@@ -1052,7 +1052,7 @@ Image pull secret to allow access to the operator image
 +
 *Default*: info
 +
-Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
+Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information.
 
 --memory-limit::
 *Type*: quantity
@@ -1392,7 +1392,7 @@ Image pull secret to allow access to the operator image.
 +
 *Default*: info
 +
-Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
+Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information and API calls. "2" prints very detailed logs, including full API payloads that may contain passwords and keys.
 
 --memory-limit::
 *Type*: quantity

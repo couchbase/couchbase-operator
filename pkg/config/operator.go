@@ -140,7 +140,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().StringVar(&o.image, "image", operatorImageDefault, "Operator image to use.")
 	cmd.Flags().Var(&o.imagePullSecret, "image-pull-secret", "Image pull secret to allow access to the operator image.")
 	cmd.Flags().StringVar(&o.imagePullPolicy, "image-pull-policy", operatorDefaultPullPolicy, "Image pull policy to affect when the image is downloaded.")
-	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\", or \"0\", prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
+	cmd.Flags().Var(&o.logLevel, "log-level", "Log level to generate logs at.  \"info\" prints basic operations. \"debug\", or \"1\" prints extended information and API calls. \"2\" prints very detailed logs, including full API payloads that may contain passwords and keys.")
 	cmd.Flags().Var(&o.podCreationTimeout, "pod-creation-timeout", "How long to wait before declaring an error when provisioning a pod.")
 	cmd.Flags().Var(&o.podDeleteDelay, "pod-delete-delay", "How long to wait before performing a delete on a failed pod.")
 	cmd.Flags().Var(&o.podReadinessDelay, "pod-readiness-delay", "How long to wait before starting readiness probes on server pods.")
