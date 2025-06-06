@@ -101,8 +101,13 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		return nil, err
 	}
 
+	err = EstablishCNGPrerequisites(client, cluster)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create the actual pod specification.
-	pod, err := CreateCouchbasePodSpec(client, m, cluster, config, serverGroup, pvcState, image, readinessConfig)
+	pod, err := CreateCouchbasePodSpec(m, cluster, config, serverGroup, pvcState, image, readinessConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -125,25 +130,81 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 			metrics.VolumeExpansionMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pvc.Name})...).Add(0)
 		}
-
-		// If we are creating a default mount, then also create an init container to
-		// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
-		// the init command is idempotent.
-		for _, pvc := range pvcState.pvcs {
-			if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
-				initContainer := couchbaseInitContainer(cluster, pvc.Name, config, image)
-				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
-			}
-		}
 	}
-
-	// Add ownership information only if we are going to create the resource.
-	addOwnerRefToObject(pod, cluster.AsOwner())
 
 	metrics.PodRecoveryFailuresMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
 	metrics.PodRecoveriesMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
 
 	return CreatePod(ctx, client, cluster.Namespace, pod)
+}
+
+func EstablishCNGPrerequisites(client *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	// we need to create the self-signed certificate for CNG if they do not provide TLS and it doesn't already exist
+	if cluster.Spec.Networking.CloudNativeGateway != nil {
+		if cluster.Spec.Networking.CloudNativeGateway.TLS == nil {
+			// check named cng self-signed secret exists
+			selfCertSecretName := getSelfCertSecretName(cluster.Name)
+
+			_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), selfCertSecretName, metav1.GetOptions{})
+			if err != nil {
+				// named secret not found, create a new one
+				dnsName := ""
+				if cluster.Spec.Networking.DNS != nil {
+					dnsName = cluster.Spec.Networking.DNS.Domain
+				}
+
+				ssc, err := GenerateSelfSignedCert(cluster.Namespace, 10*365*24*time.Hour, dnsName)
+				if err != nil {
+					log.Error(err, "Error generating CNG self-signed certificate", "cluster", cluster.NamespacedName())
+					return err
+				}
+
+				selfSignedSecret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: selfCertSecretName,
+					},
+					Data: map[string][]byte{
+						"tls.crt": ssc.cert,
+						"tls.key": ssc.key,
+					},
+				}
+
+				_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), selfSignedSecret, metav1.CreateOptions{})
+				if err != nil {
+					log.Error(err, "Error creating CNG self-signed certificate", "cluster", cluster.NamespacedName())
+					return err
+				}
+			}
+		}
+
+		// check named cng self-signed secret exists
+		adminSecretName := getAdminUserSecretName(cluster.Name)
+
+		_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), adminSecretName, metav1.GetOptions{})
+		if err != nil {
+			// named secret not found, create a new one
+			username := generateUserName(cluster.Name)
+			password := generateCouchbasePassword()
+
+			cngAdminSecret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: adminSecretName,
+				},
+				Data: map[string][]byte{
+					"username": username,
+					"password": password,
+				},
+			}
+
+			_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), cngAdminSecret, metav1.CreateOptions{})
+			if err != nil {
+				log.Error(err, "Error creating CNG user", "cluster", cluster.NamespacedName())
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup string, cluster *couchbasev2.CouchbaseCluster) {
@@ -847,7 +908,7 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 // in order to trigger Couchbase upgrade sequences.  Pods are immutable so we use swap
 // rebalances to upgrade not only the container version, but other attributes that are configurable
 // in the server class pod policy, e.g. adding PVCs, scheduling constraints etc.
-func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, serverConfig couchbasev2.ServerConfig, serverGroupZone string, pvcState *PersistentVolumeClaimState, image string, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
+func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.CouchbaseCluster, serverConfig couchbasev2.ServerConfig, serverGroupZone string, pvcState *PersistentVolumeClaimState, image string, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
 	// Create the standard Couchbase container image.
 	container := couchbaseContainer(cluster, &serverConfig, image)
 
@@ -950,12 +1011,13 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 
 	// Note: anything using clients to look up state at this point, is probably doing
 	// it wrong, gut feeling.
-	if err := applyPodMonitoring(client, cluster, pod); err != nil {
+	// I agree,  That's why I'm removing it
+	if err := applyPodMonitoring(cluster, pod); err != nil {
 		return nil, err
 	}
 
 	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
-	applyCloudNativeGateway(client, cluster, pod, &serverConfig)
+	applyCloudNativeGateway(cluster, pod, &serverConfig)
 
 	// Break out the detection and application of monitoring labels/annotations based on
 	// what is enabled, server version, etc.
@@ -981,6 +1043,19 @@ func CreateCouchbasePodSpec(client *client.Client, m couchbaseutil.Member, clust
 	}
 
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
+
+	// If we are creating a default mount, then also create an init container to
+	// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
+	// the init command is idempotent.
+	for _, pvc := range pvcState.pvcs {
+		if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
+			initContainer := couchbaseInitContainer(cluster, pvc.Name, serverConfig, image)
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+		}
+	}
+
+	// Add ownership information only if we are going to create the resource.
+	addOwnerRefToObject(pod, cluster.AsOwner())
 
 	return pod, nil
 }
@@ -1089,7 +1164,7 @@ func applyPodStorage(pod *v1.Pod, pvcState *PersistentVolumeClaimState) {
 }
 
 // applyCloudNativeGateway adds a Cloud Native Gateway for gRPC access to the cb cluster.
-func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) {
+func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) {
 	// If cloudNativeGateway is enabled add the necessary sidecars.
 	if cluster.Spec.Networking.CloudNativeGateway == nil {
 		return
@@ -1103,11 +1178,7 @@ func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.Couchba
 		}
 	}
 
-	cngContainer, err := createCloudNativeGatewayContainer(client, cluster, pod)
-	if err != nil {
-		log.Error(err, "error creating cloud-native-gateway container", "cluster", cluster.NamespacedName())
-		return
-	}
+	cngContainer := createCloudNativeGatewayContainer(cluster, pod)
 
 	pod.Spec.Volumes = append(pod.Spec.Volumes, createCNGVolume(cluster))
 	pod.Spec.Containers = append(pod.Spec.Containers, cngContainer)
@@ -1115,15 +1186,8 @@ func applyCloudNativeGateway(client *client.Client, cluster *couchbasev2.Couchba
 }
 
 // applyCloudNativeGatewayPodTLSProvided adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted.
-func applyCloudNativeGatewayPodTLSProvided(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) error {
-	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("%w: error fetching provided cloud-native-gateway self-signed secret: %s", err, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
-	}
-
+func applyCloudNativeGatewayPodTLSProvided(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
 	addSecretToPodVolume(container, pod, CngVolumeName, cluster.Spec.Networking.CloudNativeGateway.TLS.ServerSecretName)
-
-	return nil
 }
 
 func getSelfCertSecretName(clusterName string) string {
@@ -1134,35 +1198,9 @@ func getAdminUserSecretName(clusterName string) string {
 	return fmt.Sprintf("%s-%s", CngAdminUserSecretPrefix, clusterName)
 }
 
-func applyCloudNativeGatewayAdminSecret(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container) error {
-	// check named cng self-signed secret exists
+func applyCloudNativeGatewayAdminSecret(cluster *couchbasev2.CouchbaseCluster, container *v1.Container) {
 	adminSecretName := getAdminUserSecretName(cluster.Name)
-
-	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), adminSecretName, metav1.GetOptions{})
-	if err != nil {
-		// named secret not found, create a new one
-		username := generateUserName(cluster.Name)
-		password := generateCouchbasePassword()
-
-		cngAdminSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: adminSecretName,
-			},
-			Data: map[string][]byte{
-				"username": username,
-				"password": password,
-			},
-		}
-
-		_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), cngAdminSecret, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("%w: error creating cloud-native-gateway admin secret", err)
-		}
-	}
-
 	addAdminSecretToContainerEnvVars(container, adminSecretName)
-
-	return nil
 }
 
 func addAdminSecretToContainerEnvVars(container *v1.Container, adminSecretName string) {
@@ -1240,42 +1278,11 @@ func generateUserName(clusterName string) []byte {
 
 // applyCloudNativeGatewayPodTLSSelfCert adds Cloud Native Gateway server TLS certs and keys from secret to volumes and mounted
 // by generating a self-signed cert and creating the secret, if doesn't exist already.
-func applyCloudNativeGatewayPodTLSSelfCert(client *client.Client, cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) error {
+func applyCloudNativeGatewayPodTLSSelfCert(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
 	// check named cng self-signed secret exists
 	selfCertSecretName := getSelfCertSecretName(cluster.Name)
 
-	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), selfCertSecretName, metav1.GetOptions{})
-	if err != nil {
-		// named secret not found, create a new one
-		dnsName := ""
-		if cluster.Spec.Networking.DNS != nil {
-			dnsName = cluster.Spec.Networking.DNS.Domain
-		}
-
-		ssc, err := GenerateSelfSignedCert(cluster.Namespace, 10*365*24*time.Hour, dnsName)
-		if err != nil {
-			return err
-		}
-
-		selfSignedSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: selfCertSecretName,
-			},
-			Data: map[string][]byte{
-				"tls.crt": ssc.cert,
-				"tls.key": ssc.key,
-			},
-		}
-
-		_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), selfSignedSecret, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("%w: error creating cloud-native-gateway self-signed secret", err)
-		}
-	}
-
 	addSecretToPodVolume(container, pod, CngVolumeName, selfCertSecretName)
-
-	return nil
 }
 
 // addSecretToPodVolume adds the cng server secret name to a volume which then gets added to the pod.
@@ -1305,7 +1312,7 @@ func addSecretToPodVolume(container *v1.Container, pod *v1.Pod, volumeName, secr
 }
 
 // applyPodMonitoring adds any monitoring related hacks required to work.
-func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
+func applyPodMonitoring(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 	// If monitoring is enabled add the necessary side cars.
 	if cluster.Spec.Monitoring == nil {
 		return nil
@@ -1321,7 +1328,7 @@ func applyPodMonitoring(client *client.Client, cluster *couchbasev2.CouchbaseClu
 
 	metricsContainer := createMetricsContainer(cluster.Spec)
 
-	if err := applyMetricsPodSecurity(client, cluster.Spec, &metricsContainer, pod); err != nil {
+	if err := applyMetricsPodSecurity(cluster.Spec, &metricsContainer, pod); err != nil {
 		return err
 	}
 
@@ -1728,7 +1735,7 @@ func applyMetricsPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Con
 	}
 }
 
-func applyMetricsPodSecurity(client *client.Client, cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
+func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
 	// if bearer token is enabled for authorization, mount token as volume
 	if cs.Monitoring.Prometheus.AuthorizationSecret != nil {
 		volume := v1.Volume{
@@ -1750,23 +1757,6 @@ func applyMetricsPodSecurity(client *client.Client, cs couchbasev2.ClusterSpec, 
 		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 		container.Args = append(container.Args, "--token", metricsTokenMountPath+"/token")
-
-		secret, ok := client.Secrets.Get(*cs.Monitoring.Prometheus.AuthorizationSecret)
-		if !ok {
-			return errors.NewStackTracedError(fmt.Errorf("%w: unable to read monitoring token", errors.ErrResourceRequired))
-		}
-
-		token, ok := secret.Data["token"]
-		if !ok {
-			return errors.NewStackTracedError(fmt.Errorf("%w: monitoring token missing in secret", errors.ErrResourceAttributeRequired))
-		}
-
-		container.ReadinessProbe.ProbeHandler.HTTPGet.HTTPHeaders = []v1.HTTPHeader{
-			{
-				Name:  "Authorization",
-				Value: "Bearer " + string(token),
-			},
-		}
 	}
 
 	return nil
@@ -1939,7 +1929,7 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 }
 
 // createCloudNativeGatewayContainer creates a new Cloud Native Gateway container based on inputs from manifest.
-func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) (v1.Container, error) {
+func createCloudNativeGatewayContainer(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) v1.Container {
 	// create a basic cng container.
 	container := v1.Container{
 		Name:  CloudNativeGatewayContainerName,
@@ -1992,18 +1982,12 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 	// K8S Ingress/OC Routes to forward encrypted traffic to the secured CNG server.
 	// without SSL termination at Ingress/Route.
 	if cluster.Spec.Networking.CloudNativeGateway.TLS != nil {
-		if err := applyCloudNativeGatewayPodTLSProvided(client, cluster, &container, pod); err != nil {
-			return v1.Container{}, err
-		}
+		applyCloudNativeGatewayPodTLSProvided(cluster, &container, pod)
 	} else {
-		if err := applyCloudNativeGatewayPodTLSSelfCert(client, cluster, &container, pod); err != nil {
-			return v1.Container{}, err
-		}
+		applyCloudNativeGatewayPodTLSSelfCert(cluster, &container, pod)
 	}
 
-	if err := applyCloudNativeGatewayAdminSecret(client, cluster, &container); err != nil {
-		return v1.Container{}, err
-	}
+	applyCloudNativeGatewayAdminSecret(cluster, &container)
 
 	if cluster.Spec.Security.SecurityContext != nil {
 		container.SecurityContext = cluster.Spec.Security.SecurityContext
@@ -2016,7 +2000,7 @@ func createCloudNativeGatewayContainer(client *client.Client, cluster *couchbase
 		container.Args = append(container.Args, constants.CloudNativeGatewayOtlpFlag, otlp.Endpoint)
 	}
 
-	return container, nil
+	return container
 }
 
 func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
@@ -2031,7 +2015,9 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 		cs.Monitoring.Prometheus.RefreshRate = 60
 	}
 
-	readinessCheckURL := metricsEndpointPath
+	// We added a readiness probe check a long time ago that is not permissioned
+	// For some reason it never got used
+	readinessCheckURL := "/readiness-probe"
 
 	var expImgVerAft180 bool
 

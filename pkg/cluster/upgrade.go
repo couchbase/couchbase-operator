@@ -117,6 +117,10 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			ignoreMigratedHostnameAlias(actual, requestedSpec)
 		}
 
+		// Ignore metrics container readiness probes as that has changed but is obsolete in 2.9
+		requestedSpec.Containers = removeMetricsContainer(requestedSpec.Containers)
+		actualSpec.Containers = removeMetricsContainer(actualSpec.Containers)
+
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
@@ -138,6 +142,18 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	}
 
 	return candidates, nil
+}
+
+func removeMetricsContainer(initial []v1.Container) []v1.Container {
+	containers := []v1.Container{}
+
+	for _, c := range initial {
+		if c.Name != k8sutil.MetricsContainerName {
+			containers = append(containers, c)
+		}
+	}
+
+	return containers
 }
 
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {

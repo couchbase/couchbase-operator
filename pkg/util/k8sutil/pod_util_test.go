@@ -95,13 +95,13 @@ func TestCreateMetricsContainer(t *testing.T) {
 			expImage:          "couchbase/exporter:1.0.0",
 			promEnabled:       true,
 			refreshRate:       20,
-			readinessCheckURL: "/metrics",
+			readinessCheckURL: "/readiness-probe",
 			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 20)},
 		},
 		{
 			expImage:          "myrepo/my-malformed-format",
 			promEnabled:       true,
-			readinessCheckURL: "/metrics",
+			readinessCheckURL: "/readiness-probe",
 			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 60)},
 		},
 		{
@@ -113,7 +113,7 @@ func TestCreateMetricsContainer(t *testing.T) {
 		{
 			expImage:          "myrepo/myimage:1.0.6",
 			promEnabled:       false,
-			readinessCheckURL: "/metrics",
+			readinessCheckURL: "/readiness-probe",
 			containerArgs:     []string{"--per-node-refresh", fmt.Sprintf("%d", 60)},
 		},
 	}

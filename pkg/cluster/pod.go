@@ -247,7 +247,7 @@ func (c *Cluster) reconcilePods() error {
 			image = pvcState.Image
 		}
 
-		requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
+		requested, err := k8sutil.CreateCouchbasePodSpec(member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
 		if err != nil {
 			return err
 		}
@@ -305,7 +305,7 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 	// Regeneration is used for upgrades, so the CRD is the source of truth here.
 	image := c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
 
-	requested, err := k8sutil.CreateCouchbasePodSpec(c.k8s, member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
+	requested, err := k8sutil.CreateCouchbasePodSpec(member, c.cluster, *serverClass, serverGroup, pvcState, image, c.config.GetPodReadinessConfig())
 	if err != nil {
 		return nil, err
 	}
