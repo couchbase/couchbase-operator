@@ -34,6 +34,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 	generate.AddCommand(getGenerateOperatorCommand(root.UseLine(), flags))
 	generate.AddCommand(getGenerateAdmissionCommand(root.UseLine(), flags))
 	generate.AddCommand(getGenerateBackupCommand(flags))
+	generate.AddCommand(getGeneratePodCommand(root.UseLine(), flags))
 
 	// 'cbopcfg create' actually creates resources.
 	create := &cobra.Command{

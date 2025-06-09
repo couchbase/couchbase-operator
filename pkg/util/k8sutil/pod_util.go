@@ -87,7 +87,7 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	image := cluster.Spec.ServerClassCouchbaseImage(&config)
 
 	if pvcState != nil {
-		serverGroup = pvcState.availabilityZone
+		serverGroup = pvcState.AvailabilityZone
 
 		if pvcState.Image != "" {
 			image = pvcState.Image
@@ -244,8 +244,8 @@ type PersistentVolumeClaimState struct {
 	// mounts is an ordered list of mounts to attach to the container.
 	volumeMounts []v1.VolumeMount
 
-	// availabilityZone is where any existing PVCs reside when using server groups.
-	availabilityZone string
+	// AvailabilityZone is where any existing PVCs reside when using server groups.
+	AvailabilityZone string
 
 	// diff records any changes to the specification.
 	diff string
@@ -361,7 +361,7 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 
 	// Set any scheduling hints.
 	if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
-		p.availabilityZone = group
+		p.AvailabilityZone = group
 	}
 
 	if image, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {

@@ -161,7 +161,7 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 	var err error
 
 	// Initialize Kubernetes clients.
-	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster)))
+	c.k8s, err = client.NewClient(c.ctx, c.cluster.Namespace, labels.SelectorFromSet(k8sutil.LabelsForCluster(c.cluster)), nil)
 	if err != nil {
 		return nil, err
 	}

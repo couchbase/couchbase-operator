@@ -114,14 +114,18 @@ type Client struct {
 }
 
 // NewClient initializes all Kubernetes clients and caches.
-func NewClient(ctx context.Context, namespace string, selector fmt.Stringer) (*Client, error) {
+func NewClient(ctx context.Context, namespace string, selector fmt.Stringer, config *rest.Config) (*Client, error) {
 	c := &Client{}
 
 	var err error
 
-	c.KubeConfig, err = rest.InClusterConfig()
-	if err != nil {
-		return nil, err
+	if config != nil {
+		c.KubeConfig = config
+	} else {
+		c.KubeConfig, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c.KubeConfig.WarningHandler = rest.NoWarnings{}
