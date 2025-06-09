@@ -698,6 +698,93 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
 		},
 		{
+			name:           "TestValidateUpgradeStrategyMutuallyExclusiveWithUpgradeProcess",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "ImmediateUpgrade").Replace("/spec/upgradeProcess", "DeltaRecovery")},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery"},
+		},
+		{
+			name: "TestValidateUpgradeUpgradeStrategyMutuallyExclusiveWithUpgradeProcess",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "ImmediateUpgrade").
+				Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.DeltaRecovery})},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery"},
+		},
+		{
+			name:             "TestValidateDeltaRecoveryDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "DeltaRecovery")},
+			shouldFail:       false,
+			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"},
+		},
+		{
+			name:             "TestValidateUpgradeDeltaRecoveryDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.DeltaRecovery})},
+			shouldFail:       false,
+			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"},
+		},
+		{
+			name: "TestValidateInPlaceUpgradeWithOneDataNodeMultiNodeCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "InPlaceUpgrade").
+				Replace("/spec/servers", []couchbasev2.ServerConfig{
+					{
+						Name:     "data_only",
+						Services: []couchbasev2.Service{couchbasev2.DataService},
+						Size:     1,
+					},
+					{
+						Name:     "query_only",
+						Services: []couchbasev2.Service{couchbasev2.QueryService},
+						Size:     1,
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot enable InPlaceUpgrade with one data service node in a multi-node cluster"},
+		},
+		{
+			name: "TestValidateUpgradeInPlaceUpgradeWithOneDataNodeMultiNodeCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}).
+				Replace("/spec/servers", []couchbasev2.ServerConfig{
+					{
+						Name:     "data_only",
+						Services: []couchbasev2.Service{couchbasev2.DataService},
+						Size:     1,
+					},
+					{
+						Name:     "query_only",
+						Services: []couchbasev2.Service{couchbasev2.QueryService},
+						Size:     1,
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot enable InPlaceUpgrade with one data service node in a multi-node cluster"},
+		},
+		{
+			name: "TestValidateInPlaceUpgradeWithOneDataNodeMultiNodeClusterWarning",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "InPlaceUpgrade").
+				Replace("/spec/servers", []couchbasev2.ServerConfig{
+					{
+						Name:     "data_only",
+						Services: []couchbasev2.Service{couchbasev2.DataService},
+						Size:     1,
+					},
+				})},
+			shouldFail:       false,
+			expectedWarnings: []string{"It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online."},
+		},
+		{
+			name: "TestValidateUpgradeInPlaceUpgradeWithOneDataNodeMultiNodeClusterWarning",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}).
+				Replace("/spec/servers", []couchbasev2.ServerConfig{
+					{
+						Name:     "data_only",
+						Services: []couchbasev2.Service{couchbasev2.DataService},
+						Size:     1,
+					},
+				})},
+			shouldFail:       false,
+			expectedWarnings: []string{"It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online."},
+		},
+		{
 			name: "TestValidateVolumeClaimTemplatesNegRejected",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", "0")},

@@ -1645,20 +1645,24 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		}
 	}
 
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+	if c.cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
 		inPlaceUpgrade := couchbasev2.InPlaceUpgrade
-		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
+		if c.cluster.Spec.Upgrade != nil {
+			c.cluster.Spec.Upgrade.UpgradeProcess = inPlaceUpgrade
+		} else {
+			c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
+		}
 	}
 
 	// Carry out the move
 	// We can use the upgrade methods to do this (even though we're not changing the version)
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
+	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
 		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
 	} else {
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
+		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
 			log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
@@ -1761,7 +1765,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+	if c.cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
 		inPlaceUpgrade := couchbasev2.InPlaceUpgrade
 		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
 	}
@@ -1775,12 +1779,12 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			return err
 		}
 
-		if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && podRecoverable {
+		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
 
 			err = r.handleInPlaceUpgrade(c, serverCandidates, targetVersion)
 		} else {
-			if c.cluster.Spec.UpgradeProcess != nil && *c.cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade && !podRecoverable {
+			if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !podRecoverable {
 				log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 			}
 

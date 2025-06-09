@@ -228,8 +228,8 @@ func checkConstraintPerServiceClassPDB(_ *types.Validator, cluster *couchbasev2.
 }
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.UpgradeProcess != nil && cluster.Spec.UpgradeStrategy != nil {
-		if (*cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade || *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery) && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
+	if cluster.Spec.UpgradeStrategy != nil {
+		if (cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade || cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery) && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
 			return fmt.Errorf("cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery")
 		}
 	}
@@ -1104,7 +1104,7 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 }
 
 func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
-	if cluster.Spec.UpgradeProcess != nil && *cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery {
+	if cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
 		return []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"}, nil
 	}
 
@@ -1112,11 +1112,7 @@ func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchba
 }
 
 func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.UpgradeProcess == nil {
-		return nil
-	}
-
-	if (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) && (cluster.GetNumberOfDataServiceNodes() < 2 && len(cluster.Spec.Servers) > 1) {
+	if (cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery || cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade) && (cluster.GetNumberOfDataServiceNodes() < 2 && len(cluster.Spec.Servers) > 1) {
 		return fmt.Errorf("cannot enable InPlaceUpgrade with one data service node in a multi-node cluster")
 	}
 
@@ -1125,8 +1121,8 @@ func checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade(_ *types.
 
 // checkConstraintTwoDataNodesForDeltaRecovery checks there are at least two data nodes when trying to use InPlaceUpgrade.
 func checkConstraintTwoDataNodesForDeltaRecovery(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
-	if cluster.Spec.UpgradeProcess != nil {
-		if cluster.GetNumberOfDataServiceNodes() < 2 && (*cluster.Spec.UpgradeProcess == couchbasev2.DeltaRecovery || *cluster.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade) {
+	if cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery || cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
+		if cluster.GetNumberOfDataServiceNodes() < 2 {
 			return []string{"It is not possible to perform an online In-place Upgrade for a single-node cluster, the cluster will be offline while being upgraded. Please use the Swap Rebalance method to keep the cluster online."}, nil
 		}
 	}
@@ -4140,7 +4136,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	inPlaceUpgrade := curr.Spec.UpgradeProcess != nil && (*curr.Spec.UpgradeProcess == couchbasev2.InPlaceUpgrade || *curr.Spec.UpgradeProcess == couchbasev2.DeltaRecovery)
+	inPlaceUpgrade := (curr.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade || curr.GetUpgradeProcess() == couchbasev2.DeltaRecovery)
 
 	if inPlaceUpgrade && versionBefore72 && versionAfter72 {
 		return fmt.Errorf("in-place upgrades not supported from pre-7.2.0 to versions 7.2.0 and above")

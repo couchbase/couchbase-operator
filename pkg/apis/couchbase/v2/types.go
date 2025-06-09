@@ -2329,6 +2329,17 @@ const (
 	ImmediateHibernation HibernationStrategy = "Immediate"
 )
 
+// UpgradeSpec defines the upgrade configuration for a Couchbase cluster.
+type UpgradeSpec struct {
+	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
+	// When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
+	// ImmediateUpgrade (determined by UpgradeStrategy). When InPlaceUpgrade is requested, the operator will
+	// perform an in-place upgrade on a best effort basis. InPlaceUpgrade cannot be used if the UpgradeStrategy
+	// is set to ImmediateUpgrade.
+	// +kubebuilder:default="SwapRebalance"
+	UpgradeProcess UpgradeProcess `json:"upgradeProcess,omitempty"`
+}
+
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
 // the cluster to be customized.
 type ClusterSpec struct {
@@ -2369,6 +2380,10 @@ type ClusterSpec struct {
 	// to "PrioritizeDataIntegrity".
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
 
+	// Upgrade defines the upgrade configuration for a Couchbase cluster.
+	Upgrade *UpgradeSpec `json:"upgrade,omitempty"`
+
+	// DEPRECATED - By spec.upgrade.upgradeProcess.
 	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
 	// When SwapRebalance is requested (default), pods will be upgraded using either a RollingUpgrade or
 	// ImmediateUpgrade (determined by UpgradeStrategy). When InPlaceUpgrade is requested, the operator will

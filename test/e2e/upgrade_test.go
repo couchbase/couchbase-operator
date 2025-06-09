@@ -1144,12 +1144,11 @@ func TestDeltaRecovery(t *testing.T) {
 	framework.Requires(t, kubernetes).InplaceUpgradeable()
 
 	clusterSize := 3
-	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.UpgradeProcess = &upgradeProcess
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
 
 	// This config triggers unexpected counter errors during upgrade
 	kubernetes.DisableResourceAllocation = true
@@ -1356,9 +1355,9 @@ func TestDeltaRecoveryWithVariousServices(t *testing.T) {
 }
 
 func runDeltaRecoveryTests(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, f *framework.Framework, bucketName string, timeout time.Duration) {
-	upgradeProcess := couchbasev2.InPlaceUpgrade
 	numOfDocs := f.DocsCount
-	cluster.Spec.UpgradeProcess = &upgradeProcess
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
