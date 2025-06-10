@@ -1364,8 +1364,12 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *cou
 	// If we're using CBS 7 then assume it takes precedence over exporter
 	if serverVersionPrometheus {
 		// As always documentation is hard to come across but this appears to be the metrics path for CBS 7+
-		// :8091/metrics
+		// :8091/metrics or :18091/metrics
 		metricsPort = strconv.Itoa(AdminServicePort)
+
+		if cluster.IsTLSEnabled() {
+			metricsPort = strconv.Itoa(AdminServicePortTLS)
+		}
 	} else if loggingEnabled && !exporterEnabled {
 		// logging metrics are only used if exporter and CBS 7 are not in place
 		metricsPath = "/api/v1/metrics/prometheus"
