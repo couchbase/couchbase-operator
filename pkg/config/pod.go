@@ -73,6 +73,40 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 	return cmd
 }
 
+func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+	o := newPodOptions()
+
+	cmd := &cobra.Command{
+		Use:          "pod",
+		Short:        "Creates a pod of a specific cluster.",
+		SilenceUsage: true,
+		Hidden:       true,
+		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
+							to create a pod for a since removed pod, or a new pod when
+							support needs to do so.`),
+		Example: normalize(fmt.Sprintf(`
+                        # Create pod.
+                        %[1]s create pod
+
+			# Create pod scoped to the cluster with a specific index.
+			%[1]s create pod --cluster-name cb-example --server-class all_services --index 3
+
+			# Create pod scoped to a cluster with the next available index.
+			%[1]s create pod --cluster-name cb-example --server-class all_services --auto-index
+		`, command)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			resources, err := o.generate(flags)
+			if err != nil {
+				return err
+			}
+			return createResources(flags, resources)
+		},
+	}
+	o.registerPodGenerateFlags(cmd)
+
+	return cmd
+}
+
 func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.Object, error) {
 	namespace, _, err := flags.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -149,6 +183,9 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 		}
 
 		for _, pvc := range pvcState.List() {
+			// We add this whenever we create PVCs
+			pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+
 			resources = append(resources, pvc)
 		}
 	}

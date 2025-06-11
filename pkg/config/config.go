@@ -49,6 +49,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 	create.AddCommand(getCreateOperatorCommand(root.UseLine(), flags))
 	create.AddCommand(getCreateAdmissionCommand(root.UseLine(), flags))
 	create.AddCommand(getCreateBackupCommand(root.UseLine(), flags))
+	create.AddCommand(getCreatePodCommand(root.UseLine(), flags))
 
 	// 'cbopcfg create' actually deletes resources.
 	deleteCmd := &cobra.Command{

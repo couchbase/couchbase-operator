@@ -151,13 +151,21 @@ func createResources(flags *genericclioptions.ConfigFlags, objects []runtime.Obj
 
 		if mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			if _, err := client.Resource(mapping.Resource).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
-				fmt.Println(err)
+				if err.Error() == "resourceVersion should not be set on objects to be created" {
+					fmt.Printf("%s/%s already exists\n", mapping.Resource.Resource, resource.GetName())
+				} else {
+					fmt.Println(err)
+				}
 
 				continue
 			}
 		} else {
 			if _, err := client.Resource(mapping.Resource).Namespace(namespace).Create(context.Background(), resource, metav1.CreateOptions{}); err != nil {
-				fmt.Println(err)
+				if err.Error() == "resourceVersion should not be set on objects to be created" {
+					fmt.Printf("%s/%s already exists\n", mapping.Resource.Resource, resource.GetName())
+				} else {
+					fmt.Println(err)
+				}
 
 				continue
 			}
