@@ -228,10 +228,8 @@ func checkConstraintPerServiceClassPDB(_ *types.Validator, cluster *couchbasev2.
 }
 
 func checkConstraintMutuallyExclusiveUpgradeFields(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.UpgradeStrategy != nil {
-		if (cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade || cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery) && *cluster.Spec.UpgradeStrategy == couchbasev2.ImmediateUpgrade {
-			return fmt.Errorf("cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery")
-		}
+	if (cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade || cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery) && cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
+		return fmt.Errorf("cannot set spec.upgrade.upgradeStrategy to ImmediateUpgrade when spec.upgrade.upgradeProcess is set to InPlaceUpgrade or DeltaRecovery")
 	}
 
 	return nil

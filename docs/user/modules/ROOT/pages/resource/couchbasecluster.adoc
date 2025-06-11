@@ -347,7 +347,11 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-servers-volumemounts-logs,logs>>: ""
   <<couchbaseclusters-spec-softwareupdatenotifications,softwareUpdateNotifications>>: false
   <<couchbaseclusters-spec-upgrade,upgrade>>:
+    <<couchbaseclusters-spec-upgrade-rollingupgrade,rollingUpgrade>>:
+      <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradable,maxUpgradable>>: 0
+      <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
     <<couchbaseclusters-spec-upgrade-upgradeprocess,upgradeProcess>>: SwapRebalance
+    <<couchbaseclusters-spec-upgrade-upgradestrategy,upgradeStrategy>>: RollingUpgrade
   <<couchbaseclusters-spec-upgradeprocess,upgradeProcess>>: ""
   <<couchbaseclusters-spec-upgradestrategy,upgradeStrategy>>: ""
   <<couchbaseclusters-spec-volumeclaimtemplates,volumeClaimTemplates>>: []
@@ -3640,6 +3644,8 @@ to "PrioritizeDataIntegrity".
 
 ==== Description
 
+*DEPRECATED* - By spec.upgrade.rollingUpgrade.
+
 When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
 at a time.
 If this field is specified then that number can be increased.
@@ -5008,6 +5014,62 @@ When enabled, the UI will alert when a Couchbase server upgrade is available.
 
 Upgrade defines the upgrade configuration for a Couchbase cluster.
 
+=== couchbaseclusters.spec.upgrade.rollingUpgrade
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
+at a time.
+If this field is specified then that number can be increased.
+
+=== couchbaseclusters.spec.upgrade.rollingUpgrade.maxUpgradable
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+MaxUpgradable allows the number of pods affected by an upgrade at any
+one time to be increased.
+By default a rolling upgrade will
+upgrade one pod at a time.
+This field allows that limit to be removed.
+This field must be greater than zero.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+both are defined.
+
+=== couchbaseclusters.spec.upgrade.rollingUpgrade.maxUpgradablePercent
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(100|[1-9][0-9]|[1-9])%$`
+
+==== Description
+
+MaxUpgradablePercent allows the number of pods affected by an upgrade at any
+one time to be increased.
+By default a rolling upgrade will
+upgrade one pod at a time.
+This field allows that limit to be removed.
+This field must be an integer percentage, e.g.
+"10%", in the range 1% to 100%.
+Percentages are relative to the total cluster size, and rounded down to
+the nearest whole number, with a minimum of 1.
+For example, a 10 pod
+cluster, and 25% allowed to upgrade, would yield 2.5 pods per iteration,
+rounded down to 2.
+The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
+both are defined.
+
 === couchbaseclusters.spec.upgrade.upgradeProcess
 
 ==== Constraints
@@ -5027,6 +5089,30 @@ When InPlaceUpgrade is requested, the operator will
 perform an in-place upgrade on a best effort basis.
 InPlaceUpgrade cannot be used if the UpgradeStrategy
 is set to ImmediateUpgrade.
+
+=== couchbaseclusters.spec.upgrade.upgradeStrategy
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `RollingUpgrade`
+
+*Enumerations*: `RollingUpgrade, ImmediateUpgrade`
+
+==== Description
+
+UpgradeStrategy controls how aggressive the Operator is when performing a cluster
+upgrade.
+When a rolling upgrade is requested, pods are upgraded one at a time.
+This
+strategy is slower, however less disruptive.
+When an immediate upgrade strategy is
+requested, all pods are upgraded at the same time.
+This strategy is faster, but more
+disruptive.
+This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting
+to "RollingUpgrade".
 
 === couchbaseclusters.spec.upgradeProcess
 
@@ -5057,6 +5143,8 @@ is set to ImmediateUpgrade.
 *Enumerations*: `RollingUpgrade, ImmediateUpgrade`
 
 ==== Description
+
+*DEPRECATED* - By spec.upgrade.upgradeStrategy.
 
 UpgradeStrategy controls how aggressive the Operator is when performing a cluster
 upgrade.

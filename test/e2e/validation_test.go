@@ -681,34 +681,33 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 		},
 		{
 			name:           "TestValidateRollingUpgradeMaxUpgradableUnderflow",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradable", 0)},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{MaxUpgradable: -1}})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradable`},
+			expectedErrors: []string{`spec.upgrade.rollingUpgrade.maxUpgradable`},
 		},
 		{
 			name:           "TestValidateRollingUpgradeMaxUpgradablePercentUnderflow",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradablePercent", "0%")},
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{MaxUpgradablePercent: "0%"}})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
+			expectedErrors: []string{`spec.upgrade.rollingUpgrade.maxUpgradablePercent`},
 		},
 		{
 			name:           "TestValidateRollingUpgradeMaxUpgradablePercentOverflow",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/rollingUpgrade/maxUpgradablePercent", "9001%")}, // OVER 9000!!!
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{MaxUpgradablePercent: "9001%"}})}, // OVER 9000!!!
 			shouldFail:     true,
-			expectedErrors: []string{`spec.rollingUpgrade.maxUpgradablePercent`},
+			expectedErrors: []string{`spec.upgrade.rollingUpgrade.maxUpgradablePercent`},
 		},
 		{
 			name:           "TestValidateUpgradeStrategyMutuallyExclusiveWithUpgradeProcess",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "ImmediateUpgrade").Replace("/spec/upgradeProcess", "DeltaRecovery")},
 			shouldFail:     true,
-			expectedErrors: []string{"cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery"},
+			expectedErrors: []string{"cannot set spec.upgrade.upgradeStrategy to ImmediateUpgrade when spec.upgrade.upgradeProcess is set to InPlaceUpgrade"},
 		},
 		{
-			name: "TestValidateUpgradeUpgradeStrategyMutuallyExclusiveWithUpgradeProcess",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "ImmediateUpgrade").
-				Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.DeltaRecovery})},
+			name:           "TestValidateUpgradeUpgradeStrategyMutuallyExclusiveWithUpgradeProcess",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade, UpgradeStrategy: couchbasev2.ImmediateUpgrade})},
 			shouldFail:     true,
-			expectedErrors: []string{"cannot set spec.upgradeStrategy to ImmediateUpgrade when spec.UpgradeProcess is set to DeltaRecovery"},
+			expectedErrors: []string{"cannot set spec.upgrade.upgradeStrategy to ImmediateUpgrade when spec.upgrade.upgradeProcess is set to InPlaceUpgrade"},
 		},
 		{
 			name:             "TestValidateDeltaRecoveryDeprecated",

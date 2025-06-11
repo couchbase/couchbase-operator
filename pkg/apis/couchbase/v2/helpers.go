@@ -1148,11 +1148,29 @@ func (c *CouchbaseCluster) GetUpgradeProcess() UpgradeProcess {
 // GetUpgradeStrategy returns the user provided upgrade strategy or a safe default if
 // none is specified.
 func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {
-	if c.Spec.UpgradeStrategy == nil {
-		return RollingUpgrade
+	var upgradeStrategy UpgradeStrategy
+
+	if c.Spec.Upgrade != nil {
+		upgradeStrategy = c.Spec.Upgrade.UpgradeStrategy
+	} else if c.Spec.UpgradeStrategy != nil {
+		upgradeStrategy = *c.Spec.UpgradeStrategy
 	}
 
-	return *c.Spec.UpgradeStrategy
+	if upgradeStrategy == "" {
+		upgradeStrategy = RollingUpgrade
+	}
+
+	return upgradeStrategy
+}
+
+// GetRollingUpgrade returns the user provided rolling upgrade constraints or nil if
+// none is specified.
+func (c *CouchbaseCluster) GetRollingUpgrade() *RollingUpgradeConstraints {
+	if c.Spec.Upgrade != nil {
+		return c.Spec.Upgrade.RollingUpgrade
+	}
+
+	return c.Spec.RollingUpgrade
 }
 
 // GetHibernationStrategy return the user provided hibernation strategy or a safe

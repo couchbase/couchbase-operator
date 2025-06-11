@@ -2338,6 +2338,19 @@ type UpgradeSpec struct {
 	// is set to ImmediateUpgrade.
 	// +kubebuilder:default="SwapRebalance"
 	UpgradeProcess UpgradeProcess `json:"upgradeProcess,omitempty"`
+
+	// UpgradeStrategy controls how aggressive the Operator is when performing a cluster
+	// upgrade.  When a rolling upgrade is requested, pods are upgraded one at a time.  This
+	// strategy is slower, however less disruptive.  When an immediate upgrade strategy is
+	// requested, all pods are upgraded at the same time.  This strategy is faster, but more
+	// disruptive.  This field must be either "RollingUpgrade" or "ImmediateUpgrade", defaulting
+	// to "RollingUpgrade".
+	// +kubebuilder:default="RollingUpgrade"
+	UpgradeStrategy UpgradeStrategy `json:"upgradeStrategy,omitempty"`
+
+	// When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
+	// at a time.  If this field is specified then that number can be increased.
+	RollingUpgrade *RollingUpgradeConstraints `json:"rollingUpgrade,omitempty"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
@@ -2391,6 +2404,7 @@ type ClusterSpec struct {
 	// is set to ImmediateUpgrade.
 	UpgradeProcess *UpgradeProcess `json:"upgradeProcess,omitempty"`
 
+	// DEPRECATED - By spec.upgrade.upgradeStrategy.
 	// UpgradeStrategy controls how aggressive the Operator is when performing a cluster
 	// upgrade.  When a rolling upgrade is requested, pods are upgraded one at a time.  This
 	// strategy is slower, however less disruptive.  When an immediate upgrade strategy is
@@ -2399,6 +2413,7 @@ type ClusterSpec struct {
 	// to "RollingUpgrade".
 	UpgradeStrategy *UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
+	// DEPRECATED - By spec.upgrade.rollingUpgrade.
 	// When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
 	// at a time.  If this field is specified then that number can be increased.
 	RollingUpgrade *RollingUpgradeConstraints `json:"rollingUpgrade,omitempty"`

@@ -972,11 +972,10 @@ func TestUpgradeImmediate(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size3
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	upgradeStrategy := couchbasev2.ImmediateUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.UpgradeStrategy = &upgradeStrategy
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeStrategy: couchbasev2.ImmediateUpgrade}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
@@ -1017,11 +1016,11 @@ func TestUpgradeConstrained(t *testing.T) {
 	upgradablePercent := "67%"
 	upgradeChunkSize := 2
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	upgradeStrategy := couchbasev2.RollingUpgrade
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.UpgradeStrategy = &upgradeStrategy
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeStrategy: couchbasev2.RollingUpgrade}
+
 	cluster.Spec.RollingUpgrade = &couchbasev2.RollingUpgradeConstraints{
 		MaxUpgradablePercent: upgradablePercent,
 	}

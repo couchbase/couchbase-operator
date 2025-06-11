@@ -1226,21 +1226,21 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
 		}
 
-		if c.cluster.Spec.RollingUpgrade != nil {
+		if rollingUpgradeConstraints := c.cluster.GetRollingUpgrade(); rollingUpgradeConstraints != nil {
 			// Start with a big number and pick the smallest of any
 			// explicitly stated number...
 			explicitNumber := constants.IntMax
 
 			// Absolute number is first, so just set it if defined.  A zero value
 			// means it's unset and is pruned from the CR JSON.
-			if c.cluster.Spec.RollingUpgrade.MaxUpgradable != 0 {
-				explicitNumber = c.cluster.Spec.RollingUpgrade.MaxUpgradable
+			if rollingUpgradeConstraints.MaxUpgradable != 0 {
+				explicitNumber = rollingUpgradeConstraints.MaxUpgradable
 			}
 
-			if c.cluster.Spec.RollingUpgrade.MaxUpgradablePercent != "" {
+			if rollingUpgradeConstraints.MaxUpgradablePercent != "" {
 				// Strip the percentage and convert into an interger in the
 				// range 1-100.
-				maxUpgradableRaw := c.cluster.Spec.RollingUpgrade.MaxUpgradablePercent
+				maxUpgradableRaw := rollingUpgradeConstraints.MaxUpgradablePercent
 				maxUpgradableRaw = maxUpgradableRaw[:len(maxUpgradableRaw)-1]
 
 				percentage, err := strconv.Atoi(maxUpgradableRaw)
