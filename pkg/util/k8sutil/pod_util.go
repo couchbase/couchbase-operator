@@ -1044,13 +1044,15 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 
 	pod.Annotations[constants.PodSpecAnnotation] = string(specJSON)
 
-	// If we are creating a default mount, then also create an init container to
-	// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
-	// the init command is idempotent.
-	for _, pvc := range pvcState.pvcs {
-		if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
-			initContainer := couchbaseInitContainer(cluster, pvc.Name, serverConfig, image)
-			pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+	if pvcState != nil {
+		// If we are creating a default mount, then also create an init container to
+		// copy Couchbase's etc directory onto the PVC.  Do this always to avoid surprises
+		// the init command is idempotent.
+		for _, pvc := range pvcState.pvcs {
+			if isPathPersisted(pvc, couchbaseVolumeDefaultConfigDir) {
+				initContainer := couchbaseInitContainer(cluster, pvc.Name, serverConfig, image)
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
+			}
 		}
 	}
 
