@@ -528,7 +528,7 @@ func (c *Cluster) attemptAddNode(member couchbaseutil.Member, url string, servic
 
 	// Successfully got cluster info, check if node already added
 	for _, node := range clusterInfo.Nodes {
-		if string(node.HostName) == url {
+		if node.HostName.WithoutPort() == url {
 			log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
 			return true, nil
 		}
