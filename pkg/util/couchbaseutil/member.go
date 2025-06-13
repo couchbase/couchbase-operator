@@ -27,6 +27,10 @@ func (hostName HostName) GetOTPNode() OTPNode {
 	return OTPNode(fmt.Sprintf("ns_1@%s", dnsName))
 }
 
+func (hostName HostName) WithoutPort() string {
+	return strings.Split(string(hostName), ":")[0]
+}
+
 // HostNameList is a list of Couchbase host names.
 type HostNameList []HostName
 

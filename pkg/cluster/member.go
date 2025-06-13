@@ -496,7 +496,7 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 
 		// Check if node already exists in cluster
 		for _, node := range clusterInfo.Nodes {
-			if string(node.HostName) == url {
+			if node.HostName.WithoutPort() == url {
 				log.V(1).Info("node already exists in cluster", "hostname", url)
 				return nil
 			}
