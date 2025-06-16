@@ -46,7 +46,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) error{
 		checkConstraintClusterName,
-		checkConstraintServerImagesSet,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
 		checkConstraintIndexServiceMemoryQuota,
@@ -1414,95 +1413,6 @@ func checkConstraintTLSMinimumVersion(_ *types.Validator, cluster *couchbasev2.C
 			return err
 		} else if !validVersion {
 			return fmt.Errorf("tls1.0 and tls1.1 are not supported for Couchbase 7.6.0+")
-		}
-	}
-
-	return nil
-}
-
-func checkConstraintServerImagesSet(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	versionSet := map[string]bool{}
-
-	versionSet[cluster.Spec.Image] = true
-
-	for _, serverConf := range cluster.Spec.Servers {
-		if serverConf.Image != "" {
-			versionSet[serverConf.Image] = true
-		}
-	}
-
-	clusterImageVersion, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
-	if err != nil {
-		return err
-	}
-
-	for image := range versionSet {
-		if classImageVersion, err := k8sutil.CouchbaseVersion(image); err != nil {
-			return err
-		} else if classImageVersion != clusterImageVersion && classImageVersion != cluster.Status.CurrentVersion {
-			return fmt.Errorf("server class image version (%s) must match cluster image version (%s) or current version (%s)", classImageVersion, clusterImageVersion, cluster.Status.CurrentVersion)
-		}
-	}
-
-	if len(versionSet) > 2 {
-		versions := []string{}
-		for version := range versionSet {
-			versions = append(versions, version)
-		}
-
-		return fmt.Errorf("a maximum of two couchbase server images can be used in a single cluster, %v images are in use: %v", len(versionSet), versions)
-	}
-
-	if err := checkComatibleImages(cluster); err != nil {
-		return err
-	}
-
-	if err := checkClusterImageHighest(cluster); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func checkComatibleImages(cluster *couchbasev2.CouchbaseCluster) error {
-	lowImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	highImage, err := cluster.Spec.HighestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	lowVersion, err := k8sutil.CouchbaseVersion(lowImage)
-	if err != nil {
-		return err
-	}
-
-	highVersion, err := couchbaseutil.CouchbaseImageVersion(highImage)
-	if err != nil {
-		return err
-	}
-
-	return couchbaseutil.CheckUpgradePath(lowVersion, highVersion)
-}
-
-func checkClusterImageHighest(cluster *couchbasev2.CouchbaseCluster) error {
-	clusterImageVersion, err := couchbaseutil.NewVersionFromImage(cluster.Spec.Image)
-	if err != nil {
-		return err
-	}
-
-	for _, sc := range cluster.Spec.Servers {
-		if sc.Image == "" || sc.Image == cluster.Spec.Image {
-			continue
-		}
-
-		if classImageVersion, err := couchbaseutil.NewVersionFromImage(sc.Image); err != nil {
-			return err
-		} else if clusterImageVersion.Less(classImageVersion) {
-			return fmt.Errorf("server class image version (%s) cannot be higher than cluster image version (%s)", classImageVersion, clusterImageVersion)
 		}
 	}
 
@@ -4099,15 +4009,9 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 }
 
 func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) error {
-	oldImage, err := prev.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
+	oldImage := prev.Spec.CouchbaseImage()
 
-	newImage, err := curr.Spec.HighestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
+	newImage := curr.Spec.CouchbaseImage()
 
 	oldVersion, err := k8sutil.CouchbaseVersion(oldImage)
 	if err != nil {
@@ -4593,15 +4497,9 @@ func checkSampleBucketFieldPresets(resolution couchbasev2.CouchbaseBucketConflic
 }
 
 func checkForVersionChange(current, updated *couchbasev2.CouchbaseCluster) (bool, error) {
-	currentImage, err := current.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return false, err
-	}
+	currentImage := current.Spec.CouchbaseImage()
 
-	updatedImage, err := updated.Spec.HighestInUseCouchbaseVersionImage()
-	if err != nil {
-		return false, err
-	}
+	updatedImage := updated.Spec.CouchbaseImage()
 
 	currentVersion, err := k8sutil.CouchbaseVersion(currentImage)
 	if err != nil {

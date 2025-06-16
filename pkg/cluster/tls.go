@@ -214,7 +214,7 @@ func (c *Cluster) refreshTLSClientSecret() error {
 // a 7.1+ cluster as we may need to install the CA on a non-TLS pod in order
 // to upgrade.
 func (c *Cluster) refreshTLSShadowCASecret() error {
-	ok, err := c.cluster.HighestIsAtLeastVersion("7.1.0")
+	ok, err := c.cluster.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return err
 	}

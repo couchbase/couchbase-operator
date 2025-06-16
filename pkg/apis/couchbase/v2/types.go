@@ -4031,6 +4031,7 @@ type ServerConfig struct {
 	// can be controlled by the Kubernetes horizontal pod autoscaler (HPA).
 	AutoscaleEnabled bool `json:"autoscaleEnabled,omitempty"`
 
+	// DEPRECATED - use spec.image and spec.upgrade instead
 	// Image is the container image name that will be used to launch Couchbase
 	// server instances in this server class. You cannot downgrade the Couchbase
 	// version. Across spec.image and all server classes there can only be two

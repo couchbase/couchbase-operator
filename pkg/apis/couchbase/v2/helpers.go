@@ -304,7 +304,6 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // ServerClassCouchbaseImage selects the image to use for a server class. The priority
 // order is:
 // * Operator Environment image if EnvImagePrecedence is set
-// * Server class image
 // * Cluster image.
 func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
@@ -313,127 +312,13 @@ func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 		}
 	}
 
-	if server != nil {
-		if classImage := server.Image; classImage != "" {
-			return classImage
-		}
-	}
-
 	return cs.Image
 }
 
-func (cs *ClusterSpec) getInUseCouchbaseImages() ([]string, error) {
-	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
-		if cs.EnvImagePrecedence && annotatedImage != "" {
-			return []string{annotatedImage}, nil
-		}
-	}
-
-	clusterImage := cs.Image
-
-	serverConfImage := ""
-	allServerClassesOverriding := true
-
-	for _, serverConf := range cs.Servers {
-		image := serverConf.Image
-
-		if image == "" || image == clusterImage {
-			allServerClassesOverriding = false
-			continue
-		}
-
-		if serverConfImage == "" {
-			serverConfImage = image
-			continue
-		}
-
-		if serverConfImage != image {
-			return []string{""}, errors.ErrTooManyServerImages
-		}
-	}
-
-	if serverConfImage == "" {
-		return []string{clusterImage}, nil
-	}
-
-	if allServerClassesOverriding {
-		return []string{serverConfImage}, nil
-	}
-
-	return []string{clusterImage, serverConfImage}, nil
-}
-
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
-// that is in use. Operator Environment image takes the highest priority
-// If all server classes have their image set to a higher version image than the cluster image
-// then the higher server class image will be returned as the cluster image isn't in use.
+// that is in use. Operator Environment image takes the highest priority.
 func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {
-	images, err := cs.getInUseCouchbaseImages()
-	if err != nil {
-		return "", err
-	}
-
-	switch len(images) {
-	case 1:
-		return images[0], nil
-	case 2:
-		break
-	default:
-		return "", errors.NewStackTracedError(fmt.Errorf("%w: got more images from cluster spec than expected", errors.ErrInternalError))
-	}
-
-	image1, image2 := images[0], images[1]
-
-	image1Version, err := couchbaseutil.NewVersionFromImage(image1)
-	if err != nil {
-		return "", err
-	}
-
-	image2Version, err := couchbaseutil.NewVersionFromImage(image2)
-	if err != nil {
-		return "", err
-	}
-
-	if image1Version.Less(image2Version) {
-		return image1, nil
-	}
-
-	return image2, nil
-}
-
-// HighestInUseCouchbaseVersionImage does the inverse of LowestInUseCouchbaseVersionImage.
-func (cs *ClusterSpec) HighestInUseCouchbaseVersionImage() (string, error) {
-	images, err := cs.getInUseCouchbaseImages()
-	if err != nil {
-		return "", err
-	}
-
-	switch len(images) {
-	case 1:
-		return images[0], nil
-	case 2:
-		break
-	default:
-		return "", errors.NewStackTracedError(fmt.Errorf("%w: got more images from cluster spec than expected", errors.ErrInternalError))
-	}
-
-	image1, image2 := images[0], images[1]
-
-	image1Version, err := couchbaseutil.NewVersionFromImage(image1)
-	if err != nil {
-		return "", err
-	}
-
-	image2Version, err := couchbaseutil.NewVersionFromImage(image2)
-	if err != nil {
-		return "", err
-	}
-
-	if image1Version.Less(image2Version) {
-		return image2, nil
-	}
-
-	return image1, nil
+	return cs.CouchbaseImage(), nil
 }
 
 // Backup Image represents the image to use for backup.
@@ -1166,7 +1051,7 @@ func (c *CouchbaseCluster) GetUpgradeStrategy() UpgradeStrategy {
 // GetRollingUpgrade returns the user provided rolling upgrade constraints or nil if
 // none is specified.
 func (c *CouchbaseCluster) GetRollingUpgrade() *RollingUpgradeConstraints {
-	if c.Spec.Upgrade != nil {
+	if c.Spec.Upgrade != nil && c.Spec.Upgrade.RollingUpgrade != nil {
 		return c.Spec.Upgrade.RollingUpgrade
 	}
 
@@ -1222,26 +1107,6 @@ func (c *CouchbaseCluster) IsAtLeastVersion(v string) (bool, error) {
 	}
 
 	tag, err := couchbaseutil.CouchbaseImageVersion(lowestImage)
-	if err != nil {
-		return false, err
-	}
-
-	available, err := couchbaseutil.VersionAfter(tag, v)
-	if err != nil {
-		return false, err
-	}
-
-	return available, nil
-}
-
-// Checks cluster version is above minimum version requirement.
-func (c *CouchbaseCluster) HighestIsAtLeastVersion(v string) (bool, error) {
-	image, err := c.Spec.HighestInUseCouchbaseVersionImage()
-	if err != nil {
-		return false, err
-	}
-
-	tag, err := couchbaseutil.CouchbaseImageVersion(image)
 	if err != nil {
 		return false, err
 	}

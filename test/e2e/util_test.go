@@ -192,7 +192,6 @@ func registerTests() {
 		framework.NewTestDef(TestSampleBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestUpdateSampleBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDeltaRecovery).WithTags(TagSuiteP0),
-		framework.NewTestDef(TestPartialUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestDeltaRecoveryWithoutDataService).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestResilientDeltaRecovery).WithTags(TagSuiteP0),

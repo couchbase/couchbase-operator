@@ -1678,10 +1678,7 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return err
 	}
 
-	newVersionImage, err := r.c.cluster.Spec.HighestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
+	newVersionImage := r.c.cluster.Spec.CouchbaseImage()
 
 	newVersion, err := couchbaseutil.NewVersionFromImage(newVersionImage)
 	if err != nil {

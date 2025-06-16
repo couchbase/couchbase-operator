@@ -140,12 +140,24 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 						},
 					},
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+							eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+							eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+						},
+					},
 				},
 			},
 			eventschema.Optional{
 				Validator: eventschema.Sequence{
 					Validators: []eventschema.Validatable{
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Optional{
+							Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+						},
 						// I wonder why this is the only case where a member removed event doesn't happen?
 						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 					},
@@ -1019,11 +1031,13 @@ func TestUpgradeConstrained(t *testing.T) {
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeStrategy: couchbasev2.RollingUpgrade}
-
-	cluster.Spec.RollingUpgrade = &couchbasev2.RollingUpgradeConstraints{
-		MaxUpgradablePercent: upgradablePercent,
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeStrategy: couchbasev2.RollingUpgrade,
+		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
+			MaxUpgradablePercent: upgradablePercent,
+		},
 	}
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
@@ -1489,46 +1503,6 @@ func TestInplaceUpgradeWithRollback(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
-}
-
-func TestPartialUpgrade(t *testing.T) {
-	// Platform configuration.
-	f := framework.Global
-
-	kubernetes, cleanup := f.SetupTest(t)
-	defer cleanup()
-
-	framework.Requires(t, kubernetes).Upgradable()
-
-	// Static configuration.
-	classSize := constants.Size1
-	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
-
-	// Create the cluster, checking the version is as we expect, we need an upgrade path.
-	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).MustCreate(t, kubernetes)
-
-	class1Name := cluster.Spec.Servers[0].Name
-	class2Name := cluster.Spec.Servers[1].Name
-
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/1/image", f.CouchbaseServerImageUpgrade).Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
-	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, initialVersion, time.Minute)
-
-	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class1Name, f.CouchbaseServerImage, upgradeVersion)
-	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class2Name, f.CouchbaseServerImageUpgrade, initialVersion)
-
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/1/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
-	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
-
-	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class1Name, f.CouchbaseServerImage, upgradeVersion)
-	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, class2Name, f.CouchbaseServerImage, upgradeVersion)
 }
 
 // TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade tests that when a pod is deleted during

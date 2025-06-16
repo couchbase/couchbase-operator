@@ -4308,11 +4308,6 @@ func TestInvalidImageCombinations(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"must match cluster image version"},
 		},
-		{
-			name:       "TestValidateMaxTwoImages",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/servers/0/image", "couchbase/server:7.2.1").Add("/spec/servers/1/image", "couchbase/server:7.2.2")},
-			shouldFail: true,
-		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

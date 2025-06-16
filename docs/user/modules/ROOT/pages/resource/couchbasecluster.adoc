@@ -4771,8 +4771,10 @@ EnvFrom allows the setting of environment variables in the Couchbase server cont
 
 ==== Description
 
+*DEPRECATED* - use spec.image and spec.upgrade instead
 Image is the container image name that will be used to launch Couchbase
 server instances in this server class.
+
 You cannot downgrade the Couchbase
 version.
 Across spec.image and all server classes there can only be two
