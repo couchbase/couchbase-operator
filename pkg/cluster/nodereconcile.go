@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -113,6 +114,9 @@ type ReconcileMachine struct {
 	// ejectMembers are the nodes that we wish to kick out of the cluster when we call
 	// if and when we rebalance.
 	ejectMembers couchbaseutil.MemberSet
+
+	// upgradedMembers are the nodes that we have successfully upgraded.
+	upgradedMembers couchbaseutil.MemberSet
 
 	// unclusteredMembers members Couchbase knows about but we have no resource for
 	// so they need ejecting and deleting.  They are treated separately from ejectMembers
@@ -303,6 +307,8 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		c: c,
 
 		rebalanceRetries: uint(reconcileRetries),
+
+		upgradedMembers: couchbaseutil.NewMemberSet(),
 	}
 
 	// Reset any timeout counters if nodes have recovered.
@@ -1585,6 +1591,8 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 			return err
 		}
 
+		r.upgradedMembers.Add(candidate)
+
 		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 	}
@@ -1694,6 +1702,13 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
+	r.checkUpgradeStabilizationPeriod()
+
+	if !c.cluster.IsReadyToUpgrade() {
+		log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.namespacedName())
+		return nil
+	}
+
 	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil
@@ -1767,6 +1782,9 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
 	}
 
+	// Handle the stabilization period after the upgrade has completed even if some nodes fail upgrade.
+	defer r.handleApplyingUpgradeStabilizationPeriod()
+
 	groupedCandidates := candidates.GroupByServerConfigs()
 	for serverConfigName, serverCandidates := range groupedCandidates {
 		serverConf := c.cluster.Spec.GetServerConfigByName(serverConfigName)
@@ -1796,6 +1814,49 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	return nil
+}
+
+func (r *ReconcileMachine) handleApplyingUpgradeStabilizationPeriod() {
+	upgradeSpec := r.c.cluster.Spec.Upgrade
+	if upgradeSpec == nil {
+		return
+	}
+
+	if upgradeSpec.StabilizationPeriod == nil {
+		return
+	}
+
+	if len(r.upgradedMembers) == 0 {
+		return
+	}
+
+	r.c.cluster.Status.SetWaitingBetweenUpgrades()
+}
+
+func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
+	upgradeSpec := r.c.cluster.Spec.Upgrade
+
+	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+
+	// If we are waiting then check if the stabilization period has passed.
+	if waitingCond != nil && waitingCond.Status == v1.ConditionTrue {
+		lastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
+
+		if err != nil {
+			// This can happen if someone has messed with the status fields.
+			// We'll just assume that we don't need to wait.
+			log.Info("[WARN]]: failed to parse last update time for node upgrade condition", "error", err)
+			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
+
+			return
+		}
+
+		stabilizationPeriodFinished := time.Since(lastTransitionTime) > upgradeSpec.StabilizationPeriod.Duration
+
+		if stabilizationPeriodFinished {
+			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
+		}
+	}
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
@@ -2114,6 +2175,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		} else { // Update book keeping
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
+			r.upgradedMembers.Add(result.Member)
 
 			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()

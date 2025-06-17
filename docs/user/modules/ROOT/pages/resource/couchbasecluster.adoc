@@ -350,6 +350,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-upgrade-rollingupgrade,rollingUpgrade>>:
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradable,maxUpgradable>>: 0
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
+    <<couchbaseclusters-spec-upgrade-stabilizationperiod,stabilizationPeriod>>: ""
     <<couchbaseclusters-spec-upgrade-upgradeprocess,upgradeProcess>>: SwapRebalance
     <<couchbaseclusters-spec-upgrade-upgradestrategy,upgradeStrategy>>: RollingUpgrade
   <<couchbaseclusters-spec-upgradeprocess,upgradeProcess>>: ""
@@ -5072,6 +5073,17 @@ rounded down to 2.
 The smallest of `maxUpgradable` and `maxUpgradablePercent` takes precedence if
 both are defined.
 
+=== couchbaseclusters.spec.upgrade.stabilizationPeriod
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+StabilizationPeriod is the time the operator will wait after an upgrade cycle before starting the next upgrade cycle.
+If not specified the operator will start the next upgrade immediately.
+
 === couchbaseclusters.spec.upgrade.upgradeProcess
 
 ==== Constraints
@@ -5736,7 +5748,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, Unreconcilable`
+*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, Unreconcilable, WaitingBetweenUpgrades`
 
 ==== Description
 

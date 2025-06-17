@@ -2348,6 +2348,11 @@ type UpgradeSpec struct {
 	// +kubebuilder:default="RollingUpgrade"
 	UpgradeStrategy UpgradeStrategy `json:"upgradeStrategy,omitempty"`
 
+	// StabilizationPeriod is the time the operator will wait after an upgrade cycle before starting the next upgrade cycle.
+	// If not specified the operator will start the next upgrade immediately.
+	// +optional
+	StabilizationPeriod *metav1.Duration `json:"stabilizationPeriod,omitempty"`
+
 	// When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
 	// at a time.  If this field is specified then that number can be increased.
 	RollingUpgrade *RollingUpgradeConstraints `json:"rollingUpgrade,omitempty"`
@@ -4341,7 +4346,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;
 type ClusterConditionType string
 
 const (
@@ -4357,6 +4362,7 @@ const (
 	ClusterConditionAutoscaleReady           ClusterConditionType = "AutoscaleReady"
 	ClusterConditionSynchronized             ClusterConditionType = "Synchronized"
 	ClusterConditionWaitingBetweenMigrations ClusterConditionType = "WaitingBetweenMigrations"
+	ClusterConditionWaitingBetweenUpgrades   ClusterConditionType = "WaitingBetweenUpgrades"
 	ClusterConditionMigrating                ClusterConditionType = "Migrating"
 	ClusterConditionRebalancing              ClusterConditionType = "Rebalancing"
 	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"

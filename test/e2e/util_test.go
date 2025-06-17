@@ -291,6 +291,7 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradeConstrained).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeBucketDurability).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeWithTLS).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestUpgradeStabilizationPeriod).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
