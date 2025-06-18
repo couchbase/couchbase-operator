@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"sort"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -106,4 +107,34 @@ func (c *Cluster) UpdateFailedValidation(err error) error {
 	}
 
 	return nil
+}
+
+func (c *Cluster) GetRunningVersions() []string {
+	versions := []string{}
+
+	for _, member := range c.members {
+		if member.Version() == "" || member.Version() == "unknown" {
+			continue
+		}
+
+		versions = append(versions, member.Version())
+	}
+
+	return versions
+}
+
+func (c *Cluster) GetLowestMemberVersion() string {
+	versions := c.GetRunningVersions()
+
+	sort.Strings(versions)
+
+	return versions[0]
+}
+
+func (c *Cluster) GetHighestMemberVersion() string {
+	versions := c.GetRunningVersions()
+
+	sort.Strings(versions)
+
+	return versions[len(versions)-1]
 }

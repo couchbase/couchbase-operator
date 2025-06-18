@@ -306,13 +306,7 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // * Operator Environment image if EnvImagePrecedence is set
 // * Cluster image.
 func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
-	if annotatedImage, ok := os.LookupEnv(constants.EnvCouchbaseImageName); ok {
-		if cs.EnvImagePrecedence && annotatedImage != "" {
-			return annotatedImage
-		}
-	}
-
-	return cs.Image
+	return cs.CouchbaseImage()
 }
 
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
@@ -821,6 +815,11 @@ func (cs *ClusterStatus) SetExpandingVolumeCondition() {
 
 func (cs *ClusterStatus) SetBucketMigrationCondition() {
 	c := newClusterCondition(ClusterConditionBucketMigration, v1.ConditionTrue, "BucketMigration", "Migrating buckets")
+	cs.setClusterCondition(c)
+}
+
+func (cs *ClusterStatus) SetMixedModeCondition() {
+	c := newClusterCondition(ClusterConditionMixedMode, v1.ConditionTrue, "MixedMode", "Cluster running in mixed mode with two versions")
 	cs.setClusterCondition(c)
 }
 

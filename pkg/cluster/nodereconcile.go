@@ -1782,32 +1782,29 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
 	}
 
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
 	// Handle the stabilization period after the upgrade has completed even if some nodes fail upgrade.
 	defer r.handleApplyingUpgradeStabilizationPeriod()
 
-	groupedCandidates := candidates.GroupByServerConfigs()
-	for serverConfigName, serverCandidates := range groupedCandidates {
-		serverConf := c.cluster.Spec.GetServerConfigByName(serverConfigName)
+	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
+		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 
-		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.ServerClassCouchbaseImage(serverConf))
+		err = r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
 		}
-
-		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
-			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
-
-			err = r.handleInPlaceUpgrade(c, serverCandidates, targetVersion)
-		} else {
-			if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !podRecoverable {
-				log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-			}
-
-			log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", serverCandidates.Names(), "target-version", targetVersion)
-
-			err = r.swapRebalanceMembers(c, serverCandidates)
+	} else {
+		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !podRecoverable {
+			log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
+		log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
+
+		err = r.swapRebalanceMembers(c, candidates)
 		if err != nil {
 			return err
 		}

@@ -347,6 +347,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-servers-volumemounts-logs,logs>>: ""
   <<couchbaseclusters-spec-softwareupdatenotifications,softwareUpdateNotifications>>: false
   <<couchbaseclusters-spec-upgrade,upgrade>>:
+    <<couchbaseclusters-spec-upgrade-previousversionpodcount,previousVersionPodCount>>: 0
     <<couchbaseclusters-spec-upgrade-rollingupgrade,rollingUpgrade>>:
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradable,maxUpgradable>>: 0
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
@@ -5017,6 +5018,20 @@ When enabled, the UI will alert when a Couchbase server upgrade is available.
 
 Upgrade defines the upgrade configuration for a Couchbase cluster.
 
+=== couchbaseclusters.spec.upgrade.previousVersionPodCount
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `0`
+
+==== Description
+
+PreviousVersionPodCount is the number of pods that will be left running at the existing version.
+NOTE: The cluster will not be fully upgraded until all pods are at the new version.
+The default is 0.
+
 === couchbaseclusters.spec.upgrade.rollingUpgrade
 
 ==== Constraints
@@ -5748,7 +5763,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, Unreconcilable, WaitingBetweenUpgrades`
+*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, Unreconcilable, WaitingBetweenUpgrades, MixedMode`
 
 ==== Description
 

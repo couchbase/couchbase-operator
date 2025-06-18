@@ -60,7 +60,26 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		moves = m
 	}
 
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return nil, err
+	}
+
+	numToUpgrade := c.cluster.Spec.TotalSize()
+
+	if c.cluster.Spec.Upgrade != nil {
+		numOldPods := c.members.GroupBy(func(member couchbaseutil.Member) bool {
+			return (member.Version() != targetVersion && member.Version() != "" && member.Version() != "unknown")
+		}).Size()
+
+		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	}
+
 	for name, member := range c.members {
+		if candidates.Size() >= numToUpgrade {
+			break
+		}
+
 		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
@@ -206,6 +225,16 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 	return c.updateCRStatus()
 }
 
+func (c *Cluster) reportMixedMode() error {
+	if c.GetLowestMemberVersion() != c.GetHighestMemberVersion() {
+		c.cluster.Status.SetMixedModeCondition()
+	} else {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionMixedMode)
+	}
+
+	return nil
+}
+
 // reportUpgradeComplete is called unconditionally when the reconcile is complete.
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
@@ -229,17 +258,9 @@ func (c *Cluster) reportUpgradeComplete() error {
 	// Upgrade has completed, raise and event, remove the cluster condition
 	// update the current cluster version and clear the upgrading flag in
 	// persistent storage.
-	lowestImageVer, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
+	lowestImageVer := c.GetLowestMemberVersion()
 
-	version, err := k8sutil.CouchbaseVersion(lowestImageVer)
-	if err != nil {
-		return err
-	}
-
-	if err := c.state.Update(persistence.Version, version); err != nil {
+	if err := c.state.Update(persistence.Version, lowestImageVer); err != nil {
 		return err
 	}
 

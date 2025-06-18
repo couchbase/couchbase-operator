@@ -2356,6 +2356,13 @@ type UpgradeSpec struct {
 	// When `spec.upgradeStrategy` is set to `RollingUpgrade` it will, by default, upgrade one pod
 	// at a time.  If this field is specified then that number can be increased.
 	RollingUpgrade *RollingUpgradeConstraints `json:"rollingUpgrade,omitempty"`
+
+	// PreviousVersionPodCount is the number of pods that will be left running at the existing version.
+	// NOTE: The cluster will not be fully upgraded until all pods are at the new version.
+	// The default is 0.
+	// +optional
+	// +kubebuilder:default=0
+	PreviousVersionPodCount int `json:"previousVersionPodCount,omitempty"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
@@ -4346,7 +4353,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;
 type ClusterConditionType string
 
 const (
@@ -4369,6 +4376,7 @@ const (
 	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration          ClusterConditionType = "BucketMigrating"
 	ClusterUnreconcilable                    ClusterConditionType = "Unreconcilable"
+	ClusterConditionMixedMode                ClusterConditionType = "MixedMode"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

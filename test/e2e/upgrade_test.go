@@ -1610,3 +1610,65 @@ func TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade(t *testing.T) {
 	// Verify all pods are now on the upgraded version
 	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImage, upgradeVersion)
 }
+
+func TestPartialUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	classSize := constants.Size1
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	numOldPods := 1
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).Generate(kubernetes)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	clusterSize := cluster.Spec.TotalSize()
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	expectedImageCountMap := map[string]int{
+		f.CouchbaseServerImageUpgrade: numOldPods,
+		f.CouchbaseServerImage:        clusterSize - numOldPods,
+	}
+
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	expectedImageCountMap = map[string]int{
+		f.CouchbaseServerImage: clusterSize,
+	}
+
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+}

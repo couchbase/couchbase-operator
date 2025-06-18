@@ -191,6 +191,10 @@ func (c *Cluster) reconcile() error {
 		return err
 	}
 
+	if err := c.reportMixedMode(); err != nil {
+		return err
+	}
+
 	if err := c.reportUpgradeComplete(); err != nil {
 		return err
 	}

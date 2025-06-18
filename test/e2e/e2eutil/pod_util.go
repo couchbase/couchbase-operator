@@ -313,3 +313,54 @@ func checkServerClassPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.C
 
 	return nil
 }
+
+func MustGetPodImageCountMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) map[string]int {
+	imageCountMap, err := getPodImageCountMap(k8s, couchbase)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return imageCountMap
+}
+
+func getPodImageCountMap(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) (map[string]int, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	imageCountMap := make(map[string]int)
+
+	for _, pod := range pods.Items {
+		image := pod.Spec.Containers[0].Image
+		imageCountMap[image]++
+	}
+
+	return imageCountMap, nil
+}
+
+func MustCheckPodImageCountMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedImageCountMap map[string]int) {
+	err := checkPodImageCountMap(k8s, couchbase, expectedImageCountMap)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkPodImageCountMap(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expectedImageCountMap map[string]int) error {
+	imageCountMap, err := getPodImageCountMap(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+
+	for image, count := range expectedImageCountMap {
+		if imageCountMap[image] != count {
+			return fmt.Errorf("expected %d pods to be on %s, got %d", count, image, imageCountMap[image])
+		}
+	}
+
+	return nil
+}
