@@ -212,6 +212,8 @@ const (
 	MinimumCouchbaseVersionNoCNGRestriction = "7.2.4"
 	// MinimumCNGVersionWithCBAuthSupport is the first CNG version that has CBAuth support.
 	MinimumCNGVersionWithCBAuthSupport = "0.2.0"
+	// MinimumVersionForMagmaDefaultBackend is the minimum version of Couchbase Server to set magma as the default bucket storage backend.
+	MinimumVersionForMagmaDefaultBackend = "8.0.0"
 )
 
 const (

@@ -565,6 +565,15 @@ func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() CouchbaseStorageBack
 		return c.Spec.Buckets.DefaultStorageBackend
 	}
 
+	after8, err := c.IsAtLeastVersion(constants.MinimumVersionForMagmaDefaultBackend)
+	if err != nil {
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	}
+
+	if after8 {
+		return CouchbaseStorageBackendMagma
+	}
+
 	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
 }
 

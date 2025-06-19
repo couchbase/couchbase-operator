@@ -16,7 +16,9 @@ import (
 // +kubebuilder:validation:Pattern="^[a-zA-Z0-9-_%\\.]{1,100}$"
 type BucketName string
 
-// CouchbaseStorageBackend can either be "couchstore" or "magma"
+// CouchbaseStorageBackend can either be "couchstore" or "magma".
+// Defaults to magma for server versions 8.0.0+. Defaults to
+// couchstore for server versions earlier than 8.0.0.
 // +kubebuilder:validation:Enum=couchstore;magma
 type CouchbaseStorageBackend string
 
