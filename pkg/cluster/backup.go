@@ -1064,6 +1064,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--overwrite-users")
 	}
 
+	if !c.cluster.Spec.Buckets.Managed {
+		args = append(args, "--auto-create-buckets")
+	}
+
 	for flag, value := range disableFlags {
 		if !*value {
 			args = append(args, flag)
