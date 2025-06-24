@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -242,6 +244,21 @@ func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 	}
 
 	return names
+}
+
+func (cs *ClusterSpec) GetAllServerGroups() []string {
+	allServerGroups := []string{}
+	allServerGroups = append(allServerGroups, cs.ServerGroups...)
+
+	for _, config := range cs.Servers {
+		for _, group := range config.ServerGroups {
+			if !slices.Contains(allServerGroups, group) {
+				allServerGroups = append(allServerGroups, group)
+			}
+		}
+	}
+
+	return allServerGroups
 }
 
 // ServerGroupsEnabled returns true if any server config contains server group
@@ -1618,4 +1635,55 @@ func (c *CouchbaseCluster) IsInIndexMismatchErrorState() bool {
 
 func (c *CouchbaseCluster) HasCondition(condition ClusterConditionType) bool {
 	return c.Status.GetCondition(condition) != nil && c.Status.GetCondition(condition).Status == v1.ConditionTrue
+}
+
+func (c *CouchbaseCluster) GetMaxUpgradable() (int, error) {
+	upgradeLimit := 1
+
+	rollingUpgradeConstraints := c.GetRollingUpgrade()
+
+	if rollingUpgradeConstraints == nil {
+		return upgradeLimit, nil
+	}
+
+	// Start with a big number and pick the smallest of any
+	// explicitly stated number...
+	explicitNumber := constants.IntMax
+
+	// Absolute number is first, so just set it if defined.  A zero value
+	// means it's unset and is pruned from the CR JSON.
+	if rollingUpgradeConstraints.MaxUpgradable != 0 {
+		explicitNumber = rollingUpgradeConstraints.MaxUpgradable
+	}
+
+	if rollingUpgradeConstraints.MaxUpgradablePercent != "" {
+		// Strip the percentage and convert into an interger in the
+		// range 1-100.
+		maxUpgradableRaw := rollingUpgradeConstraints.MaxUpgradablePercent
+		maxUpgradableRaw = maxUpgradableRaw[:len(maxUpgradableRaw)-1]
+
+		percentage, err := strconv.Atoi(maxUpgradableRaw)
+		if err != nil {
+			return 1, errors.NewStackTracedError(err)
+		}
+
+		// Yield a number in the range 0->cluster size>.  When zero, we'll
+		// do nothing, so set a lower bound of 1.
+		maxUpgradable := (c.Spec.TotalSize() * percentage) / 100
+		if maxUpgradable <= 0 {
+			maxUpgradable = 1
+		}
+
+		// Select this value if it's smaller than enything already set.
+		if maxUpgradable < explicitNumber {
+			explicitNumber = maxUpgradable
+		}
+	}
+
+	// If we have an explicit value, update the number of candidates.
+	if explicitNumber != constants.IntMax {
+		upgradeLimit = explicitNumber
+	}
+
+	return upgradeLimit, nil
 }

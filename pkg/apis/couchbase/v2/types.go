@@ -1408,11 +1408,11 @@ type CouchbaseBucketSpec struct {
 	// MagmaKeyTreeDataBlockSize is the block size, in bytes, for Magma keyIndex blocks.
 	MagmaKeyTreeDataBlockSize *uint64 `json:"-" annotation:"magmaKeyTreeDataBlockSize"`
 
-	// Rank determines the bucket’s place in the order in which the rebalance process
-	// handles the buckets on the cluster. The higher a bucket’s assigned integer
+	// Rank determines the bucket's place in the order in which the rebalance process
+	// handles the buckets on the cluster. The higher a bucket's assigned integer
 	// (in relation to the integers assigned other buckets), the sooner in the
 	// rebalance process the bucket is handled. This assignment of rank allows a
-	// cluster’s most mission-critical data to be rebalanced with top priority.
+	// cluster's most mission-critical data to be rebalanced with top priority.
 	// This option is only supported for Couchbase Server 7.6.0+.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
@@ -1574,10 +1574,11 @@ type CouchbaseEphemeralBucketSpec struct {
 	// the set of scopes defined for the bucket.
 	Scopes *ScopeSelector `json:"scopes,omitempty"`
 
-	// Rank determines the bucket’s place in the order in which the rebalance process
-	// handles the buckets on the cluster. The higher a bucket’s assigned integer
+	// Rank determines the bucket's place in the order in which the rebalance process
+	// handles the buckets on the cluster. The higher a bucket's assigned integer
 	// (in relation to the integers assigned other buckets), the sooner in the
 	// rebalance process the bucket is handled. This assignment of rank allows a
+	// cluster's most mission-critical data to be rebalanced with top priority.
 	// cluster’s most mission-critical data to be rebalanced with top priority.
 	// This option is only supported for Couchbase Server 7.6.0+.
 	// +kubebuilder:default=0
@@ -2331,6 +2332,15 @@ const (
 	ImmediateHibernation HibernationStrategy = "Immediate"
 )
 
+type UpgradeOrderType string
+
+const (
+	UpgradeOrderTypeNodes         UpgradeOrderType = "Nodes"
+	UpgradeOrderTypeServerGroups  UpgradeOrderType = "ServerGroups"
+	UpgradeOrderTypeServerClasses UpgradeOrderType = "ServerClasses"
+	UpgradeOrderTypeServices      UpgradeOrderType = "Services"
+)
+
 // UpgradeSpec defines the upgrade configuration for a Couchbase cluster.
 type UpgradeSpec struct {
 	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
@@ -2364,7 +2374,21 @@ type UpgradeSpec struct {
 	// The default is 0.
 	// +optional
 	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
 	PreviousVersionPodCount int `json:"previousVersionPodCount,omitempty"`
+
+	// UpgradeOrderType defines the order in which spec.upgrade.upgradeOrderSequence will be interpreted.
+	// +kubebuilder:validation:Enum=Nodes;ServerGroups;ServerClasses;Services
+	// +kubebuilder:default="Nodes"
+	UpgradeOrderType UpgradeOrderType `json:"upgradeOrderType,omitempty"`
+
+	// UpgradeOrder defines the sequence in which nodes will be upgraded.
+	// The sequence will be interpreted based on what `spec.upgrade.upgradeOrderBy` is set to.
+	// If `spec.upgrade.upgradeOrderType` is set to "Nodes" then the sequence will be a list of node names.
+	// If `spec.upgrade.upgradeOrderType` is set to "ServerGroups" then the sequence will be a list of server group names.
+	// If `spec.upgrade.upgradeOrderType` is set to "ServerClasses" then the sequence will be a list of server class names.
+	// If `spec.upgrade.upgradeOrderType` is set to "Services" then the sequence will be a list of service names.
+	UpgradeOrder []string `json:"upgradeOrder,omitempty"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows

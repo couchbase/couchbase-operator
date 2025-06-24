@@ -4221,6 +4221,11 @@ func (in *UpgradeSpec) DeepCopyInto(out *UpgradeSpec) {
 		*out = new(RollingUpgradeConstraints)
 		**out = **in
 	}
+	if in.UpgradeOrder != nil {
+		in, out := &in.UpgradeOrder, &out.UpgradeOrder
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

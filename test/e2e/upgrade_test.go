@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -1671,4 +1672,526 @@ func TestPartialUpgrade(t *testing.T) {
 	}
 
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+}
+
+func TestServerClassesUpgradeOrder(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	numOldPods := 2
+	// Static configuration.
+	classSize := constants.Size2
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Set the upgrade order to upgrade the second server class first and keep two pods on the initial version
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerClasses,
+		UpgradeOrder: []string{
+			cluster.Spec.Servers[1].Name,
+			cluster.Spec.Servers[0].Name,
+		},
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server class to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is still the initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify the first server class is on the initial version and the second server class is on the upgrade version
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	// Set the previous version pod count to 0 to start the upgrade of the second server class
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	// Wait for the upgrade of the second server class to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestServicesUpgradeOrder(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size1
+	clusterSize := classSize * 3
+
+	// Static configuration.
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithSplitEphemeralTopology(classSize).Generate(kubernetes)
+	// servers[0] -> data
+	// servers[1] -> index
+	// servers[2] -> query
+
+	// Set the upgrade order to upgrade the second server class first and keep two pods on the initial version
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServices,
+		UpgradeOrder: []string{
+			string(couchbasev2.QueryService),
+			string(couchbasev2.DataService),
+			string(couchbasev2.IndexService),
+		},
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[2].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	expectedIndexUpgradeOrder := []int{2, 0, 1}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded in the expected order
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	for _, podIndex := range expectedIndexUpgradeOrder {
+		upgradeSequence := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, podIndex)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+		expectedEvents = append(expectedEvents, upgradeSequence)
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestServicesUpgradeOrderSharedServices(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size1
+	numOldPods := classSize * 1
+	// Static configuration.
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithSplitEphemeralTopology(classSize).Generate(kubernetes)
+
+	// Modify the index server class to have data and index
+	cluster.Spec.Servers[1].Services = []couchbasev2.Service{couchbasev2.DataService, couchbasev2.IndexService}
+	cluster.Spec.Servers[1].Name = "data_index"
+
+	// Set the upgrade order to upgrade the second server class first and keep two pods on the initial version
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServices,
+		UpgradeOrder: []string{
+			string(couchbasev2.DataService),
+			string(couchbasev2.QueryService),
+		},
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first service to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is still the initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify the first and second server class is on the initial upgrade version, as they both have the data service and
+	// the third server class is on the initial version as it has the index service
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[2].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Set the previous version pod count to 0 to start the upgrade of the final server class
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	// Wait for the upgrade of the final server class to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[2].Name, f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestServerGroupUpgradeOrder(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	classSize := 2
+	numOldPods := 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Enable server groups
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+
+	// Set the upgrade order to upgrade by server groups
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+		UpgradeOrder: []string{
+			availableServerGroups[1],
+			availableServerGroups[0],
+		},
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server group to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is still the initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify the first server group is on the initial version and the second server group is upgraded
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[0], f.CouchbaseServerImageUpgrade, initialVersion)
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImage, upgradeVersion)
+
+	// Set the previous version pod count to 0 to start the upgrade of the remaining server groups
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	// Wait for the upgrade of the remaining server groups to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Verify the all server groups are upgraded
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[0], f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestNodeUpgradeOrder(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	classSize := 2
+	clusterSize := classSize * 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// We have to wait until the cluster is created to set the upgrade order because the cluster has a generated name
+	upgradeOrderIndexes := []int{3, 1, 2, 0}
+	upgradeOrder := make([]string, len(upgradeOrderIndexes))
+
+	for i, index := range upgradeOrderIndexes {
+		upgradeOrder[i] = couchbaseutil.CreateMemberName(cluster.Name, index)
+	}
+
+	// Set the upgrade order to upgrade by server groups
+	upgradeSpec := &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
+		UpgradeOrder:     upgradeOrder,
+	}
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage).Replace("/spec/upgrade", upgradeSpec), time.Minute)
+
+	// Wait for the upgrade to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded in the expected order
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	for _, podIndex := range upgradeOrderIndexes {
+		upgradeSequence := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, podIndex)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+		expectedEvents = append(expectedEvents, upgradeSequence)
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestNodeUpgradeDefaultOrder(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	classSize := 2
+	clusterSize := classSize * 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded in the expected order
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	expectedUpgradeOrderIndexes := []int{0, 1, 2, 3}
+
+	for _, podIndex := range expectedUpgradeOrderIndexes {
+		upgradeSequence := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, podIndex)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+		expectedEvents = append(expectedEvents, upgradeSequence)
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestServerGroupDefaultOrderUpgrade(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	classSize := 2
+	numOldPods := 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	serverGroups := availableServerGroups[:2]
+
+	sort.Strings(serverGroups)
+
+	// Enable server groups
+	cluster.Spec.ServerGroups = serverGroups
+
+	// Set the upgrade order to upgrade by server groups
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType:        couchbasev2.UpgradeOrderTypeServerGroups,
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server group to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is still the initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify the first server group is upgraded and the second server group is on the initial version
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[0], f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Set the previous version pod count to 0 to start the upgrade of the remaining server groups
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	// Wait for the upgrade of the remaining server groups to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Verify the all server groups are upgraded
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[0], f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImage, upgradeVersion)
+}
+
+func TestServerClassesDefaultOrderUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	numOldPods := 2
+	// Static configuration.
+	classSize := constants.Size2
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Set the upgrade order to upgrade the second server class first and keep two pods on the initial version
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType:        couchbasev2.UpgradeOrderTypeServerClasses,
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server class to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is still the initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify the first server class is on the upgrade version and the second server class is on the initial version
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Set the previous version pod count to 0 to start the upgrade of the second server class
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	// Wait for the upgrade of the second server class to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
 }

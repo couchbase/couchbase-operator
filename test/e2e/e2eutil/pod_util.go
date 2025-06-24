@@ -280,8 +280,9 @@ func FindBackupEphemeralVolume(kubernetes *types.Cluster, backupName string) (*v
 }
 
 func MustCheckServerClassPodsForVersion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serverClass, image, version string) {
-	err := retryutil.RetryFor(time.Second, func() error {
-		return checkServerClassPodsForVersion(k8s, couchbase, serverClass, image, version)
+	err := retryutil.RetryFor(5*time.Second, func() error {
+		labelSelector := constants.CouchbaseServerClusterKey + "=" + couchbase.Name + "," + constants.CouchbaseNodeConfKey + "=" + serverClass
+		return checkPodsSelectionForVersion(k8s, couchbase, labelSelector, image, version)
 	})
 
 	if err != nil {
@@ -289,9 +290,20 @@ func MustCheckServerClassPodsForVersion(t *testing.T, k8s *types.Cluster, couchb
 	}
 }
 
-func checkServerClassPodsForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serverClass, expectedImage, expectedVersion string) error {
+func MustCheckServerGroupPodsForVersion(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, serverGroup, image, version string) {
+	err := retryutil.RetryFor(15*time.Second, func() error {
+		labelSelector := constants.CouchbaseServerClusterKey + "=" + couchbase.Name + "," + constants.FailureDomainZoneLabel + "=" + serverGroup
+		return checkPodsSelectionForVersion(k8s, couchbase, labelSelector, image, version)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func checkPodsSelectionForVersion(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, labelSelector, expectedImage, expectedVersion string) error {
 	listOptions := metav1.ListOptions{
-		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name + "," + constants.CouchbaseNodeConfKey + "=" + serverClass,
+		LabelSelector: labelSelector,
 	}
 
 	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)

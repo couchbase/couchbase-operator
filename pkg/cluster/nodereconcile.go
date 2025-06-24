@@ -1224,53 +1224,14 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 	// Rolling upgrade defaults to a single node at a time, however this can
 	// be increased to an absolute number or a relative size of the cluster.
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
-		// Default to one at a time
-		upgradeLimit := 1
-
 		// Remove orchestrator from list if rolling upgrade
 		if len(candidates) != 1 {
 			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
 		}
 
-		if rollingUpgradeConstraints := c.cluster.GetRollingUpgrade(); rollingUpgradeConstraints != nil {
-			// Start with a big number and pick the smallest of any
-			// explicitly stated number...
-			explicitNumber := constants.IntMax
-
-			// Absolute number is first, so just set it if defined.  A zero value
-			// means it's unset and is pruned from the CR JSON.
-			if rollingUpgradeConstraints.MaxUpgradable != 0 {
-				explicitNumber = rollingUpgradeConstraints.MaxUpgradable
-			}
-
-			if rollingUpgradeConstraints.MaxUpgradablePercent != "" {
-				// Strip the percentage and convert into an interger in the
-				// range 1-100.
-				maxUpgradableRaw := rollingUpgradeConstraints.MaxUpgradablePercent
-				maxUpgradableRaw = maxUpgradableRaw[:len(maxUpgradableRaw)-1]
-
-				percentage, err := strconv.Atoi(maxUpgradableRaw)
-				if err != nil {
-					return nil, errors.NewStackTracedError(err)
-				}
-
-				// Yield a number in the range 0->cluster size>.  When zero, we'll
-				// do nothing, so set a lower bound of 1.
-				maxUpgradable := (c.cluster.Spec.TotalSize() * percentage) / 100
-				if maxUpgradable <= 0 {
-					maxUpgradable = 1
-				}
-
-				// Select this value if it's smaller than enything already set.
-				if maxUpgradable < explicitNumber {
-					explicitNumber = maxUpgradable
-				}
-			}
-
-			// If we have an explicit value, update the number of candidates.
-			if explicitNumber != constants.IntMax {
-				upgradeLimit = explicitNumber
-			}
+		upgradeLimit, err := c.cluster.GetMaxUpgradable()
+		if err != nil {
+			return nil, err
 		}
 
 		// Cap the number of upgrades at the number of candidates.
@@ -1726,7 +1687,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	// Nothing to do, move along.
-	candidates, err := c.needsUpgrade()
+	candidates, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}

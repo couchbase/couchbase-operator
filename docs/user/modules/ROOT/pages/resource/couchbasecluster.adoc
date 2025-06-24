@@ -352,6 +352,9 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradable,maxUpgradable>>: 0
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
     <<couchbaseclusters-spec-upgrade-stabilizationperiod,stabilizationPeriod>>: ""
+    <<couchbaseclusters-spec-upgrade-upgradeorder,upgradeOrder>>:
+    - ""
+    <<couchbaseclusters-spec-upgrade-upgradeordertype,upgradeOrderType>>: Nodes
     <<couchbaseclusters-spec-upgrade-upgradeprocess,upgradeProcess>>: SwapRebalance
     <<couchbaseclusters-spec-upgrade-upgradestrategy,upgradeStrategy>>: RollingUpgrade
   <<couchbaseclusters-spec-upgradeprocess,upgradeProcess>>: ""
@@ -5026,6 +5029,8 @@ Upgrade defines the upgrade configuration for a Couchbase cluster.
 
 *Default*: `0`
 
+*Minimum*: `0`
+
 ==== Description
 
 PreviousVersionPodCount is the number of pods that will be left running at the existing version.
@@ -5098,6 +5103,35 @@ both are defined.
 
 StabilizationPeriod is the time the operator will wait after an upgrade cycle before starting the next upgrade cycle.
 If not specified the operator will start the next upgrade immediately.
+
+=== couchbaseclusters.spec.upgrade.upgradeOrder
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+UpgradeOrder defines the sequence in which nodes will be upgraded.
+The sequence will be interpreted based on what `spec.upgrade.upgradeOrderBy` is set to.
+If `spec.upgrade.upgradeOrderType` is set to "Nodes" then the sequence will be a list of node names.
+If `spec.upgrade.upgradeOrderType` is set to "ServerGroups" then the sequence will be a list of server group names.
+If `spec.upgrade.upgradeOrderType` is set to "ServerClasses" then the sequence will be a list of server class names.
+If `spec.upgrade.upgradeOrderType` is set to "Services" then the sequence will be a list of service names.
+
+=== couchbaseclusters.spec.upgrade.upgradeOrderType
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `Nodes`
+
+*Enumerations*: `Nodes, ServerGroups, ServerClasses, Services`
+
+==== Description
+
+UpgradeOrderType defines the order in which spec.upgrade.upgradeOrderSequence will be interpreted.
 
 === couchbaseclusters.spec.upgrade.upgradeProcess
 

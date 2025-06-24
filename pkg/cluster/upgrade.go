@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"encoding/json"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +18,8 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
 )
+
+var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing"}
 
 func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	candidates := couchbaseutil.MemberSet{}
@@ -35,6 +39,193 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	}
 
 	return candidates
+}
+
+func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet, numToUpgrade int) (couchbaseutil.MemberSet, error) {
+	if c.cluster.Spec.Upgrade == nil {
+		return candidates, nil
+	}
+
+	upgradeOrderType := c.cluster.Spec.Upgrade.UpgradeOrderType
+
+	// Default to one at a time
+	maxUpgradable, err := c.cluster.GetMaxUpgradable()
+	if err != nil {
+		return nil, err
+	}
+
+	switch upgradeOrderType {
+	case couchbasev2.UpgradeOrderTypeNodes:
+		return c.selectCandidatesByNodesOrder(candidates, maxUpgradable, numToUpgrade), nil
+	case couchbasev2.UpgradeOrderTypeServerGroups:
+		return c.selectCandidatesByServerGroupsOrder(candidates)
+	case couchbasev2.UpgradeOrderTypeServerClasses:
+		return c.selectCandidatesByServerClassesOrder(candidates), nil
+	case couchbasev2.UpgradeOrderTypeServices:
+		return c.selectCandidatesByServicesOrder(candidates), nil
+	}
+
+	return candidates, nil
+}
+
+func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet, maxUpgradable int, numToUpgrade int) couchbaseutil.MemberSet {
+	selectionSize := min(maxUpgradable, numToUpgrade)
+	nodeOrder := c.cluster.Spec.Upgrade.UpgradeOrder
+	finalCandidates := couchbaseutil.NewMemberSet()
+
+	for _, node := range nodeOrder {
+		if finalCandidates.Size() >= selectionSize {
+			return finalCandidates
+		}
+
+		if candidates.Contains(node) {
+			finalCandidates.Add(candidates[node])
+		}
+	}
+
+	// Go through the rest in alphabetical order
+	sortedNodes := candidates.Names()
+	sort.Strings(sortedNodes)
+
+	for _, node := range sortedNodes {
+		if finalCandidates.Size() >= selectionSize {
+			return finalCandidates
+		}
+
+		if !finalCandidates.Contains(node) {
+			finalCandidates.Add(candidates[node])
+		}
+	}
+
+	return finalCandidates
+}
+
+func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+	serverGroupOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+
+	// Append all the server groups to the end of the order, to ensure we upgrade
+	// all server groups.
+	allServerGroups := c.cluster.Spec.GetAllServerGroups()
+
+	sort.Strings(allServerGroups)
+	serverGroupOrder = append(serverGroupOrder, allServerGroups...)
+
+	// Group the external members by server group
+	groupedCandidates := map[string]couchbaseutil.MemberSet{}
+
+	for _, candidate := range candidates {
+		// The pod is likely down, so just skip it
+		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name())
+		if err != nil {
+			log.Error(err, "failed to get server group for candidate", "candidate", candidate.Name())
+			continue
+		}
+
+		if _, ok := groupedCandidates[scheduledServerGroup]; !ok {
+			groupedCandidates[scheduledServerGroup] = couchbaseutil.NewMemberSet(candidate)
+		} else {
+			groupedCandidates[scheduledServerGroup].Add(candidate)
+		}
+	}
+
+	for _, group := range serverGroupOrder {
+		if members, ok := groupedCandidates[group]; ok {
+			if members.Size() > 0 {
+				return members, nil
+			}
+		}
+	}
+
+	// If there are remaining candidates not in a server group then they go last
+	return candidates, nil
+}
+func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberSet {
+	servicesOrder := c.cluster.Spec.Upgrade.UpgradeOrder
+	groupedCandidates := candidates.GroupByServerConfigs()
+	filteredCandidates := couchbaseutil.MemberSet{}
+
+	// Add the default services order to the end of the services order, to
+	// ensure we upgrade services that the user didn't include.
+	servicesOrder = append(servicesOrder, DefaultServicesOrder...)
+
+	for _, service := range servicesOrder {
+		for configName, members := range groupedCandidates {
+			serverClass := c.cluster.Spec.GetServerConfigByName(configName)
+			if serverClass != nil && slices.Contains(serverClass.Services, couchbasev2.Service(service)) {
+				filteredCandidates.Merge(members)
+			}
+		}
+
+		if filteredCandidates.Size() > 0 {
+			return filteredCandidates
+		}
+	}
+
+	return candidates
+}
+
+func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberSet {
+	serverClassOrder := c.cluster.Spec.Upgrade.UpgradeOrder
+
+	// Add all the server classes to the end of the order, to ensure we upgrade
+	// all server classes.
+	for _, sc := range c.cluster.Spec.Servers {
+		serverClassOrder = append(serverClassOrder, sc.Name)
+	}
+
+	groupedCandidates := candidates.GroupByServerConfigs()
+
+	for _, sc := range serverClassOrder {
+		if members, ok := groupedCandidates[sc]; ok {
+			if members.Size() > 0 {
+				return members
+			}
+		}
+	}
+
+	// We should never get here, but just in case
+	return candidates
+}
+
+func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return nil, err
+	}
+
+	numOldPods := c.members.GroupBy(func(member couchbaseutil.Member) bool {
+		return (member.Version() != targetVersion && member.Version() != "" && member.Version() != "unknown")
+	}).Size()
+
+	numToUpgrade := numOldPods
+
+	if c.cluster.Spec.Upgrade != nil {
+		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	allCandidates, err := c.needsUpgrade()
+	if err != nil {
+		return nil, err
+	}
+
+	filteredCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates, numToUpgrade)
+	if err != nil {
+		return nil, err
+	}
+
+	finalCandidates := couchbaseutil.MemberSet{}
+
+	for _, member := range filteredCandidates {
+		if finalCandidates.Size() >= numToUpgrade {
+			break
+		}
+
+		finalCandidates.Add(member)
+
+		log.Info("Final pod upgrade candidate", "cluster", c.namespacedName(), "name", member.Name(), "version", member.Version())
+	}
+
+	return finalCandidates, nil
 }
 
 // needsUpgrade does an ordered walk down the list of members, if a member is not
@@ -60,26 +251,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		moves = m
 	}
 
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
-	if err != nil {
-		return nil, err
-	}
-
-	numToUpgrade := c.cluster.Spec.TotalSize()
-
-	if c.cluster.Spec.Upgrade != nil {
-		numOldPods := c.members.GroupBy(func(member couchbaseutil.Member) bool {
-			return (member.Version() != targetVersion && member.Version() != "" && member.Version() != "unknown")
-		}).Size()
-
-		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
-	}
-
 	for name, member := range c.members {
-		if candidates.Size() >= numToUpgrade {
-			break
-		}
-
 		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
 		if !exists {
@@ -246,7 +418,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
-	candidates, err := c.needsUpgrade()
+	candidates, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}

@@ -511,13 +511,13 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 
 ==== Description
 
-Rank determines the bucket’s place in the order in which the rebalance process
+Rank determines the bucket's place in the order in which the rebalance process
 handles the buckets on the cluster.
-The higher a bucket’s assigned integer
+The higher a bucket's assigned integer
 (in relation to the integers assigned other buckets), the sooner in the
 rebalance process the bucket is handled.
 This assignment of rank allows a
-cluster’s most mission-critical data to be rebalanced with top priority.
+cluster's most mission-critical data to be rebalanced with top priority.
 This option is only supported for Couchbase Server 7.6.0+.
 
 === couchbasebuckets.spec.replicas

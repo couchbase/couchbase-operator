@@ -329,7 +329,7 @@ func (ms MemberSet) Size() int {
 	return len(ms)
 }
 
-// Emptry returns whether the member set is empty.
+// Empty returns whether the member set is empty.
 func (ms MemberSet) Empty() bool {
 	return len(ms) == 0
 }
