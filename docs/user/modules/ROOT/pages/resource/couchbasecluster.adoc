@@ -204,6 +204,8 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-exposedfeaturetrafficpolicy,exposedFeatureTrafficPolicy>>: ""
     <<couchbaseclusters-spec-networking-exposedfeatures,exposedFeatures>>:
     - ""
+    <<couchbaseclusters-spec-networking-improvedhostnetwork,improvedHostNetwork>>: false
+    <<couchbaseclusters-spec-networking-initpodswithnodehostname,initPodsWithNodeHostname>>: false
     <<couchbaseclusters-spec-networking-loadbalancersourceranges,loadBalancerSourceRanges>>:
     - ""
     <<couchbaseclusters-spec-networking-networkplatform,networkPlatform>>: ""
@@ -3087,6 +3089,28 @@ When client, all services are exposed as required for client SDK operation.
 This field may contain any of "admin", "xdcr" and "client".
 Each feature may only be
 included once.
+
+=== couchbaseclusters.spec.networking.improvedHostNetwork
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+ImprovedHostNetwork is used to set the alternate address of the pod to the node name.
+
+=== couchbaseclusters.spec.networking.initPodsWithNodeHostname
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+InitPodsWithNodeHostname is used to set the hostname of the pod to the node name.
 
 === couchbaseclusters.spec.networking.loadBalancerSourceRanges
 

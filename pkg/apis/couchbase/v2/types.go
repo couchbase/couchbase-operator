@@ -3201,10 +3201,12 @@ type CouchbaseClusterNetworkingSpec struct {
 	CloudNativeGateway *CloudNativeGateway `json:"cloudNativeGateway,omitempty" annotation:"cloudNativeGateway"`
 
 	// ImprovedHostNetwork is used to set the alternate address of the pod to the node name
-	ImprovedHostNetwork bool `json:"-" annotation:"improvedHostNetwork"`
+	// +kubebulder:default=false
+	ImprovedHostNetwork bool `json:"improvedHostNetwork,omitempty"`
 
 	// InitPodsWithNodeHostname is used to set the hostname of the pod to the node name
-	InitPodsWithNodeHostname bool `json:"-" annotation:"initPodsWithNodeHostname"`
+	// +kubebuilder:default=false
+	InitPodsWithNodeHostname bool `json:"initPodsWithNodeHostname,omitempty"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
