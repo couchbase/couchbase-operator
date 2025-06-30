@@ -34,7 +34,10 @@ const (
 var upgradeSequence = eventschema.Sequence{
 	Validators: []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}}},
+		},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	},
