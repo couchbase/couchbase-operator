@@ -3712,6 +3712,24 @@ type CouchbaseClusterDataSettings struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=3
 	MinReplicasCount int `json:"minReplicasCount,omitempty"`
+
+	// DiskUsageLimit allows a threshold to be set to limit the amount of disk space that can be used by buckets.
+	// If the disk usage limit is reached, Couchbase server will prevent data writes to buckets.
+	// Setting this value reserves disk space for recovery operations like performing rebalances to add a new node.
+	// This field is only supported on Couchbase server versions 8.0 and later.
+	DiskUsageLimit *DiskUsageLimit `json:"diskUsageLimit,omitempty"`
+}
+
+type DiskUsageLimit struct {
+	// Enabled specifies whether the disk usage limit is enabled, defaulting to false.
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Percent is the percentage of disk space that can be used before bucket writes are prevented. This field must be in the range 1-100, defaulting to 85.
+	// +kubebuilder:default=85
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	Percent *int `json:"percent,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

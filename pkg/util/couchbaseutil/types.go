@@ -2006,3 +2006,12 @@ type DataServiceSettings struct {
 type RebalanceProgress struct {
 	Status RebalanceStatus `json:"status"`
 }
+
+type ResourceManagementSettings struct {
+	DiskUsage *DiskUsage `json:"diskUsage,omitempty"`
+}
+
+type DiskUsage struct {
+	Enabled bool `json:"enabled"`
+	Maximum *int `json:"maximum,omitempty"`
+}

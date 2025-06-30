@@ -1578,6 +1578,18 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+`},
 		},
+		{
+			name: "TestValidateDiskUsageLimitUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.6.3").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					DiskUsageLimit: &couchbasev2.DiskUsageLimit{
+						Enabled: util.BoolPtr(true),
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

@@ -1812,3 +1812,34 @@ func MustGetReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *cou
 
 	return settings
 }
+
+func MustGetResourceManagementSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) *couchbaseutil.ResourceManagementSettings {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+	settings := &couchbaseutil.ResourceManagementSettings{}
+	if err := couchbaseutil.GetResourceManagementSettings(settings).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	return settings
+}
+
+func MustVerifyDiskUsageLimit(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, enabled bool, percent int) {
+	callback := func() error {
+		settings := MustGetResourceManagementSettings(t, k8s, couchbase)
+
+		if settings.DiskUsage.Enabled != enabled {
+			return fmt.Errorf("disk usage limit mismatch: expected enabled %v, got enabled %v", enabled, settings.DiskUsage.Enabled)
+		}
+
+		if *settings.DiskUsage.Maximum != percent {
+			return fmt.Errorf("disk usage limit mismatch: expected percent %v, got maximum %v", percent, *settings.DiskUsage.Maximum)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}

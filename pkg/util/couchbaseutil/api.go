@@ -984,3 +984,16 @@ func SetDataServiceSettings(settings *DataServiceSettings) *Request {
 
 	return NewRequest((*Client).Post, "/settings/dataService", data, nil)
 }
+
+func GetResourceManagementSettings(settings *ResourceManagementSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/resourceManagement", nil, settings)
+}
+
+func SetResourceManagementSettings(settings *ResourceManagementSettings) *Request {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/resourceManagement", data, nil)
+}

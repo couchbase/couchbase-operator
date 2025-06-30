@@ -81,6 +81,9 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-clustername,clusterName>>: ""
     <<couchbaseclusters-spec-cluster-data,data>>:
       <<couchbaseclusters-spec-cluster-data-auxiothreads,auxIOThreads>>: 0
+      <<couchbaseclusters-spec-cluster-data-diskusagelimit,diskUsageLimit>>:
+        <<couchbaseclusters-spec-cluster-data-diskusagelimit-enabled,enabled>>: false
+        <<couchbaseclusters-spec-cluster-data-diskusagelimit-percent,percent>>: 85
       <<couchbaseclusters-spec-cluster-data-minreplicascount,minReplicasCount>>: 0
       <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: 0
@@ -1322,6 +1325,48 @@ and should only be increased where there are sufficient CPU resources
 allocated for their use.
 If not specified, this defaults to the
 default value set by Couchbase Server.
+
+=== couchbaseclusters.spec.cluster.data.diskUsageLimit
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+DiskUsageLimit allows a threshold to be set to limit the amount of disk space that can be used by buckets.
+If the disk usage limit is reached, Couchbase server will prevent data writes to buckets.
+Setting this value reserves disk space for recovery operations like performing rebalances to add a new node.
+This field is only supported on Couchbase server versions 8.0 and later.
+
+=== couchbaseclusters.spec.cluster.data.diskUsageLimit.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Enabled specifies whether the disk usage limit is enabled, defaulting to false.
+
+=== couchbaseclusters.spec.cluster.data.diskUsageLimit.percent
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `85`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
+==== Description
+
+Percent is the percentage of disk space that can be used before bucket writes are prevented.
+This field must be in the range 1-100, defaulting to 85.
 
 === couchbaseclusters.spec.cluster.data.minReplicasCount
 

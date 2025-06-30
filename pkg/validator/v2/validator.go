@@ -102,6 +102,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
+		checkConstraintsResourceManagement,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -4700,4 +4701,23 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 	}
 
 	return nil, nil
+}
+
+func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Data == nil {
+		return nil
+	}
+
+	if cluster.Spec.ClusterSettings.Data.DiskUsageLimit != nil {
+		atleast80, err := cluster.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
+
+		if !atleast80 {
+			return fmt.Errorf("spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later")
+		}
+	}
+
+	return nil
 }

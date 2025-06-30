@@ -17,6 +17,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1138,6 +1139,18 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		e2eutil.MustPatchDataServiceSettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinReplicasCount", minReplicaCounts), time.Minute)
 
 		numPatches++
+	}
+
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/diskUsageLimit", &couchbasev2.DiskUsageLimit{Enabled: util.BoolPtr(true), Percent: util.IntPtr(80)}), time.Minute)
+		e2eutil.MustVerifyDiskUsageLimit(t, kubernetes, cluster, time.Minute, true, 80)
+		// Check removing the field resets it to the default value
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/cluster/data/diskUsageLimit"), time.Minute)
+		e2eutil.MustVerifyDiskUsageLimit(t, kubernetes, cluster, time.Minute, false, 85)
+
+		numPatches += 2
 	}
 
 	// Check the events match what we expect:

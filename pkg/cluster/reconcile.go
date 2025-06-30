@@ -567,6 +567,10 @@ func (c *Cluster) reconcileDataSettings() error {
 		return err
 	}
 
+	if err := c.reconcileResourceManagementSettings(); err != nil {
+		return err
+	}
+
 	return c.reconcileDataServiceSettings()
 }
 
@@ -604,6 +608,44 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 
 	log.V(2).Info("Memcached settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memcached settings", c.cluster))
+
+	return nil
+}
+
+func (c *Cluster) reconcileResourceManagementSettings() error {
+	if atleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err != nil || !atleast80 {
+		return err
+	}
+
+	actual := couchbaseutil.ResourceManagementSettings{}
+	if err := couchbaseutil.GetResourceManagementSettings(&actual).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := actual
+	if c.cluster.Spec.ClusterSettings.Data != nil && c.cluster.Spec.ClusterSettings.Data.DiskUsageLimit != nil {
+		requested.DiskUsage = &couchbaseutil.DiskUsage{
+			Enabled: *c.cluster.Spec.ClusterSettings.Data.DiskUsageLimit.Enabled,
+			Maximum: c.cluster.Spec.ClusterSettings.Data.DiskUsageLimit.Percent,
+		}
+	} else {
+		defaultMaximum := 85
+		requested.DiskUsage = &couchbaseutil.DiskUsage{
+			Enabled: false,
+			Maximum: &defaultMaximum,
+		}
+	}
+
+	if reflect.DeepEqual(actual, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetResourceManagementSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	log.Info("Disk usage limits updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("disk usage limits", c.cluster))
 
 	return nil
 }

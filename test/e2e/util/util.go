@@ -56,4 +56,8 @@ func IntPtr(i int) *int {
 	return &i
 }
 
+func BoolPtr(b bool) *bool {
+	return &b
+}
+
 var FrameworkBackupStorageClass func() string
