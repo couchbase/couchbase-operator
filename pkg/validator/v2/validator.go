@@ -2327,6 +2327,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		errs = append(errs, err)
 	}
 
+	if backup.HasCloudStore() && backup.Spec.Strategy == couchbasev2.PeriodicMerge {
+		errs = append(errs, fmt.Errorf("spec.strategy cannot be periodicMerge when using a cloud object store"))
+	}
+
 	if !backup.HasCloudStore() && backup.Spec.EphemeralVolume {
 		errs = append(errs, fmt.Errorf("spec.ephemeralVolume is only useable with spec.objectStore.uri or spec.s3Bucket"))
 	}
@@ -3278,9 +3282,10 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 		}
 	case couchbasev2.ImmediateFull:
 	case couchbasev2.ImmediateIncremental:
+	case couchbasev2.PeriodicMerge:
 	default:
-		errs = append(errs, fmt.Errorf("spec.strategy %s not valid, must be one of %s | %s",
-			backup.Spec.Strategy, couchbasev2.FullIncremental, couchbasev2.FullOnly))
+		errs = append(errs, fmt.Errorf("spec.strategy %s not valid, must be one of %s | %s | %s | %s",
+			backup.Spec.Strategy, couchbasev2.FullIncremental, couchbasev2.FullOnly, couchbasev2.ImmediateFull, couchbasev2.ImmediateIncremental))
 	}
 
 	return errs

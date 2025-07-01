@@ -206,11 +206,15 @@ type CouchbaseBackupSpec struct {
 	// backups, and you must define a schedule in the `spec.full` field.  `full_incremental`
 	// will perform periodic full backups, and incremental backups in between.  You must
 	// define full and incremental schedules in the `spec.full` and `spec.incremental` fields
-	// respectively.  Care should be taken to ensure full and incremental schedules do not
-	// overlap, taking into account the backup time, as this will cause failures as the jobs
-	// attempt to mount the same backup volume. To cause a backup to occur immediately use `immediate_incremental`
-	// or `immediate_full` for incremental or full backups respectively.
-	// This field default to `full_incremental`.
+	// respectively. `periodic_merge` will first create an immediate full backup, after that,
+	// it will only take incremental backups and then merge them. You must define incremental and merge
+	// schedules in the `spec.incremental` and `spec.merge` fields respectively. The initial full backup
+	// will be retried based on spec.backoffLimit, if it reaches this limit without success, then the
+	// incremental, merge cycles won't run. Care should be taken to ensure full, incremental and merge
+	// schedules do not overlap, taking into account the backup time, as this will cause failures as the
+	// jobs attempt to mount the same backup volume. To cause a backup to occur immediately use
+	// `immediate_incremental` or `immediate_full` for incremental or full backups respectively.
+	// respectively. This field default to `full_incremental`.
 	// Info: https://docs.couchbase.com/server/current/backup-restore/cbbackupmgr-strategies.html
 	// +kubebuilder:default="full_incremental"
 	Strategy Strategy `json:"strategy,omitempty"`
@@ -222,6 +226,10 @@ type CouchbaseBackupSpec struct {
 	// Full is the schedule on when to take full backups.
 	// Used in Full/Incremental and FullOnly backup strategies.
 	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
+
+	// Merge is the schedule on when to merge incremental backups.
+	// Used in PeriodicMerge backup strategy.
+	Merge *CouchbaseBackupSchedule `json:"merge,omitempty"`
 
 	// Amount of time to elapse before a completed job is deleted.
 	// +kubebuilder:validation:Minimum=0
@@ -487,7 +495,7 @@ type CouchbaseBackupStatus struct {
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=full_incremental;full_only;immediate_incremental;immediate_full
+// +kubebuilder:validation:Enum=full_incremental;full_only;immediate_incremental;immediate_full;periodic_merge
 type Strategy string
 
 const (
@@ -502,6 +510,9 @@ const (
 
 	// Incremental but now
 	ImmediateIncremental Strategy = "immediate_incremental"
+
+	// Periodic merge strategy
+	PeriodicMerge Strategy = "periodic_merge"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -2922,6 +2922,12 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{},
 		},
+		{
+			name:           "TestValidateBackupCloudWithBackupMerge",
+			mutations:      patchMap{"backup0": jsonpatch.NewPatchSet().Replace("/spec/s3bucket", "s3://hello/beans").Replace("/spec/strategy", "periodic_merge")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.strategy cannot be periodicMerge when using a cloud object store`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

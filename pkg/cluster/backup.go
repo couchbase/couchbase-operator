@@ -27,6 +27,7 @@ type CBBackupmgrAction string
 const (
 	Incremental             CBBackupmgrAction = "incremental"
 	Full                    CBBackupmgrAction = "full"
+	Merge                   CBBackupmgrAction = "merge"
 	ObjEndpointCrtDir       string            = "/var/run/secrets/objectendpoint"
 	backupTLSMountDir       string            = "/var/run/secrets/couchbase.com/tls-mount"
 	StoreSecretAccessID     string            = "access-key-id"
@@ -51,6 +52,9 @@ type backupResources struct {
 
 	// incrementalCronJob (optional) deals with running and schedling an incremental backup.
 	incrementalCronJob *batchv1.CronJob
+
+	// mergeCronJob (optional) deals with running and scheduling merges.
+	mergeCronJob *batchv1.CronJob
 
 	// pvc deals with persisting the backup data.
 	pvc *corev1.PersistentVolumeClaim
@@ -95,6 +99,79 @@ func (l backupResourcesList) unique(l2 backupResourcesList) backupResourcesList 
 	return resources
 }
 
+func mergeBackupResources(l, l2 backupResources) backupResources {
+	if l.fullCronJob == nil {
+		l.fullCronJob = l2.fullCronJob
+	}
+
+	if l.incrementalCronJob == nil {
+		l.incrementalCronJob = l2.incrementalCronJob
+	}
+
+	if l.mergeCronJob == nil {
+		l.mergeCronJob = l2.mergeCronJob
+	}
+
+	if l.pvc == nil {
+		l.pvc = l2.pvc
+	}
+
+	if l.immediateBackupJob == nil {
+		l.immediateBackupJob = l2.immediateBackupJob
+	}
+
+	return l
+}
+
+// returns the mergin of elements of both l and l2, where l takes precedence.
+func (l backupResourcesList) merge(l2 backupResourcesList) backupResourcesList {
+	uniqueResources := make(map[string]backupResources)
+	for _, resource := range l {
+		uniqueResources[resource.name] = resource
+	}
+
+	for _, resource := range l2 {
+		if _, ok := uniqueResources[resource.name]; !ok {
+			uniqueResources[resource.name] = resource
+		} else {
+			uniqueResources[resource.name] = mergeBackupResources(uniqueResources[resource.name], resource)
+		}
+	}
+
+	resources := make(backupResourcesList, 0, len(uniqueResources))
+	for _, resource := range uniqueResources {
+		resources = append(resources, resource)
+	}
+
+	return resources
+}
+
+func (c *Cluster) generateImmediateFullBackupResources(backup *couchbasev2.CouchbaseBackup, resource *backupResources) error {
+	immediateFull, err := c.generateBackupJob(backup, Full)
+	if err != nil {
+		return err
+	}
+
+	resource.immediateBackupJob = immediateFull
+
+	log.V(2).Info("Generated immediate full backup job")
+
+	return nil
+}
+
+func (c *Cluster) generateImmediateIncrementalBackupResources(backup *couchbasev2.CouchbaseBackup, resource *backupResources) error {
+	immediateIncremental, err := c.generateBackupJob(backup, Incremental)
+	if err != nil {
+		return err
+	}
+
+	resource.immediateBackupJob = immediateIncremental
+
+	log.V(2).Info("Generated immediate incremental backup job")
+
+	return nil
+}
+
 // generateBackupResources evaluates the specification and determines the resources
 // required to implement the intended function.
 func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
@@ -119,29 +196,16 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 			pvc:    c.generateBackupPVC(backup),
 		}
 
-		// if the backup is immediate we skip everything else
-		// we don't validate, if you're willing to run immediate backups we assume you know what you're doing.
-		// and don't want to get in your way.
-		if backup.Spec.Strategy == couchbasev2.ImmediateFull {
-			immediateFull, err := c.generateBackupJob(backup, Full)
-			if err != nil {
-				return nil, err
-			}
-
-			resource.immediateBackupJob = immediateFull
-		} else if backup.Spec.Strategy == couchbasev2.ImmediateIncremental {
-			immediateIncremental, err := c.generateBackupJob(backup, Incremental)
-			if err != nil {
-				return nil, err
-			}
-
-			resource.immediateBackupJob = immediateIncremental
+		resourceUpdateFuncsMap := map[couchbasev2.Strategy]func(*couchbasev2.CouchbaseBackup, *backupResources) error{
+			couchbasev2.ImmediateFull:        c.generateImmediateFullBackupResources,
+			couchbasev2.ImmediateIncremental: c.generateImmediateIncrementalBackupResources,
+			couchbasev2.PeriodicMerge:        c.generatePeriodicMergeBackupResources,
 		}
 
-		// this is gross.
-		// if we did an immediate backup there's nothing else to do.
-		if resource.immediateBackupJob != nil {
-			log.V(2).Info("Generated immediate backup job")
+		if resourceUpdateFunc, ok := resourceUpdateFuncsMap[backup.Spec.Strategy]; ok {
+			if err := resourceUpdateFunc(backup, &resource); err != nil {
+				return nil, err
+			}
 
 			resources = append(resources, resource)
 
@@ -182,6 +246,45 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 	return resources, nil
 }
 
+func (c *Cluster) generatePeriodicMergeBackupResources(backup *couchbasev2.CouchbaseBackup, resource *backupResources) error {
+	// We need an immediate full backup before we can do incremental backups or merges
+	immediateFull, err := c.generateBackupJob(backup, Full)
+	if err != nil {
+		return err
+	}
+
+	resource.immediateBackupJob = immediateFull
+
+	if len(backup.Status.Repo) == 0 {
+		// We need to wait for the full backup to complete before we can create the incremental backup/merge cronjobs.
+		return nil
+	}
+
+	if backup.Spec.Incremental == nil || len(backup.Spec.Incremental.Schedule) == 0 {
+		return fmt.Errorf("%w: no valid incremental backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
+	}
+
+	incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
+	if err != nil {
+		return err
+	}
+
+	resource.incrementalCronJob = incrementalCronJob
+
+	if backup.Spec.Merge == nil || len(backup.Spec.Merge.Schedule) == 0 {
+		return fmt.Errorf("%w: no valid merge backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
+	}
+
+	mergeCronJob, err := c.generateBackupCronjob(backup, Merge)
+	if err != nil {
+		return err
+	}
+
+	resource.mergeCronJob = mergeCronJob
+
+	return nil
+}
+
 func (c Cluster) listBackupResources() (backupResourcesList, error) {
 	// cronjobs take priority
 	// since a job may exist with the same backup name.
@@ -192,7 +295,7 @@ func (c Cluster) listBackupResources() (backupResourcesList, error) {
 		return nil, err
 	}
 
-	resources := crons.unique(jobs)
+	resources := crons.merge(jobs)
 
 	return resources, nil
 }
@@ -230,6 +333,8 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 		if ok {
 			resource.pvc = pvc
 		}
+
+		resource.immediateBackupJob = job
 
 		resources = append(resources, *resource)
 	}
@@ -291,6 +396,8 @@ func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 			resource.fullCronJob = cronjob
 		case strings.HasSuffix(cronjob.Name, string(Incremental)):
 			resource.incrementalCronJob = cronjob
+		case strings.HasSuffix(cronjob.Name, string(Merge)):
+			resource.mergeCronJob = cronjob
 		default:
 			return nil, fmt.Errorf("unable to determine cronjob type: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
@@ -351,6 +458,14 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, "scheduled_incremental"})...).Inc()
 	}
 
+	if resource.mergeCronJob != nil {
+		if _, err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Create(context.Background(), resource.mergeCronJob, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+
+		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, "scheduled_merge"})...).Inc()
+	}
+
 	log.Info("Backup created", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupCreateEvent(resource.name, c.cluster))
@@ -358,8 +473,16 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 	return nil
 }
 
-// backupUpdateNotifier acts like a singleton pattern, raising the even only once.
-type backupUpdateNotifier struct {
+type backupUpdateNotifier interface {
+	notify()
+}
+
+type blankNotifier struct{}
+
+func (n *blankNotifier) notify() {}
+
+// backupUpdateNotifierImpl acts like a singleton pattern, raising the even only once.
+type backupUpdateNotifierImpl struct {
 	// c is is the cluster this relates to.
 	c *Cluster
 
@@ -370,7 +493,7 @@ type backupUpdateNotifier struct {
 	raised bool
 }
 
-func (n *backupUpdateNotifier) notify() {
+func (n *backupUpdateNotifierImpl) notify() {
 	if n.raised {
 		return
 	}
@@ -384,9 +507,19 @@ func (n *backupUpdateNotifier) notify() {
 
 // updateBackupResource conditionally updates Kubernetes resources associated with a backup.
 func (c *Cluster) updateBackupResource(requested backupResources, current *backupResources) error {
-	notifier := &backupUpdateNotifier{
+	var notifier backupUpdateNotifier
+	notifier = &backupUpdateNotifierImpl{
 		c:    c,
 		name: requested.name,
+	}
+
+	// If we're creating a periodic merge cronjob, we don't need to notify as the backup wasn't actually updated.
+	if c.isJustPeriodicMergeCronJobCreate(requested, current) {
+		notifier = &blankNotifier{}
+	}
+
+	if err := c.updateBackupJob(notifier, requested.immediateBackupJob, current.immediateBackupJob); err != nil {
+		return err
 	}
 
 	if err := c.updateBackupCronJob(notifier, requested.fullCronJob, current.fullCronJob); err != nil {
@@ -397,14 +530,54 @@ func (c *Cluster) updateBackupResource(requested backupResources, current *backu
 		return err
 	}
 
+	if err := c.updateBackupCronJob(notifier, requested.mergeCronJob, current.mergeCronJob); err != nil {
+		return err
+	}
+
 	err := c.updateBackupPVC(notifier, requested.backup, requested.pvc, current.pvc)
 
 	return err
 }
 
+func (c *Cluster) isJustPeriodicMergeCronJobCreate(requested backupResources, current *backupResources) bool {
+	if current == nil {
+		return false
+	}
+
+	expectedRequest := requested.incrementalCronJob != nil && requested.mergeCronJob != nil
+	expectedCurrent := current.immediateBackupJob != nil &&
+		current.incrementalCronJob == nil &&
+		current.mergeCronJob == nil &&
+		current.fullCronJob == nil
+
+	if expectedRequest && expectedCurrent {
+		return true
+	}
+
+	return false
+}
+
+func (c *Cluster) updateBackupJob(notifier backupUpdateNotifier, requested, current *batchv1.Job) error {
+	if requested == nil && current == nil {
+		return nil
+	}
+
+	if requested != nil && current == nil {
+		if _, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{}); err != nil {
+			return err
+		}
+
+		notifier.notify()
+
+		return nil
+	}
+
+	return nil
+}
+
 // updateBackupCronJob recreates jobs if they have been deleted, deletes them if they need
 // to be e.g. switching from incremental to full, or modifies the configuration.
-func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested, current *batchv1.CronJob) error {
+func (c *Cluster) updateBackupCronJob(notifier backupUpdateNotifier, requested, current *batchv1.CronJob) error {
 	if requested == nil && current == nil {
 		return nil
 	}
@@ -460,7 +633,7 @@ func (c *Cluster) updateBackupCronJob(notifier *backupUpdateNotifier, requested,
 
 // updateBackupPVC recreates the PVC if it has been deleted or does dyanmic expansion if
 // the backup is reporting that space is running low.
-func (c *Cluster) updateBackupPVC(notifier *backupUpdateNotifier, backup *couchbasev2.CouchbaseBackup, requested, current *corev1.PersistentVolumeClaim) error {
+func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchbasev2.CouchbaseBackup, requested, current *corev1.PersistentVolumeClaim) error {
 	if backup.Spec.EphemeralVolume {
 		return nil
 	}
@@ -726,6 +899,9 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	case Full:
 		schedule = backup.Spec.Full.Schedule
 		container = c.generateBackupContainer("cbbackupmgr-full", backup, true)
+	case Merge:
+		schedule = backup.Spec.Merge.Schedule
+		container = c.generateMergeContainer("cbbackupmgr-merge", backup)
 	}
 
 	if c.cluster.Spec.AntiAffinity {
@@ -793,17 +969,68 @@ func (c *Cluster) generateBackupCronjob(backup *couchbasev2.CouchbaseBackup, act
 	return cronjob, nil
 }
 
-// generateBackupContainer returns the actual backup container
-// with the correct image and executable command and arguments
-// config is a boolean that determines whether we take want to config a new repo
-// and then take a Full backup (true) or just an incremental backup (false).
-func (c *Cluster) generateBackupContainer(containerName string, backup *couchbasev2.CouchbaseBackup, full bool) corev1.Container {
+func (c *Cluster) generateMergeBackupContainer(backup *couchbasev2.CouchbaseBackup, args []string, containerName string) corev1.Container {
 	var resources corev1.ResourceRequirements
 
 	if c.cluster.Spec.Backup.Resources != nil {
 		resources = *c.cluster.Spec.Backup.Resources
 	}
 
+	container := corev1.Container{
+		Name:       containerName,
+		Image:      c.cluster.Spec.BackupImage(),
+		Args:       args,
+		WorkingDir: "/",
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      BackupVolumeName,
+				ReadOnly:  false,
+				MountPath: "/data",
+			},
+			{
+				Name:      CouchbaseAdminVolume,
+				ReadOnly:  true,
+				MountPath: "/var/run/secrets/couchbase",
+			},
+		},
+		Resources: resources,
+	}
+
+	c.applyContainerSecurityContext(&container)
+
+	if backup.Spec.ObjectStore != nil && backup.Spec.ObjectStore.URI != "" {
+		c.applyObjStoreConfiguration(&container, backup.Spec.ObjectStore)
+	} else if len(backup.Spec.S3Bucket) != 0 {
+		c.applyLegacyS3Configuration(&container, backup.Spec.S3Bucket)
+		c.applyObjEndpointToContainer(&container, c.cluster.GetBackupStoreEndpoint())
+	}
+
+	return container
+}
+
+// generateBackupContainer returns the actual backup container
+// with the correct image and executable command and arguments
+// config is a boolean that determines whether we take want to config a new repo
+// and then take a Full backup (true) or just an incremental backup (false).
+func (c *Cluster) generateBackupContainer(containerName string, backup *couchbasev2.CouchbaseBackup, full bool) corev1.Container {
+	args := c.generateBackupArgs(backup, full)
+	return c.generateMergeBackupContainer(backup, args, containerName)
+}
+
+func (c *Cluster) generateMergeContainer(containerName string, backup *couchbasev2.CouchbaseBackup) corev1.Container {
+	return c.generateMergeBackupContainer(backup, c.generateMergeArgs(backup), containerName)
+}
+
+func (c *Cluster) generateMergeArgs(backup *couchbasev2.CouchbaseBackup) []string {
+	return []string{
+		"--mode", "merge",
+		"--backup-ret", fmt.Sprintf("%.2f", backup.Spec.BackupRetention.Hours()),
+		"--log-ret", fmt.Sprintf("%.2f", backup.Spec.LogRetention.Hours()),
+		"-v", "INFO",
+	}
+}
+
+func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full bool) []string {
 	args := []string{
 		"--mode", "backup",
 		"--backup-ret", fmt.Sprintf("%.2f", backup.Spec.BackupRetention.Hours()),
@@ -868,36 +1095,7 @@ func (c *Cluster) generateBackupContainer(containerName string, backup *couchbas
 		}
 	}
 
-	container := corev1.Container{
-		Name:       containerName,
-		Image:      c.cluster.Spec.BackupImage(),
-		Args:       args,
-		WorkingDir: "/",
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      BackupVolumeName,
-				ReadOnly:  false,
-				MountPath: "/data",
-			},
-			{
-				Name:      CouchbaseAdminVolume,
-				ReadOnly:  true,
-				MountPath: "/var/run/secrets/couchbase",
-			},
-		},
-		Resources: resources,
-	}
-
-	c.applyContainerSecurityContext(&container)
-
-	if backup.Spec.ObjectStore != nil && backup.Spec.ObjectStore.URI != "" {
-		c.applyObjStoreConfiguration(&container, backup.Spec.ObjectStore)
-	} else if len(backup.Spec.S3Bucket) != 0 {
-		c.applyLegacyS3Configuration(&container, backup.Spec.S3Bucket)
-		c.applyObjEndpointToContainer(&container, c.cluster.GetBackupStoreEndpoint())
-	}
-
-	return container
+	return args
 }
 
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command.

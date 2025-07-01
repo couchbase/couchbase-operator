@@ -1350,6 +1350,11 @@ func (in *CouchbaseBackupSpec) DeepCopyInto(out *CouchbaseBackupSpec) {
 		*out = new(CouchbaseBackupSchedule)
 		**out = **in
 	}
+	if in.Merge != nil {
+		in, out := &in.Merge, &out.Merge
+		*out = new(CouchbaseBackupSchedule)
+		**out = **in
+	}
 	if in.TTLSecondsAfterFinished != nil {
 		in, out := &in.TTLSecondsAfterFinished, &out.TTLSecondsAfterFinished
 		*out = new(int32)

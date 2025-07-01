@@ -140,6 +140,10 @@ func BackupCompletedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Ev
 	return k8sutil.BackupCompleteEvent(backup, c)
 }
 
+func BackupMergeCompletedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
+	return k8sutil.BackupMergeCompletedEvent(backup, c)
+}
+
 func BackupFailedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
 	return k8sutil.BackupFailEvent(backup, c)
 }

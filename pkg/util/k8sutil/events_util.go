@@ -82,6 +82,9 @@ const (
 	EventReasonBackupFailed         = "BackupFailed"
 	EventReasonBackupRestoreCreated = "BackupRestoreCreated"
 	EventReasonBackupRestoreDeleted = "BackupRestoreDeleted"
+	EventReasonBackupMergeStarted   = "BackupMergeStarted"
+	EventReasonBackupMergeCompleted = "BackupMergeCompleted"
+	EventReasonBackupMergeFailed    = "BackupMergeFailed"
 
 	// Security lifecycle.
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
@@ -296,6 +299,15 @@ func BackupFailEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event 
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBackupFailed
 	event.Message = fmt.Sprintf("Backup `%s` failed", backup)
+
+	return event
+}
+
+func BackupMergeCompletedEvent(backup string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupMergeCompleted
+	event.Message = fmt.Sprintf("Backup merge `%s` completed", backup)
 
 	return event
 }

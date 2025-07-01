@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,6 +22,20 @@ import (
 func ScheduleIn(in time.Duration) string {
 	when := time.Now().UTC().Add(in)
 	return fmt.Sprintf("%d * * * *", when.Minute())
+}
+
+func ScheduleXWithYIntervalInZ(x int, y int, z time.Duration) string {
+	first := time.Now().UTC().Add(z)
+
+	builder := strings.Builder{}
+	builder.WriteString(fmt.Sprintf("%d", first.Minute()))
+
+	for i := 1; i < x; i++ {
+		builder.WriteString(fmt.Sprintf(",%d", (first.Minute()+i*y)%60))
+	}
+	builder.WriteString(" * * * *")
+
+	return builder.String()
 }
 
 // DefaultSchedule schedules a cron run that will execute.  If the cron implementation is
@@ -42,6 +57,9 @@ type Backup struct {
 
 	// incrementalSchedule is when to run the incremental backups.
 	incrementalSchedule string
+
+	// mergeSchedule is when to run the merge backups.
+	mergeSchedule string
 
 	// include is what to include in the backup.
 	include []couchbasev2.BucketScopeOrCollectionNameWithDefaults
@@ -104,6 +122,14 @@ func NewIncrementalBackup(fullSchedule, incrementalSchedule string) *Backup {
 		kind:                couchbasev2.FullIncremental,
 		fullSchedule:        fullSchedule,
 		incrementalSchedule: incrementalSchedule,
+	}
+}
+
+func NewPeriodicMergeBackup(incrementalSchedule, mergeSchedule string) *Backup {
+	return &Backup{
+		kind:                couchbasev2.PeriodicMerge,
+		incrementalSchedule: incrementalSchedule,
+		mergeSchedule:       mergeSchedule,
 	}
 }
 
@@ -274,6 +300,12 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 	if b.incrementalSchedule != "" {
 		backup.Spec.Incremental = &couchbasev2.CouchbaseBackupSchedule{
 			Schedule: b.incrementalSchedule,
+		}
+	}
+
+	if b.mergeSchedule != "" {
+		backup.Spec.Merge = &couchbasev2.CouchbaseBackupSchedule{
+			Schedule: b.mergeSchedule,
 		}
 	}
 
