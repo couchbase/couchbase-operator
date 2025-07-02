@@ -34,6 +34,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasebuckets-spec-autocompaction-viewfragmentationthreshold-size,size>>: ""
   <<couchbasebuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbasebuckets-spec-conflictresolution,conflictResolution>>: seqno
+  <<couchbasebuckets-spec-durabilityimpossiblefallback,durabilityImpossibleFallback>>: ""
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
   <<couchbasebuckets-spec-enableindexreplica,enableIndexReplica>>: false
   <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
@@ -311,6 +312,20 @@ Timestamp based resolution selects the document that was written to most recentl
 most recent.
 This field must be "seqno" (sequence based), or "lww" (timestamp based),
 defaulting to "seqno".
+
+=== couchbasebuckets.spec.durabilityImpossibleFallback
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `disabled, fallbackToActiveAck`
+
+==== Description
+
+DurabilityImpossibleFallback defines whether to report writes as durable even if not enough replicas are written to.
+This feature is only supported for Couchbase Server 8.0.0+.
+Defaults to disabled.
 
 === couchbasebuckets.spec.enableFlush
 

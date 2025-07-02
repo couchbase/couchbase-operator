@@ -454,6 +454,13 @@ const (
 	CouchbaseStorageBackendMagma      CouchbaseStorageBackend = "magma"
 )
 
+type DurabilityImpossibleFallback string
+
+const (
+	DurabilityImpossibleFallbackDisabled DurabilityImpossibleFallback = "disabled"
+	DurabilityImpossibleFallbackActive   DurabilityImpossibleFallback = "fallbackToActiveAck"
+)
+
 type CompressionMode string
 
 const (
@@ -503,6 +510,7 @@ type Bucket struct {
 	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
 	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
 	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
+	DurabilityImpossibleFallback      DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 }
 
 type BucketList []Bucket
@@ -565,6 +573,7 @@ type BucketStatus struct {
 	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
 	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
 	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
+	DurabilityImpossibleFallback      DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -893,6 +902,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.AutoCompactionSettings = status.AutoCompactionSettings
 
 	b.AccessScannerEnabled = status.AccessScannerEnabled
+	b.DurabilityImpossibleFallback = status.DurabilityImpossibleFallback
 
 	return nil
 }
@@ -949,6 +959,10 @@ func (b *Bucket) FormEncode(update bool) []byte {
 					data.Set(key, value)
 				}
 			}
+		}
+
+		if b.DurabilityImpossibleFallback != "" {
+			data.Set("durabilityImpossibleFallback", string(b.DurabilityImpossibleFallback))
 		}
 	}
 

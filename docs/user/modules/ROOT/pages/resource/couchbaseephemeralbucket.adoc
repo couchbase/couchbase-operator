@@ -22,6 +22,7 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbaseephemeralbuckets-spec,spec>>:
   <<couchbaseephemeralbuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbaseephemeralbuckets-spec-conflictresolution,conflictResolution>>: seqno
+  <<couchbaseephemeralbuckets-spec-durabilityimpossiblefallback,durabilityImpossibleFallback>>: ""
   <<couchbaseephemeralbuckets-spec-enableflush,enableFlush>>: false
   <<couchbaseephemeralbuckets-spec-evictionpolicy,evictionPolicy>>: noEviction
   <<couchbaseephemeralbuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
@@ -128,6 +129,20 @@ Timestamp based resolution selects the document that was written to most recentl
 most recent.
 This field must be "seqno" (sequence based), or "lww" (timestamp based),
 defaulting to "seqno".
+
+=== couchbaseephemeralbuckets.spec.durabilityImpossibleFallback
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `disabled, fallbackToActiveAck`
+
+==== Description
+
+DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
+This feature is only supported for Couchbase Server 8.0.0+.
+Defaults to disabled.
 
 === couchbaseephemeralbuckets.spec.enableFlush
 

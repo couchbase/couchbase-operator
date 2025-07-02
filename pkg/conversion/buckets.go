@@ -77,6 +77,7 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 				Managed:   true,
 				Resources: []couchbasev2.ScopeLocalObjectReference{},
 			},
+			DurabilityImpossibleFallback: couchbasev2.DurabilityImpossibleFallback(bucket.DurabilityImpossibleFallback),
 		},
 	}
 
@@ -117,6 +118,7 @@ func convertCouchbaseEphemeralBucketToAPIBucket(bucket *couchbaseutil.Bucket, na
 				Managed:   true,
 				Resources: []couchbasev2.ScopeLocalObjectReference{},
 			},
+			DurabilityImpossibleFallback: couchbasev2.DurabilityImpossibleFallback(bucket.DurabilityImpossibleFallback),
 		},
 	}
 }

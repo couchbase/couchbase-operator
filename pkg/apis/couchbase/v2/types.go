@@ -28,6 +28,16 @@ const (
 	CouchbaseStorageBackendMagma      CouchbaseStorageBackend = "magma"
 )
 
+// DurabilityImpossibleFallback can either be "disabled" or "fallbackToActiveAck".
+// This setting is only available for server versions 8.0.0+.
+// +kubebuilder:validation:Enum=disabled;fallbackToActiveAck
+type DurabilityImpossibleFallback string
+
+const (
+	DurabilityImpossibleFallbackDisabled DurabilityImpossibleFallback = "disabled"
+	DurabilityImpossibleFallbackActive   DurabilityImpossibleFallback = "fallbackToActiveAck"
+)
+
 // BucketScopeOrCollectionName is the name of a fully qualifed bucket, scope or collection.
 // The _default scope or collection are not valid for this type.
 // As these names are period separated, and buckets can contain periods, the latter need
@@ -1477,6 +1487,10 @@ type CouchbaseBucketSpec struct {
 	// +kubebuilder:validation:Minimum=51
 	// +kubebuilder:validation:Maximum=90
 	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
+
+	// DurabilityImpossibleFallback defines whether to report writes as durable even if not enough replicas are written to.
+	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
+	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 }
 
 type HistoryRetentionSettings struct {
@@ -1664,6 +1678,10 @@ type CouchbaseEphemeralBucketSpec struct {
 	// +kubebuilder:validation:Minimum=51
 	// +kubebuilder:validation:Maximum=90
 	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
+
+	// DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
+	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
+	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 }
 
 type CouchbaseBucketWarmupBehavior string

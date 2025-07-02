@@ -434,7 +434,10 @@ func TestEditBucket(t *testing.T) {
 		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryHighWatermark", memoryHighWatermark), time.Minute)
 		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MemoryHighWatermark", &memoryHighWatermark), time.Minute)
 
-		patchCycles += 5
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/durabilityImpossibleFallback", couchbasev2.DurabilityImpossibleFallbackActive), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/durabilityImpossibleFallback", couchbasev2.DurabilityImpossibleFallbackActive), time.Minute)
+
+		patchCycles += 6
 	}
 
 	// Avoid a race where Couchbase has been updated but the event not raise yet.

@@ -170,6 +170,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
 				b.MemoryHighWatermark = &defaultMemoryHighWatermark
 			}
+
+			b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
 		}
 
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
@@ -297,6 +299,8 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 		defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
 		b.MemoryHighWatermark = &defaultMemoryHighWatermark
 	}
+
+	b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
 }
 
 // gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
@@ -382,12 +386,12 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		return nil, err
 	}
 
-	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
-
 	atleast80, err := c.IsAtLeastVersion("8.0.0")
 	if err != nil {
 		return nil, err
 	}
+
+	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
 
 	supportedFeatures[Additional80Settings] = atleast80
 
