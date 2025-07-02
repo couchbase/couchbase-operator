@@ -402,6 +402,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		return nil, nil, nil, nil, err
 	}
 
+	memcachedUnsupported, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
 	create := []couchbaseutil.Bucket{}
 	update := []couchbaseutil.Bucket{}
 	remove := []couchbaseutil.Bucket{}
@@ -423,6 +428,12 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				}
 
 				doCrossClusterVersioningChecks(&r, &a, c.cluster)
+
+				// Ignore memcached buckets if the server version is 8.0.0 or higher.
+				if r.BucketType == constants.BucketTypeMemcached && memcachedUnsupported {
+					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "bucket-name", r.BucketName)
+					continue
+				}
 
 				if a.BucketType != r.BucketType {
 					log.Info("Bucket type cannot be changed so recreating with requested type", "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)

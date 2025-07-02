@@ -41,6 +41,11 @@ metadata:
     cao.couchbase.com/enableCrossClusterVersioning: "true"
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseMemcachedBucket
+metadata:
+  name: bucket3
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseReplication
 metadata:
   name: replication0

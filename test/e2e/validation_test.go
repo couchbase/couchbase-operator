@@ -2610,6 +2610,38 @@ func TestNegValidationCreateCouchbaseMemcachedBucket(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestWarningDeprecatedMemcachedBucket(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateDeprecatedMemcachedBucket",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0"),
+				// Empty patch to ensure the bucket is tracked by the warning collector
+				"bucket3": jsonpatch.NewPatchSet(),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{`memcached buckets are deprecated`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-76.yaml"})
+}
+
+func TestUpgradeInvalidMemcachedBucket(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateDeprecatedMemcachedBucket",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`cluster has memcached buckets`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-76.yaml"})
+}
+
 func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 	testDefs := []testDef{
 		{

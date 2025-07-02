@@ -93,3 +93,7 @@ func CheckDefaultStorageClassExists(scList *storagev1.StorageClassList) bool {
 
 	return false
 }
+
+func GenerateMemcachedBucketWarning(cluster *v2.CouchbaseCluster, memcachedBucket *v2.CouchbaseMemcachedBucket) string {
+	return fmt.Sprintf("memcached buckets are deprecated in Couchbase Server 8.0.0 and later, CouchbaseMemcachedBucket %s will be ignored for cluster %s", memcachedBucket.Name, cluster.NamespacedName())
+}

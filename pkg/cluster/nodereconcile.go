@@ -1686,6 +1686,16 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
+	blockers, err := c.getUpgradeBlockers()
+	if err != nil {
+		return err
+	}
+
+	if len(blockers) > 0 {
+		log.Info("[WARN] Cluster can't be upgraded", "cluster", c.namespacedName(), "blockers", blockers)
+		return nil
+	}
+
 	// Nothing to do, move along.
 	candidates, err := c.getUpgradeCandidates()
 	if err != nil {

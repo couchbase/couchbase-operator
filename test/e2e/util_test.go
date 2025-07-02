@@ -84,6 +84,8 @@ func registerTests() {
 		framework.NewTestDef(TestBucketCrossClusterVersioningChangeConstraints).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseEphemeralBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseMemcachedBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestWarningDeprecatedMemcachedBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestUpgradeInvalidMemcachedBucket).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationCreateCouchbaseReplication).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCreateCouchbaseReplication).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationCreateCouchbaseBackup).WithTags(TagSuiteValidation, TagSuitePlatform),

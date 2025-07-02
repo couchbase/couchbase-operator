@@ -327,7 +327,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 			prettyDiff += pvcState.Diff()
 		}
 
-		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
+		log.V(1).Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
 
 		candidates.Add(member)
 	}
@@ -472,4 +472,44 @@ func (c *Cluster) isUpgrading() (bool, error) {
 
 	// explicitly check for active status
 	return upgradeStatus == string(persistence.UpgradeActive), nil
+}
+
+// checkClusterUpgradePrerequisites checks if the cluster is ready to upgrade.
+// Currently the only prerequisite is that clusters going from < 8.0.0 to 8.0.0,
+// need to not have any memcached buckets.
+func (c *Cluster) getUpgradeBlockers() ([]string, error) {
+	startVersion, err := c.state.Get(persistence.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return nil, err
+	}
+
+	if startBefore8, err := couchbaseutil.VersionBefore(startVersion, "8.0.0"); err != nil {
+		return nil, err
+	} else if !startBefore8 {
+		return nil, nil
+	}
+
+	if targetAfter8, err := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); err != nil {
+		return nil, err
+	} else if !targetAfter8 {
+		return nil, nil
+	}
+
+	buckets := couchbaseutil.BucketStatusList{}
+	if err = couchbaseutil.ListBucketStatuses(&buckets).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	for _, bucket := range buckets {
+		if bucket.BucketType == couchbasev2.BucketTypeMemcached {
+			return []string{"cluster has memcached buckets, please remove them before upgrading"}, nil
+		}
+	}
+
+	return nil, nil
 }

@@ -111,6 +111,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintServicelessOverAdminService,
 		checkMigrationConstraints,
 		checkConstraintsIndexerSettings,
+		checkConstraintMemcachedBucketDeprecated,
 	}
 
 	var errs []error
@@ -2099,11 +2100,11 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return nil
 }
 
-func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	if bucket.Spec.MemoryQuota != nil {
@@ -2120,11 +2121,16 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 		errs = append(errs, err)
 	}
 
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	warnings, err := validateMemcachedBucketSupported(v, bucket, cluster)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	return nil
+	if errs != nil {
+		return warnings, errors.CompositeValidationError(errs...)
+	}
+
+	return warnings, nil
 }
 
 func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseReplication) error {
@@ -3174,6 +3180,52 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object, cluste
 	return nil
 }
 
+func validateMemcachedBucketSupported(v *types.Validator, memcachedBucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(memcachedBucket.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	checkCluster := func(cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+		if cluster == nil {
+			return []string{}, nil
+		}
+
+		memcachedDeprecated, err := cluster.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if memcachedDeprecated {
+			return []string{util.GenerateMemcachedBucketWarning(cluster, memcachedBucket)}, nil
+		}
+
+		return []string{}, nil
+	}
+
+	if cluster != nil {
+		return checkCluster(cluster)
+	}
+
+	warnings := []string{}
+	errs := []error{}
+
+	for _, cluster := range clusters.Items {
+		warns, err := checkCluster(&cluster)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		warnings = append(warnings, warns...)
+	}
+
+	if len(errs) > 0 {
+		return warnings, errors.CompositeValidationError(errs...)
+	}
+
+	return warnings, nil
+}
+
 // validateClusterMemoryConstraints given a cluster loads all buckets associated with it and
 // validates that the allocated memory does not exceed the memory allocated for the
 // data service. If validating against new/edited buckets, the memory quota from these buckets will replace any
@@ -3956,6 +4008,31 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	// where we can.
 	// This is a heavy check which is why we gate it behind if the default storage backend
 	// actually changes
+	if err := checkDefaultBucketStorageBackendConstraint(v, prev, curr); err != nil {
+		return err
+	}
+
+	// If the cluster is in hibernation, we should prohibit any changes
+	if err := checkChangeConstraintsHibernate(prev, curr); err != nil {
+		return err
+	}
+
+	if err := checkChangeConstraintsMigration(v, prev, curr); err != nil {
+		return err
+	}
+
+	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
+		return err
+	}
+
+	if err := checkClusterUpgradePrerequisites(v, prev, curr); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
 	if curr.GetDefaultBucketStorageBackend() != prev.GetDefaultBucketStorageBackend() {
 		tag, err := k8sutil.CouchbaseVersion(curr.Spec.Image)
 		if err != nil {
@@ -3998,17 +4075,48 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		}
 	}
 
-	// If the cluster is in hibernation, we should prohibit any changes
-	if err := checkChangeConstraintsHibernate(prev, curr); err != nil {
+	return nil
+}
+
+func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
+	if !curr.Spec.Buckets.Managed {
+		return nil
+	}
+
+	startVersion, err := k8sutil.CouchbaseVersion(prev.Spec.CouchbaseImage())
+	if err != nil {
 		return err
 	}
 
-	if err := checkChangeConstraintsMigration(v, prev, curr); err != nil {
+	targetVersion, err := k8sutil.CouchbaseVersion(curr.Spec.CouchbaseImage())
+	if err != nil {
 		return err
 	}
 
-	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
+	if startBefore8, err := couchbaseutil.VersionBefore(startVersion, "8.0.0"); err != nil {
 		return err
+	} else if !startBefore8 {
+		return nil
+	}
+
+	if targetAfter8, err := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); err != nil {
+		return err
+	} else if !targetAfter8 {
+		return nil
+	}
+
+	buckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(curr.Namespace, curr.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	memcachedBuckets := []string{}
+	for _, bucket := range buckets.Items {
+		memcachedBuckets = append(memcachedBuckets, bucket.Name)
+	}
+
+	if len(memcachedBuckets) > 0 {
+		return fmt.Errorf("cluster has memcached buckets (%s) which are not supported in Couchbase Server version 8.0.0 and above, please remove them before upgrading", strings.Join(memcachedBuckets, ", "))
 	}
 
 	return nil
@@ -4725,4 +4833,27 @@ func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2
 	}
 
 	return nil
+}
+
+func checkConstraintMemcachedBucketDeprecated(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	memcachedDeprecated, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if !memcachedDeprecated {
+		return nil, nil
+	}
+
+	buckets, err := v.Abstraction.GetCouchbaseMemcachedBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	warnings := []string{}
+	for _, bucket := range buckets.Items {
+		warnings = append(warnings, util.GenerateMemcachedBucketWarning(cluster, &bucket))
+	}
+
+	return warnings, nil
 }
