@@ -123,6 +123,7 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 	cmd.Flags().Var(&o.namespaceSelector, "namespace-selector", "Required namespace selector to use when scope is set to 'namespace'.  Format label=value[,label=value].")
 	cmd.Flags().BoolVar(&o.validateSecrets, "validate-secrets", true, "Validates secrets referenced by Couchbase resources, and their contents e.g. TLS configuration, for validity")
 	cmd.Flags().BoolVar(&o.validateStorageClasses, "validate-storage-classes", true, "Validates storage classes referenced by Couchbase resources")
+
 	cmd.Flags().IntVar(&o.replicas, "replicas", admissionDefaultReplicas, "The number of replicas in the deployment")
 	cmd.Flags().BoolVar(&o.withResources, "with-resources", false, "Populates pod resource requests and limits")
 	cmd.Flags().Var(&o.cpuRequest, "cpu-request", "CPU requested for scheduling, only valid when used with --with-resources")

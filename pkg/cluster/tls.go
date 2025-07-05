@@ -998,7 +998,13 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 		}
 	}
 
-	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace)
+	// Respect cluster-level setting for bare hostname validation when provided.
+	validateBareHostnames := true
+	if c.cluster.Spec.Networking.TLS != nil {
+		validateBareHostnames = c.cluster.Spec.Networking.TLS.ValidateBareHostnames
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace, validateBareHostnames)
 
 	if c.cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, "*."+c.cluster.Spec.Networking.DNS.Domain)

@@ -4604,6 +4604,13 @@ type TLSPolicy struct {
 	// are detected.
 	// +kubebuilder:default=false
 	AllowPlainTextCertReload bool `json:"allowPlainTextCertReload,omitempty"`
+
+	// ValidateBareHostnames controls whether the operator expects bare hostname
+	// entries (like "<cluster-name>-srv") in server certificates. When false,
+	// the operator will not require bare hostname SAN entries for its internal
+	// TLS verification. Defaults to true for backward compatibility.
+	// +kubebuilder:default=true
+	ValidateBareHostnames bool `json:"validateBareHostnames"`
 }
 
 type PassphraseType string

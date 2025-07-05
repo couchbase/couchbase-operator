@@ -252,6 +252,7 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-networking-tls-static-operatorsecret,operatorSecret>>: ""
         <<couchbaseclusters-spec-networking-tls-static-serversecret,serverSecret>>: ""
       <<couchbaseclusters-spec-networking-tls-tlsminimumversion,tlsMinimumVersion>>: TLS1.2
+      <<couchbaseclusters-spec-networking-tls-validatebarehostnames,validateBareHostnames>>: True
     <<couchbaseclusters-spec-networking-waitforaddressreachable,waitForAddressReachable>>: 10m
     <<couchbaseclusters-spec-networking-waitforaddressreachabledelay,waitForAddressReachableDelay>>: 2m
   <<couchbaseclusters-spec-onlinevolumeexpansiontimeoutinmins,onlineVolumeExpansionTimeoutInMins>>: 0
@@ -3747,6 +3748,25 @@ Must be one of TLS1.0, TLS1.1 TLS1.2 or TLS1.3,
 defaulting to TLS1.2.
 TLS1.3 is only valid for Couchbase Server 7.1.0 onward.
 TLS1.0 and TLS1.1 are not valid for Couchbase Server 7.6.0 onward.
+
+=== couchbaseclusters.spec.networking.tls.validateBareHostnames
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+ValidateBareHostnames controls whether the operator expects bare hostname
+entries (like "<cluster-name>-srv") in server certificates.
+When false,
+the operator will not require bare hostname SAN entries for its internal
+TLS verification.
+Defaults to true for backward compatibility.
 
 === couchbaseclusters.spec.networking.waitForAddressReachable
 

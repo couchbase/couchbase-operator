@@ -754,7 +754,7 @@ type TLSOpts struct {
 
 // clusterSANs generates a valid set of SANs for a cluster.
 func (ctx *TLSContext) clusterSANs() []string {
-	return util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace)
+	return util_x509.MandatorySANs(ctx.ClusterName, ctx.Namespace, true)
 }
 
 // LegacyTLS returns whether or not the specified TLS Context uses the Legacy TLS system.

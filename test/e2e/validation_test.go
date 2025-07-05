@@ -416,7 +416,7 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				if !ok {
 					tlsOpts := &e2eutil.TLSOpts{
 						ClusterName: object.GetName(),
-						AltNames:    util_x509.MandatorySANs(object.GetName(), kubernetes.Namespace),
+						AltNames:    util_x509.MandatorySANs(object.GetName(), kubernetes.Namespace, true),
 					}
 					tlsOpts.AltNames = append(tlsOpts.AltNames, "*.example.com")
 

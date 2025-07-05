@@ -71,18 +71,17 @@ func getRootDomain() string {
 }
 
 // MandatorySANs returns the list of SANs that all server certificates must implement.
-func MandatorySANs(clusterName, namespace string) []string {
+// If includeBareHostnames is false, bare hostname entries (like "{clusterName}-srv") are excluded.
+func MandatorySANs(clusterName, namespace string, includeBareHostnames bool) []string {
 	root := getRootDomain()
 
-	return []string{
+	sans := []string{
 		fmt.Sprintf("*.%s", clusterName),
 		fmt.Sprintf("*.%s.%s", clusterName, namespace),
 		// Used by the Operator for node connections.
 		fmt.Sprintf("*.%s.%s.svc", clusterName, namespace),
 		// Used for GCCCP SRV connectons.
 		fmt.Sprintf("*.%s.%s.svc.%s", clusterName, namespace, root),
-		// Used by clients for connection in the same namespace.
-		fmt.Sprintf("%s-srv", clusterName),
 		// Used by clients for connection in a different/remote namespace.
 		fmt.Sprintf("%s-srv.%s", clusterName, namespace),
 		fmt.Sprintf("%s-srv.%s.svc", clusterName, namespace),
@@ -91,6 +90,13 @@ func MandatorySANs(clusterName, namespace string) []string {
 		// Used for prometheus side-car and UI access.
 		"localhost",
 	}
+
+	// Add bare hostname entries only if requested
+	if includeBareHostnames {
+		sans = append(sans, fmt.Sprintf("%s-srv", clusterName))
+	}
+
+	return sans
 }
 
 // DecodePEM takes a raw blob of data and tries to decode PEM encoded data.

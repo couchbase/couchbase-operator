@@ -1507,7 +1507,13 @@ func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluste
 		return nil
 	}
 
-	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace)
+	// Determine whether to include bare hostnames from the cluster spec; default to true.
+	includeBareHostnames := true
+	if cluster.Spec.Networking.TLS != nil {
+		includeBareHostnames = cluster.Spec.Networking.TLS.ValidateBareHostnames
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace, includeBareHostnames)
 
 	if cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", cluster.Spec.Networking.DNS.Domain))
