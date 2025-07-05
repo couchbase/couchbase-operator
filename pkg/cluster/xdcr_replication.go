@@ -474,6 +474,15 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 		// any remoteCluster created/added via Operator must have this unique suffix
 		remoteCluster.Name += RemoteClusterOperatorManagedSuffix
 
+		// If the UUID is not provided then we should look it up, if it's not
+		// there then it will be created and we can pick it up on the next
+		// reconciliation.
+		if remoteCluster.UUID == "" {
+			if cluster, err := c.getRemoteClusterByName(remoteCluster.Name); err == nil {
+				remoteCluster.UUID = cluster.UUID
+			}
+		}
+
 		requested := couchbaseutil.RemoteCluster{
 			Name:       remoteCluster.Name,
 			UUID:       remoteCluster.UUID,

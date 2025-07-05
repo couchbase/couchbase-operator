@@ -251,6 +251,7 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRCreateClusterLocalMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterRemoteTLS).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterRemoteMutualTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCROptionalUUID).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeDown).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRSourceNodeAdd).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotatePassword).WithTags(TagSuiteP0, TagFeatureXDCR),
@@ -814,7 +815,7 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	}
 
 	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
-		e2eutil.Die(t, fmt.Errorf(out.String()))
+		e2eutil.Die(t, fmt.Errorf("%s", out.String()))
 	}
 }
 

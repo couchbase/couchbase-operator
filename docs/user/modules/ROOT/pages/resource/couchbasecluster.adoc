@@ -5599,8 +5599,6 @@ and optionally a client certificate (data key "certificate") and key
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 *Pattern (Regular Expression)*: `^[0-9a-f]\{32}$`

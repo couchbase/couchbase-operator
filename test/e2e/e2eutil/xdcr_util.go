@@ -182,6 +182,37 @@ func createRemoteClusterGeneric(srcK8s, dstK8s *types.Cluster, source, target *c
 	return remoteClusterName, err
 }
 
+// createRemoteClusterGenericWithoutUUID creates a remote cluster without specifying UUID,
+// testing the optional UUID functionality where the operator should auto-resolve it.
+func createRemoteClusterGenericWithoutUUID(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, xdcrSecretName string) (string, error) {
+	remoteClusterName := target.Name
+
+	_, host, err := getRemoteUUIDAndHostGeneric(dstK8s, target)
+	if err != nil {
+		return "", err
+	}
+
+	// Create remote cluster without UUID - this tests the optional UUID feature
+	remoteClusters := []couchbasev2.RemoteCluster{
+		{
+			Name: remoteClusterName,
+			// UUID is intentionally omitted to test optional UUID functionality
+			Hostname:             host,
+			AuthenticationSecret: &xdcrSecretName,
+		},
+	}
+
+	src, err := patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr/managed", true), time.Minute)
+	if err != nil {
+		return "", err
+	}
+
+	src, err = patchCluster(srcK8s, src, jsonpatch.NewPatchSet().Add("/spec/xdcr/remoteClusters", remoteClusters), time.Minute)
+	*source = *src
+
+	return remoteClusterName, err
+}
+
 func createRemoteClusterTLS(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, xdcrRemoteClusterSecretName string, serverTLS, clientTLS *TLSContext) (string, error) {
 	remoteClusterName := target.Name
 
@@ -296,6 +327,52 @@ func establishXDCRReplicationGeneric(srcK8s, dstK8s *types.Cluster, source, targ
 
 func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *XDCRInfo {
 	info, err := establishXDCRReplicationGeneric(srcK8s, dstK8s, source, target, replication)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return info
+}
+
+// establishXDCRReplicationGenericWithoutUUID creates a remote cluster without UUID and a replication from the source bucket to the destination
+// bucket. This tests the optional UUID functionality where the operator should auto-resolve the UUID.
+func establishXDCRReplicationGenericWithoutUUID(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*XDCRInfo, error) {
+	// Populate the namespace manually as we don't return the API object.
+	replication.Namespace = srcK8s.Namespace
+
+	xdcrSecret, err := createRemoteClusterSecret(srcK8s, dstK8s, source, target)
+	if err != nil {
+		return nil, err
+	}
+
+	replicationSpec, err := srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	sourceBucketName := string(replicationSpec.Spec.Bucket)
+	targetBucketName := string(replicationSpec.Spec.RemoteBucket)
+
+	clusterName, err := createRemoteClusterGenericWithoutUUID(srcK8s, dstK8s, source, target, xdcrSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	err = waitForReplicationAddedEvent(srcK8s, source, clusterName, sourceBucketName, targetBucketName)
+	if err != nil {
+		return nil, err
+	}
+
+	info := &XDCRInfo{
+		Replication: replicationSpec,
+		SecretName:  xdcrSecret,
+	}
+
+	return info, nil
+}
+
+func MustEstablishXDCRReplicationGenericWithoutUUID(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *XDCRInfo {
+	info, err := establishXDCRReplicationGenericWithoutUUID(srcK8s, dstK8s, source, target, replication)
 	if err != nil {
 		Die(t, err)
 	}

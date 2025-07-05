@@ -421,6 +421,55 @@ func TestXDCRCreateCluster(t *testing.T) {
 	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
+// TestXDCROptionalUUID tests establishing an XDCR connection without specifying UUID,
+// verifying that the operator can auto-resolve the UUID from an existing remote cluster.
+func TestXDCROptionalUUID(t *testing.T) {
+	// Platform configuration.
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().IstioDisabled()
+
+	// Static configuration - use smaller cluster size for simplicity.
+	clusterSize := constants.Size1
+	numOfDocs := framework.Global.DocsCount
+
+	// Create the clusters.
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	// When ready, establish the XDCR connection WITHOUT UUID, add some documents and
+	// verify they have been replicated. This tests the optional UUID functionality.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
+	e2eutil.MustEstablishXDCRReplicationGenericWithoutUUID(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	// Check the events match what we expect:
+	// * Both clusters created
+	// * Source cluster establishes XDCR without UUID (should auto-resolve)
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+	}
+
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
+}
+
 // TestXDCRPauseReplication tests a replication can be paused and restarted again.
 func TestXDCRPauseReplication(t *testing.T) {
 	// Platform configuration.
