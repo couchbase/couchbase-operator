@@ -329,6 +329,10 @@ type CouchbaseBackupSpec struct {
 
 	// AdditionalArgs is used to pass additional arguments to the backup script container.
 	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
+	// Env defines environment variables to be set on the backup container.
+	// These can be used to configure cbbackupmgr behavior via environment variables.
+	// +optional
+	Env []v1.EnvVar `json:"env,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=none;resume;purge
@@ -670,6 +674,10 @@ type CouchbaseBackupRestoreSpec struct {
 	// after the restore job has completed.
 	// +kubebuilder:default=false
 	PreserveRestoreRecord bool `json:"preserveRestoreRecord,omitempty"`
+	// Env defines environment variables to be set on the restore container.
+	// These can be used to configure cbbackupmgr behavior via environment variables.
+	// +optional
+	Env []v1.EnvVar `json:"env,omitempty"`
 }
 
 type CouchbaseBackupStagingVolume struct {

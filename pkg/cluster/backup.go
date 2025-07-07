@@ -1037,6 +1037,7 @@ func (c *Cluster) generateMergeBackupContainer(backup *couchbasev2.CouchbaseBack
 			},
 		},
 		Resources: resources,
+		Env:       backup.Spec.Env,
 	}
 
 	c.applyContainerSecurityContext(&container)
@@ -1355,6 +1356,7 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 			},
 		},
 		Resources: resources,
+		Env:       spec.Env,
 	}
 
 	c.applyContainerSecurityContext(&container)

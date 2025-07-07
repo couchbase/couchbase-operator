@@ -33,6 +33,25 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackuprestores-spec-end,end>>:
     <<couchbasebackuprestores-spec-end-int,int>>: 0
     <<couchbasebackuprestores-spec-end-str,str>>: ""
+  <<couchbasebackuprestores-spec-env,env>>:
+  - <<couchbasebackuprestores-spec-env-name,name>>: ""
+    <<couchbasebackuprestores-spec-env-value,value>>: ""
+    <<couchbasebackuprestores-spec-env-valuefrom,valueFrom>>:
+      <<couchbasebackuprestores-spec-env-valuefrom-configmapkeyref,configMapKeyRef>>:
+        <<couchbasebackuprestores-spec-env-valuefrom-configmapkeyref-key,key>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-configmapkeyref-name,name>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-configmapkeyref-optional,optional>>: false
+      <<couchbasebackuprestores-spec-env-valuefrom-fieldref,fieldRef>>:
+        <<couchbasebackuprestores-spec-env-valuefrom-fieldref-apiversion,apiVersion>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-fieldref-fieldpath,fieldPath>>: ""
+      <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref,resourceFieldRef>>:
+        <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref-containername,containerName>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref-divisor,divisor>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-resourcefieldref-resource,resource>>: ""
+      <<couchbasebackuprestores-spec-env-valuefrom-secretkeyref,secretKeyRef>>:
+        <<couchbasebackuprestores-spec-env-valuefrom-secretkeyref-key,key>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-secretkeyref-name,name>>: ""
+        <<couchbasebackuprestores-spec-env-valuefrom-secretkeyref-optional,optional>>: false
   <<couchbasebackuprestores-spec-forceupdates,forceUpdates>>: false
   <<couchbasebackuprestores-spec-logretention,logRetention>>: 168h
   <<couchbasebackuprestores-spec-objectstore,objectStore>>:
@@ -334,6 +353,228 @@ Int references a relative backup by index.
 ==== Description
 
 Str references an absolute backup by name.
+
+=== couchbasebackuprestores.spec.env
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Env defines environment variables to be set on the restore container.
+These can be used to configure cbbackupmgr behavior via environment variables.
+
+=== couchbasebackuprestores.spec.env.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of the environment variable.
+Must be a C_IDENTIFIER.
+
+=== couchbasebackuprestores.spec.env.value
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Variable references $(VAR_NAME) are expanded
+using the previously defined environment variables in the container and
+any service environment variables.
+If a variable cannot be resolved,
+the reference in the input string will be unchanged.
+Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+"$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+Escaped references will never be expanded, regardless of whether the variable
+exists or not.
+Defaults to "".
+
+=== couchbasebackuprestores.spec.env.valueFrom
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Source for the environment variable's value.
+Cannot be used if value is not empty.
+
+=== couchbasebackuprestores.spec.env.valueFrom.configMapKeyRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a key of a ConfigMap.
+
+=== couchbasebackuprestores.spec.env.valueFrom.configMapKeyRef.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The key to select.
+
+=== couchbasebackuprestores.spec.env.valueFrom.configMapKeyRef.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields.
+apiVersion, kind, uid?.
+
+=== couchbasebackuprestores.spec.env.valueFrom.configMapKeyRef.optional
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Specify whether the ConfigMap or its key must be defined.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fieldRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+
+=== couchbasebackuprestores.spec.env.valueFrom.fieldRef.apiVersion
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Version of the schema the FieldPath is written in terms of, defaults to "v1".
+
+=== couchbasebackuprestores.spec.env.valueFrom.fieldRef.fieldPath
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Path of the field to select in the specified API version.
+
+=== couchbasebackuprestores.spec.env.valueFrom.resourceFieldRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a resource of the container: only resources limits and requests
+(limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+
+=== couchbasebackuprestores.spec.env.valueFrom.resourceFieldRef.containerName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Container name: required for volumes, optional for env vars.
+
+=== couchbasebackuprestores.spec.env.valueFrom.resourceFieldRef.divisor
+
+==== Constraints
+
+*Type*: `integer or string`
+
+==== Description
+
+Specifies the output format of the exposed resources, defaults to "1".
+
+=== couchbasebackuprestores.spec.env.valueFrom.resourceFieldRef.resource
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Required: resource to select.
+
+=== couchbasebackuprestores.spec.env.valueFrom.secretKeyRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a key of a secret in the pod's namespace.
+
+=== couchbasebackuprestores.spec.env.valueFrom.secretKeyRef.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The key of the secret to select from.
+Must be a valid secret key.
+
+=== couchbasebackuprestores.spec.env.valueFrom.secretKeyRef.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields.
+apiVersion, kind, uid?.
+
+=== couchbasebackuprestores.spec.env.valueFrom.secretKeyRef.optional
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Specify whether the Secret or its key must be defined.
 
 === couchbasebackuprestores.spec.forceUpdates
 

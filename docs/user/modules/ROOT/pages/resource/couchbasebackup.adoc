@@ -29,6 +29,25 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackups-spec-data-include,include>>:
     - ""
   <<couchbasebackups-spec-defaultrecoverymethod,defaultRecoveryMethod>>: none
+  <<couchbasebackups-spec-env,env>>:
+  - <<couchbasebackups-spec-env-name,name>>: ""
+    <<couchbasebackups-spec-env-value,value>>: ""
+    <<couchbasebackups-spec-env-valuefrom,valueFrom>>:
+      <<couchbasebackups-spec-env-valuefrom-configmapkeyref,configMapKeyRef>>:
+        <<couchbasebackups-spec-env-valuefrom-configmapkeyref-key,key>>: ""
+        <<couchbasebackups-spec-env-valuefrom-configmapkeyref-name,name>>: ""
+        <<couchbasebackups-spec-env-valuefrom-configmapkeyref-optional,optional>>: false
+      <<couchbasebackups-spec-env-valuefrom-fieldref,fieldRef>>:
+        <<couchbasebackups-spec-env-valuefrom-fieldref-apiversion,apiVersion>>: ""
+        <<couchbasebackups-spec-env-valuefrom-fieldref-fieldpath,fieldPath>>: ""
+      <<couchbasebackups-spec-env-valuefrom-resourcefieldref,resourceFieldRef>>:
+        <<couchbasebackups-spec-env-valuefrom-resourcefieldref-containername,containerName>>: ""
+        <<couchbasebackups-spec-env-valuefrom-resourcefieldref-divisor,divisor>>: ""
+        <<couchbasebackups-spec-env-valuefrom-resourcefieldref-resource,resource>>: ""
+      <<couchbasebackups-spec-env-valuefrom-secretkeyref,secretKeyRef>>:
+        <<couchbasebackups-spec-env-valuefrom-secretkeyref-key,key>>: ""
+        <<couchbasebackups-spec-env-valuefrom-secretkeyref-name,name>>: ""
+        <<couchbasebackups-spec-env-valuefrom-secretkeyref-optional,optional>>: false
   <<couchbasebackups-spec-ephemeralvolume,ephemeralVolume>>: false
   <<couchbasebackups-spec-failedjobshistorylimit,failedJobsHistoryLimit>>: 3
   <<couchbasebackups-spec-full,full>>:
@@ -306,6 +325,228 @@ Changes from this field will only takes effect on a full backup.
 
 DefaultRecoveryMethod specifies how cbbackupmgr should
 recover from broken backup/restore attempts.
+
+=== couchbasebackups.spec.env
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Env defines environment variables to be set on the backup container.
+These can be used to configure cbbackupmgr behavior via environment variables.
+
+=== couchbasebackups.spec.env.name
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Name of the environment variable.
+Must be a C_IDENTIFIER.
+
+=== couchbasebackups.spec.env.value
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Variable references $(VAR_NAME) are expanded
+using the previously defined environment variables in the container and
+any service environment variables.
+If a variable cannot be resolved,
+the reference in the input string will be unchanged.
+Double $$ are reduced
+to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+"$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+Escaped references will never be expanded, regardless of whether the variable
+exists or not.
+Defaults to "".
+
+=== couchbasebackups.spec.env.valueFrom
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Source for the environment variable's value.
+Cannot be used if value is not empty.
+
+=== couchbasebackups.spec.env.valueFrom.configMapKeyRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a key of a ConfigMap.
+
+=== couchbasebackups.spec.env.valueFrom.configMapKeyRef.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The key to select.
+
+=== couchbasebackups.spec.env.valueFrom.configMapKeyRef.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields.
+apiVersion, kind, uid?.
+
+=== couchbasebackups.spec.env.valueFrom.configMapKeyRef.optional
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Specify whether the ConfigMap or its key must be defined.
+
+=== couchbasebackups.spec.env.valueFrom.fieldRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+
+=== couchbasebackups.spec.env.valueFrom.fieldRef.apiVersion
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Version of the schema the FieldPath is written in terms of, defaults to "v1".
+
+=== couchbasebackups.spec.env.valueFrom.fieldRef.fieldPath
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Path of the field to select in the specified API version.
+
+=== couchbasebackups.spec.env.valueFrom.resourceFieldRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a resource of the container: only resources limits and requests
+(limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+
+=== couchbasebackups.spec.env.valueFrom.resourceFieldRef.containerName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Container name: required for volumes, optional for env vars.
+
+=== couchbasebackups.spec.env.valueFrom.resourceFieldRef.divisor
+
+==== Constraints
+
+*Type*: `integer or string`
+
+==== Description
+
+Specifies the output format of the exposed resources, defaults to "1".
+
+=== couchbasebackups.spec.env.valueFrom.resourceFieldRef.resource
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Required: resource to select.
+
+=== couchbasebackups.spec.env.valueFrom.secretKeyRef
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selects a key of a secret in the pod's namespace.
+
+=== couchbasebackups.spec.env.valueFrom.secretKeyRef.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+The key of the secret to select from.
+Must be a valid secret key.
+
+=== couchbasebackups.spec.env.valueFrom.secretKeyRef.name
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+TODO: Add other useful fields.
+apiVersion, kind, uid?.
+
+=== couchbasebackups.spec.env.valueFrom.secretKeyRef.optional
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Specify whether the Secret or its key must be defined.
 
 === couchbasebackups.spec.ephemeralVolume
 
