@@ -3,7 +3,6 @@ package cluster
 import (
 	"time"
 
-	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -67,8 +66,4 @@ func (config Config) GetPodReadinessConfig() k8sutil.PodReadinessConfig {
 		PodReadinessDelay:  config.PodReadinessDelay,
 		PodReadinessPeriod: config.PodReadinessPeriod,
 	}
-}
-
-func (c *Cluster) GetK8sClient() *client.Client {
-	return c.k8s
 }
