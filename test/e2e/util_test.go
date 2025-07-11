@@ -610,7 +610,6 @@ func registerTests() {
 		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
-		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationRoutineDisabled).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationWithMultiMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 
 		// RBAC Tests

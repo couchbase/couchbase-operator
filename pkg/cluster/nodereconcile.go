@@ -500,6 +500,10 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			otpNodes = append(otpNodes, member.GetOTPNode())
 		}
 
+		for _, member := range r.couchbase.FailedNodes {
+			otpNodes = append(otpNodes, member.GetOTPNode())
+		}
+
 		if err := couchbaseutil.Failover(otpNodes, true).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
@@ -688,7 +692,7 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 
 			// Check the node is actually active before we attempt to delete the log volumes.
 			info := &couchbaseutil.PoolsInfo{}
-			if err := couchbaseutil.GetPools(info).InPlaintext().RetryFor(10*time.Second).On(c.api, m); err != nil {
+			if err := couchbaseutil.GetPools(info).RetryFor(10*time.Second).On(c.api, m); err != nil {
 				r.abort("unknown node is going down")
 			}
 

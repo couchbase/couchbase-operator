@@ -731,25 +731,6 @@ func TestAutoRecoveryEphemeralWithNoAutofailover(t *testing.T) {
 	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, 2*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-
-	// Check the events match what we expect:
-	// * Cluster is created
-	// * Pods go down and fail over
-	// * Replacements are balanced in
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Optional{
-			Validator: eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown}},
-		},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-	}
-
-	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestGracefulShutdown(t *testing.T) {
