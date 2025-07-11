@@ -103,6 +103,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
 		checkConstraintsResourceManagement,
+		checkConstraintsIndexerSettings,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -110,7 +111,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintDeltaRecoveryDeprecated,
 		checkConstraintServicelessOverAdminService,
 		checkMigrationConstraints,
-		checkConstraintsIndexerSettings,
 		checkConstraintMemcachedBucketDeprecated,
 	}
 
@@ -4772,41 +4772,41 @@ func checkClusterBackupConstraints(v *types.Validator, cluster *couchbasev2.Couc
 	return nil
 }
 
-func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.ClusterSettings.Indexer == nil {
-		return nil, nil
+		return nil
 	}
 
 	if cluster.Spec.ClusterSettings.Indexer.EnablePageBloomFilter {
 		pageBloomFilterSupported, err := cluster.IsAtLeastVersion("7.1.0")
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if !pageBloomFilterSupported {
-			return []string{fmt.Sprintf("spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later")}, nil
+			return fmt.Errorf("spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later")
 		}
 	}
 
 	if cluster.Spec.ClusterSettings.Indexer.EnableShardAffinity {
 		shardAffinitySupported, err := cluster.IsAtLeastVersion("7.6.0")
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if !shardAffinitySupported {
-			return []string{fmt.Sprintf("spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later")}, nil
+			return fmt.Errorf("spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later")
 		}
 	}
 
 	if cluster.Spec.ClusterSettings.Indexer.DeferBuild {
 		deferBuildSupported, err := cluster.IsAtLeastVersion("8.0.0")
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if !deferBuildSupported {
-			return []string{}, fmt.Errorf("spec.cluster.indexer.deferBuild requires Couchbase Server version 8.0.0 or later")
+			return fmt.Errorf("spec.cluster.indexer.deferBuild requires Couchbase Server version 8.0.0 or later")
 		}
 	}
 
@@ -4820,11 +4820,11 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 		}
 
 		if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica >= totalIndexPodsAvailable {
-			return []string{fmt.Sprintf("spec.cluster.indexer.numReplica %d cannot be greater or equal to the number of index pods %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica, totalIndexPodsAvailable)}, nil
+			return fmt.Errorf("spec.cluster.indexer.numReplica %d cannot be greater or equal to the number of index pods %d", cluster.Spec.ClusterSettings.Indexer.NumberOfReplica, totalIndexPodsAvailable)
 		}
 	}
 
-	return nil, nil
+	return nil
 }
 
 func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
