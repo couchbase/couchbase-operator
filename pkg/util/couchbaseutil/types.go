@@ -190,6 +190,7 @@ type IndexSettings struct {
 	RedistributeIndexes   bool             `url:"redistributeIndexes" json:"redistributeIndexes"`
 	EnableShardAffinity   *bool            `url:"enableShardAffinity,omitempty" json:"enableShardAffinity"`
 	EnablePageBloomFilter *bool            `url:"enablePageBloomFilter,omitempty" json:"enablePageBloomFilter"`
+	DeferBuild            *bool            `url:"deferBuild,omitempty" json:"deferBuild"`
 }
 
 type FailoverOnDiskFailureSettings struct {

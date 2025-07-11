@@ -3487,6 +3487,11 @@ type CouchbaseClusterIndexerSettings struct {
 	// This field is only supported on CB versions 7.1.0+.
 	// +kubebuilder:default=false
 	EnablePageBloomFilter bool `json:"enablePageBloomFilter,omitempty"`
+
+	// DeferBuild allows the indexer to defer building indexes.
+	// This field is only supported on CB versions 8.0.0+.
+	// +kubebuilder:default=false
+	DeferBuild bool `json:"deferBuild,omitempty"`
 }
 
 // QueryLogLevel controls the verbosity of the query service logs.

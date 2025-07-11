@@ -1543,6 +1543,12 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedWarnings: []string{`spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later`},
 		},
 		{
+			name:           "TestValidateDeferBuildPre80Error",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/deferBuild", true).Replace("/spec/image", "couchbase/server:7.6.3")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.deferBuild requires Couchbase Server version 8.0.0 or later`},
+		},
+		{
 			name:           "TestValidateIndexerRedistributeIndexesInValid",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/redistributeIndexes", "slim-shady")},
 			shouldFail:     true,

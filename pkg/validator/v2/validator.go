@@ -4799,6 +4799,17 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 		}
 	}
 
+	if cluster.Spec.ClusterSettings.Indexer.DeferBuild {
+		deferBuildSupported, err := cluster.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if !deferBuildSupported {
+			return []string{}, fmt.Errorf("spec.cluster.indexer.deferBuild requires Couchbase Server version 8.0.0 or later")
+		}
+	}
+
 	if cluster.Spec.ClusterSettings.Indexer.NumberOfReplica > 0 {
 		totalIndexPodsAvailable := 0
 

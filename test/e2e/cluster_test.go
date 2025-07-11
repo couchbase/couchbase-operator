@@ -227,6 +227,17 @@ func TestIndexerSettings(t *testing.T) {
 		patchCycles++
 	}
 
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		v := true
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/deferBuild", v), time.Minute)
+		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/DeferBuild", &v), time.Minute)
+
+		patchCycles++
+	}
+
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),

@@ -721,6 +721,10 @@ func (c *Cluster) reconcileIndexSettings() error {
 		if ok, err := c.IsAtLeastVersion("7.6.0"); ok && err == nil {
 			requested.EnableShardAffinity = &apiSettings.EnableShardAffinity
 		}
+
+		if ok, err := c.IsAtLeastVersion("8.0.0"); ok && err == nil {
+			requested.DeferBuild = &apiSettings.DeferBuild
+		}
 	}
 
 	if reflect.DeepEqual(current, requested) {

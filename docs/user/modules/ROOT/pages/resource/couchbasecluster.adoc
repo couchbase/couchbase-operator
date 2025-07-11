@@ -93,6 +93,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: memory_optimized
     <<couchbaseclusters-spec-cluster-indexer,indexer>>:
+      <<couchbaseclusters-spec-cluster-indexer-deferbuild,deferBuild>>: false
       <<couchbaseclusters-spec-cluster-indexer-enablepagebloomfilter,enablePageBloomFilter>>: false
       <<couchbaseclusters-spec-cluster-indexer-enableshardaffinity,enableShardAffinity>>: false
       <<couchbaseclusters-spec-cluster-indexer-loglevel,logLevel>>: info
@@ -1547,6 +1548,19 @@ index service in the cluster.
 ==== Description
 
 Indexer allows the indexer to be configured.
+
+=== couchbaseclusters.spec.cluster.indexer.deferBuild
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+DeferBuild allows the indexer to defer building indexes.
+This field is only supported on CB versions 8.0.0+.
 
 === couchbaseclusters.spec.cluster.indexer.enablePageBloomFilter
 
