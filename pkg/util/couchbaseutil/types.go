@@ -199,12 +199,13 @@ type FailoverOnDiskFailureSettings struct {
 }
 
 type AutoFailoverSettings struct {
-	Enabled                  bool                          `url:"enabled" json:"enabled"`
-	Timeout                  int64                         `url:"timeout" json:"timeout"`
-	Count                    uint8                         `json:"count"`
-	FailoverOnDataDiskIssues FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
-	FailoverServerGroup      *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
-	MaxCount                 uint64                        `url:"maxCount" json:"maxCount"`
+	Enabled                          bool                          `url:"enabled" json:"enabled"`
+	Timeout                          int64                         `url:"timeout" json:"timeout"`
+	Count                            uint8                         `json:"count"`
+	FailoverOnDataDiskIssues         FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
+	FailoverServerGroup              *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
+	MaxCount                         uint64                        `url:"maxCount" json:"maxCount"`
+	AllowFailoverEphemeralNoReplicas *bool                         `url:"allowFailoverEphemeralNoReplicas,omitempty" json:"allowFailoverEphemeralNoReplicas,omitempty"`
 }
 
 type AlternateAddressesExternalPorts struct {

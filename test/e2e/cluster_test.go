@@ -123,6 +123,11 @@ func TestEditClusterSettings(t *testing.T) {
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
+	atLeast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	// When ready change various cluster settings and ensure the changes are reflected
 	// in the Couchbase API.
 	patches := jsonpatch.NewPatchSet().
@@ -142,6 +147,12 @@ func TestEditClusterSettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(31)), time.Minute)
 	e2eutil.MustPatchAutoFailoverInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	if atLeast80 {
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/allowFailoverEphemeralNoReplicas", true), time.Minute)
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+		e2eutil.MustPatchCouchbaseInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/allowFailoverEphemeralNoReplicas", true), 5*time.Minute)
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created

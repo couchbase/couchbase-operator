@@ -450,6 +450,10 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		specFailoverSettings.FailoverServerGroup = nil
 	}
 
+	if over80, err := c.IsAtLeastVersion("8.0.0"); over80 && err == nil {
+		specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
+	}
+
 	// Mask out any existing read only values, e.g. set it to the default value
 	failoverSettings.Count = 0
 

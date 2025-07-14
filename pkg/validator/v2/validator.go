@@ -56,6 +56,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintQueryTemporarySpace,
 		checkConstraintAutoFailoverTimeout,
 		checkConstraintAutoFailoverMaxCount,
+		checkConstraintAutoFailoverEphemeral,
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
@@ -562,6 +563,21 @@ func checkConstraintAutoFailoverMaxCount(_ *types.Validator, cluster *couchbasev
 	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
 		if cluster.Spec.ClusterSettings.AutoFailoverMaxCount > 3 {
 			return fmt.Errorf("spec.cluster.autoFailoverMaxCount should be less than or equal to 3")
+		}
+	}
+
+	return nil
+}
+
+func checkConstraintAutoFailoverEphemeral(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if before80, err := couchbaseutil.VersionBefore(tag, "8.0.0"); before80 && err == nil {
+		if cluster.Spec.ClusterSettings.AllowFailoverEphemeralNoReplicas != nil {
+			return fmt.Errorf("spec.cluster.allowFailoverEphemeralNoReplicas is not supported in Couchbase Server versions lower than 8.0.0")
 		}
 	}
 

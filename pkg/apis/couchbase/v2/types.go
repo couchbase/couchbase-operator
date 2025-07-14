@@ -3468,6 +3468,10 @@ type ClusterConfig struct {
 	// to all existing buckets that have not had their auto-compaction settings individually modified.
 	// +kubebuilder:default="x-couchbase-object"
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty" annotation:"autoCompaction"`
+
+	// AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
+	// This is only supported on Couchbase Server 8.0+.
+	AllowFailoverEphemeralNoReplicas *bool `json:"allowFailoverEphemeralNoReplicas,omitempty"`
 }
 
 // IndexerLogLevel controls the verbosity of indexer logs.

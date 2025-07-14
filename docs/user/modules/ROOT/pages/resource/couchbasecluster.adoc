@@ -59,6 +59,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-buckets-selector-matchlabels,matchLabels>>:
     <<couchbaseclusters-spec-buckets-synchronize,synchronize>>: false
   <<couchbaseclusters-spec-cluster,cluster>>:
+    <<couchbaseclusters-spec-cluster-allowfailoverephemeralnoreplicas,allowFailoverEphemeralNoReplicas>>: false
     <<couchbaseclusters-spec-cluster-analyticsservicememoryquota,analyticsServiceMemoryQuota>>: 1Gi
     <<couchbaseclusters-spec-cluster-autocompaction,autoCompaction>>:
       <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
@@ -1014,6 +1015,17 @@ the documentation for the `cao save` and `cao restore` CLI commands.
 
 ClusterSettings define Couchbase cluster-wide settings such as memory allocation,
 failover characteristics and index settings.
+
+=== couchbaseclusters.spec.cluster.allowFailoverEphemeralNoReplicas
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
+This is only supported on Couchbase Server 8.0+.
 
 === couchbaseclusters.spec.cluster.analyticsServiceMemoryQuota
 
