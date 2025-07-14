@@ -804,9 +804,144 @@ func (c *Cluster) reconcileIndexSettings() error {
 	return nil
 }
 
+// configureBackfillSettings sets backfill and temporary space settings.
+func (c *Cluster) configureBackfillSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) {
+	if apiSettings.BackfillEnabled == nil || !*apiSettings.BackfillEnabled {
+		requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizBackfillDisabled
+		return
+	}
+
+	if apiSettings.TemporarySpaceUnlimited {
+		requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizeUnlimited
+		return
+	}
+
+	if apiSettings.TemporarySpace != nil {
+		requested.TemporarySpaceSize = k8sutil.Megabytes(apiSettings.TemporarySpace)
+	}
+}
+
+// configureBasicQuerySettings sets basic non-versioned query settings.
+func (c *Cluster) configureBasicQuerySettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) {
+	requested.PipelineBatch = apiSettings.PipelineBatch
+	requested.PipelineCap = apiSettings.PipelineCap
+	requested.ScanCap = apiSettings.ScanCap
+	requested.PreparedLimit = apiSettings.PreparedLimit
+	requested.CompletedLimit = apiSettings.CompletedLimit
+	requested.LogLevel = couchbaseutil.QueryLogLevel(apiSettings.LogLevel)
+	requested.MaxParallelism = apiSettings.MaxParallelism
+	requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
+	requested.MemoryQuota = int32(k8sutil.Megabytes(apiSettings.MemoryQuota))
+	requested.CBOEnabled = apiSettings.CBOEnabled
+	requested.CleanupClientAttemptsEnabled = apiSettings.CleanupClientAttemptsEnabled
+	requested.CleanupLostAttemptsEnabled = apiSettings.CleanupLostAttemptsEnabled
+	requested.NumActiveTransactionRecords = apiSettings.NumActiveTransactionRecords
+
+	if apiSettings.Timeout == nil {
+		requested.Timeout = 0
+	} else {
+		requested.Timeout = apiSettings.Timeout.Nanoseconds()
+	}
+
+	if apiSettings.CleanupWindow != nil {
+		requested.CleanupWindow = couchbaseutil.CouchbaseQueryDurationString(apiSettings.CleanupWindow.Duration)
+	}
+}
+
+// configureCompletedTrackingSettings handles legacy completed tracking fields.
+func (c *Cluster) configureCompletedTrackingSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) {
+	// Legacy fields take precedence over new CompletedThreshold field
+	if apiSettings.CompletedTrackingEnabled == nil {
+		if apiSettings.CompletedThreshold != nil {
+			requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
+		}
+
+		return
+	}
+
+	if !*apiSettings.CompletedTrackingEnabled {
+		requested.CompletedThreshold = -1 // Disable tracking
+		return
+	}
+
+	// Tracking enabled - check sub-options
+	if apiSettings.CompletedTrackingAllRequests != nil && *apiSettings.CompletedTrackingAllRequests {
+		requested.CompletedThreshold = 0 // Track all requests
+		return
+	}
+
+	if apiSettings.CompletedTrackingThreshold != nil {
+		requested.CompletedThreshold = int32(apiSettings.CompletedTrackingThreshold.Milliseconds())
+	}
+}
+
+// configureVersionSpecificSettings configures settings based on CB version using efficient if-else-if logic.
+func (c *Cluster) configureVersionSpecificSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) error {
+	atleast800, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	atleast76, err := c.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return err
+	}
+
+	if atleast800 {
+		// CB 8.0.0+ - configure both 7.6.0+ and 8.0.0+ settings
+		c.configure76PlusSettings(apiSettings, requested)
+		c.configure80PlusSettings(apiSettings, requested)
+	} else if atleast76 {
+		// CB 7.6.0+ but < 8.0.0 - configure only 7.6.0+ settings
+		c.configure76PlusSettings(apiSettings, requested)
+	}
+	// CB < 7.6.0 - no version-specific settings to configure
+
+	return nil
+}
+
+// configure76PlusSettings configures settings available in CB 7.6.0+.
+func (c *Cluster) configure76PlusSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) {
+	// Configure node quota
+	nodeQuota := int32(0)
+	if c.cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
+		nodeQuota = int32(k8sutil.Megabytes(c.cluster.Spec.ClusterSettings.QueryServiceMemQuota))
+	}
+
+	requested.NodeQuota = &nodeQuota
+
+	// Configure replica usage
+	var useReplica couchbaseutil.QueryUseReplica
+
+	switch {
+	case apiSettings.UseReplica == nil:
+		useReplica = couchbaseutil.QueryUseReplicaUnset
+	case *apiSettings.UseReplica:
+		useReplica = couchbaseutil.QueryUseReplicaOn
+	default:
+		useReplica = couchbaseutil.QueryUseReplicaOff
+	}
+
+	requested.UseReplica = &useReplica
+
+	requested.NodeQuotaValPercent = &apiSettings.NodeQuotaValPercent
+	requested.NumCpus = &apiSettings.NumCpus
+
+	if apiSettings.CompletedMaxPlanSize != nil {
+		maxPlanSize := int32(k8sutil.Bytes(apiSettings.CompletedMaxPlanSize))
+		requested.CompletedMaxPlanSize = &maxPlanSize
+	}
+}
+
+// configure80PlusSettings configures settings available in CB 8.0.0+.
+func (c *Cluster) configure80PlusSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) {
+	if apiSettings.CompletedStreamSize != nil {
+		requested.CompletedStreamSize = apiSettings.CompletedStreamSize
+	}
+}
+
 // reconcileQuerySettings updates anything query related.
 func (c *Cluster) reconcileQuerySettings() error {
-	// If we aren't managing the endpoint, then leave it alone.
 	apiSettings := c.cluster.Spec.ClusterSettings.Query
 	if apiSettings == nil {
 		return nil
@@ -817,100 +952,16 @@ func (c *Cluster) reconcileQuerySettings() error {
 		return err
 	}
 
-	// Do a shallow copy here, for now, we don't need to copy and pointers.
 	requested := *current
 
-	// Hide away the magic numbers with some proper API design.  You explicitly
-	// specify whether backfilling is enabled.  If it is, then either set to unlimited
-	// or the requested size (in order of precedence).  The size should always be populated
-	// with CRD defaulting.
-	if apiSettings.BackfillEnabled != nil && *apiSettings.BackfillEnabled {
-		if apiSettings.TemporarySpaceUnlimited {
-			requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizeUnlimited
-		} else if apiSettings.TemporarySpace != nil {
-			requested.TemporarySpaceSize = k8sutil.Megabytes(apiSettings.TemporarySpace)
-		}
-	} else {
-		requested.TemporarySpaceSize = couchbaseutil.QueryTemporarySpaceSizBackfillDisabled
-	}
+	c.configureBackfillSettings(apiSettings, &requested)
+	c.configureBasicQuerySettings(apiSettings, &requested)
+	c.configureCompletedTrackingSettings(apiSettings, &requested)
 
-	requested.PipelineBatch = apiSettings.PipelineBatch
-	requested.PipelineCap = apiSettings.PipelineCap
-	requested.ScanCap = apiSettings.ScanCap
-
-	if apiSettings.Timeout == nil {
-		requested.Timeout = 0
-	} else {
-		requested.Timeout = apiSettings.Timeout.Nanoseconds()
-	}
-
-	requested.PreparedLimit = apiSettings.PreparedLimit
-	requested.CompletedLimit = apiSettings.CompletedLimit
-	requested.LogLevel = couchbaseutil.QueryLogLevel(apiSettings.LogLevel)
-	requested.MaxParallelism = apiSettings.MaxParallelism
-
-	// CompletedTrackingEnabled, CompletedTrackingAllRequests and CompletedTrackingThreshold have been deprecated in favour of a single CompletedThreshold field.
-	// While they will no longer default to any values in the CRD, if they have already been set they should take precedence over the new CompletedThreshold field to avoid
-	// effecting existing clusters.
-	if apiSettings.CompletedTrackingEnabled != nil {
-		if *apiSettings.CompletedTrackingEnabled {
-			if apiSettings.CompletedTrackingAllRequests != nil && *apiSettings.CompletedTrackingAllRequests {
-				// 0 to track all requests
-				requested.CompletedThreshold = 0
-			} else if apiSettings.CompletedTrackingThreshold != nil {
-				requested.CompletedThreshold = int32(apiSettings.CompletedTrackingThreshold.Milliseconds())
-			}
-		} else {
-			// Negative number to disable tracking
-			requested.CompletedThreshold = -1
-		}
-	} else if apiSettings.CompletedThreshold != nil {
-		requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
-	}
-
-	requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
-	requested.MemoryQuota = int32(k8sutil.Megabytes(apiSettings.MemoryQuota))
-	requested.CBOEnabled = apiSettings.CBOEnabled
-	requested.CleanupClientAttemptsEnabled = apiSettings.CleanupClientAttemptsEnabled
-	requested.CleanupLostAttemptsEnabled = apiSettings.CleanupLostAttemptsEnabled
-
-	if apiSettings.CleanupWindow != nil {
-		requested.CleanupWindow = couchbaseutil.CouchbaseQueryDurationString(apiSettings.CleanupWindow.Duration)
-	}
-
-	if atleast76, err := c.IsAtLeastVersion("7.6.0"); err != nil {
+	if err := c.configureVersionSpecificSettings(apiSettings, &requested); err != nil {
 		return err
-	} else if atleast76 {
-		nodeQuota := int32(0)
-
-		if c.cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
-			nodeQuota = int32(k8sutil.Megabytes(c.cluster.Spec.ClusterSettings.QueryServiceMemQuota))
-		}
-		requested.NodeQuota = &nodeQuota
-
-		var useReplica couchbaseutil.QueryUseReplica
-		switch {
-		case apiSettings.UseReplica == nil:
-			useReplica = couchbaseutil.QueryUseReplicaUnset
-		case *apiSettings.UseReplica:
-			useReplica = couchbaseutil.QueryUseReplicaOn
-		default:
-			useReplica = couchbaseutil.QueryUseReplicaOff
-		}
-
-		requested.UseReplica = &useReplica
-
-		requested.NodeQuotaValPercent = &apiSettings.NodeQuotaValPercent
-
-		if apiSettings.CompletedMaxPlanSize != nil {
-			maxPlanSize := int32(k8sutil.Bytes(apiSettings.CompletedMaxPlanSize))
-			requested.CompletedMaxPlanSize = &maxPlanSize
-		}
-
-		requested.NumCpus = &apiSettings.NumCpus
 	}
 
-	requested.NumActiveTransactionRecords = apiSettings.NumActiveTransactionRecords
 	if reflect.DeepEqual(current, &requested) {
 		return nil
 	}

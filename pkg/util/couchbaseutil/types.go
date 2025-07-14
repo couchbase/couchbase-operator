@@ -1773,6 +1773,10 @@ type QuerySettings struct {
 
 	// A plan size in bytes. Limits the size of query execution plans that can be logged in the completed requests catalog.
 	CompletedMaxPlanSize *int32 `json:"queryCompletedMaxPlanSize,omitempty" url:"queryCompletedMaxPlanSize,omitempty"`
+
+	// Stream size in MiB. Controls how much data about completed N1QL queries is saved to disk for analysis.
+	// When > 0, saves query info to GZIP-compressed files with prefix local_request_log. Supports CB 8.0.0+.
+	CompletedStreamSize *int32 `json:"queryCompletedStreamSize,omitempty" url:"queryCompletedStreamSize,omitempty"`
 }
 
 // All these settings are passed through with minimal or no verification.

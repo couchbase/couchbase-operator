@@ -366,6 +366,10 @@ func (s *SpecGenerator) applyQuerySettings() error {
 		s.cluster.ClusterSettings.Query.CompletedMaxPlanSize = k8sutil.NewResourceQuantityByte(int64(*querySettings.CompletedMaxPlanSize))
 	}
 
+	if querySettings.CompletedStreamSize != nil && *querySettings.CompletedStreamSize > 0 {
+		s.cluster.ClusterSettings.Query.CompletedStreamSize = querySettings.CompletedStreamSize
+	}
+
 	if querySettings.NumCpus != nil {
 		s.cluster.ClusterSettings.Query.NumCpus = *querySettings.NumCpus
 	}

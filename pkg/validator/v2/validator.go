@@ -55,6 +55,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAnalyticsServiceMemoryQuota,
 		checkConstraintPerServiceClassPDB,
 		checkConstraintQueryTemporarySpace,
+		checkConstraintQueryCompletedStreamSize,
 		checkConstraintAutoFailoverTimeout,
 		checkConstraintAutoFailoverMaxCount,
 		checkConstraintAutoFailoverEphemeral,
@@ -544,6 +545,37 @@ func checkConstraintQueryTemporarySpace(_ *types.Validator, cluster *couchbasev2
 
 	if cluster.Spec.ClusterSettings.Query.TemporarySpace.Cmp(*k8sutil.NewResourceQuantityMi(0)) <= 0 {
 		return fmt.Errorf("spec.cluster.query.temporarySpace in body should be greater than 0Mi")
+	}
+
+	return nil
+}
+
+// checkConstraintQueryCompletedStreamSize ensures completedStreamSize is only set for Couchbase Server 8.0.0+.
+func checkConstraintQueryCompletedStreamSize(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// CompletedStreamSize is now a cluster-level (spec.cluster.query.completedStreamSize) field.
+	if cluster.Spec.ClusterSettings.Query == nil || cluster.Spec.ClusterSettings.Query.CompletedStreamSize == nil {
+		return nil
+	}
+
+	streamSize := cluster.Spec.ClusterSettings.Query.CompletedStreamSize
+
+	// Ensure numeric value is not negative.
+	if *streamSize < 0 {
+		return fmt.Errorf("spec.cluster.query.completedStreamSize must be >= 0")
+	}
+
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	after800, err := couchbaseutil.VersionAfter(tag, "8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if !after800 {
+		return fmt.Errorf("spec.cluster.query.completedStreamSize requires Couchbase Server version 8.0.0 or greater")
 	}
 
 	return nil

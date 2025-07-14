@@ -387,6 +387,15 @@ func TestQuerySettings(t *testing.T) {
 		e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedMaxPlanSize", &compMaxPlanSize), time.Minute)
 		patchCycles++
 
+		if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+			e2eutil.Die(t, err)
+		} else if ok {
+			compStreamSize := int32(50)
+			cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedStreamSize", 50), time.Minute)
+			e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedStreamSize", &compStreamSize), time.Minute)
+			patchCycles++
+		}
+
 		// QueryServiceMemQuota is a special case and actually causes a upgrade so give it more time
 		nodeQuota := int32(700)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/queryServiceMemoryQuota", "700Mi"), time.Minute)

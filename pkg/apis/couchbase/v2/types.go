@@ -3885,6 +3885,15 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:default="262144"
 	// +kubebuilder:validation:Type=string
 	CompletedMaxPlanSize *resource.Quantity `json:"completedMaxPlanSize"`
+
+	// CompletedStreamSize controls how much data about completed N1QL queries is saved to disk
+	// for analysis. When set to a value greater than 0 (measured in MiB), Couchbase saves
+	// information about completed queries to GZIP-compressed files with prefix local_request_log.
+	// This field is only supported on CB versions 8.0.0+.
+	// Defaults to 0 (disabled), minimum value is 0.
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
+	CompletedStreamSize *int32 `json:"completedStreamSize,omitempty"`
 }
 
 // CouchbaseClusterAppTelemetrySettings allows application telemetry service tweaks.
