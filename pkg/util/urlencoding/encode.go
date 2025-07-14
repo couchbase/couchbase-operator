@@ -95,6 +95,13 @@ func encode(v reflect.Value) (string, error) {
 		}
 	}
 
+	// As a fallback, check if the value implements fmt.Stringer interface.
+	if v.CanInterface() {
+		if stringer, ok := v.Interface().(fmt.Stringer); ok {
+			return stringer.String(), nil
+		}
+	}
+
 	return "", fmt.Errorf("unsupported type %v %v: %w", v, v.Type(), errors.NewStackTracedError(ErrTypeUnsupported))
 }
 

@@ -478,6 +478,11 @@ class YAMLVisitor:
             'integer': DEFAULT_INT,
         }
 
+        # Handle union types (e.g., "integer or string")
+        if ' or ' in t:
+            # For union types, prefer string as it's more general
+            if 'string' in t:
+                return DEFAULT_STRING
         return defaults[t]
 
     @yaml_printable
@@ -578,7 +583,18 @@ class WalkContext:
         Helper to return the current JSON schema type.
         """
 
-        return self.schema['type']
+        if 'type' in self.schema:
+            return self.schema['type']
+        if 'anyOf' in self.schema:
+            # Handle union types like IntOrString
+            # Return a concatenated string showing all possible types
+            types = []
+            for subschema in self.schema['anyOf']:
+                if 'type' in subschema:
+                    types.append(subschema['type'])
+            if types:
+                return ' or '.join(types)
+        return 'string'  # fallback
 
     @property
     def item_type(self):

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -423,29 +424,51 @@ func checkConstraintDataServiceMemoryQuota(_ *types.Validator, cluster *couchbas
 	return nil
 }
 
-// checkConstraintDataServiceMemcachedThreadCounts checks the reader/writer thread count for specific server version.
+// checkConstraintDataServiceMemcachedThreadCounts checks the reader/writer thread settings for a specific server version.
 func checkConstraintDataServiceMemcachedThreadCounts(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	var errs []error
+	if cluster.Spec.ClusterSettings.Data == nil {
+		return nil
+	}
 
 	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
 	if err != nil {
 		return err
 	}
 
-	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
-		serverVerErrStr := "for couchbase server version 7.1.0 or greater"
+	minThreads := int32(1)
+	maxThreads := int32(64)
+	allowedSettings := []string{}
 
-		if cluster.Spec.ClusterSettings.Data == nil {
+	if after71, err := couchbaseutil.VersionAfter(tag, "7.1.0"); !after71 && err == nil {
+		minThreads = int32(4)
+
+		allowedSettings = append(allowedSettings, "default", "disk_io_optimized")
+	} else if after80, err := couchbaseutil.VersionAfter(tag, "8.0.0"); !after80 && err == nil {
+		allowedSettings = append(allowedSettings, "default", "disk_io_optimized")
+	} else {
+		allowedSettings = append(allowedSettings, "balanced", "disk_io_optimized")
+	}
+
+	validateThreadSetting := func(setting *intstr.IntOrString, minThreads, maxThreads int32, allowedSettings []string, tag, path string) error {
+		if setting == nil {
 			return nil
 		}
 
-		if threads := cluster.Spec.ClusterSettings.Data.ReaderThreads; threads != nil && *threads < 4 {
-			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.readerThreads %d must be greater than or equal to 4 %s", *threads, serverVerErrStr))
+		if (setting.Type == intstr.Int && (setting.IntVal < minThreads || setting.IntVal > maxThreads)) ||
+			(setting.Type == intstr.String && !slices.Contains(allowedSettings, setting.StrVal)) {
+			return fmt.Errorf("%s must either be between %d and %d or one of %v for Couchbase server version %s", path, minThreads, maxThreads, strings.Join(allowedSettings, ", "), tag)
 		}
 
-		if threads := cluster.Spec.ClusterSettings.Data.WriterThreads; threads != nil && *threads < 4 {
-			errs = append(errs, fmt.Errorf("spec.clusterSettings.data.writerThreads %d must be greater than or equal to 4 %s", threads, serverVerErrStr))
-		}
+		return nil
+	}
+
+	var errs []error
+	if err := validateThreadSetting(cluster.Spec.ClusterSettings.Data.ReaderThreads, minThreads, maxThreads, allowedSettings, tag, "spec.cluster.data.readerThreads"); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := validateThreadSetting(cluster.Spec.ClusterSettings.Data.WriterThreads, minThreads, maxThreads, allowedSettings, tag, "spec.cluster.data.writerThreads"); err != nil {
+		errs = append(errs, err)
 	}
 
 	if errs != nil {

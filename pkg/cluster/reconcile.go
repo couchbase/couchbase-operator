@@ -587,18 +587,66 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		return err
 	}
 
+	defaultThreadSetting := "default"
+	if ok, err := c.IsAtLeastVersion("8.0.0"); ok && err == nil {
+		defaultThreadSetting = "balanced"
+	}
+
+	readWriteDefault := couchbaseutil.DataThreadSetting{
+		Setting: &defaultThreadSetting,
+	}
+
+	defaultIOSetting := "default"
+	ioDefault := couchbaseutil.DataThreadSetting{
+		Setting: &defaultIOSetting,
+	}
+
 	requested := current
+
 	if c.cluster.Spec.ClusterSettings.Data == nil {
-		requested.NumReaderThreads = nil
-		requested.NumWriterThreads = nil
-		requested.NumNonIOThreads = nil
-		requested.NumAuxIOThreads = nil
+		// If any values exist in the current state, we will override them to the default values.
+		defaultIfExists := func(current *couchbaseutil.DataThreadSetting, defaultSetting *couchbaseutil.DataThreadSetting) *couchbaseutil.DataThreadSetting {
+			if current != nil {
+				return defaultSetting
+			}
+
+			return nil
+		}
+
+		requested.ReaderThreads = defaultIfExists(current.ReaderThreads, &readWriteDefault)
+		requested.WriterThreads = defaultIfExists(current.WriterThreads, &readWriteDefault)
+		requested.NumNonIOThreads = defaultIfExists(current.NumNonIOThreads, &ioDefault)
+		requested.NumAuxIOThreads = defaultIfExists(current.NumAuxIOThreads, &ioDefault)
 	} else {
-		requested.NumReaderThreads = c.cluster.Spec.ClusterSettings.Data.ReaderThreads
-		requested.NumWriterThreads = c.cluster.Spec.ClusterSettings.Data.WriterThreads
+		// If anything is not set in the spec, we will set it to the default value.
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.ReaderThreads); setting != nil {
+			requested.ReaderThreads = setting
+		} else {
+			requested.ReaderThreads = &readWriteDefault
+		}
+
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.WriterThreads); setting != nil {
+			requested.WriterThreads = setting
+		} else {
+			requested.WriterThreads = &readWriteDefault
+		}
+
 		if ok, err := c.IsAtLeastVersion("7.1.0"); ok && err == nil {
-			requested.NumNonIOThreads = c.cluster.Spec.ClusterSettings.Data.NonIOThreads
-			requested.NumAuxIOThreads = c.cluster.Spec.ClusterSettings.Data.AuxIOThreads
+			// If the NonIOThreads or AuxIOThreads are not set, we will set them to the default value on valid server versions.
+			requested.NumNonIOThreads = &ioDefault
+			requested.NumAuxIOThreads = &ioDefault
+
+			if c.cluster.Spec.ClusterSettings.Data.NonIOThreads != nil {
+				requested.NumNonIOThreads = &couchbaseutil.DataThreadSetting{
+					FixedVal: c.cluster.Spec.ClusterSettings.Data.NonIOThreads,
+				}
+			}
+
+			if c.cluster.Spec.ClusterSettings.Data.AuxIOThreads != nil {
+				requested.NumAuxIOThreads = &couchbaseutil.DataThreadSetting{
+					FixedVal: c.cluster.Spec.ClusterSettings.Data.AuxIOThreads,
+				}
+			}
 		}
 	}
 

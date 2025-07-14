@@ -1596,6 +1596,52 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later`},
 		},
+		{
+			name: "TestValidateDataThreadSettingsFixedValueInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.0.3").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					ReaderThreads: util.IntOrStringPtr("1"),
+					WriterThreads: util.IntOrStringPtr("65"),
+				})},
+			shouldFail: true,
+			expectedErrors: []string{`spec.cluster.data.readerThreads must either be between 4 and 64 or one of default, disk_io_optimized for Couchbase server version 7.0.3`,
+				`spec.cluster.data.writerThreads must either be between 4 and 64 or one of default, disk_io_optimized for Couchbase server version 7.0.3`},
+		},
+		{
+			name: "TestValidateDataThreadSettingsFixedValueTooHigh",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.6.5").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					ReaderThreads: util.IntOrStringPtr("1"),
+					WriterThreads: util.IntOrStringPtr("65"),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.writerThreads must either be between 1 and 64 or one of default, disk_io_optimized for Couchbase server version 7.6.5`},
+		},
+		{
+			name: "TestValidateDataThreadSettingsSettingInvalidSettingsFor70",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.6.3").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					ReaderThreads: util.IntOrStringPtr("balanced"),
+					WriterThreads: util.IntOrStringPtr("disk_io_optimized"),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.readerThreads must either be between 1 and 64 or one of default, disk_io_optimized for Couchbase server version 7.6.3`},
+		},
+		{
+			name: "TestValidateDataThreadSettingsSettingInvalidSettingsFor80",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					ReaderThreads: util.IntOrStringPtr("default"),
+					WriterThreads: util.IntOrStringPtr("0"),
+				})},
+			shouldFail: true,
+			expectedErrors: []string{`spec.cluster.data.readerThreads must either be between 1 and 64 or one of balanced, disk_io_optimized for Couchbase server version 8.0.0`,
+				`spec.cluster.data.writerThreads must either be between 1 and 64 or one of balanced, disk_io_optimized for Couchbase server version 8.0.0`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

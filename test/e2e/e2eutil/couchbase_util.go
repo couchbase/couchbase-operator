@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -1471,9 +1472,9 @@ func MustGetCouchbaseVersion(t *testing.T, image string, overrideVersion string)
 	return version
 }
 
-// MustVerifyDataServerSettingsMemcachedThreadCounts checks memcached's reader, writer, auxIo, nonIo thread counts.
+// MustVerifyDataServerSettingsMemcachedThreads checks memcached's reader, writer, auxIo, nonIo thread settings.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
-func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads, nonIOThreads, auxIOThreads *int, timeout time.Duration) {
+func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads *intstr.IntOrString, nonIOThreads, auxIOThreads *int, timeout time.Duration) {
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(k8s, cluster)
 		if err != nil {
@@ -1486,20 +1487,31 @@ func MustVerifyDataServerSettingsMemcachedThreadCounts(t *testing.T, k8s *types.
 			return err
 		}
 
-		if !reflect.DeepEqual(current.NumReaderThreads, readerThreads) {
-			return fmt.Errorf("expected %s readers, got %s", IntPointerToString(readerThreads), IntPointerToString(current.NumReaderThreads))
+		if !reflect.DeepEqual(current.ReaderThreads, couchbaseutil.ToDataThreadSetting(readerThreads)) {
+			return fmt.Errorf("expected %s readers, got %s", readerThreads, current.ReaderThreads)
 		}
 
-		if !reflect.DeepEqual(current.NumWriterThreads, writerThreads) {
-			return fmt.Errorf("expected %s writers, got %s", IntPointerToString(writerThreads), IntPointerToString(current.NumWriterThreads))
+		if !reflect.DeepEqual(current.WriterThreads, couchbaseutil.ToDataThreadSetting(writerThreads)) {
+			return fmt.Errorf("expected %s writers, got %s", writerThreads, current.WriterThreads)
 		}
 
-		if !reflect.DeepEqual(current.NumNonIOThreads, nonIOThreads) {
-			return fmt.Errorf("expected %s non IO threads, got %s", IntPointerToString(nonIOThreads), IntPointerToString(current.NumNonIOThreads))
+		// For NonIOThreads and AuxIOThreads, if a fixed value exists on server, we can do a comparison with the expected value.
+		// However, if we don't have an expected value and the value on server is a setting (not a fixed val), we can assume this is ok as these settings
+		// cannot be configured by the operator at the moment.
+		if current.NumNonIOThreads != nil {
+			if !reflect.DeepEqual(nonIOThreads, current.NumNonIOThreads.FixedVal) {
+				return fmt.Errorf("expected %s non IO threads, got %s", IntPointerToString(nonIOThreads), IntPointerToString(current.NumNonIOThreads.FixedVal))
+			}
+		} else if nonIOThreads != nil {
+			return fmt.Errorf("expected %s non IO threads, got %s", IntPointerToString(nonIOThreads), current.NumNonIOThreads)
 		}
 
-		if !reflect.DeepEqual(current.NumAuxIOThreads, auxIOThreads) {
-			return fmt.Errorf("expected %s aux IO threads, got %s", IntPointerToString(auxIOThreads), IntPointerToString(current.NumAuxIOThreads))
+		if current.NumAuxIOThreads != nil {
+			if !reflect.DeepEqual(auxIOThreads, current.NumAuxIOThreads.FixedVal) {
+				return fmt.Errorf("expected %s aux IO threads, got %s", IntPointerToString(auxIOThreads), IntPointerToString(current.NumAuxIOThreads.FixedVal))
+			}
+		} else if auxIOThreads != nil {
+			return fmt.Errorf("expected %s aux IO threads, got %s", IntPointerToString(auxIOThreads), current.NumAuxIOThreads)
 		}
 
 		return nil

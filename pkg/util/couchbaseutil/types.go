@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var (
@@ -1746,72 +1747,87 @@ type AuditUser struct {
 	Domain string `json:"domain"`
 }
 
-// Classic API design... these return nothing when unset, and remain set once set
-// so we have no idea what the defaults are!
+// The MemcachedGlobals thread settings return nothing when unset, but remain set once any has been initialized.
+// They can also be either a string or integer, depending on couchbase version and user option.
 type MemcachedGlobals struct {
-	NumReaderThreads *int `json:"num_reader_threads,omitempty" url:"num_reader_threads,empty=default"`
-	NumWriterThreads *int `json:"num_writer_threads,omitempty" url:"num_writer_threads,empty=default"`
-	NumNonIOThreads  *int `json:"num_nonio_threads,omitempty" url:"num_nonio_threads,empty=default"`
-	NumAuxIOThreads  *int `json:"num_auxio_threads,omitempty" url:"num_auxio_threads,empty=default"`
+	ReaderThreads   *DataThreadSetting `json:"num_reader_threads,omitempty" url:"num_reader_threads,omitempty"`
+	WriterThreads   *DataThreadSetting `json:"num_writer_threads,omitempty" url:"num_writer_threads,omitempty"`
+	NumNonIOThreads *DataThreadSetting `json:"num_nonio_threads,omitempty" url:"num_nonio_threads,omitempty"`
+	NumAuxIOThreads *DataThreadSetting `json:"num_auxio_threads,omitempty" url:"num_auxio_threads,omitempty"`
 }
 
-func (m *MemcachedGlobals) UnmarshalJSON(data []byte) error {
-	var jsonData map[string]interface{}
+type DataThreadSetting struct {
+	FixedVal *int
+	Setting  *string
+}
 
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return errors.NewStackTracedError(err)
+// UnmarshalJSON is used for custom unmarshalling of responses from the settings/memcached/global endpoint.
+// The REST API will either return a string, float or nothing. This allows us to handle those cases consistently.
+func (t *DataThreadSetting) UnmarshalJSON(data []byte) error {
+	var raw interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
 	}
 
-	float64ToInt := func(v float64) *int {
-		val := int(v)
-		return &val
-	}
-
-	switch v := jsonData["num_reader_threads"].(type) {
+	switch v := raw.(type) {
 	case float64:
-		m.NumReaderThreads = float64ToInt(v)
+		intVal := int(v)
+		t.FixedVal = &intVal
+		t.Setting = nil
 	case string:
-		if strings.Contains(v, "default") {
-			m.NumReaderThreads = nil
-		}
-	default:
-		m.NumReaderThreads = nil
-	}
-
-	switch v := jsonData["num_writer_threads"].(type) {
-	case float64:
-		m.NumWriterThreads = float64ToInt(v)
-	case string:
-		if strings.Contains(v, "default") {
-			m.NumWriterThreads = nil
-		}
-	default:
-		m.NumWriterThreads = nil
-	}
-
-	switch v := jsonData["num_nonio_threads"].(type) {
-	case float64:
-		m.NumNonIOThreads = float64ToInt(v)
-	case string:
-		if strings.Contains(v, "default") {
-			m.NumNonIOThreads = nil
-		}
-	default:
-		m.NumNonIOThreads = nil
-	}
-
-	switch v := jsonData["num_auxio_threads"].(type) {
-	case float64:
-		m.NumAuxIOThreads = float64ToInt(v)
-	case string:
-		if strings.Contains(v, "default") {
-			m.NumAuxIOThreads = nil
-		}
-	default:
-		m.NumAuxIOThreads = nil
+		t.Setting = &v
+		t.FixedVal = nil
 	}
 
 	return nil
+}
+
+// String returns the string representation of the DataThreadSetting.
+// This allows it to be used directly in URL encoding.
+func (t *DataThreadSetting) String() string {
+	if t.FixedVal != nil {
+		return strconv.Itoa(*t.FixedVal)
+	}
+
+	if t.Setting != nil {
+		return *t.Setting
+	}
+
+	return ""
+}
+
+func (t *DataThreadSetting) ToIntOrString() *intstr.IntOrString {
+	if t.FixedVal != nil {
+		val := intstr.FromInt(*t.FixedVal)
+		return &val
+	}
+
+	if t.Setting != nil {
+		val := intstr.FromString(*t.Setting)
+		return &val
+	}
+
+	return nil
+}
+
+func ToDataThreadSetting(intOrStr *intstr.IntOrString) *DataThreadSetting {
+	if intOrStr == nil {
+		return nil
+	}
+
+	if intOrStr.Type == intstr.Int {
+		val := intOrStr.IntValue()
+
+		return &DataThreadSetting{
+			FixedVal: &val,
+		}
+	}
+
+	val := intOrStr.String()
+
+	return &DataThreadSetting{
+		Setting: &val,
+	}
 }
 
 // ScopeList defines all scopes for a bucket, and all nested collections.

@@ -2,6 +2,7 @@ package util
 
 import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var UseANSIColor bool
@@ -58,6 +59,11 @@ func IntPtr(i int) *int {
 
 func BoolPtr(b bool) *bool {
 	return &b
+}
+
+func IntOrStringPtr(s string) *intstr.IntOrString {
+	val := intstr.Parse(s)
+	return &val
 }
 
 var FrameworkBackupStorageClass func() string

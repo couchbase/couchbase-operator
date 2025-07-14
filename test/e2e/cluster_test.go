@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // Test scaling a cluster with no buckets up and down
@@ -1117,41 +1118,63 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0") // non io thread + aux threads are only valid 7.1+
-
 	// Static configuration.
 	clusterSize := 3
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
-	// Check that the starting state is correct (aka totally unknown).
-	// The check that adding configuration shows up.
-	readerThreads := 6
-	writerThreads := 9
-	nonIOThreads := 12
-	auxIOThreads := 15
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
+	after80, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0")
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
 
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &readerThreads}), time.Minute)
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, &readerThreads, nil, nil, nil, time.Minute)
+	defaultSetting := intstr.Parse("default")
+	if after80 {
+		defaultSetting = intstr.Parse("balanced")
+	}
 
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/writerThreads", writerThreads), time.Minute)
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, &readerThreads, &writerThreads, nil, nil, time.Minute)
+	diskOptimized := intstr.Parse("disk_io_optimized")
+	fixedVal := func(value int) *intstr.IntOrString {
+		val := intstr.FromInt(value)
+		return &val
+	}
 
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/nonIOThreads", nonIOThreads), time.Minute)
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, &readerThreads, &writerThreads, &nonIOThreads, nil, time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
 
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/auxIOThreads", auxIOThreads), time.Minute)
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, &readerThreads, &writerThreads, &nonIOThreads, &auxIOThreads, time.Minute)
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: fixedVal(4)}), time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, fixedVal(4), &defaultSetting, nil, nil, time.Minute)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/writerThreads", diskOptimized), time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, fixedVal(4), &diskOptimized, nil, nil, time.Minute)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: nil, WriterThreads: nil, NonIOThreads: nil, AuxIOThreads: nil}), time.Minute)
-	e2eutil.MustVerifyDataServerSettingsMemcachedThreadCounts(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, nil, nil, time.Minute)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &defaultSetting, WriterThreads: &diskOptimized}), time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &diskOptimized, nil, nil, time.Minute)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &defaultSetting}), time.Minute)
+	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, nil, nil, time.Minute)
 
 	numPatches := 5
 
-	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		nonIOThreads := 12
+		auxIOThreads := 15
+
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/nonIOThreads", nonIOThreads), time.Minute)
+		e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, &nonIOThreads, nil, time.Minute)
+
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/auxIOThreads", auxIOThreads), time.Minute)
+		e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, &nonIOThreads, &auxIOThreads, time.Minute)
+
+		numPatches += 2
+	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
@@ -1163,16 +1186,17 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		numPatches++
 	}
 
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
-		e2eutil.Die(t, err)
-	} else if ok {
+	if after80 {
 		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/diskUsageLimit", &couchbasev2.DiskUsageLimit{Enabled: util.BoolPtr(true), Percent: util.IntPtr(80)}), time.Minute)
 		e2eutil.MustVerifyDiskUsageLimit(t, kubernetes, cluster, time.Minute, true, 80)
 		// Check removing the field resets it to the default value
 		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/cluster/data/diskUsageLimit"), time.Minute)
 		e2eutil.MustVerifyDiskUsageLimit(t, kubernetes, cluster, time.Minute, false, 85)
 
-		numPatches += 2
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &defaultSetting, WriterThreads: &defaultSetting}), time.Minute)
+		e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, nil, nil, time.Minute)
+
+		numPatches += 3
 	}
 
 	// Check the events match what we expect:

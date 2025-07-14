@@ -87,8 +87,8 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-cluster-data-diskusagelimit-percent,percent>>: 85
       <<couchbaseclusters-spec-cluster-data-minreplicascount,minReplicasCount>>: 0
       <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
-      <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: 0
-      <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: 0
+      <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: ""
+      <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: ""
     <<couchbaseclusters-spec-cluster-dataservicememoryquota,dataServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-eventingservicememoryquota,eventingServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
@@ -1426,46 +1426,35 @@ default value set by Couchbase Server.
 
 ==== Constraints
 
-*Type*: `integer`
-
-*Minimum*: `1`
-
-*Maximum*: `64`
+*Type*: `integer or string`
 
 ==== Description
 
 ReaderThreads allows the number of threads used by the data service,
 per pod, to be altered.
-This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
-or 1 and 64 for CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources
-allocated for their use.
-If not specified, this defaults to the
-default value set by Couchbase Server.
+This can either be fixed to a number between 1 and 64, or to
+one of default(pre 8.0.0) / balanced(post 8.0.0) or disk_io_optimized.
+For server versions below 7.1.0, the minimum fixed value is 4.
+Increasing the fixed value should only be done where there are sufficient CPU resources.
+When using the default/balanced and disk_io_optimized options, CB server will automatically determine the number of threads to use.
+If not specified, this defaults to default/balanced.
 
 === couchbaseclusters.spec.cluster.data.writerThreads
 
 ==== Constraints
 
-*Type*: `integer`
-
-*Minimum*: `1`
-
-*Maximum*: `64`
+*Type*: `integer or string`
 
 ==== Description
 
 WriterThreads allows the number of threads used by the data service,
 per pod, to be altered.
-This setting is especially relevant when
-using "durable writes", increasing this field will have a large
-impact on performance.
-This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
-	// or 1 and 64 for CB versions 7.1.0+.
-and should only be increased where there are sufficient CPU resources
-allocated for their use.
-If not specified, this defaults to the
-default value set by Couchbase Server.
+This can either be fixed to a number between 1 and 64, or to
+one of "default" (pre 8.0.0) / "balanced" (post 8.0.0) or "disk_io_optimized".
+For server versions below 7.1.0, the minimum fixed value is 4.
+Increasing the fixed value should only be done where there are sufficient CPU resources.
+When using the default/balanced and disk_io_optimized options, CB server will automatically determine the number of threads to use.
+If not specified, this defaults to default/balanced.
 
 === couchbaseclusters.spec.cluster.dataServiceMemoryQuota
 

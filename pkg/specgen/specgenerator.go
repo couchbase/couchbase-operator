@@ -225,12 +225,24 @@ func (s *SpecGenerator) applyMemcachedSettings() error {
 		return err
 	}
 
-	s.cluster.ClusterSettings.Data = &couchbasev2.CouchbaseClusterDataSettings{
-		ReaderThreads: mcdSettings.NumReaderThreads,
-		WriterThreads: mcdSettings.NumWriterThreads,
-		NonIOThreads:  mcdSettings.NumNonIOThreads,
-		AuxIOThreads:  mcdSettings.NumAuxIOThreads,
+	clusterDataSettings := &couchbasev2.CouchbaseClusterDataSettings{}
+	if mcdSettings.ReaderThreads != nil {
+		clusterDataSettings.ReaderThreads = mcdSettings.ReaderThreads.ToIntOrString()
 	}
+
+	if mcdSettings.WriterThreads != nil {
+		clusterDataSettings.WriterThreads = mcdSettings.WriterThreads.ToIntOrString()
+	}
+
+	if mcdSettings.NumNonIOThreads != nil {
+		clusterDataSettings.NonIOThreads = mcdSettings.NumNonIOThreads.FixedVal
+	}
+
+	if mcdSettings.NumAuxIOThreads != nil {
+		clusterDataSettings.AuxIOThreads = mcdSettings.NumAuxIOThreads.FixedVal
+	}
+
+	s.cluster.ClusterSettings.Data = clusterDataSettings
 
 	dataSettings := couchbaseutil.DataServiceSettings{}
 	if err := couchbaseutil.GetDataServiceSettings(&dataSettings).On(s.api, s.clusterURL); err != nil {

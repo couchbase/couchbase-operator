@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // BucketName is the name of a bucket.
@@ -3749,26 +3750,24 @@ type CouchbaseClusterQuerySettings struct {
 // CouchbaseClusterDataSettings allows data service tweaks.
 type CouchbaseClusterDataSettings struct {
 	// ReaderThreads allows the number of threads used by the data service,
-	// per pod, to be altered.  This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
-	// or 1 and 64 for CB versions 7.1.0+.
-	// and should only be increased where there are sufficient CPU resources
-	// allocated for their use.  If not specified, this defaults to the
-	// default value set by Couchbase Server.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=64
-	ReaderThreads *int `json:"readerThreads,omitempty"`
+	// per pod, to be altered. This can either be fixed to a number between 1 and 64, or to
+	// one of default(pre 8.0.0) / balanced(post 8.0.0) or disk_io_optimized.
+	// For server versions below 7.1.0, the minimum fixed value is 4.
+	// Increasing the fixed value should only be done where there are sufficient CPU resources.
+	// When using the default/balanced and disk_io_optimized options, CB server will automatically determine the number of threads to use.
+	// If not specified, this defaults to default/balanced.
+	// +kubebuilder:validation:XIntOrString
+	ReaderThreads *intstr.IntOrString `json:"readerThreads,omitempty"`
 
 	// WriterThreads allows the number of threads used by the data service,
-	// per pod, to be altered.  This setting is especially relevant when
-	// using "durable writes", increasing this field will have a large
-	// impact on performance.  This value must be between 4 and 64 threads for CB versions below 7.1.0 and,
-	//	// or 1 and 64 for CB versions 7.1.0+.
-	// and should only be increased where there are sufficient CPU resources
-	// allocated for their use. If not specified, this defaults to the
-	// default value set by Couchbase Server.
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:validation:Maximum=64
-	WriterThreads *int `json:"writerThreads,omitempty"`
+	// per pod, to be altered. This can either be fixed to a number between 1 and 64, or to
+	// one of "default" (pre 8.0.0) / "balanced" (post 8.0.0) or "disk_io_optimized".
+	// For server versions below 7.1.0, the minimum fixed value is 4.
+	// Increasing the fixed value should only be done where there are sufficient CPU resources.
+	// When using the default/balanced and disk_io_optimized options, CB server will automatically determine the number of threads to use.
+	// If not specified, this defaults to default/balanced.
+	// +kubebuilder:validation:XIntOrString
+	WriterThreads *intstr.IntOrString `json:"writerThreads,omitempty"`
 
 	// NonIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are

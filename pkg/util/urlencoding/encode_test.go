@@ -1,6 +1,7 @@
 package urlencoding
 
 import (
+	"strconv"
 	"testing"
 )
 
@@ -114,6 +115,72 @@ func TestEncodingHandleUndefined(t *testing.T) {
 
 		if string(byteF) != testcase.expected {
 			t.Errorf("expected %s, but got %s", testcase.expected, string(byteF))
+		}
+	}
+}
+
+// ImplementsStringer is a local test struct that implements fmt.Stringer, which is used to ensure encoding works using this custom string implementation.
+type ImplementsStringer struct {
+	FixedVal *int
+	Setting  *string
+}
+
+// String implements fmt.Stringer.
+func (t *ImplementsStringer) String() string {
+	if t == nil {
+		return ""
+	}
+
+	if t.FixedVal != nil {
+		return strconv.Itoa(*t.FixedVal)
+	}
+
+	if t.Setting != nil {
+		return *t.Setting
+	}
+
+	return ""
+}
+
+type ImplementsStringerType struct {
+	FieldOmitsEmpty *ImplementsStringer `url:"omit_empty_field,omitempty"`
+	FieldHasEmpty   *ImplementsStringer `url:"has_empty_field,empty=balanced"`
+}
+
+func TestImplementsStringerEncoding(t *testing.T) {
+	intVal := 4
+	stringVal := "balanced"
+
+	testcases := []struct {
+		field    ImplementsStringerType
+		expected string
+	}{
+		{
+			field:    ImplementsStringerType{FieldOmitsEmpty: &ImplementsStringer{FixedVal: &intVal}},
+			expected: "has_empty_field=balanced&omit_empty_field=4",
+		},
+		{
+			field:    ImplementsStringerType{FieldOmitsEmpty: &ImplementsStringer{Setting: &stringVal}},
+			expected: "has_empty_field=balanced&omit_empty_field=balanced",
+		},
+		{
+			field:    ImplementsStringerType{FieldOmitsEmpty: nil, FieldHasEmpty: &ImplementsStringer{FixedVal: &intVal}},
+			expected: "has_empty_field=4",
+		},
+		{
+			field:    ImplementsStringerType{FieldOmitsEmpty: nil, FieldHasEmpty: nil},
+			expected: "has_empty_field=balanced",
+		},
+	}
+
+	for _, testcase := range testcases {
+		byteResult, err := Marshal(testcase.field)
+		if err != nil {
+			t.Fatalf("Error marshalling ImplementsStringerType: %v", err)
+		}
+
+		if string(byteResult) != testcase.expected {
+			t.Errorf("expected %s, but got %s", testcase.expected, string(byteResult))
 		}
 	}
 }
