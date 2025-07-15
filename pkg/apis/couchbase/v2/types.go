@@ -1444,6 +1444,38 @@ type CouchbaseBucketSpec struct {
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
 	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
+
+	// AccessScannerEnabled allows the bucket to be configured to allow enabling and disabling the access scanner.
+	// This feature is only supported for Couchbase Server 8.0.0+. It is set to true by default.
+	// +kubebuilder:default=true
+	AccessScannerEnabled *bool `json:"accessScannerEnabled,omitempty"`
+
+	// ExpiryPagerSleepTime defines the time between Expiry Pager runs.
+	// It defaults to 10 minutes. This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:default="10m"
+	ExpiryPagerSleepTime *metav1.Duration `json:"expiryPagerSleepTime,omitempty"`
+
+	// WarmupBehavior defines the behavior of the bucket when it is being warmed up.
+	// It defaults to "background". This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:validation:Enum=none;background;blocking
+	// +kubebuilder:default="background"
+	WarmupBehavior CouchbaseBucketWarmupBehavior `json:"warmupBehavior,omitempty"`
+
+	// MemoryLowWatermark defines the memory low watermark for the bucket.
+	// It must be between 50 and 89. It must also be less than spec.memoryHighWatermark.
+	// It defaults to 75. This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:default=75
+	// +kubebuilder:validation:Minimum=50
+	// +kubebuilder:validation:Maximum=89
+	MemoryLowWatermark *int `json:"memoryLowWatermark,omitempty"`
+
+	// MemoryHighWatermark defines the memory high watermark for the bucket.
+	// It must be between 51 and 90. It must also be greater than spec.memoryLowWatermark.
+	// It defaults to 85. This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:default=85
+	// +kubebuilder:validation:Minimum=51
+	// +kubebuilder:validation:Maximum=90
+	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
 }
 
 type HistoryRetentionSettings struct {
@@ -1604,7 +1636,42 @@ type CouchbaseEphemeralBucketSpec struct {
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
 	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
+
+	// ExpiryPagerSleepTime defines the time between Expiry Pager runs.
+	// It defaults to 10 minutes.
+	// +kubebuilder:default="10m"
+	ExpiryPagerSleepTime *metav1.Duration `json:"expiryPagerSleepTime,omitempty"`
+
+	// WarmupBehavior defines the behavior of the bucket when it is being warmed up.
+	// It defaults to "background".
+	// +kubebuilder:validation:Enum=none;background;blocking
+	// +kubebuilder:default="background"
+	WarmupBehavior CouchbaseBucketWarmupBehavior `json:"warmupBehavior,omitempty"`
+
+	// MemoryLowWatermark defines the memory low watermark for the bucket.
+	// It must be between 50 and 89. It must also be less than spec.memoryHighWatermark.
+	// It defaults to 75.
+	// +kubebuilder:default=75
+	// +kubebuilder:validation:Minimum=50
+	// +kubebuilder:validation:Maximum=89
+	MemoryLowWatermark *int `json:"memoryLowWatermark,omitempty"`
+
+	// MemoryHighWatermark defines the memory high watermark for the bucket.
+	// It must be between 51 and 90. It must also be greater than spec.memoryLowWatermark.
+	// It defaults to 85.
+	// +kubebuilder:default=85
+	// +kubebuilder:validation:Minimum=51
+	// +kubebuilder:validation:Maximum=90
+	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
 }
+
+type CouchbaseBucketWarmupBehavior string
+
+const (
+	CouchbaseBucketWarmupBehaviorNone       CouchbaseBucketWarmupBehavior = "none"
+	CouchbaseBucketWarmupBehaviorBackground CouchbaseBucketWarmupBehavior = "background"
+	CouchbaseBucketWarmupBehaviorBlocking   CouchbaseBucketWarmupBehavior = "blocking"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseEphemeralBucketList struct {

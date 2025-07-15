@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
@@ -28,6 +29,7 @@ const (
 	SupportedRank
 	SupportedBlockSize
 	SupportedCrossClusterVersioning
+	Additional80Settings
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -43,6 +45,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedBlockSize := supportedFeatures[SupportedBlockSize]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
+	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
 
 	for _, bucket := range k8sBuckets {
 		if client != nil {
@@ -132,6 +135,43 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
 
+		if supportedAdditional80Settings {
+			if bucket.Spec.AccessScannerEnabled != nil {
+				b.AccessScannerEnabled = bucket.Spec.AccessScannerEnabled
+			} else {
+				defaultAccessScannerEnabled := true
+				b.AccessScannerEnabled = &defaultAccessScannerEnabled
+			}
+
+			if bucket.Spec.ExpiryPagerSleepTime != nil {
+				expiryPagerSleepTime := uint64(bucket.Spec.ExpiryPagerSleepTime.Duration.Seconds())
+				b.ExpiryPagerSleepTime = &expiryPagerSleepTime
+			} else {
+				defaultExpiryPagerSleepTime := uint64(constants.ExpiryPagerSleepTimeDefaultSeconds * time.Second)
+				b.ExpiryPagerSleepTime = &defaultExpiryPagerSleepTime
+			}
+
+			if bucket.Spec.WarmupBehavior != "" {
+				b.WarmupBehavior = string(bucket.Spec.WarmupBehavior)
+			} else {
+				b.WarmupBehavior = constants.BucketWarmupBehaviorDefault
+			}
+
+			if bucket.Spec.MemoryLowWatermark != nil {
+				b.MemoryLowWatermark = bucket.Spec.MemoryLowWatermark
+			} else {
+				defaultMemoryLowWatermark := constants.MemoryLowWatermarkDefault
+				b.MemoryLowWatermark = &defaultMemoryLowWatermark
+			}
+
+			if bucket.Spec.MemoryHighWatermark != nil {
+				b.MemoryHighWatermark = bucket.Spec.MemoryHighWatermark
+			} else {
+				defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
+				b.MemoryHighWatermark = &defaultMemoryHighWatermark
+			}
+		}
+
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
 		b.AutoCompactionSettings = autoCompactionSettings
 		b.PurgeInterval = purgeInterval
@@ -159,6 +199,7 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
+	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
 
 	for _, bucket := range k8sEphemeralBuckets {
 		bucketA, found := client.CouchbaseEphemeralBuckets.Get(bucket.Name)
@@ -218,10 +259,44 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
 
+		if supportedAdditional80Settings {
+			apply80Settings(&b, bucket)
+		}
+
 		outputBuckets = append(outputBuckets, b)
 	}
 
 	return outputBuckets
+}
+
+func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphemeralBucket) {
+	if bucket.Spec.ExpiryPagerSleepTime != nil {
+		expiryPagerSleepTime := uint64(bucket.Spec.ExpiryPagerSleepTime.Duration.Seconds())
+		b.ExpiryPagerSleepTime = &expiryPagerSleepTime
+	} else {
+		defaultExpiryPagerSleepTime := uint64(constants.ExpiryPagerSleepTimeDefaultSeconds * time.Second)
+		b.ExpiryPagerSleepTime = &defaultExpiryPagerSleepTime
+	}
+
+	if bucket.Spec.WarmupBehavior != "" {
+		b.WarmupBehavior = string(bucket.Spec.WarmupBehavior)
+	} else {
+		b.WarmupBehavior = constants.BucketWarmupBehaviorDefault
+	}
+
+	if bucket.Spec.MemoryLowWatermark != nil {
+		b.MemoryLowWatermark = bucket.Spec.MemoryLowWatermark
+	} else {
+		defaultMemoryLowWatermark := constants.MemoryLowWatermarkDefault
+		b.MemoryLowWatermark = &defaultMemoryLowWatermark
+	}
+
+	if bucket.Spec.MemoryHighWatermark != nil {
+		b.MemoryHighWatermark = bucket.Spec.MemoryHighWatermark
+	} else {
+		defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
+		b.MemoryHighWatermark = &defaultMemoryHighWatermark
+	}
 }
 
 // gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
@@ -308,6 +383,13 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	}
 
 	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
+
+	atleast80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, err
+	}
+
+	supportedFeatures[Additional80Settings] = atleast80
 
 	allBuckets := []couchbaseutil.Bucket{}
 

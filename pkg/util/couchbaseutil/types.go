@@ -496,6 +496,11 @@ type Bucket struct {
 	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
 	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
 	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
+	AccessScannerEnabled              *bool                        `json:"accessScannerEnabled,omitempty"`
+	ExpiryPagerSleepTime              *uint64                      `json:"expiryPagerSleepTime,omitempty"`
+	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
+	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
+	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
 }
 
 type BucketList []Bucket
@@ -553,6 +558,11 @@ type BucketStatus struct {
 	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
 	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
 	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
+	AccessScannerEnabled              *bool                        `json:"accessScannerEnabled,omitempty"`
+	ExpiryPagerSleepTime              *uint64                      `json:"expiryPagerSleepTime,omitempty"`
+	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
+	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
+	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -862,6 +872,10 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.Rank = status.Rank
 	b.EnableCrossClusterVersioning = status.EnableCrossClusterVersioning
 	b.VersionPruningWindowHrs = status.VersionPruningWindowHrs
+	b.ExpiryPagerSleepTime = status.ExpiryPagerSleepTime
+	b.WarmupBehavior = status.WarmupBehavior
+	b.MemoryLowWatermark = status.MemoryLowWatermark
+	b.MemoryHighWatermark = status.MemoryHighWatermark
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -875,6 +889,8 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 
 	b.PurgeInterval = status.PurgeInterval
 	b.AutoCompactionSettings = status.AutoCompactionSettings
+
+	b.AccessScannerEnabled = status.AccessScannerEnabled
 
 	return nil
 }
@@ -970,6 +986,26 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.VersionPruningWindowHrs != nil {
 		data.Set("versionPruningWindowHrs", strconv.FormatUint(*b.VersionPruningWindowHrs, 10))
+	}
+
+	if b.AccessScannerEnabled != nil {
+		data.Set("accessScannerEnabled", BoolAsStr(*b.AccessScannerEnabled))
+	}
+
+	if b.ExpiryPagerSleepTime != nil {
+		data.Set("expiryPagerSleepTime", strconv.FormatUint(*b.ExpiryPagerSleepTime, 10))
+	}
+
+	if b.WarmupBehavior != "" {
+		data.Set("warmupBehavior", b.WarmupBehavior)
+	}
+
+	if b.MemoryLowWatermark != nil {
+		data.Set("memoryLowWatermark", strconv.Itoa(*b.MemoryLowWatermark))
+	}
+
+	if b.MemoryHighWatermark != nil {
+		data.Set("memoryHighWatermark", strconv.Itoa(*b.MemoryHighWatermark))
 	}
 
 	return []byte(data.Encode())

@@ -287,4 +287,16 @@ const (
 
 	// VersionPruningWindowHrsDefault default number of hours to retain version history for a bucket.
 	VersionPruningWindowHrsDefault = 720
+
+	// ExpiryPagerSleepTimeDefaultSeconds default number of seconds to sleep between expiry pager runs.
+	ExpiryPagerSleepTimeDefaultSeconds = 600
+
+	// BucketWarmupBehaviorDefault default warmup behavior for a bucket.
+	BucketWarmupBehaviorDefault = "background"
+
+	// MemoryLowWatermarkDefault default memory low watermark for a bucket.
+	MemoryLowWatermarkDefault = 75
+
+	// MemoryHighWatermarkDefault default memory high watermark for a bucket.
+	MemoryHighWatermarkDefault = 85
 )

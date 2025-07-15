@@ -2522,6 +2522,41 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"enableCrossClusterVersioning requires Couchbase Server version 7.6.0 or later"},
 		},
+		{
+			name: "TestValidateBucketInvalidMemoryWatermarks",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/memoryLowWatermark", 74).
+					Replace("/spec/memoryHighWatermark", 62),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.memoryLowWatermark"},
+		},
+		{
+			name: "TestValidateBucketInvalidLowMemoryWatermark",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/memoryLowWatermark", 12),
+			},
+			shouldFail: true,
+		},
+		{
+			name: "TestValidateBucketInvalidHighMemoryWatermark",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/memoryHighWatermark", 1212),
+			},
+			shouldFail: true,
+		},
+		{
+			name: "TestValidateBucketInvalidWarmupBehavior",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/warmupBehavior", "invalid"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.warmupBehavior"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

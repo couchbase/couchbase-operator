@@ -1914,14 +1914,8 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
 	}
 
-	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-		if err := checkBucketClustersMagmaStorageBackend(v, bucket); err != nil {
-			errs = append(errs, err)
-		}
-
-		if bucket.Spec.EnableIndexReplica {
-			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
-		}
+	if err := checkMagmaBucketSettings(v, bucket); err != nil {
+		errs = append(errs, err)
 	}
 
 	if bucket.Spec.MaxTTL != nil {
@@ -1964,6 +1958,53 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 
 	if err := checkBucketCrossClusterVersioning(v, bucket); err != nil {
 		errs = append(errs, err)
+	}
+
+	if err := checkBucketMemoryWatermarkSettings(bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) error {
+	if bucket.Spec.MemoryLowWatermark != nil || bucket.Spec.MemoryHighWatermark != nil {
+		low := constants.MemoryLowWatermarkDefault
+		high := constants.MemoryHighWatermarkDefault
+
+		if bucket.Spec.MemoryLowWatermark != nil {
+			low = *bucket.Spec.MemoryLowWatermark
+		}
+
+		if bucket.Spec.MemoryHighWatermark != nil {
+			high = *bucket.Spec.MemoryHighWatermark
+		}
+
+		if low >= high {
+			return fmt.Errorf("spec.memoryLowWatermark (%d) must be less than spec.memoryHighWatermark (%d)", low, high)
+		}
+	}
+
+	return nil
+}
+
+func checkMagmaBucketSettings(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+	var errs []error
+
+	if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+		return nil
+	}
+
+	if err := checkBucketClustersMagmaStorageBackend(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if bucket.Spec.EnableIndexReplica {
+		errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
 	}
 
 	if errs != nil {

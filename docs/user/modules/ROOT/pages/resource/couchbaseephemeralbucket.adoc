@@ -24,8 +24,11 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseephemeralbuckets-spec-conflictresolution,conflictResolution>>: seqno
   <<couchbaseephemeralbuckets-spec-enableflush,enableFlush>>: false
   <<couchbaseephemeralbuckets-spec-evictionpolicy,evictionPolicy>>: noEviction
+  <<couchbaseephemeralbuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
   <<couchbaseephemeralbuckets-spec-iopriority,ioPriority>>: low
   <<couchbaseephemeralbuckets-spec-maxttl,maxTTL>>: ""
+  <<couchbaseephemeralbuckets-spec-memoryhighwatermark,memoryHighWatermark>>: 85
+  <<couchbaseephemeralbuckets-spec-memorylowwatermark,memoryLowWatermark>>: 75
   <<couchbaseephemeralbuckets-spec-memoryquota,memoryQuota>>: 100Mi
   <<couchbaseephemeralbuckets-spec-minimumdurability,minimumDurability>>: ""
   <<couchbaseephemeralbuckets-spec-name,name>>: ""
@@ -37,6 +40,7 @@ The following is an example resource, depicting the overall structure and any de
     - <<couchbaseephemeralbuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
       <<couchbaseephemeralbuckets-spec-scopes-resources-name,name>>: ""
     <<couchbaseephemeralbuckets-spec-scopes-selector,selector>>: {}
+  <<couchbaseephemeralbuckets-spec-warmupbehavior,warmupBehavior>>: background
 ----
 
 == couchbaseephemeralbuckets.apiVersion
@@ -157,6 +161,19 @@ recently in order to free up memory.
 This field must be "noEviction" or "nruEviction",
 defaulting to "noEviction".
 
+=== couchbaseephemeralbuckets.spec.expiryPagerSleepTime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `10m`
+
+==== Description
+
+ExpiryPagerSleepTime defines the time between Expiry Pager runs.
+It defaults to 10 minutes.
+
 === couchbaseephemeralbuckets.spec.ioPriority
 
 ==== Constraints
@@ -197,6 +214,44 @@ This field must be a duration in the range 0-2147483648s,
 defaulting to 0.
 More info:
 https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbaseephemeralbuckets.spec.memoryHighWatermark
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `85`
+
+*Minimum*: `51`
+
+*Maximum*: `90`
+
+==== Description
+
+MemoryHighWatermark defines the memory high watermark for the bucket.
+It must be between 51 and 90.
+It must also be greater than spec.memoryLowWatermark.
+It defaults to 85.
+
+=== couchbaseephemeralbuckets.spec.memoryLowWatermark
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `75`
+
+*Minimum*: `50`
+
+*Maximum*: `89`
+
+==== Description
+
+MemoryLowWatermark defines the memory low watermark for the bucket.
+It must be between 50 and 89.
+It must also be less than spec.memoryHighWatermark.
+It defaults to 75.
 
 === couchbaseephemeralbuckets.spec.memoryQuota
 
@@ -410,3 +465,18 @@ Selector allows resources to be implicitly considered for inclusion in this
 bucket.
 More info:
 https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
+
+=== couchbaseephemeralbuckets.spec.warmupBehavior
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `background`
+
+*Enumerations*: `none, background, blocking`
+
+==== Description
+
+WarmupBehavior defines the behavior of the bucket when it is being warmed up.
+It defaults to "background".

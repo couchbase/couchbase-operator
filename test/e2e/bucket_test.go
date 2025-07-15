@@ -411,6 +411,32 @@ func TestEditBucket(t *testing.T) {
 		patchCycles += 4
 	}
 
+	if isAtleast80, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if isAtleast80 {
+		accessScannerEnabled := false
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/accessScannerEnabled", accessScannerEnabled), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/AccessScannerEnabled", &accessScannerEnabled), time.Minute)
+
+		expiryPagerSleepTimeSeconds := uint64(900)
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/expiryPagerSleepTime", k8sutil.NewDurationS(900)), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ExpiryPagerSleepTime", &expiryPagerSleepTimeSeconds), time.Minute)
+
+		warmupBehaviour := "blocking"
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/warmupBehavior", warmupBehaviour), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/WarmupBehavior", warmupBehaviour), time.Minute)
+
+		memoryLowWatermark := 56
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryLowWatermark", memoryLowWatermark), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MemoryLowWatermark", &memoryLowWatermark), time.Minute)
+
+		memoryHighWatermark := 83
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/memoryHighWatermark", memoryHighWatermark), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MemoryHighWatermark", &memoryHighWatermark), time.Minute)
+
+		patchCycles += 5
+	}
+
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
 	time.Sleep(10 * time.Second)
 

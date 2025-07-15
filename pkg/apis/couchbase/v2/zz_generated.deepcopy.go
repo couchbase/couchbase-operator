@@ -1588,6 +1588,26 @@ func (in *CouchbaseBucketSpec) DeepCopyInto(out *CouchbaseBucketSpec) {
 		*out = new(uint64)
 		**out = **in
 	}
+	if in.AccessScannerEnabled != nil {
+		in, out := &in.AccessScannerEnabled, &out.AccessScannerEnabled
+		*out = new(bool)
+		**out = **in
+	}
+	if in.ExpiryPagerSleepTime != nil {
+		in, out := &in.ExpiryPagerSleepTime, &out.ExpiryPagerSleepTime
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.MemoryLowWatermark != nil {
+		in, out := &in.MemoryLowWatermark, &out.MemoryLowWatermark
+		*out = new(int)
+		**out = **in
+	}
+	if in.MemoryHighWatermark != nil {
+		in, out := &in.MemoryHighWatermark, &out.MemoryHighWatermark
+		*out = new(int)
+		**out = **in
+	}
 	return
 }
 
@@ -2434,6 +2454,21 @@ func (in *CouchbaseEphemeralBucketSpec) DeepCopyInto(out *CouchbaseEphemeralBuck
 	if in.VersionPruningWindowHrs != nil {
 		in, out := &in.VersionPruningWindowHrs, &out.VersionPruningWindowHrs
 		*out = new(uint64)
+		**out = **in
+	}
+	if in.ExpiryPagerSleepTime != nil {
+		in, out := &in.ExpiryPagerSleepTime, &out.ExpiryPagerSleepTime
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.MemoryLowWatermark != nil {
+		in, out := &in.MemoryLowWatermark, &out.MemoryLowWatermark
+		*out = new(int)
+		**out = **in
+	}
+	if in.MemoryHighWatermark != nil {
+		in, out := &in.MemoryHighWatermark, &out.MemoryHighWatermark
+		*out = new(int)
 		**out = **in
 	}
 	return

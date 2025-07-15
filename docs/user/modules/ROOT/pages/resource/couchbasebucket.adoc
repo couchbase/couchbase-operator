@@ -19,6 +19,7 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasebuckets-metadata,metadata>>:
   <<couchbasebuckets-metadata-name,name>>: ""
 <<couchbasebuckets-spec,spec>>:
+  <<couchbasebuckets-spec-accessscannerenabled,accessScannerEnabled>>: True
   <<couchbasebuckets-spec-autocompaction,autoCompaction>>:
     <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
       <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold-percent,percent>>: 0
@@ -36,12 +37,15 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
   <<couchbasebuckets-spec-enableindexreplica,enableIndexReplica>>: false
   <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
+  <<couchbasebuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
   <<couchbasebuckets-spec-historyretention,historyRetention>>:
     <<couchbasebuckets-spec-historyretention-bytes,bytes>>: 0
     <<couchbasebuckets-spec-historyretention-collectionhistorydefault,collectionHistoryDefault>>: True
     <<couchbasebuckets-spec-historyretention-seconds,seconds>>: 0
   <<couchbasebuckets-spec-iopriority,ioPriority>>: low
   <<couchbasebuckets-spec-maxttl,maxTTL>>: ""
+  <<couchbasebuckets-spec-memoryhighwatermark,memoryHighWatermark>>: 85
+  <<couchbasebuckets-spec-memorylowwatermark,memoryLowWatermark>>: 75
   <<couchbasebuckets-spec-memoryquota,memoryQuota>>: 100Mi
   <<couchbasebuckets-spec-minimumdurability,minimumDurability>>: ""
   <<couchbasebuckets-spec-name,name>>: ""
@@ -54,6 +58,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasebuckets-spec-scopes-resources-name,name>>: ""
     <<couchbasebuckets-spec-scopes-selector,selector>>: {}
   <<couchbasebuckets-spec-storagebackend,storageBackend>>: ""
+  <<couchbasebuckets-spec-warmupbehavior,warmupBehavior>>: background
 ----
 
 == couchbasebuckets.apiVersion
@@ -97,6 +102,20 @@ include::partial$autogen-reference-metadata.adoc[tags=**;!*;couchbasebucket]
 
 CouchbaseBucketSpec is the specification for a Couchbase bucket resource, and
 allows the bucket to be customized.
+
+=== couchbasebuckets.spec.accessScannerEnabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `True`
+
+==== Description
+
+AccessScannerEnabled allows the bucket to be configured to allow enabling and disabling the access scanner.
+This feature is only supported for Couchbase Server 8.0.0+.
+It is set to true by default.
 
 === couchbasebuckets.spec.autoCompaction
 
@@ -336,6 +355,20 @@ flushed to disk.
 This field must be "valueOnly" or "fullEviction", defaulting to
 "valueOnly".
 
+=== couchbasebuckets.spec.expiryPagerSleepTime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `10m`
+
+==== Description
+
+ExpiryPagerSleepTime defines the time between Expiry Pager runs.
+It defaults to 10 minutes.
+This field is only supported for Couchbase Server 8.0.0+.
+
 === couchbasebuckets.spec.historyRetention
 
 ==== Constraints
@@ -424,6 +457,46 @@ This field must be a duration in the range 0-2147483648s,
 defaulting to 0.
 More info:
 https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbasebuckets.spec.memoryHighWatermark
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `85`
+
+*Minimum*: `51`
+
+*Maximum*: `90`
+
+==== Description
+
+MemoryHighWatermark defines the memory high watermark for the bucket.
+It must be between 51 and 90.
+It must also be greater than spec.memoryLowWatermark.
+It defaults to 85.
+This field is only supported for Couchbase Server 8.0.0+.
+
+=== couchbasebuckets.spec.memoryLowWatermark
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `75`
+
+*Minimum*: `50`
+
+*Maximum*: `89`
+
+==== Description
+
+MemoryLowWatermark defines the memory low watermark for the bucket.
+It must be between 50 and 89.
+It must also be less than spec.memoryHighWatermark.
+It defaults to 75.
+This field is only supported for Couchbase Server 8.0.0+.
 
 === couchbasebuckets.spec.memoryQuota
 
@@ -658,3 +731,19 @@ StorageBackend to be assigned to and used by the bucket.
 Only valid for Couchbase Server 7.0.0 onward.
 Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
 Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
+
+=== couchbasebuckets.spec.warmupBehavior
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `background`
+
+*Enumerations*: `none, background, blocking`
+
+==== Description
+
+WarmupBehavior defines the behavior of the bucket when it is being warmed up.
+It defaults to "background".
+This field is only supported for Couchbase Server 8.0.0+.
