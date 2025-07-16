@@ -3,6 +3,7 @@ package cluster
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -436,6 +437,8 @@ func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, e
 
 // generateGroups generates the list of groups that should exist, under the control
 // of the RBAC label selector.
+//
+//nolint:gocognit // This function orchestrates selection, migration and construction of groups.
 func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 	// gather selected groups
 	selector := labels.Everything()
@@ -466,7 +469,30 @@ func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 			LDAPGroupRef: g.Spec.LDAPGroupRef,
 		}
 
-		for _, role := range g.Spec.Roles {
+		// Migrate deprecated roles (if any) before handling them, but only
+		// when the target Couchbase Server version is Morpheus (8.0+) where
+		// the deprecated names are no longer valid. For older server
+		// versions, accept the old names as-is.
+		migrated := g.Spec.Roles
+		if ok, err := c.IsAtLeastVersion("8.0.0"); err == nil && ok {
+			migrated = couchbasev2.MigrateDeprecatedRoles(g.Spec.Roles)
+			// emit an event to notify the user that migration occurred
+			deprecated := []string{}
+
+			for _, r := range g.Spec.Roles {
+				rn := string(r.Name)
+				if rn == "security_admin_local" || rn == "security_admin_external" {
+					deprecated = append(deprecated, rn)
+				}
+			}
+
+			if len(deprecated) > 0 {
+				details := strings.Join(deprecated, ",")
+				c.raiseEvent(k8sutil.RolesMigratedEvent(g.Name, details, c.cluster))
+			}
+		}
+
+		for _, role := range migrated {
 			newRoles, err := c.handleRole(role)
 			if err != nil {
 				return groups, err

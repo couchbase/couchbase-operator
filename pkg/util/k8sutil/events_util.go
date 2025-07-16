@@ -40,12 +40,13 @@ const (
 	EventReasonBucketEdited  = "BucketEdited"
 
 	// RBAC lifecycle.
-	EventReasonUserCreated  = "UserCreated"
-	EventReasonUserDeleted  = "UserDeleted"
-	EventReasonUserEdited   = "UserEdited"
-	EventReasonGroupCreated = "GroupCreated"
-	EventReasonGroupDeleted = "GroupDeleted"
-	EventReasonGroupEdited  = "GroupEdited"
+	EventReasonUserCreated   = "UserCreated"
+	EventReasonUserDeleted   = "UserDeleted"
+	EventReasonUserEdited    = "UserEdited"
+	EventReasonGroupCreated  = "GroupCreated"
+	EventReasonGroupDeleted  = "GroupDeleted"
+	EventReasonGroupEdited   = "GroupEdited"
+	EventReasonRolesMigrated = "RolesMigrated"
 
 	// Service lifecycle.
 	EventReasonServiceCreated = "ServiceCreated"
@@ -674,6 +675,15 @@ func ManualInterventionResolvedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonManualInterventionResolved
 	event.Message = "Manual intervention no longer required"
+
+	return event
+}
+
+func RolesMigratedEvent(groupName, deprecatedRoles string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonRolesMigrated
+	event.Message = fmt.Sprintf("Group %s had deprecated roles (%s) automatically migrated to new role model", groupName, deprecatedRoles)
 
 	return event
 }

@@ -50,7 +50,9 @@ var clusterRoles7 = []string{
 	e2e_constants.RoleQueryCurlAccess,
 	e2e_constants.RoleQuestySystemAccess,
 	e2e_constants.RoleAnalyticsReader,
+	//nolint:staticcheck // Using deprecated roles here is intentional for 7.x compatibility tests.
 	e2e_constants.RoleSecurityAdminExternal,
+	//nolint:staticcheck // Using deprecated roles here is intentional for 7.x compatibility tests.
 	e2e_constants.RoleSecurityAdminLocal,
 	e2e_constants.RoleBackupAdmin,
 	e2e_constants.RoleQueryManageGlobalFunctions,
@@ -71,8 +73,10 @@ var clusterRoles8 = []string{
 	e2e_constants.RoleQueryCurlAccess,
 	e2e_constants.RoleQuestySystemAccess,
 	e2e_constants.RoleAnalyticsReader,
-	// e2e_constants.RoleUserAdminExternal,
-	// e2e_constants.RoleUserAdminLocal,
+	// security + user admin roles for 8.0+
+	e2e_constants.RoleSecurityAdmin,
+	e2e_constants.RoleUserAdminExternal,
+	e2e_constants.RoleUserAdminLocal,
 	e2e_constants.RoleBackupAdmin,
 	e2e_constants.RoleQueryManageGlobalFunctions,
 	e2e_constants.RoleQueryExecuteGlobalFunctions,

@@ -118,6 +118,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkServerClassImageDeprecated,
 		checkConstraintsDeprecatedNetworkingOptions,
 		checkConstraintDeprecatedAnnotations,
+		checkConstraintDeprecatedRBACRoles,
 	}
 
 	var errs []error
@@ -4897,15 +4898,9 @@ func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.C
 	return nil
 }
 
-// checkClusterGroupRBACConstraints checks that the security_admin role is not used in any CouchbaseGroup for a cluster running a server version above 7.0.0. If a specific group is passed in, we will only validate against that group. If this is omitted, we will validate against every group for the cluster.
+// checkClusterGroupRBACConstraints checks RBAC role constraints based on server version.
 func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, group *couchbasev2.CouchbaseGroup) error {
 	if !cluster.Spec.Security.RBAC.Managed {
-		return nil
-	}
-
-	if v, err := isVersion7OrAbove(cluster); err != nil {
-		return err
-	} else if !v {
 		return nil
 	}
 
@@ -4921,10 +4916,30 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 		couchbaseGroups = groups
 	}
 
+	// Check if we're on 8.0+ for role validation
+	is8Plus, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	// Check if we're on 7.0+ for security_admin validation
+	is7Plus, err := isVersion7OrAbove(cluster)
+	if err != nil {
+		return err
+	}
+
 	for _, g := range couchbaseGroups.Items {
 		for _, r := range g.Spec.Roles {
-			if r.Name == couchbasev2.RoleSecurityAdmin {
-				return fmt.Errorf("security_admin role is configured in group %s and cannot be used with Couchbase Server 7.0.0 and above", g.Name)
+			// security_admin is invalid on 7.0+ but valid again on 8.0+
+			if r.Name == couchbasev2.RoleSecurityAdmin && is7Plus && !is8Plus {
+				return fmt.Errorf("security_admin role is configured in group %s and cannot be used with Couchbase Server 7.0+", g.Name)
+			}
+
+			// New roles on older versions should error
+			if !is8Plus {
+				if r.Name == couchbasev2.RoleUserAdminLocal || r.Name == couchbasev2.RoleUserAdminExternal {
+					return fmt.Errorf("role %s in group %s requires Couchbase Server 8.0+", r.Name, g.Name)
+				}
 			}
 		}
 	}
@@ -4954,6 +4969,40 @@ func checkConstraintServicelessOverAdminService(_ *types.Validator, cluster *cou
 	}
 
 	return nil, nil
+}
+
+// checkConstraintDeprecatedRBACRoles returns warnings for deprecated RBAC roles on 8.0+.
+func checkConstraintDeprecatedRBACRoles(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if !cluster.Spec.Security.RBAC.Managed {
+		return nil, nil
+	}
+
+	is8Plus, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if !is8Plus {
+		return nil, nil
+	}
+
+	groups, err := v.Abstraction.GetCouchbaseGroups(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	var warnings []string
+
+	for _, g := range groups.Items {
+		for _, r := range g.Spec.Roles {
+			//nolint:staticcheck // Deprecated roles referenced intentionally for upgrade/migration warnings.
+			if r.Name == couchbasev2.RoleSecurityAdminLocal || r.Name == couchbasev2.RoleSecurityAdminExternal {
+				warnings = append(warnings, fmt.Sprintf("Group %s uses deprecated role %s - will be automatically migrated to security_admin + user_admin_*", g.Name, r.Name))
+			}
+		}
+	}
+
+	return warnings, nil
 }
 
 func checkClusterBackupConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {

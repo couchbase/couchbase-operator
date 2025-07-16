@@ -3962,20 +3962,7 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.roles(\[0\])?.bucket`},
 		},
-		{
-			name:           "TestRejectSecurityAdminRoleForServerVersion",
-			mutations:      patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
-			shouldFail:     true,
-			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
-		},
-		{
-			name: "TestRejectSecurityAdminRoleForServerVersionLabelCheck",
-			mutations: patchMap{
-				"cluster":     jsonpatch.NewPatchSet().Add("/spec/security/rbac/selector", metav1.LabelSelector{MatchLabels: map[string]string{"name": "security-admin-role-label"}}),
-				"admin-group": jsonpatch.NewPatchSet().Add("/metadata/labels", map[string]string{"name": "security-admin-role-label"}).Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
-			shouldFail:     true,
-			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0.0 and above`},
-		},
+		// RBAC role-version specific tests were moved to TestRBACRoleValidation76 and TestRBACRoleValidation80.
 		{
 			name: "TestWarnDuplicateUserNameInSpec",
 			mutations: patchMap{
@@ -3992,6 +3979,94 @@ func TestRBACValidationCreate(t *testing.T) {
 			},
 			shouldFail:       false,
 			expectedWarnings: []string{"user name user1 is already in use"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+// TestRBACRoleValidation80 tests RBAC role validation for 8.0+ server.
+func TestRBACRoleValidation80(t *testing.T) {
+	testDefs := []testDef{
+		// RBAC Role validation tests for 8.0+ server (uses validation.yaml with cluster image patched to 8.0.0).
+		{
+			name: "TestAcceptSecurityAdminOn80",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/status/currentVersion", "8.0.0"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestWarnSecurityAdminLocalOn80",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/status/currentVersion", "8.0.0"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin_local"}),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{`Group admin-group uses deprecated role security_admin_local - will be automatically migrated to security_admin \+ user_admin_\*`},
+		},
+		{
+			name: "TestWarnSecurityAdminExternalOn80",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/status/currentVersion", "8.0.0"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin_external"}),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{`Group admin-group uses deprecated role security_admin_external - will be automatically migrated to security_admin \+ user_admin_\*`},
+		},
+		{
+			name: "TestAcceptUserAdminLocalOn80",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/status/currentVersion", "8.0.0"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_local"}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestAcceptUserAdminExternalOn80",
+			mutations: patchMap{
+				"cluster":     jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/status/currentVersion", "8.0.0"),
+				"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_external"}),
+			},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+// TestRBACRoleValidation76 tests RBAC role validation for 7.6.x server.
+func TestRBACRoleValidation76(t *testing.T) {
+	testDefs := []testDef{
+		// RBAC Role validation tests for 7.x server (uses validation.yaml default image 7.1.4).
+		{
+			name:           "TestRejectSecurityAdminRoleOn7x",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin"})},
+			shouldFail:     true,
+			expectedErrors: []string{`security_admin role is configured in group admin-group and cannot be used with Couchbase Server 7.0\+`},
+		},
+		{
+			name:       "TestAcceptSecurityAdminLocalOn7x",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin_local"})},
+			shouldFail: false,
+		},
+		{
+			name:       "TestAcceptSecurityAdminExternalOn7x",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "security_admin_external"})},
+			shouldFail: false,
+		},
+		{
+			name:           "TestRejectUserAdminLocalOn7x",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_local"})},
+			shouldFail:     true,
+			expectedErrors: []string{`role user_admin_local in group admin-group requires Couchbase Server 8.0\+`},
+		},
+		{
+			name:           "TestRejectUserAdminExternalOn7x",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_external"})},
+			shouldFail:     true,
+			expectedErrors: []string{`role user_admin_external in group admin-group requires Couchbase Server 8.0\+`},
 		},
 	}
 

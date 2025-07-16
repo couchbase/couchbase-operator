@@ -94,8 +94,6 @@ const (
 	RoleQueryCurlAccess                     = "query_external_access"
 	RoleQuestySystemAccess                  = "query_system_catalog"
 	RoleAnalyticsReader                     = "analytics_reader"
-	RoleSecurityAdminExternal               = "security_admin_external"
-	RoleSecurityAdminLocal                  = "security_admin_local"
 	RoleBackupAdmin                         = "backup_admin"
 	RoleQueryManageGlobalFunctions          = "query_manage_global_functions"
 	RoleQueryExecuteGlobalFunctions         = "query_execute_global_functions"
@@ -106,6 +104,13 @@ const (
 	RoleEventingAdmin                       = "eventing_admin"
 	RoleUserAdminExternal                   = "user_admin_external"
 	RoleUserAdminLocal                      = "user_admin_local"
+
+	// Deprecated: These roles are removed in Morpheus (8.0+).
+	RoleSecurityAdminExternal = "security_admin_external"
+
+	// Deprecated: These roles are removed in Morpheus (8.0+).
+	RoleSecurityAdminLocal = "security_admin_local"
+
 	// Couchbase specific bucket roles.
 	BucketAdminRole = "bucket_admin"
 

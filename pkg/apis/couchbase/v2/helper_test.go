@@ -145,3 +145,52 @@ func TestMarshalDurationWithNegativeOverride(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrateDeprecatedRoles(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []Role
+		expected []Role
+	}{
+		{
+			name: "migrate security_admin_local",
+			input: []Role{
+				{Name: RoleSecurityAdminLocal},
+			},
+			expected: []Role{
+				{Name: RoleSecurityAdmin},
+				{Name: RoleUserAdminLocal},
+			},
+		},
+		{
+			name: "migrate security_admin_external",
+			input: []Role{
+				{Name: RoleSecurityAdminExternal},
+			},
+			expected: []Role{
+				{Name: RoleSecurityAdmin},
+				{Name: RoleUserAdminExternal},
+			},
+		},
+		{
+			name: "no migration for new roles",
+			input: []Role{
+				{Name: RoleUserAdminLocal},
+				{Name: RoleSecurityAdmin},
+			},
+			expected: []Role{
+				{Name: RoleUserAdminLocal},
+				{Name: RoleSecurityAdmin},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MigrateDeprecatedRoles(tt.input)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("expected %v, but got %v", tt.expected, result)
+			}
+		})
+	}
+}

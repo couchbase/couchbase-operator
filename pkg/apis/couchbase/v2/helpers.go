@@ -925,8 +925,8 @@ var clusterRoles = []RoleName{
 	RoleQueryCurlAccess,
 	RoleQuestySystemAccess,
 	RoleAnalyticsReader,
-	RoleSecurityAdminExternal,
-	RoleSecurityAdminLocal,
+	RoleUserAdminExternal,
+	RoleUserAdminLocal,
 	RoleBackupAdmin,
 	RoleQueryManageGlobalFunctions,
 	RoleQueryExecuteGlobalFunctions,
@@ -961,6 +961,41 @@ var scopeRoles = []RoleName{
 	RoleQueryExecuteExternalFunctions,
 	RoleQueryUseSequences,
 	RoleQueryManageSequences,
+}
+
+// MigrateDeprecatedRoles converts deprecated role names into their replacements.
+// Specifically:
+// - "security_admin_local"  -> security_admin + user_admin_local
+// - "security_admin_external" -> security_admin + user_admin_external
+// The returned slice preserves bucket/scope/collection scoping from the original role entries.
+func MigrateDeprecatedRoles(roles []Role) []Role {
+	out := make([]Role, 0, len(roles))
+
+	for _, r := range roles {
+		nameStr := string(r.Name)
+		switch nameStr {
+		case "security_admin_local":
+			// add security_admin
+			rr := r
+			rr.Name = RoleSecurityAdmin
+			out = append(out, rr)
+			// add user_admin_local
+			ur := r
+			ur.Name = RoleUserAdminLocal
+			out = append(out, ur)
+		case "security_admin_external":
+			rr := r
+			rr.Name = RoleSecurityAdmin
+			out = append(out, rr)
+			ur := r
+			ur.Name = RoleUserAdminExternal
+			out = append(out, ur)
+		default:
+			out = append(out, r)
+		}
+	}
+
+	return out
 }
 
 // collectionRoles can be bucket + scope + collection scoped.
