@@ -230,7 +230,6 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileBuckets,
 		(*Cluster).reconcileUnmanagedBucketsBackends,
-		(*Cluster).reconcileMemberAlternateAddresses,
 		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,

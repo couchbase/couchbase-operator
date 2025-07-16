@@ -203,50 +203,24 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 	return returnErr
 }
 
-func (c *Cluster) handleHostnameAA(ctx context.Context) error {
-	if !c.cluster.Spec.Networking.ImprovedHostNetwork {
-		persistenceVar, err := c.state.Get(persistence.MembersWithHostnameAAadded)
-
-		for _, member := range c.members {
-			// If we got an error, it's because the key didn't exist for the persistence var.
-			if persistenceVar == "true" && err == nil {
-				if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
-					return err
-				}
-			}
-		}
-
-		return c.state.Upsert(persistence.MembersWithHostnameAAadded, "false")
+func (c *Cluster) cleanMembersWithHostnameAAPersistence() error {
+	if c.cluster.Spec.Networking.ImprovedHostNetwork {
+		return nil
 	}
 
-	if c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
-		indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
-
-		for _, member := range c.members {
-			existingAddresses, err := c.getAlternateAddressesExternal(member)
-			if err != nil {
-				log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
-				return nil
-			}
-
-			if !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
-				if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
-					return err
-				}
-
-				var addErr error
-
-				indexes, addErr = couchbaseutil.AddMemberIndexToIndexList(indexes, member.Name())
-				if addErr != nil {
-					return err
-				}
-			}
-		}
-
-		return c.state.Upsert(persistence.MembersWithHostnameAAadded, indexes)
+	// If the persistence var doesn't exist, or is false, we don't need to do anything.
+	persistenceVar, err := c.state.Get(persistence.MembersWithHostnameAAadded)
+	if err != nil || persistenceVar == "false" {
+		return nil
 	}
 
-	return nil
+	for _, member := range c.members {
+		if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	return c.state.Upsert(persistence.MembersWithHostnameAAadded, "false")
 }
 
 func (c *Cluster) handleExposedFeatures(member couchbaseutil.Member, existingAddresses *couchbaseutil.AlternateAddressesExternal) error {
@@ -256,6 +230,7 @@ func (c *Cluster) handleExposedFeatures(member couchbaseutil.Member, existingAdd
 
 	indexes, _ := c.state.Get(persistence.MembersWithHostnameAAadded)
 
+	// If it exists in the indexes, we DON'T need to delete the alternate addresses
 	if !couchbaseutil.DoesMemberIndexExistInIndexes(indexes, member.Name()) {
 		if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
 			return err
@@ -269,6 +244,8 @@ func (c *Cluster) handleExposedFeatures(member couchbaseutil.Member, existingAdd
 // ports into the requested member.  Clients may use these addresses/ports to
 // connect to the cluster if there is no direct L3 connectivity into the pod
 // network.
+//
+//nolint:gocognit
 func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// Start a global timout counter, this caters for any/all alternate addresses
 	// in the system as we are waiting for external-DNS to do its thing, and all
@@ -283,8 +260,15 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	ctx, cancel := context.WithTimeout(context.Background(), delay)
 	defer cancel()
 
-	if err := c.handleHostnameAA(ctx); err != nil {
+	if err := c.cleanMembersWithHostnameAAPersistence(); err != nil {
 		return err
+	}
+
+	var persistenceIndexes string
+
+	usePersistence := c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname
+	if usePersistence {
+		persistenceIndexes, _ = c.state.Get(persistence.MembersWithHostnameAAadded)
 	}
 
 	// Examine each member in turn as they will have different node
@@ -315,52 +299,24 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 			continue
 		}
 
-		// Get the requested alternate address specification.
-		addresses, err := c.createAlternateAddressesExternal(member)
-		if err != nil {
-			return err
+		// Perform the update if the member is not in the persistence indexes. If we are not using persistence,
+		// we will always perform the update as the persistenceIndex will be a zero value.
+		if !couchbaseutil.DoesMemberIndexExistInIndexes(persistenceIndexes, member.Name()) {
+			if err := c.addMemberAlternateAddresses(member, existingAddresses, ctx); err != nil {
+				return err
+			}
+
+			if usePersistence {
+				persistenceIndexes, err = couchbaseutil.AddMemberIndexToIndexList(persistenceIndexes, member.Name())
+				if err != nil {
+					return err
+				}
+			}
 		}
+	}
 
-		// BUG: MB-49376
-		// Kubernetes service always exposes data ports but Couchbase doesn't
-		// include these ports in alternative address configs if node service
-		// does not explicitly include "data".
-		// Therefore for functional correctness, the Kubernetes data ports
-		// will be same as existing ports (if specified).
-		if c.alternatePortsNeedUpdating(member.Config(), addresses, existingAddresses) {
-			c.addDataServiceExternalPorts(addresses.Ports, existingAddresses.Ports)
-		}
-
-		// Check to see if we need to perform any updates, ignoring if not
-		if reflect.DeepEqual(addresses, existingAddresses) {
-			continue
-		}
-
-		// Wait for a period of time before allowing polling to happen in order to
-		// avoid negative caching of DNS values.
-		log.Info("Waiting for DNS propagation", "cluster", c.namespacedName(), "hostname", addresses.Hostname)
-
-		<-ctx.Done()
-
-		// Next check to see if the DNS entry is actually live (and visible by the Operator),
-		// before installing it into Couchbase server, which will then propagate to clients
-		// and potentially break them.
-		log.Info("Polling for DNS availability", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
-
-		timeout := 10 * time.Minute
-
-		if c.cluster.Spec.Networking.WaitForAddressReachable != nil {
-			timeout = c.cluster.Spec.Networking.WaitForAddressReachable.Duration
-		}
-
-		if err := waitAlternateAddressReachable(timeout, addresses); err != nil {
-			return fmt.Errorf("could not reach hostname: %s, %w", addresses.Hostname, err)
-		}
-
-		log.Info("DNS available", "cluster", c.namespacedName(), "service", member.Name(), "hostname", addresses.Hostname)
-
-		// Perform the update
-		if err := couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member); err != nil {
+	if usePersistence {
+		if err := c.state.Upsert(persistence.MembersWithHostnameAAadded, persistenceIndexes); err != nil {
 			return err
 		}
 	}
