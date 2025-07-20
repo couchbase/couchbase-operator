@@ -1562,7 +1562,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 					"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "1",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
 		},
 		{
 			name: "TestValidateAutoCompactionMagmaFragmentationPercentageMaximum",
@@ -1572,7 +1572,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 					"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "101",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
 		},
 		{
 			name: "TestValidateAutoCompactionMagmaFragmentationPercentageUnsupportedVersion",
@@ -1582,7 +1582,38 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 				}).
 				Replace("/spec/image", "couchbase/server:7.0.1")},
 			shouldFail:     true,
-			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+`},
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+`},
+		},
+		{
+			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldMinimum",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.1.0").
+				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 1)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+		},
+		{
+			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldMaximum",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.1.0").
+				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 101)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+		},
+		{
+			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.0.1").
+				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 15)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+`},
+		},
+		{
+			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldValid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:7.1.0").
+				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 50)},
+			shouldFail: false,
 		},
 		{
 			name: "TestValidateDiskUsageLimitUnsupportedVersion",
@@ -2545,7 +2576,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 					"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "1",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
 		},
 		{
 			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageMaximum",
@@ -2554,7 +2585,27 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 					"cao.couchbase.com/autoCompaction.magmaFragmentationPercentage": "101",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+		},
+		{
+			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldMinimum",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 1)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+		},
+		{
+			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldMaximum",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 101)},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+		},
+		{
+			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldValid",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 50)},
+			shouldFail: false,
 		},
 		{
 			name: "TestValidateBucketEnableCrossClusterVersioningInvalidVersion",

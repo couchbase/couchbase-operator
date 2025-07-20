@@ -1630,11 +1630,11 @@ func checkConstraintAutoCompactionCluster(_ *types.Validator, cluster *couchbase
 		}
 
 		if !magmaFragmentationPercentageSupported {
-			return fmt.Errorf("cao.couchbase.com/autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+")
+			return fmt.Errorf("spec.cluster.autoCompaction.magmaFragmentationPercentage is only supported for Couchbase 7.1.0+")
 		}
 
 		if *cluster.Spec.ClusterSettings.AutoCompaction.MagmaFragmentationThresholdPercentage < 10 || *cluster.Spec.ClusterSettings.AutoCompaction.MagmaFragmentationThresholdPercentage > 100 {
-			return fmt.Errorf("cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100")
+			return fmt.Errorf("spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100")
 		}
 	}
 
@@ -1653,7 +1653,7 @@ func checkConstraintAutoCompactionBucket(autoCompaction *couchbasev2.AutoCompact
 
 	if autoCompaction.MagmaFragmentationThresholdPercentage != nil {
 		if *autoCompaction.MagmaFragmentationThresholdPercentage < 10 || *autoCompaction.MagmaFragmentationThresholdPercentage > 100 {
-			return fmt.Errorf("cao.couchbase.com/autoCompaction.magmaFragmentationPercentage must be between 10 and 100")
+			return fmt.Errorf("spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100")
 		}
 	}
 

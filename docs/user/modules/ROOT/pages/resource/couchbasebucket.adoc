@@ -24,6 +24,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
       <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold-percent,percent>>: 0
       <<couchbasebuckets-spec-autocompaction-databasefragmentationthreshold-size,size>>: ""
+    <<couchbasebuckets-spec-autocompaction-magmafragmentationpercentage,magmaFragmentationPercentage>>: 0
     <<couchbasebuckets-spec-autocompaction-timewindow,timeWindow>>:
       <<couchbasebuckets-spec-autocompaction-timewindow-abortcompactionoutsidewindow,abortCompactionOutsideWindow>>: false
       <<couchbasebuckets-spec-autocompaction-timewindow-end,end>>: ""
@@ -170,6 +171,21 @@ This field must be in the range 2-100, defaulting to the cluster level value.
 Size the level of database fragmentation that must be reached for data compaction to be automatically triggered on the bucket.
 More info:
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbasebuckets.spec.autoCompaction.magmaFragmentationPercentage
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `10`
+
+*Maximum*: `100`
+
+==== Description
+
+MagmaFragmentationThresholdPercentage defines the percentage of magma fragmentation level to determine the point when compaction is triggered for buckets with a magma storage backend.
+This field will be ignored if the bucket has a couchstore storage backend.
 
 === couchbasebuckets.spec.autoCompaction.timeWindow
 

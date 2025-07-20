@@ -3927,7 +3927,11 @@ type AutoCompaction struct {
 
 	// MagmaFragmentationThresholdPercentage defines the default database fragmentation level to determine point when database compaction is triggered for buckets with a magma storage backend.
 	// This field must be in the range 10-100.
-	MagmaFragmentationThresholdPercentage *int `json:"-" annotation:"magmaFragmentationPercentage"`
+	// This field is ignored for Couchstore buckets.
+	// +optional
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=100
+	MagmaFragmentationThresholdPercentage *int `json:"magmaFragmentationPercentage,omitempty" annotation:"magmaFragmentationPercentage"`
 
 	// ParallelCompaction controls whether database and view compactions can happen
 	// in parallel.
@@ -3952,9 +3956,10 @@ type AutoCompactionSpecBucket struct {
 	ViewFragmentationThreshold *ViewFragmentationThresholdBucket `json:"viewFragmentationThreshold,omitempty"`
 
 	// MagmaFragmentationThresholdPercentage defines the percentage of magma fragmentation level to determine the point when compaction is triggered for buckets with a magma storage backend. This field will be ignored if the bucket has a couchstore storage backend.
+	// +optional
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=100
-	MagmaFragmentationThresholdPercentage *int `json:"-" annotation:"magmaFragmentationPercentage"`
+	MagmaFragmentationThresholdPercentage *int `json:"magmaFragmentationPercentage,omitempty" annotation:"magmaFragmentationPercentage"`
 
 	// TombstonePurgeInterval controls how long to wait before purging tombstones.
 	// This field must be in the range 1h-1440h, defaulting to the cluster level value.

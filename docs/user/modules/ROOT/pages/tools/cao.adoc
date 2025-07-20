@@ -798,7 +798,7 @@ Image pull secret to allow access to the operator image
 +
 *Default*: info
 +
-Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information.
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
 
 --memory-limit::
 *Type*: quantity
@@ -1207,6 +1207,154 @@ Separates cluster name and namespace from certain metrics.
 *Default*: false
 +
 Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao create pod [flags]
+
+This command is for debug and recovery purposes only.  It is intended
+to create a pod for a since removed pod, or a new pod when
+support needs to do so.
+
+=== Examples
+
+[source,console]
+----
+# Create pod.
+cao create pod
+
+# Create pod scoped to the cluster with a specific index.
+cao create pod --cluster-name cb-example --server-class all_services --index 3
+
+# Create pod scoped to a cluster with the next available index.
+cao create pod --cluster-name cb-example --server-class all_services --auto-index
+----
+
+=== Flags
+
+--auto-index::
+*Type*: bool
++
+*Default*: false
++
+Use the persistence secret's to generate a new pod with a new index
+
+--couchbase-cluster::
+*Type*: string
++
+The cluster from which to create a pod definition for.
+
+--index::
+*Type*: int
++
+*Default*: 0
++
+The index of the pod to create
+
+--server-class::
+*Type*: string
++
+The server class from which to create a pod definition for.
 
 === Inherited Flags
 
@@ -1751,7 +1899,7 @@ Image pull secret to allow access to the operator image
 +
 *Default*: info
 +
-Log level to generate logs at.  "info" prints basic operations. "debug", or "1" prints extended information.
+Log level to generate logs at.  "info", or "0", prints basic operations. "debug", or "1" prints extended information.
 
 --memory-limit::
 *Type*: quantity
@@ -2160,6 +2308,154 @@ Separates cluster name and namespace from certain metrics.
 *Default*: false
 +
 Populates pod resource requests and limits
+
+=== Inherited Flags
+
+--as::
+*Type*: string
++
+Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
+
+--as-group::
+*Type*: stringArray
++
+*Default*: []
++
+Group to impersonate for the operation, this flag can be repeated to specify multiple groups.
+
+--as-uid::
+*Type*: string
++
+UID to impersonate for the operation.
+
+--cache-dir::
+*Type*: string
++
+*Default*: $HOME/.kube/cache
++
+Default cache directory
+
+--certificate-authority::
+*Type*: string
++
+Path to a cert file for the certificate authority
+
+--client-certificate::
+*Type*: string
++
+Path to a client certificate file for TLS
+
+--client-key::
+*Type*: string
++
+Path to a client key file for TLS
+
+--cluster::
+*Type*: string
++
+The name of the kubeconfig cluster to use
+
+--context::
+*Type*: string
++
+The name of the kubeconfig context to use
+
+--disable-compression::
+*Type*: bool
++
+*Default*: false
++
+If true, opt-out of response compression for all requests to the server
+
+--insecure-skip-tls-verify::
+*Type*: bool
++
+*Default*: false
++
+If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
+
+--kubeconfig::
+*Type*: string
++
+Path to the kubeconfig file to use for CLI requests.
+
+--namespace, -n::
+*Type*: string
++
+If present, the namespace scope for this CLI request
+
+--request-timeout::
+*Type*: string
++
+*Default*: 0
++
+The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.
+
+--server, -s::
+*Type*: string
++
+The address and port of the Kubernetes API server
+
+--tls-server-name::
+*Type*: string
++
+Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
+
+--token::
+*Type*: string
++
+Bearer token for authentication to the API server
+
+--user::
+*Type*: string
++
+The name of the kubeconfig user to use
+
+== cao generate pod [flags]
+
+This command is for debug and recovery purposes only.  It is intended
+to generate a pod definition for a since removed pod, or a new pod when
+support needs to do so.
+
+=== Examples
+
+[source,console]
+----
+# Create pod.
+cao generate pod
+
+# Create pod scoped to the cluster with a specific index.
+cao generate pod --cluster-name cb-example --server-class all_services --index 3
+
+# Create pod scoped to a cluster with the next available index.
+cao generate pod --cluster-name cb-example --server-class all_services --auto-index
+----
+
+=== Flags
+
+--auto-index::
+*Type*: bool
++
+*Default*: false
++
+Use the persistence secret's to generate a new pod with a new index
+
+--couchbase-cluster::
+*Type*: string
++
+The cluster from which to create a pod definition for.
+
+--index::
+*Type*: int
++
+*Default*: 0
++
+The index of the pod to create
+
+--server-class::
+*Type*: string
++
+The server class from which to create a pod definition for.
 
 === Inherited Flags
 
