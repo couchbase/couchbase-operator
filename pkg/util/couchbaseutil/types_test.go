@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
 )
 
 func TestEmbedding(t *testing.T) {
@@ -575,5 +577,39 @@ func TestSetAutoCompactionUndefinedFieldsForEncoding(t *testing.T) {
 		if !reflect.DeepEqual(testcase.settings, testcase.expected) {
 			t.Errorf("expected settings did not match actual settings")
 		}
+	}
+}
+
+func TestEncodeReplication(t *testing.T) {
+	disabled := false
+	replication := Replication{
+		ToCluster:       "targetCluster",
+		FromBucket:      "source",
+		ToBucket:        "target",
+		ReplicationType: ReplicationReplicationTypeContinuous,
+		Type:            ReplicationTypeXMEM,
+		ConflictLogging: &ConflictLoggingSettings{
+			Disabled:   &disabled,
+			Bucket:     "test",
+			Collection: "test",
+			LoggingRules: map[string]*ConflictLoggingLocation{
+				"scope1": {
+					Bucket:     "bucket1",
+					Collection: "s1.c1",
+				},
+				"scope2": {},
+				"scope3": nil,
+			},
+		},
+	}
+
+	encoded, err := urlencoding.Marshal(replication)
+	if err != nil {
+		t.Errorf("Error encoding ConflictLoggingSettings: %v", err)
+	}
+
+	expected := `conflictLogging=%7B%22disabled%22%3Afalse%2C%22bucket%22%3A%22test%22%2C%22collection%22%3A%22test%22%2C%22loggingRules%22%3A%7B%22scope1%22%3A%7B%22bucket%22%3A%22bucket1%22%2C%22collection%22%3A%22s1.c1%22%7D%2C%22scope2%22%3A%7B%7D%2C%22scope3%22%3Anull%7D%7D&fromBucket=source&pauseRequested=false&replicationType=continuous&toBucket=target&toCluster=targetCluster&type=xmem`
+	if string(encoded) != expected {
+		t.Errorf("Expected: %s - Got: %s", expected, string(encoded))
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -1885,4 +1886,133 @@ func TestXDCRMobileActive(t *testing.T) {
 	if settings.Mobile != "Active" {
 		e2eutil.Die(t, fmt.Errorf("Mobile is not Active: %s", settings.Mobile))
 	}
+}
+
+func TestXDCRConflictLogging(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	scopeName := "pinky"
+	collectionName := "brain"
+
+	// Create a collection
+	collection := e2eutil.NewCollection(collectionName).MustCreate(t, kubernetes)
+
+	// Create a scope.
+	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
+
+	enableCrossClusterVersioning := true
+
+	// Link to a sourceBucket and create that.
+	sourceBucket := e2espec.DefaultBucket()
+	sourceBucket.Name = "source"
+	sourceBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	sourceBucket.Spec.EnableCrossClusterVersioning = &enableCrossClusterVersioning
+	e2eutil.LinkBucketToScopesExplicit(sourceBucket, scope)
+	e2eutil.MustNewBucket(t, kubernetes, sourceBucket)
+
+	// Link to a targetBucket and create that.
+	targetBucket := e2espec.DefaultBucket()
+	targetBucket.Name = "target"
+	targetBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	targetBucket.Spec.EnableCrossClusterVersioning = &enableCrossClusterVersioning
+	e2eutil.LinkBucketToScopesExplicit(targetBucket, scope)
+	e2eutil.MustNewBucket(t, kubernetes, targetBucket)
+
+	// Link to a logBucket and create that.
+	logBucket := e2espec.DefaultBucket()
+	logBucket.Name = "log"
+	logBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	e2eutil.LinkBucketToScopesExplicit(logBucket, scope)
+	e2eutil.MustNewBucket(t, kubernetes, logBucket)
+
+	// Create the cluster.
+	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(512)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	clusterUUID := cluster.Status.ClusterID
+
+	if len(clusterUUID) == 0 {
+		e2eutil.Die(t, fmt.Errorf("couldn't get cluster UUID"))
+	}
+
+	// Add the cluster as a remote cluster itself.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/xdcr", couchbasev2.XDCR{
+		Managed: true,
+		RemoteClusters: []couchbasev2.RemoteCluster{
+			{
+				Name:                 cluster.GetName(),
+				UUID:                 clusterUUID,
+				Hostname:             "couchbase://localhost",
+				AuthenticationSecret: &cluster.Spec.Security.AdminSecret,
+			},
+		},
+	}), time.Minute)
+
+	// When ready, establish the XDCR connection.
+	replication := e2espec.GetReplication(sourceBucket.GetName(), targetBucket.GetName())
+
+	replication.Spec.ConflictLogging = &couchbasev2.CouchbaseConflictLoggingSpec{
+		Enabled: true,
+		LogCollection: couchbasev2.CouchbaseConflictLogCollection{
+			Bucket:     couchbasev2.BucketName(logBucket.GetName()),
+			Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault("_default"),
+			Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault("_default"),
+		},
+	}
+	replication = e2eutil.MustCreateReplication(t, kubernetes, kubernetes, cluster, replication)
+
+	disabled := false
+	expectedConflictLoggingSettings := couchbaseutil.ConflictLoggingSettings{
+		Disabled:   &disabled,
+		Bucket:     logBucket.GetName(),
+		Collection: "_default._default",
+	}
+
+	e2eutil.MustPatchReplicationSettings(t, kubernetes, cluster, replication, &cluster.Spec.XDCR.RemoteClusters[0], jsonpatch.NewPatchSet().Test("/ConflictLogging", &expectedConflictLoggingSettings), time.Minute)
+
+	loggingRules := couchbasev2.CouchbaseLoggingRulesSpec{
+		DefaultCollectionRules: []couchbasev2.CouchbaseConflictKeyspace{
+			{
+				Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault("_default"),
+				Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault("_default"),
+			},
+		},
+		NoLoggingRules: []couchbasev2.CouchbaseConflictKeyspace{
+			{
+				Scope: couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+			},
+		},
+		CustomCollectionRules: []couchbasev2.CouchbaseConflictCustomCollectionRule{
+			{
+				Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+				Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(collectionName),
+				LogCollection: couchbasev2.CouchbaseConflictLogCollection{
+					Bucket:     couchbasev2.BucketName(logBucket.GetName()),
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(collectionName),
+				},
+			},
+		},
+	}
+	replication = e2eutil.MustPatchReplication(t, kubernetes, replication, jsonpatch.NewPatchSet().Replace("/spec/conflictLogging/loggingRules", loggingRules), time.Minute)
+
+	expectedConflictLoggingSettings.LoggingRules = map[string]*couchbaseutil.ConflictLoggingLocation{
+		"_default._default": {},
+		scopeName:           nil,
+		fmt.Sprintf("%s.%s", scopeName, collectionName): {
+			Bucket:     logBucket.GetName(),
+			Collection: fmt.Sprintf("%s.%s", scopeName, collectionName),
+		},
+	}
+
+	time.Sleep(time.Minute)
+
+	e2eutil.MustPatchReplicationSettings(t, kubernetes, cluster, replication, &cluster.Spec.XDCR.RemoteClusters[0], jsonpatch.NewPatchSet().Test("/ConflictLogging", &expectedConflictLoggingSettings), time.Minute)
 }

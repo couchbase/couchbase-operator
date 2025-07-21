@@ -1855,3 +1855,26 @@ func MustVerifyDiskUsageLimit(t *testing.T, k8s *types.Cluster, couchbase *couch
 		Die(t, err)
 	}
 }
+
+func MustPatchReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, remoteCluster *couchbasev2.RemoteCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	err := PatchReplicationSettings(t, k8s, couchbase, replication, remoteCluster, patches, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+func PatchReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, remoteCluster *couchbasev2.RemoteCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		settings := &couchbaseutil.ReplicationSettings{}
+		if err := couchbaseutil.GetReplicationSettings(settings, remoteCluster.UUID, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		return jsonpatch.Apply(settings, patches.Patches())
+	})
+}

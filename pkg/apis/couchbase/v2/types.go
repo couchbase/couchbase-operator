@@ -1450,11 +1450,12 @@ type CouchbaseBucketSpec struct {
 
 	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
 	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
-	EnableCrossClusterVersioning *bool `json:"-" annotation:"enableCrossClusterVersioning"`
+	EnableCrossClusterVersioning *bool `json:"enableCrossClusterVersioning,omitempty" annotation:"enableCrossClusterVersioning"`
 
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
-	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
+	// This feature is only supported for Couchbase Server 7.6.0+.
+	VersionPruningWindowHrs *uint64 `json:"versionPruningWindowHrs,omitempty" annotation:"versionPruningWindowHrs"`
 
 	// AccessScannerEnabled allows the bucket to be configured to allow enabling and disabling the access scanner.
 	// This feature is only supported for Couchbase Server 8.0.0+. It is set to true by default.
@@ -1646,11 +1647,11 @@ type CouchbaseEphemeralBucketSpec struct {
 
 	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
 	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
-	EnableCrossClusterVersioning *bool `json:"-" annotation:"enableCrossClusterVersioning"`
+	EnableCrossClusterVersioning *bool `json:"enableCrossClusterVersioning,omitempty" annotation:"enableCrossClusterVersioning"`
 
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
-	VersionPruningWindowHrs *uint64 `json:"-" annotation:"versionPruningWindowHrs"`
+	VersionPruningWindowHrs *uint64 `json:"versionPruningWindowHrs,omitempty" annotation:"versionPruningWindowHrs"`
 
 	// ExpiryPagerSleepTime defines the time between Expiry Pager runs.
 	// It defaults to 10 minutes.
@@ -1918,6 +1919,71 @@ type CouchbaseReplicationSpec struct {
 	// Mobile is the configuration for the mobile replication.
 	// This feature is available in Couchbase Server 7.6.4 and later.
 	Mobile MobileReplication `json:"-" annotation:"mobile"`
+
+	// ConflictResolution is the configuration for the conflict resolution.
+	// Conflicts will be logged to a specified conflict collection.
+	// This feature is available in Couchbase Server 8.0.0 and later.
+	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
+}
+
+// CouchbaseConflictLoggingSpec defines the configuration for conflict logging.
+type CouchbaseConflictLoggingSpec struct {
+	// Enabled defines whether conflict logging is enabled.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// LogCollection defines the collection to log conflicts to.
+	LogCollection CouchbaseConflictLogCollection `json:"logCollection,omitempty"`
+
+	// LoggingRules defines the list of logging rules for conflict logging. The rules can
+	// be scoped to a specific scope or a specific collection in a scope. The rules can disable
+	// logging, log to the default collection defined at `spec.conflictLogging.logCollection`, or
+	// log to a different collection.
+	LoggingRules CouchbaseLoggingRulesSpec `json:"loggingRules,omitempty"`
+}
+
+// CouchbaseLoggingRulesSpec defines the list of logging rules for conflict logging.
+type CouchbaseLoggingRulesSpec struct {
+	// DefaultCollectionRules defines the rules for logging to the default collection.
+	DefaultCollectionRules []CouchbaseConflictKeyspace `json:"defaultCollectionRules,omitempty"`
+
+	// NoLoggingRules defines the rules for disabling logging to for conflicts in a specific scope or collection.
+	NoLoggingRules []CouchbaseConflictKeyspace `json:"noLoggingRules,omitempty"`
+
+	// CustomCollectionRules defines the rules for logging to a different collection.
+	CustomCollectionRules []CouchbaseConflictCustomCollectionRule `json:"customCollectionRules,omitempty"`
+}
+
+// CouchbaseConflictKeyspace defines a scope or collection to apply the rule to.
+type CouchbaseConflictKeyspace struct {
+	// Scope defines the scope to apply the rule to.
+	Scope ScopeOrCollectionNameIncludingDefault `json:"scope,omitempty"`
+
+	// Collection defines the collection to apply the rule to.
+	Collection ScopeOrCollectionNameIncludingDefault `json:"collection,omitempty"`
+}
+
+// CouchbaseConflictLogCollection defines the collection to log conflicts to.
+type CouchbaseConflictLogCollection struct {
+	// Bucket defines the bucket to log conflicts to.
+	Bucket BucketName `json:"bucket,omitempty"`
+
+	// Scope defines the scope to log conflicts to.
+	Scope ScopeOrCollectionNameIncludingDefault `json:"scope,omitempty"`
+
+	// Collection defines the collection to log conflicts to.
+	Collection ScopeOrCollectionNameIncludingDefault `json:"collection,omitempty"`
+}
+
+// CouchbaseConflictCustomCollectionRule defines a rule for conflict logging that logs to a different collection.
+type CouchbaseConflictCustomCollectionRule struct {
+	// Scope defines the scope to apply the rule to.
+	Scope ScopeOrCollectionNameIncludingDefault `json:"scope"`
+
+	// Collection defines the collection to apply the rule to.
+	Collection ScopeOrCollectionNameIncludingDefault `json:"collection,omitempty"`
+
+	// LogCollection defines the collection to log conflicts to.
+	LogCollection CouchbaseConflictLogCollection `json:"logCollection"`
 }
 
 type MobileReplication string

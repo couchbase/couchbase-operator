@@ -36,6 +36,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbasebuckets-spec-conflictresolution,conflictResolution>>: seqno
   <<couchbasebuckets-spec-durabilityimpossiblefallback,durabilityImpossibleFallback>>: ""
+  <<couchbasebuckets-spec-enablecrossclusterversioning,enableCrossClusterVersioning>>: false
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
   <<couchbasebuckets-spec-enableindexreplica,enableIndexReplica>>: false
   <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
@@ -60,6 +61,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasebuckets-spec-scopes-resources-name,name>>: ""
     <<couchbasebuckets-spec-scopes-selector,selector>>: {}
   <<couchbasebuckets-spec-storagebackend,storageBackend>>: ""
+  <<couchbasebuckets-spec-versionpruningwindowhrs,versionPruningWindowHrs>>: 0
   <<couchbasebuckets-spec-warmupbehavior,warmupBehavior>>: background
 ----
 
@@ -342,6 +344,18 @@ defaulting to "seqno".
 DurabilityImpossibleFallback defines whether to report writes as durable even if not enough replicas are written to.
 This feature is only supported for Couchbase Server 8.0.0+.
 Defaults to disabled.
+
+=== couchbasebuckets.spec.enableCrossClusterVersioning
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
+This feature is only supported for Couchbase Server 7.6.0+.
+Once it has been set to true, it cannot be toggled to false.
 
 === couchbasebuckets.spec.enableFlush
 
@@ -762,6 +776,18 @@ StorageBackend to be assigned to and used by the bucket.
 Only valid for Couchbase Server 7.0.0 onward.
 Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
 Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
+
+=== couchbasebuckets.spec.versionPruningWindowHrs
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
+This field must be an integer larger than 23, defaulting to 720 (30 days).
+This feature is only supported for Couchbase Server 7.6.0+.
 
 === couchbasebuckets.spec.warmupBehavior
 

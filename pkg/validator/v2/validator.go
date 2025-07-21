@@ -1077,6 +1077,10 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
 				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
 			}
+
+			if err := validateReplicationConflictLogging(v, cluster, &replication.Spec); err != nil {
+				errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", replication.Name, err))
+			}
 		}
 
 		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
@@ -3358,12 +3362,18 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 
 // validateReplicationBucketValid ensures the specified Couchbase bucket exists.
 func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, rs *couchbasev2.CouchbaseReplicationSpec) error {
+	if !cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
 	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
 		return err
 	}
 
 	bucketName := string(rs.Bucket)
+
+	conflictLoggingEnabled := rs.ConflictLogging != nil && rs.ConflictLogging.Enabled
 
 	for _, bucket := range buckets {
 		if bucket.GetCouchbaseName() != bucketName {
@@ -3389,10 +3399,73 @@ func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.Cou
 			}
 		}
 
+		if conflictLoggingEnabled && !bucket.HasCrossClusterVersioningEnabled() {
+			return fmt.Errorf("bucket %s must have cross cluster versioning enabled to enable conflict logging", bucketName)
+		}
+
 		return nil
 	}
 
 	return fmt.Errorf("bucket %s not found", bucketName)
+}
+
+func validateReplicationConflictLogging(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplicationSpec) error {
+	if replication.ConflictLogging == nil || !replication.ConflictLogging.Enabled {
+		return nil
+	}
+
+	if conflictLoggingSupported, err := cluster.IsAtLeastVersion("8.0.0"); err != nil {
+		return err
+	} else if !conflictLoggingSupported {
+		return fmt.Errorf("conflict logging requires cluster version 8.0.0 or greater")
+	}
+
+	if !cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	bucketExists := func(bucketName string) bool {
+		for _, b := range buckets {
+			if b.GetCouchbaseName() == bucketName {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	if !bucketExists(string(replication.ConflictLogging.LogCollection.Bucket)) {
+		return fmt.Errorf("bucket %s not found", replication.ConflictLogging.LogCollection.Bucket)
+	}
+
+	if replication.ConflictLogging.LogCollection.Scope == "" {
+		return fmt.Errorf("spec.conflictLogging.logCollection.scope is required for conflict logging")
+	}
+
+	if replication.ConflictLogging.LogCollection.Collection == "" {
+		return fmt.Errorf("spec.conflictLogging.logCollection.collection is required for conflict logging")
+	}
+
+	for _, rule := range replication.ConflictLogging.LoggingRules.CustomCollectionRules {
+		if !bucketExists(string(rule.LogCollection.Bucket)) {
+			return fmt.Errorf("bucket %s not found", rule.LogCollection.Bucket)
+		}
+
+		if rule.LogCollection.Scope == "" {
+			return fmt.Errorf("spec.conflictLogging.logCollection.scope is required for conflict logging")
+		}
+
+		if rule.LogCollection.Collection == "" {
+			return fmt.Errorf("spec.conflictLogging.logCollection.collection is required for conflict logging")
+		}
+	}
+
+	return nil
 }
 
 // validateBackupCronSchedules ensures that the correct cronjob schedules are valid for the desired backup strategy.

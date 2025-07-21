@@ -29,6 +29,26 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasemigrationreplications-spec,spec>>:
   <<couchbasemigrationreplications-spec-bucket,bucket>>: ""
   <<couchbasemigrationreplications-spec-compressiontype,compressionType>>: Auto
+  <<couchbasemigrationreplications-spec-conflictlogging,conflictLogging>>:
+    <<couchbasemigrationreplications-spec-conflictlogging-enabled,enabled>>: false
+    <<couchbasemigrationreplications-spec-conflictlogging-logcollection,logCollection>>:
+      <<couchbasemigrationreplications-spec-conflictlogging-logcollection-bucket,bucket>>: ""
+      <<couchbasemigrationreplications-spec-conflictlogging-logcollection-collection,collection>>: ""
+      <<couchbasemigrationreplications-spec-conflictlogging-logcollection-scope,scope>>: ""
+    <<couchbasemigrationreplications-spec-conflictlogging-loggingrules,loggingRules>>:
+      <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules,customCollectionRules>>:
+      - <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-collection,collection>>: ""
+        <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-logcollection,logCollection>>:
+          <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-logcollection-bucket,bucket>>: ""
+          <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-logcollection-collection,collection>>: ""
+          <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-logcollection-scope,scope>>: ""
+        <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-customcollectionrules-scope,scope>>: ""
+      <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-defaultcollectionrules,defaultCollectionRules>>:
+      - <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-defaultcollectionrules-collection,collection>>: ""
+        <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-defaultcollectionrules-scope,scope>>: ""
+      <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules,noLoggingRules>>:
+      - <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules-collection,collection>>: ""
+        <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules-scope,scope>>: ""
   <<couchbasemigrationreplications-spec-filterexpression,filterExpression>>: ""
   <<couchbasemigrationreplications-spec-paused,paused>>: false
   <<couchbasemigrationreplications-spec-remotebucket,remoteBucket>>: ""
@@ -199,6 +219,285 @@ transferred between clusters.
 When Auto, Couchbase server will automatically
 compress documents as they are transferred to reduce bandwidth requirements.
 This field must be one of "None" or "Auto", defaulting to "Auto".
+
+=== couchbasemigrationreplications.spec.conflictLogging
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ConflictResolution is the configuration for the conflict resolution.
+Conflicts will be logged to a specified conflict collection.
+This feature is available in Couchbase Server 8.0.0 and later.
+
+=== couchbasemigrationreplications.spec.conflictLogging.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled defines whether conflict logging is enabled.
+
+=== couchbasemigrationreplications.spec.conflictLogging.logCollection
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+LogCollection defines the collection to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.logCollection.bucket
+
+==== Constraints
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
+
+==== Description
+
+Bucket defines the bucket to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.logCollection.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.logCollection.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+LoggingRules defines the list of logging rules for conflict logging.
+The rules can
+be scoped to a specific scope or a specific collection in a scope.
+The rules can disable
+logging, log to the default collection defined at `spec.conflictLogging.logCollection`, or
+log to a different collection.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+CustomCollectionRules defines the rules for logging to a different collection.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.logCollection
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+LogCollection defines the collection to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.logCollection.bucket
+
+==== Constraints
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
+
+==== Description
+
+Bucket defines the bucket to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.logCollection.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.logCollection.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to log conflicts to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.customCollectionRules.scope
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.defaultCollectionRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+DefaultCollectionRules defines the rules for logging to the default collection.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.defaultCollectionRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.defaultCollectionRules.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.noLoggingRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+NoLoggingRules defines the rules for disabling logging to for conflicts in a specific scope or collection.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.noLoggingRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbasemigrationreplications.spec.conflictLogging.loggingRules.noLoggingRules.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
 
 === couchbasemigrationreplications.spec.filterExpression
 

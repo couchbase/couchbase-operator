@@ -434,3 +434,17 @@ func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, target *couc
 		Die(t, err)
 	}
 }
+
+func MustCreateReplication(t *testing.T, kubernetes *types.Cluster, src *types.Cluster, cluster *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) *couchbasev2.CouchbaseReplication {
+	replication, err := kubernetes.CRClient.CouchbaseV2().CouchbaseReplications(cluster.Namespace).Create(context.Background(), replication, metav1.CreateOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	err = waitForReplicationAddedEvent(kubernetes, cluster, cluster.GetName(), string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket))
+	if err != nil {
+		Die(t, err)
+	}
+
+	return replication
+}

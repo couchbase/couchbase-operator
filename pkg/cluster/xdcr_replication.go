@@ -107,6 +107,10 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 			}
 		}
 
+		if settings.ConflictLogging != nil {
+			newReplication.ConflictLogging = settings.ConflictLogging
+		}
+
 		replications[i] = newReplication
 	}
 
@@ -370,6 +374,13 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 			}
 		}
 
+		if isAtleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err != nil {
+			log.Error(err, "Failed to check server version for conflict logging")
+			return nil, err
+		} else if isAtleast80 {
+			newReplication.ConflictLogging = generateConflictLoggingSettings(replication.Spec.ConflictLogging)
+		}
+
 		replicationKey := replicationKey(newReplication)
 
 		_, exists := duplicateChecks[replicationKey]
@@ -396,6 +407,54 @@ func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteClust
 	}
 
 	return replications, nil
+}
+
+func generateConflictLoggingSettings(conflictLogging *couchbasev2.CouchbaseConflictLoggingSpec) *couchbaseutil.ConflictLoggingSettings {
+	if conflictLogging == nil {
+		return &couchbaseutil.ConflictLoggingSettings{}
+	}
+
+	disabled := !conflictLogging.Enabled
+
+	settings := &couchbaseutil.ConflictLoggingSettings{
+		Disabled:   &disabled,
+		Bucket:     string(conflictLogging.LogCollection.Bucket),
+		Collection: fmt.Sprintf("%s.%s", conflictLogging.LogCollection.Scope, conflictLogging.LogCollection.Collection),
+	}
+
+	getRuleKey := func(scope, collection couchbasev2.ScopeOrCollectionNameIncludingDefault) string {
+		if collection != "" {
+			return fmt.Sprintf("%s.%s", scope, collection)
+		}
+
+		return string(scope)
+	}
+
+	rules := make(map[string]*couchbaseutil.ConflictLoggingLocation)
+
+	for _, r := range conflictLogging.LoggingRules.NoLoggingRules {
+		rules[getRuleKey(r.Scope, r.Collection)] = nil
+	}
+
+	for _, r := range conflictLogging.LoggingRules.DefaultCollectionRules {
+		rules[getRuleKey(r.Scope, r.Collection)] = &couchbaseutil.ConflictLoggingLocation{}
+	}
+
+	for _, r := range conflictLogging.LoggingRules.CustomCollectionRules {
+		rules[getRuleKey(r.Scope, r.Collection)] = &couchbaseutil.ConflictLoggingLocation{
+			Bucket:     string(r.LogCollection.Bucket),
+			Collection: fmt.Sprintf("%s.%s", r.LogCollection.Scope, r.LogCollection.Collection),
+		}
+	}
+
+	// Note this is important, we only set the LoggingRules if there are any rules to set.
+	// This is because the DeepEqual check will fail if the Requested LoggingRules is an empty map
+	// and the API returns nil for the LoggingRules field if there are no rules to set.
+	if len(rules) > 0 {
+		settings.LoggingRules = rules
+	}
+
+	return settings
 }
 
 // generateXDCR combines API and secret data to construct an idealized form
@@ -797,7 +856,7 @@ func (c *Cluster) checkXDCRTask(cluster *couchbaseutil.RemoteCluster, atLeast721
 			resultMessageNode := resultMessage[item]
 			for node := range resultMessageNode {
 				resultString := resultMessageNode[node]
-				if strings.Contains(resultString[0], "successful") {
+				if strings.Contains(resultString[0], "successful") || strings.HasPrefix(resultString[0], "Intra-cluster replication detected, skipping connection pre-check") {
 					return nil
 				}
 			}

@@ -1316,6 +1316,10 @@ type Replication struct {
 	// This is really a map of strings to strings or pointers to strings but easier to handle here this way then deal with explicitly in code.
 	MappingRules string `url:"colMappingRules,omitempty"`
 	Mobile       string `url:"mobile,omitempty"`
+
+	// ConflictLogging is the configuration for the conflict logging.
+	// only available in Couchbase Server 8.0.0 and later.
+	ConflictLogging *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,empty={}"`
 }
 
 type ReplicationList []Replication
@@ -1331,6 +1335,39 @@ type ReplicationSettings struct {
 	// One API uses a map, the other wants it as a JSON-ified string already.
 	MappingRules map[string]*string `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
 	Mobile       string             `json:"mobile,omitempty" url:"mobile,omitempty"`
+
+	// ConflictLogging is the configuration for the conflict logging.
+	// only available in Couchbase Server 8.0.0 and later.
+	ConflictLogging *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,omitempty"`
+}
+
+// ConflictLoggingSettings is the configuration for the conflict logging.
+// This object doesn't have a url tag because it's encoded as JSON and the json string is then
+// encoded as a url parameter.
+type ConflictLoggingSettings struct {
+	Disabled   *bool  `json:"disabled,omitempty"`
+	Bucket     string `json:"bucket,omitempty"`
+	Collection string `json:"collection,omitempty"`
+
+	// LoggingRules is a map of scope and collection to the location to log the conflicts.
+	// If the location is nil then the conflicts are not logged.
+	// If the location is empty then the conflicts are logged to the default location for the replication.
+	// If the location is not nil and not empty then the conflicts are logged to the specified location.
+	LoggingRules map[string]*ConflictLoggingLocation `json:"loggingRules,omitempty"`
+}
+
+func (c *ConflictLoggingSettings) String() string {
+	jsonS, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+
+	return string(jsonS)
+}
+
+type ConflictLoggingLocation struct {
+	Bucket     string `json:"bucket,omitempty" url:"bucket,omitempty"`
+	Collection string `json:"collection,omitempty" url:"collection,omitempty"`
 }
 
 // Convert from one API call to the other.

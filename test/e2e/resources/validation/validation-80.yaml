@@ -1,0 +1,67 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication0
+spec:
+  bucket: bucket1
+  remoteBucket: bucket1
+  conflictLogging:
+    enabled: true
+    logCollection:
+      bucket: bucket2
+      scope: scope1
+      collection: collection1
+    loggingRules:
+      customCollectionRules:
+        - logCollection:
+            bucket: bucket2
+            scope: scope1
+            collection: collection1
+          scope: scope2
+          collection: collection2
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  enableCrossClusterVersioning: true
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseEphemeralBucket
+metadata:
+  name: bucket2
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster1
+spec:
+  image: couchbase/server:8.0.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  xdcr:
+    managed: true
+    remoteClusters:
+      - name: cluster1
+        uuid: 246bb8fb53a75e37819cb50b98ac3b65
+        hostname: couchbases://localhost
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+  cluster:
+    dataServiceMemoryQuota: 4048Mi
+status:
+  currentVersion: 8.0.0
+  size: 1

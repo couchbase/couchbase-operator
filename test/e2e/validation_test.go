@@ -1885,6 +1885,66 @@ func TestNegValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+func TestValidationXDCRConflictLogging(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:           "TestValidateXDCRConflictLoggingInvalidVersion",
+			mutations:      patchMap{"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.0").Replace("/status/clusterVersion", "7.6.0")},
+			shouldFail:     true,
+			expectedErrors: []string{`conflict logging requires cluster version 8.0.0 or greater`},
+		},
+		{
+			name:           "TestValidateXDCRConflictLoggingCrossClusterVersioningDisabled",
+			mutations:      patchMap{"bucket1": jsonpatch.NewPatchSet().Replace("/spec/enableCrossClusterVersioning", false)},
+			shouldFail:     true,
+			expectedErrors: []string{`must have cross cluster versioning enabled to enable conflict logging`},
+		},
+		{
+			name:           "TestValidateXDCRConflictLoggingInvalidBucket",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/conflictLogging/logCollection/bucket", "bucket8001")},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket bucket8001 not found`},
+		},
+		{
+			name: "TestValidateXDCRConflictLoggingManagedBucketsDisabled",
+			mutations: patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/conflictLogging/logCollection/bucket", "bucket8001"),
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/managed", false)},
+			shouldFail: false,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingMissingScope",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/scope")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingMissingCollection",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/collection")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingRuleCollectionMissingScope",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/scope")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingRuleCollectionMissingCollection",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/collection")},
+			shouldFail: true,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingRuleWithoutCollection",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/collection")},
+			shouldFail: false,
+		},
+		{
+			name:       "TestValidateXDCRConflictLoggingRuleWithoutScope",
+			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/conflictLogging/loggingRules/customCollectionRules/0/scope", "")},
+			shouldFail: true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-80.yaml"})
+}
 func TestValidationCreateCouchbaseClusterXDCR(t *testing.T) {
 	testDefs := []testDef{
 		{
@@ -2608,7 +2668,7 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name: "TestValidateBucketEnableCrossClusterVersioningInvalidVersion",
+			name: "TestValidateBucketEnableCrossClusterVersioningInvalidVersionAnnotation",
 			mutations: patchMap{"bucket7": jsonpatch.NewPatchSet().
 				Add("/metadata/annotations", map[string]string{
 					"cao.couchbase.com/enableCrossClusterVersioning": "false",

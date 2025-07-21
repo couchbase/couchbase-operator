@@ -23,6 +23,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseephemeralbuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbaseephemeralbuckets-spec-conflictresolution,conflictResolution>>: seqno
   <<couchbaseephemeralbuckets-spec-durabilityimpossiblefallback,durabilityImpossibleFallback>>: ""
+  <<couchbaseephemeralbuckets-spec-enablecrossclusterversioning,enableCrossClusterVersioning>>: false
   <<couchbaseephemeralbuckets-spec-enableflush,enableFlush>>: false
   <<couchbaseephemeralbuckets-spec-evictionpolicy,evictionPolicy>>: noEviction
   <<couchbaseephemeralbuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
@@ -41,6 +42,7 @@ The following is an example resource, depicting the overall structure and any de
     - <<couchbaseephemeralbuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
       <<couchbaseephemeralbuckets-spec-scopes-resources-name,name>>: ""
     <<couchbaseephemeralbuckets-spec-scopes-selector,selector>>: {}
+  <<couchbaseephemeralbuckets-spec-versionpruningwindowhrs,versionPruningWindowHrs>>: 0
   <<couchbaseephemeralbuckets-spec-warmupbehavior,warmupBehavior>>: background
 ----
 
@@ -143,6 +145,18 @@ defaulting to "seqno".
 DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
 This feature is only supported for Couchbase Server 8.0.0+.
 Defaults to disabled.
+
+=== couchbaseephemeralbuckets.spec.enableCrossClusterVersioning
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
+This feature is only supported for Couchbase Server 7.6.0+.
+Once it has been set to true, it cannot be toggled to false.
 
 === couchbaseephemeralbuckets.spec.enableFlush
 
@@ -480,6 +494,17 @@ Selector allows resources to be implicitly considered for inclusion in this
 bucket.
 More info:
 https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
+
+=== couchbaseephemeralbuckets.spec.versionPruningWindowHrs
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
+This field must be an integer larger than 23, defaulting to 720 (30 days).
 
 === couchbaseephemeralbuckets.spec.warmupBehavior
 
