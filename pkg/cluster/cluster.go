@@ -805,6 +805,20 @@ func (c *Cluster) getClusterPodsByPhase() (running, pending []*v1.Pod) {
 	return
 }
 
+func (c *Cluster) getPendingPods() []*v1.Pod {
+	clusterPods := c.getClusterPods()
+
+	var pendingPods []*v1.Pod
+
+	for _, pod := range clusterPods {
+		if k8sutil.IsPendingMember(pod) {
+			pendingPods = append(pendingPods, pod)
+		}
+	}
+
+	return pendingPods
+}
+
 // initClients sets up communication with the Couchbase cluster.
 // This needs to be done on start up for existing clusters (loading the
 // most recent good credentials from the persistent secret), and every

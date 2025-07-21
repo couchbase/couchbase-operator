@@ -1180,6 +1180,26 @@ func MustKillOperatorAndWaitForRecovery(t *testing.T, k8s *types.Cluster) {
 	}
 }
 
+func MustUpdateOperatorDeploymentDNSConfig(t *testing.T, k8s *types.Cluster, dns *v1.Service) {
+	deployment := k8s.OperatorDeployment.DeepCopy()
+	deployment.Spec.Template.Spec.DNSConfig = &v1.PodDNSConfig{
+		Nameservers: []string{dns.Spec.ClusterIP},
+		Searches:    []string{"svc.cluster.local", "cluster.local"},
+	}
+
+	deployment.Spec.Template.Spec.DNSPolicy = v1.DNSNone
+
+	if _, err := k8s.KubeClient.AppsV1().Deployments(k8s.Namespace).Update(context.Background(), deployment, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+
+	k8s.OperatorDeployment = deployment
+
+	if err := WaitUntilOperatorReady(k8s, 5*time.Minute); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustDeleteOperatorDeployment shuts down the operator and waits for it to be garbage collected
 // once all the dependant pods are cleaned up.  This allows us to explicitly make alterations
 // while the operator is not running and see what happens on a restart without introducing race

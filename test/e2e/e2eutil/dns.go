@@ -3,6 +3,7 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
@@ -35,6 +36,22 @@ const (
   forward . %s
 }
 `
+
+	// coreFileTemplateForExternalDNSCheck is used to configure CoreDNS to pass external DNS checks against certain pods.
+	coreFileTemplateForExternalDNSCheck = `%s:%d {
+		hosts {
+			fallthrough
+		}
+			forward . %s
+	}
+
+	.:%d {
+		log
+		errors
+		reload 10s
+  	forward . %s
+	}
+	`
 )
 
 var dnsServices = map[string]string{
@@ -109,13 +126,90 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 		return nil, fmt.Errorf("dns service cluster IP is empty")
 	}
 
+	return provisionDNS(local, resourceName, localDNSPort, fmt.Sprintf(coreFileTemplate, remote.Namespace, localDNSPort, remoteAddress, localDNSPort, localAddress))
+}
+
+func provisionCoreDNSForExternalDNSCheck(local *types.Cluster, dnsPath string) (*corev1.Service, error) {
+	namespace, service, err := findDNSService(local)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the local DNS endpoint.
+	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the local DNS endpoint to use as a fallback.
+	localAddress := localDNSService.Spec.ClusterIP
+	if localAddress == "" {
+		return nil, fmt.Errorf("dns service cluster IP is empty")
+	}
+
+	return provisionDNS(local, resourceName, 53, fmt.Sprintf(coreFileTemplateForExternalDNSCheck, dnsPath, 53, localAddress, 53, localAddress))
+}
+
+// MustProvisionCoreDNS reates a CoreDNS instance that forwards requests to the remote
+// namespace to the remote cluster's authoratative DNS server, and everything else
+// to the local cluster's authoratative DNS server.  It returns the DNS service and
+// a cleanup callback.
+func MustProvisionCoreDNS(t *testing.T, local, remote *types.Cluster) *corev1.Service {
+	svc, err := provisionCoreDNS(local, remote)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return svc
+}
+
+func MustProvisionCoreDNSForExternalDNSCheck(t *testing.T, local *types.Cluster, dnsPath string) *corev1.Service {
+	svc, err := provisionCoreDNSForExternalDNSCheck(local, dnsPath)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return svc
+}
+
+func MustAddPodsForDNSCheck(t *testing.T, local *types.Cluster, svcName, dnsPath string, pods []corev1.Pod) {
+	cm, err := local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Get(context.Background(), svcName, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	var newEntries string
+	for _, pod := range pods {
+		newEntries += fmt.Sprintf("%s %s.%s\n", pod.Status.HostIP, pod.Name, dnsPath)
+	}
+
+	lines := strings.Split(cm.Data["Corefile"], "\n")
+
+	var updated []string
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "fallthrough" {
+			updated = append(updated, newEntries)
+		}
+
+		updated = append(updated, line)
+	}
+
+	cm.Data["Corefile"] = strings.Join(updated, "\n")
+
+	if _, err := local.KubeClient.CoreV1().ConfigMaps(local.Namespace).Update(context.Background(), cm, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
+func provisionDNS(local *types.Cluster, resourceName string, targetPort int, corefile string) (*corev1.Service, error) {
 	// Create the resources.
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: resourceName,
 		},
 		Data: map[string]string{
-			"Corefile": fmt.Sprintf(coreFileTemplate, remote.Namespace, localDNSPort, remoteAddress, localDNSPort, localAddress),
+			"Corefile": corefile,
 		},
 	}
 
@@ -145,7 +239,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 					Containers: []corev1.Container{
 						{
 							Name:  "coredns",
-							Image: "coredns/coredns:1.9.0",
+							Image: "coredns/coredns:1.12.2",
 							Args: []string{
 								"-conf",
 								"/etc/coredns/Corefile",
@@ -153,7 +247,7 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "dns",
-									ContainerPort: int32(localDNSPort),
+									ContainerPort: int32(targetPort),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
@@ -199,35 +293,17 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 					Name:       "dns",
 					Protocol:   corev1.ProtocolUDP,
 					Port:       int32(53),
-					TargetPort: intstr.FromInt(localDNSPort),
+					TargetPort: intstr.FromInt(targetPort),
 				},
 				{
 					Name:       "dns-tcp",
 					Protocol:   corev1.ProtocolTCP,
 					Port:       int32(53),
-					TargetPort: intstr.FromInt(localDNSPort),
+					TargetPort: intstr.FromInt(targetPort),
 				},
 			},
 		},
 	}
 
-	svc, err := local.KubeClient.CoreV1().Services(local.Namespace).Create(context.Background(), coreService, metav1.CreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return svc, nil
-}
-
-// MustProvisionCoreDNS reates a CoreDNS instance that forwards requests to the remote
-// namespace to the remote cluster's authoratative DNS server, and everything else
-// to the local cluster's authoratative DNS server.  It returns the DNS service and
-// a cleanup callback.
-func MustProvisionCoreDNS(t *testing.T, local, remote *types.Cluster) *corev1.Service {
-	svc, err := provisionCoreDNS(local, remote)
-	if err != nil {
-		Die(t, err)
-	}
-
-	return svc
+	return local.KubeClient.CoreV1().Services(local.Namespace).Create(context.Background(), coreService, metav1.CreateOptions{})
 }

@@ -3290,6 +3290,11 @@ type CouchbaseClusterNetworkingSpec struct {
 	// external addresses is started, and when it is deemed a failure.  Polling of
 	// DNS name availability inherently dangerous due to negative caching, so prefer
 	// the use of an initial `waitForAddressReachableDelay` to allow propagation.
+	// Nodes that reach the timeout without a reachable alternate address and that have not
+	// been balanced into the cluster will be removed. This field will not effect
+	// pods that have already been balanced into the cluster and those will continue
+	// to have their alternate address validated during each reconciliation loop until
+	// it can be reached
 	// +kubebuilder:default="10m"
 	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
 

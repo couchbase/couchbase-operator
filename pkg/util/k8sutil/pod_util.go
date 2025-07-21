@@ -48,6 +48,7 @@ const (
 	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
 	MetricsContainerName                      = "metrics"
 	podReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
+	PodPendingExternalDNSCondition            = v1.PodConditionType("pod.couchbase.com/pending-external-dns")
 	CouchbaseLogSidecarContainerName          = "logging"
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
@@ -2435,52 +2436,6 @@ func GetVolumeStorageSize(claim *v1.PersistentVolumeClaim) string {
 	return size
 }
 
-// FlagPodReady adds a readiness gate to the pod so we can have explicit control over
-// pod eviction, when used in conjunction with a pod disruption budget, through the
-// pod resource only.
-func FlagPodReady(client *client.Client, name string) error {
-	pod, found := client.Pods.Get(name)
-	if !found {
-		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
-	}
-
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == podReadinessCondition {
-			return nil
-		}
-	}
-
-	now := metav1.Time{
-		Time: time.Now(),
-	}
-
-	condition := v1.PodCondition{
-		Type:               podReadinessCondition,
-		Status:             v1.ConditionTrue,
-		LastTransitionTime: now,
-	}
-
-	mergePatch, err := json.Marshal(condition)
-	if err != nil {
-		return errors.NewStackTracedError(err)
-	}
-
-	// Yes it's ugly, but efficient.
-	mergePatch = []byte(`{"status":{"conditions":[` + string(mergePatch) + `]}}`)
-
-	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.StrategicMergePatchType, mergePatch, metav1.PatchOptions{}, "status"); err != nil {
-		return errors.NewStackTracedError(err)
-	}
-
-	logPodReady(pod)
-
-	return nil
-}
-
-func logPodReady(pod *v1.Pod) {
-	log.V(1).Info("Pod marked ready by operator", "pod", pod.Name)
-}
-
 func ApplyPodAntiAffinityForCluster(clusterName string) *v1.PodAntiAffinity {
 	return &v1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
@@ -2602,4 +2557,188 @@ func addOptionalLabelsToPodMetric(cluster *couchbasev2.CouchbaseCluster, existin
 	}
 
 	return existingLabels
+}
+
+// FlagPodReady adds a readiness gate to the pod so we can have explicit control over
+// pod eviction, when used in conjunction with a pod disruption budget, through the
+// pod resource only.
+func FlagPodReady(client *client.Client, name string) error {
+	pod, found := client.Pods.Get(name)
+	if !found {
+		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+	}
+
+	readinessCondition := GetPodCondition(pod, podReadinessCondition)
+	if readinessCondition != nil {
+		return nil
+	}
+
+	readinessCondition = NewPodCondition(podReadinessCondition, v1.ConditionTrue, "")
+
+	err := PatchPodCondition(client, pod, readinessCondition)
+	if err != nil {
+		return err
+	}
+
+	log.V(1).Info("Pod marked ready by operator", "pod", pod.Name)
+
+	return nil
+}
+
+// FlagPodExternallyUnreachable adds a condition to the pod indicating that
+// it external DNS cannot be reached.
+func FlagPodPendingExternalDNS(client *client.Client, pod *v1.Pod, message string) error {
+	condition := NewPodCondition(PodPendingExternalDNSCondition, v1.ConditionTrue, message)
+
+	err := PatchPodCondition(client, pod, condition)
+	if err != nil {
+		return err
+	}
+
+	return client.Pods.Update(pod)
+}
+
+func RemovePendingExternalDNSFlag(client *client.Client, pod *v1.Pod) error {
+	err := RemovePodCondition(client, pod, PodPendingExternalDNSCondition)
+	if err != nil {
+		return err
+	}
+
+	return client.Pods.Update(pod)
+}
+
+// IsPendingMember returns true if the pod is not ready to be added to the cluster, but should not be ejected.
+// For example, if we are waiting for external DNS propagation, we don't want want to block reconciliation but
+// we don't want to add it into the cluster either.
+func IsPendingMember(pod *v1.Pod) bool {
+	condition := GetPodCondition(pod, PodPendingExternalDNSCondition)
+	if condition == nil {
+		return false
+	}
+
+	return condition.Status == v1.ConditionTrue
+}
+
+// GetPendingTransitionTime returns the time the pod was marked pending.
+func GetPendingTransitionTime(pod *v1.Pod) metav1.Time {
+	condition := GetPodCondition(pod, PodPendingExternalDNSCondition)
+	if condition == nil {
+		return metav1.Time{}
+	}
+
+	return condition.LastTransitionTime
+}
+
+// NewPodCondition creates a new pod condition with the given type, status, and message.
+func NewPodCondition(conditionType v1.PodConditionType, status v1.ConditionStatus, message string) *v1.PodCondition {
+	return &v1.PodCondition{
+		Type:               conditionType,
+		Status:             status,
+		Message:            message,
+		LastTransitionTime: metav1.Time{Time: time.Now()},
+	}
+}
+
+// GetPodCondition returns the condition of the given type from the pod, or nil if it does not exist.
+func GetPodCondition(pod *v1.Pod, conditionType v1.PodConditionType) *v1.PodCondition {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == conditionType {
+			return &condition
+		}
+	}
+
+	return nil
+}
+
+// AddPodCondition adds a new condition to a pod without overwriting existing conditions.
+// If a condition of the same type already exists, it will be updated with the new status and message.
+func PatchPodCondition(client *client.Client, pod *v1.Pod, condition *v1.PodCondition) error {
+	// Get current pod conditions
+	currentConditions := pod.Status.Conditions
+
+	// Check if condition of the same type already exists
+	conditionExists := false
+
+	for i, existingCondition := range currentConditions {
+		if existingCondition.Type == condition.Type {
+			// Update existing condition, but leave the existing transition time if the status isn't changing
+			if existingCondition.Status == condition.Status {
+				condition.LastTransitionTime = existingCondition.LastTransitionTime
+			}
+
+			currentConditions[i] = *condition
+			conditionExists = true
+
+			break
+		}
+	}
+
+	// If condition doesn't exist, append it
+	if !conditionExists {
+		currentConditions = append(currentConditions, *condition)
+	}
+
+	err := patchConditions(client, pod, &currentConditions)
+	if err != nil {
+		return err
+	}
+
+	// Once the pod has been patched, we can update the pod we are acting on in case the condition is checked
+	// during this reconciliation loop.
+	pod.Status.Conditions = currentConditions
+
+	// during this reconciliation loop.
+	return nil
+}
+
+// RemovePodCondition removes any conditions of a given type from a pod.
+func RemovePodCondition(client *client.Client, pod *v1.Pod, conditionType v1.PodConditionType) error {
+	currentConditions := pod.Status.Conditions
+	originalCount := len(currentConditions)
+
+	// Create a new slice without the condition we want to remove
+	filteredConditions := make([]v1.PodCondition, 0, len(currentConditions))
+
+	for _, condition := range currentConditions {
+		if condition.Type != conditionType {
+			filteredConditions = append(filteredConditions, condition)
+		}
+	}
+
+	// If no conditions were removed, nothing to do
+	if len(filteredConditions) == originalCount {
+		return nil
+	}
+
+	err := patchConditions(client, pod, &filteredConditions)
+	if err != nil {
+		return err
+	}
+
+	// Once the pod has been patched, we can update the pod we are acting on in case the condition is checked
+	// during this reconciliation loop.
+	pod.Status.Conditions = filteredConditions
+
+	return nil
+}
+
+// patchConditions upserts the list of conditions on a pod.
+func patchConditions(client *client.Client, pod *v1.Pod, conditions *[]v1.PodCondition) error {
+	// Create a proper patch structure
+	patch := map[string]interface{}{
+		"status": map[string]interface{}{
+			"conditions": *conditions,
+		},
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	return nil
 }

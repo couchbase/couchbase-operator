@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -56,18 +57,17 @@ func PodReady(client kubernetes.Interface, namespace, name string) error {
 		return err
 	}
 
-	for _, condition := range pod.Status.Conditions {
-		if condition.Type == corev1.PodReady {
-			if condition.Status == corev1.ConditionTrue {
-				return nil
-			}
-
-			if condition.Status == corev1.ConditionFalse && pod.Status.ContainerStatuses[0].State.Terminated != nil {
-				return ErrStatusTerminated
-			}
-
-			return ErrConditionUnready
+	condition := k8sutil.GetPodCondition(pod, corev1.PodReady)
+	if condition != nil {
+		if condition.Status == corev1.ConditionTrue {
+			return nil
 		}
+
+		if condition.Status == corev1.ConditionFalse && pod.Status.ContainerStatuses[0].State.Terminated != nil {
+			return ErrStatusTerminated
+		}
+
+		return ErrConditionUnready
 	}
 
 	return ErrConditionMissing

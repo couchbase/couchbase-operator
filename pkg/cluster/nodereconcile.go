@@ -125,6 +125,12 @@ type ReconcileMachine struct {
 	// FSM is called.
 	unclusteredMembers couchbaseutil.MemberSet
 
+	// pendingMembers are nodes that have been created but are not yet ready to be rebalanced into the cluster.
+	// In the future, we will split the pod creation and cluster addion steps which will make use of this
+	// set more often. For now, it acts as an indicator that there are pods which we have added to the cluster and therefore shouldn't
+	// remove them, but we don't want to rebalance them into the cluster yet as checks have not passed.
+	pendingMembers couchbaseutil.MemberSet
+
 	// needsRebalance records whether we think Couchbase Server will require a rebalance.
 	// We could just let it report this fact and we take action in the next iteration, but
 	// for historical reasons (and perhaps performance), do this manually.
@@ -154,7 +160,7 @@ type ReconcileMachine struct {
 }
 
 func (r *ReconcileMachine) logState() {
-	log.V(0).Info("reconciler", "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance)
+	log.V(0).Info("reconciler", "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
 }
 
 // addMember simulates creating and clustering a new member.
@@ -309,6 +315,8 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		rebalanceRetries: uint(reconcileRetries),
 
 		upgradedMembers: couchbaseutil.NewMemberSet(),
+
+		pendingMembers: c.members.Intersect(podsToMemberSet(c.getPendingPods())),
 	}
 
 	// Reset any timeout counters if nodes have recovered.
@@ -1868,8 +1876,30 @@ func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 	}
 
 	err := c.reconcileMemberAlternateAddresses()
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Update the pending members after reconciling alternative addresses.
+	r.pendingMembers = c.members.Intersect(podsToMemberSet(c.getPendingPods()))
+
+	// If at this point a pod is still pending DNS propagation and the timeout
+	// has elapsed, we should remove the member if it has not been rebalanced (activated) into the cluster
+	// If it has already been activated, we will continue to attempt to set the alternate address,
+	// but we should not remove the member from the cluster.
+	for _, member := range r.pendingMembers.Intersect(r.couchbase.PendingAddNodes) {
+		pod, found := c.k8s.Pods.Get(member.Name())
+		if !found {
+			continue
+		}
+
+		if c.hasDNSCheckTimeoutElapsed(pod) {
+			r.removeMember(member)
+			r.pendingMembers.Remove(member.Name())
+		}
+	}
+
+	return nil
 }
 
 // When cluster is under topology changes that are outside of
@@ -1895,7 +1925,8 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 
 //nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
-	if r.needsRebalance {
+	// We should not rebalance if there are members pending DNS propagation that have not been activated in the cluster.
+	if r.needsRebalance && r.pendingMembers.Diff(r.couchbase.ActiveNodes).Empty() {
 		if len(r.couchbase.ServerRebalanceReasons) > 0 {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}

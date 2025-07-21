@@ -6,6 +6,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -17,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -629,4 +631,155 @@ func TestCreateInitNodeHostNameClusterServerGroups(t *testing.T) {
 
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
 	expected.mustValidateRzaMap(t, kubernetes, cluster)
+}
+
+// TestAlternateAddressExternalDNSCheck tests that a healthy cluster
+// that has its DNS settings updated will not eject activated nodes
+// if the DNS check timeout is reached, but will continue to
+// attempt to reach the DNS server.
+func TestAlternateAddressExternalDNSCheck(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+
+	testDomain := "dnstest.local"
+
+	// Provision a coreDNS service that mocks an exernalDNS by using the dns and the pod node ip.
+	// Requests that aren't handled by this dns service will be forwarded to the cluster default dns service.
+	// This will initially have no entries. We can add the pods after they have been created to simulate
+	// dns propagation.
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	// Static configuration.
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size2
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	timeout := 30 * time.Second
+
+	networking := couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 10 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: timeout},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking", networking), time.Minute)
+
+	// Sleep so we can guarantee the DNS check timeout elapses.
+	time.Sleep(timeout)
+
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+
+	// Check both pods are still pending external DNS.
+	e2eutil.MustGetPodWithCondition(t, kubernetes, pods[0].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
+	e2eutil.MustGetPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
+
+	// Add all the pods to the dns forwarding list.
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	// We expect the cluster to enter a healthy state once all the pods' external addresses can be reached.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check that the alternate addresses have been added to the cluster.
+	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, testDomain, 2*time.Minute)
+	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, testDomain, time.Minute)
+
+	// We only expect the cluster to be created. Members should not be changed despite the
+	// external DNS initially being unreachable and the DNS check timeout elapsing.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestAlternateAddressExternalDNSCheckEjectsNewPods tests that new pods that have not been
+// activated in the cluster are ejected if the DNS check timeout is reached.
+func TestAlternateAddressExternalDNSCheckEjectsNewPods(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+
+	testDomain := "dnstest.local"
+
+	// Provision a coreDNS service that mocks an exernalDNS by using the dns and the pod node ip.
+	// Requests that aren't handled by this dns service will be forwarded to the cluster default dns service.
+	// This will initially have no entries. We can add the pods after they have been created to simulate
+	// dns propagation.
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	// Static configuration.
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size2
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+	cluster.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
+	}
+
+	cluster.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: time.Minute},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 90 * time.Second},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Wait until all the cluster pods have been created
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+
+	// Initially only add a single pod to the mocked dns
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods[:1])
+
+	// Wait until the second pod is waiting for propagation, then wait for propagation to hit the timeout and the pod to be ejected as it was never activated.
+	e2eutil.MustGetPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
+	e2eutil.MustWaitForRebalanceEjectingNode(t, kubernetes, cluster, pods[1].Name, 10*time.Minute)
+
+	// Fetch the new pod and add it to the dns forwarding list.
+	newMemberName := couchbaseutil.CreateMemberName(cluster.Name, 2)
+	pod3 := e2eutil.MustGetPodWithCondition(t, kubernetes, newMemberName, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Delaying DNS Check", 1*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, []corev1.Pod{*pod3})
+
+	// We expect the cluster to enter a healthy state once all the pods' external addresses can be reached.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check that the alternate addresses have been added to the cluster.
+	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, testDomain, 2*time.Minute)
+	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, testDomain, time.Minute)
+
+	// We expect the first two members to be added, the latter of which should be ejected as the DNS check
+	// will fail given we didn't add it to the dns forwarding list. Once the third member is added, we expect
+	// the cluster rebalance to complete as the DNS check will now pass.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: pods[1].Name},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: newMemberName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

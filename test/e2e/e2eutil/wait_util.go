@@ -1572,3 +1572,70 @@ func MustWaitUntilCouchbaseServerGroupsExist(t *testing.T, k8s *types.Cluster, c
 		Die(t, err)
 	}
 }
+
+func MustWaitForClusterPods(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) []v1.Pod {
+	var pods []v1.Pod
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	callback := func() error {
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		if len(podList.Items) != size {
+			return fmt.Errorf("cluster size is %d, want %d", len(podList.Items), size)
+		}
+
+		pods = podList.Items
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+
+	return pods
+}
+
+func MustGetPodWithCondition(t *testing.T, k8s *types.Cluster, podName string, conditionType v1.PodConditionType, conditionStatus v1.ConditionStatus, conditionMessage string, timeout time.Duration) *v1.Pod {
+	var pod *v1.Pod
+
+	callback := func() error {
+		member, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if member == nil {
+			return fmt.Errorf("pod %s not found", podName)
+		}
+
+		condition := k8sutil.GetPodCondition(member, conditionType)
+		if condition == nil {
+			return fmt.Errorf("condition %s not found on pod %s", conditionType, podName)
+		}
+
+		if condition.Status != conditionStatus {
+			return fmt.Errorf("condition status mismatch: %s != %s", condition.Status, conditionStatus)
+		}
+
+		if condition.Message != conditionMessage {
+			return fmt.Errorf("condition message mismatch: %s != %s", condition.Message, conditionMessage)
+		}
+
+		pod = member
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+
+	return pod
+}
