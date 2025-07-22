@@ -35,9 +35,6 @@ func ValidUpgrade(old, new string) (bool, error) {
 		return false, err
 	}
 
-	test := withinTwoMajorVersions && (newGroup == oldGroup || oldGroup+1 == newGroup)
-	fmt.Println(test)
-
 	return withinTwoMajorVersions && (newGroup == oldGroup || oldGroup+1 == newGroup), nil
 }
 
