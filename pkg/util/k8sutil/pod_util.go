@@ -47,7 +47,7 @@ const (
 	tlsSecretMountPath                        = "/var/run/secrets/couchbase.com/couchbase-tls"
 	metricsTokenMountPath                     = "/var/run/secrets/couchbase.com/metrics-token"
 	MetricsContainerName                      = "metrics"
-	podReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
+	PodReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
 	PodPendingExternalDNSCondition            = v1.PodConditionType("pod.couchbase.com/pending-external-dns")
 	CouchbaseLogSidecarContainerName          = "logging"
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
@@ -980,7 +980,7 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 
 	pod.Spec.ReadinessGates = []v1.PodReadinessGate{
 		{
-			ConditionType: podReadinessCondition,
+			ConditionType: PodReadinessCondition,
 		},
 	}
 
@@ -2568,14 +2568,14 @@ func FlagPodReady(client *client.Client, name string) error {
 		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
 	}
 
-	readinessCondition := GetPodCondition(pod, podReadinessCondition)
+	readinessCondition := GetPodCondition(pod, PodReadinessCondition)
 	if readinessCondition != nil {
 		return nil
 	}
 
-	readinessCondition = NewPodCondition(podReadinessCondition, v1.ConditionTrue, "")
+	readinessCondition = NewPodCondition(PodReadinessCondition, v1.ConditionTrue, "")
 
-	err := PatchPodCondition(client, pod, readinessCondition)
+	err := UpsertPodCondition(client, pod, readinessCondition)
 	if err != nil {
 		return err
 	}
@@ -2590,16 +2590,7 @@ func FlagPodReady(client *client.Client, name string) error {
 func FlagPodPendingExternalDNS(client *client.Client, pod *v1.Pod, message string) error {
 	condition := NewPodCondition(PodPendingExternalDNSCondition, v1.ConditionTrue, message)
 
-	err := PatchPodCondition(client, pod, condition)
-	if err != nil {
-		return err
-	}
-
-	return client.Pods.Update(pod)
-}
-
-func RemovePendingExternalDNSFlag(client *client.Client, pod *v1.Pod) error {
-	err := RemovePodCondition(client, pod, PodPendingExternalDNSCondition)
+	err := UpsertPodCondition(client, pod, condition)
 	if err != nil {
 		return err
 	}
@@ -2652,16 +2643,19 @@ func GetPodCondition(pod *v1.Pod, conditionType v1.PodConditionType) *v1.PodCond
 
 // AddPodCondition adds a new condition to a pod without overwriting existing conditions.
 // If a condition of the same type already exists, it will be updated with the new status and message.
-func PatchPodCondition(client *client.Client, pod *v1.Pod, condition *v1.PodCondition) error {
-	// Get current pod conditions
-	currentConditions := pod.Status.Conditions
+func UpsertPodCondition(client *client.Client, pod *v1.Pod, condition *v1.PodCondition) error {
+	// Get current pod conditions so we can add or update the latest conditions.
+	currentPod, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Get(context.Background(), pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 
-	// Check if condition of the same type already exists
 	conditionExists := false
+	currentConditions := currentPod.Status.Conditions
 
 	for i, existingCondition := range currentConditions {
 		if existingCondition.Type == condition.Type {
-			// Update existing condition, but leave the existing transition time if the status isn't changing
+			// Update existing condition, but leave the transition time if the status isn't changing
 			if existingCondition.Status == condition.Status {
 				condition.LastTransitionTime = existingCondition.LastTransitionTime
 			}
@@ -2673,31 +2667,25 @@ func PatchPodCondition(client *client.Client, pod *v1.Pod, condition *v1.PodCond
 		}
 	}
 
-	// If condition doesn't exist, append it
 	if !conditionExists {
 		currentConditions = append(currentConditions, *condition)
 	}
 
-	err := patchConditions(client, pod, &currentConditions)
-	if err != nil {
-		return err
-	}
-
-	// Once the pod has been patched, we can update the pod we are acting on in case the condition is checked
-	// during this reconciliation loop.
-	pod.Status.Conditions = currentConditions
-
-	// during this reconciliation loop.
-	return nil
+	return patchConditions(client, pod, &currentConditions)
 }
 
 // RemovePodCondition removes any conditions of a given type from a pod.
 func RemovePodCondition(client *client.Client, pod *v1.Pod, conditionType v1.PodConditionType) error {
-	currentConditions := pod.Status.Conditions
+	// Get current pod conditions so we can add or update the latest conditions.
+	currentPod, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Get(context.Background(), pod.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	currentConditions := currentPod.Status.Conditions
 	originalCount := len(currentConditions)
 
-	// Create a new slice without the condition we want to remove
-	filteredConditions := make([]v1.PodCondition, 0, len(currentConditions))
+	filteredConditions := []v1.PodCondition{}
 
 	for _, condition := range currentConditions {
 		if condition.Type != conditionType {
@@ -2710,16 +2698,7 @@ func RemovePodCondition(client *client.Client, pod *v1.Pod, conditionType v1.Pod
 		return nil
 	}
 
-	err := patchConditions(client, pod, &filteredConditions)
-	if err != nil {
-		return err
-	}
-
-	// Once the pod has been patched, we can update the pod we are acting on in case the condition is checked
-	// during this reconciliation loop.
-	pod.Status.Conditions = filteredConditions
-
-	return nil
+	return patchConditions(client, pod, &filteredConditions)
 }
 
 // patchConditions upserts the list of conditions on a pod.
@@ -2733,12 +2712,15 @@ func patchConditions(client *client.Client, pod *v1.Pod, conditions *[]v1.PodCon
 
 	patchBytes, err := json.Marshal(patch)
 	if err != nil {
-		return errors.NewStackTracedError(err)
+		return err
 	}
 
-	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
-		return errors.NewStackTracedError(err)
+	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
+		return err
 	}
 
-	return nil
+	// Update the pod so the caller has the latest status and update the cache.
+	pod.Status.Conditions = *conditions
+
+	return client.Pods.Update(pod)
 }

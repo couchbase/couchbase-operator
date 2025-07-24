@@ -1925,8 +1925,7 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 
 //nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
-	// We should not rebalance if there are members pending DNS propagation that have not been activated in the cluster.
-	if r.needsRebalance && r.pendingMembers.Diff(r.couchbase.ActiveNodes).Empty() {
+	if shouldRebalance(c, r) {
 		if len(r.couchbase.ServerRebalanceReasons) > 0 {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
@@ -1992,6 +1991,32 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	metrics.VolumeSizeUnderManagementBytesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(float64(k8sutil.GetTotalPVCMemoryByApp(c.k8s.PersistentVolumeClaims.List(), constants.App)))
 
 	return nil
+}
+
+// shouldRebalance checks that conditions are satisfied to rebalance the cluster.
+func shouldRebalance(c *Cluster, r *ReconcileMachine) bool {
+	if !r.needsRebalance {
+		return false
+	}
+
+	// If the allowExternallyUnreachablePods flag is set, we will rebalance the cluster if all the pending members have had their DNS check delay elapsed.
+	// If it is not set, we will only rebalance if there are no pending members that have not been activated in the cluster.
+	if c.cluster.Spec.Networking.AllowExternallyUnreachablePods != nil && *c.cluster.Spec.Networking.AllowExternallyUnreachablePods {
+		for _, member := range r.pendingMembers {
+			pod, found := c.k8s.Pods.Get(member.Name())
+			if !found {
+				continue
+			}
+
+			if !c.hasDNSCheckDelayElapsed(pod) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return r.pendingMembers.Diff(r.couchbase.ActiveNodes).Empty()
 }
 
 // Dead members are members that the operator is tracking, but do not have a

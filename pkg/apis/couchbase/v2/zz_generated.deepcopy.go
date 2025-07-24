@@ -531,6 +531,11 @@ func (in *ClusterConfig) DeepCopyInto(out *ClusterConfig) {
 		*out = new(AutoCompaction)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AllowFailoverEphemeralNoReplicas != nil {
+		in, out := &in.AllowFailoverEphemeralNoReplicas, &out.AllowFailoverEphemeralNoReplicas
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -2058,6 +2063,11 @@ func (in *CouchbaseClusterNetworkingSpec) DeepCopyInto(out *CouchbaseClusterNetw
 	if in.WaitForAddressReachable != nil {
 		in, out := &in.WaitForAddressReachable, &out.WaitForAddressReachable
 		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.AllowExternallyUnreachablePods != nil {
+		in, out := &in.AllowExternallyUnreachablePods, &out.AllowExternallyUnreachablePods
+		*out = new(bool)
 		**out = **in
 	}
 	if in.CloudNativeGateway != nil {

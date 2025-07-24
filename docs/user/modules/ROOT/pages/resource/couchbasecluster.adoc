@@ -194,6 +194,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: NodePort
     <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
     - ""
+    <<couchbaseclusters-spec-networking-allowexternallyunreachablepods,allowExternallyUnreachablePods>>: false
     <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
       <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
       <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
@@ -2930,6 +2931,24 @@ This field may contain any of "data", "index", "query", "search", "eventing"
 and "analytics".
 Each service may only be included once.
 
+=== couchbaseclusters.spec.networking.allowExternallyUnreachablePods
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+AllowExternallyUnreachablePods is used to allow new pods to be rebalanced into the cluster
+regardless of whether the external DNS is reachable or not.
+If this is set to true,
+pods for which the DNS has not yet propagated will be balanced into the cluster and marked
+as ready once the WaitForAddressReachableDelay has elapsed.
+The external DNS will continue to be checked for reachability during each reconciliation loop
+and the couchbase node will not have it's alternate addresses updated until it is reachable.
+
 === couchbaseclusters.spec.networking.cloudNativeGateway
 
 ==== Constraints
@@ -3637,7 +3656,7 @@ external addresses is started, and when it is deemed a failure.
 Polling of
 DNS name availability inherently dangerous due to negative caching, so prefer
 the use of an initial `waitForAddressReachableDelay` to allow propagation.
-Nodes that reach the timeout without a reachable alternate address and that have not
+Once the timeout has elapsed, pods without a reachable alternate address that have not
 been balanced into the cluster will be removed.
 This field will not effect
 pods that have already been balanced into the cluster and those will continue
@@ -3659,6 +3678,9 @@ ensure external addresses are reachable before new nodes are balanced
 in to the cluster.
 This prevents negative DNS caching while waiting
 for external-DDNS controllers to propagate addresses.
+Pods will not be marked
+as ready until external addresses are reachable which at the earliest will be
+after this delay has elapsed.
 
 === couchbaseclusters.spec.onlineVolumeExpansionTimeoutInMins
 

@@ -1161,6 +1161,19 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 // balanced.
 func (c *Cluster) reconcileReadiness() error {
 	for name := range c.callableMembers {
+		pod, ok := c.k8s.Pods.Get(name)
+		if !ok {
+			continue
+		}
+
+		// If the pod is pending external DNS, we should not mark it as ready unless allowExternallyUnreachablePods is true and the delay has elapsed.
+		if condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingExternalDNSCondition); condition != nil && condition.Status == v1.ConditionTrue {
+			// If allowExternallyUnreachablePods is not set, or is false, or the delay has not elapsed, we should not mark the pod as ready.
+			if c.cluster.Spec.Networking.AllowExternallyUnreachablePods == nil || !*c.cluster.Spec.Networking.AllowExternallyUnreachablePods || !c.hasDNSCheckDelayElapsed(pod) {
+				continue
+			}
+		}
+
 		if err := k8sutil.FlagPodReady(c.k8s, name); err != nil {
 			return err
 		}

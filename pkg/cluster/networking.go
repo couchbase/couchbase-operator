@@ -184,7 +184,7 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 	// set the alternate address, we can exit before checking the DNS connection and remove
 	// the pending DNS flag.
 	if reflect.DeepEqual(addresses, existingAddresses) {
-		err = k8sutil.RemovePendingExternalDNSFlag(c.k8s, pod)
+		err = k8sutil.RemovePodCondition(c.k8s, pod, k8sutil.PodPendingExternalDNSCondition)
 		return false, err
 	}
 
@@ -198,7 +198,7 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Waiting on DNS Propagation")
 	}
 
-	err = k8sutil.RemovePendingExternalDNSFlag(c.k8s, pod)
+	err = k8sutil.RemovePodCondition(c.k8s, pod, k8sutil.PodPendingExternalDNSCondition)
 	if err != nil {
 		return false, err
 	}

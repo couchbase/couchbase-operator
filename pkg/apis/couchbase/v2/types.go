@@ -3348,7 +3348,9 @@ type CouchbaseClusterNetworkingSpec struct {
 	// WaitForAddressReachableDelay is used to defer operator checks that
 	// ensure external addresses are reachable before new nodes are balanced
 	// in to the cluster.  This prevents negative DNS caching while waiting
-	// for external-DDNS controllers to propagate addresses.
+	// for external-DDNS controllers to propagate addresses. Pods will not be marked
+	// as ready until external addresses are reachable which at the earliest will be
+	// after this delay has elapsed.
 	// +kubebuilder:default="2m"
 	WaitForAddressReachableDelay *metav1.Duration `json:"waitForAddressReachableDelay,omitempty"`
 
@@ -3356,13 +3358,22 @@ type CouchbaseClusterNetworkingSpec struct {
 	// external addresses is started, and when it is deemed a failure.  Polling of
 	// DNS name availability inherently dangerous due to negative caching, so prefer
 	// the use of an initial `waitForAddressReachableDelay` to allow propagation.
-	// Nodes that reach the timeout without a reachable alternate address and that have not
+	// Once the timeout has elapsed, pods without a reachable alternate address that have not
 	// been balanced into the cluster will be removed. This field will not effect
 	// pods that have already been balanced into the cluster and those will continue
 	// to have their alternate address validated during each reconciliation loop until
-	// it can be reached
+	// it can be reached.
 	// +kubebuilder:default="10m"
 	WaitForAddressReachable *metav1.Duration `json:"waitForAddressReachable,omitempty"`
+
+	// AllowExternallyUnreachablePods is used to allow new pods to be rebalanced into the cluster
+	// regardless of whether the external DNS is reachable or not. If this is set to true,
+	// pods for which the DNS has not yet propagated will be balanced into the cluster and marked
+	// as ready once the WaitForAddressReachableDelay has elapsed.
+	// The external DNS will continue to be checked for reachability during each reconciliation loop
+	// and the couchbase node will not have it's alternate addresses updated until it is reachable.
+	// +kubebuilder:default=false
+	AllowExternallyUnreachablePods *bool `json:"allowExternallyUnreachablePods,omitempty"`
 
 	// CloudNativeGateway is used to provision a gRPC gateway proxying a Couchbase
 	// cluster.
