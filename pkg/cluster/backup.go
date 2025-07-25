@@ -737,6 +737,13 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 		}
 	}
 
+	if resource.immediateBackupJob != nil {
+		propagationPolicy := metav1.DeletePropagationBackground
+		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), resource.immediateBackupJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+			return err
+		}
+	}
+
 	log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
