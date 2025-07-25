@@ -1537,10 +1537,10 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedWarnings: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
 		},
 		{
-			name:             "TestValidateEnableShardAffinityPre76Warning",
-			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enableShardAffinity", true).Replace("/spec/image", "couchbase/server:7.1.0")},
-			shouldFail:       false,
-			expectedWarnings: []string{`spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later`},
+			name:           "TestValidateEnableShardAffinityPre76Error",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enableShardAffinity", true).Replace("/spec/image", "couchbase/server:7.1.0")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.enableShardAffinity requires Couchbase Server version 7.6.0 or later`},
 		},
 		{
 			name:           "TestValidateDeferBuildPre80Error",
