@@ -1551,7 +1551,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{"spec.cluster.indexer.numReplica 3 cannot be greater or equal to the number of index pods 3"},
 		},
 		{
-			name:           "TestValidateEnablePageBloomFilterPre71Warning",
+			name:           "TestValidateEnablePageBloomFilterPre71Error",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", true).Replace("/spec/image", "couchbase/server:7.0.1")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
