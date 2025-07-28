@@ -244,9 +244,11 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 			return errorResponse(err)
 		}
 
-		if err := validator.CheckChangeConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
+		if warnings, err := validator.CheckChangeConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
 			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
+		} else if warnings != nil {
+			reviewResponse.Warnings = append(reviewResponse.Warnings, warnings...)
 		}
 	}
 

@@ -103,11 +103,11 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 	return nil
 }
 
-func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object) error {
+func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object) ([]string, error) {
 	switch t := current.(type) {
 	case *couchbasev2.CouchbaseCluster:
 		if t2, ok := updated.(*couchbasev2.CouchbaseCluster); ok {
-			return validationv2.CheckChangeConstraintsCluster(v, t, t2)
+			return nil, validationv2.CheckChangeConstraintsCluster(v, t, t2)
 		}
 	case *couchbasev2.CouchbaseBucket:
 		if t2, ok := updated.(*couchbasev2.CouchbaseBucket); ok {
@@ -115,11 +115,11 @@ func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object)
 		}
 	case *couchbasev2.CouchbaseEphemeralBucket:
 		if t2, ok := updated.(*couchbasev2.CouchbaseEphemeralBucket); ok {
-			return validationv2.CheckChangeConstraintsEphemeralBucket(v, t, t2, nil)
+			return nil, validationv2.CheckChangeConstraintsEphemeralBucket(v, t, t2, nil)
 		}
 	}
 
-	return nil
+	return nil, nil
 }
 
 func WarnOnFieldValues(resource runtime.Object) []string {

@@ -4314,21 +4314,23 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
 }
 
-func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
+
+	var warnings []string
 
 	err := annotations.Populate(&prev.Spec, prev.Annotations)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = annotations.Populate(&curr.Spec, curr.Annotations)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if checkAnnotationSkipValidation(curr.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
@@ -4346,6 +4348,8 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			if err := CheckBucketHistoryDisabled(prev); err != nil {
 				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
 			}
+
+			warnings = append(warnings, "Changing bucket storagebackend could have associated collections with history retention enabled. This must be disabled to prevent errors.")
 		}
 	}
 
@@ -4366,10 +4370,14 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return nil, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	if len(warnings) > 0 {
+		return warnings, nil
+	}
+
+	return nil, nil
 }
 
 func CheckChangeConstraintsEphemeralBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {

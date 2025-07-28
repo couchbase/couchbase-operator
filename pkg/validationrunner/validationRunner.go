@@ -294,7 +294,7 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 		switch t1 := oldBucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseBucket); ok {
-				if err := validationv2.CheckChangeConstraintsBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
+				if _, err := validationv2.CheckChangeConstraintsBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
 					errs = append(errs, err)
 
 					cbBucket, found := currentCluster.GetK8sClient().CouchbaseBuckets.Get(update.BucketName)
