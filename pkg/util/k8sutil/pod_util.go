@@ -408,11 +408,15 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	actualSize := pvc.Status.Capacity[v1.ResourceStorage]
 	requestedSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 
-	if actualSize.Equal(requestedSize) {
+	// If the requested size is less than or equal to what's actually there,
+	// then we are not expanding, so we can exit early. This covers both
+	// a correctly sized volume and an over-provisioned one.
+	if requestedSize.Cmp(actualSize) <= 0 {
 		return nil
 	}
 
-	log.V(1).Info("Volume expansion is enabled and PVC size is not equal", "member", member.Name(), "actualSize", actualSize, "requestedSize", requestedSize)
+	// If we are here, then requestedSize > actualSize, so a resize is pending.
+	log.V(1).Info("Volume expansion is enabled and PVC size is less than requested", "member", member.Name(), "actualSize", actualSize, "requestedSize", requestedSize)
 
 	if err := checkVolumeResizeFailure(client, pvc, expansionTimeout); err != nil {
 		if !goerrors.Is(err, errors.ErrVolumeResizeError) {

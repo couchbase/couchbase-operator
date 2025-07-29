@@ -665,7 +665,7 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 		return nil
 	}
 
-	if !currentRequestedSize.Equal(currentActualSize) {
+	if currentRequestedSize.Cmp(currentActualSize) > 0 {
 		log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", requested.Name)
 		return nil
 	}
