@@ -881,8 +881,9 @@ type CouchbaseCollectionSpecCommon struct {
 	// removed by Couchbase, after they have expired, when either accessed, the expiry
 	// pager is run, or the bucket is compacted.  When set to 0, then documents are not
 	// expired by default.  This field must be a duration in the range 0-2147483648s,
-	// defaulting to 0.  More info:
-	// https://golang.org/pkg/time/#ParseDuration
+	// defaulting to 0. While this field can be changed on the CRD,
+	// it will not be updated on the collection if the Couchbase Server version is pre 7.6.0.
+	// More info: https://golang.org/pkg/time/#ParseDuration.
 	MaxTTL *metav1.Duration `json:"maxTTL,omitempty"`
 
 	// History controls whether history retention is enabled for a collection.

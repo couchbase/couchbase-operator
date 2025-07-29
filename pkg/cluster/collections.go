@@ -335,7 +335,7 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
 		requestedCollection.History = nil
 		existingCollection.History = nil
-	} else {
+	} else if collection.Spec.History != nil {
 		requestedCollection.History = collection.Spec.History
 	}
 
@@ -347,9 +347,6 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	if canEditTTL && collection.Spec.MaxTTL != nil {
 		maxTTL := int(collection.Spec.MaxTTL.Seconds())
 		requestedCollection.MaxTTL = &maxTTL
-	} else if !canEditTTL {
-		requestedCollection.MaxTTL = nil
-		existingCollection.History = nil
 	}
 
 	if !reflect.DeepEqual(existingCollection, requestedCollection) {

@@ -97,8 +97,9 @@ When set to 0, then documents are not
 expired by default.
 This field must be a duration in the range 0-2147483648s,
 defaulting to 0.
-More info:
-https://golang.org/pkg/time/#ParseDuration.
+While this field can be changed on the CRD,
+it will not be updated on the collection if the Couchbase Server version is pre 7.6.0.
+More info: https://golang.org/pkg/time/#ParseDuration.
 
 === couchbasecollectiongroups.spec.names
 
