@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -3275,4 +3276,63 @@ func TestAutoCreateBucketOnRestore(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupRemoveLockfileAnnotation(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	numOfDocs := f.DocsCount
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup("*/1 * * * *").ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/forceDeleteLockfile": "true"}).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	cronJob, err := kubernetes.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", v1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Check the force delete lockfile argument is present
+	if !slices.Contains(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args, "--force-delete-lockfile") {
+		e2eutil.Die(t, fmt.Errorf("expected --force-delete-lockfile in cron job args"))
+	}
+
+	// Wait for a backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
+	// Wait for the backup to be updated
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.BackupUpdatedEvent(cluster, backup.Name), 5*time.Minute)
+
+	cronJob, err = kubernetes.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", v1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Check the force delete lockfile argument is no longer present
+	if slices.Contains(cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args, "--force-delete-lockfile") {
+		e2eutil.Die(t, fmt.Errorf("Unexpected --force-delete-lockfile in cron job args"))
+	}
 }

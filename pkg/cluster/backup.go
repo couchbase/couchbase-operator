@@ -11,6 +11,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -386,6 +387,10 @@ func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 
 		backup, ok := c.k8s.CouchbaseBackups.Get(name)
 		if ok {
+			if err := annotations.Populate(&backup.Spec, backup.Annotations); err != nil {
+				return nil, err
+			}
+
 			resource.backup = backup
 		}
 
@@ -1102,7 +1107,19 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		}
 	}
 
+	if backup.Spec.ForceDeleteLockfile {
+		args = append(args, "--force-delete-lockfile")
+
+		if !isImmediateStrategy(backup.Spec.Strategy) {
+			args = append(args, "--remove-delete-lockfile-annotation")
+		}
+	}
+
 	return args
+}
+
+func isImmediateStrategy(strategy couchbasev2.Strategy) bool {
+	return strategy == couchbasev2.ImmediateFull || strategy == couchbasev2.ImmediateIncremental
 }
 
 // generateRestoreJob returns a job that performs a cbbackupmgr restore command.
@@ -1562,6 +1579,10 @@ func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 
 		if !selector.Matches(labels.Set(backup.Labels)) {
 			continue
+		}
+
+		if err := annotations.Populate(&backup.Spec, backup.Annotations); err != nil {
+			return nil, err
 		}
 
 		backups = append(backups, *backup)

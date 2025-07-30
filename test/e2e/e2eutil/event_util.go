@@ -148,6 +148,10 @@ func BackupFailedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event
 	return k8sutil.BackupFailEvent(backup, c)
 }
 
+func BackupUpdatedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Event {
+	return k8sutil.BackupUpdateEvent(backup, c)
+}
+
 func AutoscaleUpEvent(cl *couchbasev2.CouchbaseCluster, configName string, from int, to int) *v1.Event {
 	return k8sutil.AutoscaleUpEvent(cl, configName, from, to)
 }

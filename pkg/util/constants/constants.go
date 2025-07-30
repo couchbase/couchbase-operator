@@ -128,6 +128,7 @@ const (
 	AnnotationSkipDACValidation               = "dac.couchbase.com/skipvalidation"
 	AnnotationDisableAdmissionController      = "dac.couchbase.com/skipDAC"
 	AnnotationSkipClusterNameLengthValidation = "dac.couchbase.com/skipClusterNameLengthValidation"
+	AnnotationForceDeleteLockfile             = "cao.couchbase.com/forceDeleteLockfile"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion

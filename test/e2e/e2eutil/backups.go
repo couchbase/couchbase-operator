@@ -107,6 +107,9 @@ type Backup struct {
 
 	// backups users
 	users bool
+
+	// annotations to be added to the backup
+	annotations map[string]string
 }
 
 // NewFullBackup creates a full-only backup with all required parameters.
@@ -276,6 +279,12 @@ func (b *Backup) WithUsers(users bool) *Backup {
 	return b
 }
 
+func (b *Backup) WithAnnotations(annotations map[string]string) *Backup {
+	b.annotations = annotations
+
+	return b
+}
+
 // MustCreate generates the concrete backup resource and creates it in Kubernetes.
 func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackup {
 	generateName := "backup-"
@@ -283,6 +292,7 @@ func (b *Backup) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev
 	backup := &couchbasev2.CouchbaseBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: generateName,
+			Annotations:  b.annotations,
 		},
 		Spec: couchbasev2.CouchbaseBackupSpec{
 			Strategy: b.kind,
