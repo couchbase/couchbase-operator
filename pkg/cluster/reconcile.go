@@ -842,21 +842,26 @@ func (c *Cluster) reconcileQuerySettings() error {
 
 	requested.PreparedLimit = apiSettings.PreparedLimit
 	requested.CompletedLimit = apiSettings.CompletedLimit
-	requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
 	requested.LogLevel = couchbaseutil.QueryLogLevel(apiSettings.LogLevel)
 	requested.MaxParallelism = apiSettings.MaxParallelism
 
-	// Similar to the backfill above, we make the api of this field nicer
-	if apiSettings.CompletedTrackingEnabled {
-		if apiSettings.CompletedTrackingAllRequests {
-			// 0 to track all requests
-			requested.CompletedThreshold = 0
-		} else if apiSettings.CompletedThreshold != nil {
-			requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
+	// CompletedTrackingEnabled, CompletedTrackingAllRequests and CompletedTrackingThreshold have been deprecated in favour of a single CompletedThreshold field.
+	// While they will no longer default to any values in the CRD, if they have already been set they should take precedence over the new CompletedThreshold field to avoid
+	// effecting existing clusters.
+	if apiSettings.CompletedTrackingEnabled != nil {
+		if *apiSettings.CompletedTrackingEnabled {
+			if apiSettings.CompletedTrackingAllRequests != nil && *apiSettings.CompletedTrackingAllRequests {
+				// 0 to track all requests
+				requested.CompletedThreshold = 0
+			} else if apiSettings.CompletedTrackingThreshold != nil {
+				requested.CompletedThreshold = int32(apiSettings.CompletedTrackingThreshold.Milliseconds())
+			}
+		} else {
+			// Negative number to disable tracking
+			requested.CompletedThreshold = -1
 		}
-	} else {
-		// Negative number to disable tracking
-		requested.CompletedThreshold = -1
+	} else if apiSettings.CompletedThreshold != nil {
+		requested.CompletedThreshold = int32(apiSettings.CompletedThreshold.Milliseconds())
 	}
 
 	requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
@@ -905,6 +910,8 @@ func (c *Cluster) reconcileQuerySettings() error {
 	if reflect.DeepEqual(current, &requested) {
 		return nil
 	}
+
+	fmt.Println("updating query settungs, diff", diff.PrettyDiff(current, &requested))
 
 	if err := couchbaseutil.SetQuerySettings(&requested).On(c.api, c.readyMembers()); err != nil {
 		return err

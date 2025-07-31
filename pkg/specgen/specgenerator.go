@@ -306,15 +306,11 @@ func (s *SpecGenerator) applyQuerySettings() error {
 
 		PreparedLimit:  querySettings.PreparedLimit,
 		CompletedLimit: querySettings.CompletedLimit,
+		LogLevel:       couchbasev2.QueryLogLevel(querySettings.LogLevel),
+		MaxParallelism: querySettings.MaxParallelism,
 		CompletedThreshold: &metav1.Duration{
 			Duration: time.Duration(querySettings.CompletedThreshold) * time.Millisecond,
 		},
-		LogLevel:       couchbasev2.QueryLogLevel(querySettings.LogLevel),
-		MaxParallelism: querySettings.MaxParallelism,
-
-		CompletedTrackingEnabled:     querySettings.CompletedThreshold < 0,
-		CompletedTrackingAllRequests: querySettings.CompletedThreshold == 0,
-
 		MemoryQuota:                  k8sutil.NewResourceQuantityMi(int64(querySettings.MemoryQuota)),
 		CBOEnabled:                   querySettings.CBOEnabled,
 		CleanupClientAttemptsEnabled: querySettings.CleanupClientAttemptsEnabled,
@@ -332,12 +328,6 @@ func (s *SpecGenerator) applyQuerySettings() error {
 	} else {
 		s.cluster.ClusterSettings.Query.Timeout = &metav1.Duration{
 			Duration: time.Duration(querySettings.Timeout) * time.Nanosecond,
-		}
-	}
-
-	if querySettings.CompletedThreshold > 0 {
-		s.cluster.ClusterSettings.Query.CompletedThreshold = &metav1.Duration{
-			Duration: time.Duration(querySettings.CompletedThreshold) * time.Millisecond,
 		}
 	}
 

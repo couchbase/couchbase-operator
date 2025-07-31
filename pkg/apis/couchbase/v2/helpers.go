@@ -1687,3 +1687,36 @@ func (c *CouchbaseCluster) GetMaxUpgradable() (int, error) {
 
 	return upgradeLimit, nil
 }
+
+func unmarshalDurationWithNegativeOverride(field string, negValue, defaultVal time.Duration) (*metav1.Duration, error) {
+	switch field {
+	case "":
+		return &metav1.Duration{Duration: defaultVal}, nil
+	case "-1":
+		return &metav1.Duration{Duration: negValue}, nil
+	case "0":
+		return &metav1.Duration{Duration: 0 * time.Second}, nil
+	default:
+		duration, err := time.ParseDuration(field)
+		if err != nil {
+			return nil, err
+		}
+
+		return &metav1.Duration{Duration: duration}, nil
+	}
+}
+
+func marshalDurationWithNegativeOverride(duration *metav1.Duration, negValue time.Duration) string {
+	if duration == nil {
+		return ""
+	}
+
+	switch duration.Duration {
+	case negValue:
+		return "-1"
+	case 0 * time.Millisecond:
+		return "0"
+	default:
+		return duration.Duration.String()
+	}
+}

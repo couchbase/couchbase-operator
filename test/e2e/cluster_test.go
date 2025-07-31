@@ -283,8 +283,8 @@ func TestQuerySettings(t *testing.T) {
 		CBOEnabled:                   true,
 		CleanupClientAttemptsEnabled: true,
 		CleanupLostAttemptsEnabled:   true,
-		CompletedTrackingEnabled:     true,
 	}
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Play with the settings and ensure they are as expected.
@@ -316,14 +316,17 @@ func TestQuerySettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedLimit", 7000), time.Minute)
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedLimit", int32(7000)), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingThreshold", e2espec.NewDurationS(1)).Replace("/spec/cluster/query/completedTrackingEnabled", true), time.Minute)
-	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(1000)), time.Minute)
-
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingAllRequests", true), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedThreshold", "0"), time.Minute)
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(0)), time.Minute)
 
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedTrackingEnabled", false), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedThreshold", "-1"), time.Minute)
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(-1)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/completedThreshold", "10m"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(600000)), time.Minute)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/cluster/query/completedThreshold"), time.Minute)
+	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/CompletedThreshold", int32(1000)), time.Minute)
 
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/logLevel", couchbasev2.QueryLogLevelWarn), time.Minute)
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/LogLevel", couchbaseutil.QueryLogLevelWarn), time.Minute)
@@ -352,7 +355,7 @@ func TestQuerySettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/query/numActiveTransactionRecords", 512), time.Minute)
 	e2eutil.MustPatchQuerySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumActiveTransactionRecords", int32(512)), time.Minute)
 
-	patchCycles := 22
+	patchCycles := 23
 	upgradeCycles := 0
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)

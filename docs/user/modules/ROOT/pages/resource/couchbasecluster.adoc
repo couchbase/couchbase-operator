@@ -114,9 +114,10 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-cleanupwindow,cleanupWindow>>: 60s
       <<couchbaseclusters-spec-cluster-query-completedlimit,completedLimit>>: 4000
       <<couchbaseclusters-spec-cluster-query-completedmaxplansize,completedMaxPlanSize>>: 262144
+      <<couchbaseclusters-spec-cluster-query-completedthreshold,completedThreshold>>: 1s
       <<couchbaseclusters-spec-cluster-query-completedtrackingallrequests,completedTrackingAllRequests>>: false
-      <<couchbaseclusters-spec-cluster-query-completedtrackingenabled,completedTrackingEnabled>>: True
-      <<couchbaseclusters-spec-cluster-query-completedtrackingthreshold,completedTrackingThreshold>>: 7s
+      <<couchbaseclusters-spec-cluster-query-completedtrackingenabled,completedTrackingEnabled>>: false
+      <<couchbaseclusters-spec-cluster-query-completedtrackingthreshold,completedTrackingThreshold>>: ""
       <<couchbaseclusters-spec-cluster-query-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-cluster-query-maxparallelism,maxParallelism>>: 1
       <<couchbaseclusters-spec-cluster-query-memoryquota,memoryQuota>>: 0
@@ -1864,18 +1865,34 @@ Queries with plans larger than this are not logged.
 This field is only supported on CB versions 7.6.0+.
 Defaults to 262144, maximum value is 20840448, and minimum value is 0.
 
+=== couchbaseclusters.spec.cluster.query.completedThreshold
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `1s`
+
+==== Description
+
+CompletedThreshold sets the minimum request duration after which requests are added to the completed
+requests catalog.
+This field must either be a duration up to 2147483648s, "0", or "-1".
+Setting this field to "0" will log all requests.
+Setting this field to "-1" will disable request logging.
+This field defaults to 1s.
+
 === couchbaseclusters.spec.cluster.query.completedTrackingAllRequests
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
-
-*Default*: `False`
 
 ==== Description
 
+*DEPRECATED* - by spec.cluster.query.completedThreshold.
+
+Set completedThreshold to "0" to log all requests.
 CompletedTrackingAllRequests allows all requests to be tracked regardless of their
 time.
 This field requires `completedTrackingEnabled` to be true.
@@ -1884,14 +1901,13 @@ This field requires `completedTrackingEnabled` to be true.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
-
-*Default*: `True`
 
 ==== Description
 
+*DEPRECATED* - by spec.cluster.query.completedThreshold.
+
+Set completedThreshold to "-1" to disable request tracking.
 CompletedTrackingEnabled allows completed requests to be tracked in the requests
 catalog.
 
@@ -1901,11 +1917,11 @@ catalog.
 
 *Type*: `string`
 
-*Default*: `7s`
-
 ==== Description
 
-CompletedThreshold is a trigger for queries to be logged in the completed
+*DEPRECATED* - by spec.cluster.query.completedThreshold.
+
+CompletedTrackingThreshold is a trigger for queries to be logged in the completed
 requests catalog.
 All completed queries lasting longer than this threshold
 are logged in the completed requests catalog.

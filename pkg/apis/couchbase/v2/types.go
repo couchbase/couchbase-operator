@@ -3747,22 +3747,29 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:default=4000
 	CompletedLimit int32 `json:"completedLimit"`
 
+	// DEPRECATED - by spec.cluster.query.completedThreshold. Set completedThreshold to "-1" to disable request tracking.
 	// CompletedTrackingEnabled allows completed requests to be tracked in the requests
 	// catalog.
-	// +kubebuilder:default=true
-	CompletedTrackingEnabled bool `json:"completedTrackingEnabled"`
+	CompletedTrackingEnabled *bool `json:"completedTrackingEnabled,omitempty"`
 
+	// DEPRECATED - by spec.cluster.query.completedThreshold. Set completedThreshold to "0" to log all requests.
 	// CompletedTrackingAllRequests allows all requests to be tracked regardless of their
 	// time. This field requires `completedTrackingEnabled` to be true.
-	// +kubebuilder:default=false
-	CompletedTrackingAllRequests bool `json:"completedTrackingAllRequests"`
+	CompletedTrackingAllRequests *bool `json:"completedTrackingAllRequests,omitempty"`
 
-	// CompletedThreshold is a trigger for queries to be logged in the completed
+	// DEPRECATED - by spec.cluster.query.completedThreshold.
+	// CompletedTrackingThreshold is a trigger for queries to be logged in the completed
 	// requests catalog. All completed queries lasting longer than this threshold
 	// are logged in the completed requests catalog. This field requires `completedTrackingEnabled`
 	// to be set to true and `completedTrackingAllRequests` to be false to have any effect.
-	// +kubebuilder:default="7s"
-	CompletedThreshold *metav1.Duration `json:"completedTrackingThreshold,omitempty"`
+	CompletedTrackingThreshold *metav1.Duration `json:"completedTrackingThreshold,omitempty"`
+
+	// CompletedThreshold sets the minimum request duration after which requests are added to the completed
+	// requests catalog. This field must either be a duration up to 2147483648s, "0", or "-1".
+	// Setting this field to "0" will log all requests. Setting this field to "-1" will disable request logging.
+	// This field defaults to 1s.
+	// +kubebuilder:default="1s"
+	CompletedThreshold *metav1.Duration `json:"completedThreshold,omitempty"`
 
 	// LogLevel controls the verbosity of query logs. This field must be one of
 	// "debug", "trace", "info", "warn", "error", "severe", or "none", defaulting to "info".
@@ -3860,6 +3867,50 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:default="262144"
 	// +kubebuilder:validation:Type=string
 	CompletedMaxPlanSize *resource.Quantity `json:"completedMaxPlanSize"`
+}
+
+func (q *CouchbaseClusterQuerySettings) UnmarshalJSON(data []byte) error {
+	type Alias CouchbaseClusterQuerySettings
+
+	aux := &struct {
+		*Alias
+		CompletedThreshold string `json:"completedThreshold,omitempty"`
+	}{
+		Alias: (*Alias)(q),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	duration, err := unmarshalDurationWithNegativeOverride(aux.CompletedThreshold, -1*time.Millisecond, time.Second)
+	if err != nil {
+		return err
+	}
+
+	q.CompletedThreshold = duration
+
+	return nil
+}
+
+func (q *CouchbaseClusterQuerySettings) MarshalJSON() ([]byte, error) {
+	type Alias CouchbaseClusterQuerySettings
+
+	aux := &struct {
+		*Alias
+		CompletedThreshold string `json:"completedThreshold,omitempty"`
+	}{
+		Alias: (*Alias)(q),
+	}
+
+	aux.CompletedThreshold = marshalDurationWithNegativeOverride(q.CompletedThreshold, -1*time.Millisecond)
+
+	json, err := json.Marshal(aux)
+	if err != nil {
+		return nil, err
+	}
+
+	return json, nil
 }
 
 // CouchbaseClusterDataSettings allows data service tweaks.

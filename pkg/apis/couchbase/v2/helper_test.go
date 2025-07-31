@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -38,5 +39,109 @@ func TestIsNativeAuditCleanupEnabled(t *testing.T) {
 
 	if !c.IsNativeAuditCleanupEnabled() {
 		t.Error("expected IsNativeAuditCleanupEnabled to return true, but returned false")
+	}
+}
+
+func TestUnmarshalDurationWithNegativeOverride(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		crdEntry   string
+		negValue   time.Duration
+		defaultVal time.Duration
+		expected   time.Duration
+	}{
+		{
+			crdEntry:   "1s",
+			negValue:   time.Second,
+			defaultVal: time.Second,
+			expected:   time.Second,
+		},
+		{
+			crdEntry: "-1",
+			negValue: time.Second * -1,
+			expected: time.Second * -1,
+		},
+		{
+			crdEntry: "-1",
+			negValue: time.Millisecond * -1,
+			expected: time.Millisecond * -1,
+		},
+		{
+			crdEntry: "0",
+			expected: time.Second * 0,
+		},
+		{
+			crdEntry:   "",
+			defaultVal: time.Second,
+			expected:   time.Second,
+		},
+		{
+			crdEntry:   "",
+			defaultVal: time.Minute,
+			expected:   time.Minute,
+		},
+	}
+
+	for _, testcase := range testcases {
+		duration, err := unmarshalDurationWithNegativeOverride(testcase.crdEntry, testcase.negValue, testcase.defaultVal)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := v1.Duration{Duration: testcase.expected}
+		if !reflect.DeepEqual(duration, &expected) {
+			t.Errorf("expected duration to be %v, but got %v", expected, duration)
+		}
+	}
+}
+
+func TestMarshalDurationWithNegativeOverride(t *testing.T) {
+	testcases := []struct {
+		duration *v1.Duration
+		negValue time.Duration
+		expected string
+	}{
+		{
+			duration: &v1.Duration{Duration: time.Second},
+			expected: "1s",
+		},
+		{
+			duration: &v1.Duration{Duration: time.Minute},
+			expected: "1m0s",
+		},
+		{
+			duration: &v1.Duration{Duration: time.Second * -1},
+			negValue: time.Second * -1,
+			expected: "-1",
+		},
+		{
+			duration: &v1.Duration{Duration: time.Minute * -1},
+			negValue: time.Minute * -1,
+			expected: "-1",
+		},
+		{
+			duration: &v1.Duration{Duration: time.Minute * -1},
+			negValue: time.Second * -1,
+			expected: "-1m0s",
+		},
+		{
+			duration: &v1.Duration{Duration: time.Second * 0},
+			negValue: time.Second * -1,
+			expected: "0",
+		},
+		{
+			duration: nil,
+			expected: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		expected := testcase.expected
+
+		actual := marshalDurationWithNegativeOverride(testcase.duration, testcase.negValue)
+		if actual != expected {
+			t.Errorf("expected %v, but got %v", expected, actual)
+		}
 	}
 }
