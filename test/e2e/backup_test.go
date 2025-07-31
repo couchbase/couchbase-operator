@@ -3336,3 +3336,87 @@ func TestBackupRemoveLockfileAnnotation(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("Unexpected --force-delete-lockfile in cron job args"))
 	}
 }
+
+func TestBackupAndKeepRestore(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
+
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+
+	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	// create new restore
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).WithPreserveRestoreRecord(true).MustCreate(t, kubernetes)
+
+	// restore job is too fast, just validate bucket item count
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	time.Sleep(20 * time.Second)
+
+	r, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackupRestores(backup.Namespace).Get(context.Background(), restore.Name, v1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	if r == nil {
+		e2eutil.Die(t, fmt.Errorf("Restore was not preserved"))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * Remove Bucket
+	// * Bucket created
+	// * Restore created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

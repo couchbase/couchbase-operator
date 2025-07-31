@@ -458,6 +458,9 @@ type Restore struct {
 
 	// restore users
 	users bool
+
+	// preserveRestoreRecord
+	preserveRestoreRecord bool
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -590,6 +593,13 @@ func (r *Restore) WithUsers(users bool) *Restore {
 	return r
 }
 
+// WithPreserveRestoreRecord preserves the restore record.
+func (r *Restore) WithPreserveRestoreRecord(preserveRestoreRecord bool) *Restore {
+	r.preserveRestoreRecord = preserveRestoreRecord
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -663,6 +673,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.forceUpdates {
 		restore.Spec.ForceUpdates = true
+	}
+
+	if r.preserveRestoreRecord {
+		restore.Spec.PreserveRestoreRecord = true
 	}
 
 	if r.include != nil || r.exclude != nil || r.mapping != nil {

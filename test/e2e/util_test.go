@@ -734,6 +734,7 @@ func registerTests() {
 		framework.NewTestDef(TestPeriodicMergeBackup).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestAutoCreateBucketOnRestore).WithTags(TagSuiteP1, TagFeatureBackup),
 		framework.NewTestDef(TestBackupRemoveLockfileAnnotation).WithTags(TagSuiteP1, TagFeatureBackup),
+		framework.NewTestDef(TestBackupAndKeepRestore).WithTags(TagSuiteP1, TagFeatureBackup),
 
 		// Synchronization tests.
 		framework.NewTestDef(TestDataSynchronizationBasic).WithTags(TagSuiteP1, TagFeatureSynchronization, TagFeatureCollections, TagSuitePlatform),

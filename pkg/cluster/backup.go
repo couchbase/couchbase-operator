@@ -1716,45 +1716,66 @@ func (c *Cluster) reconcileBackupRestore() error {
 	// for the current CouchbaseBackupRestores, loop through and see if they have a Job created
 	for i := range currentRestores {
 		currentRestore := &currentRestores[i]
-
-		apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(currentRestore.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiRestore.Annotations) {
-			continue
+		if !currentRestore.Status.Completed {
+			if err := c.reconcileActiveBackupRestore(currentRestore); err != nil {
+				return err
+			}
+		} else if !currentRestore.Spec.PreserveRestoreRecord {
+			if err := c.deleteCouchbaseRestore(currentRestore.Name); err != nil {
+				return err
+			}
 		}
+	}
 
-		requested, err := c.generateRestoreJob(currentRestore)
+	return nil
+}
+
+func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.CouchbaseBackupRestore) error {
+	apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(currentRestore.Name)
+	if found && !couchbaseutil.ShouldReconcile(apiRestore.Annotations) {
+		return nil
+	}
+
+	requested, err := c.generateRestoreJob(currentRestore)
+	if err != nil {
+		return err
+	}
+
+	k8sutil.ApplyBaseAnnotations(requested)
+
+	// Check if restore job already exists.  If it doesn't, then it's never been created, or
+	// less likely, been deleted and needs recreating.
+	currentjob, ok := c.k8s.Jobs.Get(requested.Name)
+	if !ok {
+		log.Info("Restore created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name)
+
+		c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
+
+		createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 
-		k8sutil.ApplyBaseAnnotations(requested)
+		log.Info("restore job created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name, "created job", createdJob.Name)
 
-		// Check if restore job already exists.  If it doesn't, then it's never been created, or
-		// less likely, been deleted and needs recreating.
-		currentjob, ok := c.k8s.Jobs.Get(requested.Name)
-		if !ok {
-			log.Info("Restore created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name)
+		return nil
+	}
 
-			c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
-
-			createdJob, err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Create(context.Background(), requested, metav1.CreateOptions{})
-			if err != nil {
-				return err
-			}
-
-			log.Info("restore job created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name, "created job", createdJob.Name)
-
-			continue
+	// Cleanup completed restores so that aren't rerun.
+	if currentjob.Status.Succeeded == 1 {
+		if err := c.deleteCouchbaseRestore(currentRestore.Name); err != nil {
+			return err
 		}
+	}
 
-		// Cleanup completed restores so that aren't rerun.
-		if currentjob.Status.Succeeded == 1 {
-			log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", currentRestore.Name)
+	return nil
+}
 
-			if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), currentRestore.Name, *metav1.NewDeleteOptions(0)); err != nil {
-				return err
-			}
-		}
+func (c *Cluster) deleteCouchbaseRestore(restoreName string) error {
+	log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", restoreName)
+
+	if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), restoreName, *metav1.NewDeleteOptions(0)); err != nil {
+		return err
 	}
 
 	return nil

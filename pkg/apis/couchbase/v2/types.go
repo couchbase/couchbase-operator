@@ -658,6 +658,11 @@ type CouchbaseBackupRestoreSpec struct {
 	// Number of seconds to elapse before a completed job is deleted.
 	// +kubebuilder:validation:Minimum=0
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty"`
+
+	// PreserveRestoreRecord indicates whether the restore record should be preserved
+	// after the restore job has completed.
+	// +kubebuilder:default=false
+	PreserveRestoreRecord bool `json:"preserveRestoreRecord,omitempty"`
 }
 
 type CouchbaseBackupStagingVolume struct {
@@ -822,6 +827,9 @@ type CouchbaseBackupRestoreStatus struct {
 
 	// Failed indicates whether the most recent restore has failed.
 	Failed bool `json:"failed"`
+
+	// Completed indicates whether the restore has been successfully completed.
+	Completed bool `json:"completed"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Output reports useful information from the backup process.
