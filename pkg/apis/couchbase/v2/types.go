@@ -413,6 +413,7 @@ type CouchbaseBackupDataFilter struct {
 	// period is the separator used to delimit scopes and collections.  Included data cannot overlap
 	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
 	// be used at the same time as excluded items.
+	// Changes from this field will only takes effect on a full backup.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
 	Include []BucketScopeOrCollectionNameWithDefaults `json:"include,omitempty"`
@@ -425,6 +426,7 @@ type CouchbaseBackupDataFilter struct {
 	// period is the separator used to delimit scopes and collections.  Excluded data cannot overlap
 	// e.g. specifying `my-bucket` and `my-bucket.my-scope` is illegal.  This field cannot
 	// be used at the same time as included items.
+	// Changes from this field will only takes effect on a full backup.
 	// +listType=set
 	// +kubebuilder:validation:MinItems=1
 	Exclude []BucketScopeOrCollectionNameWithDefaults `json:"exclude,omitempty"`
