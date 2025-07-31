@@ -279,6 +279,7 @@ var ImageDigests = map[string]string{
 	"b5475e68861b9b9b6595d907e6e0f8ad80b567adeeb1a915ef1578b6a6f7b6d6": "fluent-1.2.1-1",
 }
 
+// Defaults for bucket API.
 const (
 	// MagmaSeqTreeDataDefaultBlockSize default block size for Magma seqIndex.
 	MagmaSeqTreeDataDefaultBlockSize = 4096
@@ -299,4 +300,12 @@ const (
 
 	// MemoryHighWatermarkDefault default memory high watermark for a bucket.
 	MemoryHighWatermarkDefault = 85
+
+	// DurabilityImpossibleFallbackDefault default durability impossible fallback for a bucket.
+	DurabilityImpossibleFallbackDefault = "disabled"
+)
+
+// Defaults for AutoFailover API.
+const (
+	DefaultAllowFailoverEphemeralNoReplicas = false
 )

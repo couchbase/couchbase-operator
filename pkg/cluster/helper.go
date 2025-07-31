@@ -128,6 +128,10 @@ func (c *Cluster) GetLowestMemberVersion() string {
 
 	sort.Strings(versions)
 
+	if len(versions) == 0 {
+		return ""
+	}
+
 	return versions[0]
 }
 

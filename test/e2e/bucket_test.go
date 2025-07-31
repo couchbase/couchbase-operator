@@ -430,7 +430,7 @@ func TestEditBucket(t *testing.T) {
 		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/MemoryHighWatermark", &memoryHighWatermark), time.Minute)
 
 		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/durabilityImpossibleFallback", couchbasev2.DurabilityImpossibleFallbackActive), time.Minute)
-		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/durabilityImpossibleFallback", couchbasev2.DurabilityImpossibleFallbackActive), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/DurabilityImpossibleFallback", couchbaseutil.DurabilityImpossibleFallback(couchbasev2.DurabilityImpossibleFallbackActive)), time.Minute)
 
 		patchCycles += 6
 	}

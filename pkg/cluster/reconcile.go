@@ -450,7 +450,12 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	}
 
 	if over80, err := c.IsAtLeastVersion("8.0.0"); over80 && err == nil {
-		specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
+		if clusterSettings.AllowFailoverEphemeralNoReplicas != nil {
+			specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
+		} else {
+			defaultAllowFailoverEphemeralNoReplicas := constants.DefaultAllowFailoverEphemeralNoReplicas
+			specFailoverSettings.AllowFailoverEphemeralNoReplicas = &defaultAllowFailoverEphemeralNoReplicas
+		}
 	}
 
 	// Mask out any existing read only values, e.g. set it to the default value

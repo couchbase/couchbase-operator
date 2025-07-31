@@ -171,7 +171,11 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.MemoryHighWatermark = &defaultMemoryHighWatermark
 			}
 
-			b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
+			if bucket.Spec.DurabilityImpossibleFallback != "" {
+				b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
+			} else {
+				b.DurabilityImpossibleFallback = constants.DurabilityImpossibleFallbackDefault
+			}
 		}
 
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)

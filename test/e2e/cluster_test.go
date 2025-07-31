@@ -149,10 +149,16 @@ func TestEditClusterSettings(t *testing.T) {
 	e2eutil.MustPatchAutoFailoverInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Timeout", int64(31)), time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
+	patchCycles := 2
+
 	if atLeast80 {
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/allowFailoverEphemeralNoReplicas", true), time.Minute)
 		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-		e2eutil.MustPatchCouchbaseInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/allowFailoverEphemeralNoReplicas", true), 5*time.Minute)
+
+		allowFailoverEphemeralNoReplicas := true
+
+		e2eutil.MustPatchAutoFailoverInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/AllowFailoverEphemeralNoReplicas", &allowFailoverEphemeralNoReplicas), 5*time.Minute)
+		patchCycles++
 	}
 
 	// Check the events match what we expect:
@@ -164,8 +170,7 @@ func TestEditClusterSettings(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		upgradeSequence,
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

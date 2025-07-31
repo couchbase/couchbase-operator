@@ -188,24 +188,17 @@ func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.
 }
 
 func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
-	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	allCandidates, err := c.needsUpgrade()
 	if err != nil {
 		return nil, err
 	}
 
-	numOldPods := c.members.GroupBy(func(member couchbaseutil.Member) bool {
-		return (member.Version() != targetVersion && member.Version() != "" && member.Version() != "unknown")
-	}).Size()
+	numOldPods := allCandidates.Size()
 
 	numToUpgrade := numOldPods
 
 	if c.cluster.Spec.Upgrade != nil {
 		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
-	}
-
-	allCandidates, err := c.needsUpgrade()
-	if err != nil {
-		return nil, err
 	}
 
 	filteredCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates, numToUpgrade)
