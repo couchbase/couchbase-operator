@@ -572,22 +572,35 @@ func TestNetworkAddressFamily(t *testing.T) {
 	// to a bug fix release" form.
 	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
 
-	// Create any old cluster and ensure all pods have dual stack enabled.
+	// Create any old cluster
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, false, time.Minute)
+	expectedUpdates := 0
 
-	// Set the mode explicitly to IPv4, expect the IPv6 ports to disappear.
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.AFInet), time.Minute)
-	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, true, time.Minute)
-
-	// Revert the mode back to unset and esnure dial stack is restored.
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/addressFamily"), time.Minute)
-	e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.AFInet, false, time.Minute)
+	// We can only test IPv6 settings when the certify flag is set, otherwise the cluster will default to IPv4
+	if kubernetes.IPv6 {
+		// Check that the cluster is initialised with IPv6 (The --up)
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv6Only, time.Minute)
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.IPv6Priority), time.Minute)
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv6Priority, time.Minute)
+		expectedUpdates++
+		// Check the deprecated IPv6 option still sets the address family to IPv6Only.
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.IPv6), time.Minute)
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv6Only, time.Minute)
+		expectedUpdates++
+	} else {
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv4Priority, time.Minute)
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.IPv4Only), time.Minute)
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv4Only, time.Minute)
+		expectedUpdates++
+		// Check the deprecated IPv4 option still sets the address family to IPv4Only. We don't expect an update event here though.
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.IPv4), time.Minute)
+		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv4Only, time.Minute)
+	}
 
 	// Ensure the expected events were raised.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified}},
+		eventschema.Repeat{Times: expectedUpdates, Validator: eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

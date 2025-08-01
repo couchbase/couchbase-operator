@@ -27,7 +27,7 @@ func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couch
 	}
 
 	if k8s.IPv6 {
-		ipv6 := couchbasev2.AFInet6
+		ipv6 := couchbasev2.IPv6Only
 		cl.Spec.Networking.AddressFamily = &ipv6
 	}
 

@@ -115,6 +115,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
+		checkConstraintsDeprecatedNetworkingOptions,
 	}
 
 	var errs []error
@@ -5041,4 +5042,26 @@ func checkServerClassImageDeprecated(v *types.Validator, cluster *couchbasev2.Co
 	}
 
 	return nil, nil
+}
+
+func checkConstraintsDeprecatedNetworkingOptions(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.Networking.AddressFamily == nil {
+		return nil, nil
+	}
+
+	var warnings []string
+
+	// Map of deprecated address families to their replacements
+	deprecatedToReplacement := map[couchbasev2.AddressFamily]couchbasev2.AddressFamily{
+		couchbasev2.IPv4: couchbasev2.IPv4Only,
+		couchbasev2.IPv6: couchbasev2.IPv6Only,
+	}
+
+	addressFamily := *cluster.Spec.Networking.AddressFamily
+	if replacement, isDeprecated := deprecatedToReplacement[addressFamily]; isDeprecated {
+		warning := fmt.Sprintf("%s should be used in place of %s for spec.networking.addressFamily. %s is deprecated and will be removed in a future release", replacement, addressFamily, addressFamily)
+		warnings = append(warnings, warning)
+	}
+
+	return warnings, nil
 }

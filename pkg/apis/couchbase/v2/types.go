@@ -3161,13 +3161,23 @@ const (
 )
 
 // AddressFamily allows you to select the IP protocol version.
-// +kubebuilder:validation:Enum=IPv4;IPv6
+// +kubebuilder:validation:Enum=IPv4;IPv6;IPv4Priority;IPv6Priority;IPv6Only;IPv4Only
 type AddressFamily string
 
 const (
-	AFInet AddressFamily = "IPv4"
+	// Deprecated - use IPv4Only instead
+	IPv4 AddressFamily = "IPv4"
 
-	AFInet6 AddressFamily = "IPv6"
+	// Deprecated - use IPv6Only instead
+	IPv6 AddressFamily = "IPv6"
+
+	IPv4Priority AddressFamily = "IPv4Priority"
+
+	IPv6Priority AddressFamily = "IPv6Priority"
+
+	IPv4Only AddressFamily = "IPv4Only"
+
+	IPv6Only AddressFamily = "IPv6Only"
 )
 
 type CloudNativeGatewayTLS struct {
@@ -3260,13 +3270,12 @@ type CloudNativeGatewayOTLP struct {
 
 type CouchbaseClusterNetworkingSpec struct {
 	// AddressFamily allows the manual selection of the address family to use.
+	// Setting this field to either IPv4Only or IPv6Only will exclusively use that address family.
+	// Setting this field to IPv4Priority or IPv6Priority will allow dual stack networking with
+	// the given address family being prioritised.
 	// When this field is not set, Couchbase server will default to using IPv4
 	// for internal communication and also support IPv6 on dual stack systems.
-	// Setting this field to either IPv4 or IPv6 will force Couchbase to use the
-	// selected protocol for internal communication, and also disable all other
-	// protocols to provide added security and simplicty when defining firewall
-	// rules.  Disabling of address families is only supported in Couchbase
-	// Server 7.0.2+.
+	// This is only supported in Couchbase Server 7.0.2+.
 	AddressFamily *AddressFamily `json:"addressFamily,omitempty"`
 
 	// ExposeAdminConsole creates a service referencing the admin console.

@@ -1113,21 +1113,16 @@ func (c *CouchbaseCluster) GetBucketLabelSelector() (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
 }
 
-// AddressFamily returns the cluster address family, defaulting to IPv4 if
+// AddressFamily returns the cluster address family, defaulting to IPv4 dual-stack if
 // none is specified.
 func (c *CouchbaseCluster) AddressFamily() AddressFamily {
-	af := AFInet
+	af := IPv4Priority
 
 	if c.Spec.Networking.AddressFamily != nil {
 		af = *c.Spec.Networking.AddressFamily
 	}
 
 	return af
-}
-
-// DualStack returns true if the address family is not explicitly stated.
-func (c *CouchbaseCluster) DualStack() bool {
-	return c.Spec.Networking.AddressFamily == nil
 }
 
 func (c *CouchbaseCluster) GetBackupStoreEndpoint() *ObjectEndpoint {

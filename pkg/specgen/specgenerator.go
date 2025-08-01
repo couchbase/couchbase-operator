@@ -384,7 +384,7 @@ func (s *SpecGenerator) applyNetworkingSettings() error {
 		return err
 	}
 
-	af := couchbaseAPIAddressFamilyToServer(clusterInfo.Nodes[0].AddressFamily.ConvertAddressFamilyOutToAddressFamily())
+	af := couchbaseAPIAddressFamilyToServer(clusterInfo.Nodes[0].AddressFamily.ConvertAddressFamilyOutToAddressFamily(), clusterInfo.Nodes[0].AddressFamilyOnly)
 	s.cluster.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
 		AddressFamily: &af,
 	}
@@ -471,10 +471,19 @@ func (s *SpecGenerator) applySoftwareNotificationSettings() error {
 }
 
 // apiAddressFamilyToCouchbase translates from our consistent API to Couchbase's.
-func couchbaseAPIAddressFamilyToServer(af couchbaseutil.AddressFamily) couchbasev2.AddressFamily {
-	if af == couchbaseutil.AddressFamilyIPV6 {
-		return couchbasev2.AFInet6
-	}
+func couchbaseAPIAddressFamilyToServer(af couchbaseutil.AddressFamily, addressFamilyOnly bool) couchbasev2.AddressFamily {
+	switch af {
+	case couchbaseutil.AddressFamilyIPV6:
+		if addressFamilyOnly {
+			return couchbasev2.IPv6Only
+		}
 
-	return couchbasev2.AFInet
+		return couchbasev2.IPv6Priority
+	default:
+		if addressFamilyOnly {
+			return couchbasev2.IPv4Only
+		}
+
+		return couchbasev2.IPv4Priority
+	}
 }

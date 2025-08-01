@@ -829,6 +829,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.backup.image cannot be empty when spec.backup.managed is true"},
 		},
+		{
+			name: "TestValidateDeprecatedNetworkingOptionsIPv4",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/networking/addressFamily", couchbasev2.IPv4)},
+			shouldFail:       false,
+			expectedWarnings: []string{"IPv4Only should be used in place of IPv4 for spec.networking.addressFamily. IPv4 is deprecated and will be removed in a future release"},
+		},
+		{
+			name: "TestValidateDeprecatedNetworkingOptionsIPv6",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/networking/addressFamily", couchbasev2.IPv6)},
+			shouldFail:       false,
+			expectedWarnings: []string{"IPv6Only should be used in place of IPv6 for spec.networking.addressFamily. IPv6 is deprecated and will be removed in a future release"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

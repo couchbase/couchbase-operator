@@ -357,25 +357,30 @@ func (c *Cluster) supportsAFFiltering() bool {
 	return version.GreaterEqualString("7.0.2")
 }
 
-// apiAddressFamilyToCouchbase translates from our consistent API to Couchbase's.
-func apiAddressFamilyToCouchbase(af couchbasev2.AddressFamily) couchbaseutil.AddressFamily {
-	if af == couchbasev2.AFInet6 {
-		return couchbaseutil.AddressFamilyIPV6
+// AddressFamilyResourceToCouchbase translates from our consistent API to Couchbase's.
+func addressFamilyResourceToCouchbase(af couchbasev2.AddressFamily) (couchbaseutil.AddressFamily, bool) {
+	switch af {
+	case couchbasev2.IPv4, couchbasev2.IPv4Only:
+		return couchbaseutil.AddressFamilyIPV4, true
+	case couchbasev2.IPv6, couchbasev2.IPv6Only:
+		return couchbaseutil.AddressFamilyIPV6, true
+	case couchbasev2.IPv6Priority:
+		return couchbaseutil.AddressFamilyIPV6, false
+	default:
+		return couchbaseutil.AddressFamilyIPV4, false
 	}
-
-	return couchbaseutil.AddressFamilyIPV4
 }
 
 // generateNetworkConfiguration generates the required network configuration for
 // the requested cluster configuration.
 func (c *Cluster) generateNetworkConfiguration() *couchbaseutil.NodeNetworkConfiguration {
+	addressFamily, addressFamilyOnly := addressFamilyResourceToCouchbase(c.cluster.AddressFamily())
 	networkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
-		AddressFamily: apiAddressFamilyToCouchbase(c.cluster.AddressFamily()),
+		AddressFamily: addressFamily,
 	}
 
 	if c.supportsAFFiltering() {
-		notDualStack := !c.cluster.DualStack()
-		networkConfiguration.AddressFamilyOnly = &notDualStack
+		networkConfiguration.AddressFamilyOnly = &addressFamilyOnly
 	}
 
 	return networkConfiguration
@@ -389,8 +394,9 @@ func (c *Cluster) initMemberNetworking(member couchbaseutil.Member) error {
 	// to work, there is some other magical -- and completely undocumented -- thing
 	// called a listener that needs to be manually turned on.  Why?  Surely telling
 	// it to use IPv6 is enough right?
+	addressFamily, _ := addressFamilyResourceToCouchbase(c.cluster.AddressFamily())
 	listenerSettings := &couchbaseutil.ListenerConfiguration{
-		AddressFamily: apiAddressFamilyToCouchbase(c.cluster.AddressFamily()),
+		AddressFamily: addressFamily,
 	}
 
 	if err := couchbaseutil.EnableExternalListener(listenerSettings).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {

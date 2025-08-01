@@ -554,7 +554,7 @@ func MustCheckConsoleServiceLoadBalancerSourceRanges(t *testing.T, k8s *types.Cl
 // exposePorts checks if the server ports are exposed only on the requested protocols.
 // Works with 7.0.2+ only.  Don't be tempted to actually probe the ports themselves,
 // you'll find it practically impossible to actually test this on 99% of platforms.
-func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, unique bool, timeout time.Duration) error {
+func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, timeout time.Duration) error {
 	// Get the expected number of pods (with kubernetes as the source of truth, we expect Couchbase to match).
 	options := metav1.ListOptions{
 		LabelSelector: labels.Set(k8sutil.SelectorForClusterResource(couchbase)).String(),
@@ -566,10 +566,17 @@ func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, pr
 	}
 
 	// Translate between the API idea of an address family and that Couchbase returns.
-	family := couchbaseutil.AddressFamilyOutInet
+	addressFamily, addressFamilyOnly := couchbaseutil.AddressFamilyOutInet, false
 
-	if protocol == couchbasev2.AFInet6 {
-		family = couchbaseutil.AddressFamilyOutInet6
+	switch protocol {
+	case couchbasev2.IPv4Only, couchbasev2.IPv4:
+		addressFamilyOnly = true
+	case couchbasev2.IPv6Only, couchbasev2.IPv6:
+		addressFamily = couchbaseutil.AddressFamilyOutInet6
+		addressFamilyOnly = true
+	case couchbasev2.IPv6Priority:
+		addressFamily = couchbaseutil.AddressFamilyOutInet6
+		addressFamilyOnly = false
 	}
 
 	// Accumulate tests to run against the /pools/default endpoint.
@@ -577,8 +584,8 @@ func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, pr
 	patchset := jsonpatch.NewPatchSet()
 
 	for i := range pods.Items {
-		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamily", i), family)
-		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamilyOnly", i), unique)
+		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamily", i), addressFamily)
+		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamilyOnly", i), addressFamilyOnly)
 	}
 
 	callback := func() error {
@@ -588,8 +595,8 @@ func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, pr
 	return retryutil.RetryFor(timeout, callback)
 }
 
-func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, unique bool, timeout time.Duration) {
-	if err := exposePorts(k8s, couchbase, protocol, unique, timeout); err != nil {
+func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, timeout time.Duration) {
+	if err := exposePorts(k8s, couchbase, protocol, timeout); err != nil {
 		Die(t, err)
 	}
 }
