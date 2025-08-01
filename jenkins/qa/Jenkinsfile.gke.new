@@ -712,6 +712,7 @@ pipeline {
           -jobBuildNumber=${env.BUILD_NUMBER} \
           -jira-username=${env.JIRA_USERNAME} \
           -jira-api-key=${env.JIRA_API_TOKEN} \
+          -platform GKE \
           -test-info kubernetes-version=${params.kubernetes_version} \
           -test-info operator-image=${params.operator_image} \
           -test-info admission-image=${params.admission_image} \
