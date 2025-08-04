@@ -1628,7 +1628,16 @@ func NewFTSIndexWithCollections(bucketName, scopeName, collectionName string) go
 // executeFTSOPs creates FTS Index and execute a n1ql against that index.
 func executeFTSOps(searchIndex gocb.SearchIndex, searchManager *gocb.SearchIndexManager, host *gocb.Cluster, query string) error {
 	// Create FTS Index.
-	if err := searchManager.UpsertIndex(searchIndex, &gocb.UpsertSearchIndexOptions{Timeout: 10 * time.Minute}); err != nil {
+	// Occasionally this needs a retry while the cluster warms up.
+	var callback = func() error {
+		if err := searchManager.UpsertIndex(searchIndex, &gocb.UpsertSearchIndexOptions{Timeout: 10 * time.Minute}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(1*time.Minute, callback); err != nil {
 		return err
 	}
 
