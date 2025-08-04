@@ -252,23 +252,26 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	}
 
 	for name, nodeState := range status.NodeStates {
+		member, ok := c.members[name]
+		if !ok {
+			continue
+		}
+
 		switch nodeState {
 		case NodeStateActive:
-			state.ActiveNodes.Add(c.members[name])
+			state.ActiveNodes.Add(member)
 		case NodeStatePendingAdd:
-			state.PendingAddNodes.Add(c.members[name])
+			state.PendingAddNodes.Add(member)
 		case NodeStateFailedAdd:
-			state.FailedAddNodes.Add(c.members[name])
+			state.FailedAddNodes.Add(member)
 		case NodeStateWarmup:
-			state.WarmupNodes.Add(c.members[name])
+			state.WarmupNodes.Add(member)
 		case NodeStateDown:
-			state.DownNodes.Add(c.members[name])
+			state.DownNodes.Add(member)
 		case NodeStateFailed:
-			if member, ok := c.members[name]; ok {
-				state.FailedNodes.Add(member)
-			}
+			state.FailedNodes.Add(member)
 		case NodeStateAddBack:
-			state.AddBackNodes.Add(c.members[name])
+			state.AddBackNodes.Add(member)
 		}
 	}
 
