@@ -2106,6 +2106,21 @@ func (in *CouchbaseClusterQuerySettings) DeepCopyInto(out *CouchbaseClusterQuery
 		*out = new(v1.Duration)
 		**out = **in
 	}
+	if in.CompletedTrackingEnabled != nil {
+		in, out := &in.CompletedTrackingEnabled, &out.CompletedTrackingEnabled
+		*out = new(bool)
+		**out = **in
+	}
+	if in.CompletedTrackingAllRequests != nil {
+		in, out := &in.CompletedTrackingAllRequests, &out.CompletedTrackingAllRequests
+		*out = new(bool)
+		**out = **in
+	}
+	if in.CompletedTrackingThreshold != nil {
+		in, out := &in.CompletedTrackingThreshold, &out.CompletedTrackingThreshold
+		*out = new(v1.Duration)
+		**out = **in
+	}
 	if in.CompletedThreshold != nil {
 		in, out := &in.CompletedThreshold, &out.CompletedThreshold
 		*out = new(v1.Duration)

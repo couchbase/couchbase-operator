@@ -383,15 +383,6 @@ func WaitForBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, time
 			return err
 		}
 
-		if backup.Spec.Strategy != couchbasev2.FullIncremental {
-			return nil
-		}
-
-		// TODO: you can check more than presence, the schedule for example can allow you to wait for updates...
-		if _, err := k8s.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-incremental", metav1.GetOptions{}); err != nil {
-			return err
-		}
-
 		return nil
 	}
 

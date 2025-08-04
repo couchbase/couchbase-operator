@@ -233,12 +233,16 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 				return nil, fmt.Errorf("%w: no valid incremental backup schedule found for backup %s", errors.ErrBackupInvalidConfiguration, backup.Name)
 			}
 
-			incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
-			if err != nil {
-				return nil, err
-			}
+			if len(backup.Status.Repo) == 0 {
+				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", backup.Name)
+			} else {
+				incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
+				if err != nil {
+					return nil, err
+				}
 
-			resource.incrementalCronJob = incrementalCronJob
+				resource.incrementalCronJob = incrementalCronJob
+			}
 		}
 
 		resources = append(resources, resource)
@@ -323,6 +327,21 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 		resource := &backupResources{
 			name:               name,
 			immediateBackupJob: job,
+		}
+
+		isOwnedByCronJob := func(job *batchv1.Job) bool {
+			for _, owner := range job.OwnerReferences {
+				if owner.Kind == "CronJob" {
+					return true
+				}
+			}
+
+			return false
+		}
+
+		// If the job is owned by a cronjob then it's not an immediate backup job
+		if isOwnedByCronJob(job) {
+			continue
 		}
 
 		backup, ok := c.k8s.CouchbaseBackups.Get(name)
@@ -519,7 +538,7 @@ func (c *Cluster) updateBackupResource(requested backupResources, current *backu
 	}
 
 	// If we're creating a periodic merge cronjob, we don't need to notify as the backup wasn't actually updated.
-	if c.isJustPeriodicMergeCronJobCreate(requested, current) {
+	if c.isJustPeriodicMergeCronJobCreate(requested, current) || c.isJustFullIncrementalIncrementalCronJobCreate(requested, current) {
 		notifier = &blankNotifier{}
 	}
 
@@ -555,11 +574,23 @@ func (c *Cluster) isJustPeriodicMergeCronJobCreate(requested backupResources, cu
 		current.mergeCronJob == nil &&
 		current.fullCronJob == nil
 
-	if expectedRequest && expectedCurrent {
-		return true
+	return expectedRequest && expectedCurrent
+}
+
+func (c *Cluster) isJustFullIncrementalIncrementalCronJobCreate(requested backupResources, current *backupResources) bool {
+	if current == nil || requested.backup == nil || requested.backup.Spec.Strategy != couchbasev2.FullIncremental {
+		return false
 	}
 
-	return false
+	// Check if we're only adding an incremental cronjob to an existing full backup cronjob
+	expectedRequest := requested.incrementalCronJob != nil && requested.fullCronJob != nil && requested.mergeCronJob == nil && requested.immediateBackupJob == nil
+
+	currentHasFullOnly := current.fullCronJob != nil &&
+		current.incrementalCronJob == nil &&
+		current.mergeCronJob == nil &&
+		current.immediateBackupJob == nil
+
+	return expectedRequest && currentHasFullOnly
 }
 
 func (c *Cluster) updateBackupJob(notifier backupUpdateNotifier, requested, current *batchv1.Job) error {
