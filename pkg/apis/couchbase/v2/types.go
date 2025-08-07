@@ -324,6 +324,9 @@ type CouchbaseBackupSpec struct {
 	// This is used to force delete the lock file when the backup is deleted.
 	// +kubebuilder:default=false
 	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
+
+	// AdditionalArgs is used to pass additional arguments to the backup script container.
+	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
 }
 
 // +kubebuilder:validation:Enum=none;resume;purge

@@ -1146,6 +1146,10 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		}
 	}
 
+	if backup.Spec.AdditionalArgs != "" {
+		args = append(args, backup.Spec.AdditionalArgs)
+	}
+
 	return args
 }
 
