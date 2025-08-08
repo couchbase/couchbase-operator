@@ -114,6 +114,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintServicelessOverAdminService,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
+		checkServerClassImageDeprecated,
 	}
 
 	var errs []error
@@ -5028,4 +5029,16 @@ func checkConstraintMemcachedBucketDeprecated(v *types.Validator, cluster *couch
 	}
 
 	return warnings, nil
+}
+
+func checkServerClassImageDeprecated(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	for _, serverClass := range cluster.Spec.Servers {
+		if serverClass.Image == "" {
+			continue
+		}
+
+		return []string{fmt.Sprintf("spec.servers.image is deprecated use spec.image and spec.upgrade for granular upgrades instead")}, nil
+	}
+
+	return nil, nil
 }

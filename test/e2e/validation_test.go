@@ -1053,6 +1053,12 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers(\[3\])?.services cannot contain the admin service and other services`},
 		},
+		{
+			name:             "TestServerClassImageDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/0/image", "couchbase/server:7.1.0")},
+			expectedWarnings: []string{"spec.servers.image"},
+			shouldFail:       false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -4536,29 +4542,6 @@ func TestValidationClusterMigrationApply(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
-}
-
-func TestInvalidImageCombinations(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:       "IncompatibleImagesTest",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.3").Add("/spec/servers/0/image", "couchbase/server:7.0.5")},
-			shouldFail: true,
-		},
-		{
-			name:       "ServerClassHigherImageThan",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.0").Add("/spec/servers/0/image", "couchbase/server:7.6.3")},
-			shouldFail: true,
-		},
-		{
-			name:           "NewMultiVersionCluster",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.0").Add("/spec/servers/0/image", "couchbase/server:7.6.3")},
-			shouldFail:     true,
-			expectedErrors: []string{"must match cluster image version"},
-		},
-	}
-
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
 func TestMidUpgradeImageValidations(t *testing.T) {

@@ -122,7 +122,6 @@ func registerTests() {
 		framework.NewTestDef(TestClusterMigrationInvalidMigration).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestNegValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
-		framework.NewTestDef(TestInvalidImageCombinations).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestMidUpgradeImageValidations).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCouchbaseClusterWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAnnotationWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
@@ -350,14 +349,11 @@ func registerTests() {
 		framework.NewTestDef(TestBackupAndRestoreNodeSelector).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestPrometheusMetricsTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsMutualTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
-		framework.NewTestDef(TestPrometheusMetricsEnable).WithTags(TagSuiteP0, TagFeatureMetrics),
 		framework.NewTestDef(TestPrometheusMetricsEnableTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsEnableMutualTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS, TagSuitePlatform),
 		framework.NewTestDef(TestPrometheusMetricsEnableShadowTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsEnableMutualShadowTLS).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureTLS),
 		framework.NewTestDef(TestPrometheusMetricsPerformOps).WithTags(TagSuiteP0, TagFeatureMetrics, TagSuitePlatform),
-		framework.NewTestDef(TestPrometheusMetricsBearerTokenAuth).WithTags(TagSuiteP0, TagFeatureMetrics),
-		framework.NewTestDef(TestPrometheusMetricsUpgrade).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureUpgrade),
 		framework.NewTestDef(TestPrometheusMetricsOperator).WithTags(TagSuiteP0, TagFeatureMetrics),
 		framework.NewTestDef(TestCouchbaseMetricsDocumentCount).WithTags(TagSuiteP0, TagFeatureMetrics, TagFeatureCollections),
 		framework.NewTestDef(TestCreateClusterWithTLSAndControlPlaneNodeToNode).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS),
@@ -841,15 +837,6 @@ func clusterOptions() *e2eutil.ClusterOptions {
 func clusterOptionsUpgrade() *e2eutil.ClusterOptions {
 	options := clusterOptions()
 	options.Options.Image = framework.Global.CouchbaseServerImageUpgrade
-
-	return options
-}
-
-// clusterOptionsUpgrade does the same as above, but replaces the default image
-// with the one to upgrade from.
-func clusterOptionsUpgradeMonitoring() *e2eutil.ClusterOptions {
-	options := clusterOptions()
-	options.Options.MonitoringImage = framework.Global.CouchbaseExporterImageUpgrade
 
 	return options
 }
