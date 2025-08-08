@@ -207,6 +207,9 @@ This field defaults to 20 if not specified.
 ==== Description
 
 Number of times a backup job should try to execute.
+The time between each
+attempt increases exponentially starting at 10s doubling each time and caps
+out at 6 minutes.
 Once it hits the BackoffLimit it will not run until the next scheduled job.
 
 === couchbasebackups.spec.backupRetention

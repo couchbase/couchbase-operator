@@ -256,7 +256,9 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	FailedJobsHistoryLimit int32 `json:"failedJobsHistoryLimit,omitempty"`
 
-	// Number of times a backup job should try to execute.
+	// Number of times a backup job should try to execute. The time between each
+	// attempt increases exponentially starting at 10s doubling each time and caps
+	// out at 6 minutes.
 	// Once it hits the BackoffLimit it will not run until the next scheduled job.
 	// +kubebuilder:default=2
 	BackoffLimit int32 `json:"backoffLimit,omitempty"`
