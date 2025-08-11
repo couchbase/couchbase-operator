@@ -186,6 +186,7 @@ func registerTests() {
 		framework.NewTestDef(TestDenyCommunityEdition).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestAutoCompactionUpdate).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestModifyDataServiceSettings).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestAppTelemetrySettings).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketUnmanaged).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketSelection).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithExplicitName).WithTags(TagSuiteP0),

@@ -686,6 +686,14 @@ func MustPatchDataServiceSettings(t *testing.T, k8s *types.Cluster, couchbase *c
 	}
 }
 
+func MustPatchAppTelemetrySettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	appTelemetrySettingsFetcher := getClusterFetcher(couchbaseutil.GetAppTelemetrySettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, appTelemetrySettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func PatchCluster(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration, getSettingsFn clusterFetcher) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)

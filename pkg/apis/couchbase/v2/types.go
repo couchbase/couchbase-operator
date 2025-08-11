@@ -3602,6 +3602,10 @@ type ClusterConfig struct {
 	// AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
 	// This is only supported on Couchbase Server 8.0+.
 	AllowFailoverEphemeralNoReplicas *bool `json:"allowFailoverEphemeralNoReplicas,omitempty"`
+
+	// AppTelemetry allows the configuration of application telemetry.
+	// This is only supported on Couchbase Server 8.0+.
+	AppTelemetry *CouchbaseClusterAppTelemetrySettings `json:"appTelemetry,omitempty"`
 }
 
 // IndexerLogLevel controls the verbosity of indexer logs.
@@ -3881,6 +3885,27 @@ type CouchbaseClusterQuerySettings struct {
 	// +kubebuilder:default="262144"
 	// +kubebuilder:validation:Type=string
 	CompletedMaxPlanSize *resource.Quantity `json:"completedMaxPlanSize"`
+}
+
+// CouchbaseClusterAppTelemetrySettings allows application telemetry service tweaks.
+type CouchbaseClusterAppTelemetrySettings struct {
+	// Enabled controls whether application telemetry is enabled.
+	// +kubebuilder:default=false
+	Enabled bool `json:"enabled"`
+
+	// MaxScrapeClientsPerNode sets the maximum number of scrape clients per node.
+	// Must be between 1 and 1024.
+	// +kubebuilder:default=1024
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1024
+	MaxScrapeClientsPerNode int `json:"maxScrapeClientsPerNode,omitempty"`
+
+	// ScrapeIntervalSeconds sets the scrape interval in seconds.
+	// Must be between 60 and 600.
+	// +kubebuilder:default=60
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:validation:Maximum=600
+	ScrapeIntervalSeconds int `json:"scrapeIntervalSeconds,omitempty"`
 }
 
 func (q *CouchbaseClusterQuerySettings) UnmarshalJSON(data []byte) error {

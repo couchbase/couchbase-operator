@@ -413,6 +413,10 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileAppTelemetrySettings(); err != nil {
+		return err
+	}
+
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
 
 	return nil
@@ -1121,6 +1125,45 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 	}
 
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("auto compaction", c.cluster))
+
+	return nil
+}
+
+func (c *Cluster) reconcileAppTelemetrySettings() error {
+	// Only supported on version 8.0 and above
+	if over80, err := c.IsAtLeastVersion("8.0.0"); err != nil {
+		return err
+	} else if !over80 {
+		return nil
+	}
+
+	appTelemetrySettings := c.cluster.Spec.ClusterSettings.AppTelemetry
+	if appTelemetrySettings == nil {
+		return nil
+	}
+
+	current := &couchbaseutil.AppTelemetrySettings{}
+	if err := couchbaseutil.GetAppTelemetrySettings(current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := &couchbaseutil.AppTelemetrySettings{
+		Enabled:                 appTelemetrySettings.Enabled,
+		MaxScrapeClientsPerNode: appTelemetrySettings.MaxScrapeClientsPerNode,
+		ScrapeIntervalSeconds:   appTelemetrySettings.ScrapeIntervalSeconds,
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	log.Info("Updating app telemetry settings", "cluster", c.namespacedName())
+
+	if err := couchbaseutil.SetAppTelemetrySettings(requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("app telemetry", c.cluster))
 
 	return nil
 }

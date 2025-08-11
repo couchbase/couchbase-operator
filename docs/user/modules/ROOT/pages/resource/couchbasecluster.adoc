@@ -61,6 +61,10 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-spec-cluster,cluster>>:
     <<couchbaseclusters-spec-cluster-allowfailoverephemeralnoreplicas,allowFailoverEphemeralNoReplicas>>: false
     <<couchbaseclusters-spec-cluster-analyticsservicememoryquota,analyticsServiceMemoryQuota>>: 1Gi
+    <<couchbaseclusters-spec-cluster-apptelemetry,appTelemetry>>:
+      <<couchbaseclusters-spec-cluster-apptelemetry-enabled,enabled>>: false
+      <<couchbaseclusters-spec-cluster-apptelemetry-maxscrapeclientspernode,maxScrapeClientsPerNode>>: 1024
+      <<couchbaseclusters-spec-cluster-apptelemetry-scrapeintervalseconds,scrapeIntervalSeconds>>: 60
     <<couchbaseclusters-spec-cluster-autocompaction,autoCompaction>>:
       <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold,databaseFragmentationThreshold>>:
         <<couchbaseclusters-spec-cluster-autocompaction-databasefragmentationthreshold-percent,percent>>: 30
@@ -1050,6 +1054,65 @@ This
 field defaults to 1Gi.
 More info:
 https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-units-in-kubernetes.
+
+=== couchbaseclusters.spec.cluster.appTelemetry
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+AppTelemetry allows the configuration of application telemetry.
+This is only supported on Couchbase Server 8.0+.
+
+=== couchbaseclusters.spec.cluster.appTelemetry.enabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Enabled controls whether application telemetry is enabled.
+
+=== couchbaseclusters.spec.cluster.appTelemetry.maxScrapeClientsPerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `1024`
+
+*Minimum*: `1`
+
+*Maximum*: `1024`
+
+==== Description
+
+MaxScrapeClientsPerNode sets the maximum number of scrape clients per node.
+Must be between 1 and 1024.
+
+=== couchbaseclusters.spec.cluster.appTelemetry.scrapeIntervalSeconds
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `60`
+
+*Minimum*: `60`
+
+*Maximum*: `600`
+
+==== Description
+
+ScrapeIntervalSeconds sets the scrape interval in seconds.
+Must be between 60 and 600.
 
 === couchbaseclusters.spec.cluster.autoCompaction
 

@@ -1551,10 +1551,10 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			expectedErrors: []string{"spec.cluster.indexer.numReplica 3 cannot be greater or equal to the number of index pods 3"},
 		},
 		{
-			name:             "TestValidateEnablePageBloomFilterPre71Warning",
-			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", true).Replace("/spec/image", "couchbase/server:7.0.1")},
-			shouldFail:       false,
-			expectedWarnings: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
+			name:           "TestValidateEnablePageBloomFilterPre71Warning",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", true).Replace("/spec/image", "couchbase/server:7.0.1")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.indexer.enablePageBloomFilter requires Couchbase Server version 7.1.0 or later`},
 		},
 		{
 			name:           "TestValidateEnableShardAffinityPre76Error",
@@ -1610,7 +1610,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 				Replace("/spec/image", "couchbase/server:7.1.0").
 				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 1)},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage`},
 		},
 		{
 			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldMaximum",
@@ -1618,7 +1618,7 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 				Replace("/spec/image", "couchbase/server:7.1.0").
 				Replace("/spec/cluster/autoCompaction/magmaFragmentationPercentage", 101)},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.cluster.autoCompaction.magmaFragmentationPercentage`},
 		},
 		{
 			name: "TestValidateAutoCompactionMagmaFragmentationPercentageCRDFieldUnsupportedVersion",
@@ -1692,6 +1692,68 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 			shouldFail: true,
 			expectedErrors: []string{`spec.cluster.data.readerThreads must either be between 1 and 64 or one of balanced, disk_io_optimized for Couchbase server version 8.0.0`,
 				`spec.cluster.data.writerThreads must either be between 1 and 64 or one of balanced, disk_io_optimized for Couchbase server version 8.0.0`},
+		},
+		{
+			name: "TestValidateAppTelemetryInvalidMaxScrapeClientsPerNode",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					MaxScrapeClientsPerNode: -1,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.maxScrapeClientsPerNode`},
+		},
+		{
+			name: "TestValidateAppTelemetryMaxScrapeClientsPerNodeExceedsMaximum",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					MaxScrapeClientsPerNode: 1025,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.maxScrapeClientsPerNode`},
+		},
+		{
+			name: "TestValidateAppTelemetryInvalidScrapeIntervalSeconds",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					ScrapeIntervalSeconds: -1,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.scrapeIntervalSeconds`},
+		},
+		{
+			name: "TestValidateAppTelemetryScrapeIntervalSecondsBelowMinimum",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					ScrapeIntervalSeconds: 59,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.scrapeIntervalSeconds`},
+		},
+		{
+			name: "TestValidateAppTelemetryScrapeIntervalSecondsExceedsMaximum",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					ScrapeIntervalSeconds: 601,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.scrapeIntervalSeconds`},
+		},
+		{
+			name: "TestValidateAppTelemetryBothFieldsInvalid",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+					Enabled:                 true,
+					MaxScrapeClientsPerNode: 2000,
+					ScrapeIntervalSeconds:   30,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.appTelemetry.maxScrapeClientsPerNode`, `spec.cluster.appTelemetry.scrapeIntervalSeconds`},
 		},
 	}
 

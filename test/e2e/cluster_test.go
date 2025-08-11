@@ -1220,6 +1220,41 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestAppTelemetrySettings(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := 3
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/appTelemetry", &couchbasev2.CouchbaseClusterAppTelemetrySettings{
+		Enabled: true,
+	}), time.Minute)
+	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Enabled", true), time.Minute)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/appTelemetry/maxScrapeClientsPerNode", 512), time.Minute)
+	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MaxScrapeClientsPerNode", 512), time.Minute)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/appTelemetry/scrapeIntervalSeconds", 300), time.Minute)
+	e2eutil.MustPatchAppTelemetrySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/ScrapeIntervalSeconds", 300), time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	patchCycles := 3
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestMovePod(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

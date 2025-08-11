@@ -2120,3 +2120,9 @@ type DiskUsage struct {
 	Enabled bool `json:"enabled"`
 	Maximum *int `json:"maximum,omitempty"`
 }
+
+type AppTelemetrySettings struct {
+	Enabled                 bool `json:"enabled"`
+	MaxScrapeClientsPerNode int  `json:"maxScrapeClientsPerNode"`
+	ScrapeIntervalSeconds   int  `json:"scrapeIntervalSeconds"`
+}

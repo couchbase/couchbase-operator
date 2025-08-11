@@ -997,3 +997,16 @@ func SetResourceManagementSettings(settings *ResourceManagementSettings) *Reques
 
 	return NewRequest((*Client).PostJSON, "/settings/resourceManagement", data, nil)
 }
+
+func GetAppTelemetrySettings(settings *AppTelemetrySettings) *Request {
+	return NewRequest((*Client).Get, "/settings/appTelemetry", nil, settings)
+}
+
+func SetAppTelemetrySettings(settings *AppTelemetrySettings) *Request {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/appTelemetry", data, nil)
+}
