@@ -248,6 +248,11 @@ func (c *Cluster) newCluster() error {
 	// Perform any necessary upgrades to the cluster and kubernetes resources.
 	err = c.operatorUpgrade()
 
+	// Spawn the mirWatchdog process which monitors the cluster for issues that require manual intervention.
+	if c.cluster.Spec.EnableMirWatchdog == nil || *c.cluster.Spec.EnableMirWatchdog {
+		go newMirWatchdog(c).run()
+	}
+
 	return err
 }
 
@@ -1229,4 +1234,5 @@ func (c *Cluster) InitCounterMetrics() {
 	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Add(0)
 	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 	metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
 }

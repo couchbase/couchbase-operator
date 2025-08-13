@@ -56,6 +56,7 @@ const (
 	TagFeatureAdmission         = "admission"
 	TagFeatureHibernation       = "hibernation"
 	TagFeatureInitNodeHostName  = "initnodehostname"
+	TagFeatureMir               = "mir"
 )
 
 // registerTests does what it says on the tin.  As we can see both the framework and all the
@@ -773,6 +774,10 @@ func registerTests() {
 		// Bucket auto-compaction settings tests
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsCouchstoreBackend).WithTags(TagSuiteSanity),
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsMagmaBackend).WithTags(TagSuiteSanity),
+
+		// Manual Intervention Required Watchdog tests
+		framework.NewTestDef(TestMirWatchdogDisabledAnnotation).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentials).WithTags(TagSuiteP1, TagFeatureMir),
 	}
 }
 

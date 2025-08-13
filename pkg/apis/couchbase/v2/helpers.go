@@ -731,6 +731,11 @@ func (cs *ClusterStatus) SetBalancedCondition() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetManualInterventionRequiredCondition(message string) {
+	c := newClusterCondition(ClusterConditionManualInterventionRequired, v1.ConditionTrue, "ManualInterventionRequired", message)
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetUnbalancedCondition() {
 	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionFalse, "Unbalanced",
 		"The operator is attempting to rebalance the data to correct this issue")

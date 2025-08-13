@@ -1735,3 +1735,19 @@ func MustWaitForPodWithoutCondition(t *testing.T, k8s *types.Cluster, podName st
 
 	return pod
 }
+
+// MustChangeClusterPassword changes the cluster password. If it is changed, you will need to update the auth password in order to change it back.
+func MustChangeClusterPassword(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, authPassword, newPassword string, timeout time.Duration) {
+	client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+	if authPassword != "" {
+		client.client.SetPassword(authPassword)
+	}
+
+	err := retryutil.RetryFor(timeout, func() error {
+		return couchbaseutil.ChangePassword(newPassword).On(client.client, client.host)
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}

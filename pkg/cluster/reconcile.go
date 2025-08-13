@@ -966,8 +966,6 @@ func (c *Cluster) reconcileQuerySettings() error {
 		return nil
 	}
 
-	fmt.Println("updating query settungs, diff", diff.PrettyDiff(current, &requested))
-
 	if err := couchbaseutil.SetQuerySettings(&requested).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}

@@ -335,6 +335,18 @@ var (
 	// nolint:godot
 	BackupJobsCreatedTotalMetric = prometheus.CounterVec{}
 
+	// ManualInterventionRequiredMetric
+	// name: cluster_manual_intervention
+	// type: gauge
+	// help: Indicates whether manual intervention is required for the cluster
+	// unit:
+	// added: 2.9.0
+	// stability: committed
+	// labels: namespace, name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	ManualInterventionRequiredMetric = prometheus.GaugeVec{}
+
 	buildInfoCollector = version.NewCollector("couchbase_operator")
 )
 
@@ -529,6 +541,13 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"namespace", "backup_type"}))
 
+	ManualInterventionRequiredMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "cluster_manual_intervention",
+		Help:      "Indicates whether manual intervention is required for the cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"namespace", "name"}))
+
 	metrics.Registry.MustRegister(
 		ReconcileTotalMetric,
 		ReconcileFailureMetric,
@@ -556,5 +575,6 @@ func InitMetrics() {
 		MemoryUnderManagementBytesMetric,
 		CPUUnderManagementMetric,
 		BackupJobsCreatedTotalMetric,
+		ManualInterventionRequiredMetric,
 	)
 }

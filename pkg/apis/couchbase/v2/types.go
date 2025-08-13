@@ -2825,6 +2825,10 @@ type ClusterSpec struct {
 	// Migration defines the specification for a CouchbaseCluster assimilation of an unmanaged
 	// cluster to a managed Kubernetes cluster
 	Migration *ClusterAssimilationSpec `json:"migration,omitempty"`
+
+	// EnableMirWatchdog can be used to disable the manual intervention required watchdog for the cluster.
+	// This defaults to true and is not publicly documented.
+	EnableMirWatchdog *bool `json:"-" annotation:"enableMirWatchdog"`
 }
 
 // ClusterAssimilationSpec defines the specification for a CouchbaseCluster assimilation of an unmanaged
@@ -4727,30 +4731,31 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;ManualInterventionRequired;
 type ClusterConditionType string
 
 const (
-	ClusterConditionAvailable                ClusterConditionType = "Available"
-	ClusterConditionBalanced                 ClusterConditionType = "Balanced"
-	ClusterConditionManageConfig             ClusterConditionType = "ManageConfig"
-	ClusterConditionScaling                  ClusterConditionType = "Scaling"
-	ClusterConditionScalingUp                ClusterConditionType = "ScalingUp"
-	ClusterConditionScalingDown              ClusterConditionType = "ScalingDown"
-	ClusterConditionUpgrading                ClusterConditionType = "Upgrading"
-	ClusterConditionHibernating              ClusterConditionType = "Hibernating"
-	ClusterConditionError                    ClusterConditionType = "Error"
-	ClusterConditionAutoscaleReady           ClusterConditionType = "AutoscaleReady"
-	ClusterConditionSynchronized             ClusterConditionType = "Synchronized"
-	ClusterConditionWaitingBetweenMigrations ClusterConditionType = "WaitingBetweenMigrations"
-	ClusterConditionWaitingBetweenUpgrades   ClusterConditionType = "WaitingBetweenUpgrades"
-	ClusterConditionMigrating                ClusterConditionType = "Migrating"
-	ClusterConditionRebalancing              ClusterConditionType = "Rebalancing"
-	ClusterConditionExpandingVolume          ClusterConditionType = "ExpandingVolume"
-	ClusterLastUpdateTime                    ClusterConditionType = "LastUpdateTime"
-	ClusterConditionBucketMigration          ClusterConditionType = "BucketMigrating"
-	ClusterUnreconcilable                    ClusterConditionType = "Unreconcilable"
-	ClusterConditionMixedMode                ClusterConditionType = "MixedMode"
+	ClusterConditionAvailable                  ClusterConditionType = "Available"
+	ClusterConditionBalanced                   ClusterConditionType = "Balanced"
+	ClusterConditionManageConfig               ClusterConditionType = "ManageConfig"
+	ClusterConditionScaling                    ClusterConditionType = "Scaling"
+	ClusterConditionScalingUp                  ClusterConditionType = "ScalingUp"
+	ClusterConditionScalingDown                ClusterConditionType = "ScalingDown"
+	ClusterConditionUpgrading                  ClusterConditionType = "Upgrading"
+	ClusterConditionHibernating                ClusterConditionType = "Hibernating"
+	ClusterConditionError                      ClusterConditionType = "Error"
+	ClusterConditionAutoscaleReady             ClusterConditionType = "AutoscaleReady"
+	ClusterConditionSynchronized               ClusterConditionType = "Synchronized"
+	ClusterConditionWaitingBetweenMigrations   ClusterConditionType = "WaitingBetweenMigrations"
+	ClusterConditionWaitingBetweenUpgrades     ClusterConditionType = "WaitingBetweenUpgrades"
+	ClusterConditionMigrating                  ClusterConditionType = "Migrating"
+	ClusterConditionRebalancing                ClusterConditionType = "Rebalancing"
+	ClusterConditionExpandingVolume            ClusterConditionType = "ExpandingVolume"
+	ClusterLastUpdateTime                      ClusterConditionType = "LastUpdateTime"
+	ClusterConditionBucketMigration            ClusterConditionType = "BucketMigrating"
+	ClusterUnreconcilable                      ClusterConditionType = "Unreconcilable"
+	ClusterConditionMixedMode                  ClusterConditionType = "MixedMode"
+	ClusterConditionManualInterventionRequired ClusterConditionType = "ManualInterventionRequired"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

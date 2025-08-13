@@ -109,6 +109,10 @@ const (
 	// Hibernation.
 	EventReasonHibernationStarted = "HibernationStarted"
 	EventReasonHibernationEnded   = "HibernationEnded"
+
+	// Manual intervention required.
+	EventReasonManualInterventionRequired = "ManualInterventionRequired"
+	EventReasonManualInterventionResolved = "ManualInterventionResolved"
 )
 
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
@@ -652,6 +656,24 @@ func HibernationEndedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonHibernationEnded
 	event.Message = "Cluster left hibernation"
+
+	return event
+}
+
+func ManualInterventionRequiredEvent(cl *couchbasev2.CouchbaseCluster, message string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonManualInterventionRequired
+	event.Message = message
+
+	return event
+}
+
+func ManualInterventionResolvedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonManualInterventionResolved
+	event.Message = "Manual intervention no longer required"
 
 	return event
 }

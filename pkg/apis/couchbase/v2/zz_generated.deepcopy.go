@@ -643,6 +643,11 @@ func (in *ClusterSpec) DeepCopyInto(out *ClusterSpec) {
 		*out = new(ClusterAssimilationSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.EnableMirWatchdog != nil {
+		in, out := &in.EnableMirWatchdog, &out.EnableMirWatchdog
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

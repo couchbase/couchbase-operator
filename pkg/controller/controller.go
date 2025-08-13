@@ -119,6 +119,11 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return requeueResult, nil
 	}
 
+	if c.GetCouchbaseCluster().HasCondition(couchbasev2.ClusterConditionManualInterventionRequired) {
+		log.Info("Manual intervention required, skipping reconciliation", "cluster", c.GetCouchbaseCluster().NamespacedName())
+		return requeueResult, nil
+	}
+
 	if err := validationrunner.CheckCouchbaseClusterResourceImmutableFields(couchbase, c.GetCouchbaseCluster()); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 

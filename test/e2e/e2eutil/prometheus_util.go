@@ -22,6 +22,9 @@ import (
 	testconstants "github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
+	dto "github.com/prometheus/client_model/go"
+	"github.com/prometheus/common/expfmt"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -369,4 +372,77 @@ func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchba
 	}
 
 	return responseDataStr
+}
+
+// MustCheckOperatorGaugeMetric checks that the value of a gauge metric is equal to the given value.
+func MustCheckOperatorGaugeMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, expectedValue float64, timeout time.Duration) {
+	metricVal := getOperatorMetric(t, k8s, ctx, metric, timeout)
+	if metricVal == nil || metricVal.GetGauge() == nil {
+		Die(t, fmt.Errorf("metric %q not found", metric))
+	}
+
+	if metricVal.GetGauge().GetValue() != expectedValue {
+		Die(t, fmt.Errorf("metric %q value %v does not match expected value %v", metric, metricVal.GetGauge().GetValue(), expectedValue))
+	}
+}
+
+func getOperatorMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, timeout time.Duration) *dto.Metric {
+	operatorMetricsPort := "8383"
+
+	var operatorPods *v1.PodList
+
+	err := retryutil.RetryFor(timeout, func() error {
+		var err error
+
+		operatorPods, err = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: testconstants.CouchbaseOperatorLabel,
+		})
+
+		return err
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	for _, pod := range operatorPods.Items {
+		operatorMetricsStr, err := getPodMetrics(k8s, pod.Name, operatorMetricsPort, ctx)
+		if err != nil {
+			Die(t, err)
+		}
+
+		metricDto, err := parseMetricFromString(operatorMetricsStr, metric)
+		if err != nil {
+			Die(t, err)
+		}
+
+		// The metricDto slice contains one Metric pointer for each unique label set. For now, we'll return the first one.
+		// In most e2e test scenarios, we expect only one operator pod and a single metric instance per test cluster,
+		// so returning the first metric is appropriate (most metrics have name + namespace as labels exclusively).
+		// We might want to update this in the future for other test scenarios, but for now, returning the first is sufficient.
+		if len(metricDto) > 0 {
+			return metricDto[0]
+		}
+	}
+
+	return nil
+}
+
+func parseMetricFromString(metricsText string, metricName string) ([]*dto.Metric, error) {
+	metricName = fmt.Sprintf("%s_%s_%s", metrics.MetricNamespace, metrics.MetricSubsystem, metricName)
+	reader := strings.NewReader(metricsText)
+
+	var parser expfmt.TextParser
+
+	mfs, err := parser.TextToMetricFamilies(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse metrics: %w", err)
+	}
+
+	mf, ok := mfs[metricName]
+	if !ok {
+		return nil, fmt.Errorf("metric %q not found", metricName)
+	}
+
+	return mf.Metric, nil
 }
