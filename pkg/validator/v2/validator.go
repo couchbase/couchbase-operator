@@ -117,6 +117,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
 		checkConstraintsDeprecatedNetworkingOptions,
+		checkConstraintDeprecatedAnnotations,
 	}
 
 	var errs []error
@@ -5096,4 +5097,22 @@ func checkConstraintsDeprecatedNetworkingOptions(v *types.Validator, cluster *co
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintDeprecatedAnnotations(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if len(cluster.Annotations) == 0 {
+		return nil, nil
+	}
+
+	deprecatedAnnotations := map[string]string{
+		"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "spec.buckets.enableBucketMigrationRoutines",
+	}
+
+	for annotation, newField := range deprecatedAnnotations {
+		if _, ok := cluster.Annotations[annotation]; ok {
+			return []string{fmt.Sprintf("%s is deprecated, please use %s field instead", annotation, newField)}, nil
+		}
+	}
+
+	return nil, nil
 }

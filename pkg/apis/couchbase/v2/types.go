@@ -3899,7 +3899,6 @@ type CouchbaseClusterQuerySettings struct {
 	// information about completed queries to GZIP-compressed files with prefix local_request_log.
 	// This field is only supported on CB versions 8.0.0+.
 	// Defaults to 0 (disabled), minimum value is 0.
-	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	CompletedStreamSize *int32 `json:"completedStreamSize,omitempty"`
 }
@@ -4294,7 +4293,7 @@ type Buckets struct {
 
 	// Used to define whether managed bucket storage backend migration routines should be enabled.
 	// This value defaults to false.
-	EnableBucketMigrationRoutines bool `json:"-" annotation:"enableBucketMigrationRoutines"`
+	EnableBucketMigrationRoutines bool `json:"enableBucketMigrationRoutines,omitempty" annotation:"enableBucketMigrationRoutines"`
 
 	// MaxConcurrentPodSwaps allows the number of pods affected by a bucket migration at any
 	// one time to be increased.

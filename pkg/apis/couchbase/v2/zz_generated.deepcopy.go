@@ -2172,6 +2172,11 @@ func (in *CouchbaseClusterQuerySettings) DeepCopyInto(out *CouchbaseClusterQuery
 		x := (*in).DeepCopy()
 		*out = &x
 	}
+	if in.CompletedStreamSize != nil {
+		in, out := &in.CompletedStreamSize, &out.CompletedStreamSize
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

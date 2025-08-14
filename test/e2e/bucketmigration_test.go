@@ -49,8 +49,7 @@ func TestMagmaBucketToCouchstoreMigration(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
-
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -96,8 +95,7 @@ func TestMultipleCouchstoreBucketsToMagmaMigration(t *testing.T) {
 
 	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
-
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -149,8 +147,8 @@ func TestCouchstoreBucketsToMagmaMigrationWithMultiMigration(t *testing.T) {
 
 	cluster := clusterOptions().WithDataOnlyEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
 
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
 	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.maxConcurrentPodSwaps", "2")
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -200,7 +198,7 @@ func TestCouchstoreBucketToMagmaMigrationUnmanagedBucket(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Buckets.Managed = false
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
@@ -240,9 +238,9 @@ func TestCouchstoreBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(1152))
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
 
 	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.defaultStorageBackend", "couchstore")
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, "cao.couchbase.com/buckets.enableBucketMigrationRoutines", "true")
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

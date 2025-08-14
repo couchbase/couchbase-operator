@@ -4436,6 +4436,15 @@ func TestAnnotationWarnings(t *testing.T) {
 			shouldFail:       false,
 			expectedWarnings: []string{"No target found for annotation"},
 		},
+		{
+			name: "TestDeprecatedAnnotation",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
+				})},
+			shouldFail:       false,
+			expectedWarnings: []string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines is deprecated, please use spec.buckets.enableBucketMigrationRoutines field instead"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

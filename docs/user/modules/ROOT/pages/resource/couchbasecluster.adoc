@@ -49,6 +49,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-backup-tolerations-value,value>>: ""
     <<couchbaseclusters-spec-backup-useiamrole,useIAMRole>>: false
   <<couchbaseclusters-spec-buckets,buckets>>:
+    <<couchbaseclusters-spec-buckets-enablebucketmigrationroutines,enableBucketMigrationRoutines>>: false
     <<couchbaseclusters-spec-buckets-managed,managed>>: false
     <<couchbaseclusters-spec-buckets-selector,selector>>:
       <<couchbaseclusters-spec-buckets-selector-matchexpressions,matchExpressions>>:
@@ -880,6 +881,17 @@ UseIAMRole will ignore credentials in s3Secret.
 
 Buckets defines whether the Operator should manage buckets, and how to lookup
 bucket resources.
+
+=== couchbaseclusters.spec.buckets.enableBucketMigrationRoutines
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Used to define whether managed bucket storage backend migration routines should be enabled.
+This value defaults to false.
 
 === couchbaseclusters.spec.buckets.managed
 
@@ -1934,8 +1946,6 @@ Defaults to 262144, maximum value is 20840448, and minimum value is 0.
 ==== Constraints
 
 *Type*: `integer`
-
-*Default*: `0`
 
 *Minimum*: `0`
 
