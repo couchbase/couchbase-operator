@@ -409,6 +409,32 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-spec-upgradestrategy,upgradeStrategy>>: ""
   <<couchbaseclusters-spec-volumeclaimtemplates,volumeClaimTemplates>>: []
   <<couchbaseclusters-spec-xdcr,xdcr>>:
+    <<couchbaseclusters-spec-xdcr-globalsettings,globalSettings>>:
+      <<couchbaseclusters-spec-xdcr-globalsettings-checkpointinterval,checkpointInterval>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-collectionsosomode,collectionsOSOMode>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-compressiontype,compressionType>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-desiredlatency,desiredLatency>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-docbatchsizekb,docBatchSizeKb>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-failurerestartinterval,failureRestartInterval>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-filterbypassexpiry,filterBypassExpiry>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-filterbypassuncommittedtxn,filterBypassUncommittedTxn>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-filterdeletion,filterDeletion>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-filterexpiration,filterExpiration>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-gogc,goGC>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-gomaxprocs,goMaxProcs>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-hlvpruningwindowsec,hlvPruningWindowSec>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-jsfunctiontimeoutms,jsFunctionTimeoutMs>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-loglevel,logLevel>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-mobile,mobile>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-networkusagelimit,networkUsageLimit>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-optimisticreplicationthreshold,optimisticReplicationThreshold>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-priority,priority>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-retryonremoteautherr,retryOnRemoteAuthErr>>: false
+      <<couchbaseclusters-spec-xdcr-globalsettings-retryonremoteautherrmaxwaitsec,retryOnRemoteAuthErrMaxWaitSec>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-sourcenozzlepernode,sourceNozzlePerNode>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-statsinterval,statsInterval>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-targetnozzlepernode,targetNozzlePerNode>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-workerbatchsize,workerBatchSize>>: 0
     <<couchbaseclusters-spec-xdcr-managed,managed>>: false
     <<couchbaseclusters-spec-xdcr-remoteclusters,remoteClusters>>:
     - <<couchbaseclusters-spec-xdcr-remoteclusters-authenticationsecret,authenticationSecret>>: ""
@@ -5896,6 +5922,343 @@ by server class volume mount configuration.
 
 XDCR defines whether the Operator should manage XDCR, remote clusters and how
 to lookup replication resources.
+
+=== couchbaseclusters.spec.xdcr.globalSettings
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+GlobalSettings configures cluster-wide XDCR advanced settings.
+These settings provide defaults for new replications and do not affect existing
+replications retroactively.
+Only specified fields are applied; unspecified fields
+are left unchanged on the server.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.checkpointInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `60`
+
+*Maximum*: `14400`
+
+==== Description
+
+CheckpointInterval is the interval in seconds between checkpoints.
+This field defaults to 600 and must be between 60 and 14400.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.collectionsOSOMode
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+CollectionsOSOMode optimizes for out-of-order mutations streaming (performance toggle).
+This field defaults to true.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.compressionType
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `Auto, None`
+
+==== Description
+
+CompressionType is the compression used for XDCR traffic.
+This field must be one of "Auto" or "None", defaulting to "Auto".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.desiredLatency
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+DesiredLatency is the target latency (ms) for high-priority replications;
+lower values result in faster replication but greater load.
+This field defaults to 50.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.docBatchSizeKb
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `10`
+
+*Maximum*: `10000`
+
+==== Description
+
+DocBatchSizeKb is the size (KB) of document batches sent.
+This field defaults to 2048 and must be between 10 and 10000.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.failureRestartInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `300`
+
+==== Description
+
+FailureRestartInterval is the seconds to wait before restarting after a failure.
+This field defaults to 10 and must be between 1 and 300.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.filterBypassExpiry
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBypassExpiry when true, TTL is removed before replication.
+This field defaults to false.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.filterBypassUncommittedTxn
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
+This field defaults to false.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.filterDeletion
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterDeletion when true, delete mutations are filtered out (not replicated).
+This field defaults to false.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.filterExpiration
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterExpiration when true, expiry mutations are filtered out.
+This field defaults to false.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.goGC
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+GoGC is the Go GC target percentage for XDCR processes.
+This field can be an integer (0-100) as a string or "off", defaulting to "100".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.goMaxProcs
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+GoMaxProcs is the max threads per node for XDCR.
+This field defaults to 4.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.hlvPruningWindowSec
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+HlvPruningWindowSec is the HLV pruning window (sec) for hybrid logical vector conflict resolution.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.jsFunctionTimeoutMs
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+JSFunctionTimeoutMs is the timeout for JS custom conflict-resolution functions (ms).
+
+=== couchbaseclusters.spec.xdcr.globalSettings.logLevel
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `Error, Info, Debug, Trace`
+
+==== Description
+
+LogLevel is the logging verbosity for XDCR.
+This field must be one of "Error", "Info", "Debug", or "Trace", defaulting to "Info".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.mobile
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `Off, Active`
+
+==== Description
+
+Mobile enables mobile (Sync Gateway) active-active mode.
+This field must be one of "Active" or "Off", defaulting to "Off".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.networkUsageLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+NetworkUsageLimit is the upper limit for replication network usage (MB/s).
+This field defaults to 0 (no limit).
+
+=== couchbaseclusters.spec.xdcr.globalSettings.optimisticReplicationThreshold
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `20971520`
+
+==== Description
+
+OptimisticReplicationThreshold is the size threshold below which documents replicate optimistically.
+This field defaults to 256 and must be between 0 and 20971520.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.priority
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `High, Medium, Low`
+
+==== Description
+
+Priority is the resource priority for replication streams.
+This field must be one of "High", "Medium", or "Low", defaulting to "High".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.retryOnRemoteAuthErr
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+RetryOnRemoteAuthErr defines whether to retry connections when remote auth fails.
+This field defaults to true.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.retryOnRemoteAuthErrMaxWaitSec
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+RetryOnRemoteAuthErrMaxWaitSec is the max wait seconds for retrying remote auth failures.
+Only effective if retryOnRemoteAuthErr is true.
+This field defaults to 360.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.sourceNozzlePerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
+==== Description
+
+SourceNozzlePerNode is the number of source nozzles (parallelism) per source node.
+This field defaults to 2 and must be between 1 and 100.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.statsInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `200`
+
+*Maximum*: `600000`
+
+==== Description
+
+StatsInterval is the interval for statistics updates (ms).
+This field defaults to 1000 and must be between 200 and 600000.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.targetNozzlePerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
+==== Description
+
+TargetNozzlePerNode is the number of target nozzles per target node (parallelism).
+This field defaults to 2 and must be between 1 and 100.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.workerBatchSize
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `500`
+
+*Maximum*: `10000`
+
+==== Description
+
+WorkerBatchSize is the number of mutations per worker batch.
+This field defaults to 500 and must be between 500 and 10000.
 
 === couchbaseclusters.spec.xdcr.managed
 

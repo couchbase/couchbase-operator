@@ -711,6 +711,31 @@ func UpdateReplication(r *Replication, uuid, from, to string) *Request {
 	return NewRequest((*Client).Post, "/settings/replications/"+url.PathEscape(uuid+"/"+from+"/"+to), data, nil)
 }
 
+// GetXDCRGlobalSettings returns cluster-wide XDCR settings.
+func GetXDCRGlobalSettings(s *XDCRGlobalSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/replications", nil, s)
+}
+
+// SetXDCRGlobalSettings sets cluster-wide XDCR settings. Only non-empty fields are sent.
+func SetXDCRGlobalSettings(s *XDCRGlobalSettings) *Request {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/replications", data, nil)
+}
+
+// UpdateReplicationSettings partially updates per-replication settings at the XDCR settings endpoint.
+func UpdateReplicationSettings(s *ReplicationSettings, uuid, from, to string) *Request {
+	data, err := urlencoding.Marshal(s)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/replications/"+url.PathEscape(uuid+"/"+from+"/"+to), data, nil)
+}
+
 // DeleteReplication deletes an existing XDCR replication between clusters.
 func DeleteReplication(uuid, from, to string) *Request {
 	return NewRequest((*Client).Delete, "/controller/cancelXDCR/"+url.PathEscape(uuid+"/"+from+"/"+to), nil, nil)

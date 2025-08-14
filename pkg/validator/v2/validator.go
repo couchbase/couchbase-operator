@@ -2283,7 +2283,12 @@ func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseRep
 		return err
 	}
 
-	switch r.Spec.Mobile {
+	mobileValue := ""
+	if r.Spec.Mobile != nil {
+		mobileValue = *r.Spec.Mobile
+	}
+
+	switch mobileValue {
 	case "", "Active", "Off":
 	default:
 		return fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
@@ -3440,7 +3445,7 @@ func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.Cou
 			return fmt.Errorf("memcached bucket %s cannot be replicated", bucketName)
 		}
 
-		if rs.Mobile == "Active" {
+		if rs.Mobile != nil && *rs.Mobile == "Active" {
 			mobileSupported, err := cluster.IsAtLeastVersion("7.6.4")
 			if err != nil {
 				return err
@@ -4612,10 +4617,6 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 
 	if prev.Spec.RemoteBucket != curr.Spec.RemoteBucket {
 		errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
-	}
-
-	if prev.Spec.FilterExpression != curr.Spec.FilterExpression {
-		errs = append(errs, util.NewUpdateError("spec.filterExpression", "body"))
 	}
 
 	if errs != nil {

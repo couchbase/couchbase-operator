@@ -28,7 +28,12 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasemigrationreplications-migrationmapping-mappings-targetkeyspace-scope,scope>>: ""
 <<couchbasemigrationreplications-spec,spec>>:
   <<couchbasemigrationreplications-spec-bucket,bucket>>: ""
-  <<couchbasemigrationreplications-spec-compressiontype,compressionType>>: Auto
+  <<couchbasemigrationreplications-spec-checkpointinterval,checkpointInterval>>: 0
+  <<couchbasemigrationreplications-spec-colmappingrules,colMappingRules>>:
+  <<couchbasemigrationreplications-spec-collectionsexplicitmapping,collectionsExplicitMapping>>: false
+  <<couchbasemigrationreplications-spec-collectionsmigrationmode,collectionsMigrationMode>>: false
+  <<couchbasemigrationreplications-spec-collectionsosomode,collectionsOSOMode>>: false
+  <<couchbasemigrationreplications-spec-compressiontype,compressionType>>: ""
   <<couchbasemigrationreplications-spec-conflictlogging,conflictLogging>>:
     <<couchbasemigrationreplications-spec-conflictlogging-enabled,enabled>>: false
     <<couchbasemigrationreplications-spec-conflictlogging-logcollection,logCollection>>:
@@ -49,9 +54,32 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules,noLoggingRules>>:
       - <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules-collection,collection>>: ""
         <<couchbasemigrationreplications-spec-conflictlogging-loggingrules-nologgingrules-scope,scope>>: ""
+  <<couchbasemigrationreplications-spec-desiredlatency,desiredLatency>>: 0
+  <<couchbasemigrationreplications-spec-docbatchsizekb,docBatchSizeKb>>: 0
+  <<couchbasemigrationreplications-spec-failurerestartinterval,failureRestartInterval>>: 0
+  <<couchbasemigrationreplications-spec-filterbinary,filterBinary>>: false
+  <<couchbasemigrationreplications-spec-filterbypassexpiry,filterBypassExpiry>>: false
+  <<couchbasemigrationreplications-spec-filterbypassuncommittedtxn,filterBypassUncommittedTxn>>: false
+  <<couchbasemigrationreplications-spec-filterdeletion,filterDeletion>>: false
+  <<couchbasemigrationreplications-spec-filterexpiration,filterExpiration>>: false
   <<couchbasemigrationreplications-spec-filterexpression,filterExpression>>: ""
-  <<couchbasemigrationreplications-spec-paused,paused>>: false
+  <<couchbasemigrationreplications-spec-filterskiprestream,filterSkipRestream>>: false
+  <<couchbasemigrationreplications-spec-hlvpruningwindowsec,hlvPruningWindowSec>>: 0
+  <<couchbasemigrationreplications-spec-jsfunctiontimeoutms,jsFunctionTimeoutMs>>: 0
+  <<couchbasemigrationreplications-spec-loglevel,logLevel>>: ""
+  <<couchbasemigrationreplications-spec-mergefunctionmapping,mergeFunctionMapping>>:
+  <<couchbasemigrationreplications-spec-mobile,mobile>>: ""
+  <<couchbasemigrationreplications-spec-networkusagelimit,networkUsageLimit>>: 0
+  <<couchbasemigrationreplications-spec-optimisticreplicationthreshold,optimisticReplicationThreshold>>: 0
+  <<couchbasemigrationreplications-spec-pauserequested,pauseRequested>>: false
+  <<couchbasemigrationreplications-spec-priority,priority>>: ""
   <<couchbasemigrationreplications-spec-remotebucket,remoteBucket>>: ""
+  <<couchbasemigrationreplications-spec-retryonremoteautherr,retryOnRemoteAuthErr>>: false
+  <<couchbasemigrationreplications-spec-retryonremoteautherrmaxwaitsec,retryOnRemoteAuthErrMaxWaitSec>>: 0
+  <<couchbasemigrationreplications-spec-sourcenozzlepernode,sourceNozzlePerNode>>: 0
+  <<couchbasemigrationreplications-spec-statsinterval,statsInterval>>: 0
+  <<couchbasemigrationreplications-spec-targetnozzlepernode,targetNozzlePerNode>>: 0
+  <<couchbasemigrationreplications-spec-workerbatchsize,workerBatchSize>>: 0
 ----
 
 == couchbasemigrationreplications.apiVersion
@@ -201,24 +229,78 @@ be defined on this cluster.
 Legal bucket names have a maximum length of 100
 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 
+=== couchbasemigrationreplications.spec.checkpointInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `60`
+
+*Maximum*: `14400`
+
+==== Description
+
+CheckpointInterval is the interval in seconds between checkpoints.
+
+=== couchbasemigrationreplications.spec.colMappingRules
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+ColMappingRules defines collection-related rules for explicit mapping or migration.
+
+=== couchbasemigrationreplications.spec.collectionsExplicitMapping
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+CollectionsExplicitMapping enables explicit mapping rules from colMappingRules.
+When true, replication uses explicit mapping rules and implicit bucket-level mapping does not occur.
+
+=== couchbasemigrationreplications.spec.collectionsMigrationMode
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+CollectionsMigrationMode enables migration mode for default collection documents.
+When true, documents from source default collection are replicated to collections determined by mapping rules.
+
+=== couchbasemigrationreplications.spec.collectionsOSOMode
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+CollectionsOSOMode optimizes for out-of-order mutations streaming (performance toggle).
+This field defaults to true.
+
 === couchbasemigrationreplications.spec.compressionType
 
 ==== Constraints
 
 *Type*: `string`
 
-*Default*: `Auto`
-
-*Enumerations*: `None, Auto`
+*Enumerations*: `Auto, None`
 
 ==== Description
 
-CompressionType is the type of compression to apply to the replication.
-When None, no compression will be applied to documents as they are
-transferred between clusters.
-When Auto, Couchbase server will automatically
-compress documents as they are transferred to reduce bandwidth requirements.
-This field must be one of "None" or "Auto", defaulting to "Auto".
+CompressionType is the compression used for XDCR traffic.
 
 === couchbasemigrationreplications.spec.conflictLogging
 
@@ -228,8 +310,7 @@ This field must be one of "None" or "Auto", defaulting to "Auto".
 
 ==== Description
 
-ConflictResolution is the configuration for the conflict resolution.
-Conflicts will be logged to a specified conflict collection.
+ConflictLogging is the configuration for conflict logging.
 This feature is available in Couchbase Server 8.0.0 and later.
 
 === couchbasemigrationreplications.spec.conflictLogging.enabled
@@ -499,6 +580,95 @@ Collection defines the collection to apply the rule to.
 
 Scope defines the scope to apply the rule to.
 
+=== couchbasemigrationreplications.spec.desiredLatency
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+DesiredLatency is the target latency (ms) for high-priority replications.
+This field defaults to 50.
+
+=== couchbasemigrationreplications.spec.docBatchSizeKb
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `10`
+
+*Maximum*: `10000`
+
+==== Description
+
+DocBatchSizeKb is the size (KB) of document batches sent.
+
+=== couchbasemigrationreplications.spec.failureRestartInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `300`
+
+==== Description
+
+FailureRestartInterval is the seconds to wait before restarting after a failure.
+
+=== couchbasemigrationreplications.spec.filterBinary
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBinary specifies whether binary documents should be replicated.
+
+=== couchbasemigrationreplications.spec.filterBypassExpiry
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBypassExpiry when true, TTL is removed before replication.
+
+=== couchbasemigrationreplications.spec.filterBypassUncommittedTxn
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
+
+=== couchbasemigrationreplications.spec.filterDeletion
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterDeletion when true, delete mutations are filtered out (not replicated).
+
+=== couchbasemigrationreplications.spec.filterExpiration
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterExpiration when true, expiry mutations are filtered out.
+
 === couchbasemigrationreplications.spec.filterExpression
 
 ==== Constraints
@@ -507,18 +677,131 @@ Scope defines the scope to apply the rule to.
 
 ==== Description
 
-FilterExpression allows certain documents to be filtered out of the replication.
+FilterExpression is a filter expression to match against documents in the source bucket.
+Each document that produces a successful match is replicated.
 
-=== couchbasemigrationreplications.spec.paused
+=== couchbasemigrationreplications.spec.filterSkipRestream
 
 ==== Constraints
 
 *Type*: `boolean`
 
+*Default*: `False`
+
 ==== Description
 
-Paused allows a replication to be stopped and restarted without having to
-restart the replication from the beginning.
+FilterSkipRestream controls whether replication restarts after filterExpression changes.
+When false (default), replication restarts after filter changes.
+When true, continues without restart.
+
+=== couchbasemigrationreplications.spec.hlvPruningWindowSec
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+HlvPruningWindowSec is the HLV pruning window (sec) for hybrid logical vector conflict resolution.
+
+=== couchbasemigrationreplications.spec.jsFunctionTimeoutMs
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+JSFunctionTimeoutMs is the timeout for JS custom conflict-resolution functions (ms).
+
+=== couchbasemigrationreplications.spec.logLevel
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `Error, Info, Debug, Trace`
+
+==== Description
+
+LogLevel is the logging verbosity for XDCR.
+
+=== couchbasemigrationreplications.spec.mergeFunctionMapping
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
+Nil values can be used to explicitly unset merge functions for specific collections.
+
+=== couchbasemigrationreplications.spec.mobile
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `Off, Active`
+
+==== Description
+
+Mobile enables mobile (Sync Gateway) active-active mode.
+
+=== couchbasemigrationreplications.spec.networkUsageLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+NetworkUsageLimit is the upper limit for replication network usage (MB/s).
+
+=== couchbasemigrationreplications.spec.optimisticReplicationThreshold
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `20971520`
+
+==== Description
+
+OptimisticReplicationThreshold is the size threshold below which documents replicate optimistically.
+
+=== couchbasemigrationreplications.spec.pauseRequested
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+PauseRequested indicates whether the replication has been issued a pause request.
+
+=== couchbasemigrationreplications.spec.priority
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `High, Medium, Low`
+
+==== Description
+
+Priority is the resource priority for replication streams.
 
 === couchbasemigrationreplications.spec.remoteBucket
 
@@ -540,3 +823,82 @@ Couchbase bucket name, not the resource name of the bucket.
 Legal bucket names
 have a maximum length of 100 characters and may be composed of any character from
 "a-z", "A-Z", "0-9" and "-_%\.".
+
+=== couchbasemigrationreplications.spec.retryOnRemoteAuthErr
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+RetryOnRemoteAuthErr defines whether to retry connections when remote auth fails.
+
+=== couchbasemigrationreplications.spec.retryOnRemoteAuthErrMaxWaitSec
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+RetryOnRemoteAuthErrMaxWaitSec is the max wait seconds for retrying remote auth failures.
+Only effective if retryOnRemoteAuthErr is true.
+
+=== couchbasemigrationreplications.spec.sourceNozzlePerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
+==== Description
+
+SourceNozzlePerNode is the number of source nozzles (parallelism) per source node.
+
+=== couchbasemigrationreplications.spec.statsInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `200`
+
+*Maximum*: `600000`
+
+==== Description
+
+StatsInterval is the interval for statistics updates (ms).
+
+=== couchbasemigrationreplications.spec.targetNozzlePerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
+
+==== Description
+
+TargetNozzlePerNode is the number of target nozzles per target node (parallelism).
+
+=== couchbasemigrationreplications.spec.workerBatchSize
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `500`
+
+*Maximum*: `10000`
+
+==== Description
+
+WorkerBatchSize is the number of mutations per worker batch.

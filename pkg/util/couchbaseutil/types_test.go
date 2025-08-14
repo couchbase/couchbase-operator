@@ -608,7 +608,7 @@ func TestEncodeReplication(t *testing.T) {
 		t.Errorf("Error encoding ConflictLoggingSettings: %v", err)
 	}
 
-	expected := `conflictLogging=%7B%22disabled%22%3Afalse%2C%22bucket%22%3A%22test%22%2C%22collection%22%3A%22test%22%2C%22loggingRules%22%3A%7B%22scope1%22%3A%7B%22bucket%22%3A%22bucket1%22%2C%22collection%22%3A%22s1.c1%22%7D%2C%22scope2%22%3A%7B%7D%2C%22scope3%22%3Anull%7D%7D&fromBucket=source&pauseRequested=false&replicationType=continuous&toBucket=target&toCluster=targetCluster&type=xmem`
+	expected := `conflictLogging=%7B%22disabled%22%3Afalse%2C%22bucket%22%3A%22test%22%2C%22collection%22%3A%22test%22%2C%22loggingRules%22%3A%7B%22scope1%22%3A%7B%22bucket%22%3A%22bucket1%22%2C%22collection%22%3A%22s1.c1%22%7D%2C%22scope2%22%3A%7B%7D%2C%22scope3%22%3Anull%7D%7D&fromBucket=source&replicationType=continuous&toBucket=target&toCluster=targetCluster&type=xmem`
 	if string(encoded) != expected {
 		t.Errorf("Expected: %s - Got: %s", expected, string(encoded))
 	}

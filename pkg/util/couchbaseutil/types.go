@@ -377,10 +377,8 @@ type Task struct {
 	NodesInfo RebalanceNodesInfo `json:"nodesInfo"`
 
 	// Replication attributes.
-	Source           string          `json:"source"`
-	Target           string          `json:"target"`
-	ReplicationType  ReplicationType `url:"replicationType"`
-	FilterExpression string          `url:"filterExpression"`
+	Source string `json:"source"`
+	Target string `json:"target"`
 }
 
 type RebalanceNodesInfo struct {
@@ -1324,24 +1322,41 @@ const (
 // Replication describes an XDCR replication as set with /controller/createReplication.
 // Note we unmarshall this explicitly...
 type Replication struct {
-	FromBucket       string                     `url:"fromBucket"`
-	ToCluster        string                     `url:"toCluster"`
-	ToBucket         string                     `url:"toBucket"`
-	Type             ReplicationType            `url:"type"`
-	ReplicationType  ReplicationReplicationType `url:"replicationType"`
-	CompressionType  string                     `url:"compressionType,omitempty"`
-	FilterExpression string                     `url:"filterExpression,omitempty"`
-	PauseRequested   bool                       `url:"pauseRequested"`
-	// These are subject to scopes and collections support in CBS 7+
-	ExplicitMapping  bool `url:"collectionsExplicitMapping,omitempty"`
-	MigrationMapping bool `url:"collectionsMigrationMode,omitempty"`
-	// This is really a map of strings to strings or pointers to strings but easier to handle here this way then deal with explicitly in code.
-	MappingRules string `url:"colMappingRules,omitempty"`
-	Mobile       string `url:"mobile,omitempty"`
+	// Core immutable fields (for replication creation)
+	FromBucket         string                     `url:"fromBucket"`
+	ToCluster          string                     `url:"toCluster"` // mapped by selector, not in API
+	ToBucket           string                     `url:"toBucket"`
+	Type               ReplicationType            `url:"type"`                         // constant: "xmem"
+	ReplicationType    ReplicationReplicationType `url:"replicationType"`              // constant: "continuous"
+	FilterSkipRestream *bool                      `url:"filterSkipRestream,omitempty"` // default: false
 
-	// ConflictLogging is the configuration for the conflict logging.
-	// only available in Couchbase Server 8.0.0 and later.
-	ConflictLogging *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,empty={}"`
+	// Legacy core fields (can be set during creation)
+	PauseRequested   *bool                    `url:"pauseRequested,omitempty"`
+	ExplicitMapping  *bool                    `url:"collectionsExplicitMapping,omitempty"`
+	MigrationMapping *bool                    `url:"collectionsMigrationMode,omitempty"`
+	MappingRules     *ColMappingRules         `url:"colMappingRules,omitempty"`
+	ConflictLogging  *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,empty={}"`
+
+	// Advanced settings supported during replication creation (from createReplication API docs)
+	CompressionType                *string `url:"compressionType,omitempty"`
+	DesiredLatency                 *int32  `url:"desiredLatency,omitempty"`
+	FilterExpression               *string `url:"filterExpression,omitempty"`
+	FilterDeletion                 *bool   `url:"filterDeletion,omitempty"`
+	FilterExpiration               *bool   `url:"filterExpiration,omitempty"`
+	FilterBypassExpiry             *bool   `url:"filterBypassExpiry,omitempty"`
+	FilterBinary                   *bool   `url:"filterBinary,omitempty"`
+	Priority                       *string `url:"priority,omitempty"`
+	OptimisticReplicationThreshold *int32  `url:"optimisticReplicationThreshold,omitempty"`
+	FailureRestartInterval         *int32  `url:"failureRestartInterval,omitempty"`
+	DocBatchSizeKb                 *int32  `url:"docBatchSizeKb,omitempty"`
+	WorkerBatchSize                *int32  `url:"workerBatchSize,omitempty"`
+	CheckpointInterval             *int32  `url:"checkpointInterval,omitempty"`
+	SourceNozzlePerNode            *int32  `url:"sourceNozzlePerNode,omitempty"`
+	TargetNozzlePerNode            *int32  `url:"targetNozzlePerNode,omitempty"`
+	StatsInterval                  *int32  `url:"statsInterval,omitempty"`
+	LogLevel                       *string `url:"logLevel,omitempty"`
+	NetworkUsageLimit              *int32  `url:"networkUsageLimit,omitempty"`
+	Mobile                         *string `url:"mobile,omitempty"`
 }
 
 type ReplicationList []Replication
@@ -1349,18 +1364,98 @@ type ReplicationList []Replication
 // ReplicationSettings describes an XDCR replication settings as returned by
 // GET /settings/replications/<remote UUID>/<local bucket>/<remote bucket>.
 type ReplicationSettings struct {
-	CompressionType string `json:"compressionType" url:"compressionType,omitempty"`
-	PauseRequested  bool   `json:"pauseRequested" url:"pauseRequested"`
-	// These are subject to scopes and collections support in CBS 7+
-	ExplicitMapping  bool `json:"collectionsExplicitMapping,omitempty" url:"collectionsExplicitMapping,omitempty"`
-	MigrationMapping bool `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
-	// One API uses a map, the other wants it as a JSON-ified string already.
-	MappingRules map[string]*string `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
-	Mobile       string             `json:"mobile,omitempty" url:"mobile,omitempty"`
-
-	// ConflictLogging is the configuration for the conflict logging.
-	// only available in Couchbase Server 8.0.0 and later.
+	// Legacy core fields (maintained for backward compatibility)
 	ConflictLogging *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,omitempty"`
+
+	// Global / Per-replication advanced settings (from settings API docs)
+	CasDriftThresholdSecs             *int32  `json:"casDriftThresholdSecs,omitempty" url:"casDriftThresholdSecs,omitempty"`
+	CheckpointInterval                *int32  `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
+	CkptSvcCacheEnabled               *bool   `json:"ckptSvcCacheEnabled,omitempty" url:"ckptSvcCacheEnabled,omitempty"`
+	CollectionsOSOMode                *bool   `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
+	CompressionType                   *string `json:"compressionType,omitempty" url:"compressionType,omitempty"`
+	DcpEnablePurgeRollback            *bool   `json:"dcpEnablePurgeRollback,omitempty" url:"dcpEnablePurgeRollback,omitempty"`
+	DesiredLatency                    *int32  `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
+	DocBatchSizeKb                    *int32  `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
+	FailureRestartInterval            *int32  `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
+	FilterBinary                      *bool   `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
+	FilterBypassExpiry                *bool   `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
+	FilterBypassUncommittedTxn        *bool   `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
+	FilterDeletion                    *bool   `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
+	FilterExpiration                  *bool   `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
+	HlvPruningWindowSec               *int32  `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
+	JSFunctionTimeoutMs               *int32  `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
+	LogLevel                          *string `json:"logLevel,omitempty" url:"logLevel,omitempty"`
+	Mobile                            *string `json:"mobile,omitempty" url:"mobile,omitempty"`
+	NetworkUsageLimit                 *int32  `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
+	OptimisticReplicationThreshold    *int32  `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
+	PreCheckCasDriftThresholdHours    *int32  `json:"preCheckCasDriftThresholdHours,omitempty" url:"preCheckCasDriftThresholdHours,omitempty"`
+	PreReplicateVBMasterCheck         *bool   `json:"preReplicateVBMasterCheck,omitempty" url:"preReplicateVBMasterCheck,omitempty"`
+	Priority                          *string `json:"priority,omitempty" url:"priority,omitempty"`
+	ReplicateCkptIntervalMin          *int32  `json:"replicateCkptIntervalMin,omitempty" url:"replicateCkptIntervalMin,omitempty"`
+	RetryOnErrExceptAuthErrMaxWaitSec *int32  `json:"retryOnErrExceptAuthErrMaxWaitSec,omitempty" url:"retryOnErrExceptAuthErrMaxWaitSec,omitempty"`
+	RetryOnRemoteAuthErr              *bool   `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
+	RetryOnRemoteAuthErrMaxWaitSec    *int32  `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+	SkipReplSpecAutoGc                *bool   `json:"skipReplSpecAutoGc,omitempty" url:"skipReplSpecAutoGc,omitempty"`
+	SourceNozzlePerNode               *int32  `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
+	StatsInterval                     *int32  `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
+	TargetNozzlePerNode               *int32  `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
+	TargetTopologyLogFrequency        *int32  `json:"targetTopologyLogFrequency,omitempty" url:"targetTopologyLogFrequency,omitempty"`
+	WorkerBatchSize                   *int32  `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
+
+	// Per-replication only settings (from settings API docs)
+	ColMappingRules            *ColMappingRules           `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
+	CollectionsExplicitMapping *bool                      `json:"collectionsExplicitMapping,omitempty" url:"collectionsExplicitMapping,omitempty"`
+	CollectionsMigrationMode   *bool                      `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
+	CollectionsMirroringMode   *bool                      `json:"collectionsMirroringMode,omitempty" url:"collectionsMirroringMode,omitempty"`
+	FilterExpression           *string                    `json:"filterExpression,omitempty" url:"filterExpression,omitempty"`
+	MergeFunctionMapping       *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
+	PauseRequested             *bool                      `json:"pauseRequested,omitempty" url:"pauseRequested,omitempty"`
+	Type                       *string                    `json:"type,omitempty" url:"type,omitempty"`
+}
+
+// XDCRGlobalSettings mirrors the Couchbase XDCR global settings payload returned by
+// GET /settings/replications and accepted by POST /settings/replications. All fields
+// are pointers to allow selective updates and to distinguish between absent and zero values.
+type XDCRGlobalSettings struct {
+	// Global / Per-replication settings (can be set globally as defaults)
+	CasDriftThresholdSecs             *int32                     `json:"casDriftThresholdSecs,omitempty" url:"casDriftThresholdSecs,omitempty"`
+	CheckpointInterval                *int32                     `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
+	CkptSvcCacheEnabled               *bool                      `json:"ckptSvcCacheEnabled,omitempty" url:"ckptSvcCacheEnabled,omitempty"`
+	CollectionsOSOMode                *bool                      `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
+	CompressionType                   *string                    `json:"compressionType,omitempty" url:"compressionType,omitempty"`
+	DcpEnablePurgeRollback            *bool                      `json:"dcpEnablePurgeRollback,omitempty" url:"dcpEnablePurgeRollback,omitempty"`
+	DesiredLatency                    *int32                     `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
+	DocBatchSizeKb                    *int32                     `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
+	FailureRestartInterval            *int32                     `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
+	FilterBinary                      *bool                      `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
+	FilterBypassExpiry                *bool                      `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
+	FilterBypassUncommittedTxn        *bool                      `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
+	FilterDeletion                    *bool                      `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
+	FilterExpiration                  *bool                      `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
+	HlvPruningWindowSec               *int32                     `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
+	JSFunctionTimeoutMs               *int32                     `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
+	LogLevel                          *string                    `json:"logLevel,omitempty" url:"logLevel,omitempty"`
+	MergeFunctionMapping              *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
+	Mobile                            *string                    `json:"mobile,omitempty" url:"mobile,omitempty"`
+	NetworkUsageLimit                 *int32                     `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
+	OptimisticReplicationThreshold    *int32                     `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
+	PreCheckCasDriftThresholdHours    *int32                     `json:"preCheckCasDriftThresholdHours,omitempty" url:"preCheckCasDriftThresholdHours,omitempty"`
+	PreReplicateVBMasterCheck         *bool                      `json:"preReplicateVBMasterCheck,omitempty" url:"preReplicateVBMasterCheck,omitempty"`
+	Priority                          *string                    `json:"priority,omitempty" url:"priority,omitempty"`
+	ReplicateCkptIntervalMin          *int32                     `json:"replicateCkptIntervalMin,omitempty" url:"replicateCkptIntervalMin,omitempty"`
+	RetryOnErrExceptAuthErrMaxWaitSec *int32                     `json:"retryOnErrExceptAuthErrMaxWaitSec,omitempty" url:"retryOnErrExceptAuthErrMaxWaitSec,omitempty"`
+	RetryOnRemoteAuthErr              *bool                      `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
+	RetryOnRemoteAuthErrMaxWaitSec    *int32                     `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+	SkipReplSpecAutoGc                *bool                      `json:"skipReplSpecAutoGc,omitempty" url:"skipReplSpecAutoGc,omitempty"`
+	SourceNozzlePerNode               *int32                     `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
+	StatsInterval                     *int32                     `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
+	TargetNozzlePerNode               *int32                     `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
+	TargetTopologyLogFrequency        *int32                     `json:"targetTopologyLogFrequency,omitempty" url:"targetTopologyLogFrequency,omitempty"`
+	WorkerBatchSize                   *int32                     `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
+
+	// Global-only settings (cannot be set per-replication)
+	GoGC       *string `json:"goGC,omitempty" url:"gogc,omitempty"`
+	GoMaxProcs *int32  `json:"goMaxProcs,omitempty" url:"gomaxprocs,omitempty"`
 }
 
 // ConflictLoggingSettings is the configuration for the conflict logging.
@@ -1387,23 +1482,46 @@ func (c *ConflictLoggingSettings) String() string {
 	return string(jsonS)
 }
 
+// ColMappingRules represents collection mapping rules for XDCR explicit mapping or migration.
+// It's a map where keys are source collections/scopes and values are target collections/scopes.
+// Nil values represent denial rules (don't replicate).
+type ColMappingRules map[string]*string
+
+// String returns the JSON representation of the mapping rules for URL encoding.
+func (c ColMappingRules) String() string {
+	if len(c) == 0 {
+		return "{}"
+	}
+
+	jsonS, err := json.Marshal(c)
+	if err != nil {
+		return "{}"
+	}
+
+	return string(jsonS)
+}
+
+// MergeFunctionMappingRules represents merge function mapping rules for XDCR conflict resolution.
+// This is a simple type alias that can be converted to/from the API type.
+type MergeFunctionMappingRules map[string]*string
+
+// String returns the JSON representation of the merge function mapping rules for URL encoding.
+func (m MergeFunctionMappingRules) String() string {
+	if len(m) == 0 {
+		return "{}"
+	}
+
+	jsonS, err := json.Marshal(m)
+	if err != nil {
+		return "{}"
+	}
+
+	return string(jsonS)
+}
+
 type ConflictLoggingLocation struct {
 	Bucket     string `json:"bucket,omitempty" url:"bucket,omitempty"`
 	Collection string `json:"collection,omitempty" url:"collection,omitempty"`
-}
-
-// Convert from one API call to the other.
-func MappingRulesToStr(rules map[string]*string) (string, error) {
-	if len(rules) > 0 {
-		bytes, err := json.Marshal(rules)
-		if err != nil {
-			return "", err
-		}
-
-		return string(bytes), nil
-	}
-
-	return "", nil
 }
 
 // FormEncode represents user type in api compatible form.

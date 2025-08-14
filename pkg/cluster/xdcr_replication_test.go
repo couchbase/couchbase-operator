@@ -8,11 +8,20 @@ import (
 )
 
 var replicationSpec = couchbasev2.CouchbaseReplicationSpec{
-	Bucket:           "bucket",
-	RemoteBucket:     "remoteBucket",
-	CompressionType:  "Auto",
-	FilterExpression: "",
-	Paused:           false,
+	Bucket:       "bucket",
+	RemoteBucket: "remoteBucket",
+	CompressionType: func() *string {
+		s := "Auto"
+		return &s
+	}(),
+	FilterExpression: func() *string {
+		s := ""
+		return &s
+	}(),
+	PauseRequested: func() *bool {
+		s := false
+		return &s
+	}(),
 }
 
 func TestXDCRGenerateMigrationMappings(t *testing.T) {

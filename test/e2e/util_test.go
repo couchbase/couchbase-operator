@@ -608,6 +608,8 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRWithMandatoryTLSAndMultipleCAs).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRMobileActive).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRConflictLogging).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRGlobalSettingsBeforeReplication).WithTags(TagSuiteP1, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRGlobalSettingsDoNotUpdateExistingReplications).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestRzaAntiAffinityOn).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),
 		framework.NewTestDef(TestRzaAntiAffinityOff).WithTags(TagSuiteP1, TagFeatureServerGroups, TagFeatureScheduling),
 		framework.NewTestDef(TestPersistentVolumeKillAllPods).WithTags(TagSuiteP1, TagSuitePlatform, TagFeaturePersistentVolumes),

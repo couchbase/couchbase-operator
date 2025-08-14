@@ -13,7 +13,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
-	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -33,7 +33,6 @@ var (
 const (
 	defaultMigrationFilter                    = couchbasev2.DefaultScopeOrCollection + "." + couchbasev2.DefaultScopeOrCollection
 	RemoteClusterOperatorManagedSuffix string = "-operator-managed"
-	defaultMobileReplicationValue      string = "Off"
 )
 
 // replicationKey returns a unique identifier per replication.
@@ -41,7 +40,7 @@ func replicationKey(r couchbaseutil.Replication) string {
 	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
 }
 
-func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
+func (c *Cluster) ListReplications() (couchbaseutil.ReplicationList, error) {
 	mappingsPossible, err := c.isScopesAndCollectionsSupported()
 	if err != nil {
 		return nil, err
@@ -60,12 +59,12 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 		// Parse the target to recover lost information.
 		// Should be in the form /remoteClusters/c4c9af9ad62d8b5f665edac5ffc9c1be/buckets/default
 		if task.Target == "" {
-			return nil, fmt.Errorf("listReplications: target not populated: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
+			return nil, fmt.Errorf("ListReplications: target not populated: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		parts := strings.Split(task.Target, "/")
 		if len(parts) != 5 {
-			return nil, fmt.Errorf("listReplications: target incorrectly formatted: %v: %w", task.Target, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
+			return nil, fmt.Errorf("ListReplications: target incorrectly formatted: %v: %w", task.Target, errors.NewStackTracedError(errors.ErrCouchbaseServerError))
 		}
 
 		uuid := parts[2]
@@ -85,25 +84,45 @@ func (c *Cluster) listReplications() (couchbaseutil.ReplicationList, error) {
 
 		// By now your eyeballs will be dry from all the rolling they are doing.
 		newReplication := couchbaseutil.Replication{
-			FromBucket:       task.Source,
-			ToCluster:        cluster.Name,
-			ToBucket:         to,
-			Type:             task.ReplicationType,
-			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
-			CompressionType:  settings.CompressionType,
-			FilterExpression: task.FilterExpression,
-			PauseRequested:   settings.PauseRequested,
-			Mobile:           settings.Mobile,
+			// Core immutable fields
+			FromBucket:      task.Source,
+			ToCluster:       cluster.Name,
+			ToBucket:        to,
+			Type:            couchbaseutil.ReplicationTypeXMEM,
+			ReplicationType: couchbaseutil.ReplicationReplicationTypeContinuous,
+
+			// Legacy core fields (from server settings)
+			PauseRequested: settings.PauseRequested,
+
+			// Advanced settings (only those supported during creation)
+			CompressionType:                settings.CompressionType,
+			DesiredLatency:                 settings.DesiredLatency,
+			FilterExpression:               settings.FilterExpression,
+			FilterDeletion:                 settings.FilterDeletion,
+			FilterExpiration:               settings.FilterExpiration,
+			FilterBypassExpiry:             settings.FilterBypassExpiry,
+			FilterBinary:                   settings.FilterBinary,
+			Priority:                       settings.Priority,
+			OptimisticReplicationThreshold: settings.OptimisticReplicationThreshold,
+			FailureRestartInterval:         settings.FailureRestartInterval,
+			DocBatchSizeKb:                 settings.DocBatchSizeKb,
+			WorkerBatchSize:                settings.WorkerBatchSize,
+			CheckpointInterval:             settings.CheckpointInterval,
+			SourceNozzlePerNode:            settings.SourceNozzlePerNode,
+			TargetNozzlePerNode:            settings.TargetNozzlePerNode,
+			StatsInterval:                  settings.StatsInterval,
+			LogLevel:                       settings.LogLevel,
+			NetworkUsageLimit:              settings.NetworkUsageLimit,
+			Mobile:                         settings.Mobile,
 		}
 
 		// Deal with any additional mappings for scopes and collections
 		if mappingsPossible {
-			newReplication.ExplicitMapping = settings.ExplicitMapping
-			newReplication.MigrationMapping = settings.MigrationMapping
+			newReplication.ExplicitMapping = settings.CollectionsExplicitMapping
+			newReplication.MigrationMapping = settings.CollectionsMigrationMode
 
-			newReplication.MappingRules, err = couchbaseutil.MappingRulesToStr(settings.MappingRules)
-			if err != nil {
-				return nil, err
+			if settings.ColMappingRules != nil {
+				newReplication.MappingRules = settings.ColMappingRules
 			}
 		}
 
@@ -261,154 +280,6 @@ func (c *Cluster) isScopesAndCollectionsSupported() (bool, error) {
 	return c.IsAtLeastVersion("7.0.0")
 }
 
-// generateXDCRReplications uses the remote's label selector to pick all the replications
-// to create for this remote cluster connection.
-//
-//nolint:gocognit
-func (c *Cluster) generateXDCRReplications(remoteCluster couchbasev2.RemoteCluster) ([]couchbaseutil.Replication, error) {
-	var replications []couchbaseutil.Replication
-
-	selector := labels.Everything()
-
-	if remoteCluster.Replications.Selector != nil {
-		var err error
-
-		if selector, err = metav1.LabelSelectorAsSelector(remoteCluster.Replications.Selector); err != nil {
-			return nil, err
-		}
-	}
-
-	xdcrScopesAndCollectionsSupported, err := c.isScopesAndCollectionsSupported()
-	if err != nil {
-		return nil, err
-	}
-
-	duplicateChecks := make(map[string]bool)
-
-	if xdcrScopesAndCollectionsSupported {
-		apiMigrations := c.k8s.CouchbaseMigrationReplications.List()
-
-		for _, migration := range apiMigrations {
-			if !selector.Matches(labels.Set(migration.Labels)) {
-				continue
-			}
-
-			err := annotations.Populate(&migration.Spec, migration.Annotations)
-			if err != nil {
-				// we failed but its not worth stopping. log the error and continue
-				log.Error(err, "failed to populate migration with annotation")
-			}
-
-			newMigration := couchbaseutil.Replication{
-				FromBucket:       string(migration.Spec.Bucket),
-				ToCluster:        remoteCluster.Name,
-				ToBucket:         string(migration.Spec.RemoteBucket),
-				Type:             couchbaseutil.ReplicationTypeXMEM,
-				ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
-				CompressionType:  string(migration.Spec.CompressionType),
-				FilterExpression: migration.Spec.FilterExpression,
-				PauseRequested:   migration.Spec.Paused,
-				MigrationMapping: true,
-			}
-
-			if isAtleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
-				log.Error(err, "Failed to check server version for mobile replication")
-				return nil, err
-			} else if isAtleast76 {
-				newMigration.Mobile = string(migration.Spec.Mobile)
-				// Use default value if not set
-				if newMigration.Mobile == "" {
-					newMigration.Mobile = defaultMobileReplicationValue
-				}
-			}
-
-			replicationKey := replicationKey(newMigration)
-
-			_, exists := duplicateChecks[replicationKey]
-			if exists {
-				return nil, fmt.Errorf("%w: duplicate migration replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), replicationKey)
-			}
-
-			rules, err := generateMigrationMappingRules(migration)
-			if err != nil {
-				return nil, fmt.Errorf("%w: invalid migration replication for %s", errors.NewStackTracedError(err), replicationKey)
-			}
-
-			newMigration.MappingRules = rules
-
-			replications = append(replications, newMigration)
-			duplicateChecks[replicationKey] = true
-		}
-	}
-
-	apiReplications := c.k8s.CouchbaseReplications.List()
-	for _, replication := range apiReplications {
-		if !selector.Matches(labels.Set(replication.Labels)) {
-			continue
-		}
-
-		err := annotations.Populate(&replication.Spec, replication.Annotations)
-		if err != nil {
-			// we failed but its not worth stopping. log the error and continue
-			log.Error(err, "failed to populate replication with annotation")
-		}
-
-		newReplication := couchbaseutil.Replication{
-			FromBucket:       string(replication.Spec.Bucket),
-			ToCluster:        remoteCluster.Name,
-			ToBucket:         string(replication.Spec.RemoteBucket),
-			Type:             couchbaseutil.ReplicationTypeXMEM,
-			ReplicationType:  couchbaseutil.ReplicationReplicationTypeContinuous,
-			CompressionType:  string(replication.Spec.CompressionType),
-			FilterExpression: replication.Spec.FilterExpression,
-			PauseRequested:   replication.Spec.Paused,
-		}
-
-		if isAtleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
-			log.Error(err, "Failed to check server version for mobile replication")
-			return nil, err
-		} else if isAtleast76 {
-			newReplication.Mobile = string(replication.Spec.Mobile)
-			if newReplication.Mobile == "" {
-				newReplication.Mobile = "Off"
-			}
-		}
-
-		if isAtleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err != nil {
-			log.Error(err, "Failed to check server version for conflict logging")
-			return nil, err
-		} else if isAtleast80 {
-			newReplication.ConflictLogging = generateConflictLoggingSettings(replication.Spec.ConflictLogging)
-		}
-
-		replicationKey := replicationKey(newReplication)
-
-		_, exists := duplicateChecks[replicationKey]
-		if exists {
-			return nil, fmt.Errorf("%w: duplicate replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), replicationKey)
-		}
-
-		if xdcrScopesAndCollectionsSupported {
-			rules, err := generateExplicitMappingRules(replication)
-			if err != nil {
-				return nil, fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), replicationKey)
-			}
-
-			if rules != "{}" {
-				newReplication.ExplicitMapping = true
-				newReplication.MappingRules = rules
-			} else {
-				newReplication.ExplicitMapping = false
-			}
-		}
-
-		replications = append(replications, newReplication)
-		duplicateChecks[replicationKey] = true
-	}
-
-	return replications, nil
-}
-
 func generateConflictLoggingSettings(conflictLogging *couchbasev2.CouchbaseConflictLoggingSpec) *couchbaseutil.ConflictLoggingSettings {
 	if conflictLogging == nil {
 		return &couchbaseutil.ConflictLoggingSettings{}
@@ -457,17 +328,15 @@ func generateConflictLoggingSettings(conflictLogging *couchbasev2.CouchbaseConfl
 	return settings
 }
 
-// generateXDCR combines API and secret data to construct an idealized form
-// of XDCR primitives that need to exist.
-func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil.Replication, error) {
+// generateXDCR combines API and secret data to construct remote clusters.
+// Note: Replication generation is now handled by BuildDesiredReplicationStates().
+func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, error) {
 	var clusters []couchbaseutil.RemoteCluster
-
-	var replications []couchbaseutil.Replication
 
 	for _, remoteCluster := range c.cluster.Spec.XDCR.RemoteClusters {
 		hostname, network, err := getXDCRHostnameAndNetwork(remoteCluster)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		// renaming c.cluster.spec.xdcr.remoteClusters.name
@@ -494,7 +363,7 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 		if remoteCluster.AuthenticationSecret != nil {
 			secret, found := c.k8s.Secrets.Get(*remoteCluster.AuthenticationSecret)
 			if !found {
-				return nil, nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.AuthenticationSecret)
+				return nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.AuthenticationSecret)
 			}
 
 			requested.Username = string(secret.Data["username"])
@@ -504,11 +373,11 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 		if remoteCluster.TLS != nil && remoteCluster.TLS.Secret != nil {
 			secret, found := c.k8s.Secrets.Get(*remoteCluster.TLS.Secret)
 			if !found {
-				return nil, nil, fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.TLS.Secret)
+				return nil, fmt.Errorf("%w: unable to get remote cluster TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.TLS.Secret)
 			}
 
 			if _, ok := secret.Data[couchbasev2.RemoteClusterTLSCA]; !ok {
-				return nil, nil, fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+				return nil, fmt.Errorf("%w: CA certificate is required for TLS encryption", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 			}
 
 			// No, we will never support any other type!
@@ -529,16 +398,9 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, []couchbaseutil
 		}
 
 		clusters = append(clusters, requested)
-
-		clusterReplications, err := c.generateXDCRReplications(remoteCluster)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		replications = append(replications, clusterReplications...)
 	}
 
-	return clusters, replications, nil
+	return clusters, nil
 }
 
 // getPersistentXDCRData grabs a persistent data string.
@@ -719,125 +581,433 @@ Next:
 	return clusters
 }
 
-// replicationCreations is a generator that returns replications that need creating.
-func replicationCreations(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
-	var replications couchbaseutil.ReplicationList
+// updateCreateDeleteXDCRReplications handles the creation, update and removal of replications.
+// This must be called after new remotes are added, and before old remotes are removed.
+// Note: requestedReplications are now generated internally via BuildDesiredReplicationStates().
+func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchbaseutil.ReplicationList) error {
+	// Build desired state from CRDs
+	desiredStates, err := c.BuildDesiredReplicationStates()
+	if err != nil {
+		return err
+	}
 
-Next:
-	for _, req := range requested {
-		for _, cur := range current {
-			if replicationKey(req) == replicationKey(cur) {
-				continue Next
+	// Fetch current state from server (including settings)
+	currentStates, err := c.FetchCurrentReplicationStates(currentReplications)
+	if err != nil {
+		return err
+	}
+
+	// Diff and reconcile - handle all operations (create/update/delete)
+	toCreate, toUpdate, toDelete := c.diffReplicationStates(desiredStates, currentStates)
+
+	// Handle deletions first (replications must be deleted before their remote clusters)
+	for _, current := range toDelete {
+		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", current.Key)
+
+		cluster, err := c.getRemoteClusterByName(current.Create.ToCluster)
+		if err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.DeleteReplication(cluster.UUID, current.Create.FromBucket, current.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, current.Key))
+	}
+
+	// Handle updates (settings changes only)
+	for _, desired := range toUpdate {
+		log.Info("Updating XDCR replication settings", "cluster", c.namespacedName(), "replication", desired.Key)
+
+		current := currentStates[desired.Key]
+
+		// Compute minimal patch
+		patch := c.computeSettingsPatch(&desired.Settings, &current.Settings)
+
+		// If patch is empty, skip
+		if c.isEmptySettings(patch) {
+			continue
+		}
+
+		// Apply settings patch
+		if err := couchbaseutil.UpdateReplicationSettings(&patch, current.RemoteUUID, current.Create.FromBucket, current.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication settings", c.cluster))
+	}
+
+	// Handle creations
+	for _, desired := range toCreate {
+		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", desired.Key)
+
+		// Create via creation API
+		if err := couchbaseutil.CreateReplication(&desired.Create).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, desired.Key))
+
+		// Apply settings immediately after creation
+		cluster, err := c.getRemoteClusterByName(desired.RemoteCluster)
+		if err != nil {
+			return err
+		}
+
+		// Fetch current settings (should be defaults/globals)
+		currentSettings := &couchbaseutil.ReplicationSettings{}
+		if err := couchbaseutil.GetReplicationSettings(currentSettings, cluster.UUID, desired.Create.FromBucket, desired.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		// Compute patch against current settings
+		patch := c.computeSettingsPatch(&desired.Settings, currentSettings)
+
+		// Apply settings if there are changes
+		if !c.isEmptySettings(patch) {
+			if err := couchbaseutil.UpdateReplicationSettings(&patch, cluster.UUID, desired.Create.FromBucket, desired.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+
+			c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication settings", c.cluster))
+		}
+	}
+
+	return nil
+}
+
+// DesiredReplicationState represents the complete desired state of a replication from CRD.
+type DesiredReplicationState struct {
+	// Creation fields (sent to /controller/createReplication)
+	Create couchbaseutil.Replication
+
+	// Settings fields (sent to /settings/replications/<id>)
+	Settings couchbaseutil.ReplicationSettings
+
+	// Metadata
+	CRDName       string
+	RemoteCluster string
+	Key           string // replicationKey for efficient lookup
+}
+
+// CurrentReplicationState represents the current state of a replication on the server.
+type CurrentReplicationState struct {
+	// Creation state (from ListReplications)
+	Create couchbaseutil.Replication
+
+	// Settings state (from GET /settings/replications/<id>)
+	Settings couchbaseutil.ReplicationSettings
+
+	// Metadata
+	Key        string
+	RemoteUUID string
+}
+
+// BuildDesiredReplicationStates builds comprehensive replication states from all CRDs.
+func (c *Cluster) BuildDesiredReplicationStates() (map[string]DesiredReplicationState, error) {
+	states := make(map[string]DesiredReplicationState)
+
+	for _, remoteCluster := range c.cluster.Spec.XDCR.RemoteClusters {
+		// Get all replications that match this remote cluster's selector
+		apiReplications := c.k8s.CouchbaseReplications.List()
+
+		// Convert the label selector.
+		selector := labels.Everything()
+
+		if remoteCluster.Replications.Selector != nil {
+			var err error
+			if selector, err = metav1.LabelSelectorAsSelector(remoteCluster.Replications.Selector); err != nil {
+				return nil, err
 			}
 		}
 
-		replications = append(replications, req)
-	}
-
-	return replications
-}
-
-// replicationUpdates is a generator that returns replications that need updating.
-func replicationUpdates(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
-	var replications couchbaseutil.ReplicationList
-
-Next:
-	for _, req := range requested {
-		for _, cur := range current {
-			if replicationKey(req) != replicationKey(cur) {
+		// Build states for matching replications
+		for _, replication := range apiReplications {
+			if !selector.Matches(labels.Set(replication.Labels)) {
 				continue
 			}
 
-			if !reflect.DeepEqual(req, cur) {
-				replications = append(replications, req)
-			}
+			// Compute the operator-managed remote cluster name deterministically.
+			generatedName := remoteCluster.Name + RemoteClusterOperatorManagedSuffix
 
-			continue Next
+			// Build creation struct (only creation-supported fields)
+			create := c.buildCreateFromSpec(&replication.Spec, generatedName)
+
+			// Build settings struct (all per-replication settings)
+			settings := c.buildSettingsFromSpec(&replication.Spec)
+
+			key := replicationKey(create)
+			states[key] = DesiredReplicationState{
+				Create:        create,
+				Settings:      settings,
+				CRDName:       replication.Name,
+				RemoteCluster: generatedName,
+				Key:           key,
+			}
 		}
 	}
 
-	return replications
+	return states, nil
 }
 
-// replicationDeletions is a generator that returns replications that need deleting.
-func replicationDeletions(current, requested couchbaseutil.ReplicationList) couchbaseutil.ReplicationList {
-	var replications couchbaseutil.ReplicationList
+// buildCreateFromSpec builds the creation API struct from a CRD spec (only creation-supported fields).
+func (c *Cluster) buildCreateFromSpec(spec *couchbasev2.CouchbaseReplicationSpec, remoteClusterName string) couchbaseutil.Replication {
+	replication := couchbaseutil.Replication{
+		// Core immutable fields
+		FromBucket:         string(spec.Bucket),
+		ToCluster:          remoteClusterName,
+		ToBucket:           string(spec.RemoteBucket),
+		Type:               couchbaseutil.ReplicationTypeXMEM,
+		ReplicationType:    couchbaseutil.ReplicationReplicationTypeContinuous,
+		FilterSkipRestream: spec.FilterSkipRestream,
 
-Next:
-	for _, cur := range current {
-		for _, req := range requested {
-			if replicationKey(cur) == replicationKey(req) {
-				continue Next
-			}
-		}
+		// Legacy core fields (can be set during creation)
+		PauseRequested:   spec.PauseRequested,
+		ExplicitMapping:  spec.CollectionsExplicitMapping,
+		MigrationMapping: spec.CollectionsMigrationMode,
+		MappingRules:     convertColMappingRules(spec.ColMappingRules),
 
-		replications = append(replications, cur)
+		// Advanced settings supported during replication creation (from createReplication API docs)
+		CompressionType:                spec.CompressionType,
+		DesiredLatency:                 spec.DesiredLatency,
+		FilterExpression:               spec.FilterExpression,
+		FilterDeletion:                 spec.FilterDeletion,
+		FilterExpiration:               spec.FilterExpiration,
+		FilterBypassExpiry:             spec.FilterBypassExpiry,
+		FilterBinary:                   spec.FilterBinary,
+		Priority:                       spec.Priority,
+		OptimisticReplicationThreshold: spec.OptimisticReplicationThreshold,
+		FailureRestartInterval:         spec.FailureRestartInterval,
+		DocBatchSizeKb:                 spec.DocBatchSizeKb,
+		WorkerBatchSize:                spec.WorkerBatchSize,
+		CheckpointInterval:             spec.CheckpointInterval,
+		SourceNozzlePerNode:            spec.SourceNozzlePerNode,
+		TargetNozzlePerNode:            spec.TargetNozzlePerNode,
+		StatsInterval:                  spec.StatsInterval,
+		LogLevel:                       spec.LogLevel,
+		NetworkUsageLimit:              spec.NetworkUsageLimit,
+		Mobile:                         spec.Mobile,
 	}
 
-	return replications
+	// Add version-specific fields
+	if isAtleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtleast76 {
+		replication.Mobile = spec.Mobile
+	}
+
+	if isAtleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err == nil && isAtleast80 {
+		replication.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
+	}
+
+	return replication
 }
 
-func (c *Cluster) deleteXDCRReplications(requestedReplications, currentReplications couchbaseutil.ReplicationList) error {
-	// Delete any orphaned replications...
-	replicationDeletes := replicationDeletions(currentReplications, requestedReplications)
-	for i := range replicationDeletes {
-		replication := replicationDeletes[i]
+// buildSettingsFromSpec builds the settings API struct from a CRD spec (all per-replication settings).
+func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSpec) couchbaseutil.ReplicationSettings {
+	var dest couchbaseutil.ReplicationSettings
 
-		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
+	// Legacy core fields (map from CRD spec to ReplicationSettings)
+	dest.PauseRequested = spec.PauseRequested
+	dest.CollectionsExplicitMapping = spec.CollectionsExplicitMapping
+	dest.CollectionsMigrationMode = spec.CollectionsMigrationMode
+	dest.ColMappingRules = convertColMappingRules(spec.ColMappingRules)
 
-		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
+	// Global / Per-replication advanced settings (from CRD spec)
+	dest.CompressionType = spec.CompressionType
+	dest.DesiredLatency = spec.DesiredLatency
+	dest.FilterDeletion = spec.FilterDeletion
+	dest.FilterExpiration = spec.FilterExpiration
+	dest.FilterBypassExpiry = spec.FilterBypassExpiry
+	dest.FilterBinary = spec.FilterBinary
+	dest.Priority = spec.Priority
+	dest.OptimisticReplicationThreshold = spec.OptimisticReplicationThreshold
+	dest.FailureRestartInterval = spec.FailureRestartInterval
+	dest.DocBatchSizeKb = spec.DocBatchSizeKb
+	dest.WorkerBatchSize = spec.WorkerBatchSize
+	dest.CheckpointInterval = spec.CheckpointInterval
+	dest.SourceNozzlePerNode = spec.SourceNozzlePerNode
+	dest.TargetNozzlePerNode = spec.TargetNozzlePerNode
+	dest.StatsInterval = spec.StatsInterval
+	dest.LogLevel = spec.LogLevel
+	dest.NetworkUsageLimit = spec.NetworkUsageLimit
+	dest.Mobile = spec.Mobile
+
+	// Per-replication only settings (from CRD spec)
+	dest.FilterExpression = spec.FilterExpression
+	dest.MergeFunctionMapping = convertMergeFunctionMappingRules(&spec.MergeFunctionMapping)
+
+	// Additional settings only available in ReplicationSettings API
+	dest.CollectionsOSOMode = spec.CollectionsOSOMode
+	dest.HlvPruningWindowSec = spec.HlvPruningWindowSec
+	dest.JSFunctionTimeoutMs = spec.JSFunctionTimeoutMs
+	dest.RetryOnRemoteAuthErr = spec.RetryOnRemoteAuthErr
+	dest.RetryOnRemoteAuthErrMaxWaitSec = spec.RetryOnRemoteAuthErrMaxWaitSec
+
+	// Conflict logging (convert from CRD spec)
+	if spec.ConflictLogging != nil {
+		dest.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
+	}
+
+	return dest
+}
+
+// FetchCurrentReplicationStates fetches current state from the server.
+func (c *Cluster) FetchCurrentReplicationStates(currentReplications couchbaseutil.ReplicationList) (map[string]CurrentReplicationState, error) {
+	states := make(map[string]CurrentReplicationState)
+
+	for _, replication := range currentReplications {
+		key := replicationKey(replication)
+
+		// Get remote cluster UUID for this replication
+		remoteCluster, err := c.getRemoteClusterByName(replication.ToCluster)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if err := couchbaseutil.DeleteReplication(cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
-			return err
+		// Fetch current settings from server
+		currentSettings := &couchbaseutil.ReplicationSettings{}
+		if err := couchbaseutil.GetReplicationSettings(currentSettings, remoteCluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
+			return nil, err
 		}
 
-		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, replicationKey(replication)))
+		states[key] = CurrentReplicationState{
+			Create:     replication,
+			Settings:   *currentSettings,
+			Key:        key,
+			RemoteUUID: remoteCluster.UUID,
+		}
 	}
+
+	return states, nil
+}
+
+// computeSettingsPatch computes a minimal patch containing only changed fields.
+func (c *Cluster) computeSettingsPatch(desired, current *couchbaseutil.ReplicationSettings) couchbaseutil.ReplicationSettings {
+	var patch couchbaseutil.ReplicationSettings
+
+	// Use reflection to iterate over all fields and copy changed ones
+	desiredVal := reflect.ValueOf(desired).Elem()
+	currentVal := reflect.ValueOf(current).Elem()
+	patchVal := reflect.ValueOf(&patch).Elem()
+
+	for i := 0; i < desiredVal.NumField(); i++ {
+		desiredField := desiredVal.Field(i)
+		currentField := currentVal.Field(i)
+		patchField := patchVal.Field(i)
+
+		// Only process settable fields
+		if !patchField.CanSet() {
+			continue
+		}
+
+		// Check if the field has changed
+		if !reflect.DeepEqual(desiredField.Interface(), currentField.Interface()) {
+			patchField.Set(desiredField)
+		}
+	}
+
+	return patch
+}
+
+// isEmptySettings checks if a settings struct has no non-nil fields.
+func (c *Cluster) isEmptySettings(settings couchbaseutil.ReplicationSettings) bool {
+	return reflect.DeepEqual(settings, couchbaseutil.ReplicationSettings{})
+}
+
+// diffReplicationStates compares desired vs current states and returns what needs to be done.
+func (c *Cluster) diffReplicationStates(desired map[string]DesiredReplicationState, current map[string]CurrentReplicationState) (
+	toCreate []DesiredReplicationState,
+	toUpdate []DesiredReplicationState,
+	toDelete []CurrentReplicationState,
+) {
+	// Find creates and updates
+	for key, desiredState := range desired {
+		if currentState, exists := current[key]; exists {
+			// Exists - check if settings need updating
+			// Note: Immutable field changes are prevented by validation layers
+			if c.needsSettingsUpdate(desiredState.Settings, currentState.Settings) {
+				toUpdate = append(toUpdate, desiredState)
+			}
+		} else {
+			// Doesn't exist - needs creation
+			toCreate = append(toCreate, desiredState)
+		}
+	}
+
+	// Find deletions (replications that exist on server but not in desired state)
+	for key, currentState := range current {
+		if _, exists := desired[key]; !exists {
+			toDelete = append(toDelete, currentState)
+		}
+	}
+
+	return toCreate, toUpdate, toDelete
+}
+
+// needsSettingsUpdate determines if settings need updating.
+func (c *Cluster) needsSettingsUpdate(desired, current couchbaseutil.ReplicationSettings) bool {
+	// Compute patch and check if it's empty
+	patch := c.computeSettingsPatch(&desired, &current)
+	return !c.isEmptySettings(patch)
+}
+
+// reconcileXDCRGlobalSettings applies cluster-wide XDCR settings before handling replications.
+func (c *Cluster) reconcileXDCRGlobalSettings() error {
+	if !c.cluster.Spec.XDCR.Managed {
+		return nil
+	}
+
+	spec := c.cluster.Spec.XDCR.GlobalSettings
+	if spec == nil {
+		return nil
+	}
+
+	desired := toXDCRGlobalSettings(spec)
+
+	// Apply desired settings; urlencoding with omitempty will skip nil pointers
+	if err := couchbaseutil.SetXDCRGlobalSettings(desired).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr global settings", c.cluster))
 
 	return nil
 }
 
-// updateCreateXDCRReplications handles the creation, update and removal of replications.
-// This must be called after new remotes are added, and before old remotes are removed.
-func (c *Cluster) updateCreateXDCRReplications(requestedReplications, currentReplications couchbaseutil.ReplicationList) error {
-	// We deal with migrations first, the assumption being that these would be one-offs and they should be done
-	// first.
-	// Create/update any replications...
-	replicationUpdates := replicationUpdates(currentReplications, requestedReplications)
-	for i := range replicationUpdates {
-		replication := replicationUpdates[i]
-
-		log.Info("Updating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
-
-		cluster, err := c.getRemoteClusterByName(replication.ToCluster)
-		if err != nil {
-			return err
-		}
-
-		if err := couchbaseutil.UpdateReplication(&replication, cluster.UUID, replication.FromBucket, replication.ToBucket).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("xdcr replication", c.cluster))
+func toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.XDCRGlobalSettings {
+	if spec == nil {
+		return nil
+	}
+	// Shallow pointer copy into util model; fields align by name
+	out := &couchbaseutil.XDCRGlobalSettings{
+		CheckpointInterval:             spec.CheckpointInterval,
+		CollectionsOSOMode:             spec.CollectionsOSOMode,
+		CompressionType:                spec.CompressionType,
+		DesiredLatency:                 spec.DesiredLatency,
+		DocBatchSizeKb:                 spec.DocBatchSizeKb,
+		FailureRestartInterval:         spec.FailureRestartInterval,
+		FilterBypassExpiry:             spec.FilterBypassExpiry,
+		FilterBypassUncommittedTxn:     spec.FilterBypassUncommittedTxn,
+		FilterDeletion:                 spec.FilterDeletion,
+		FilterExpiration:               spec.FilterExpiration,
+		HlvPruningWindowSec:            spec.HlvPruningWindowSec,
+		JSFunctionTimeoutMs:            spec.JSFunctionTimeoutMs,
+		LogLevel:                       spec.LogLevel,
+		Mobile:                         spec.Mobile,
+		NetworkUsageLimit:              spec.NetworkUsageLimit,
+		OptimisticReplicationThreshold: spec.OptimisticReplicationThreshold,
+		Priority:                       spec.Priority,
+		RetryOnRemoteAuthErr:           spec.RetryOnRemoteAuthErr,
+		RetryOnRemoteAuthErrMaxWaitSec: spec.RetryOnRemoteAuthErrMaxWaitSec,
+		SourceNozzlePerNode:            spec.SourceNozzlePerNode,
+		StatsInterval:                  spec.StatsInterval,
+		TargetNozzlePerNode:            spec.TargetNozzlePerNode,
+		WorkerBatchSize:                spec.WorkerBatchSize,
+		GoGC:                           spec.GoGC,
+		GoMaxProcs:                     spec.GoMaxProcs,
 	}
 
-	replicationCreates := replicationCreations(currentReplications, requestedReplications)
-	for i := range replicationCreates {
-		replication := replicationCreates[i]
-
-		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", replicationKey(replication))
-
-		if err := couchbaseutil.CreateReplication(&replication).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, replicationKey(replication)))
-	}
-
-	return nil
+	return out
 }
 
 // checkXDCRTask checks the XDCR connections.
@@ -876,32 +1046,6 @@ func (c *Cluster) checkXDCRTask(cluster *couchbaseutil.RemoteCluster, atLeast721
 	return err
 }
 
-func (c *Cluster) GatherReplicationChanges() (map[couchbaseutil.Replication]couchbaseutil.Replication, error) {
-	var updates = make(map[couchbaseutil.Replication]couchbaseutil.Replication)
-
-	current, err := c.listReplications()
-	if err != nil {
-		return nil, err
-	}
-
-	_, requested, err := c.generateXDCR()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range current {
-		for _, r := range requested {
-			if replicationKey(c) == replicationKey(r) {
-				if !reflect.DeepEqual(r, c) {
-					updates[c] = r
-				}
-			}
-		}
-	}
-
-	return updates, nil
-}
-
 // reconcileXDCR creates and deletes XDCR connections dynamically.
 func (c *Cluster) reconcileXDCR() error {
 	if !c.cluster.Spec.XDCR.Managed {
@@ -913,26 +1057,26 @@ func (c *Cluster) reconcileXDCR() error {
 		return err
 	}
 
-	requestedClusters, requestedReplications, err := c.generateXDCR()
+	requestedClusters, err := c.generateXDCR()
 	if err != nil {
 		return err
 	}
+
+	// Note: requestedReplications are now generated via BuildDesiredReplicationStates() in updateCreateDeleteXDCRReplications()
+	// This eliminates redundant CRD iteration and ensures consistency with the new architecture
 
 	currentClusters, err := c.listRemoteClusters()
 	if err != nil {
 		return err
 	}
 
-	currentReplications, err := c.listReplications()
+	currentReplications, err := c.ListReplications()
 	if err != nil {
 		return err
 	}
 
 	// Delete stuff first to remove any non-managed remote-clusters that could conflict with managed ones
-	// Deleting replications first because replications need to be deleted before remote clusters
-	if err = c.deleteXDCRReplications(requestedReplications, currentReplications); err != nil {
-		return err
-	}
+	// Note: We'll handle ALL replication operations (create/update/delete) after clusters are ready
 
 	// Delete any orphaned clusters
 	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
@@ -997,7 +1141,34 @@ func (c *Cluster) reconcileXDCR() error {
 		}
 	}
 
-	// Replications depend on remotes existing, and also need to be removed before
-	// the remote they depend on, so perform it here.
-	return c.updateCreateXDCRReplications(requestedReplications, currentReplications)
+	// Replications depend on remotes existing, so handle them AFTER clusters are ready
+	return c.updateCreateDeleteXDCRReplications(currentReplications)
+}
+
+// convertColMappingRules converts API ColMappingRules to util ColMappingRules.
+func convertColMappingRules(apiRules *couchbasev2.ColMappingRules) *couchbaseutil.ColMappingRules {
+	if apiRules == nil {
+		return nil
+	}
+
+	utilRules := make(couchbaseutil.ColMappingRules)
+	for k, v := range *apiRules {
+		utilRules[k] = v
+	}
+
+	return &utilRules
+}
+
+// convertMergeFunctionMappingRules converts API MergeFunctionMappingRules to util MergeFunctionMappingRules.
+func convertMergeFunctionMappingRules(apiRules *couchbasev2.MergeFunctionMappingRules) *couchbaseutil.MergeFunctionMappingRules {
+	if apiRules == nil {
+		return nil
+	}
+
+	utilRules := make(couchbaseutil.MergeFunctionMappingRules)
+	for k, v := range *apiRules {
+		utilRules[k] = v
+	}
+
+	return &utilRules
 }

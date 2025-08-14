@@ -1930,8 +1930,25 @@ type CouchbaseMigrationMapping struct {
 	TargetKeyspace CouchbaseReplicationKeyspace `json:"targetKeyspace"`
 }
 
+// ColMappingRules represents collection mapping rules for XDCR explicit mapping or migration.
+// It's a map where keys are source collections/scopes and values are target collections/scopes.
+// Nil values represent denial rules (don't replicate).
+// The rules follow Couchbase Server priority order:
+// Priority 0: scope.collection to scope.collection affirmation
+// Priority 1: scope.collection denial (null value)
+// Priority 2: scope to scope affirmation
+// Priority 3: scope denial (null value)
+type ColMappingRules map[string]*string
+
+// MergeFunctionMappingRules represents merge function mapping rules for XDCR conflict resolution.
+// It's a map where keys are collection specifiers (scope.collection) and values are merge function names.
+// Nil values can be used to explicitly unset merge functions for specific collections.
+type MergeFunctionMappingRules map[string]*string
+
 // CouchbaseReplicationSpec allows configuration of an XDCR replication.
 type CouchbaseReplicationSpec struct {
+	// === CORE IMMUTABLE FIELDS (validation runner enforced) ===
+
 	// Bucket is the source bucket to replicate from.  This refers to the Couchbase
 	// bucket name, not the resource name of the bucket.  A bucket with this name must
 	// be defined on this cluster.  Legal bucket names have a maximum length of 100
@@ -1944,28 +1961,142 @@ type CouchbaseReplicationSpec struct {
 	// "a-z", "A-Z", "0-9" and "-_%\.".
 	RemoteBucket BucketName `json:"remoteBucket"`
 
-	// CompressionType is the type of compression to apply to the replication.
-	// When None, no compression will be applied to documents as they are
-	// transferred between clusters.  When Auto, Couchbase server will automatically
-	// compress documents as they are transferred to reduce bandwidth requirements.
-	// This field must be one of "None" or "Auto", defaulting to "Auto".
-	// +kubebuilder:default="Auto"
-	// +kubebuilder:validation:Enum=None;Auto
-	CompressionType CompressionType `json:"compressionType,omitempty"`
+	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
+	// When false (default), replication restarts after filter changes. When true, continues without restart.
+	// +kubebuilder:default=false
+	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
 
-	// FilterExpression allows certain documents to be filtered out of the replication.
-	FilterExpression string `json:"filterExpression,omitempty"`
+	// === PER-REPLICATION MUTABLE SETTINGS (all pointers) ===
 
-	// Paused allows a replication to be stopped and restarted without having to
-	// restart the replication from the beginning.
-	Paused bool `json:"paused,omitempty"`
+	// Per-replication-only settings (cannot be set globally)
 
-	// Mobile is the configuration for the mobile replication.
-	// This feature is available in Couchbase Server 7.6.4 and later.
-	Mobile MobileReplication `json:"-" annotation:"mobile"`
+	// ColMappingRules defines collection-related rules for explicit mapping or migration.
+	ColMappingRules *ColMappingRules `json:"colMappingRules,omitempty"`
 
-	// ConflictResolution is the configuration for the conflict resolution.
-	// Conflicts will be logged to a specified conflict collection.
+	// CollectionsExplicitMapping enables explicit mapping rules from colMappingRules.
+	// When true, replication uses explicit mapping rules and implicit bucket-level mapping does not occur.
+	// +kubebuilder:default=false
+	CollectionsExplicitMapping *bool `json:"collectionsExplicitMapping,omitempty"`
+
+	// CollectionsMigrationMode enables migration mode for default collection documents.
+	// When true, documents from source default collection are replicated to collections determined by mapping rules.
+	// +kubebuilder:default=false
+	CollectionsMigrationMode *bool `json:"collectionsMigrationMode,omitempty"`
+
+	// FilterExpression is a filter expression to match against documents in the source bucket.
+	// Each document that produces a successful match is replicated.
+	FilterExpression *string `json:"filterExpression,omitempty"`
+
+	// PauseRequested indicates whether the replication has been issued a pause request.
+	// +kubebuilder:default=false
+	PauseRequested *bool `json:"pauseRequested,omitempty"`
+
+	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
+	// Nil values can be used to explicitly unset merge functions for specific collections.
+	MergeFunctionMapping MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
+
+	// Shared settings (can override global defaults)
+
+	// CheckpointInterval is the interval in seconds between checkpoints.
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:validation:Maximum=14400
+	CheckpointInterval *int32 `json:"checkpointInterval,omitempty"`
+
+	// CollectionsOSOMode optimizes for out-of-order mutations streaming (performance toggle).
+	// This field defaults to true.
+	CollectionsOSOMode *bool `json:"collectionsOSOMode,omitempty"`
+
+	// CompressionType is the compression used for XDCR traffic.
+	// +kubebuilder:validation:Enum=Auto;None
+	CompressionType *string `json:"compressionType,omitempty"`
+
+	// DesiredLatency is the target latency (ms) for high-priority replications.
+	// This field defaults to 50.
+	DesiredLatency *int32 `json:"desiredLatency,omitempty"`
+
+	// DocBatchSizeKb is the size (KB) of document batches sent.
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=10000
+	DocBatchSizeKb *int32 `json:"docBatchSizeKb,omitempty"`
+
+	// FailureRestartInterval is the seconds to wait before restarting after a failure.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=300
+	FailureRestartInterval *int32 `json:"failureRestartInterval,omitempty"`
+
+	// FilterBinary specifies whether binary documents should be replicated.
+	FilterBinary *bool `json:"filterBinary,omitempty"`
+
+	// FilterBypassExpiry when true, TTL is removed before replication.
+	FilterBypassExpiry *bool `json:"filterBypassExpiry,omitempty"`
+
+	// FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
+	FilterBypassUncommittedTxn *bool `json:"filterBypassUncommittedTxn,omitempty"`
+
+	// FilterDeletion when true, delete mutations are filtered out (not replicated).
+	FilterDeletion *bool `json:"filterDeletion,omitempty"`
+
+	// FilterExpiration when true, expiry mutations are filtered out.
+	FilterExpiration *bool `json:"filterExpiration,omitempty"`
+
+	// HlvPruningWindowSec is the HLV pruning window (sec) for hybrid logical vector conflict resolution.
+	// +kubebuilder:validation:Minimum=1
+	HlvPruningWindowSec *int32 `json:"hlvPruningWindowSec,omitempty"`
+
+	// JSFunctionTimeoutMs is the timeout for JS custom conflict-resolution functions (ms).
+	// +kubebuilder:validation:Minimum=1
+	JSFunctionTimeoutMs *int32 `json:"jsFunctionTimeoutMs,omitempty"`
+
+	// LogLevel is the logging verbosity for XDCR.
+	// +kubebuilder:validation:Enum=Error;Info;Debug;Trace
+	LogLevel *string `json:"logLevel,omitempty"`
+
+	// Mobile enables mobile (Sync Gateway) active-active mode.
+	// +kubebuilder:validation:Enum=Off;Active
+	Mobile *string `json:"mobile,omitempty"`
+
+	// NetworkUsageLimit is the upper limit for replication network usage (MB/s).
+	// +kubebuilder:validation:Minimum=0
+	NetworkUsageLimit *int32 `json:"networkUsageLimit,omitempty"`
+
+	// OptimisticReplicationThreshold is the size threshold below which documents replicate optimistically.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=20971520
+	OptimisticReplicationThreshold *int32 `json:"optimisticReplicationThreshold,omitempty"`
+
+	// Priority is the resource priority for replication streams.
+	// +kubebuilder:validation:Enum=High;Medium;Low
+	Priority *string `json:"priority,omitempty"`
+
+	// RetryOnRemoteAuthErr defines whether to retry connections when remote auth fails.
+	RetryOnRemoteAuthErr *bool `json:"retryOnRemoteAuthErr,omitempty"`
+
+	// RetryOnRemoteAuthErrMaxWaitSec is the max wait seconds for retrying remote auth failures.
+	// Only effective if retryOnRemoteAuthErr is true.
+	// +kubebuilder:validation:Minimum=1
+	RetryOnRemoteAuthErrMaxWaitSec *int32 `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+
+	// SourceNozzlePerNode is the number of source nozzles (parallelism) per source node.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	SourceNozzlePerNode *int32 `json:"sourceNozzlePerNode,omitempty"`
+
+	// StatsInterval is the interval for statistics updates (ms).
+	// +kubebuilder:validation:Minimum=200
+	// +kubebuilder:validation:Maximum=600000
+	StatsInterval *int32 `json:"statsInterval,omitempty"`
+
+	// TargetNozzlePerNode is the number of target nozzles per target node (parallelism).
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	TargetNozzlePerNode *int32 `json:"targetNozzlePerNode,omitempty"`
+
+	// WorkerBatchSize is the number of mutations per worker batch.
+	// +kubebuilder:validation:Minimum=500
+	// +kubebuilder:validation:Maximum=10000
+	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
+
+	// ConflictLogging is the configuration for conflict logging.
 	// This feature is available in Couchbase Server 8.0.0 and later.
 	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
 }
@@ -4312,6 +4443,144 @@ type XDCR struct {
 	// Defaults to false
 	// +kubebuilder:default=false
 	DisablePrechecks bool `json:"-" annotation:"disablePrechecks"`
+
+	// GlobalSettings configures cluster-wide XDCR advanced settings.
+	// These settings provide defaults for new replications and do not affect existing
+	// replications retroactively. Only specified fields are applied; unspecified fields
+	// are left unchanged on the server.
+	GlobalSettings *XDCRGlobalSettings `json:"globalSettings,omitempty"`
+}
+
+// XDCRGlobalSettings defines the subset of XDCR advanced settings that are cluster-wide
+// (global) or are allowed to be set globally by Couchbase Server. Fields are pointers so that
+// omission does not change the corresponding server-side value.
+type XDCRGlobalSettings struct {
+	// Global / Per-replication settings (can be set globally as defaults)
+
+	// CheckpointInterval is the interval in seconds between checkpoints.
+	// This field defaults to 600 and must be between 60 and 14400.
+	// +kubebuilder:validation:Minimum=60
+	// +kubebuilder:validation:Maximum=14400
+	CheckpointInterval *int32 `json:"checkpointInterval,omitempty"`
+
+	// CollectionsOSOMode optimizes for out-of-order mutations streaming (performance toggle).
+	// This field defaults to true.
+	CollectionsOSOMode *bool `json:"collectionsOSOMode,omitempty"`
+
+	// CompressionType is the compression used for XDCR traffic.
+	// This field must be one of "Auto" or "None", defaulting to "Auto".
+	// +kubebuilder:validation:Enum=Auto;None
+	CompressionType *string `json:"compressionType,omitempty"`
+
+	// DesiredLatency is the target latency (ms) for high-priority replications;
+	// lower values result in faster replication but greater load.
+	// This field defaults to 50.
+	DesiredLatency *int32 `json:"desiredLatency,omitempty"`
+
+	// DocBatchSizeKb is the size (KB) of document batches sent.
+	// This field defaults to 2048 and must be between 10 and 10000.
+	// +kubebuilder:validation:Minimum=10
+	// +kubebuilder:validation:Maximum=10000
+	DocBatchSizeKb *int32 `json:"docBatchSizeKb,omitempty"`
+
+	// FailureRestartInterval is the seconds to wait before restarting after a failure.
+	// This field defaults to 10 and must be between 1 and 300.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=300
+	FailureRestartInterval *int32 `json:"failureRestartInterval,omitempty"`
+
+	// FilterBypassExpiry when true, TTL is removed before replication.
+	// This field defaults to false.
+	FilterBypassExpiry *bool `json:"filterBypassExpiry,omitempty"`
+
+	// FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
+	// This field defaults to false.
+	FilterBypassUncommittedTxn *bool `json:"filterBypassUncommittedTxn,omitempty"`
+
+	// FilterDeletion when true, delete mutations are filtered out (not replicated).
+	// This field defaults to false.
+	FilterDeletion *bool `json:"filterDeletion,omitempty"`
+
+	// FilterExpiration when true, expiry mutations are filtered out.
+	// This field defaults to false.
+	FilterExpiration *bool `json:"filterExpiration,omitempty"`
+
+	// HlvPruningWindowSec is the HLV pruning window (sec) for hybrid logical vector conflict resolution.
+	// +kubebuilder:validation:Minimum=1
+	HlvPruningWindowSec *int32 `json:"hlvPruningWindowSec,omitempty"`
+
+	// JSFunctionTimeoutMs is the timeout for JS custom conflict-resolution functions (ms).
+	// +kubebuilder:validation:Minimum=1
+	JSFunctionTimeoutMs *int32 `json:"jsFunctionTimeoutMs,omitempty"`
+
+	// LogLevel is the logging verbosity for XDCR.
+	// This field must be one of "Error", "Info", "Debug", or "Trace", defaulting to "Info".
+	// +kubebuilder:validation:Enum=Error;Info;Debug;Trace
+	LogLevel *string `json:"logLevel,omitempty"`
+
+	// Mobile enables mobile (Sync Gateway) active-active mode.
+	// This field must be one of "Active" or "Off", defaulting to "Off".
+	// +kubebuilder:validation:Enum=Off;Active
+	Mobile *string `json:"mobile,omitempty"`
+
+	// NetworkUsageLimit is the upper limit for replication network usage (MB/s).
+	// This field defaults to 0 (no limit).
+	// +kubebuilder:validation:Minimum=0
+	NetworkUsageLimit *int32 `json:"networkUsageLimit,omitempty"`
+
+	// OptimisticReplicationThreshold is the size threshold below which documents replicate optimistically.
+	// This field defaults to 256 and must be between 0 and 20971520.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=20971520
+	OptimisticReplicationThreshold *int32 `json:"optimisticReplicationThreshold,omitempty"`
+
+	// Priority is the resource priority for replication streams.
+	// This field must be one of "High", "Medium", or "Low", defaulting to "High".
+	// +kubebuilder:validation:Enum=High;Medium;Low
+	Priority *string `json:"priority,omitempty"`
+
+	// RetryOnRemoteAuthErr defines whether to retry connections when remote auth fails.
+	// This field defaults to true.
+	RetryOnRemoteAuthErr *bool `json:"retryOnRemoteAuthErr,omitempty"`
+
+	// RetryOnRemoteAuthErrMaxWaitSec is the max wait seconds for retrying remote auth failures.
+	// Only effective if retryOnRemoteAuthErr is true. This field defaults to 360.
+	// +kubebuilder:validation:Minimum=1
+	RetryOnRemoteAuthErrMaxWaitSec *int32 `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+
+	// SourceNozzlePerNode is the number of source nozzles (parallelism) per source node.
+	// This field defaults to 2 and must be between 1 and 100.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	SourceNozzlePerNode *int32 `json:"sourceNozzlePerNode,omitempty"`
+
+	// StatsInterval is the interval for statistics updates (ms).
+	// This field defaults to 1000 and must be between 200 and 600000.
+	// +kubebuilder:validation:Minimum=200
+	// +kubebuilder:validation:Maximum=600000
+	StatsInterval *int32 `json:"statsInterval,omitempty"`
+
+	// TargetNozzlePerNode is the number of target nozzles per target node (parallelism).
+	// This field defaults to 2 and must be between 1 and 100.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	TargetNozzlePerNode *int32 `json:"targetNozzlePerNode,omitempty"`
+
+	// WorkerBatchSize is the number of mutations per worker batch.
+	// This field defaults to 500 and must be between 500 and 10000.
+	// +kubebuilder:validation:Minimum=500
+	// +kubebuilder:validation:Maximum=10000
+	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
+
+	// Global-only settings (cannot be set per-replication)
+
+	// GoGC is the Go GC target percentage for XDCR processes.
+	// This field can be an integer (0-100) as a string or "off", defaulting to "100".
+	GoGC *string `json:"goGC,omitempty"`
+
+	// GoMaxProcs is the max threads per node for XDCR.
+	// This field defaults to 4.
+	GoMaxProcs *int32 `json:"goMaxProcs,omitempty"`
 }
 
 type Buckets struct {

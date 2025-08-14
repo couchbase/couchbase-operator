@@ -162,26 +162,53 @@ func validateBackupsImmutableFields(currentCluster *cluster.Cluster) []error {
 func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
-	replicationChanges, err := currentCluster.GatherReplicationChanges()
+	// Skip validation if cluster is not ready or XDCR is not managed
+	if !currentCluster.GetCouchbaseCluster().Spec.XDCR.Managed {
+		return nil
+	}
+
+	// Build desired state from CRDs - this might fail if remote clusters aren't configured yet
+	desiredStates, err := currentCluster.BuildDesiredReplicationStates()
 	if err != nil {
 		if checkIsMemberError(err) {
 			return nil
 		}
-
-		return append(errs, err)
+		// If remote clusters aren't ready, skip validation rather than failing
+		return nil
 	}
 
-	for actual, update := range replicationChanges {
-		if actual.FromBucket != update.FromBucket {
-			errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
+	// Get current replications from server
+	currentReplications, err := currentCluster.ListReplications()
+	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
 		}
+		// If server isn't ready, skip validation
+		return nil
+	}
 
-		if actual.ToBucket != update.ToBucket {
-			errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
+	// Fetch current state from server
+	currentStates, err := currentCluster.FetchCurrentReplicationStates(currentReplications)
+	if err != nil {
+		if checkIsMemberError(err) {
+			return nil
 		}
+		// If we can't fetch current state, skip validation
+		return nil
+	}
 
-		if actual.FilterExpression != update.FilterExpression {
-			errs = append(errs, util.NewUpdateError("spec.filterExpression", "body"))
+	// Check for immutable field changes (only user-configurable fields)
+	for key, desiredState := range desiredStates {
+		if currentState, exists := currentStates[key]; exists {
+			// Only validate truly immutable user-configurable fields
+			// Note: ToCluster, Type, ReplicationType are not user-configurable.
+			if currentState.Create.FromBucket != desiredState.Create.FromBucket {
+				errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
+			}
+
+			if currentState.Create.ToBucket != desiredState.Create.ToBucket {
+				errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
+			}
 		}
 	}
 

@@ -801,7 +801,8 @@ func TestXDCRFilterExp(t *testing.T) {
 
 	// When ready, establish the XDCR connection with the specified filter expression
 	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
-	replication.Spec.FilterExpression = `REGEXP_CONTAINS(META().id, "^doc.*$")`
+	filter := `REGEXP_CONTAINS(META().id, "^doc.*$")`
+	replication.Spec.FilterExpression = &filter
 
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
@@ -1932,8 +1933,8 @@ func TestXDCRMobileActive(t *testing.T) {
 	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
 
 	settings := e2eutil.MustGetReplicationSettings(t, kubernetes1, sourceCluster, replication, &sourceCluster.Spec.XDCR.RemoteClusters[0])
-	if settings.Mobile != "Active" {
-		e2eutil.Die(t, fmt.Errorf("Mobile is not Active: %s", settings.Mobile))
+	if settings.Mobile == nil || *settings.Mobile != "Active" {
+		e2eutil.Die(t, fmt.Errorf("Mobile is not Active: %v", settings.Mobile))
 	}
 }
 
