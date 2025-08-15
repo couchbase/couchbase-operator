@@ -1394,6 +1394,14 @@ type CouchbaseBucketSpec struct {
 	// +kubebuilder:default="valueOnly"
 	EvictionPolicy CouchbaseBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
 
+	// OnlineEvictionPolicyChange controls whether eviction policy changes can be made online
+	// without requiring a bucket restart. If set the eviction policy change will only take effect
+	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
+	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
+	// This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:validation:Optional
+	OnlineEvictionPolicyChange bool `json:"onlineEvictionPolicyChange,omitempty"`
+
 	// ConflictResolution defines how XDCR handles concurrent write conflicts.  Sequence number
 	// based resolution selects the document with the highest sequence number as the most recent.
 	// Timestamp based resolution selects the document that was written to most recently as the
@@ -1711,6 +1719,14 @@ type CouchbaseEphemeralBucketSpec struct {
 	// DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
 	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+
+	// OnlineEvictionPolicyChange controls whether eviction policy changes can be made online
+	// without requiring a bucket restart. If set the eviction policy change will only take effect
+	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
+	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
+	// This field is only supported for Couchbase Server 8.0.0+.
+	// +kubebuilder:validation:Optional
+	OnlineEvictionPolicyChange bool `json:"onlineEvictionPolicyChange,omitempty"`
 }
 
 type CouchbaseBucketWarmupBehavior string

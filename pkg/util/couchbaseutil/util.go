@@ -8,10 +8,12 @@ func BoolToInt(b bool) int {
 	return map[bool]int{false: 0, true: 1}[b]
 }
 
-func BoolToStr(b bool) string {
+// BoolToStr converts a boolean to a binary string ("1" or "0").
+func BoolToBinaryStr(b bool) string {
 	return strconv.Itoa(BoolToInt(b))
 }
 
+// BoolAsStr converts a boolean to a string ("true" or "false").
 func BoolAsStr(b bool) string {
 	if b {
 		return "true"

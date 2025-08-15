@@ -949,7 +949,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
 		c.needsUpgrade,
-		c.getBackendMigrationCandidates,
+		c.getBucketMigrationCandidates,
 	}
 
 	for _, getCandidatesFunc := range getCandidatesFuncs {
@@ -2053,7 +2053,7 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 	return false
 }
 
-func (c *Cluster) getBackendMigrationCandidates() (couchbaseutil.MemberSet, error) {
+func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error) {
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil, err
@@ -2073,8 +2073,8 @@ func (c *Cluster) getBackendMigrationCandidates() (couchbaseutil.MemberSet, erro
 
 	for _, bucket := range clusterBuckets {
 		for _, node := range bucket.Nodes {
-			// node.StorageBackend is empty if it matches the bucket storageMode
-			if node.StorageBackend != "" {
+			// node.StorageBackend/EvictionPolicy is empty if it matches the bucket storageMode/evictionPolicy
+			if node.StorageBackend != "" || node.EvictionPolicy != "" {
 				candidates.Add(c.members[node.HostName.GetMemberName()])
 			}
 		}
@@ -2111,7 +2111,7 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	candidates, err := c.getBackendMigrationCandidates()
+	candidates, err := c.getBucketMigrationCandidates()
 	if err != nil {
 		return err
 	}

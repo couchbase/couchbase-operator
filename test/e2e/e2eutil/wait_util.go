@@ -1088,18 +1088,93 @@ func WaitUntilAllNodeStorageBackendMatch(k8s *types.Cluster, couchbase *couchbas
 
 		for _, bucket := range clusterBuckets {
 			if bucket.StorageBackend != targetBackend {
-				return fmt.Errorf("waiting for bucket `%s` to have %s backend", targetBackend, bucket.BucketName)
+				return fmt.Errorf("waiting for bucket `%s` to have %s backend", bucket.BucketName, targetBackend)
 			}
 
 			for _, node := range bucket.Nodes {
 				// If node storage backend is empty it means it matches the global backend for bucket
 				if node.StorageBackend != "" && node.StorageBackend != string(targetBackend) {
-					return fmt.Errorf("waiting for node `%s` to have %s backend", targetBackend, node.HostName)
+					return fmt.Errorf("waiting for node `%s` to have %s backend", node.HostName, targetBackend)
 				}
 			}
 		}
 		return nil
 	})
+}
+
+func MustWaitUntilAllNodeEvictionPolicyMatch(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, targetEvictionPolicy string) {
+	if err := WaitUntilAllNodeEvictionPolicyMatch(k8s, couchbase, timeout, targetEvictionPolicy); err != nil {
+		Die(t, err)
+	}
+}
+
+func WaitUntilAllNodeEvictionPolicyMatch(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration, targetEvictionPolicy string) error {
+	return retryutil.RetryFor(timeout, func() error {
+		currCluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(couchbase.Namespace).Get(context.Background(), couchbase.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// user must also be in couchbase
+		client, err := CreateAdminConsoleClient(k8s, currCluster)
+		if err != nil {
+			return err
+		}
+
+		clusterBuckets := couchbaseutil.BucketStatusList{}
+		if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(client.client, client.host); err != nil {
+			return err
+		} else if len(clusterBuckets) == 0 {
+			return fmt.Errorf("no buckets found")
+		}
+
+		for _, bucket := range clusterBuckets {
+			if bucket.EvictionPolicy != targetEvictionPolicy {
+				return fmt.Errorf("waiting for bucket `%s` to have %s eviction policy", bucket.BucketName, targetEvictionPolicy)
+			}
+
+			for _, node := range bucket.Nodes {
+				// If node storage backend is empty it means it matches the global backend for bucket
+				if node.EvictionPolicy != "" && node.EvictionPolicy != targetEvictionPolicy {
+					return fmt.Errorf("waiting for node `%s` to have %s eviction policy", node.HostName, targetEvictionPolicy)
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func NodesMustNotHaveClusterEvictionPolicy(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	err := retryutil.AssertFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			Die(t, err)
+		}
+
+		clusterBuckets := couchbaseutil.BucketStatusList{}
+		if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(client.client, client.host); err != nil {
+			Die(t, err)
+		} else if len(clusterBuckets) == 0 {
+			Die(t, fmt.Errorf("no buckets found"))
+		}
+
+		for _, bucket := range clusterBuckets {
+			bucketEvictionPolicy := bucket.EvictionPolicy
+
+			for _, node := range bucket.Nodes {
+				// If node storage backend is empty it means it matches the global backend for bucket
+				if node.EvictionPolicy == "" || node.EvictionPolicy == bucketEvictionPolicy {
+					Die(t, fmt.Errorf("node `%s` should not have %s eviction policy", node.HostName, bucketEvictionPolicy))
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
 }
 
 func MustWaitUntilUserExists(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) {

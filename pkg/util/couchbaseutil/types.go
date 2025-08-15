@@ -301,7 +301,7 @@ type NodeInfo struct {
 	Version            string               `json:"version"`
 
 	// This property is only available if a bucket in the cluster has been changed from
-	// couchstore to magma.
+	// couchstore to magma or vice versa.
 	StorageBackend string `json:"storageBackend"`
 
 	// AddressFamily is the actual network configuration of the node, and controls
@@ -320,6 +320,10 @@ type NodeInfo struct {
 	// ExternalListeners are... something, but you need to have a corresponding one
 	// in order to set the address family, or node encryption.
 	ExternalListeners []ExternalListener `json:"externalListeners"`
+
+	// This property is only available if a bucket has eviction policy changed with
+	// noRestart set to true.
+	EvictionPolicy string `json:"evictionPolicy"`
 }
 
 type AvailableStorageInfo map[AvailableStorageType][]StorageInfo
@@ -511,6 +515,7 @@ type Bucket struct {
 	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
 	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
 	DurabilityImpossibleFallback      DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+	NoRestart                         *bool                        `json:"noRestart,omitempty"`
 }
 
 type BucketList []Bucket
@@ -874,6 +879,18 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 
 	// Generic things across couchbase/ephemeral
 	b.EvictionPolicy = status.EvictionPolicy
+
+	// If the eviction policy for any node is different from the bucket, then we can
+	// infer that the eviction policy was changed with noRestart set to true.
+	for _, node := range status.Nodes {
+		if node.EvictionPolicy != "" && node.EvictionPolicy != status.EvictionPolicy {
+			noRestart := true
+			b.NoRestart = &noRestart
+
+			break
+		}
+	}
+
 	b.ConflictResolution = status.ConflictResolution
 	b.BucketReplicas = status.ReplicaNumber
 	b.CompressionMode = status.CompressionMode
@@ -926,10 +943,14 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	data.Set("authType", "sasl")
 	data.Set("compressionMode", string(b.CompressionMode))
-	data.Set("flushEnabled", BoolToStr(b.EnableFlush))
+	data.Set("flushEnabled", BoolToBinaryStr(b.EnableFlush))
 
 	if b.EvictionPolicy != "" {
 		data.Set("evictionPolicy", b.EvictionPolicy)
+
+		if update && b.NoRestart != nil {
+			data.Set("noRestart", BoolAsStr(*b.NoRestart))
+		}
 	}
 
 	if b.IoPriority == IoPriorityTypeLow {
@@ -945,7 +966,7 @@ func (b *Bucket) FormEncode(update bool) []byte {
 	}
 
 	if b.BucketType == "couchbase" {
-		data.Set("replicaIndex", BoolToStr(b.EnableIndexReplica))
+		data.Set("replicaIndex", BoolToBinaryStr(b.EnableIndexReplica))
 
 		data.Set("autoCompactionDefined", BoolAsStr(b.AutoCompactionSettings.Enabled))
 

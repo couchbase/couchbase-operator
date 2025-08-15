@@ -176,6 +176,11 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			} else {
 				b.DurabilityImpossibleFallback = constants.DurabilityImpossibleFallbackDefault
 			}
+
+			if bucket.Spec.OnlineEvictionPolicyChange {
+				noRestart := true
+				b.NoRestart = &noRestart
+			}
 		}
 
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
@@ -302,6 +307,11 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 	} else {
 		defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
 		b.MemoryHighWatermark = &defaultMemoryHighWatermark
+	}
+
+	if bucket.Spec.OnlineEvictionPolicyChange {
+		noRestart := true
+		b.NoRestart = &noRestart
 	}
 
 	b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
@@ -523,6 +533,14 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				if r.BucketType == constants.BucketTypeMemcached && memcachedUnsupported {
 					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "bucket-name", r.BucketName)
 					continue
+				}
+
+				// We have to do this to prevent deepEqual from updating the bucket just because of the NoRestart field.
+				// This is OK to do as we don't actually get a.NoRestart from the API endpoint we just infer it and
+				// once an offline eviction policy change is requested, we can't do anything about it so this difference doesn't matter.
+				// On the other hande if a.NoRestart is true and r.NoRestart is false, we want to switch from and online upgrade to an offline upgrade.
+				if r.NoRestart != nil && *r.NoRestart && r.NoRestart != a.NoRestart {
+					a.NoRestart = r.NoRestart
 				}
 
 				if a.BucketType != r.BucketType {
