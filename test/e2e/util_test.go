@@ -683,6 +683,7 @@ func registerTests() {
 		framework.NewTestDef(TestRBACWithMultipleBucketMultiScopeSingleCollectionRole).WithTags(TagSuiteP1, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACWithMultipleBucketMultiScopeMultiCollectionRole).WithTags(TagSuiteP1, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACWithBucketSelector).WithTags(TagSuiteP1, TagFeatureRBAC),
+		framework.NewTestDef(TestRBACUpdateUser).WithTags(TagSuiteP1, TagFeatureRBAC),
 		// end RBAC
 
 		framework.NewTestDef(TestFailedBackupBehaviour).WithTags(TagSuiteP1, TagFeatureBackup),

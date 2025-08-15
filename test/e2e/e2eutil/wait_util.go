@@ -1597,7 +1597,7 @@ func waitUntilUsersExist(t *testing.T, k8s *types.Cluster, couchbase *couchbasev
 			}
 
 			if !userFound {
-				return fmt.Errorf("user %s not found", user)
+				return fmt.Errorf("user %s not found", user.ID)
 			}
 		}
 

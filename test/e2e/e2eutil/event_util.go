@@ -178,6 +178,10 @@ func NewMemberRemovedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.E
 	return k8sutil.MemberRemoveEvent(name, cl)
 }
 
+func UserEditedEvent(cl *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) *v1.Event {
+	return k8sutil.UserEditEvent(user.Name, cl)
+}
+
 // VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
 func VolumeExpansionSuccessSequence() eventschema.Validatable {
 	return eventschema.Sequence{

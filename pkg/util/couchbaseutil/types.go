@@ -625,6 +625,7 @@ type User struct {
 	ID       string     `json:"id"`
 	Roles    []UserRole `json:"roles"`
 	Groups   []string   `json:"groups"`
+	Locked   *bool      `json:"locked,omitempty"`
 }
 
 type UserList []User
@@ -1418,6 +1419,10 @@ func (u *User) FormEncode() []byte {
 	data.Set("name", u.Name)
 	data.Set("roles", strings.Join(roles, ","))
 	data.Set("groups", strings.Join(u.Groups, ","))
+
+	if u.Locked != nil {
+		data.Set("locked", BoolAsStr(*u.Locked))
+	}
 
 	return []byte(data.Encode())
 }

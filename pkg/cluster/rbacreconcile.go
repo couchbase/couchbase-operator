@@ -577,12 +577,45 @@ func (c *Cluster) gatherSubjectsForRoleBinding(roleBinding *couchbasev2.Couchbas
 	return subjects, nil
 }
 
+func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, atLeast80 bool) (couchbaseutil.User, error) {
+	user := couchbaseutil.User{
+		ID:     subject.Spec.Name,
+		Name:   subject.Spec.FullName,
+		Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
+	}
+
+	if atLeast80 {
+		userLockedDefault := false
+		user.Locked = &userLockedDefault
+
+		if subject.Spec.Locked != nil {
+			user.Locked = subject.Spec.Locked
+		}
+	}
+
+	if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
+		password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
+		if err != nil {
+			return user, err
+		}
+
+		user.Password = password
+	}
+
+	return user, nil
+}
+
 // generateUsers generates all the user configurations that can be created, under the
 // control of the groups parameter (e.g. the group must exist before creating the dependent
 // user).
 func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User, map[string]bool, error) {
 	users := map[string]couchbaseutil.User{}
 	unReconcilableUsers := map[string]bool{}
+
+	atLeast80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, nil, err
+	}
 
 	// For every rolebinding (SM: this is not filtered, why??) check if the
 	// group exists, if it does, then accumulate the subjects, that are selected
@@ -618,19 +651,9 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 
 			user, ok := users[subject.Name]
 			if !ok {
-				user = couchbaseutil.User{
-					ID:     subject.Spec.Name,
-					Name:   subject.Spec.FullName,
-					Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
-				}
-
-				if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
-					password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
-					if err != nil {
-						return nil, nil, err
-					}
-
-					user.Password = password
+				user, err = c.createAPIUserFromSubject(subject, atLeast80)
+				if err != nil {
+					return nil, nil, err
 				}
 			}
 
@@ -682,6 +705,10 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		return nil, err
 	}
 
+	shouldUpdateUser := func(r couchbaseutil.User, e couchbaseutil.User) bool {
+		return !reflect.DeepEqual(r.Groups, e.Groups) || !reflect.DeepEqual(r.Name, e.Name) || !reflect.DeepEqual(r.Locked, e.Locked)
+	}
+
 	existingUserNames := []string{}
 
 	for _, user := range *existingUsers {
@@ -690,7 +717,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		if r, ok := requestedUsers[e.ID]; ok {
 			// requested user exists
 			// update user if group bindings change
-			if !reflect.DeepEqual(r.Groups, e.Groups) || !reflect.DeepEqual(r.Name, e.Name) {
+			if shouldUpdateUser(r, e) {
 				if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
 					return existingUserNames, err
 				}

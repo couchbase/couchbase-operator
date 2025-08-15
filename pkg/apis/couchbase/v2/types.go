@@ -2083,6 +2083,10 @@ type CouchbaseUserSpec struct {
 
 	// Name of Kubernetes secret with password for Couchbase domain.
 	AuthSecret string `json:"authSecret,omitempty"`
+
+	// Locked defines whether the user is locked.
+	// This field is only available for Couchbase Server 8.0.0+.
+	Locked *bool `json:"locked,omitempty"`
 }
 
 // CouchbaseUserList is a list of Couchbase users.

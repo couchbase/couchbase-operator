@@ -1292,3 +1292,43 @@ func TestRBACWithBucketSelector(t *testing.T) {
 	role2 := e2eutil.NewRole(string(couchbasev2.RoleDataReader)).WithBucket(bucket2.GetName()).Create()
 	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role, role2)
 }
+
+// Create cluster with user and cluster admin binding.
+func TestRBACUpdateUser(t *testing.T) {
+	// Plaform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Create user
+	user, group, _ := mustCreateBoundUser(t, kubernetes)
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, 4*time.Minute)
+
+	locked := true
+	e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/locked", &locked), time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 1*time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Locked", &locked), time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * UserCreated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Check if group has appropriate role
+	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
+	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
+}

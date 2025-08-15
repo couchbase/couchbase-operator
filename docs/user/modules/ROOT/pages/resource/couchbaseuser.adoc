@@ -19,6 +19,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseusers-spec-authdomain,authDomain>>: ""
   <<couchbaseusers-spec-authsecret,authSecret>>: ""
   <<couchbaseusers-spec-fullname,fullName>>: ""
+  <<couchbaseusers-spec-locked,locked>>: false
   <<couchbaseusers-spec-name,name>>: ""
 ----
 
@@ -96,6 +97,17 @@ Name of Kubernetes secret with password for Couchbase domain.
 ==== Description
 
 Full Name of Couchbase user.
+
+=== couchbaseusers.spec.locked
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Locked defines whether the user is locked.
+This field is only available for Couchbase Server 8.0.0+.
 
 === couchbaseusers.spec.name
 

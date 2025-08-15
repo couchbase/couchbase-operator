@@ -107,6 +107,24 @@ func MustPatchGroup(t *testing.T, k8s *types.Cluster, group *couchbasev2.Couchba
 	return group
 }
 
+func PatchUser(k8s *types.Cluster, user *couchbasev2.CouchbaseUser, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseUser, error) {
+	resource, err := patchResource(k8s, user, patches, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource.(*couchbasev2.CouchbaseUser), nil
+}
+
+func MustPatchUser(t *testing.T, k8s *types.Cluster, user *couchbasev2.CouchbaseUser, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseUser {
+	user, err := PatchUser(k8s, user, patches, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return user
+}
+
 // Patch CouchbaseRoleBinding.
 func PatchRoleBinding(k8s *types.Cluster, binding *couchbasev2.CouchbaseRoleBinding, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseRoleBinding, error) {
 	resource, err := patchResource(k8s, binding, patches, timeout)
