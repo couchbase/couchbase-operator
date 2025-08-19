@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"reflect"
@@ -279,7 +280,7 @@ func (c *Cluster) initializeClusterState() error {
 	// to go off the spec, not what is in memory.
 
 	// The only thing we want to keep are the failed serverGroups.
-	failedGroups, err := c.state.Get(persistence.FailedSchedulingServerGroups)
+	failedGroupsTracker, err := c.state.Get(persistence.FailedSchedulingServerGroupsTracker)
 	if err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
 		return err
 	}
@@ -288,8 +289,8 @@ func (c *Cluster) initializeClusterState() error {
 		return err
 	}
 
-	if failedGroups != "" {
-		if err := c.state.Insert(persistence.FailedSchedulingServerGroups, failedGroups); err != nil {
+	if failedGroupsTracker != "" {
+		if err := c.state.Upsert(persistence.FailedSchedulingServerGroupsTracker, failedGroupsTracker); err != nil {
 			return err
 		}
 	}
@@ -346,18 +347,24 @@ func (c *Cluster) addFailedSchedulingServerGroups(serverGroup string) error {
 		return nil
 	}
 
-	// Add the server groups that failed to schedule to the state.
-	failedGroups := []string{}
-
-	if failedGroupsString, err := c.state.Get(persistence.FailedSchedulingServerGroups); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
+	failedGroupsTracker, err := c.getFailedServerGroupsTracker()
+	if err != nil {
 		return err
-	} else if err == nil {
-		failedGroups = strings.Split(failedGroupsString, ServerGroupAvoidDelimiter)
 	}
 
-	failedGroups = append(failedGroups, serverGroup)
+	// Increment the count for the server group
+	if v, ok := failedGroupsTracker[serverGroup]; ok {
+		failedGroupsTracker[serverGroup] = v + 1
+	} else {
+		failedGroupsTracker[serverGroup] = 1
+	}
 
-	return c.state.Upsert(persistence.FailedSchedulingServerGroups, strings.Join(failedGroups, ServerGroupAvoidDelimiter))
+	b, err := json.Marshal(failedGroupsTracker)
+	if err != nil {
+		return err
+	}
+
+	return c.state.Upsert(persistence.FailedSchedulingServerGroupsTracker, string(b))
 }
 
 var readyConditions = []couchbasev2.ClusterConditionType{
@@ -399,7 +406,7 @@ func (c *Cluster) clearFailedSchedulingServerGroupsIfReady() {
 		return
 	}
 
-	if err := c.state.Delete(persistence.FailedSchedulingServerGroups); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
+	if err := c.state.Delete(persistence.FailedSchedulingServerGroupsTracker); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
 		log.Error(err, "Failed to clear failed scheduling server groups", "cluster", c.namespacedName())
 	}
 }

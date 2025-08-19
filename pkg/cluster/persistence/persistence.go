@@ -61,7 +61,9 @@ const (
 
 	UpgradeTime PersistentKind = "upgradeTime"
 
-	FailedSchedulingServerGroups PersistentKind = "failedSchedulingServerGroups"
+	// FailedSchedulingServerGroupsTracker is a map of the number of times a server group has failed to schedule.
+	// This is used to avoid scheduling to these server groups.
+	FailedSchedulingServerGroupsTracker PersistentKind = "failedSchedulingServerGroupsTracker"
 
 	HostnameAAadded = "hostnameAAadded"
 
@@ -285,7 +287,7 @@ func (p *persistentStorageImpl) Clear() error {
 	return p.apply(f)
 }
 
-// apply applies and flushes the config map to etcd to persist changes.
+// apply applies and flushes the secret to etcd to persist changes.
 func (p *persistentStorageImpl) apply(f func(*corev1.Secret) error) error {
 	callback := func() error {
 		secret, err := p.get()

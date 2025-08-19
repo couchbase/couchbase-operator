@@ -140,5 +140,9 @@ func (c *Cluster) GetHighestMemberVersion() string {
 
 	sort.Strings(versions)
 
+	if len(versions) == 0 {
+		return ""
+	}
+
 	return versions[len(versions)-1]
 }

@@ -2,9 +2,9 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	goerrors "errors"
@@ -56,13 +56,51 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 	return c.waitForCreatePod(ctx, m)
 }
 
-func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
-	if failedSchedulingServerGroups, err := c.state.Get(persistence.FailedSchedulingServerGroups); err == nil {
-		c.scheduler.AvoidGroups(strings.Split(failedSchedulingServerGroups, ServerGroupAvoidDelimiter)...)
+type failedSchedulingServerGroupsTracker map[string]int
 
-		log.Info("Avoiding server groups", "cluster", c.namespacedName(), "serverGroups", failedSchedulingServerGroups)
-	} else if !goerrors.Is(err, persistence.ErrKeyError) {
-		log.Error(err, "Failed to get failed scheduling server groups", "cluster", c.namespacedName())
+func (c *Cluster) getServerGroupsToAvoid() ([]string, error) {
+	failedGroupsTracker, err := c.getFailedServerGroupsTracker()
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter and return only server groups that have failed more than twice
+	var result []string
+
+	for group, count := range failedGroupsTracker {
+		if count > 1 {
+			result = append(result, group)
+		}
+	}
+
+	return result, nil
+}
+
+func (c *Cluster) getFailedServerGroupsTracker() (failedSchedulingServerGroupsTracker, error) {
+	failedGroupsTracker := failedSchedulingServerGroupsTracker{}
+
+	trackerString, err := c.state.Get(persistence.FailedSchedulingServerGroupsTracker)
+	if err != nil {
+		// If the key doesn't exist, just return an empty tracker
+		if goerrors.Is(err, persistence.ErrKeyError) {
+			return failedGroupsTracker, nil
+		}
+
+		return nil, err
+	}
+
+	if err := json.Unmarshal([]byte(trackerString), &failedGroupsTracker); err != nil {
+		return nil, err
+	}
+
+	return failedGroupsTracker, nil
+}
+
+func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+	if serverGroupsToAvoid, err := c.getServerGroupsToAvoid(); err == nil && len(serverGroupsToAvoid) > 0 {
+		c.scheduler.AvoidGroups(serverGroupsToAvoid...)
+
+		log.Info("Avoiding server groups", "cluster", c.namespacedName(), "serverGroups", serverGroupsToAvoid)
 	}
 
 	pod, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig())
