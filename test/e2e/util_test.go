@@ -184,6 +184,7 @@ func registerTests() {
 		framework.NewTestDef(TestFTSCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestSyncGatewayCreateLocal).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureSyncGateway),
 		framework.NewTestDef(TestMovePod).WithTags(TagSuiteSanity),
+		framework.NewTestDef(TestMovePodDuringUpgrade).WithTags(TagSuiteSanity, TagFeatureUpgrade),
 		framework.NewTestDef(TestServicelessClass).WithTags(TagSuiteSanity),
 
 		// High priority tests.

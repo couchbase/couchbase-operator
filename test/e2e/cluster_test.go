@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -1324,6 +1325,92 @@ func TestMovePod(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMovePodDuringUpgrade is a bit of a special test. We cannot use the standard event based validation as the order
+// of events can potentially change every time. Therefore, the best test to make sure a pod isn't moved as we're upgrading
+// another pod is to make sure we always have more than two nodes healthy in a 3 node cluster as we should only ever have
+// one node down at a time.
+func TestMovePodDuringUpgrade(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster.
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	var annotations = make(map[string]string)
+	annotations["cao.couchbase.com/reschedule"] = "true"
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + cluster.Name,
+	}
+
+	var podsList = corev1.PodList{}
+
+	var podsCall = func() error {
+		pods, err := kubernetes.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+		podsList = *pods
+		return nil
+	}
+
+	err := retryutil.Retry(context.Background(), 5*time.Minute, podsCall)
+
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	callback := func(ctx context.Context) {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				info := e2eutil.MustGetPoolsDefault(t, kubernetes, cluster)
+
+				healthyNodes := 0
+
+				for _, node := range info.Nodes {
+					if node.Status == "healthy" {
+						healthyNodes++
+					}
+				}
+
+				if healthyNodes < 2 {
+					e2eutil.Die(t, fmt.Errorf("too few healthy nodes (%d) to move pod during upgrade", healthyNodes))
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go callback(ctx)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustAddCustomAnnotationAndLabelsSinglePod(t, kubernetes, annotations, nil, podsList.Items[0])
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 }
 
 func TestServicelessClass(t *testing.T) {

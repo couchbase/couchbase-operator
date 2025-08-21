@@ -65,6 +65,8 @@ const (
 	// This is used to avoid scheduling to these server groups.
 	FailedSchedulingServerGroupsTracker PersistentKind = "failedSchedulingServerGroupsTracker"
 
+	RescheduleInProgress PersistentKind = "rescheduleInProgress"
+
 	HostnameAAadded = "hostnameAAadded"
 
 	MembersWithHostnameAAadded = "membersWithHostnameAAadded"
@@ -79,6 +81,8 @@ const (
 
 	// MirWatchdogInterval is the interval in at which the manual intervention required checks will run.
 	MirWatchdogInterval = "mirWatchdogInterval"
+
+	NodeReplacementInProgress = "nodeReplacementInProgress"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

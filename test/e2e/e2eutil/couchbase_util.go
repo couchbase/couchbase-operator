@@ -1840,6 +1840,27 @@ func GetTerseClusterInfo(client *CouchbaseClient) (*couchbaseutil.TerseClusterIn
 	return info, nil
 }
 
+func GetPoolsDefault(client *CouchbaseClient) (*couchbaseutil.ClusterInfo, error) {
+	info := &couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	return info, nil
+}
+
+func MustGetPoolsDefault(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *couchbaseutil.ClusterInfo {
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	info, err := GetPoolsDefault(client)
+
+	if err != nil {
+		Die(t, err)
+	}
+
+	return info
+}
+
 func MustGetOrchestratorNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) string {
 	client := MustCreateAdminConsoleClient(t, k8s, cluster)
 

@@ -33,6 +33,9 @@ const (
 	EventReasonExpandVolumeFallback  = "ExpandVolumeFallback"
 	EventReasonExpandVolumeSucceeded = "ExpandVolumeSucceeded"
 	EventReasonReconcileFailed       = "ReconciliationFailed"
+	EventReasonRescheduleStarted     = "RescheduleStarted"
+	EventReasonRescheduleFailed      = "RescheduleFailed"
+	EventReasonRescheduleCompleted   = "RescheduleCompleted"
 
 	// Bucket lifecycle.
 	EventReasonBucketCreated = "BucketCreated"
@@ -121,6 +124,32 @@ const (
 	EventReasonEncryptionKeyDeleted = "EncryptionKeyDeleted"
 )
 
+func RescheduleStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRescheduleStarted
+	event.Message = "Reschedule of a pod has started"
+
+	return event
+}
+
+func RescheduleFailedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonRescheduleFailed
+	event.Message = "Reschedule of a pod has failed"
+
+	return event
+}
+
+func RescheduleCompletedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRescheduleCompleted
+	event.Message = "Reschedule of a pod has completed"
+
+	return event
+}
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

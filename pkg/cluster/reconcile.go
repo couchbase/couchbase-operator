@@ -19,7 +19,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,7 +78,15 @@ func (l reconcileFuncList) run(c *Cluster) error {
 //   - Topology and feature updates.
 func (c *Cluster) reconcile() error {
 	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
-	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
+
+	ctx, cancel := context.WithCancel(c.ctx)
+
+	closeFunc := func() {
+		cancel()
+		log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
+	}
+
+	defer closeFunc()
 
 	pods := c.getClusterPods()
 
@@ -179,6 +186,8 @@ func (c *Cluster) reconcile() error {
 	if err != nil {
 		return err
 	}
+
+	go fsm.handleMoveNodes(c, ctx)
 
 	if aborted, err := c.reconcileMembers(fsm); err != nil {
 		return err
