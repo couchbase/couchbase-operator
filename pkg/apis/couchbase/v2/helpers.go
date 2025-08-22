@@ -724,11 +724,19 @@ func (cs *ClusterStatus) SetRebalancingCondition() {
 	c := newClusterCondition(ClusterConditionRebalancing, v1.ConditionTrue, "Rebalancing", "Rebalancing the cluster")
 	cs.setClusterCondition(c)
 }
+func (cs *ClusterStatus) AddRebalanceAttempt() {
+	cs.RebalanceAttempts++
+}
+
+func (cs *ClusterStatus) GetRebalanceAttempts() int {
+	return cs.RebalanceAttempts
+}
 
 func (cs *ClusterStatus) SetBalancedCondition() {
 	c := newClusterCondition(ClusterConditionBalanced, v1.ConditionTrue, "Balanced",
 		"Data is equally distributed across all nodes in the cluster")
 	cs.setClusterCondition(c)
+	cs.RebalanceAttempts = 0
 }
 
 func (cs *ClusterStatus) SetManualInterventionRequiredCondition(message string) {

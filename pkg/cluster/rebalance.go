@@ -266,7 +266,9 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	}
 
 	if err != nil {
+		c.cluster.Status.AddRebalanceAttempt()
 		c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
+
 		return err
 	}
 

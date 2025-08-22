@@ -434,6 +434,7 @@ The following is an example resource, depicting the overall structure and any de
     - ""
     <<couchbaseclusters-status-members-unready,unready>>:
     - ""
+  <<couchbaseclusters-status-rebalanceattempts,rebalanceAttempts>>: 0
   <<couchbaseclusters-status-size,size>>: 0
   <<couchbaseclusters-status-users,users>>:
   - ""
@@ -6134,6 +6135,16 @@ The member names are the same as the Couchbase pod names.
 Unready are the Couchbase members not clustered or unready to serve
 client requests.
 The member names are the same as the Couchbase pod names.
+
+=== couchbaseclusters.status.rebalanceAttempts
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+RebalanceAttempts is the number of consecutive reconciliation loops that the operator has failed to rebalance after exhausting all retries.
 
 === couchbaseclusters.status.size
 

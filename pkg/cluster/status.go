@@ -258,3 +258,13 @@ func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) bool {
 
 	return false
 }
+
+func areAllNodesActive(nodeStates NodeStateMap) bool {
+	for _, nodeState := range nodeStates {
+		if nodeState != NodeStateActive {
+			return false
+		}
+	}
+
+	return true
+}

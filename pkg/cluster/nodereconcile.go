@@ -281,15 +281,15 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		}
 	}
 
-	var reconcileRetries = 1
+	var rebalanceRetries = 1
 
 	val, err := c.state.Get(persistence.RebalanceRetries)
 	if err == nil {
 		rr, err := strconv.Atoi(val)
 		if err != nil {
-			reconcileRetries = 1
+			rebalanceRetries = 1
 		} else {
-			reconcileRetries = rr
+			rebalanceRetries = rr
 		}
 	}
 
@@ -315,7 +315,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 		c: c,
 
-		rebalanceRetries: uint(reconcileRetries),
+		rebalanceRetries: uint(rebalanceRetries),
 
 		upgradedMembers: couchbaseutil.NewMemberSet(),
 

@@ -1886,3 +1886,110 @@ func PatchReplicationSettings(t *testing.T, k8s *types.Cluster, couchbase *couch
 		return jsonpatch.Apply(settings, patches.Patches())
 	})
 }
+
+func MustRebalanceCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := RebalanceCluster(t, k8s, couchbase, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func RebalanceCluster(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		known := make(couchbaseutil.OTPNodeList, len(info.Nodes))
+
+		for i, node := range info.Nodes {
+			known[i] = node.OTPNode
+		}
+
+		return couchbaseutil.Rebalance(known, nil).On(client.client, client.host)
+	}
+
+	if err := retryutil.Retry(ctx, 5*time.Second, callback); err != nil {
+		return err
+	}
+
+	callback = func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if info.RebalanceStatus != "none" {
+			return fmt.Errorf("rebalance is still running")
+		}
+
+		if info.Balanced != true {
+			return fmt.Errorf("cluster is not balanced")
+		}
+
+		// Cluster is balanced
+		return nil
+	}
+
+	return retryutil.Retry(ctx, time.Second, callback)
+}
+
+func MustFailRebalance(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	if err := FailRebalance(t, k8s, couchbase, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// FailRebalance will send stopRebalance requests to the cluster until a RebalanceIncomplete event is found.
+// This method will not work if rebalances are failing due to invalid POST requests during one of the rebalance attempts.
+// The tasks api isn't consistent in returning the actual task status if rebalances are retried in short order, so you should
+// be using this method in conjunction with a cluster that has enough data to slow down the rebalance.
+func FailRebalance(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	// We only want to return once we find a RebalanceIncomplete event after calling this method.
+	startTime := time.Now()
+
+	return retryutil.Retry(ctx, time.Second, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		// Stop the current rebalance if it's running.
+		tasks := &couchbaseutil.TaskList{}
+		if err := couchbaseutil.ListTasks(tasks).On(client.client, client.host); err == nil {
+			if task, err := tasks.GetTask(couchbaseutil.TaskTypeRebalance); err == nil && task.Status == "running" {
+				_ = couchbaseutil.StopRebalance().On(client.client, client.host)
+			}
+		}
+
+		// Search for a RebalanceIncomplete event.
+		events, err := GetCouchbaseEvents(k8s.KubeClient, couchbase)
+		if err != nil {
+			return err
+		}
+
+		for _, event := range events {
+			if event.Reason == "RebalanceIncomplete" && event.CreationTimestamp.After(startTime) {
+				return nil // Success - found a RebalanceIncomplete
+			}
+		}
+
+		return fmt.Errorf("waiting for RebalanceIncomplete event")
+	})
+}

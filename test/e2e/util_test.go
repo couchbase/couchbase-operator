@@ -784,6 +784,7 @@ func registerTests() {
 		// Manual Intervention Required Watchdog tests
 		framework.NewTestDef(TestMirWatchdogDisabledAnnotation).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentials).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogOnConsecutiveRebalanceFailures).WithTags(TagSuiteP1, TagFeatureMir),
 	}
 }
 

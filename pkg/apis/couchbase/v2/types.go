@@ -4816,6 +4816,9 @@ type ClusterStatus struct {
 
 	// LastUpdateTime is the time that the cluster object was last updated.
 	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
+
+	// RebalanceAttempts is the number of consecutive reconciliation loops that the operator has failed to rebalance after exhausting all retries.
+	RebalanceAttempts int `json:"rebalanceAttempts,omitempty"`
 }
 
 // ServerClassStatus summarizes memory allocations to make configuration easier.
