@@ -3483,15 +3483,21 @@ type DNS struct {
 }
 
 // AutoResourceAllocation automatically populates Kubernetes resource requests.
+// +kubebuilder:validation:XValidation:rule="!has(self.overheadPercent) || !has(self.overheadMemory)",message="at most one of spec.autoResourceAllocation.overheadPercent or spec.autoResourceAllocation.overheadMemory can be set"
 type AutoResourceAllocation struct {
 	// Enabled defines whether auto-resource allocation is enabled.
 	Enabled bool `json:"enabled,omitempty"`
 
 	// OverheadPercent defines the amount of memory above that required for individual
 	// services on a pod.  For Couchbase Server this should be approximately 25%.
-	// +kubebuilder:default=25
 	// +kubebuilder:validation:Minimum=0
 	OverheadPercent int `json:"overheadPercent,omitempty"`
+
+	// OverheadMemory defines a static amount of memory above that required for
+	// individual services on a pod. This will override `overheadPercent` if both
+	// are specified.
+	// +kubebuilder:validation:Type=string
+	OverheadMemory *resource.Quantity `json:"overheadMemory,omitempty"`
 
 	// CPURequests automatically populates the CPU requests across all Couchbase
 	// server pods.  The default value of "2", is the minimum recommended number of

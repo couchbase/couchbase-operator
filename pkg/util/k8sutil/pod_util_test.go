@@ -424,3 +424,67 @@ func pvcClaimFromJSON(jsonString string, t *testing.T) v1.PersistentVolumeClaimS
 func strPtr(s string) *string {
 	return &s
 }
+
+func TestCalculatePodResourcesOverhead(t *testing.T) {
+	tests := []struct {
+		name            string
+		overheadPercent int
+		overheadMemory  *resource.Quantity
+		expectedMemory  resource.Quantity
+	}{
+		{
+			name:            "OverheadPercent only (35% of 100Mi base = 135Mi total)",
+			overheadPercent: 35,
+			overheadMemory:  nil,
+			expectedMemory:  resource.MustParse("135Mi"),
+		},
+		{
+			name:            "OverheadMemory only (1Gi overhead = 100Mi base + 1Gi overhead = 1124Mi total)",
+			overheadPercent: 0,
+			overheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI),
+			expectedMemory:  resource.MustParse("1124Mi"),
+		},
+		{
+			name:            "OverheadMemory takes precedence (1Gi overhead = 100Mi base + 1Gi overhead = 1124Mi total)",
+			overheadPercent: 25,
+			overheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI),
+			expectedMemory:  resource.MustParse("1124Mi"),
+		},
+		{
+			name:            "Neither specified (default 25% overhead = 125Mi total)",
+			overheadPercent: 0,
+			overheadMemory:  nil,
+			expectedMemory:  resource.MustParse("125Mi"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					AutoResourceAllocation: &couchbasev2.AutoResourceAllocation{
+						Enabled:         true,
+						OverheadPercent: test.overheadPercent,
+						OverheadMemory:  test.overheadMemory,
+					},
+					ClusterSettings: couchbasev2.ClusterConfig{
+						DataServiceMemQuota: resource.NewQuantity(100*1024*1024, resource.BinarySI), // Base memory for DataService
+					},
+				},
+			}
+
+			config := &couchbasev2.ServerConfig{
+				Services: []couchbasev2.Service{couchbasev2.DataService},
+			}
+
+			// Call couchbaseContainer which internally uses the logic we modified
+			container := couchbaseContainer(cluster, config, "some-image")
+
+			actualMemory := container.Resources.Requests[v1.ResourceMemory]
+
+			if !actualMemory.Equal(test.expectedMemory) {
+				t.Errorf("for %s: expected total memory %s, got %s", test.name, test.expectedMemory.String(), actualMemory.String())
+			}
+		})
+	}
+}

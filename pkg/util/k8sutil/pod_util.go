@@ -1846,67 +1846,93 @@ func couchbaseContainer(cluster *couchbasev2.CouchbaseCluster, config *couchbase
 		c.SecurityContext = cluster.Spec.Security.SecurityContext
 	}
 
-	// Automatically configure resource memory requests, mainly for lazy users,
-	// but also to prevent memory starvation and random OOM killings.  It must
-	// be manually enabled to maintain current behaviour...
 	autoAllocation := cluster.Spec.AutoResourceAllocation != nil && cluster.Spec.AutoResourceAllocation.Enabled
 
 	if autoAllocation {
-		memoryRequests := resource.Quantity{}
+		addTotalMemoryRequests(cluster, config, &c)
 
-		for _, service := range config.Services {
-			switch service {
-			case couchbasev2.DataService:
-				memoryRequests.Add(*cluster.Spec.ClusterSettings.DataServiceMemQuota)
-			case couchbasev2.IndexService:
-				memoryRequests.Add(*cluster.Spec.ClusterSettings.IndexServiceMemQuota)
-			case couchbasev2.QueryService:
-				if cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
-					memoryRequests.Add(*cluster.Spec.ClusterSettings.QueryServiceMemQuota)
-				}
-			case couchbasev2.SearchService:
-				memoryRequests.Add(*cluster.Spec.ClusterSettings.SearchServiceMemQuota)
-			case couchbasev2.EventingService:
-				memoryRequests.Add(*cluster.Spec.ClusterSettings.EventingServiceMemQuota)
-			case couchbasev2.AnalyticsService:
-				memoryRequests.Add(*cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota)
-			}
-		}
-
-		overhead := resource.NewQuantity((memoryRequests.Value()*int64(cluster.Spec.AutoResourceAllocation.OverheadPercent))/100, resource.BinarySI)
-
-		memoryRequests.Add(*overhead)
-
-		// Add requests and limits maps if they don't exist.
-		if c.Resources.Requests == nil {
-			c.Resources.Requests = v1.ResourceList{}
-		}
-
-		if c.Resources.Limits == nil {
-			c.Resources.Limits = v1.ResourceList{}
-		}
-
-		// If not already defined explicitly add in the implicit memory request.
-		if _, ok := c.Resources.Requests[v1.ResourceMemory]; !ok {
-			c.Resources.Requests[v1.ResourceMemory] = memoryRequests
-		}
-
-		// If not already defined explicitly add in the implicit cpu request.
-		if cluster.Spec.AutoResourceAllocation.CPURequests != nil {
-			if _, ok := c.Resources.Requests[v1.ResourceCPU]; !ok {
-				c.Resources.Requests[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPURequests
-			}
-		}
-
-		// If not already defined explicitly add in the implicit cpu limit.
-		if cluster.Spec.AutoResourceAllocation.CPULimits != nil {
-			if _, ok := c.Resources.Limits[v1.ResourceCPU]; !ok {
-				c.Resources.Limits[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPULimits
-			}
-		}
+		applyCPURequestsAndLimits(cluster, &c)
 	}
 
 	return c
+}
+
+// addTotalMemoryRequests calculates the total memory requests for a container,
+// including service allocations and any specified overhead, and applies them to the container.
+func addTotalMemoryRequests(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ServerConfig, c *v1.Container) {
+	memoryRequests := resource.Quantity{}
+
+	for _, service := range config.Services {
+		switch service {
+		case couchbasev2.DataService:
+			memoryRequests.Add(*cluster.Spec.ClusterSettings.DataServiceMemQuota)
+		case couchbasev2.IndexService:
+			memoryRequests.Add(*cluster.Spec.ClusterSettings.IndexServiceMemQuota)
+		case couchbasev2.QueryService:
+			if cluster.Spec.ClusterSettings.QueryServiceMemQuota != nil {
+				memoryRequests.Add(*cluster.Spec.ClusterSettings.QueryServiceMemQuota)
+			}
+		case couchbasev2.SearchService:
+			memoryRequests.Add(*cluster.Spec.ClusterSettings.SearchServiceMemQuota)
+		case couchbasev2.EventingService:
+			memoryRequests.Add(*cluster.Spec.ClusterSettings.EventingServiceMemQuota)
+		case couchbasev2.AnalyticsService:
+			memoryRequests.Add(*cluster.Spec.ClusterSettings.AnalyticsServiceMemQuota)
+		}
+	}
+
+	// Calculate overhead.
+	var overhead *resource.Quantity
+
+	defaultOverheadPercent := 25
+
+	if cluster.Spec.AutoResourceAllocation.OverheadPercent != 0 {
+		overhead = resource.NewQuantity((memoryRequests.Value()*int64(cluster.Spec.AutoResourceAllocation.OverheadPercent))/100, resource.BinarySI)
+	} else {
+		overhead = resource.NewQuantity((memoryRequests.Value()*int64(defaultOverheadPercent))/100, resource.BinarySI)
+	}
+
+	if cluster.Spec.AutoResourceAllocation.OverheadMemory != nil {
+		overhead = cluster.Spec.AutoResourceAllocation.OverheadMemory
+	}
+
+	memoryRequests.Add(*overhead)
+
+	// Add requests map if it doesn't exist.
+	if c.Resources.Requests == nil {
+		c.Resources.Requests = v1.ResourceList{}
+	}
+
+	// If not already defined explicitly add in the implicit memory request.
+	if _, ok := c.Resources.Requests[v1.ResourceMemory]; !ok {
+		c.Resources.Requests[v1.ResourceMemory] = memoryRequests
+	}
+}
+
+// applyCPURequestsAndLimits applies CPU requests and limits to the container if auto-allocation is enabled.
+func applyCPURequestsAndLimits(cluster *couchbasev2.CouchbaseCluster, c *v1.Container) {
+	// Add requests and limits maps if they don't exist.
+	if c.Resources.Requests == nil {
+		c.Resources.Requests = v1.ResourceList{}
+	}
+
+	if c.Resources.Limits == nil {
+		c.Resources.Limits = v1.ResourceList{}
+	}
+
+	// If not already defined explicitly add in the implicit cpu request.
+	if cluster.Spec.AutoResourceAllocation.CPURequests != nil {
+		if _, ok := c.Resources.Requests[v1.ResourceCPU]; !ok {
+			c.Resources.Requests[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPURequests
+		}
+	}
+
+	// If not already defined explicitly add in the implicit cpu limit.
+	if cluster.Spec.AutoResourceAllocation.CPULimits != nil {
+		if _, ok := c.Resources.Limits[v1.ResourceCPU]; !ok {
+			c.Resources.Limits[v1.ResourceCPU] = *cluster.Spec.AutoResourceAllocation.CPULimits
+		}
+	}
 }
 
 // Init container is same as runtime container except it used

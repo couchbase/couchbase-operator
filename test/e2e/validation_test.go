@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -5030,4 +5031,50 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-80.yaml"})
+}
+
+// TestAutoResourceAllocationValidation tests all scenarios for autoResourceAllocation
+// overhead validation including mutual exclusivity and individual field acceptance.
+func TestAutoResourceAllocationValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateAutoResourceAllocationOverheadPercentOnly",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
+					Enabled:         true,
+					OverheadPercent: 20,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateAutoResourceAllocationOverheadMemoryOnly",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
+					Enabled:        true,
+					OverheadMemory: resource.NewQuantity(1*1024*1024*1024, resource.BinarySI), // 1Gi
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateAutoResourceAllocationNeitherSpecified",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
+					Enabled: true,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateAutoResourceAllocationOverheadPercentAndOverheadMemorySet",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
+					Enabled:         true,
+					OverheadPercent: 35,
+					OverheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI), // 1Gi
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`at most one of spec.autoResourceAllocation.overheadPercent or spec.autoResourceAllocation.overheadMemory can be set`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }

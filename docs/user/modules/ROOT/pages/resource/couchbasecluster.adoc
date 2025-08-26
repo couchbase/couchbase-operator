@@ -23,7 +23,8 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-autoresourceallocation-cpulimits,cpuLimits>>: 4
     <<couchbaseclusters-spec-autoresourceallocation-cpurequests,cpuRequests>>: 2
     <<couchbaseclusters-spec-autoresourceallocation-enabled,enabled>>: false
-    <<couchbaseclusters-spec-autoresourceallocation-overheadpercent,overheadPercent>>: 25
+    <<couchbaseclusters-spec-autoresourceallocation-overheadmemory,overheadMemory>>: ""
+    <<couchbaseclusters-spec-autoresourceallocation-overheadpercent,overheadPercent>>: 0
   <<couchbaseclusters-spec-autoscalestabilizationperiod,autoscaleStabilizationPeriod>>: ""
   <<couchbaseclusters-spec-backup,backup>>:
     <<couchbaseclusters-spec-backup-annotations,annotations>>:
@@ -595,13 +596,26 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 
 Enabled defines whether auto-resource allocation is enabled.
 
+=== couchbaseclusters.spec.autoResourceAllocation.overheadMemory
+
+==== Constraints
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
+
+==== Description
+
+OverheadMemory defines a static amount of memory above that required for
+individual services on a pod.
+This will override `overheadPercent` if both
+are specified.
+
 === couchbaseclusters.spec.autoResourceAllocation.overheadPercent
 
 ==== Constraints
 
 *Type*: `integer`
-
-*Default*: `25`
 
 *Minimum*: `0`
 
