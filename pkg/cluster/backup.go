@@ -1799,7 +1799,7 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 	}
 
 	// Cleanup completed restores so that aren't rerun.
-	if currentjob.Status.Succeeded == 1 {
+	if currentjob.Status.Succeeded == 1 && !currentRestore.Spec.PreserveRestoreRecord {
 		if err := c.deleteCouchbaseRestore(currentRestore.Name); err != nil {
 			return err
 		}

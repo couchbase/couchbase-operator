@@ -18,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil/cloud"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -3419,4 +3420,108 @@ func TestBackupAndKeepRestore(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestBackupAndRestorePreserveRecord(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+
+	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+
+	// wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// delete bucket
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	// wait for new bucket to be created and create new bucket
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	t.Run("PreserveRestoreRecord_True", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		// create new restore with preserveRestoreRecord: true
+		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).WithPreserveRestoreRecord(true).MustCreate(t, kubernetes)
+
+		// restore job is too fast, just validate bucket item count
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+		// Wait for restore job to complete
+		time.Sleep(30 * time.Second)
+
+		// Verify that the restore record was preserved
+		r, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackupRestores(backup.Namespace).Get(context.Background(), restore.Name, v1.GetOptions{})
+		if err != nil {
+			e2eutil.Die(t, fmt.Errorf("Failed to get restore record: %w", err))
+		}
+
+		if r == nil {
+			e2eutil.Die(t, fmt.Errorf("Restore record should have been preserved but was not found"))
+		}
+
+		// Cleanup the restore record manually since it was preserved
+		err = kubernetes.CRClient.CouchbaseV2().CouchbaseBackupRestores(backup.Namespace).Delete(context.Background(), restore.Name, v1.DeleteOptions{})
+		if err != nil {
+			e2eutil.Die(t, fmt.Errorf("Failed to cleanup preserved restore record: %w", err))
+		}
+	})
+
+	t.Run("PreserveRestoreRecord_False", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		// create new restore with default behavior (preserveRestoreRecord: false)
+		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).MustCreate(t, kubernetes)
+
+		// restore job is too fast, just validate bucket item count
+		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+		// Wait longer to ensure the restore job completes and cleanup happens
+		time.Sleep(30 * time.Second)
+
+		// Verify that the restore record was deleted (default behavior)
+		_, err := kubernetes.CRClient.CouchbaseV2().CouchbaseBackupRestores(backup.Namespace).Get(context.Background(), restore.Name, v1.GetOptions{})
+		if err == nil {
+			e2eutil.Die(t, fmt.Errorf("Restore record should have been deleted but still exists"))
+		}
+
+		// Check that we get a NotFound error, which is expected
+		if !errors.IsNotFound(err) {
+			e2eutil.Die(t, fmt.Errorf("Expected NotFound error but got: %w", err))
+		}
+	})
 }
