@@ -5134,6 +5134,7 @@ type EncryptionAtRestSpec struct {
 	Audit *EncryptionAtRestUsageConfiguration `json:"audit,omitempty"`
 
 	// Log is the configuration for encryption at rest for log files.
+	// NOTE: Enabled encryption at rest of logs will break fluent-bit log streaming.
 	Log *EncryptionAtRestUsageConfiguration `json:"log,omitempty"`
 }
 
@@ -5143,7 +5144,8 @@ type EncryptionAtRestUsageConfiguration struct {
 	Enabled bool `json:"enabled"`
 
 	// Key is the name of the encryption key to use for encryption at rest.
-	Key string `json:"key,omitempty"`
+	// If not provided, the operator will use the master password.
+	KeyName string `json:"keyName,omitempty"`
 
 	// RotationInterval is the interval at which the encryption key will be rotated.
 	// Must be greater or equal to 7 days. Default is 30 days.

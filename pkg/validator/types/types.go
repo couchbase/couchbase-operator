@@ -62,6 +62,8 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	GetCouchbaseScopes(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error)
 	// GetCouchbaseScopeGroups returns the selected scope groups.
 	GetCouchbaseScopeGroups(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeGroupList, error)
+	// GetCouchbaseEncryptionKeys returns all encryption keys for a specified selector.
+	GetCouchbaseEncryptionKeys(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error)
 	// GetCouchbaseMigrationeplications returns all migration replications for a specified selector.
 	GetCouchbaseMigrationReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error)
 }
@@ -350,6 +352,17 @@ func (ab *kubeAbstractionImpl) GetCouchbaseScopeGroups(namespace string, selecto
 	}
 
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).List(context.Background(), listOpts)
+}
+
+// GetCouchbaseEncryptionKeys returns all encryption keys for a specified selector.
+func (ab *kubeAbstractionImpl) GetCouchbaseEncryptionKeys(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error) {
+	listOpts := metav1.ListOptions{}
+
+	if selector != nil {
+		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	}
+
+	return ab.couchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.Background(), listOpts)
 }
 
 // ValidatorOptions are configurable, as opposed to required, bits of the

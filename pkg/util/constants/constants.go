@@ -310,3 +310,15 @@ const (
 const (
 	DefaultAllowFailoverEphemeralNoReplicas = false
 )
+
+// Encryption at rest usage types.
+const (
+	// EncryptionAtRestUsageConfiguration is the usage type for configuration encryption.
+	EncryptionAtRestUsageConfiguration = "configuration"
+
+	// EncryptionAtRestUsageAudit is the usage type for audit encryption.
+	EncryptionAtRestUsageAudit = "audit"
+
+	// EncryptionAtRestUsageLog is the usage type for log encryption.
+	EncryptionAtRestUsageLog = "log"
+)

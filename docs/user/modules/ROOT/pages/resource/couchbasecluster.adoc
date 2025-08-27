@@ -268,19 +268,19 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-security-encryptionatrest,encryptionAtRest>>:
       <<couchbaseclusters-spec-security-encryptionatrest-audit,audit>>:
         <<couchbaseclusters-spec-security-encryptionatrest-audit-enabled,enabled>>: false
-        <<couchbaseclusters-spec-security-encryptionatrest-audit-key,key>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-audit-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-audit-keyname,keyName>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-audit-rotationinterval,rotationInterval>>: 720h
       <<couchbaseclusters-spec-security-encryptionatrest-configuration,configuration>>:
         <<couchbaseclusters-spec-security-encryptionatrest-configuration-enabled,enabled>>: false
-        <<couchbaseclusters-spec-security-encryptionatrest-configuration-key,key>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-configuration-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-configuration-keyname,keyName>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-configuration-rotationinterval,rotationInterval>>: 720h
       <<couchbaseclusters-spec-security-encryptionatrest-enabled,enabled>>: false
       <<couchbaseclusters-spec-security-encryptionatrest-log,log>>:
         <<couchbaseclusters-spec-security-encryptionatrest-log-enabled,enabled>>: false
-        <<couchbaseclusters-spec-security-encryptionatrest-log-key,key>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-log-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-log-keyname,keyName>>: ""
         <<couchbaseclusters-spec-security-encryptionatrest-log-rotationinterval,rotationInterval>>: 720h
       <<couchbaseclusters-spec-security-encryptionatrest-selector,selector>>:
         <<couchbaseclusters-spec-security-encryptionatrest-selector-matchexpressions,matchExpressions>>:
@@ -4042,16 +4042,6 @@ Audit is the configuration for encryption at rest for the cluster.
 
 Enabled enables encryption at rest for the cluster.
 
-=== couchbaseclusters.spec.security.encryptionAtRest.audit.key
-
-==== Constraints
-
-*Type*: `string`
-
-==== Description
-
-Key is the name of the encryption key to use for encryption at rest.
-
 === couchbaseclusters.spec.security.encryptionAtRest.audit.keyLifetime
 
 ==== Constraints
@@ -4065,6 +4055,17 @@ Key is the name of the encryption key to use for encryption at rest.
 KeyLifetime is the lifetime of the encryption key.
 Must be greater or equal to 30 days.
 Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit.keyName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+If not provided, the operator will use the master password.
 
 === couchbaseclusters.spec.security.encryptionAtRest.audit.rotationInterval
 
@@ -4102,16 +4103,6 @@ Configuration defines how the configurations on the cluster should be encrypted 
 
 Enabled enables encryption at rest for the cluster.
 
-=== couchbaseclusters.spec.security.encryptionAtRest.configuration.key
-
-==== Constraints
-
-*Type*: `string`
-
-==== Description
-
-Key is the name of the encryption key to use for encryption at rest.
-
 === couchbaseclusters.spec.security.encryptionAtRest.configuration.keyLifetime
 
 ==== Constraints
@@ -4125,6 +4116,17 @@ Key is the name of the encryption key to use for encryption at rest.
 KeyLifetime is the lifetime of the encryption key.
 Must be greater or equal to 30 days.
 Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration.keyName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+If not provided, the operator will use the master password.
 
 === couchbaseclusters.spec.security.encryptionAtRest.configuration.rotationInterval
 
@@ -4159,6 +4161,7 @@ Enabled is a boolean that enables the encryption at rest.
 ==== Description
 
 Log is the configuration for encryption at rest for log files.
+NOTE: Enabled encryption at rest of logs will break fluent-bit log streaming.
 
 === couchbaseclusters.spec.security.encryptionAtRest.log.enabled
 
@@ -4171,16 +4174,6 @@ Log is the configuration for encryption at rest for log files.
 ==== Description
 
 Enabled enables encryption at rest for the cluster.
-
-=== couchbaseclusters.spec.security.encryptionAtRest.log.key
-
-==== Constraints
-
-*Type*: `string`
-
-==== Description
-
-Key is the name of the encryption key to use for encryption at rest.
 
 === couchbaseclusters.spec.security.encryptionAtRest.log.keyLifetime
 
@@ -4195,6 +4188,17 @@ Key is the name of the encryption key to use for encryption at rest.
 KeyLifetime is the lifetime of the encryption key.
 Must be greater or equal to 30 days.
 Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log.keyName
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+If not provided, the operator will use the master password.
 
 === couchbaseclusters.spec.security.encryptionAtRest.log.rotationInterval
 

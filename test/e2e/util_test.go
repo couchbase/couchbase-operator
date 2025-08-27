@@ -128,6 +128,8 @@ func registerTests() {
 		framework.NewTestDef(TestMidUpgradeImageValidations).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCouchbaseClusterWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAnnotationWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationEncryptionKey).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationEncryptionAtRest).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),

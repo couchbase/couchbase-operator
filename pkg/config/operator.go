@@ -338,6 +338,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				couchbasev2.ClusterCRDResourcePlural + "/finalizers",
 				// Not supported by GKE 1.13 for some odd reason
 				// couchbasev2.ClusterCRDResourcePlural + "/status",
+				couchbasev2.EncryptionKeyCRDResourcePlural,
 			},
 			Verbs: []string{
 				"get",    // used by the operator to update status.

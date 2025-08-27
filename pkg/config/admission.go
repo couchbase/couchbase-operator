@@ -422,6 +422,7 @@ func (o *generateAdmissionOptions) getAdmissionRole() runtime.Object {
 				couchbasev2.ScopeCRDResourcePlural,
 				couchbasev2.ScopeGroupCRDResourcePlural,
 				couchbasev2.MigrationReplicationCRDResourcePlural,
+				couchbasev2.EncryptionKeyCRDResourcePlural,
 			},
 			Verbs: []string{
 				"get",

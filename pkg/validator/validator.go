@@ -55,6 +55,8 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 		return []string{}, validationv2.CheckConstraintsScope(v, t)
 	case *couchbasev2.CouchbaseScopeGroup:
 		return []string{}, validationv2.CheckConstraintsScopeGroup(v, t)
+	case *couchbasev2.CouchbaseEncryptionKey:
+		return []string{}, validationv2.CheckConstraintsEncryptionKey(v, t)
 	}
 
 	return nil, nil
