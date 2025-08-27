@@ -27,6 +27,8 @@ type Interface interface {
 	CouchbaseCollections() CouchbaseCollectionInformer
 	// CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
 	CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer
+	// CouchbaseEncryptionKeys returns a CouchbaseEncryptionKeyInformer.
+	CouchbaseEncryptionKeys() CouchbaseEncryptionKeyInformer
 	// CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.
 	CouchbaseEphemeralBuckets() CouchbaseEphemeralBucketInformer
 	// CouchbaseGroups returns a CouchbaseGroupInformer.
@@ -91,6 +93,11 @@ func (v *version) CouchbaseCollections() CouchbaseCollectionInformer {
 // CouchbaseCollectionGroups returns a CouchbaseCollectionGroupInformer.
 func (v *version) CouchbaseCollectionGroups() CouchbaseCollectionGroupInformer {
 	return &couchbaseCollectionGroupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// CouchbaseEncryptionKeys returns a CouchbaseEncryptionKeyInformer.
+func (v *version) CouchbaseEncryptionKeys() CouchbaseEncryptionKeyInformer {
+	return &couchbaseEncryptionKeyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // CouchbaseEphemeralBuckets returns a CouchbaseEphemeralBucketInformer.

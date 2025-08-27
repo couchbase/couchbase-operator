@@ -45,6 +45,10 @@ func (c *FakeCouchbaseV2) CouchbaseCollectionGroups(namespace string) v2.Couchba
 	return &FakeCouchbaseCollectionGroups{c, namespace}
 }
 
+func (c *FakeCouchbaseV2) CouchbaseEncryptionKeys(namespace string) v2.CouchbaseEncryptionKeyInterface {
+	return &FakeCouchbaseEncryptionKeys{c, namespace}
+}
+
 func (c *FakeCouchbaseV2) CouchbaseEphemeralBuckets(namespace string) v2.CouchbaseEphemeralBucketInterface {
 	return &FakeCouchbaseEphemeralBuckets{c, namespace}
 }

@@ -265,6 +265,30 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
   <<couchbaseclusters-spec-security,security>>:
     <<couchbaseclusters-spec-security-adminsecret,adminSecret>>: ""
+    <<couchbaseclusters-spec-security-encryptionatrest,encryptionAtRest>>:
+      <<couchbaseclusters-spec-security-encryptionatrest-audit,audit>>:
+        <<couchbaseclusters-spec-security-encryptionatrest-audit-enabled,enabled>>: false
+        <<couchbaseclusters-spec-security-encryptionatrest-audit-key,key>>: ""
+        <<couchbaseclusters-spec-security-encryptionatrest-audit-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-audit-rotationinterval,rotationInterval>>: 720h
+      <<couchbaseclusters-spec-security-encryptionatrest-configuration,configuration>>:
+        <<couchbaseclusters-spec-security-encryptionatrest-configuration-enabled,enabled>>: false
+        <<couchbaseclusters-spec-security-encryptionatrest-configuration-key,key>>: ""
+        <<couchbaseclusters-spec-security-encryptionatrest-configuration-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-configuration-rotationinterval,rotationInterval>>: 720h
+      <<couchbaseclusters-spec-security-encryptionatrest-enabled,enabled>>: false
+      <<couchbaseclusters-spec-security-encryptionatrest-log,log>>:
+        <<couchbaseclusters-spec-security-encryptionatrest-log-enabled,enabled>>: false
+        <<couchbaseclusters-spec-security-encryptionatrest-log-key,key>>: ""
+        <<couchbaseclusters-spec-security-encryptionatrest-log-keylifetime,keyLifetime>>: 8760h
+        <<couchbaseclusters-spec-security-encryptionatrest-log-rotationinterval,rotationInterval>>: 720h
+      <<couchbaseclusters-spec-security-encryptionatrest-selector,selector>>:
+        <<couchbaseclusters-spec-security-encryptionatrest-selector-matchexpressions,matchExpressions>>:
+        - <<couchbaseclusters-spec-security-encryptionatrest-selector-matchexpressions-key,key>>: ""
+          <<couchbaseclusters-spec-security-encryptionatrest-selector-matchexpressions-operator,operator>>: ""
+          <<couchbaseclusters-spec-security-encryptionatrest-selector-matchexpressions-values,values>>:
+          - ""
+        <<couchbaseclusters-spec-security-encryptionatrest-selector-matchlabels,matchLabels>>:
     <<couchbaseclusters-spec-security-ldap,ldap>>:
       <<couchbaseclusters-spec-security-ldap-authenticationenabled,authenticationEnabled>>: True
       <<couchbaseclusters-spec-security-ldap-authorizationenabled,authorizationEnabled>>: false
@@ -3984,6 +4008,283 @@ The admin secret must contain the keys "username" and "password".
 The password data
 must be at least 6 characters in length, and not contain the any of the characters
 `()<>,;:\"/[]?={}`.
+
+=== couchbaseclusters.spec.security.encryptionAtRest
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+EncryptionAtRest configures encryption at rest for the cluster.
+This field is only supported on Couchbase Server 8.0.0+.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Audit is the configuration for encryption at rest for the cluster.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit.enabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled enables encryption at rest for the cluster.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit.key
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit.keyLifetime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `8760h`
+
+==== Description
+
+KeyLifetime is the lifetime of the encryption key.
+Must be greater or equal to 30 days.
+Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.audit.rotationInterval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `720h`
+
+==== Description
+
+RotationInterval is the interval at which the encryption key will be rotated.
+Must be greater or equal to 7 days.
+Default is 30 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Configuration defines how the configurations on the cluster should be encrypted at rest.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration.enabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled enables encryption at rest for the cluster.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration.key
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration.keyLifetime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `8760h`
+
+==== Description
+
+KeyLifetime is the lifetime of the encryption key.
+Must be greater or equal to 30 days.
+Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.configuration.rotationInterval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `720h`
+
+==== Description
+
+RotationInterval is the interval at which the encryption key will be rotated.
+Must be greater or equal to 7 days.
+Default is 30 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled is a boolean that enables the encryption at rest.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Log is the configuration for encryption at rest for log files.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log.enabled
+
+==== Constraints
+
+*Required*
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled enables encryption at rest for the cluster.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log.key
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log.keyLifetime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `8760h`
+
+==== Description
+
+KeyLifetime is the lifetime of the encryption key.
+Must be greater or equal to 30 days.
+Default is 365 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.log.rotationInterval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `720h`
+
+==== Description
+
+RotationInterval is the interval at which the encryption key will be rotated.
+Must be greater or equal to 7 days.
+Default is 30 days.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Selector is a label selector used to select the encryption keys to use.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector.matchExpressions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+matchExpressions is a list of label selector requirements.
+The requirements are ANDed.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector.matchExpressions.key
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+key is the label key that the selector applies to.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector.matchExpressions.operator
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector.matchExpressions.values
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+values is an array of string values.
+If the operator is In or NotIn,
+the values array must be non-empty.
+If the operator is Exists or DoesNotExist,
+the values array must be empty.
+This array is replaced during a strategic
+merge patch.
+
+=== couchbaseclusters.spec.security.encryptionAtRest.selector.matchLabels
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+matchLabels is a map of {key,value} pairs.
+A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value".
+The requirements are ANDed.
 
 === couchbaseclusters.spec.security.ldap
 

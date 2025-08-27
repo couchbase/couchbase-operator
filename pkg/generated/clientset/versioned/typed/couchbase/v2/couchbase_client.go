@@ -24,6 +24,7 @@ type CouchbaseV2Interface interface {
 	CouchbaseClustersGetter
 	CouchbaseCollectionsGetter
 	CouchbaseCollectionGroupsGetter
+	CouchbaseEncryptionKeysGetter
 	CouchbaseEphemeralBucketsGetter
 	CouchbaseGroupsGetter
 	CouchbaseMemcachedBucketsGetter
@@ -66,6 +67,10 @@ func (c *CouchbaseV2Client) CouchbaseCollections(namespace string) CouchbaseColl
 
 func (c *CouchbaseV2Client) CouchbaseCollectionGroups(namespace string) CouchbaseCollectionGroupInterface {
 	return newCouchbaseCollectionGroups(c, namespace)
+}
+
+func (c *CouchbaseV2Client) CouchbaseEncryptionKeys(namespace string) CouchbaseEncryptionKeyInterface {
+	return newCouchbaseEncryptionKeys(c, namespace)
 }
 
 func (c *CouchbaseV2Client) CouchbaseEphemeralBuckets(namespace string) CouchbaseEphemeralBucketInterface {

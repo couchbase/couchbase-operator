@@ -38,6 +38,8 @@ const (
 	ScopeGroupCRDResourcePlural           = "couchbasescopegroups"
 	MigrationReplicationCRDResourceKind   = "CouchbaseMigrationReplication"
 	MigrationReplicationCRDResourcePlural = "couchbasemigrationreplications"
+	EncryptionKeyCRDResourceKind          = "CouchbaseEncryptionKey"
+	EncryptionKeyCRDResourcePlural        = "couchbaseencryptionkeys"
 
 	GroupVersion = "v2"
 	GroupName    = "couchbase.com"
@@ -59,6 +61,7 @@ const (
 	ScopeCRDName                = ScopeCRDResourcePlural + "." + GroupName
 	ScopeGroupCRDName           = ScopeGroupCRDResourcePlural + "." + GroupName
 	MigrationReplicationCRDName = MigrationReplicationCRDResourcePlural + "." + GroupName
+	EncryptionKeyCRDName        = EncryptionKeyCRDResourcePlural + "." + GroupName
 )
 
 var (
@@ -86,6 +89,7 @@ func init() {
 	SchemeBuilder.Register(&CouchbaseScope{}, &CouchbaseScopeList{})
 	SchemeBuilder.Register(&CouchbaseScopeGroup{}, &CouchbaseScopeGroupList{})
 	SchemeBuilder.Register(&CouchbaseMigrationReplication{}, &CouchbaseMigrationReplicationList{})
+	SchemeBuilder.Register(&CouchbaseEncryptionKey{}, &CouchbaseEncryptionKeyList{})
 }
 
 func Resource(resource string) schema.GroupResource {
@@ -122,6 +126,8 @@ func Resource(resource string) schema.GroupResource {
 		return schema.GroupResource{Group: GroupName, Resource: ScopeGroupCRDResourceKind}
 	case "couchbasemigrationreplication":
 		return schema.GroupResource{Group: GroupName, Resource: MigrationReplicationCRDResourceKind}
+	case "couchbaseencryptionkey":
+		return schema.GroupResource{Group: GroupName, Resource: EncryptionKeyCRDResourceKind}
 	default:
 		return schema.GroupResource{}
 	}

@@ -111,9 +111,14 @@ type Client struct {
 
 	// CouchbaseMigrationReplications is a read only cache of couchbase migration replications (namespace scoped)
 	CouchbaseMigrationReplications *CouchbaseMigrationReplicationCache
+
+	// CouchbaseEncryptionKeys is a read only cache of couchbase encryption keys (namespace scoped)
+	CouchbaseEncryptionKeys *CouchbaseEncryptionKeyCache
 }
 
 // NewClient initializes all Kubernetes clients and caches.
+//
+//nolint:gocognit,gocyclo
 func NewClient(ctx context.Context, namespace string, selector fmt.Stringer, config *rest.Config) (*Client, error) {
 	c := &Client{}
 
@@ -269,6 +274,11 @@ func NewClient(ctx context.Context, namespace string, selector fmt.Stringer, con
 		return nil, err
 	}
 
+	c.CouchbaseEncryptionKeys, err = newCouchbaseEncryptionKeyCache(ctx, c.CouchbaseClient, namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return c, nil
 }
 
@@ -297,6 +307,7 @@ func (c *Client) Shutdown() {
 	c.CouchbaseCollections.stop()
 	c.CouchbaseCollectionGroups.stop()
 	c.CouchbaseMigrationReplications.stop()
+	c.CouchbaseEncryptionKeys.stop()
 }
 
 // Get is a type agnostic interface to retrieve a named object.
@@ -316,6 +327,8 @@ func (c *Client) Get(gvk schema.GroupVersionKind, name string) (runtime.Object, 
 		return c.CouchbaseScopes.Get(name)
 	case couchbasev2.CollectionCRDResourceKind:
 		return c.CouchbaseCollections.Get(name)
+	case couchbasev2.EncryptionKeyCRDResourceKind:
+		return c.CouchbaseEncryptionKeys.Get(name)
 	}
 
 	return nil, false

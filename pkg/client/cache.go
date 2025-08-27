@@ -1271,3 +1271,58 @@ func (c *CouchbaseMigrationReplicationCache) List() (resources []*couchbasev2.Co
 func (c *CouchbaseMigrationReplicationCache) stop() {
 	c.resourceCache.stop()
 }
+
+// CouchbaseEncryptionKeyCache is a wrapper around a resourceCache that provides concrete typing for
+// CouchbaseEncryptionKey resources.
+type CouchbaseEncryptionKeyCache struct {
+	resourceCache *resourceCache
+	namespace     string
+}
+
+// newCouchbaseEncryptionKeyCache creates a new synchronized cache for CouchbaseEncryptionKey resources.
+func newCouchbaseEncryptionKeyCache(ctx context.Context, client couchbaseclientv2.Interface, namespace string) (*CouchbaseEncryptionKeyCache, error) {
+	selector := labels.Everything()
+
+	resourceCache, err := newResourceCache(ctx, client.CouchbaseV2().RESTClient(), &couchbasev2.CouchbaseEncryptionKey{}, selector, couchbasev2.EncryptionKeyCRDResourcePlural, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CouchbaseEncryptionKeyCache{
+		resourceCache: resourceCache,
+		namespace:     namespace,
+	}, nil
+}
+
+// Get returns the requested couchbaseencryptionkey based on name.
+func (c *CouchbaseEncryptionKeyCache) Get(name string) (*couchbasev2.CouchbaseEncryptionKey, bool) {
+	key := c.namespace + "/" + name
+
+	// Cannot error
+	obj, exists, _ := c.resourceCache.informer.GetStore().GetByKey(key)
+	if !exists {
+		return nil, exists
+	}
+
+	return obj.(*couchbasev2.CouchbaseEncryptionKey), true
+}
+
+// List returns all couchbaseencryptionkeys.
+func (c *CouchbaseEncryptionKeyCache) List() (resources []*couchbasev2.CouchbaseEncryptionKey) {
+	objs := c.resourceCache.informer.GetStore().List()
+	for _, obj := range objs {
+		resources = append(resources, obj.(*couchbasev2.CouchbaseEncryptionKey))
+	}
+
+	return
+}
+
+// Update updates the couchbaseencryptionkey in the cache.
+func (c *CouchbaseEncryptionKeyCache) Update(resource *couchbasev2.CouchbaseEncryptionKey) error {
+	return c.resourceCache.informer.GetStore().Update(resource)
+}
+
+// stop stops the cache synchronization and frees resources.
+func (c *CouchbaseEncryptionKeyCache) stop() {
+	c.resourceCache.stop()
+}

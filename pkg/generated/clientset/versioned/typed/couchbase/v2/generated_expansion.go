@@ -21,6 +21,8 @@ type CouchbaseCollectionExpansion interface{}
 
 type CouchbaseCollectionGroupExpansion interface{}
 
+type CouchbaseEncryptionKeyExpansion interface{}
+
 type CouchbaseEphemeralBucketExpansion interface{}
 
 type CouchbaseGroupExpansion interface{}

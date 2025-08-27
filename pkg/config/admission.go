@@ -705,6 +705,7 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 								couchbasev2.ScopeCRDResourcePlural,
 								couchbasev2.ScopeGroupCRDResourcePlural,
 								couchbasev2.MigrationReplicationCRDResourcePlural,
+								couchbasev2.EncryptionKeyCRDResourcePlural,
 							},
 							APIVersions: []string{
 								"v1",

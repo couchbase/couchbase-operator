@@ -63,6 +63,14 @@ type CouchbaseCollectionGroupListerExpansion interface{}
 // CouchbaseCollectionGroupNamespaceLister.
 type CouchbaseCollectionGroupNamespaceListerExpansion interface{}
 
+// CouchbaseEncryptionKeyListerExpansion allows custom methods to be added to
+// CouchbaseEncryptionKeyLister.
+type CouchbaseEncryptionKeyListerExpansion interface{}
+
+// CouchbaseEncryptionKeyNamespaceListerExpansion allows custom methods to be added to
+// CouchbaseEncryptionKeyNamespaceLister.
+type CouchbaseEncryptionKeyNamespaceListerExpansion interface{}
+
 // CouchbaseEphemeralBucketListerExpansion allows custom methods to be added to
 // CouchbaseEphemeralBucketLister.
 type CouchbaseEphemeralBucketListerExpansion interface{}

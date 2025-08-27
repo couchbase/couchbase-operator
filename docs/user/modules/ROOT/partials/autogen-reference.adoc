@@ -6,6 +6,7 @@
 ** xref:resource/couchbasecluster.adoc[CouchbaseCluster Resource]
 ** xref:resource/couchbasecollectiongroup.adoc[CouchbaseCollectionGroup Resource]
 ** xref:resource/couchbasecollection.adoc[CouchbaseCollection Resource]
+** xref:resource/couchbaseencryptionkey.adoc[CouchbaseEncryptionKey Resource]
 ** xref:resource/couchbaseephemeralbucket.adoc[CouchbaseEphemeralBucket Resource]
 ** xref:resource/couchbasegroup.adoc[CouchbaseGroup Resource]
 ** xref:resource/couchbasememcachedbucket.adoc[CouchbaseMemcachedBucket Resource]
