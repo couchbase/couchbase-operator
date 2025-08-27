@@ -3602,6 +3602,9 @@ type ClusterConfig struct {
 	// Data allows the data service to be configured.
 	Data *CouchbaseClusterDataSettings `json:"data,omitempty"`
 
+	// Analytics allows the analytics service to be configured.
+	Analytics *CouchbaseClusterAnalyticSettings `json:"analytics,omitempty"`
+
 	// Indexer allows the indexer to be configured.
 	Indexer *CouchbaseClusterIndexerSettings `json:"indexer,omitempty"`
 
@@ -4003,6 +4006,12 @@ func (q *CouchbaseClusterQuerySettings) MarshalJSON() ([]byte, error) {
 	}
 
 	return json, nil
+}
+
+// CouchbaseClusterAnalyticSettings allow analytic service tweaks.
+type CouchbaseClusterAnalyticSettings struct {
+	// NumReplicas specifies the number of replicas for Analytics.
+	NumReplicas *int `json:"numReplicas,omitempty"`
 }
 
 // CouchbaseClusterDataSettings allows data service tweaks.

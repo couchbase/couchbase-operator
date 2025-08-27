@@ -2030,3 +2030,23 @@ func FailRebalance(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Couc
 		return fmt.Errorf("waiting for RebalanceIncomplete event")
 	})
 }
+func MustVerifyAnalyticsServiceSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, numReplicas *int, timeout time.Duration) {
+	callback := func() error {
+		client := MustCreateAdminConsoleClient(t, k8s, couchbase)
+
+		settings := &couchbaseutil.AnalyticsSettings{}
+		if err := couchbaseutil.GetAnalyticsSettings(settings).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if *settings.NumReplicas != *numReplicas {
+			return fmt.Errorf("analytics numReplicas mismatch: expected %v, got %v", numReplicas, settings.NumReplicas)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}

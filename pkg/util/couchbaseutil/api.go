@@ -900,6 +900,21 @@ func GetMemcachedGlobalSettings(settings *MemcachedGlobals) *Request {
 	return NewRequest((*Client).Get, "/pools/default/settings/memcached/global", nil, settings)
 }
 
+// GetAnalyticsSettings gets analytic service settings.
+func GetAnalyticsSettings(settings *AnalyticsSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/analytics", nil, settings)
+}
+
+// SetAnalyticsSettings sets analytic service settings.
+func SetAnalyticsSettings(settings *AnalyticsSettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/analytics", data, nil)
+}
+
 // SetMemcachedGlobalSettings sets stuff like reader/writer threads.
 func SetMemcachedGlobalSettings(settings *MemcachedGlobals) *Request {
 	data, err := urlencoding.Marshal(settings)

@@ -62,6 +62,8 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-buckets-synchronize,synchronize>>: false
   <<couchbaseclusters-spec-cluster,cluster>>:
     <<couchbaseclusters-spec-cluster-allowfailoverephemeralnoreplicas,allowFailoverEphemeralNoReplicas>>: false
+    <<couchbaseclusters-spec-cluster-analytics,analytics>>:
+      <<couchbaseclusters-spec-cluster-analytics-numreplicas,numReplicas>>: 0
     <<couchbaseclusters-spec-cluster-analyticsservicememoryquota,analyticsServiceMemoryQuota>>: 1Gi
     <<couchbaseclusters-spec-cluster-apptelemetry,appTelemetry>>:
       <<couchbaseclusters-spec-cluster-apptelemetry-enabled,enabled>>: false
@@ -1090,6 +1092,26 @@ failover characteristics and index settings.
 
 AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
 This is only supported on Couchbase Server 8.0+.
+
+=== couchbaseclusters.spec.cluster.analytics
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Analytics allows the analytics service to be configured.
+
+=== couchbaseclusters.spec.cluster.analytics.numReplicas
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+NumReplicas specifies the number of replicas for Analytics.
 
 === couchbaseclusters.spec.cluster.analyticsServiceMemoryQuota
 

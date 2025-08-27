@@ -1841,6 +1841,10 @@ type MemcachedGlobals struct {
 	TCPUserTimeout       *int               `json:"tcp_user_timeout,omitempty" url:"tcp_user_timeout,omitempty"`
 }
 
+type AnalyticsSettings struct {
+	NumReplicas *int `json:"numReplicas,omitempty" url:"numReplicas,omitempty"`
+}
+
 type DataThreadSetting struct {
 	FixedVal *int
 	Setting  *string

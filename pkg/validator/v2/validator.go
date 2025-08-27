@@ -53,6 +53,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintSearchServiceMemoryQuota,
 		checkConstraintEventingServiceMemoryQuota,
 		checkConstraintAnalyticsServiceMemoryQuota,
+		checkConstraintAnalyticsServiceSettings,
 		checkConstraintPerServiceClassPDB,
 		checkConstraintQueryTemporarySpace,
 		checkConstraintQueryCompletedStreamSize,
@@ -170,6 +171,18 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintAnalyticsServiceSettings(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Analytics == nil {
+		return nil
+	}
+
+	if *cluster.Spec.ClusterSettings.Analytics.NumReplicas < 0 || *cluster.Spec.ClusterSettings.Analytics.NumReplicas > 3 {
+		return fmt.Errorf("spec.cluster.analytics.numberOfReplica must be between 0 and 3")
+	}
+
+	return nil
 }
 
 func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {

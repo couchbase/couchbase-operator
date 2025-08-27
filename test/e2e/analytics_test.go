@@ -8,6 +8,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -40,6 +41,38 @@ func skipAnalytics(t *testing.T) {
 	if version.Semver() == "6.5.0" && f.EnableIstio {
 		t.Skip("Analytics broken on 6.5.0 with Istio")
 	}
+}
+
+func TestAnalyticsServiceSettings(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	skipAnalytics(t)
+
+	clusterSize := 3
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	numReplicas := 3
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/analytics", &couchbasev2.CouchbaseClusterAnalyticSettings{NumReplicas: &numReplicas}), time.Minute)
+	e2eutil.MustVerifyAnalyticsServiceSettings(t, kubernetes, cluster, &numReplicas, 2*time.Minute)
+
+	numPatches := 1
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Settings updated
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.RepeatAtLeast{
+			Times:     numPatches,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 // Create cluster with Analytics service enabled

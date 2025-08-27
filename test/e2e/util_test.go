@@ -165,6 +165,7 @@ func registerTests() {
 		framework.NewTestDef(TestLogCollectValidateArguments).WithTags(TagSuiteSanity, TagFeatureSupportability),
 		framework.NewTestDef(TestExtendedDebugWithDefaultValues).WithTags(TagSuiteSanity, TagFeatureSupportability),
 		framework.NewTestDef(TestLogRedactionVerify).WithTags(TagSuiteSanity, TagFeatureSupportability),
+		framework.NewTestDef(TestAnalyticsServiceSettings).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestAnalyticsCreateDataSet).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestEventingCreateEventingCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestPrometheusMetrics).WithTags(TagSuiteSanity, TagFeatureMetrics, TagSuitePlatform),

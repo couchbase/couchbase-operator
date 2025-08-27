@@ -397,6 +397,10 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
+	if err := c.reconcileAnalyticSettings(); err != nil {
+		return err
+	}
+
 	if err := c.reconcileIndexSettings(); err != nil {
 		return err
 	}
@@ -584,6 +588,38 @@ func (c *Cluster) reconcileDataSettings() error {
 	}
 
 	return c.reconcileDataServiceSettings()
+}
+
+func (c *Cluster) reconcileAnalyticSettings() error {
+	if ok, err := c.IsAtLeastVersion("7.6.0"); !ok && err == nil {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	current := couchbaseutil.AnalyticsSettings{}
+	if err := couchbaseutil.GetAnalyticsSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	if c.cluster.Spec.ClusterSettings.Analytics != nil {
+		requested.NumReplicas = c.cluster.Spec.ClusterSettings.Analytics.NumReplicas
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetAnalyticsSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	log.V(2).Info("Analytics settings updated", "cluster", c.namespacedName())
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("analytics settings", c.cluster))
+
+	return nil
 }
 
 func (c *Cluster) reconcileMemcachedDataSettings() error {
