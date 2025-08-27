@@ -1159,6 +1159,8 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		return &val
 	}
 
+	numPatches := 5
+
 	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, nil, nil, nil, nil, time.Minute)
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: fixedVal(4)}), time.Minute)
@@ -1175,8 +1177,6 @@ func TestModifyDataServiceSettings(t *testing.T) {
 
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &defaultSetting}), time.Minute)
 	e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, nil, nil, time.Minute)
-
-	numPatches := 5
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
 		e2eutil.Die(t, err)
@@ -1213,7 +1213,15 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{ReaderThreads: &defaultSetting, WriterThreads: &defaultSetting}), time.Minute)
 		e2eutil.MustVerifyDataServerSettingsMemcachedThreads(t, kubernetes, cluster, &defaultSetting, &defaultSetting, nil, nil, time.Minute)
 
-		numPatches += 3
+		TCPUserTimeout := 20
+		TCPKeepAliveProbes := 2
+		TCPKeepAliveInterval := 5
+		TCPKeepAliveIdle := 120
+
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{TCPUserTimeout: &TCPUserTimeout, TCPKeepAliveProbes: &TCPKeepAliveProbes, TCPKeepAliveInterval: &TCPKeepAliveInterval, TCPKeepAliveIdle: &TCPKeepAliveIdle}), time.Minute)
+		e2eutil.MustVerifyDataServerSettingsMemcachedTCPSettings(t, kubernetes, cluster, TCPUserTimeout, TCPKeepAliveProbes, TCPKeepAliveInterval, TCPKeepAliveIdle, 2*time.Minute)
+
+		numPatches += 4
 	}
 
 	// Check the events match what we expect:

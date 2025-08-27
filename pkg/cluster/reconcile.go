@@ -656,6 +656,13 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 				}
 			}
 		}
+
+		if ok, err := c.IsAtLeastVersion("8.0.0"); ok && err == nil {
+			requested.TCPKeepAliveInterval = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveInterval
+			requested.TCPKeepAliveIdle = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveIdle
+			requested.TCPKeepAliveProbes = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveProbes
+			requested.TCPUserTimeout = c.cluster.Spec.ClusterSettings.Data.TCPUserTimeout
+		}
 	}
 
 	if reflect.DeepEqual(current, requested) {

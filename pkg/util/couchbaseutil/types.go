@@ -1831,10 +1831,14 @@ type AuditUser struct {
 // The MemcachedGlobals thread settings return nothing when unset, but remain set once any has been initialized.
 // They can also be either a string or integer, depending on couchbase version and user option.
 type MemcachedGlobals struct {
-	ReaderThreads   *DataThreadSetting `json:"num_reader_threads,omitempty" url:"num_reader_threads,omitempty"`
-	WriterThreads   *DataThreadSetting `json:"num_writer_threads,omitempty" url:"num_writer_threads,omitempty"`
-	NumNonIOThreads *DataThreadSetting `json:"num_nonio_threads,omitempty" url:"num_nonio_threads,omitempty"`
-	NumAuxIOThreads *DataThreadSetting `json:"num_auxio_threads,omitempty" url:"num_auxio_threads,omitempty"`
+	ReaderThreads        *DataThreadSetting `json:"num_reader_threads,omitempty" url:"num_reader_threads,omitempty"`
+	WriterThreads        *DataThreadSetting `json:"num_writer_threads,omitempty" url:"num_writer_threads,omitempty"`
+	NumNonIOThreads      *DataThreadSetting `json:"num_nonio_threads,omitempty" url:"num_nonio_threads,omitempty"`
+	NumAuxIOThreads      *DataThreadSetting `json:"num_auxio_threads,omitempty" url:"num_auxio_threads,omitempty"`
+	TCPKeepAliveIdle     *int               `json:"tcp_keepalive_idle,omitempty" url:"tcp_keepalive_idle,omitempty"`
+	TCPKeepAliveInterval *int               `json:"tcp_keepalive_interval,omitempty" url:"tcp_keepalive_interval,omitempty"`
+	TCPKeepAliveProbes   *int               `json:"tcp_keepalive_probes,omitempty" url:"tcp_keepalive_probes,omitempty"`
+	TCPUserTimeout       *int               `json:"tcp_user_timeout,omitempty" url:"tcp_user_timeout,omitempty"`
 }
 
 type DataThreadSetting struct {

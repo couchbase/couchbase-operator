@@ -94,6 +94,10 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-data-minreplicascount,minReplicasCount>>: 0
       <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
       <<couchbaseclusters-spec-cluster-data-readerthreads,readerThreads>>: ""
+      <<couchbaseclusters-spec-cluster-data-tcpkeepaliveidle,tcpKeepAliveIdle>>: 0
+      <<couchbaseclusters-spec-cluster-data-tcpkeepaliveinterval,tcpKeepAliveInterval>>: 0
+      <<couchbaseclusters-spec-cluster-data-tcpkeepaliveprobes,tcpKeepAliveProbes>>: 0
+      <<couchbaseclusters-spec-cluster-data-tcpusertimeout,tcpUserTimeout>>: 0
       <<couchbaseclusters-spec-cluster-data-writerthreads,writerThreads>>: ""
     <<couchbaseclusters-spec-cluster-dataservicememoryquota,dataServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-eventingservicememoryquota,eventingServiceMemoryQuota>>: 256Mi
@@ -1559,6 +1563,50 @@ For server versions below 7.1.0, the minimum fixed value is 4.
 Increasing the fixed value should only be done where there are sufficient CPU resources.
 When using the default/balanced and disk_io_optimized options, CB server will automatically determine the number of threads to use.
 If not specified, this defaults to default/balanced.
+
+=== couchbaseclusters.spec.cluster.data.tcpKeepAliveIdle
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+TCPKeepAliveIdle is the number of seconds before the first TCP probe is sent.
+This field is only supported on Couchbase server versions 8.0.0 and later.
+
+=== couchbaseclusters.spec.cluster.data.tcpKeepAliveInterval
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+TCPKeepAliveInterval is the number of seconds between TCP probes.
+This field is only supported on Couchbase server versions 8.0.0 and later.
+
+=== couchbaseclusters.spec.cluster.data.tcpKeepAliveProbes
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+TCPKeepAliveProbes is the number of TCP probes missing before the connection is considered dead.
+This field is only supported on Couchbase server versions 8.0.0 and later.
+
+=== couchbaseclusters.spec.cluster.data.tcpUserTimeout
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+TCPUserTimeout is the number of seconds data is stuck in the send buffer before the connection gets torn down.
+This field is only supported on Couchbase server versions 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.writerThreads
 

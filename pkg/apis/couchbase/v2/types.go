@@ -4056,6 +4056,22 @@ type CouchbaseClusterDataSettings struct {
 	// Setting this value reserves disk space for recovery operations like performing rebalances to add a new node.
 	// This field is only supported on Couchbase server versions 8.0 and later.
 	DiskUsageLimit *DiskUsageLimit `json:"diskUsageLimit,omitempty"`
+
+	// TCPKeepAliveIdle is the number of seconds before the first TCP probe is sent.
+	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	TCPKeepAliveIdle *int `json:"tcpKeepAliveIdle,omitempty"`
+
+	// TCPKeepAliveInterval is the number of seconds between TCP probes.
+	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	TCPKeepAliveInterval *int `json:"tcpKeepAliveInterval,omitempty"`
+
+	// TCPKeepAliveProbes is the number of TCP probes missing before the connection is considered dead.
+	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	TCPKeepAliveProbes *int `json:"tcpKeepAliveProbes,omitempty"`
+
+	// TCPUserTimeout is the number of seconds data is stuck in the send buffer before the connection gets torn down.
+	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	TCPUserTimeout *int `json:"tcpUserTimeout,omitempty"`
 }
 
 type DiskUsageLimit struct {

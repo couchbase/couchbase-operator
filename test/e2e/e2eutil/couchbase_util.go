@@ -1480,6 +1480,43 @@ func MustGetCouchbaseVersion(t *testing.T, image string, overrideVersion string)
 	return version
 }
 
+func MustVerifyDataServerSettingsMemcachedTCPSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tcpUserTimeout, tcpKeepAliveProbes, tcpKeepAliveInterval, tcpKeepAliveIdle int, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.MemcachedGlobals{}
+
+		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if !reflect.DeepEqual(current.TCPUserTimeout, &tcpUserTimeout) {
+			return fmt.Errorf("expected %d TCP user timeout, got %d", tcpUserTimeout, current.TCPUserTimeout)
+		}
+
+		if !reflect.DeepEqual(current.TCPKeepAliveProbes, &tcpKeepAliveProbes) {
+			return fmt.Errorf("expected %d TCP keep alive probes, got %d", tcpKeepAliveProbes, current.TCPKeepAliveProbes)
+		}
+
+		if !reflect.DeepEqual(current.TCPKeepAliveInterval, &tcpKeepAliveInterval) {
+			return fmt.Errorf("expected %d TCP keep alive interval, got %d", tcpKeepAliveInterval, current.TCPKeepAliveInterval)
+		}
+
+		if !reflect.DeepEqual(current.TCPKeepAliveIdle, &tcpKeepAliveIdle) {
+			return fmt.Errorf("expected %d TCP keep alive idle, got %d", tcpKeepAliveIdle, current.TCPKeepAliveIdle)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustVerifyDataServerSettingsMemcachedThreads checks memcached's reader, writer, auxIo, nonIo thread settings.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
 func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads *intstr.IntOrString, nonIOThreads, auxIOThreads *int, timeout time.Duration) {
