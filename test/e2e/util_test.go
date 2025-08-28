@@ -793,6 +793,7 @@ func registerTests() {
 		framework.NewTestDef(TestMirWatchdogDisabledAnnotation).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentials).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnConsecutiveRebalanceFailures).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogOnManualActionDownNodes).WithTags(TagSuiteP1, TagFeatureMir),
 
 		// Encryption at rest tests
 		framework.NewTestDef(TestEncryptionAtRest).WithTags(TagSuiteP1, TagFeatureEAR),

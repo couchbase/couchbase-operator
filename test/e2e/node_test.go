@@ -99,7 +99,7 @@ func TestNodeManualFailover(t *testing.T) {
 	defer e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, bucket.GetName())()
 
 	// When ready failover a node, expect it to be added back in.
-	e2eutil.MustFailoverNode(t, kubernetes, cluster, 0, time.Minute)
+	e2eutil.MustFailoverNode(t, kubernetes, cluster, 0, false, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -439,7 +439,7 @@ func TestRecoveryAfterTwoPodFailureNoBucket(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, unhealthyWaitTimeout)
-	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, 5*time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, false, 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -546,7 +546,7 @@ func TestRecoveryAfterTwoPodFailureBucketOneReplica(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, 3*time.Minute)
-	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, false, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -652,7 +652,7 @@ func TestRecoveryAfterTwoPodFailureBucketTwoReplica(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex1, true)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex2, true)
 	e2eutil.MustWaitForUnhealthyNodes(t, kubernetes, cluster, 2, unhealthyWaitTimeout)
-	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, time.Minute)
+	e2eutil.MustFailoverNodes(t, kubernetes, cluster, []int{victimIndex1, victimIndex2}, false, time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 

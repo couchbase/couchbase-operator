@@ -8,6 +8,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	v1 "k8s.io/api/core/v1"
@@ -33,9 +34,6 @@ func TestMirWatchdogDisabledAnnotation(t *testing.T) {
 	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
 	password := string(authSecret.Data["password"])
 	updatedPassword := fmt.Sprintf("%s!", password)
-
-	// Check the cluster is healthy.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the current value of the intervention metric is 0.
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
@@ -76,8 +74,6 @@ func TestMirWatchdogOnInvalidClusterCredentials(t *testing.T) {
 	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
 	originalPassword := string(authSecret.Data["password"])
 	updatedPassword := fmt.Sprintf("%s!", originalPassword)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the current value of the intervention metric is 0.
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
@@ -122,8 +118,6 @@ func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 	clusterSize := 2
 
 	cluster := clusterOptions().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
-
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
 	// Create and populate a bucket (200 MB) to slow down the rebalance.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -178,6 +172,58 @@ func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
 		eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
 		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestMirWatchdogOnManualActionDownNodes(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 2
+	victimIndex := 0
+
+	clusterOptions := clusterOptions().WithEphemeralTopology(clusterSize)
+	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(5)
+	cluster := clusterOptions.MustCreate(t, kubernetes)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+
+	// By killing a node in a 2 node cluster, cb server will be unable to auto failover.
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+
+	// Check that we enter the manual intervention required state.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Manually failover the node we killed to resolve the MIR condition.
+	e2eutil.MustFailoverNode(t, kubernetes, cluster, victimIndex, true, 5*time.Minute)
+
+	// Once the node has manually been removed, we should see the MIR condition removed and the metric reset.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 2*time.Minute, couchbasev2.ClusterConditionManualInterventionRequired)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Check we get the expected series of events
+	// 1. Cluster Created
+	// 2. Node Down (and unrecoverable)
+	// 3. MIR Required
+	// 4. MIR Resolved (Manually failed over the node)
+	// 5. Cluster scaled back up by the operator
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

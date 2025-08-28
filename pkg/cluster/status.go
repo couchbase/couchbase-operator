@@ -109,32 +109,37 @@ type Status struct {
 
 // GetStatus returns a new cluster status.
 func (c *Cluster) GetStatus() (*Status, error) {
+	return c.GetStatusWithTimeout(2 * time.Minute)
+}
+
+// GetStatus returns a new cluster status.
+func (c *Cluster) GetStatusWithTimeout(timeout time.Duration) (*Status, error) {
 	target := c.getMigratingReadyTarget()
 
 	if _, ok := target.(couchbaseutil.MemberSet); ok {
-		return c.getStatus(c.callableMembers)
+		return c.getStatus(c.callableMembers, timeout)
 	}
 
-	return c.getStatusFromTarget(target, c.members)
+	return c.getStatusFromTarget(target, c.members, timeout)
 }
 
 // GetStatusUnsafe returns a new cluster status from an untrusted
 // set of members.
 func (c *Cluster) GetStatusUnsafe(members couchbaseutil.MemberSet) (*Status, error) {
-	return c.getStatus(members)
+	return c.getStatus(members, 2*time.Minute)
 }
 
 // getStatus parses the Couchbase cluster status and makes it easier
 // to use.
-func (c *Cluster) getStatus(members couchbaseutil.MemberSet) (*Status, error) {
-	return c.getStatusFromTarget(members, members)
+func (c *Cluster) getStatus(members couchbaseutil.MemberSet, timeout time.Duration) (*Status, error) {
+	return c.getStatusFromTarget(members, members, timeout)
 }
 
 // getStatusFromTarget parses the Couchbase cluster status and makes it easier
 // to use.
-func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.MemberSet) (*Status, error) {
+func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.MemberSet, timeout time.Duration) (*Status, error) {
 	info := &couchbaseutil.ClusterInfo{}
-	if err := couchbaseutil.GetPoolsDefault(info).RetryFor(2*time.Minute).On(c.api, target); err != nil {
+	if err := couchbaseutil.GetPoolsDefault(info).RetryFor(timeout).On(c.api, target); err != nil {
 		return nil, err
 	}
 

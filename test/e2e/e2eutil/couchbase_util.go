@@ -548,7 +548,7 @@ func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig s
 	return couchbaseutil.NewMember(couchbase.Namespace, couchbase.Name, name, "", serverConfig, false)
 }
 
-func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) error {
+func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, allowUnsafe bool, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
@@ -564,20 +564,24 @@ func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 			data.Add("otpNode", string(member.GetOTPNode()))
 		}
 
+		if allowUnsafe {
+			data.Add("allowUnsafe", "true")
+		}
+
 		request := newRequest("/controller/failOver", []byte(data.Encode()), nil)
 
 		return client.client.Post(request, client.host)
 	})
 }
 
-func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, timeout time.Duration) {
-	if err := FailoverNodes(k8s, couchbase, []int{index}, timeout); err != nil {
+func MustFailoverNode(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, index int, allowUnsafe bool, timeout time.Duration) {
+	if err := FailoverNodes(k8s, couchbase, []int{index}, allowUnsafe, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
-func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, timeout time.Duration) {
-	if err := FailoverNodes(k8s, couchbase, indexes, timeout); err != nil {
+func MustFailoverNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, allowUnsafe bool, timeout time.Duration) {
+	if err := FailoverNodes(k8s, couchbase, indexes, allowUnsafe, timeout); err != nil {
 		Die(t, err)
 	}
 }

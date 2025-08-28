@@ -21,6 +21,7 @@ type ManualInterventionRequired string
 const (
 	MIRLoginFailure              ManualInterventionRequired = "Unable to authenticate to the cluster using login credentials provided"
 	MIRRebalanceRetriesExhausted ManualInterventionRequired = "Rebalance retries have been exhausted 3 times in a row"
+	MIRManualActionDownNodes     ManualInterventionRequired = "There are down nodes that cannot be recovered"
 )
 
 type ManualInterventionRequiredList []*ManualInterventionRequired
@@ -78,6 +79,7 @@ func (w *mirWatchdog) checkCluster() {
 	mirChecks := []func(*couchbasev2.ClusterCondition) *ManualInterventionRequired{
 		w.checkForClusterLoginFailure,
 		w.checkForConsecutiveRebalanceFailures,
+		w.checkForManualActionDownNodes,
 	}
 
 	mirList := ManualInterventionRequiredList{}
@@ -178,8 +180,47 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 		return mir(MIRRebalanceRetriesExhausted)
 	}
 
+	// Entry
 	if w.cluster.cluster.Status.GetRebalanceAttempts() >= 3 {
 		return mir(MIRRebalanceRetriesExhausted)
+	}
+
+	return nil
+}
+
+// checkForManualActionDownNodes checks whether there are down nodes that cannot be recovered by the operator.
+// Entry: There are down nodes that cannot be recovered.
+// Exit: There are no unrecoverable down nodes.
+func (w *mirWatchdog) checkForManualActionDownNodes(existingCondition *couchbasev2.ClusterCondition) *ManualInterventionRequired {
+	if w.cluster.cluster.GetRecoveryPolicy() != couchbasev2.PrioritizeDataIntegrity {
+		return nil
+	}
+
+	status, err := w.cluster.GetStatusWithTimeout(20 * time.Second)
+	if err != nil {
+		log.Info("Unable to get cluster status", "cluster", w.cluster.namespacedName(), "error", err)
+		return nil
+	}
+
+	for memberName, nodeState := range status.NodeStates {
+		if nodeState != NodeStateDown {
+			continue
+		}
+
+		m, ok := w.cluster.members[memberName]
+		if !ok {
+			continue
+		}
+
+		r, _ := w.cluster.hasMemberRecoveryTimeElapsed(memberName)
+		if !r {
+			continue
+		}
+
+		recoverable, _ := w.cluster.checkPodRecoverability(m, false)
+		if !recoverable {
+			return mir(MIRManualActionDownNodes)
+		}
 	}
 
 	return nil

@@ -519,16 +519,9 @@ func (c *Cluster) allDownNodesRecoveryTimedout(members couchbaseutil.MemberSet) 
 	recoverable := true
 
 	for name := range members {
-		recoveryTime, ok := c.recoveryTime[name]
-		if !ok {
-			timeout := c.cluster.Spec.ClusterSettings.AutoFailoverTimeout
-			recoveryTime = time.Now().Add(timeout.Duration).Add(30 * time.Second)
-			c.recoveryTime[name] = recoveryTime
-			recoverable = false
-		}
-
-		if recoveryTime.After(time.Now()) {
-			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", time.Until(recoveryTime))
+		r, timeUntilRecovery := c.hasMemberRecoveryTimeElapsed(name)
+		if !r {
+			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", timeUntilRecovery)
 
 			recoverable = false
 		}
@@ -537,8 +530,33 @@ func (c *Cluster) allDownNodesRecoveryTimedout(members couchbaseutil.MemberSet) 
 	return recoverable
 }
 
+// hasMemberRecoveryTimeElapsed checks if the recovery time has elapsed for a member.
+// If the recovery timeout has not elapsed, it returns false and the time until the recovery timeout will be true.
+// If the recovery timeout has elapsed, it returns true and nil.
+func (c *Cluster) hasMemberRecoveryTimeElapsed(memberName string) (bool, *time.Duration) {
+	recoverable := true
+
+	recoveryTime, ok := c.recoveryTime[memberName]
+	if !ok {
+		timeout := c.cluster.Spec.ClusterSettings.AutoFailoverTimeout
+		recoveryTime = time.Now().Add(timeout.Duration).Add(30 * time.Second)
+		c.recoveryTime[memberName] = recoveryTime
+	}
+
+	var timeUntilRecovery *time.Duration
+
+	if recoveryTime.After(time.Now()) {
+		recoverable = false
+		r := time.Until(recoveryTime)
+		timeUntilRecovery = &r
+	}
+
+	return recoverable, timeUntilRecovery
+}
+
 // If any nodes are marked as down, we first and foremost, wait for Server to safely
 // autofailover.
+// nolint:gocognit
 func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	if r.couchbase.DownNodes.Empty() {
 		return nil
@@ -568,27 +586,30 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		return nil
 	}
 
-	// Get the duration that the node has been down from the status
-	// and check if it has persistent volumes to be recovered
-	recovered := 0
+	// If the recovery policy is set to prioritize data integrity (default) and any down nodes are
+	// not recoverable, we need to abort here to wait for user action. If the MirWatchdog is running, this
+	// should also trigger the MIR state.
+	if c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
+		manualActionNodes := []string{}
 
-	// If the node is not recoverable and the recovery policy is set to prioritize data integrity, then
-	// we need to wait for users to take manual action to get the cluster to a stable state.
-	manualActionNodes := []string{}
+		for name, m := range r.couchbase.DownNodes {
+			if !c.isPodRecoverable(m) {
+				manualActionNodes = append(manualActionNodes, name)
+			}
+		}
 
-	for name, m := range r.couchbase.DownNodes {
-		if !c.isPodRecoverable(m) && c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
-			manualActionNodes = append(manualActionNodes, name)
+		if len(manualActionNodes) > 0 {
+			log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
+
+			r.abort("waiting for manual action of down nodes")
+
+			return nil
 		}
 	}
 
-	if len(manualActionNodes) > 0 {
-		log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
-
-		r.abort("waiting for manual action of down nodes")
-
-		return nil
-	}
+	// Get the duration that the node has been down from the status
+	// and check if it has persistent volumes to be recovered
+	recovered := 0
 
 	for name, m := range r.couchbase.DownNodes {
 		// Ephemeral clusters are handled either automatically by server or
