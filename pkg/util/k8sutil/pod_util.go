@@ -1886,8 +1886,8 @@ func addTotalMemoryRequests(cluster *couchbasev2.CouchbaseCluster, config *couch
 
 	defaultOverheadPercent := 25
 
-	if cluster.Spec.AutoResourceAllocation.OverheadPercent != 0 {
-		overhead = resource.NewQuantity((memoryRequests.Value()*int64(cluster.Spec.AutoResourceAllocation.OverheadPercent))/100, resource.BinarySI)
+	if cluster.Spec.AutoResourceAllocation.OverheadPercent != nil {
+		overhead = resource.NewQuantity((memoryRequests.Value()*int64(*cluster.Spec.AutoResourceAllocation.OverheadPercent))/100, resource.BinarySI)
 	} else {
 		overhead = resource.NewQuantity((memoryRequests.Value()*int64(defaultOverheadPercent))/100, resource.BinarySI)
 	}

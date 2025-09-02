@@ -3685,7 +3685,7 @@ type AutoResourceAllocation struct {
 	// OverheadPercent defines the amount of memory above that required for individual
 	// services on a pod.  For Couchbase Server this should be approximately 25%.
 	// +kubebuilder:validation:Minimum=0
-	OverheadPercent int `json:"overheadPercent,omitempty"`
+	OverheadPercent *int `json:"overheadPercent,omitempty"`
 
 	// OverheadMemory defines a static amount of memory above that required for
 	// individual services on a pod. This will override `overheadPercent` if both

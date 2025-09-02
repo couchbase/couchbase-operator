@@ -425,34 +425,38 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func intPtr(i int) *int {
+	return &i
+}
+
 func TestCalculatePodResourcesOverhead(t *testing.T) {
 	tests := []struct {
 		name            string
-		overheadPercent int
+		overheadPercent *int
 		overheadMemory  *resource.Quantity
 		expectedMemory  resource.Quantity
 	}{
 		{
 			name:            "OverheadPercent only (35% of 100Mi base = 135Mi total)",
-			overheadPercent: 35,
+			overheadPercent: intPtr(35),
 			overheadMemory:  nil,
 			expectedMemory:  resource.MustParse("135Mi"),
 		},
 		{
 			name:            "OverheadMemory only (1Gi overhead = 100Mi base + 1Gi overhead = 1124Mi total)",
-			overheadPercent: 0,
+			overheadPercent: nil,
 			overheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI),
 			expectedMemory:  resource.MustParse("1124Mi"),
 		},
 		{
 			name:            "OverheadMemory takes precedence (1Gi overhead = 100Mi base + 1Gi overhead = 1124Mi total)",
-			overheadPercent: 25,
+			overheadPercent: intPtr(25),
 			overheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI),
 			expectedMemory:  resource.MustParse("1124Mi"),
 		},
 		{
 			name:            "Neither specified (default 25% overhead = 125Mi total)",
-			overheadPercent: 0,
+			overheadPercent: nil,
 			overheadMemory:  nil,
 			expectedMemory:  resource.MustParse("125Mi"),
 		},

@@ -5179,7 +5179,7 @@ func TestAutoResourceAllocationValidation(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
 					Enabled:         true,
-					OverheadPercent: 20,
+					OverheadPercent: intPtr(20),
 				})},
 			shouldFail: false,
 		},
@@ -5205,7 +5205,7 @@ func TestAutoResourceAllocationValidation(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
 					Enabled:         true,
-					OverheadPercent: 35,
+					OverheadPercent: intPtr(0),
 					OverheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI), // 1Gi
 				})},
 			shouldFail:     true,
@@ -5276,4 +5276,9 @@ func TestDeleteInUseEncryptionKey(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationDelete, validationFile: "validation-80.yaml"})
+}
+
+// intPtr returns a pointer to the given int value.
+func intPtr(i int) *int {
+	return &i
 }
