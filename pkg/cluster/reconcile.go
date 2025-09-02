@@ -235,6 +235,8 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
 		(*Cluster).reconcileCloudNativeGatewayService,
+		(*Cluster).reconcileEncryptionKeys,
+		(*Cluster).reconcileEncryptionAtRest,
 	}
 
 	if err := postTopologyReconcilers.run(c); err != nil {

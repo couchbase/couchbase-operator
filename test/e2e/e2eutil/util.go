@@ -891,6 +891,24 @@ func patchResource(k8s *types.Cluster, resource runtime.Object, patches jsonpatc
 	return resource, nil
 }
 
+func patchEncryptionKey(k8s *types.Cluster, key *couchbasev2.CouchbaseEncryptionKey, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseEncryptionKey, error) {
+	resource, err := patchResource(k8s, key, patches, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource.(*couchbasev2.CouchbaseEncryptionKey), nil
+}
+
+func MustPatchEncryptionKey(t *testing.T, k8s *types.Cluster, key *couchbasev2.CouchbaseEncryptionKey, patches jsonpatch.PatchSet, timeout time.Duration) *couchbasev2.CouchbaseEncryptionKey {
+	resource, err := patchEncryptionKey(k8s, key, patches, timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return resource
+}
+
 func patchCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) (*couchbasev2.CouchbaseCluster, error) {
 	resource, err := patchResource(k8s, cluster, patches, timeout)
 	if err != nil {

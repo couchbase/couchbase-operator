@@ -1025,3 +1025,74 @@ func SetAppTelemetrySettings(settings *AppTelemetrySettings) *Request {
 
 	return NewRequest((*Client).PostJSON, "/settings/appTelemetry", data, nil)
 }
+
+func CreateEncryptionKey(key *EncryptionKey) *Request {
+	data, err := json.Marshal(key)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/encryptionKeys", data, nil)
+}
+
+func UpdateEncryptionKey(key *EncryptionKey, keyID int) *Request {
+	data, err := json.Marshal(key)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PutJSON, fmt.Sprintf("/settings/encryptionKeys/%d", keyID), data, nil)
+}
+
+func ListEncryptionKeys(keys *EncryptionKeyList) *Request {
+	return NewRequest((*Client).Get, "/settings/encryptionKeys", nil, keys)
+}
+
+func DeleteEncryptionKey(keyID int) *Request {
+	return NewRequest((*Client).Delete, fmt.Sprintf("/settings/encryptionKeys/%d", keyID), nil, nil)
+}
+
+func UpdateConfigurationEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/security/encryptionAtRest/config", data, nil)
+}
+
+func GetConfigurationEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/security/encryptionAtRest/config", nil, settings)
+}
+
+func UpdateAuditEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/security/encryptionAtRest/audit", data, nil)
+}
+
+func GetAuditEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/security/encryptionAtRest/audit", nil, settings)
+}
+
+// UpdateLogEncryptionSettings sets log encryption at rest settings.
+func UpdateLogEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).PostJSON, "/settings/security/encryptionAtRest/log", data, nil)
+}
+
+// GetLogEncryptionSettings gets log encryption at rest settings.
+func GetLogEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/security/encryptionAtRest/log", nil, settings)
+}
+
+func GetEncryptionAtRestSettings(settings *AllEncryptionAtRestSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/security/encryptionAtRest", nil, settings)
+}

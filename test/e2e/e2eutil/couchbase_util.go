@@ -746,6 +746,36 @@ func MustPatchQuerySettings(t *testing.T, k8s *types.Cluster, couchbase *couchba
 	}
 }
 
+func MustPatchEncryptionAtRestSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	encryptionAtRestSettingsFetcher := getClusterFetcher(couchbaseutil.GetEncryptionAtRestSettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, encryptionAtRestSettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustPatchEncryptionKeySettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, keyName string, patches jsonpatch.PatchSet, timeout time.Duration) {
+	keySettingsFetcher := func(c *CouchbaseClient) (interface{}, error) {
+		keys := couchbaseutil.EncryptionKeyList{}
+
+		if err := couchbaseutil.ListEncryptionKeys(&keys).On(c.client, c.host); err != nil {
+			return nil, err
+		}
+
+		for _, key := range keys {
+			if key.Name == keyName {
+				return key, nil
+			}
+		}
+
+		return nil, fmt.Errorf("key %s not found", keyName)
+	}
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, keySettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func PatchIndexSettingInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)

@@ -114,6 +114,11 @@ const (
 	// Manual intervention required.
 	EventReasonManualInterventionRequired = "ManualInterventionRequired"
 	EventReasonManualInterventionResolved = "ManualInterventionResolved"
+
+	// Encryption at rest.
+	EventReasonEncryptionKeyCreated = "EncryptionKeyCreated"
+	EventReasonEncryptionKeyUpdated = "EncryptionKeyUpdated"
+	EventReasonEncryptionKeyDeleted = "EncryptionKeyDeleted"
 )
 
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
@@ -684,6 +689,33 @@ func RolesMigratedEvent(groupName, deprecatedRoles string, cl *couchbasev2.Couch
 	event.Type = v1.EventTypeWarning
 	event.Reason = EventReasonRolesMigrated
 	event.Message = fmt.Sprintf("Group %s had deprecated roles (%s) automatically migrated to new role model", groupName, deprecatedRoles)
+
+	return event
+}
+
+func EncryptionKeyCreatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonEncryptionKeyCreated
+	event.Message = fmt.Sprintf("Encryption key `%s` was created", name)
+
+	return event
+}
+
+func EncryptionKeyUpdatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonEncryptionKeyUpdated
+	event.Message = fmt.Sprintf("Encryption key `%s` was updated", name)
+
+	return event
+}
+
+func EncryptionKeyDeletedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonEncryptionKeyDeleted
+	event.Message = fmt.Sprintf("Encryption key `%s` was deleted", name)
 
 	return event
 }

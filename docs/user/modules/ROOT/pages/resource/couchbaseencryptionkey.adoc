@@ -152,8 +152,6 @@ IntervalDays defines the rotation interval in days.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `string`
 
 ==== Description
@@ -351,6 +349,8 @@ VerifyWithSystemCA defines whether to verify with system CA.
 
 *Type*: `object`
 
+*Default*: `{'allBuckets': True, 'audit': True, 'configuration': True, 'key': True, 'log': True, 'managedBucketSelection': False}`
+
 ==== Description
 
 Usage defines what the encryption key should be used for.
@@ -429,11 +429,7 @@ Log defines whether the key should be used for logs.
 
 ==== Constraints
 
-*Required*
-
 *Type*: `boolean`
-
-*Default*: `False`
 
 ==== Description
 

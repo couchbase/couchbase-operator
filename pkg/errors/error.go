@@ -142,6 +142,10 @@ var (
 
 	// ErrNoMatchingServerClass is raised when no server class is found that matches the node.
 	ErrNoMatchingServerClass = errors.New("no matching server class found")
+
+	ErrUnsupportedEncryptionKeyType = errors.New("unsupported encryption key type")
+
+	ErrEncryptionKeyNotFound = errors.New("encryption key not found")
 )
 
 // CLI errors.

@@ -1763,3 +1763,18 @@ func marshalDurationWithNegativeOverride(duration *metav1.Duration, negValue tim
 		return duration.Duration.String()
 	}
 }
+
+func (c *CouchbaseEncryptionKey) GetUsage() CouchbaseEncryptionKeyUsage {
+	if c.Spec.Usage == nil {
+		return CouchbaseEncryptionKeyUsage{
+			Configuration:          true,
+			Key:                    true,
+			Log:                    true,
+			Audit:                  true,
+			AllBuckets:             true,
+			ManagedBucketSelection: false,
+		}
+	}
+
+	return *c.Spec.Usage
+}

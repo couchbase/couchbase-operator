@@ -182,6 +182,18 @@ func UserEditedEvent(cl *couchbasev2.CouchbaseCluster, user *couchbasev2.Couchba
 	return k8sutil.UserEditEvent(user.Name, cl)
 }
 
+func ClusterSettingsEditedEvent(cl *couchbasev2.CouchbaseCluster, settingName string) *v1.Event {
+	return k8sutil.ClusterSettingsEditedEvent(settingName, cl)
+}
+
+func NewEncryptionKeyCreatedEvent(cl *couchbasev2.CouchbaseCluster, keyName string) *v1.Event {
+	return k8sutil.EncryptionKeyCreatedEvent(cl, keyName)
+}
+
+func NewEncryptionKeyUpdatedEvent(cl *couchbasev2.CouchbaseCluster, keyName string) *v1.Event {
+	return k8sutil.EncryptionKeyUpdatedEvent(cl, keyName)
+}
+
 // VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
 func VolumeExpansionSuccessSequence() eventschema.Validatable {
 	return eventschema.Sequence{
