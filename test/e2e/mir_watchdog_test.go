@@ -7,6 +7,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
+	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -224,6 +225,108 @@ func TestMirWatchdogOnManualActionDownNodes(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestMirWatchdogOnCACertTLSExpiration(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Init a cluster with a CA that expires in 2 minutes
+	validTo := time.Now().In(time.UTC).Add(4 * time.Minute)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ValidTo: &validTo})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+
+	// Because the CA and Server certificates will be expired, we need to enable this to allow the operator to rotate them.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/allowPlainTextCertReload", true), time.Minute)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
+
+	// Check that we enter the manual intervention required state once the CA expires.
+	// We can't use the cluster condition as the mirWatchdog will be unable to update the status because of the expired CA.
+	// However, we can still wait for the event and ensure the metric is incremented.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionRequiredEvent(cluster, "TLS certificate has expired"), 5*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Rotate the certificates and check that we are removed from the manual intervention required state.
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionResolvedEvent(cluster), 5*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestMirWatchdogOnClientCertTLSExpiration(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+
+	// Init a cluster with a CA that expires in 2 minutes
+	clientValidTo := time.Now().In(time.UTC).Add(4 * time.Minute)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ClientValidTo: &clientValidTo})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
+
+	// Check that we enter the manual intervention required state once the CA expires.
+	// We can't use the cluster condition as the mirWatchdog will be unable to update the status because of the expired CA.
+	// However, we can still wait for the event and ensure the metric is incremented.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionRequiredEvent(cluster, "TLS certificate has expired"), 5*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Rotate the client certificate and check that we are removed from the manual intervention required state.
+	e2eutil.MustRotateClientCertificate(t, ctx)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionResolvedEvent(cluster), 5*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid}},
+		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ const (
 	MIRLoginFailure              ManualInterventionRequired = "Unable to authenticate to the cluster using login credentials provided"
 	MIRRebalanceRetriesExhausted ManualInterventionRequired = "Rebalance retries have been exhausted 3 times in a row"
 	MIRManualActionDownNodes     ManualInterventionRequired = "There are down nodes that cannot be recovered"
+	MIRTLSExpired                ManualInterventionRequired = "TLS certificate has expired"
 )
 
 type ManualInterventionRequiredList []*ManualInterventionRequired
@@ -80,6 +82,7 @@ func (w *mirWatchdog) checkCluster() {
 		w.checkForClusterLoginFailure,
 		w.checkForConsecutiveRebalanceFailures,
 		w.checkForManualActionDownNodes,
+		w.checkForTLSExpiration,
 	}
 
 	mirList := ManualInterventionRequiredList{}
@@ -99,7 +102,7 @@ func (w *mirWatchdog) checkCluster() {
 	}
 
 	if err := w.cluster.updateCRStatus(); err != nil {
-		log.Error(err, "Failed to update cluster status", "cluster", w.cluster.namespacedName())
+		log.Error(err, "MirWatchdog failed to update cluster status", "cluster", w.cluster.namespacedName())
 	}
 }
 
@@ -169,7 +172,6 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 	if inMirStateForReason(existingCondition, MIRRebalanceRetriesExhausted) {
 		status, err := w.cluster.GetStatus()
 		if err != nil {
-			log.Info("Unable to get cluster status", "cluster", w.cluster.namespacedName(), "error", err)
 			return nil
 		}
 
@@ -198,7 +200,6 @@ func (w *mirWatchdog) checkForManualActionDownNodes(existingCondition *couchbase
 
 	status, err := w.cluster.GetStatusWithTimeout(20 * time.Second)
 	if err != nil {
-		log.Info("Unable to get cluster status", "cluster", w.cluster.namespacedName(), "error", err)
 		return nil
 	}
 
@@ -220,6 +221,46 @@ func (w *mirWatchdog) checkForManualActionDownNodes(existingCondition *couchbase
 		recoverable, _ := w.cluster.checkPodRecoverability(m, false)
 		if !recoverable {
 			return mir(MIRManualActionDownNodes)
+		}
+	}
+
+	return nil
+}
+
+// checkForTLSExpiration checks for tls expiration on CA, server, and client certs.
+// Entry: There are TLS certificates that have expired and will not be rotated by the operator.
+// Exit: There are no expired TLS certificates or the operator will rotate any that are expired.
+func (w *mirWatchdog) checkForTLSExpiration(existingCondition *couchbasev2.ClusterCondition) *ManualInterventionRequired {
+	if !w.cluster.cluster.IsTLSEnabled() {
+		return nil
+	}
+
+	clientTLS := w.cluster.api.GetTLS()
+	if clientTLS == nil {
+		return nil
+	}
+
+	// If we are in the MIR state for TLS expiration, we should refresh the tls cache as reconcile will be blocked ontil the MIR is resolved.
+	if inMirStateForReason(existingCondition, MIRTLSExpired) {
+		if err := w.cluster.initTLSCache(); err != nil {
+			log.Error(err, "MirWatchdog failed to refresh tls cache", "cluster", w.cluster.namespacedName())
+			return nil
+		}
+	}
+
+	// For all TLS certs, we should enter the MIR condition if they are expired and the operator is not going to rotate them.
+	// We can leave the MIR state once we know they will be rotated by the operator on one of the subsequent reconcile loops.
+	if clientTLS.ClientAuth != nil && w.cluster.checkCertExpiration(clientTLS.ClientAuth.Cert) && reflect.DeepEqual(clientTLS.ClientAuth.Cert, w.cluster.tlsCache.clientCert) {
+		return mir(MIRTLSExpired)
+	}
+
+	if w.cluster.checkCertExpiration(clientTLS.CACert) && (!w.cluster.cluster.Spec.Networking.TLS.AllowPlainTextCertReload || reflect.DeepEqual(clientTLS.CACert, w.cluster.tlsCache.serverCA)) {
+		return mir(MIRTLSExpired)
+	}
+
+	for _, ca := range clientTLS.RootCAs {
+		if w.cluster.checkCertExpiration(ca) && (!w.cluster.cluster.Spec.Networking.TLS.AllowPlainTextCertReload || reflect.DeepEqual(clientTLS.RootCAs, &w.cluster.tlsCache.rootCAs)) {
+			return mir(MIRTLSExpired)
 		}
 	}
 
