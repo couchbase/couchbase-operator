@@ -316,6 +316,12 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-security-ldap-userdnmapping,userDNMapping>>:
         <<couchbaseclusters-spec-security-ldap-userdnmapping-query,query>>: ""
         <<couchbaseclusters-spec-security-ldap-userdnmapping-template,template>>: ""
+    <<couchbaseclusters-spec-security-passwordpolicy,passwordPolicy>>:
+      <<couchbaseclusters-spec-security-passwordpolicy-enforcedigits,enforceDigits>>: false
+      <<couchbaseclusters-spec-security-passwordpolicy-enforcelowercase,enforceLowercase>>: false
+      <<couchbaseclusters-spec-security-passwordpolicy-enforcespecialchars,enforceSpecialChars>>: false
+      <<couchbaseclusters-spec-security-passwordpolicy-enforceuppercase,enforceUppercase>>: false
+      <<couchbaseclusters-spec-security-passwordpolicy-minlength,minLength>>: 0
     <<couchbaseclusters-spec-security-podsecuritycontext,podSecurityContext>>:
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroup,fsGroup>>: 0
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroupchangepolicy,fsGroupChangePolicy>>: ""
@@ -4661,6 +4667,78 @@ Query is the LDAP query to run to map from Couchbase user to LDAP distinguished 
 This field specifies list of templates to use for providing username to DN mapping.
 The template may contain a placeholder specified as `%u` to represent the Couchbase
 user who is attempting to gain access.
+
+=== couchbaseclusters.spec.security.passwordPolicy
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+PasswordPolicy specifies a series of character-related requirements that
+must be met by all passwords whose definition occurs subsequent to the
+establishing of the policy.
+If this is updated, previously defined passwords continue to be
+valid, even if they do not meet the requirements specified in the new policy.
+
+=== couchbaseclusters.spec.security.passwordPolicy.enforceDigits
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnforceDigits sets whether passwords must contain at least one digit.
+
+=== couchbaseclusters.spec.security.passwordPolicy.enforceLowercase
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnforceLowercase sets whether passwords must contain at least one lowercase letter.
+
+=== couchbaseclusters.spec.security.passwordPolicy.enforceSpecialChars
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnforceSpecialChars sets whether passwords must contain at least one special character.
+If this is set to true, the allowed special chars are limited to: @, %, +, /, ', \, ", !, #, $, ^, ?, :, ,, (, ), {, }, [, ], ~, `, -, and _.
+
+=== couchbaseclusters.spec.security.passwordPolicy.enforceUppercase
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+EnforceUppercase sets whether passwords must contain at least one uppercase letter.
+
+=== couchbaseclusters.spec.security.passwordPolicy.minLength
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+*Maximum*: `100`
+
+==== Description
+
+MinLength sets the minimum length a password must be,
+This field must be between 0 and 100.
+If this field is set to 0, Couchbase Server will permit the definition of highly insecure
+zero-length passwords which is not recommended.
 
 === couchbaseclusters.spec.security.podSecurityContext
 

@@ -45,6 +45,10 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 		}
 	}
 
+	if checkPasswordPolicyZeroLength(cluster.Spec.Security.PasswordPolicy) {
+		warnings = append(warnings, "CouchbaseCluster spec.security.passwordPolicy.minLength is set to 0. This is highly insecure and should not be used for production clusters.")
+	}
+
 	return warnings
 }
 
@@ -78,4 +82,8 @@ func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 	}
 
 	return warnings
+}
+
+func checkPasswordPolicyZeroLength(passwordPolicy *couchbasev2.PasswordPolicySpec) bool {
+	return passwordPolicy != nil && passwordPolicy.MinLength != nil && *passwordPolicy.MinLength == 0
 }

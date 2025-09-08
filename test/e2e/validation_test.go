@@ -4484,6 +4484,14 @@ func TestCouchbaseClusterWarnings(t *testing.T) {
 			shouldFail:       false,
 			expectedWarnings: []string{"CouchbaseCluster spec.cluster.autoCompaction settings have been left as their defaults. It is recommended these are tuned for production clusters."},
 		},
+		{
+			name: "TestPasswordPolicyZeroMinLengthWarning",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+				MinLength: util.IntPtr(0),
+			})},
+			shouldFail:       false,
+			expectedWarnings: []string{"CouchbaseCluster spec.security.passwordPolicy.minLength is set to 0. This is highly insecure and should not be used for production clusters."},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})

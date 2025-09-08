@@ -796,6 +796,14 @@ func PatchIndexSettingInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 	})
 }
 
+func MustPatchPasswordPolicySettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	securitySettingsFetcher := getClusterFetcher(couchbaseutil.GetPasswordPolicySettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, securitySettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustPatchIndexSettingInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	if err := PatchIndexSettingInfo(k8s, couchbase, patches, timeout); err != nil {
 		Die(t, err)

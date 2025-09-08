@@ -1121,3 +1121,16 @@ func GetLogEncryptionSettings(settings *EncryptionAtRestSettings) *Request {
 func GetEncryptionAtRestSettings(settings *AllEncryptionAtRestSettings) *Request {
 	return NewRequest((*Client).Get, "/settings/security/encryptionAtRest", nil, settings)
 }
+
+func GetPasswordPolicySettings(settings *PasswordPolicySettings) *Request {
+	return NewRequest((*Client).Get, "/settings/passwordPolicy", nil, settings)
+}
+
+func SetPasswordPolicySettings(settings *PasswordPolicySettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/passwordPolicy", data, nil)
+}

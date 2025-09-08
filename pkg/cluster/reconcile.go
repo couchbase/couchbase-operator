@@ -232,6 +232,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileUnmanagedBucketsBackends,
 		(*Cluster).reconcileRBAC,
+		(*Cluster).reconcilePasswordPolicy,
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
@@ -1459,6 +1460,52 @@ func (c *Cluster) reconcileStatus() error {
 	}
 
 	c.cluster.Status.Allocations = statuses
+
+	return nil
+}
+
+func (c *Cluster) reconcilePasswordPolicy() error {
+	if c.cluster.Spec.Security.PasswordPolicy == nil {
+		return nil
+	}
+
+	current := couchbaseutil.PasswordPolicySettings{}
+	if err := couchbaseutil.GetPasswordPolicySettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	policy := c.cluster.Spec.Security.PasswordPolicy
+	if policy.MinLength != nil {
+		requested.MinLength = policy.MinLength
+	}
+
+	if policy.EnforceUppercase != nil {
+		requested.EnforceUppercase = policy.EnforceUppercase
+	}
+
+	if policy.EnforceLowercase != nil {
+		requested.EnforceLowercase = policy.EnforceLowercase
+	}
+
+	if policy.EnforceDigits != nil {
+		requested.EnforceDigits = policy.EnforceDigits
+	}
+
+	if policy.EnforceSpecialChars != nil {
+		requested.EnforceSpecialChars = policy.EnforceSpecialChars
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetPasswordPolicySettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("password policy", c.cluster))
 
 	return nil
 }

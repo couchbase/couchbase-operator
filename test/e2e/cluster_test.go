@@ -1348,3 +1348,63 @@ func TestServicelessClass(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+func TestSecuritySettings(t *testing.T) {
+	f := framework.Global
+
+	// Platform configuration.
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Initialise the cluster. By default, password policy settings are not configured (server defaults)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+		MinLength:           util.IntPtr(8),
+		EnforceUppercase:    util.BoolPtr(true),
+		EnforceLowercase:    util.BoolPtr(true),
+		EnforceDigits:       util.BoolPtr(true),
+		EnforceSpecialChars: util.BoolPtr(true),
+	}), time.Minute)
+
+	// Validate the password policy settings are set to the expected values.
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinLength", util.IntPtr(8)), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceUppercase", util.BoolPtr(true)), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceLowercase", util.BoolPtr(true)), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceDigits", util.BoolPtr(true)), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceSpecialChars", util.BoolPtr(true)), time.Minute)
+
+	patchCycles := 1
+
+	// Check that we can update each password policy setting independently.
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy/minLength", 100), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinLength", util.IntPtr(100)), time.Minute)
+	patchCycles++
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy/enforceUppercase", false), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceUppercase", util.BoolPtr(false)), time.Minute)
+	patchCycles++
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy/enforceLowercase", false), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceLowercase", util.BoolPtr(false)), time.Minute)
+	patchCycles++
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy/enforceDigits", false), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceDigits", util.BoolPtr(false)), time.Minute)
+	patchCycles++
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/security/passwordPolicy/enforceSpecialChars", false), time.Minute)
+	e2eutil.MustPatchPasswordPolicySettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnforceSpecialChars", util.BoolPtr(false)), time.Minute)
+	patchCycles++
+
+	// Check that the cluster is edited the expected number of times.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

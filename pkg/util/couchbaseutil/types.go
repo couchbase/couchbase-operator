@@ -2454,3 +2454,11 @@ type AllEncryptionAtRestSettings struct {
 	Audit  EncryptionAtRestSettings `json:"audit,omitempty"`
 	Log    EncryptionAtRestSettings `json:"log,omitempty"`
 }
+
+type PasswordPolicySettings struct {
+	MinLength           *int  `url:"minLength" json:"minLength"`
+	EnforceUppercase    *bool `url:"enforceUppercase" json:"enforceUppercase"`
+	EnforceLowercase    *bool `url:"enforceLowercase" json:"enforceLowercase"`
+	EnforceDigits       *bool `url:"enforceDigits" json:"enforceDigits"`
+	EnforceSpecialChars *bool `url:"enforceSpecialChars" json:"enforceSpecialChars"`
+}

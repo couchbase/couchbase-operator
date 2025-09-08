@@ -3269,6 +3269,12 @@ type CouchbaseClusterSecuritySpec struct {
 	// EncryptionAtRest configures encryption at rest for the cluster.
 	// This field is only supported on Couchbase Server 8.0.0+.
 	EncryptionAtRest *EncryptionAtRestSpec `json:"encryptionAtRest,omitempty"`
+
+	// PasswordPolicy specifies a series of character-related requirements that
+	// must be met by all passwords whose definition occurs subsequent to the
+	// establishing of the policy. If this is updated, previously defined passwords continue to be
+	// valid, even if they do not meet the requirements specified in the new policy.
+	PasswordPolicy *PasswordPolicySpec `json:"passwordPolicy,omitempty"`
 }
 
 // +kubebuilder:validation:Pattern="^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/\\d{1,2}$"
@@ -5627,4 +5633,27 @@ type CouchbaseEncryptionKeyList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseEncryptionKey `json:"items"`
+}
+
+type PasswordPolicySpec struct {
+	// MinLength sets the minimum length a password must be,
+	// This field must be between 0 and 100.
+	// If this field is set to 0, Couchbase Server will permit the definition of highly insecure
+	// zero-length passwords which is not recommended.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	MinLength *int `json:"minLength,omitempty"`
+
+	// EnforceUppercase sets whether passwords must contain at least one uppercase letter.
+	EnforceUppercase *bool `json:"enforceUppercase,omitempty"`
+
+	// EnforceLowercase sets whether passwords must contain at least one lowercase letter.
+	EnforceLowercase *bool `json:"enforceLowercase,omitempty"`
+
+	// EnforceDigits sets whether passwords must contain at least one digit.
+	EnforceDigits *bool `json:"enforceDigits,omitempty"`
+
+	// EnforceSpecialChars sets whether passwords must contain at least one special character.
+	// If this is set to true, the allowed special chars are limited to: @, %, +, /, ', \, ", !, #, $, ^, ?, :, ,, (, ), {, }, [, ], ~, `, -, and _.
+	EnforceSpecialChars *bool `json:"enforceSpecialChars,omitempty"`
 }

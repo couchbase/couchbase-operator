@@ -668,6 +668,7 @@ func registerTests() {
 		framework.NewTestDef(TestEvictionPolicyOnlineChange).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestEvictionPolicyOnlineChangeMigrationDisabled).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestPodDisruptionBudgets).WithTags(TagSuiteP1),
+		framework.NewTestDef(TestSecuritySettings).WithTags(TagSuiteP1, TagSuitePlatform),
 
 		// RBAC Tests
 		framework.NewTestDef(TestRBACRemoveUserFromBinding).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureRBAC),
