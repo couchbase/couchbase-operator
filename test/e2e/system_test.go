@@ -215,7 +215,7 @@ func DeleteJob(t *testing.T, f *framework.Framework, jobName string) {
 
 	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
-		t.Fatalf("failed to list pods for cluster: " + err.Error())
+		e2eutil.Die(t, err)
 	}
 
 	for _, pod := range pods.Items {

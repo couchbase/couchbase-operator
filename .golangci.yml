@@ -7,72 +7,76 @@ run:
 linters:
   # Enable all linters
   presets:
-  - bugs
-  - complexity
-  - format
-  - performance
-  - style
-  - unused
+    - bugs
+    - complexity
+    - format
+    - performance
+    - style
+    - unused
 
   # Selectively disable things to get a pass.  These probably are
   # masking bugs so re-enable and fix them!
   disable:
-  - nosnakecase # removed in v1.49.0 due to bugs
-  - varnamelen
-  - exhaustruct
-  - contextcheck
-  - nosprintfhostport
-  - nonamedreturns
-  - nilnil
-  - maintidx
-  - ireturn
-  - gosimple
-  - containedctx
-  - gosec # insecure!
-  - nestif # complicated code
-  - gomnd # magic numbers
-  - testpackage # packages for test, need to be marked as test
-  - godox # TODOs are bad, it suggests it's not finished
-  - maligned # memory alignment - this is fine
-  - funlen # complicated functions
-  - gochecknoglobals # global variables
-  - lll # long lines
-  - gochecknoinits # init functions
-  - goconst # repeated things that should be constants
-  - prealloc # constant sized arrays can be preallocated
-  - nakedret # using naked returns in complicated functions
-  - exhaustive # doesn't pay attention to default in switch statements
-  - exhaustivestruct # it's okay not to define every field
-  - gofumpt # really anal
-  - paralleltest # really really anal
-  - nlreturn # seems at odds with cuddling
-  - noctx # do want to fix this
-  - wrapcheck # we do want this, but I want https://github.com/tomarrell/wrapcheck/issues/2 fixing first
-  - forbidigo # allow println
-  - promlinter # don't check that our metrics are all broken...
-  - cyclop # we just did this...??
-  - ifshort # turn me on
-  - nilerr # turn me on
-  - forcetypeassert # turn me on (maybe, some times we know it's the correct type)
-  - tagliatelle # don't complain about Kubernetes json tag formats, they are standard
-  - predeclared # turn me on
-  - thelper # turn me on
-  - gci # turn me on (perhaps new conding standards?)
-  - durationcheck # turn me on (perhaps)
-  - scopelint # deprecated replaced by exportloopref
-  - interfacer # deprecated
-  - golint # deprecated replaced by revive
-  - depguard
-  - tagalign
-  - mirror
-  ## Everything that follows was disabled for go1.20 update - reenable
-  - nolintlint
-  - usestdlibvars
-  - reassign
-  - musttag
-  - loggercheck
-  - interfacebloat
-  - revive
+    - varnamelen
+    - exhaustruct
+    - contextcheck
+    - nosprintfhostport
+    - nonamedreturns
+    - nilnil
+    - maintidx
+    - ireturn
+    - gosimple
+    - containedctx
+    - gosec # insecure!
+    - nestif # complicated code
+    - mnd # magic numbers
+    - testpackage # packages for test, need to be marked as test
+    - godox # TODOs are bad, it suggests it's not finished
+    - funlen # complicated functions
+    - gochecknoglobals # global variables
+    - lll # long lines
+    - gochecknoinits # init functions
+    - goconst # repeated things that should be constants
+    - prealloc # constant sized arrays can be preallocated
+    - nakedret # using naked returns in complicated functions
+    - exhaustive # doesn't pay attention to default in switch statements
+    - gofumpt # really anal
+    - paralleltest # really really anal
+    - nlreturn # seems at odds with cuddling
+    - noctx # do want to fix this
+    - wrapcheck # we do want this, but I want https://github.com/tomarrell/wrapcheck/issues/2 fixing first
+    - forbidigo # allow println
+    - promlinter # don't check that our metrics are all broken...
+    - cyclop # we just did this...??
+    - nilerr # turn me on
+    - forcetypeassert # turn me on (maybe, some times we know it's the correct type)
+    - tagliatelle # don't complain about Kubernetes json tag formats, they are standard
+    - predeclared # turn me on
+    - thelper # turn me on
+    - gci # turn me on (perhaps new conding standards?)
+    - durationcheck # turn me on (perhaps)
+    - depguard
+    - tagalign
+    - mirror
+    ## Everything that follows was disabled for go1.20 update - reenable
+    - nolintlint
+    - usestdlibvars
+    - reassign
+    - musttag
+    - loggercheck
+    - interfacebloat
+    - revive
+    - inamedparam
+    - perfsprint
+    - recvcheck
+    - govet
+    - intrange
+    - nilnesserr
+    - protogetter
+    - testifylint
+    - unparam
+    - wsl
+    - staticcheck
 
 linters-settings:
   # Code duplication filter catches a lot of duplication in test
@@ -82,39 +86,39 @@ linters-settings:
 
 issues:
   exclude-rules:
-  # Deep copies have 'in' as the receiver, ours have something else.
-  # This linter should ignore the auto generated stuff, but doesn't.
-  - text: ST1016
-    linters:
-    - stylecheck
-  # Things that are parameterized, and don't need to be.  This is probably
-  # a gap in testing.
-  - text: always receives
-    linters:
-    - unparam
-  # turn me on
-  - text: appendAssign
-    linters:
-    - gocritic
-  # Test is exempt from proper error handling.
-  # Validation and tools are exempt for now...
-  - path: test/.*
-    linters:
-    - goerr113
-    - gocognit
-    - gocyclo
-  - path: cmd/.*
-    linters:
-    - goerr113
-  - path: pkg/admission/.*
-    linters:
-    - goerr113
-  - path: pkg/config/.*
-    linters:
-    - goerr113
-  - path: pkg/info/.*
-    linters:
-    - goerr113
-  - path: pkg/validator/.*
-    linters:
-    - goerr113
+    # Deep copies have 'in' as the receiver, ours have something else.
+    # This linter should ignore the auto generated stuff, but doesn't.
+    - text: ST1016
+      linters:
+        - stylecheck
+    # Things that are parameterized, and don't need to be.  This is probably
+    # a gap in testing.
+    - text: always receives
+      linters:
+        - unparam
+    # turn me on
+    - text: appendAssign
+      linters:
+        - gocritic
+    # Test is exempt from proper error handling.
+    # Validation and tools are exempt for now...
+    - path: test/.*
+      linters:
+        - err113
+        - gocognit
+        - gocyclo
+    - path: cmd/.*
+      linters:
+        - err113
+    - path: pkg/admission/.*
+      linters:
+        - err113
+    - path: pkg/config/.*
+      linters:
+        - err113
+    - path: pkg/info/.*
+      linters:
+        - err113
+    - path: pkg/validator/.*
+      linters:
+        - err113

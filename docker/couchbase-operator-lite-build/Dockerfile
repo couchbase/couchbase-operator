@@ -1,4 +1,4 @@
-FROM golang:1.22.1-bullseye
+FROM golang:1.24.7-trixie
 
 WORKDIR /tmp/src/github.com/couchbase/couchbase-operator
 ADD go.mod go.sum ./

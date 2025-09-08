@@ -287,7 +287,7 @@ func TestPodDeletedAfterExpectedDelay(t *testing.T) {
 
 	_, err = e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 5*time.Minute)
 	if err != nil {
-		t.Errorf("TestPodDeletedAfterExpectedDelay should not timeout" + err.Error())
+		e2eutil.Die(t, err)
 	}
 }
 
@@ -309,6 +309,6 @@ func TestPodDeleteDelayRespected(t *testing.T) {
 
 	_, err := e2eutil.ResizeCluster(0, constants.Size1, kubernetes, cluster, 2*time.Minute)
 	if err != nil {
-		t.Errorf("TestPodDeleteDelayRespected failed: " + err.Error())
+		e2eutil.Die(t, err)
 	}
 }

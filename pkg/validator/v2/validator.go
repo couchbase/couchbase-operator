@@ -3425,13 +3425,11 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota != nil {
 		if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
-			errMsg := fmt.Sprintf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
-
 			if sb {
-				errMsg = fmt.Sprintf("%s, sample buckets have a memory quota of 200Mi", errMsg)
+				return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s sample buckets have a memory quota of 200Mi", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
 			}
 
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
 		}
 	}
 
