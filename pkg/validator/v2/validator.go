@@ -775,6 +775,23 @@ func checkConstraintPrometheusAuthorizationSecret(v *types.Validator, cluster *c
 	return nil
 }
 
+// checkConstraintLoggingSidecarTLS checks that if enabled, the logging sidecar TLS configs passed.
+func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	fbs := cluster.Spec.Logging.Server
+	if fbs == nil {
+		return nil
+	}
+
+	if fbs.Sidecar == nil || fbs.Sidecar.TLS == nil {
+		return nil
+	}
+
+	// In operator 2.9.0 the `spec.logging.server.sidecar.tls` field is not
+	// implemented. Reject usage via the admission controller so users cannot
+	// rely on it until mounting/rotation is implemented in 2.9.1.
+	return fmt.Errorf("spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+")
+}
+
 // checkConstraintLoggingPermissible checks persistent volumes are being used.
 func checkConstraintLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsServerLoggingEnabled() {

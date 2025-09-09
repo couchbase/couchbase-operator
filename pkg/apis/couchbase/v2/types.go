@@ -5354,6 +5354,29 @@ type LogShipperSidecarSpec struct {
 	// Resources is the resource requirements for the sidecar container.
 	// Will be populated by Kubernetes defaults if not specified.
 	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
+
+	// TLS configures mounting kubernetes TLS secrets into the logging sidecar.
+	// The operator will (in a later release) mount each secret under
+	// <mountPath>/<secretName>/ and the files within the secret will retain
+	// their keys as filenames. In 2.9.0 this field is accepted by the CRD but
+	// currently not implemented - usage will be rejected by the admission
+	// controller. Implementation (mounting) is planned for 2.9.1.
+	TLS *LogShipperSidecarTLSSpec `json:"tls,omitempty"`
+}
+
+// LogShipperSidecarTLSSpec configures TLS secret mounts for the logging sidecar.
+type LogShipperSidecarTLSSpec struct {
+	// MountPath is the parent directory into which each secret will be mounted
+	// as a sub-directory named after the secret. For example, a secret named
+	// `fluent-bit-ca` mounted with MountPath `/fluent-bit/certs/` will expose
+	// files under `/fluent-bit/certs/fluent-bit-ca/`.
+	// +kubebuilder:default="/fluent-bit/certs/"
+	MountPath string `json:"mountPath,omitempty"`
+
+	// SecretNames is the list of Kubernetes Secret names (typically of type
+	// kubernetes.io/tls) to mount into the sidecar. Filenames inside each
+	// mounted directory will match the keys in the Secret's data map.
+	SecretNames []string `json:"secretNames,omitempty"`
 }
 
 // The AuditDisabledUser is actually a compound string intended to feed a two-element struct.

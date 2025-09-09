@@ -219,6 +219,72 @@ func TestValidateEncryptionKeyCircularDependencies(t *testing.T) {
 	}
 }
 
+func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
+	testcases := []struct {
+		name        string
+		clusterSpec *couchbasev2.CouchbaseCluster
+		expectedErr string
+	}{
+		{
+			name: "should reject usage of logging sidecar TLS in 2.9.0",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "/fluent-bit/certs/",
+									SecretNames: []string{"fluent-bit-ca", "fluent-bit-client-cert"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+",
+		},
+		{
+			name: "should allow if logging sidecar TLS is nil",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{},
+						},
+					},
+				},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "should allow if logging server is nil",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{},
+				},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "should allow if logging is nil",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{},
+			},
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			err := checkConstraintLoggingSidecarTLS(nil, testcase.clusterSpec)
+
+			if (err == nil && testcase.expectedErr != "") || (err != nil && err.Error() != testcase.expectedErr) {
+				t.Errorf("test %s failed, expected error %s, got %s", testcase.name, testcase.expectedErr, err)
+			}
+		})
+	}
+}
+
 // keySpec is a helper struct for creating test encryption keys.
 type keySpec struct {
 	name        string

@@ -182,6 +182,10 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-logging-server-sidecar-configurationmountpath,configurationMountPath>>: /fluent-bit/config/
         <<couchbaseclusters-spec-logging-server-sidecar-image,image>>: couchbase/fluent-bit:1.2.9
         <<couchbaseclusters-spec-logging-server-sidecar-resources,resources>>: {}
+        <<couchbaseclusters-spec-logging-server-sidecar-tls,tls>>:
+          <<couchbaseclusters-spec-logging-server-sidecar-tls-mountpath,mountPath>>: /fluent-bit/certs/
+          <<couchbaseclusters-spec-logging-server-sidecar-tls-secretnames,secretNames>>:
+          - ""
   <<couchbaseclusters-spec-migration,migration>>:
     <<couchbaseclusters-spec-migration-maxconcurrentmigrations,maxConcurrentMigrations>>: 1
     <<couchbaseclusters-spec-migration-migrationorderoverride,migrationOrderOverride>>:
@@ -2879,6 +2883,52 @@ It will default to the latest supported version of Fluent Bit.
 
 Resources is the resource requirements for the sidecar container.
 Will be populated by Kubernetes defaults if not specified.
+
+=== couchbaseclusters.spec.logging.server.sidecar.tls
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+TLS configures mounting kubernetes TLS secrets into the logging sidecar.
+The operator will (in a later release) mount each secret under
+<mountPath>/<secretName>/ and the files within the secret will retain
+their keys as filenames.
+In 2.9.0 this field is accepted by the CRD but
+currently not implemented - usage will be rejected by the admission
+controller.
+Implementation (mounting) is planned for 2.9.1.
+
+=== couchbaseclusters.spec.logging.server.sidecar.tls.mountPath
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `/fluent-bit/certs/`
+
+==== Description
+
+MountPath is the parent directory into which each secret will be mounted
+as a sub-directory named after the secret.
+For example, a secret named
+`fluent-bit-ca` mounted with MountPath `/fluent-bit/certs/` will expose
+files under `/fluent-bit/certs/fluent-bit-ca/`.
+
+=== couchbaseclusters.spec.logging.server.sidecar.tls.secretNames
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+SecretNames is the list of Kubernetes Secret names (typically of type
+kubernetes.io/tls) to mount into the sidecar.
+Filenames inside each
+mounted directory will match the keys in the Secret's data map.
 
 === couchbaseclusters.spec.migration
 
