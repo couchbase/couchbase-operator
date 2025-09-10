@@ -793,6 +793,15 @@ func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
 		return err
 	}
 
+	// I really don't like this but this is all we can do if the certs have expired, and we need to rotate them.
+	// This will succeed in rotating the certs using password authentication if allowPlainTextCertReload is true.
+	if c.cluster.Spec.Networking.TLS.AllowPlainTextCertReload {
+		request := couchbaseutil.ReloadNodeCert(settings).InPlaintext()
+		request.Authenticate = true
+
+		return request.On(c.api, member)
+	}
+
 	return couchbaseutil.ReloadNodeCert(settings).On(c.api, member)
 }
 
@@ -1234,13 +1243,17 @@ func (c *Cluster) updateTLS() error {
 	c.api.CloseIdleConnections()
 
 	// Update the CA and any server certificate chains that require it.
+	if err := c.updateClientCA(); err != nil {
+		return err
+	}
+
 	for _, member := range c.members {
 		if err := c.reconcileMemberTLS(member, cert); err != nil {
 			return err
 		}
 	}
 
-	return c.updateClientCA()
+	return nil
 }
 
 func (c *Cluster) updateClientCA() error {
