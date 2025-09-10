@@ -3525,3 +3525,48 @@ func TestBackupAndRestorePreserveRecord(t *testing.T) {
 		}
 	})
 }
+
+func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// create provider
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	// setup environmen
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--default-recovery=resume"}).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	container := e2eutil.MustGetBackupContainer(t, kubernetes, backup)
+
+	if !slices.Contains(container.Args, "--default-recovery=resume") {
+		e2eutil.Die(t, fmt.Errorf("expected --default-recovery=resume in backup container args"))
+	}
+
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--default-recovery=purge"}).UseBlankBackupName(false).MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
+	container = e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
+
+	if !slices.Contains(container.Args, "--default-recovery=purge") {
+		e2eutil.Die(t, fmt.Errorf("expected --default-recovery=purge in restore container args"))
+	}
+}

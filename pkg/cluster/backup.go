@@ -1338,6 +1338,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		}
 	}
 
+	if spec.AdditionalArgs != "" {
+		args = append(args, spec.AdditionalArgs)
+	}
+
 	container := corev1.Container{
 		Name:       "cbbackupmgr-restore",
 		Image:      c.cluster.Spec.BackupImage(),
@@ -1651,6 +1655,10 @@ func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, 
 
 		if !selector.Matches(labels.Set(restore.Labels)) {
 			continue
+		}
+
+		if err := annotations.Populate(&restore.Spec, restore.Annotations); err != nil {
+			return nil, err
 		}
 
 		restores = append(restores, *restore)

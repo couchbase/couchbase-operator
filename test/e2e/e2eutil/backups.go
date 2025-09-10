@@ -461,6 +461,9 @@ type Restore struct {
 
 	// preserveRestoreRecord
 	preserveRestoreRecord bool
+
+	// annotations to be added to the restore
+	annotations map[string]string
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -600,6 +603,13 @@ func (r *Restore) WithPreserveRestoreRecord(preserveRestoreRecord bool) *Restore
 	return r
 }
 
+// WithAnnotations adds annotations to the restore.
+func (r *Restore) WithAnnotations(annotations map[string]string) *Restore {
+	r.annotations = annotations
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -608,6 +618,7 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 	restore := &couchbasev2.CouchbaseBackupRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: generateName,
+			Annotations:  r.annotations,
 		},
 		Spec: couchbasev2.CouchbaseBackupRestoreSpec{},
 	}
@@ -714,4 +725,22 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 	}
 
 	return newRestore
+}
+
+func MustGetBackupContainer(t *testing.T, kubernetes *types.Cluster, backup *couchbasev2.CouchbaseBackup) *v1.Container {
+	cronJob, err := kubernetes.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), backup.Name+"-full", metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return &cronJob.Spec.JobTemplate.Spec.Template.Spec.Containers[0]
+}
+
+func MustGetRestoreContainer(t *testing.T, kubernetes *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) *v1.Container {
+	job, err := kubernetes.KubeClient.BatchV1().Jobs(restore.Namespace).Get(context.Background(), restore.Name, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	return &job.Spec.Template.Spec.Containers[0]
 }
