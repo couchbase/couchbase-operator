@@ -1528,6 +1528,26 @@ type CouchbaseBucketSpec struct {
 	// DurabilityImpossibleFallback defines whether to report writes as durable even if not enough replicas are written to.
 	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+
+	// EncryptionAtRest defines the encryption at rest settings for the bucket.
+	// This field is only supported for Couchbase Server 8.0.0+.
+	// +optional
+	EncryptionAtRest *BucketEncryptionAtRestConfiguration `json:"encryptionAtRest,omitempty"`
+}
+
+type BucketEncryptionAtRestConfiguration struct {
+	// Key is the name of the encryption key to use for encryption at rest.
+	KeyName string `json:"keyName"`
+
+	// RotationInterval is the interval at which the encryption key will be rotated.
+	// Must be greater or equal to 7 days. Default is 30 days.
+	// +kubebuilder:default="720h"
+	RotationInterval *metav1.Duration `json:"rotationInterval,omitempty"`
+
+	// KeyLifetime is the lifetime of the encryption key.
+	// Must be greater or equal to 30 days. Default is 365 days.
+	// +kubebuilder:default="8760h"
+	KeyLifetime *metav1.Duration `json:"keyLifetime,omitempty"`
 }
 
 type HistoryRetentionSettings struct {

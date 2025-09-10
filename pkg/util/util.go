@@ -44,3 +44,7 @@ func Contains[T comparable](elements []T, element T) bool {
 
 	return false
 }
+
+func IntPtr(i int) *int {
+	return &i
+}

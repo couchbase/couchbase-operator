@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -482,38 +483,41 @@ const (
 
 // Bucket is a canonical representation of the parameters used for creating/editing buckets with the REST API.
 type Bucket struct {
-	SampleBucket                      bool
-	BucketName                        string                       `json:"name"`
-	BucketType                        string                       `json:"type"`
-	BucketStorageBackend              CouchbaseStorageBackend      `json:"storageBackend"`
-	BucketMemoryQuota                 int64                        `json:"memoryQuota"`
-	BucketReplicas                    int                          `json:"replicas"`
-	IoPriority                        IoPriorityType               `json:"ioPriority"`
-	EvictionPolicy                    string                       `json:"evictionPolicy"`
-	ConflictResolution                string                       `json:"conflictResolution"`
-	EnableFlush                       bool                         `json:"enableFlush"`
-	EnableIndexReplica                bool                         `json:"enableIndexReplica"`
-	BucketPassword                    string                       `json:"password"`
-	CompressionMode                   CompressionMode              `json:"compressionMode"`
-	DurabilityMinLevel                Durability                   `json:"durabilityMinLevel"`
-	MaxTTL                            int                          `json:"maxTTL"`
-	HistoryRetentionSeconds           uint64                       `json:"historyRetentionSeconds"`
-	HistoryRetentionBytes             uint64                       `json:"historyRetentionBytes"`
-	HistoryRetentionCollectionDefault *bool                        `json:"historyRetentionCollectionDefault"`
-	MagmaSeqTreeDataBlockSize         *uint64                      `json:"magmaSeqTreeDataBlockSize"`
-	MagmaKeyTreeDataBlockSize         *uint64                      `json:"magmaKeyTreeDataBlockSize"`
-	Rank                              *int                         `json:"rank"`
-	PurgeInterval                     *float64                     `json:"purgeInterval,omitempty"`
-	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
-	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
-	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
-	AccessScannerEnabled              *bool                        `json:"accessScannerEnabled,omitempty"`
-	ExpiryPagerSleepTime              *uint64                      `json:"expiryPagerSleepTime,omitempty"`
-	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
-	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
-	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
-	DurabilityImpossibleFallback      DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
-	NoRestart                         *bool                        `json:"noRestart,omitempty"`
+	SampleBucket                        bool
+	BucketName                          string                       `json:"name"`
+	BucketType                          string                       `json:"type"`
+	BucketStorageBackend                CouchbaseStorageBackend      `json:"storageBackend"`
+	BucketMemoryQuota                   int64                        `json:"memoryQuota"`
+	BucketReplicas                      int                          `json:"replicas"`
+	IoPriority                          IoPriorityType               `json:"ioPriority"`
+	EvictionPolicy                      string                       `json:"evictionPolicy"`
+	ConflictResolution                  string                       `json:"conflictResolution"`
+	EnableFlush                         bool                         `json:"enableFlush"`
+	EnableIndexReplica                  bool                         `json:"enableIndexReplica"`
+	BucketPassword                      string                       `json:"password"`
+	CompressionMode                     CompressionMode              `json:"compressionMode"`
+	DurabilityMinLevel                  Durability                   `json:"durabilityMinLevel"`
+	MaxTTL                              int                          `json:"maxTTL"`
+	HistoryRetentionSeconds             uint64                       `json:"historyRetentionSeconds"`
+	HistoryRetentionBytes               uint64                       `json:"historyRetentionBytes"`
+	HistoryRetentionCollectionDefault   *bool                        `json:"historyRetentionCollectionDefault"`
+	MagmaSeqTreeDataBlockSize           *uint64                      `json:"magmaSeqTreeDataBlockSize"`
+	MagmaKeyTreeDataBlockSize           *uint64                      `json:"magmaKeyTreeDataBlockSize"`
+	Rank                                *int                         `json:"rank"`
+	PurgeInterval                       *float64                     `json:"purgeInterval,omitempty"`
+	AutoCompactionSettings              BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
+	EnableCrossClusterVersioning        *bool                        `json:"enableCrossClusterVersioning,omitempty"`
+	VersionPruningWindowHrs             *uint64                      `json:"versionPruningWindowHrs,omitempty"`
+	AccessScannerEnabled                *bool                        `json:"accessScannerEnabled,omitempty"`
+	ExpiryPagerSleepTime                *uint64                      `json:"expiryPagerSleepTime,omitempty"`
+	WarmupBehavior                      string                       `json:"warmupBehavior,omitempty"`
+	MemoryLowWatermark                  *int                         `json:"memoryLowWatermark,omitempty"`
+	MemoryHighWatermark                 *int                         `json:"memoryHighWatermark,omitempty"`
+	DurabilityImpossibleFallback        DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+	NoRestart                           *bool                        `json:"noRestart,omitempty"`
+	EncryptionAtRestKeyID               *int                         `json:"encryptionAtRestKeyId,omitempty"`
+	EncryptionAtRestDekRotationInterval *int                         `json:"encryptionAtRestDekRotationInterval,omitempty"`
+	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
 }
 
 type BucketList []Bucket
@@ -544,39 +548,42 @@ type BucketBasicStats struct {
 // SM: THIS IS SO M****RF***KING ANNOYING.  HAVE A SINGLE SOURCE OF TRUTH!!!!!
 // THIS IS UTTERLY POINTLESS OVERENGINEERING.  (Fix me essentially).
 type BucketStatus struct {
-	Nodes                             []NodeInfo                   `json:"nodes"`
-	BucketName                        string                       `json:"name"`
-	BucketType                        string                       `json:"bucketType"`
-	StorageBackend                    CouchbaseStorageBackend      `json:"storageBackend"`
-	EvictionPolicy                    string                       `json:"evictionPolicy"`
-	ConflictResolution                string                       `json:"conflictResolutionType"`
-	EnableIndexReplica                bool                         `json:"replicaIndex"`
-	ReplicaNumber                     int                          `json:"replicaNumber"`
-	ThreadsNumber                     IoPriorityThreadCount        `json:"threadsNumber"`
-	Controllers                       map[string]string            `json:"controllers"`
-	Quota                             map[string]int64             `json:"quota"`
-	Stats                             map[string]string            `json:"stats"`
-	VBServerMap                       VBucketServerMap             `json:"vBucketServerMap"`
-	CompressionMode                   CompressionMode              `json:"compressionMode"`
-	DurabilityMinLevel                Durability                   `json:"durabilityMinLevel"`
-	MaxTTL                            int                          `json:"maxTTL"`
-	BasicStats                        BucketBasicStats             `json:"basicStats"`
-	HistoryRetentionSeconds           uint64                       `json:"historyRetentionSeconds,omitempty"`
-	HistoryRetentionBytes             uint64                       `json:"historyRetentionBytes,omitempty"`
-	HistoryRetentionCollectionDefault *bool                        `json:"historyRetentionCollectionDefault,omitempty"`
-	MagmaSeqTreeDataBlockSize         *uint64                      `json:"magmaSeqTreeDataBlockSize,omitempty"`
-	MagmaKeyTreeDataBlockSize         *uint64                      `json:"magmaKeyTreeDataBlockSize,omitempty"`
-	Rank                              *int                         `json:"rank"`
-	PurgeInterval                     *float64                     `json:"purgeInterval,omitempty"`
-	AutoCompactionSettings            BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
-	EnableCrossClusterVersioning      *bool                        `json:"enableCrossClusterVersioning,omitempty"`
-	VersionPruningWindowHrs           *uint64                      `json:"versionPruningWindowHrs,omitempty"`
-	AccessScannerEnabled              *bool                        `json:"accessScannerEnabled,omitempty"`
-	ExpiryPagerSleepTime              *uint64                      `json:"expiryPagerSleepTime,omitempty"`
-	WarmupBehavior                    string                       `json:"warmupBehavior,omitempty"`
-	MemoryLowWatermark                *int                         `json:"memoryLowWatermark,omitempty"`
-	MemoryHighWatermark               *int                         `json:"memoryHighWatermark,omitempty"`
-	DurabilityImpossibleFallback      DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+	Nodes                               []NodeInfo                   `json:"nodes"`
+	BucketName                          string                       `json:"name"`
+	BucketType                          string                       `json:"bucketType"`
+	StorageBackend                      CouchbaseStorageBackend      `json:"storageBackend"`
+	EvictionPolicy                      string                       `json:"evictionPolicy"`
+	ConflictResolution                  string                       `json:"conflictResolutionType"`
+	EnableIndexReplica                  bool                         `json:"replicaIndex"`
+	ReplicaNumber                       int                          `json:"replicaNumber"`
+	ThreadsNumber                       IoPriorityThreadCount        `json:"threadsNumber"`
+	Controllers                         map[string]string            `json:"controllers"`
+	Quota                               map[string]int64             `json:"quota"`
+	Stats                               map[string]string            `json:"stats"`
+	VBServerMap                         VBucketServerMap             `json:"vBucketServerMap"`
+	CompressionMode                     CompressionMode              `json:"compressionMode"`
+	DurabilityMinLevel                  Durability                   `json:"durabilityMinLevel"`
+	MaxTTL                              int                          `json:"maxTTL"`
+	BasicStats                          BucketBasicStats             `json:"basicStats"`
+	HistoryRetentionSeconds             uint64                       `json:"historyRetentionSeconds,omitempty"`
+	HistoryRetentionBytes               uint64                       `json:"historyRetentionBytes,omitempty"`
+	HistoryRetentionCollectionDefault   *bool                        `json:"historyRetentionCollectionDefault,omitempty"`
+	MagmaSeqTreeDataBlockSize           *uint64                      `json:"magmaSeqTreeDataBlockSize,omitempty"`
+	MagmaKeyTreeDataBlockSize           *uint64                      `json:"magmaKeyTreeDataBlockSize,omitempty"`
+	Rank                                *int                         `json:"rank"`
+	PurgeInterval                       *float64                     `json:"purgeInterval,omitempty"`
+	AutoCompactionSettings              BucketAutoCompactionSettings `json:"autoCompactionSettings,omitempty"`
+	EnableCrossClusterVersioning        *bool                        `json:"enableCrossClusterVersioning,omitempty"`
+	VersionPruningWindowHrs             *uint64                      `json:"versionPruningWindowHrs,omitempty"`
+	AccessScannerEnabled                *bool                        `json:"accessScannerEnabled,omitempty"`
+	ExpiryPagerSleepTime                *uint64                      `json:"expiryPagerSleepTime,omitempty"`
+	WarmupBehavior                      string                       `json:"warmupBehavior,omitempty"`
+	MemoryLowWatermark                  *int                         `json:"memoryLowWatermark,omitempty"`
+	MemoryHighWatermark                 *int                         `json:"memoryHighWatermark,omitempty"`
+	DurabilityImpossibleFallback        DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+	EncryptionAtRestKeyID               *int                         `json:"encryptionAtRestKeyId,omitempty"`
+	EncryptionAtRestDekRotationInterval *int                         `json:"encryptionAtRestDekRotationInterval,omitempty"`
+	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -920,10 +927,14 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.AccessScannerEnabled = status.AccessScannerEnabled
 	b.DurabilityImpossibleFallback = status.DurabilityImpossibleFallback
 
+	b.EncryptionAtRestKeyID = status.EncryptionAtRestKeyID
+	b.EncryptionAtRestDekRotationInterval = status.EncryptionAtRestDekRotationInterval
+	b.EncryptionAtRestDekLifetime = status.EncryptionAtRestDekLifetime
+
 	return nil
 }
 
-//nolint:gocognit
+//nolint:gocognit,gocyclo
 func (b *Bucket) FormEncode(update bool) []byte {
 	data := url.Values{}
 	data.Set("name", b.BucketName)
@@ -1042,6 +1053,18 @@ func (b *Bucket) FormEncode(update bool) []byte {
 
 	if b.MemoryHighWatermark != nil {
 		data.Set("memoryHighWatermark", strconv.Itoa(*b.MemoryHighWatermark))
+	}
+
+	if b.EncryptionAtRestKeyID != nil {
+		data.Set("encryptionAtRestKeyId", strconv.Itoa(*b.EncryptionAtRestKeyID))
+	}
+
+	if b.EncryptionAtRestDekRotationInterval != nil {
+		data.Set("encryptionAtRestDekRotationInterval", strconv.Itoa(*b.EncryptionAtRestDekRotationInterval))
+	}
+
+	if b.EncryptionAtRestDekLifetime != nil {
+		data.Set("encryptionAtRestDekLifetime", strconv.Itoa(*b.EncryptionAtRestDekLifetime))
 	}
 
 	return []byte(data.Encode())
@@ -2348,6 +2371,16 @@ func (l EncryptionKeyList) GetKeyByName(name string) *EncryptionKeyInfo {
 type EncryptionKeyInfo struct {
 	ID int `json:"id"`
 	EncryptionKey
+}
+
+func (k *EncryptionKeyInfo) CanEncryptBucket(bucketName string) bool {
+	for _, usage := range k.Usage {
+		if usage == EncryptionKeyUsageBucketEncryptionAll || usage == strings.Join([]string{constants.EncryptionKeyUsageBucketEncryptionPrefix, bucketName}, "-") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MarshalJSON is used to marshal the EncryptionKey into a JSON object.

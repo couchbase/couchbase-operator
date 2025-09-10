@@ -758,6 +758,26 @@ func MustPatchEncryptionAtRestSettings(t *testing.T, k8s *types.Cluster, couchba
 	}
 }
 
+func MustGetEncryptionKeyID(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, keyName string) int {
+	keys := couchbaseutil.EncryptionKeyList{}
+
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		Die(t, err)
+	}
+
+	if err := couchbaseutil.ListEncryptionKeys(&keys).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	key := keys.GetKeyByName(keyName)
+	if key == nil {
+		Die(t, fmt.Errorf("key %s not found", keyName))
+	}
+
+	return keys.GetKeyByName(keyName).ID
+}
+
 func MustPatchEncryptionKeySettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, keyName string, patches jsonpatch.PatchSet, timeout time.Duration) {
 	keySettingsFetcher := func(c *CouchbaseClient) (interface{}, error) {
 		keys := couchbaseutil.EncryptionKeyList{}

@@ -5265,6 +5265,11 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 		errs = append(errs, fmt.Errorf("encryption key circular dependency validation failed: %w", err))
 	}
 
+	// Check the encryption keyys used on buckets all exist and have the appropriate usage settings
+	if err := validateEncryptionKeysUsedOnBuckets(v, cluster, keyMap); err != nil {
+		errs = append(errs, fmt.Errorf("encryption key used on bucket validation failed: %w", err))
+	}
+
 	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -5445,4 +5450,69 @@ func formatCycle(cycle []string) string {
 	}
 
 	return strings.Join(cycle, " -> ")
+}
+
+func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, keyMap map[string]*couchbasev2.CouchbaseEncryptionKey) error {
+	var errs []error
+
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	usedKeys := make(map[string]bool)
+
+	// First check that the bucket is using an encryption key that exists
+	for _, bucket := range couchbaseBuckets.Items {
+		if bucket.Spec.EncryptionAtRest == nil || bucket.Spec.EncryptionAtRest.KeyName == "" {
+			continue
+		}
+
+		if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
+			rotationInterval := bucket.Spec.EncryptionAtRest.RotationInterval.Duration
+			if rotationInterval.Hours() < 7*24 {
+				return fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
+			}
+		}
+
+		// Check key lifetime is at least 30 days if set
+		if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
+			keyLifetime := bucket.Spec.EncryptionAtRest.KeyLifetime.Duration
+			if keyLifetime.Hours() < 30*24 {
+				return fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
+			}
+		}
+
+		// Mark the key as used for the second check
+		usedKeys[bucket.Spec.EncryptionAtRest.KeyName] = true
+
+		key, found := keyMap[bucket.Spec.EncryptionAtRest.KeyName]
+		if !found {
+			errs = append(errs, fmt.Errorf("encryption key %s does not exist or is not selected by the encryption at rest selector", bucket.Spec.EncryptionAtRest.KeyName))
+			continue
+		}
+
+		if !key.Spec.Usage.AllBuckets && !key.Spec.Usage.ManagedBucketSelection {
+			errs = append(errs, fmt.Errorf("encryption key %s does not have bucket usage enabled", bucket.Spec.EncryptionAtRest.KeyName))
+			continue
+		}
+	}
+
+	// Now we need to check that if an encryption key only has bucket usage enabled then it is used on at least one bucket
+	for _, key := range keyMap {
+		if !key.Spec.Usage.ManagedBucketSelection || key.Spec.Usage.AllBuckets || key.Spec.Usage.Configuration || key.Spec.Usage.Key || key.Spec.Usage.Log || key.Spec.Usage.Audit {
+			continue
+		}
+
+		if !usedKeys[key.Name] {
+			errs = append(errs, fmt.Errorf("encryption key %s is not used on any buckets. If only bucket usage is enabled, it must be used on at least one bucket", key.Name))
+			continue
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
 }

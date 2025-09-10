@@ -10,6 +10,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -36,8 +37,8 @@ type SupportedFeatureMap map[SupportedFeature]bool
 
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
 //
-//nolint:gocognit
-func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client) []couchbaseutil.Bucket {
+//nolint:gocognit,gocyclo
+func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client, encryptionKeys couchbaseutil.EncryptionKeyList) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
@@ -180,6 +181,27 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			if bucket.Spec.OnlineEvictionPolicyChange {
 				noRestart := true
 				b.NoRestart = &noRestart
+			}
+
+			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
+			b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
+			b.EncryptionAtRestKeyID = util.IntPtr(constants.DefaultEncryptionAtRestKeyID)
+
+			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
+				if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
+					log.Info("Encryption key not found for bucket", "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+				} else if !key.CanEncryptBucket(bucket.Name) {
+					log.Info("Encryption key cannot encrypt bucket", "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+				} else {
+					b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
+
+					if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
+						b.EncryptionAtRestDekRotationInterval = util.IntPtr(int(bucket.Spec.EncryptionAtRest.RotationInterval.Seconds()))
+					}
+					if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
+						b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
+					}
+				}
 			}
 		}
 
@@ -414,7 +436,15 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
 	ephemeralBuckets := c.k8s.CouchbaseEphemeralBuckets.List()
 
-	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s)
+	encryptionKeys := couchbaseutil.EncryptionKeyList{}
+	if atleast80 {
+		err = couchbaseutil.ListEncryptionKeys(&encryptionKeys).On(c.api, c.readyMembers())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s, encryptionKeys)
 	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
 

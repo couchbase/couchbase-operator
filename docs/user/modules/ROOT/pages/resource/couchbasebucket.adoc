@@ -39,6 +39,10 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-enablecrossclusterversioning,enableCrossClusterVersioning>>: false
   <<couchbasebuckets-spec-enableflush,enableFlush>>: false
   <<couchbasebuckets-spec-enableindexreplica,enableIndexReplica>>: false
+  <<couchbasebuckets-spec-encryptionatrest,encryptionAtRest>>:
+    <<couchbasebuckets-spec-encryptionatrest-keylifetime,keyLifetime>>: 8760h
+    <<couchbasebuckets-spec-encryptionatrest-keyname,keyName>>: ""
+    <<couchbasebuckets-spec-encryptionatrest-rotationinterval,rotationInterval>>: 720h
   <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
   <<couchbasebuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
   <<couchbasebuckets-spec-historyretention,historyRetention>>:
@@ -379,6 +383,57 @@ This field defaults to false.
 
 EnableIndexReplica defines whether indexes for this bucket are replicated.
 This field defaults to false.
+
+=== couchbasebuckets.spec.encryptionAtRest
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+EncryptionAtRest defines the encryption at rest settings for the bucket.
+This field is only supported for Couchbase Server 8.0.0+.
+
+=== couchbasebuckets.spec.encryptionAtRest.keyLifetime
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `8760h`
+
+==== Description
+
+KeyLifetime is the lifetime of the encryption key.
+Must be greater or equal to 30 days.
+Default is 365 days.
+
+=== couchbasebuckets.spec.encryptionAtRest.keyName
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Key is the name of the encryption key to use for encryption at rest.
+
+=== couchbasebuckets.spec.encryptionAtRest.rotationInterval
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `720h`
+
+==== Description
+
+RotationInterval is the interval at which the encryption key will be rotated.
+Must be greater or equal to 7 days.
+Default is 30 days.
 
 === couchbasebuckets.spec.evictionPolicy
 

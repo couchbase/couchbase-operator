@@ -304,6 +304,15 @@ const (
 
 	// DurabilityImpossibleFallbackDefault default durability impossible fallback for a bucket.
 	DurabilityImpossibleFallbackDefault = "disabled"
+
+	// DefaultEncryptionAtRestRotationInterval default rotation interval for a bucket.
+	DefaultEncryptionAtRestRotationInterval = 0
+
+	// DefaultEncryptionAtRestKeyLifetime default key lifetime for a bucket.
+	DefaultEncryptionAtRestKeyLifetime = 0
+
+	// DefaultEncryptionAtRestKeyID default key id for a bucket.
+	DefaultEncryptionAtRestKeyID = -1
 )
 
 // Defaults for AutoFailover API.
@@ -321,4 +330,10 @@ const (
 
 	// EncryptionAtRestUsageLog is the usage type for log encryption.
 	EncryptionAtRestUsageLog = "log"
+)
+
+const (
+	// EncryptionKeyUsageBucketEncryptionPrefix is the prefix for bucket encryption usage
+	// a specific bucket. For a bucket names default the usage will be "bucket-encryption-default".
+	EncryptionKeyUsageBucketEncryptionPrefix = "bucket-encryption"
 )

@@ -5038,6 +5038,83 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"auto-generated encryption keys use master password encryption and require configuration encryption at rest to be enabled"},
 		},
+		{
+			name: "TestEncryptionAtRestKeyWithoutBucketUsage",
+			mutations: patchMap{
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage/allBuckets", false).Replace("/spec/usage/managedBucketSelection", false),
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyName: "auto-generated-key-1",
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key auto-generated-key-1 does not have bucket usage enabled"},
+		},
+		{
+			name: "TestEncryptionAtRestKeyWithNonexistentKey",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyName: "non-existent-key",
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key non-existent-key does not exist"},
+		},
+		{
+			name: "TestEncryptionAtRestKeyWithOnlyBucketUsageAndNoBucket",
+			mutations: patchMap{
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage", &couchbasev2.CouchbaseEncryptionKeyUsage{
+					ManagedBucketSelection: true,
+					AllBuckets:             false,
+					Configuration:          false,
+					Key:                    false,
+					Log:                    false,
+					Audit:                  false,
+				}),
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key auto-generated-key-1 is not used on any buckets. If only bucket usage is enabled, it must be used on at least one bucket"},
+		},
+		{
+			name: "TestBucketEncryptionAtRestRotationIntervalTooShort",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					RotationInterval: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+					KeyName: "auto-generated-key-1",
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"rotation interval must be at least 7 days"},
+		},
+		{
+			name: "TestBucketEncryptionAtRestKeyLifetimeTooShort",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyLifetime: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+					KeyName: "auto-generated-key-1",
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"key lifetime must be at least 30 days"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-80.yaml"})
