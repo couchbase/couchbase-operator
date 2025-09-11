@@ -42,6 +42,12 @@ type Scheduler interface {
 	// exclusive moves to get us back into a conforming state.
 	Reschedule() ([]Move, error)
 
+	// RescheduleUnschedulableOnly performs a simplified reschedule that only moves
+	// pods from unschedulable server groups (removed from cluster spec) to valid
+	// server groups. This is used in unstable cluster mode where full rebalancing
+	// is not desired.
+	RescheduleUnschedulableOnly() ([]Move, error)
+
 	// LogStatus writes out the status to a writer.
 	LogStatus(cluster string)
 

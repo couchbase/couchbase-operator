@@ -115,6 +115,13 @@ func (sched *nullSchedulerImpl) Reschedule() ([]Move, error) {
 	return nil, nil
 }
 
+// RescheduleUnschedulableOnly performs a simplified reschedule that only moves
+// pods from unschedulable server groups to valid server groups. For the null
+// scheduler, this is a no-op since server groups are not used.
+func (sched *nullSchedulerImpl) RescheduleUnschedulableOnly() ([]Move, error) {
+	return nil, nil
+}
+
 // LogStatus returns nothing.
 func (sched *nullSchedulerImpl) LogStatus(_ string) {
 }

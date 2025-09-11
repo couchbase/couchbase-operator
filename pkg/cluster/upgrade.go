@@ -232,6 +232,7 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 	var moves []scheduler.Move
 
 	if c.cluster.Spec.ServerGroupsEnabled() && !c.cluster.Spec.RescheduleDifferentServerGroup {
+		// Stable mode: Full A* reschedule for systematic rebalancing
 		m, err := c.scheduler.Reschedule()
 		if err != nil {
 			return nil, err
@@ -239,6 +240,18 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		for _, move := range m {
 			log.V(1).Info("rescheduled member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
+		}
+
+		moves = m
+	} else if c.cluster.Spec.ServerGroupsEnabled() && c.cluster.Spec.RescheduleDifferentServerGroup {
+		// Unstable mode: Simplified reschedule only for pods in removed server groups
+		m, err := c.scheduler.RescheduleUnschedulableOnly()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, move := range m {
+			log.V(1).Info("rescheduled unschedulable member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
 		}
 
 		moves = m

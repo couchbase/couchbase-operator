@@ -600,6 +600,92 @@ func (sched *stripeSchedulerImpl) Reschedule() ([]Move, error) {
 	return moves, nil
 }
 
+// RescheduleUnschedulableOnly performs a simplified reschedule that only moves
+// pods from unschedulable server groups to valid server groups. This is used
+// in unstable cluster mode where we want to rescue pods from removed server
+// groups without doing full cluster rebalancing.
+func (sched *stripeSchedulerImpl) RescheduleUnschedulableOnly() ([]Move, error) {
+	var moves []Move
+
+	// Only process classes that have unschedulable pods
+	for class := range sched.unschedulableServerClasses {
+		// Create state for this class
+		s := newState(sched, class)
+
+		// Check if there are any unschedulable pods that need moving
+		hasUnschedulablePods := false
+
+		for _, serverGroup := range s.ServerGroups {
+			if serverGroup.Unschedulable && serverGroup.Size > 0 {
+				hasUnschedulablePods = true
+				break
+			}
+		}
+
+		if !hasUnschedulablePods {
+			continue
+		}
+
+		// Generate moves only for unschedulable pods
+		classMoves := sched.generateUnschedulableMoves(s)
+		moves = append(moves, classMoves...)
+	}
+
+	return moves, nil
+}
+
+// generateUnschedulableMoves creates moves to relocate pods from unschedulable
+// server groups to the smallest available schedulable server groups.
+func (sched *stripeSchedulerImpl) generateUnschedulableMoves(s *state) []Move {
+	var moves []Move
+
+	// Find the minimum size among schedulable server groups
+	minSize := constants.IntMax
+	for _, serverGroup := range s.ServerGroups {
+		if !serverGroup.Unschedulable && serverGroup.Size < minSize {
+			minSize = serverGroup.Size
+		}
+	}
+
+	// If no schedulable groups exist, we can't move anything
+	if minSize == constants.IntMax {
+		return moves
+	}
+
+	// Move each pod from unschedulable groups to smallest schedulable groups
+	for memberName, member := range s.Members {
+		// Only move pods that are in unschedulable server groups
+		if !s.ServerGroups[member.ServerGroup].Unschedulable {
+			continue
+		}
+
+		// Find a schedulable server group with minimum size to move to
+		for serverGroupName, serverGroup := range s.ServerGroups {
+			if serverGroup.Unschedulable || serverGroup.Size != minSize {
+				continue
+			}
+
+			// Create the move
+			move := Move{
+				Name: memberName,
+				From: member.ServerGroup,
+				To:   serverGroupName,
+			}
+
+			moves = append(moves, move)
+
+			// Update the size for next iteration (simple load balancing)
+			serverGroup.Size++
+			minSize = serverGroup.Size
+
+			// Move to next member
+			break
+		}
+	}
+
+	return moves
+}
+
 // LogStatus writes formatted state for debugging.
 func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 	// Remember the classes/groups so we can do an ordered/sorted traversal
