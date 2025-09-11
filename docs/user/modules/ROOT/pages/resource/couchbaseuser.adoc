@@ -21,6 +21,10 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseusers-spec-fullname,fullName>>: ""
   <<couchbaseusers-spec-locked,locked>>: false
   <<couchbaseusers-spec-name,name>>: ""
+  <<couchbaseusers-spec-password,password>>:
+    <<couchbaseusers-spec-password-expiresafter,expiresAfter>>: ""
+    <<couchbaseusers-spec-password-expiresat,expiresAt>>: ""
+    <<couchbaseusers-spec-password-requireinitialchange,requireInitialChange>>: false
 ----
 
 == couchbaseusers.apiVersion
@@ -86,7 +90,8 @@ The domain which provides user authentication.
 
 ==== Description
 
-Name of Kubernetes secret with password for Couchbase domain.
+Name of Kubernetes secret to be used as a user's initial password for the Couchbase domain.
+Once a user has been created, any further changes to this field will be ignored.
 
 === couchbaseusers.spec.fullName
 
@@ -118,3 +123,56 @@ This field is only available for Couchbase Server 8.0.0+.
 ==== Description
 
 Username of the couchbase user.
+
+=== couchbaseusers.spec.password
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Password allows user specific password settings to be set.
+This field is only available for Couchbase Server 8.0.0+.
+
+=== couchbaseusers.spec.password.expiresAfter
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ExpiresAfter allows setting a fixed duration after a user changes their password when they will be required to change their password again.
+Consider that this duration will be checked against the users last password change date, not the current date and time and could therefore
+result in the user being required to change their password immediately.
+This field is only available for Couchbase Server 8.0.0+.
+More info:
+https://golang.org/pkg/time/#ParseDuration.
+
+=== couchbaseusers.spec.password.expiresAt
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+ExpiresAt allows setting a timestamp when a user's password will expire.
+After that timestamp has passed, the user
+will be required to change their password.
+If set to a timestamp in the past, the user's password must have been changed since then or they
+will be required to change their password.
+This field is only available for Couchbase Server 8.0.0+.
+
+=== couchbaseusers.spec.password.requireInitialChange
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+RequireInitialChange defines whether a user will be required to change
+their password the first time they login and is only effective when a user is first being created.
+This field is only available for Couchbase Server 8.0.0+.

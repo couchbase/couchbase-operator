@@ -2237,12 +2237,38 @@ type CouchbaseUserSpec struct {
 	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
 
-	// Name of Kubernetes secret with password for Couchbase domain.
+	// Name of Kubernetes secret to be used as a user's initial password for the Couchbase domain.
+	// Once a user has been created, any further changes to this field will be ignored.
 	AuthSecret string `json:"authSecret,omitempty"`
 
 	// Locked defines whether the user is locked.
 	// This field is only available for Couchbase Server 8.0.0+.
 	Locked *bool `json:"locked,omitempty"`
+
+	// Password allows user specific password settings to be set.
+	// This field is only available for Couchbase Server 8.0.0+.
+	Password *CouchbaseUserPasswordSpec `json:"password,omitempty"`
+}
+
+type CouchbaseUserPasswordSpec struct {
+	// RequireInitialChange defines whether a user will be required to change
+	// their password the first time they login and is only effective when a user is first being created.
+	// This field is only available for Couchbase Server 8.0.0+.
+	RequireInitialChange *bool `json:"requireInitialChange,omitempty"`
+
+	// ExpiresAt allows setting a timestamp when a user's password will expire. After that timestamp has passed, the user
+	// will be required to change their password.
+	// If set to a timestamp in the past, the user's password must have been changed since then or they
+	// will be required to change their password.
+	// This field is only available for Couchbase Server 8.0.0+.
+	ExpiresAt *metav1.Time `json:"expiresAt,omitempty"`
+
+	// ExpiresAfter allows setting a fixed duration after a user changes their password when they will be required to change their password again.
+	// Consider that this duration will be checked against the users last password change date, not the current date and time and could therefore
+	// result in the user being required to change their password immediately.
+	// This field is only available for Couchbase Server 8.0.0+. More info:
+	// https://golang.org/pkg/time/#ParseDuration
+	ExpiresAfter *metav1.Duration `json:"expiresAfter,omitempty"`
 }
 
 // CouchbaseUserList is a list of Couchbase users.
@@ -5693,6 +5719,16 @@ type CouchbaseEncryptionKeyList struct {
 }
 
 type PasswordPolicySpec struct {
+	// RequirePasswordResetOnPolicyChange defines whether users will be required to change
+	// their password when the password policy is updated.
+	// This field is only available for Couchbase Server 8.0.0+.
+	RequirePasswordResetOnPolicyChange *bool `json:"requirePasswordResetOnPolicyChange,omitempty"`
+
+	// PolicyChangePasswordResetExemptUsers defines a list of users who will not be required to change
+	// their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
+	// This field is only available for Couchbase Server 8.0.0+.
+	PasswordResetOnPolicyChangeExemptUsers []*string `json:"passwordResetOnPolicyChangeExemptUsers,omitempty"`
+
 	// MinLength sets the minimum length a password must be,
 	// This field must be between 0 and 100.
 	// If this field is set to 0, Couchbase Server will permit the definition of highly insecure

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -624,13 +625,29 @@ const (
 )
 
 type User struct {
-	Name     string     `json:"name"`
-	Password string     `json:"password"`
-	Domain   AuthDomain `json:"domain"`
-	ID       string     `json:"id"`
-	Roles    []UserRole `json:"roles"`
-	Groups   []string   `json:"groups"`
-	Locked   *bool      `json:"locked,omitempty"`
+	Name               string     `json:"name"`
+	Password           string     `json:"password"`
+	Domain             AuthDomain `json:"domain"`
+	ID                 string     `json:"id"`
+	Roles              []UserRole `json:"roles"`
+	Groups             []string   `json:"groups"`
+	Locked             *bool      `json:"locked,omitempty"`
+	TemporaryPassword  *bool      `json:"temporary_password,omitempty"`
+	PasswordChangeDate *string    `json:"password_change_date,omitempty"` // RFC3339 format
+}
+
+func (u *User) HasTempPassword() bool {
+	return u.TemporaryPassword != nil && *u.TemporaryPassword
+}
+
+// GetPasswordChangeDate returns the last time the password was changed.
+// If the password change date is not set, it returns a zero value for time.
+func (u *User) GetPasswordChangeDate() (time.Time, error) {
+	if u.PasswordChangeDate == nil {
+		return time.Time{}, nil
+	}
+
+	return time.Parse(time.RFC3339, *u.PasswordChangeDate)
 }
 
 type UserList []User
@@ -1563,6 +1580,10 @@ func (u *User) FormEncode() []byte {
 
 	if u.Locked != nil {
 		data.Set("locked", BoolAsStr(*u.Locked))
+	}
+
+	if u.TemporaryPassword != nil {
+		data.Set("temporaryPassword", BoolAsStr(*u.TemporaryPassword))
 	}
 
 	return []byte(data.Encode())

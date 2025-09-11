@@ -2133,3 +2133,61 @@ func MustVerifyAnalyticsServiceSettings(t *testing.T, k8s *types.Cluster, couchb
 		Die(t, err)
 	}
 }
+
+// This method should only be used for couchbase server versions >= 8.0.0.
+func MustChangeUserPassword(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user string, userAuthDomain couchbaseutil.AuthDomain, newPassword string, timeout time.Duration) {
+	lastPwChange := MustGetLastPasswordChangeTime(t, k8s, couchbase, user, timeout)
+	// Let some time elapse since the last change to avoid race conditions.
+	time.Sleep(10 * time.Second)
+
+	changeUserPassword := func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		params := url.Values{}
+		params.Set("password", newPassword)
+
+		request := newRequest("/settings/rbac/users/local/"+user, []byte(params.Encode()), nil)
+		_ = client.client.Patch(request, client.host)
+
+		// Check that the password has been changed.
+		pwChange := MustGetLastPasswordChangeTime(t, k8s, couchbase, user, timeout)
+		if pwChange.After(lastPwChange) {
+			return nil
+		}
+
+		return fmt.Errorf("unable to change user password")
+	}
+
+	if err := retryutil.RetryFor(timeout, changeUserPassword); err != nil {
+		Die(t, err)
+	}
+
+	// Check that the temporary password is set to false.
+	MustPatchUserInfo(t, k8s, couchbase, user, userAuthDomain, jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+}
+
+func MustGetLastPasswordChangeTime(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name string, timeout time.Duration) time.Time {
+	getLastPasswordChangeTime := func() (time.Time, error) {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		user := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(name, couchbaseutil.InternalAuthDomain, user).On(client.client, client.host); err != nil {
+			return time.Time{}, err
+		}
+
+		return user.GetPasswordChangeDate()
+	}
+
+	lastChangedDate, err := getLastPasswordChangeTime()
+	if err != nil {
+		Die(t, err)
+	}
+
+	return lastChangedDate
+}

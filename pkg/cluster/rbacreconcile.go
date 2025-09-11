@@ -3,7 +3,9 @@ package cluster
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -38,6 +40,11 @@ func (c *Cluster) reconcileRBACResources() error {
 	// Update status to reflect requested resources
 	c.cluster.Status.Groups = groups
 	c.cluster.Status.Users = users
+
+	err = c.reconcileTemporaryPasswords(false)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -617,6 +624,11 @@ func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, at
 		if subject.Spec.Locked != nil {
 			user.Locked = subject.Spec.Locked
 		}
+
+		// If we require an initial password change, we'll set this to true here but this should be overridden if the user already exists.
+		if subject.Spec.Password != nil && subject.Spec.Password.RequireInitialChange != nil {
+			user.TemporaryPassword = subject.Spec.Password.RequireInitialChange
+		}
 	}
 
 	if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
@@ -732,7 +744,13 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	}
 
 	shouldUpdateUser := func(r couchbaseutil.User, e couchbaseutil.User) bool {
-		return !reflect.DeepEqual(r.Groups, e.Groups) || !reflect.DeepEqual(r.Name, e.Name) || !reflect.DeepEqual(r.Locked, e.Locked)
+		requestedGroups := r.Groups
+		sort.Strings(requestedGroups)
+
+		existingGroups := e.Groups
+		sort.Strings(existingGroups)
+
+		return !reflect.DeepEqual(requestedGroups, existingGroups) || !reflect.DeepEqual(r.Name, e.Name) || !reflect.DeepEqual(r.Locked, e.Locked)
 	}
 
 	existingUserNames := []string{}
@@ -744,6 +762,12 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			// requested user exists
 			// update user if group bindings change
 			if shouldUpdateUser(r, e) {
+				// On regular reconciliation, we should never change the temporary password when updating a user. This is handled in reconcileTemporaryPasswords.
+				r.TemporaryPassword = e.TemporaryPassword
+
+				// Once a user has been created, we will never change the password to avoid overriding any changes made to the password by the user.
+				r.Password = ""
+
 				if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
 					return existingUserNames, err
 				}
@@ -784,6 +808,97 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	}
 
 	return existingUserNames, nil
+}
+
+// reconcileTemporaryPasswords reconciles the temporary password fields for users. This is only applicable for 8.0.0+ clusters.
+// By setting temporary password to true, a user will be prompted to change their password on next login.
+func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
+	atLeast80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil || !atLeast80 {
+		return err
+	}
+
+	users := &couchbaseutil.UserList{}
+	if err := couchbaseutil.ListUsers(users).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	for _, user := range *users {
+		userSpec, ok := c.k8s.CouchbaseUsers.Get(user.ID)
+
+		// If we can't find an associated spec for the user, or the user already has a temporary password, we can't reconcile the password.
+		if !ok || user.HasTempPassword() {
+			continue
+		}
+
+		resetPassword, err := c.userRequiresPasswordReset(policyChange, userSpec, user)
+		if err != nil {
+			return err
+		}
+
+		if resetPassword {
+			user.TemporaryPassword = &resetPassword
+
+			if err := couchbaseutil.CreateUser(&user).On(c.api, c.readyMembers()); err != nil {
+				return err
+			}
+
+			c.raiseEvent(k8sutil.UserEditEvent(user.ID, c.cluster))
+			log.Info("edit CouchbaseUser password is temporary", "cluster", c.cluster.NamespacedName(), "name", user.ID)
+		}
+	}
+
+	return nil
+}
+
+func (c *Cluster) userRequiresPasswordReset(policyChange bool, userSpec *couchbasev2.CouchbaseUser, user couchbaseutil.User) (bool, error) {
+	if policyChange {
+		reset := c.shouldResetUserPasswordOnPolicyChange(userSpec)
+		return reset, nil
+	}
+
+	lastChangedDate, err := user.GetPasswordChangeDate()
+	if err != nil {
+		return false, err
+	}
+
+	now := time.Now()
+
+	return passwordExpired(lastChangedDate, now, userSpec) || passwordResetDurationElapsed(lastChangedDate, now, userSpec), nil
+}
+
+func passwordExpired(lastChangedDate time.Time, now time.Time, userSpec *couchbasev2.CouchbaseUser) bool {
+	pwOptions := userSpec.Spec.Password
+	if pwOptions == nil || pwOptions.ExpiresAt == nil {
+		return false
+	}
+
+	return lastChangedDate.Before(pwOptions.ExpiresAt.Time) && now.After(pwOptions.ExpiresAt.Time)
+}
+
+func passwordResetDurationElapsed(lastChangedDate time.Time, now time.Time, userSpec *couchbasev2.CouchbaseUser) bool {
+	pwOptions := userSpec.Spec.Password
+	if pwOptions == nil || pwOptions.ExpiresAfter == nil {
+		return false
+	}
+
+	return now.After(lastChangedDate.Add(pwOptions.ExpiresAfter.Duration))
+}
+
+func (c *Cluster) shouldResetUserPasswordOnPolicyChange(user *couchbasev2.CouchbaseUser) bool {
+	passwordPolicy := c.cluster.Spec.Security.PasswordPolicy
+	if passwordPolicy == nil || passwordPolicy.RequirePasswordResetOnPolicyChange == nil || !*passwordPolicy.RequirePasswordResetOnPolicyChange {
+		return false
+	}
+
+	// Check if user is in the exemption list
+	for _, exemptUser := range passwordPolicy.PasswordResetOnPolicyChangeExemptUsers {
+		if exemptUser != nil && *exemptUser == user.Name {
+			return false
+		}
+	}
+
+	return true
 }
 
 // create couchbase group with verification.

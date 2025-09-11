@@ -327,6 +327,9 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-security-passwordpolicy-enforcespecialchars,enforceSpecialChars>>: false
       <<couchbaseclusters-spec-security-passwordpolicy-enforceuppercase,enforceUppercase>>: false
       <<couchbaseclusters-spec-security-passwordpolicy-minlength,minLength>>: 0
+      <<couchbaseclusters-spec-security-passwordpolicy-passwordresetonpolicychangeexemptusers,passwordResetOnPolicyChangeExemptUsers>>:
+      - ""
+      <<couchbaseclusters-spec-security-passwordpolicy-requirepasswordresetonpolicychange,requirePasswordResetOnPolicyChange>>: false
     <<couchbaseclusters-spec-security-podsecuritycontext,podSecurityContext>>:
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroup,fsGroup>>: 0
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroupchangepolicy,fsGroupChangePolicy>>: ""
@@ -4807,6 +4810,30 @@ MinLength sets the minimum length a password must be,
 This field must be between 0 and 100.
 If this field is set to 0, Couchbase Server will permit the definition of highly insecure
 zero-length passwords which is not recommended.
+
+=== couchbaseclusters.spec.security.passwordPolicy.passwordResetOnPolicyChangeExemptUsers
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+PolicyChangePasswordResetExemptUsers defines a list of users who will not be required to change
+their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
+This field is only available for Couchbase Server 8.0.0+.
+
+=== couchbaseclusters.spec.security.passwordPolicy.requirePasswordResetOnPolicyChange
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+RequirePasswordResetOnPolicyChange defines whether users will be required to change
+their password when the password policy is updated.
+This field is only available for Couchbase Server 8.0.0+.
 
 === couchbaseclusters.spec.security.podSecurityContext
 

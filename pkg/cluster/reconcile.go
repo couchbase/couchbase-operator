@@ -1516,5 +1516,5 @@ func (c *Cluster) reconcilePasswordPolicy() error {
 
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("password policy", c.cluster))
 
-	return nil
+	return c.reconcileTemporaryPasswords(true)
 }

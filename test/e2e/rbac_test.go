@@ -11,6 +11,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	e2e_constants "github.com/couchbase/couchbase-operator/test/e2e/constants"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -1329,6 +1330,162 @@ func TestRBACUpdateUser(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 
 	// Check if group has appropriate role
+	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
+	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
+}
+
+// TestRBACUserPasswordSpec tests the the operators ability to set the temporaryPassword field when expected, depending on a users password spec or a clusters
+// password policy options. Three users (user1, user2, user3) are created for this test.
+// When the temporaryPassword field is set to true for a user, this means they will be prompted to change their password on next login.
+func TestRBACUserPasswordSpec(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	group := e2eutil.MustNewGroup(t, kubernetes, e2espec.NewClusterAdminGroup())
+
+	userSpec := func(name string, passwordSpec *couchbasev2.CouchbaseUserPasswordSpec) *couchbasev2.CouchbaseUser {
+		return &couchbasev2.CouchbaseUser{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Spec: couchbasev2.CouchbaseUserSpec{
+				AuthDomain: couchbasev2.InternalAuthDomain,
+				AuthSecret: e2e_constants.KubeTestSecretName,
+				Password:   passwordSpec,
+			},
+		}
+	}
+
+	// To help with testing, we are going to create 3 users with different password specs.
+	user1 := e2eutil.MustNewUser(t, kubernetes,
+		userSpec("user1", &couchbasev2.CouchbaseUserPasswordSpec{
+			RequireInitialChange: &[]bool{true}[0],
+		}))
+
+	user2 := e2eutil.MustNewUser(t, kubernetes,
+		userSpec("user2", &couchbasev2.CouchbaseUserPasswordSpec{
+			ExpiresAt: &metav1.Time{Time: time.Now().Add(1 * time.Minute)},
+		}))
+
+	user3 := e2eutil.MustNewUser(t, kubernetes,
+		userSpec("user3", &couchbasev2.CouchbaseUserPasswordSpec{
+			ExpiresAfter: &metav1.Duration{Duration: 90 * time.Second},
+		}))
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonUserCreated}},
+	}
+
+	e2eutil.MustNewRoleBinding(t, kubernetes, e2espec.NewRoleBinding(e2e_constants.RoleBindingName, []string{user1.Name, user2.Name, user3.Name}, group.Name))
+
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user1, 4*time.Minute)
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user2, 4*time.Minute)
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user3, 4*time.Minute)
+
+	// Check the temp password values for each user. We only expect a password reset to be required on user1.
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+
+	// Check that user2's password is set to temporary after the expiry timestamp (1 min after creation).
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user2), 2*time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUserEdited})
+
+	// Check that user3's password is set to temporary after the expiry duration elapses (90 seconds).
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user3), 3*time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUserEdited})
+
+	// Change user3's password manually so that the temporary password is set to false.
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), "limestone99", 1*time.Minute)
+
+	// Check that user3's password is set to temporary after the expiry duration elapses again (90 seconds).
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user3), 2*time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUserEdited})
+
+	// Setting an expiry date in the past is allowed, but the operator should only force a password change if the expiry date is after the last changed date.
+	// Change the password on user1 so that the temporaryPassword changes to false.
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), "ivorywinter54", 1*time.Minute)
+
+	// Get the exact timestamp of the last password change.
+	lastChangedDate := e2eutil.MustGetLastPasswordChangeTime(t, kubernetes, cluster, user1.Name, 3*time.Minute)
+
+	// Set the expiry date to a time in the past before the last changed date. We do not expect the temporary password to be changed as the expiry date is before the last changed date.
+	e2eutil.MustPatchUser(t, kubernetes, user1, jsonpatch.NewPatchSet().Replace("/spec/password/expiresAt", &metav1.Time{Time: lastChangedDate.Add(-1 * time.Minute)}), time.Minute)
+	time.Sleep(20 * time.Second)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+
+	// Setting an expiry date in the past, but after the last changed date, should force a password change.
+	e2eutil.MustPatchUser(t, kubernetes, user1, jsonpatch.NewPatchSet().Replace("/spec/password/expiresAt", &metav1.Time{Time: lastChangedDate.Add(1 * time.Second)}), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUserEdited})
+
+	// Remove the password spec from each user and manually change their passwords to ensure that the temporary password is not set to true.
+	e2eutil.MustPatchUser(t, kubernetes, user1, jsonpatch.NewPatchSet().Remove("/spec/password"), time.Minute)
+	e2eutil.MustPatchUser(t, kubernetes, user2, jsonpatch.NewPatchSet().Remove("/spec/password"), time.Minute)
+	e2eutil.MustPatchUser(t, kubernetes, user3, jsonpatch.NewPatchSet().Remove("/spec/password"), time.Minute)
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), "niceglass25", 1*time.Minute)
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), "curlymoose93", 1*time.Minute)
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), "rosekick61", 1*time.Minute)
+
+	// Exempt user3 from the password reset on policy change.
+	exemptUser := []*string{&user3.Name}
+
+	// Change the password policy so we trigger a password reset on policy change.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+		RequirePasswordResetOnPolicyChange:     util.BoolPtr(true),
+		PasswordResetOnPolicyChangeExemptUsers: exemptUser,
+		MinLength:                              util.IntPtr(2),
+	}), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ClusterSettingsEditedEvent(cluster, "password policy"), 1*time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited})
+
+	// Check we update user1 and user2 so they require a password reset after the policy change whereas user3 should not be effected as it is exempt.
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{true}[0]), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user3.Name, couchbaseutil.AuthDomain(user3.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonUserEdited}})
+
+	// Update user1 and user2's password to ensure that the temporary password is not set to true.
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), "flatclub99", 1*time.Minute)
+	e2eutil.MustChangeUserPassword(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), "limeangle19", 1*time.Minute)
+
+	// Change the password policy again, but also update requirePasswordResetOnPolicyChange to false.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+		RequirePasswordResetOnPolicyChange:     util.BoolPtr(false),
+		PasswordResetOnPolicyChangeExemptUsers: exemptUser,
+		MinLength:                              util.IntPtr(3),
+	}), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ClusterSettingsEditedEvent(cluster, "password policy"), 1*time.Minute)
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited})
+
+	// Check that user1 and user2's temporary password are still set to false despite changing the password policy.
+	time.Sleep(20 * time.Second)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user1.Name, couchbaseutil.AuthDomain(user1.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user2.Name, couchbaseutil.AuthDomain(user2.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/TemporaryPassword", &[]bool{false}[0]), time.Minute)
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+
+	// Check that despire the password changes above, we haven't changed any of the groups roles.
 	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
 	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
 }
