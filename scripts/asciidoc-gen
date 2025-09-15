@@ -29,6 +29,7 @@ NATIVE_TYPES = [
     'couchbaseclusters.spec.monitoring.prometheus.resources',
     'couchbaseclusters.spec.networking.adminConsoleServiceTemplate',
     'couchbaseclusters.spec.networking.exposedFeatureServiceTemplate',
+    'couchbaseclusters.spec.networking.cloudNativeGateway.serviceTemplate',
     'couchbaseclusters.spec.security.rbac.selector',
     'couchbaseclusters.spec.securityContext',
     'couchbaseclusters.spec.servers.env',

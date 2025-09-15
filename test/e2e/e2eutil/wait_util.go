@@ -1414,8 +1414,10 @@ func MustWaitForStableResourceVersion(t *testing.T, k8s *types.Cluster, resource
 }
 
 // WaitForCloudNativeGatewayServiceReadyServiceReady waits for the CNG service to be ready and checks for the selector.
-func WaitForCloudNativeGatewayServiceReadyServiceReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) error {
-	return retryutil.RetryFor(timeout, func() error {
+func WaitForCloudNativeGatewayServiceReadyServiceReady(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) (*v1.Service, error) {
+	var svc *v1.Service
+
+	return svc, retryutil.RetryFor(timeout, func() error {
 		cngServiceName := couchbase.Name + "-cloud-native-gateway-service"
 		service, err := k8s.KubeClient.CoreV1().Services(couchbase.Namespace).Get(context.Background(), cngServiceName, metav1.GetOptions{})
 		if err != nil {
@@ -1426,16 +1428,19 @@ func WaitForCloudNativeGatewayServiceReadyServiceReady(k8s *types.Cluster, couch
 			return fmt.Errorf("label couchbase_cloud_native_gateway not present on service: %s", cngServiceName)
 		}
 
+		svc = service
 		return nil
 	})
 }
 
 // MustWaitForCloudNativeGatewaySidecarReady waits for the duration to confirm that the Cloud Native Gateway service is running.
-func MustWaitForCloudNativeGatewayServiceReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
-	err := WaitForCloudNativeGatewayServiceReadyServiceReady(k8s, couchbase, timeout)
+func MustWaitForCloudNativeGatewayServiceReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) *v1.Service {
+	svc, err := WaitForCloudNativeGatewayServiceReadyServiceReady(k8s, couchbase, timeout)
 	if err != nil {
 		Die(t, err)
 	}
+
+	return svc
 }
 
 // WaitForContainerReady waits for the specified container to enter a ready state.

@@ -732,6 +732,15 @@ func prune(currentJSON, originalJSON, requestedJSON []byte) ([]byte, error) {
 func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	service := &v1.Service{}
 
+	if cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate != nil {
+		service.Labels = maps.Clone(cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate.Labels)
+		service.Annotations = maps.Clone(cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate.Annotations)
+
+		if cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate.Spec != nil {
+			service.Spec = *cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate.Spec
+		}
+	}
+
 	service.Name = cluster.Name + "-cloud-native-gateway-service"
 	service.Labels = mergeLabels(service.Labels, LabelsForClusterResource(cluster))
 	service.OwnerReferences = []metav1.OwnerReference{

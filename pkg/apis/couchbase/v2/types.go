@@ -3463,6 +3463,13 @@ type CloudNativeGateway struct {
 	// this configuration on an existing cluster with cloud native gateway will add the rescheduling annotation to each of the pods, which
 	// will trigger a restart depending on the configured UpgradeProcess.
 	DataAPI *CloudNativeGatewayDataAPI `json:"-" annotation:"dataAPI"`
+
+	// ServiceTemplate can be used to provice a template used by the Operator
+	// when creating the CNG service. This allows services to be annotated, the
+	// service type defined and any other options that Kubernetes provides. The Operator
+	// reserves the right to modify or replace any field.  More info:
+	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core
+	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {

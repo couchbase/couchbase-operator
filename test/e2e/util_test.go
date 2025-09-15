@@ -140,6 +140,7 @@ func registerTests() {
 		framework.NewTestDef(TestCNGDataAPIConfigChangeRestart).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCNGBucketOps).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCngOtlp).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
+		framework.NewTestDef(TestCNGServiceTemplate).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
 		framework.NewTestDef(TestCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCLIParametersCluster).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestCreateBucketCluster).WithTags(TagSuiteSanity),

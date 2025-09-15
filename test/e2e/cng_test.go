@@ -376,3 +376,85 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 	// Check the mgmt service is now available
 	e2eutil.MustCheckDAPIMgmtService(t, dClient, http.StatusOK)
 }
+
+func TestCNGServiceTemplate(t *testing.T) {
+	f := framework.Global
+
+	kubernetesCluster, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetesCluster).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
+	cluster.Spec.Networking.CloudNativeGateway.ServiceTemplate = &couchbasev2.ServiceTemplateSpec{
+		ObjectMeta: couchbasev2.ObjectMeta{
+			Annotations: map[string]string{
+				"my.annotation": "true",
+			},
+			Labels: map[string]string{
+				"some-label": "true",
+			},
+		},
+		Spec: &v1.ServiceSpec{
+			Type:           v1.ServiceTypeLoadBalancer,
+			LoadBalancerIP: "10.0.0.1",
+		},
+	}
+
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
+	svc := e2eutil.MustWaitForCloudNativeGatewayServiceReady(t, kubernetesCluster, cluster, 10*time.Minute)
+
+	// Check the service template has correctly been applied to the cng service.
+	if svc.Annotations["my.annotation"] != "true" {
+		e2eutil.Die(t, fmt.Errorf("annotation not set"))
+	}
+
+	if svc.Labels["some-label"] != "true" {
+		e2eutil.Die(t, fmt.Errorf("label not set"))
+	}
+
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+		e2eutil.Die(t, fmt.Errorf("service type not set"))
+	}
+
+	if svc.Spec.LoadBalancerIP != "10.0.0.1" {
+		e2eutil.Die(t, fmt.Errorf("load balancer ip not set"))
+	}
+
+	// Remove the template spec and check the service template has been removed from the cng service.
+	cluster = e2eutil.MustPatchCluster(t, kubernetesCluster, cluster, jsonpatch.NewPatchSet().Remove("/spec/networking/cloudNativeGateway/serviceTemplate"), time.Minute)
+	time.Sleep(20 * time.Second)
+
+	svc = e2eutil.MustWaitForCloudNativeGatewayServiceReady(t, kubernetesCluster, cluster, 10*time.Minute)
+
+	if _, ok := svc.Annotations["my.annotation"]; ok {
+		e2eutil.Die(t, fmt.Errorf("annotation not removed: %s", svc.Annotations["my.annotation"]))
+	}
+
+	if _, ok := svc.Labels["some-label"]; ok {
+		e2eutil.Die(t, fmt.Errorf("label not removed: %s", svc.Labels["some-label"]))
+	}
+
+	if svc.Spec.Type != v1.ServiceTypeClusterIP {
+		e2eutil.Die(t, fmt.Errorf("service type not set to clusterIP: %s", svc.Spec.Type))
+	}
+
+	if svc.Spec.LoadBalancerIP != "" {
+		e2eutil.Die(t, fmt.Errorf("Load balancer ip not removed: %s", svc.Spec.LoadBalancerIP))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
+	}
+	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
+}

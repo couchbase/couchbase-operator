@@ -216,6 +216,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
       <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
       <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
+      <<couchbaseclusters-spec-networking-cloudnativegateway-servicetemplate,serviceTemplate>>: {}
       <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 75
       <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
         <<couchbaseclusters-spec-networking-cloudnativegateway-tls-serversecretname,serverSecretName>>: ""
@@ -3291,6 +3292,23 @@ No validation is carried out as this can be any arbitrary repo and tag.
 LogLevel controls the verbosity of cloud native logs.
 This field must be one of
 "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.serviceTemplate
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ServiceTemplate can be used to provice a template used by the Operator
+when creating the CNG service.
+This allows services to be annotated, the
+service type defined and any other options that Kubernetes provides.
+The Operator
+reserves the right to modify or replace any field.
+More info:
+https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.terminationGracePeriodSeconds
 
