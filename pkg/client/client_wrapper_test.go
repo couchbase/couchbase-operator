@@ -33,7 +33,7 @@ func TestKubeAPIWrapper(t *testing.T) {
 				err:      nil,
 			},
 			request:        httptest.NewRequest("POST", "http://kube-api-server/resource/path/post", nil),
-			expectedLabels: []string{"POST", "kube-api-server", "/resource/path/post"},
+			expectedLabels: []string{"POST", "kube-api-server"},
 		},
 		{
 			roundTrip: &MockedRoundTrip{
@@ -41,7 +41,7 @@ func TestKubeAPIWrapper(t *testing.T) {
 				err:      nil,
 			},
 			request:        httptest.NewRequest("GET", "http://kube-api-server/resource/path/get", nil),
-			expectedLabels: []string{"GET", "kube-api-server", "/resource/path/get"},
+			expectedLabels: []string{"GET", "kube-api-server"},
 		},
 		{
 			roundTrip: &MockedRoundTrip{
@@ -49,9 +49,11 @@ func TestKubeAPIWrapper(t *testing.T) {
 				err:      errors.ErrUnsupported,
 			},
 			request:        httptest.NewRequest("PATCH", "http://kube-api-server/resource/path/patch", nil),
-			expectedLabels: []string{"PATCH", "kube-api-server", "/resource/path/patch"},
+			expectedLabels: []string{"PATCH", "kube-api-server"},
 		},
 	}
+
+	metrics.InitMetrics()
 
 	for _, testcase := range testcases {
 		tw := &TransportWrapper{testcase.roundTrip}

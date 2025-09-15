@@ -61,7 +61,11 @@ func main() {
 				metricMetadata.OptionalLabels = s
 			}
 		}
-		metrics[metricName] = *metricMetadata
+
+		// Only document metrics that have a name
+		if metricName != "" {
+			metrics[metricName] = *metricMetadata
+		}
 	}
 
 	json, err := json.MarshalIndent(metrics, "", "    ")

@@ -16,7 +16,7 @@ type TransportWrapper struct {
 }
 
 func (t *TransportWrapper) RoundTrip(req *http.Request) (*http.Response, error) {
-	metricLabels := []string{req.Method, req.URL.Hostname(), req.URL.Path}
+	metricLabels := []string{req.Method, req.URL.Hostname()}
 
 	metrics.KubernetesAPIRequestTotalMetric.WithLabelValues(metricLabels...).Inc()
 

@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,7 +26,8 @@ const (
 )
 
 var (
-	SeparateNameAndNamespace bool
+	SeparateNameAndNamespace  bool
+	UseHighCardinalityMetrics bool
 
 	OptionalLabels UUIDorName = None
 	// ReconcileTotalMetric
@@ -62,6 +65,21 @@ var (
 	// optionalLabels: cluster_uuid, cluster_name
 	// nolint:godot
 	ReconcileDurationMetric = prometheus.HistogramVec{}
+
+	// lowCardinalityHTTPRequestMetricPaths is a list of paths that are considered low cardinality for the http request metrics.
+	// Requests that have a path which is not in this list will have their "service" label set to "".
+	// This is used to reduce the number of time series metrics by avoiding creating new ones for each dynamic path.
+	// Users can disable this filtering by setting the "use-high-cardinality-metrics" environment variable to true.
+	lowCardinalityHTTPRequestMetricPaths = []string{
+		"/controller",
+		"/node/controller",
+		"/nodes/self",
+		"/pools",
+		"/pools/default",
+		"/pools/default/stats/range",
+		"/settings",
+		"/settings/replications",
+	}
 
 	// HTTPRequestTotalMetric
 	// name: server_http_requests_total
@@ -249,13 +267,13 @@ var (
 	// unit:
 	// added: 2.8.0
 	// stability: committed
-	// labels: method, host, path
+	// labels: method, host
 	KubernetesAPIRequestTotalMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "kubernetes_api_requests_total",
 		Help:      "Total requests made to the Kubernetes API by the operator",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
-	}, []string{"method", "host", "path"})
+	}, []string{"method", "host"})
 
 	// KubernetesAPIRequestFailureMetric
 	// name: kubernetes_api_request_failures
@@ -264,13 +282,13 @@ var (
 	// unit:
 	// added: 2.8.0
 	// stability: committed
-	// labels: method, host, path
+	// labels: method, host
 	KubernetesAPIRequestFailureMetric = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "kubernetes_api_request_failures",
 		Help:      "Total failed requests to the Kubernetes API by the operator",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
-	}, []string{"method", "host", "path"})
+	}, []string{"method", "host"})
 
 	// KubernetesAPIRequestDurationMSMetric
 	// name: kubernetes_api_requests_time_milliseconds
@@ -279,13 +297,13 @@ var (
 	// unit: milliseconds
 	// added: 2.8.0
 	// stability: committed
-	// labels: method, host, path
+	// labels: method, host
 	KubernetesAPIRequestDurationMSMetric = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:      "kubernetes_api_requests_time_milliseconds",
 		Help:      "Length of time per request to the Kubernetes API",
 		Namespace: MetricNamespace,
 		Subsystem: MetricSubsystem,
-	}, []string{"method", "host", "path"})
+	}, []string{"method", "host"})
 
 	// VolumeSizeUnderManagementBytesMetric
 	// name: volume_size_under_management_bytes
@@ -363,23 +381,19 @@ func addOptionalLabels(existingLabels []string) []string {
 	return existingLabels
 }
 
-func separateNameAndNamespaceLabels(existingLabels []string) []string {
+func separateNameAndNamespaceWithConstrainedLabels(labels prometheus.ConstrainedLabels) prometheus.ConstrainedLabels {
 	if SeparateNameAndNamespace {
-		return append(existingLabels, "namespace", "name")
+		return append(labels, prometheus.ConstrainedLabel{Name: "namespace"}, prometheus.ConstrainedLabel{Name: "name"})
 	}
 
-	return append(existingLabels, "name")
+	return append(labels, prometheus.ConstrainedLabel{Name: "name"})
 }
 
 func InitMetrics() {
 	additionalLabels := os.Getenv("additional-prometheus-labels")
 
-	separateNameAndNamespace := os.Getenv("separate-cluster-name-and-namespace")
-	if strings.EqualFold(separateNameAndNamespace, "true") {
-		SeparateNameAndNamespace = true
-	} else {
-		SeparateNameAndNamespace = false
-	}
+	SeparateNameAndNamespace, _ = strconv.ParseBool(os.Getenv("separate-cluster-name-and-namespace"))
+	UseHighCardinalityMetrics, _ = strconv.ParseBool(os.Getenv("use-high-cardinality-metrics"))
 
 	if strings.Compare(additionalLabels, "uuid-only") == 0 {
 		OptionalLabels = UUIDonly
@@ -387,33 +401,72 @@ func InitMetrics() {
 		OptionalLabels = UUIDandName
 	}
 
-	HTTPRequestTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_requests_total",
-		Help:      "Total HTTP requests to Couchbase Server for a specific cluster.",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
+	var httpRequestServiceLabelConstraint prometheus.LabelConstraint
 
-	HTTPRequestTotalCodeMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_request_codes_total",
-		Help:      "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, separateNameAndNamespaceLabels([]string{"method", "code", "service", "host"}))
+	if !UseHighCardinalityMetrics {
+		sort.Slice(lowCardinalityHTTPRequestMetricPaths, func(i, j int) bool {
+			return len(lowCardinalityHTTPRequestMetricPaths[i]) > len(lowCardinalityHTTPRequestMetricPaths[j])
+		})
 
-	HTTPRequestFailureMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name:      "server_http_request_failures",
-		Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
+		httpRequestServiceLabelConstraint = NormalizeServicePath
+	}
 
-	HTTPRequestDurationMSMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Name:      "server_http_requests_time_milliseconds",
-		Help:      "Length of time per request for a specific cluster",
-		Namespace: MetricNamespace,
-		Subsystem: MetricSubsystem,
-	}, separateNameAndNamespaceLabels([]string{"method", "service", "host"}))
+	HTTPRequestTotalMetric = *prometheus.V2.NewCounterVec(prometheus.CounterVecOpts{
+		CounterOpts: prometheus.CounterOpts{
+			Name:      "server_http_requests_total",
+			Help:      "Total HTTP requests to Couchbase Server for a specific cluster.",
+			Namespace: MetricNamespace,
+			Subsystem: MetricSubsystem,
+		},
+		VariableLabels: separateNameAndNamespaceWithConstrainedLabels(prometheus.ConstrainedLabels{
+			{Name: "method"},
+			{Name: "service", Constraint: httpRequestServiceLabelConstraint},
+			{Name: "host"},
+		}),
+	})
+
+	HTTPRequestTotalCodeMetric = *prometheus.V2.NewCounterVec(prometheus.CounterVecOpts{
+		CounterOpts: prometheus.CounterOpts{
+			Name:      "server_http_request_codes_total",
+			Help:      "Total HTTP requests to Couchbase Server for a specific cluster, method and status code returned",
+			Namespace: MetricNamespace,
+			Subsystem: MetricSubsystem,
+		},
+		VariableLabels: separateNameAndNamespaceWithConstrainedLabels(prometheus.ConstrainedLabels{
+			{Name: "method"},
+			{Name: "code"},
+			{Name: "service", Constraint: httpRequestServiceLabelConstraint},
+			{Name: "host"},
+		}),
+	})
+
+	HTTPRequestFailureMetric = *prometheus.V2.NewCounterVec(prometheus.CounterVecOpts{
+		CounterOpts: prometheus.CounterOpts{
+			Name:      "server_http_request_failures",
+			Help:      "Total failed HTTP requests to Couchbase Server for a specific cluster.",
+			Namespace: MetricNamespace,
+			Subsystem: MetricSubsystem,
+		},
+		VariableLabels: separateNameAndNamespaceWithConstrainedLabels(prometheus.ConstrainedLabels{
+			{Name: "method"},
+			{Name: "service", Constraint: httpRequestServiceLabelConstraint},
+			{Name: "host"},
+		}),
+	})
+
+	HTTPRequestDurationMSMetric = *prometheus.V2.NewHistogramVec(prometheus.HistogramVecOpts{
+		HistogramOpts: prometheus.HistogramOpts{
+			Name:      "server_http_requests_time_milliseconds",
+			Help:      "Length of time per request for a specific cluster",
+			Namespace: MetricNamespace,
+			Subsystem: MetricSubsystem,
+		},
+		VariableLabels: separateNameAndNamespaceWithConstrainedLabels(prometheus.ConstrainedLabels{
+			{Name: "method"},
+			{Name: "service", Constraint: httpRequestServiceLabelConstraint},
+			{Name: "host"},
+		}),
+	})
 
 	ReconcileTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name:      "reconcile_total",
@@ -577,4 +630,19 @@ func InitMetrics() {
 		BackupJobsCreatedTotalMetric,
 		ManualInterventionRequiredMetric,
 	)
+}
+
+// NormalizeURLPath acts as a label constraint for the path label and reduces URL path cardinality for Couchbase API met metrics.
+// Note that when fetching a metric using .WithLabelValues(), assuming the metric has been initialized with a constraint func, that func will also
+// be applied to the label values in the fetch statement.
+func NormalizeServicePath(path string) string {
+	for _, p := range lowCardinalityHTTPRequestMetricPaths {
+		// If the path is a prefix of the low cardinality path, return it. The list of paths should be ordered with the longest paths first such that these are matched first where
+		// possible.
+		if strings.HasPrefix(path, p) {
+			return p
+		}
+	}
+
+	return ""
 }
