@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -1791,4 +1792,18 @@ func (k *CouchbaseEncryptionKey) HasClusterFinalizer(c *CouchbaseCluster) bool {
 	}
 
 	return slices.Contains(k.Finalizers, c.GetEncryptionKeyFinalizer())
+}
+
+func (c *CouchbaseCluster) GetSpecFromAnnotation() *ClusterSpec {
+	annotation := c.GetAnnotations()[constants.AnnotationLastReconciledSpec]
+	if annotation == "" {
+		return nil
+	}
+
+	var spec ClusterSpec
+	if err := json.Unmarshal([]byte(annotation), &spec); err != nil {
+		return nil
+	}
+
+	return &spec
 }

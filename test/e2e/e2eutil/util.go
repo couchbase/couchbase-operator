@@ -1917,3 +1917,24 @@ func GetPvcName(lpv bool) string {
 func MiToByteQuantity(mi int) int64 {
 	return int64(mi * 1024 * 1024)
 }
+
+func MustWaitForClusterWithAnnotation(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, key, value string, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, func() error {
+		cluster, err := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Get(context.Background(), cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		if cluster.Annotations == nil {
+			return fmt.Errorf("cluster %s has no annotations", cluster.Name)
+		}
+
+		if cluster.Annotations[key] != value {
+			return fmt.Errorf("cluster %s has no annotation %s with value %s", cluster.Name, key, value)
+		}
+
+		return nil
+	}); err != nil {
+		Die(t, err)
+	}
+}

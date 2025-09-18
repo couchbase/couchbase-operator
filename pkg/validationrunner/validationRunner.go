@@ -288,6 +288,18 @@ func CheckChangeConstraints(currentCluster *cluster.Cluster) []error {
 	return errs
 }
 
+func CheckClusterChangeConstraints(currentCluster, updatedCluster *couchbasev2.CouchbaseCluster) error {
+	if err := CheckCouchbaseClusterResourceImmutableFields(updatedCluster, currentCluster); err != nil {
+		return err
+	}
+
+	if err := CheckCouchbaseClusterResourceUpdate(updatedCluster, currentCluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //nolint:gocognit
 func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error

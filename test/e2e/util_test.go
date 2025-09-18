@@ -550,6 +550,7 @@ func registerTests() {
 		framework.NewTestDef(TestCAODacValidationDisabled).WithTags(TagSuiteP1, TagFeatureAdmission),
 		framework.NewTestDef(TestCAOValidationUnreconcilable).WithTags(TagSuiteP1, TagFeatureAdmission),
 		framework.NewTestDef(TestDisableAllValidation).WithTags(TagSuiteP1, TagFeatureAdmission),
+		framework.NewTestDef(TestCAOValidationOperatorRestart).WithTags(TagSuiteP1, TagFeatureAdmission),
 
 		// Low priority tests.
 		framework.NewTestDef(TestInvalidBaseImage).WithTags(TagSuiteP1, TagSuitePlatform),

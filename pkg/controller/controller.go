@@ -189,6 +189,18 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			validationErrors = append(validationErrors, err.Error())
 		}
 
+		// We should check change constraints if this is an existing cluster but the operator has restarted and therefore doesn't have an in-memory
+		// representation of the last state of the cluster. We will only validate the spec here.
+		if existingSpec := c.GetCouchbaseCluster().GetSpecFromAnnotation(); existingSpec != nil {
+			existingCluster := c.GetCouchbaseCluster().DeepCopy()
+
+			existingCluster.Spec = *existingSpec
+			if err := validationrunner.CheckClusterChangeConstraints(existingCluster, c.GetCouchbaseCluster()); err != nil {
+				log.Error(err, "Validation failed", "cluster", request.NamespacedName)
+				c.UpdateOnFailedValidationOperatorRestart(err, existingCluster)
+			}
+		}
+
 		c.RunReconcile(r.operatorStartTime)
 
 		r.clusters.Store(request.NamespacedName.String(), c)
@@ -201,14 +213,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return requeueResult, nil
 	}
 
-	if err := validationrunner.CheckCouchbaseClusterResourceImmutableFields(couchbase, c.GetCouchbaseCluster()); err != nil {
-		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
-
-		validationErrors = append(validationErrors, err.Error())
-		validationFailed = true
-	}
-
-	if err := validationrunner.CheckCouchbaseClusterResourceUpdate(couchbase, c.GetCouchbaseCluster()); err != nil {
+	if err := validationrunner.CheckClusterChangeConstraints(c.GetCouchbaseCluster(), couchbase); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
 		validationErrors = append(validationErrors, err.Error())

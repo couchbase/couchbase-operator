@@ -689,6 +689,10 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
 
+	if err := c.updateCRSpecAnnotation(); err != nil {
+		log.Info("unable to update spec annotation", "cluster", c.namespacedName(), "error", err)
+	}
+
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
@@ -765,6 +769,46 @@ func (c *Cluster) updateCRStatus() error {
 	c.generation = newCluster.Generation
 
 	return nil
+}
+
+func (c *Cluster) UpdateOnFailedValidationOperatorRestart(validationErr error, existingCluster *couchbasev2.CouchbaseCluster) {
+	c.cluster.Status.SetErrorCondition(validationErr.Error())
+	c.cluster = existingCluster
+}
+
+// updateCRSpecAnnotation updates lastReconciledSpec annotation with the JSON representation of the current spec.
+// The annotation will only be updated if the spec has changed.
+func (c *Cluster) updateCRSpecAnnotation() error {
+	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
+
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	lastReconciledSpec := cluster.GetSpecFromAnnotation()
+	if reflect.DeepEqual(c.cluster.Spec, lastReconciledSpec) {
+		return nil
+	}
+
+	d, err := diff.Diff(c.cluster.Spec, lastReconciledSpec)
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	if d == "" {
+		return nil
+	}
+
+	specJSON, err := json.Marshal(c.cluster.Spec)
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
+
+	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, constants.AnnotationLastReconciledSpec, string(specJSON))
+
+	_, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
+
+	return err
 }
 
 // Selects any member that can be recovered and attempts to restart it.
