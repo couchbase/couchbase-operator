@@ -100,6 +100,10 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 		if _, ok := updated.(*couchbasev2.CouchbaseCollectionGroup); !ok {
 			return fmt.Errorf("failed to update couchbase collection group")
 		}
+	case *couchbasev2.CouchbaseEncryptionKey:
+		if t2, ok := updated.(*couchbasev2.CouchbaseEncryptionKey); ok {
+			return validationv2.CheckImmutableFieldsEncryptionKey(t, t2)
+		}
 	}
 
 	return nil
@@ -122,6 +126,15 @@ func CheckChangeConstraints(v *types.Validator, current, updated runtime.Object)
 	}
 
 	return nil, nil
+}
+
+func CheckDeleteConstraints(v *types.Validator, resource runtime.Object) error {
+	switch t := resource.(type) {
+	case *couchbasev2.CouchbaseEncryptionKey:
+		return validationv2.CheckDeleteConstraintsEncryptionKey(v, t)
+	default:
+		return nil
+	}
 }
 
 func WarnOnFieldValues(resource runtime.Object) []string {

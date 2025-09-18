@@ -1,12 +1,15 @@
 package cluster
 
 import (
+	"context"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -55,12 +58,14 @@ func (c *Cluster) reconcileEncryptionAtRestSettings(
 		return err
 	}
 
-	// Initialize requested settings with current values as defaults
+	// Initialize requested settings with disabled settings as defaults,
+	// using current lifetime + rotation interval as defaults
 	requestedSettings := couchbaseutil.EncryptionAtRestSettings{
-		EncryptionMethod:    couchbaseutil.EncryptionMethodDisabled,
+		EncryptionMethod: couchbaseutil.EncryptionMethodDisabled,
+		EncryptionKeyID:  nil,
+
 		DEKLifetime:         currSettings.DEKLifetime,
 		DEKRotationInterval: currSettings.DEKRotationInterval,
-		EncryptionKeyID:     currSettings.EncryptionKeyID,
 	}
 
 	// Apply settings from spec if enabled
@@ -74,11 +79,16 @@ func (c *Cluster) reconcileEncryptionAtRestSettings(
 			}
 
 			requestedSettings.EncryptionMethod = couchbaseutil.EncryptionMethodEncryptionKey
-			requestedSettings.EncryptionKeyID = key.ID
+			requestedSettings.EncryptionKeyID = &key.ID
 		}
 
 		requestedSettings.DEKLifetime = int(settings.KeyLifetime.Seconds())
 		requestedSettings.DEKRotationInterval = int(settings.RotationInterval.Seconds())
+	}
+
+	// Server will return -1 if the key is not set but won't accept it so we need to set it to nil
+	if currSettings.EncryptionKeyID != nil && *currSettings.EncryptionKeyID == -1 {
+		currSettings.EncryptionKeyID = nil
 	}
 
 	// Update settings if they have changed
@@ -129,21 +139,14 @@ func (c *Cluster) reconcileEncryptionKeys() error {
 		return nil
 	}
 
-	actualKeys := couchbaseutil.EncryptionKeyList{}
-
-	err := couchbaseutil.ListEncryptionKeys(&actualKeys).On(c.api, c.readyMembers())
-	if err != nil {
-		return err
-	}
-
 	// Gather encryption key resources
-	requestedKeys, err := c.gatherRequestedKeys()
+	requestedKeys, deletedKeys, err := c.gatherRequestedKeys()
 	if err != nil {
 		return err
 	}
 
-	// Delete keys that are in actualKeys but not in requestedKeys
-	if err := c.deleteRemovedEncryptionKeys(actualKeys, requestedKeys); err != nil {
+	// Delete keys that are in actualKeys but not in requestedKeys also handle removing finalizers from keys that are deleted
+	if err := c.deleteRemovedEncryptionKeys(requestedKeys, deletedKeys); err != nil {
 		return err
 	}
 
@@ -156,14 +159,48 @@ func (c *Cluster) reconcileEncryptionKeys() error {
 }
 
 // deleteRemovedEncryptionKeys deletes encryption keys that exist in the cluster but are not in the requested keys.
-func (c *Cluster) deleteRemovedEncryptionKeys(actualKeys couchbaseutil.EncryptionKeyList, requestedKeys []*couchbasev2.CouchbaseEncryptionKey) error {
-	for _, actualKey := range actualKeys {
+func (c *Cluster) deleteRemovedEncryptionKeys(requestedKeys []*couchbasev2.CouchbaseEncryptionKey, deletedKeys []*couchbasev2.CouchbaseEncryptionKey) error {
+	actualKeys := couchbaseutil.EncryptionKeyList{}
+
+	err := couchbaseutil.ListEncryptionKeys(&actualKeys).On(c.api, c.readyMembers())
+	if err != nil {
+		return err
+	}
+
+	// Convert the actual keys to a map for faster lookup + deletion
+	actualKeysMap := make(map[string]couchbaseutil.EncryptionKeyInfo)
+	for _, k := range actualKeys {
+		actualKeysMap[k.Name] = k
+	}
+
+	// First handle the deleted keys (keys with finalizers on them + deletionTimestamp set)
+	for _, k := range deletedKeys {
+		actualKey, keyExists := actualKeysMap[k.Name]
+
+		// If the key is not found then it is already deleted so just remove the finalizer
+		if !keyExists {
+			c.removeFinalizer(k)
+			continue
+		}
+
+		// Remove the key from the map so we don't try to delete it again
+		delete(actualKeysMap, actualKey.Name)
+
+		// Attempt to delete the key
+		if err := couchbaseutil.DeleteEncryptionKey(actualKey.ID).On(c.api, c.readyMembers()); err == nil {
+			// Remove the finalizer from the key if deleted successfully
+			c.removeFinalizer(k)
+
+			log.Info("Encryption key deleted", "cluster", c.namespacedName(), "name", actualKey.Name)
+			c.raiseEvent(k8sutil.EncryptionKeyDeletedEvent(c.cluster, actualKey.Name))
+		} // If the key could not be deleted then it is probably still being used somewhere
+	}
+
+	for _, actualKey := range actualKeysMap {
 		found := false
 
-		// Iterate in reverse to ensure we delete the dependent keys first
-		for i := len(requestedKeys) - 1; i >= 0; i-- {
-			requestedKey := requestedKeys[i]
-			if requestedKey != nil && actualKey.Name == requestedKey.Name {
+		for _, k := range requestedKeys {
+			if actualKey.Name == k.Name {
 				found = true
 				break
 			}
@@ -228,6 +265,8 @@ func (c *Cluster) createAndUpdateEncryptionKeys(requestedKeys []*couchbasev2.Cou
 
 			log.Info("Encryption key created", "cluster", c.namespacedName(), "name", apiRequestedKey.Name)
 			c.raiseEvent(k8sutil.EncryptionKeyCreatedEvent(c.cluster, apiRequestedKey.Name))
+
+			c.applyFinalizer(requestedKey)
 		} else {
 			if apiRequestedKey.AutoGenerated != nil && apiRequestedKey.AutoGenerated.NextRotationTime == "" && actualKey.EncryptionKey.AutoGenerated != nil {
 				apiRequestedKey.AutoGenerated.NextRotationTime = actualKey.EncryptionKey.AutoGenerated.NextRotationTime
@@ -249,15 +288,51 @@ func (c *Cluster) createAndUpdateEncryptionKeys(requestedKeys []*couchbasev2.Cou
 	return nil
 }
 
-func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, error) {
+func (c *Cluster) applyFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
+	if key == nil {
+		return
+	}
+
+	if key.HasClusterFinalizer(c.cluster) {
+		return
+	}
+
+	key.Finalizers = append(key.Finalizers, c.GetEncryptionKeyFinalizer())
+
+	var err error
+	if key, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(c.cluster.Namespace).Update(context.Background(), key, metav1.UpdateOptions{}); err != nil {
+		// Not worth stopping the reconciliation for this
+		log.Info("[WARN] failed to apply finalizer to encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
+	}
+}
+
+func (c *Cluster) removeFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
+	if !key.HasClusterFinalizer(c.cluster) {
+		return
+	}
+
+	key.Finalizers = slices.DeleteFunc(key.Finalizers, func(f string) bool {
+		return f == c.GetEncryptionKeyFinalizer()
+	})
+
+	var err error
+	if key, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(c.cluster.Namespace).Update(context.Background(), key, metav1.UpdateOptions{}); err != nil {
+		// Not worth stopping the reconciliation for this
+		log.Info("[WARN] failed to remove finalizer from encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
+	}
+}
+
+func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, []*couchbasev2.CouchbaseEncryptionKey, error) {
 	selector := labels.Everything()
+
+	deletedKeys := []*couchbasev2.CouchbaseEncryptionKey{}
 
 	if c.cluster.Spec.Security.EncryptionAtRest.Selector != nil {
 		var err error
 		selector, err = metav1.LabelSelectorAsSelector(c.cluster.Spec.Security.EncryptionAtRest.Selector)
 
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -269,12 +344,17 @@ func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, 
 			continue
 		}
 
+		if key.DeletionTimestamp != nil {
+			deletedKeys = append(deletedKeys, key)
+			continue
+		}
+
 		keys = append(keys, key)
 	}
 
 	orderedKeys := orderKeysForCreation(keys)
 
-	return orderedKeys, nil
+	return orderedKeys, deletedKeys, nil
 }
 
 // orderKeysForCreation orders the keys for creation in the correct order.
@@ -337,8 +417,9 @@ func (c *Cluster) convertEncryptionKey(key *couchbasev2.CouchbaseEncryptionKey, 
 
 		// Use the same defaults as server
 		encryptionKey.AutoGenerated = &couchbaseutil.AutoGeneratedKeyData{
-			CanBeCached: true,
-			EncryptWith: couchbaseutil.EncryptionKeyEncryptWithNodeSecretManager,
+			CanBeCached:      true,
+			EncryptWith:      couchbaseutil.EncryptionKeyEncryptWithNodeSecretManager,
+			EncryptWithKeyID: util.IntPtr(-1),
 		}
 
 		if key.Spec.AutoGenerated == nil {

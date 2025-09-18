@@ -4504,6 +4504,15 @@ func CheckChangeConstraintsEphemeralBucket(v *types.Validator, prev, curr *couch
 	return nil
 }
 
+// CheckImmutableFieldsEncryptionKey checks for field changes that are invalid.
+func CheckImmutableFieldsEncryptionKey(prev, current *couchbasev2.CouchbaseEncryptionKey) error {
+	if prev.Spec.KeyType != current.Spec.KeyType {
+		return fmt.Errorf("encryption key type cannot be changed")
+	}
+
+	return nil
+}
+
 func CheckBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	// History retention labels have been deprecated, bucket.Spec.HistoryRetentionSettings resource object should be used instead
 	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil {
@@ -5522,6 +5531,74 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 		if !usedKeys[key.Name] {
 			errs = append(errs, fmt.Errorf("encryption key %s is not used on any buckets. If only bucket usage is enabled, it must be used on at least one bucket", key.Name))
 			continue
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// nolint:gocognit
+func CheckDeleteConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) error {
+	// Get the clusters that are using the encryption key
+	clusters, err := v.Abstraction.GetCouchbaseClusters(key.Namespace)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+
+	for _, cluster := range clusters.Items {
+		if encryptionAtRestSupported, err := cluster.IsAtLeastVersion("8.0.0"); err != nil {
+			return err
+		} else if !encryptionAtRestSupported {
+			continue
+		}
+
+		if cluster.Spec.Security.EncryptionAtRest == nil || !cluster.Spec.Security.EncryptionAtRest.Managed {
+			continue
+		}
+
+		// If the encryption key is not selected by the cluster then we can skip the checks
+		if cluster.Spec.Security.EncryptionAtRest.Selector != nil {
+			encryptionKeySelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.EncryptionAtRest.Selector)
+			if err != nil {
+				return err
+			}
+
+			if !encryptionKeySelector.Matches(labels.Set(key.Labels)) {
+				continue
+			}
+		}
+
+		if cluster.Spec.Security.EncryptionAtRest.Configuration != nil && cluster.Spec.Security.EncryptionAtRest.Configuration.KeyName == key.Name {
+			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for configuration encryption on cluster %s", key.Name, cluster.Name))
+		}
+
+		if cluster.Spec.Security.EncryptionAtRest.Audit != nil && cluster.Spec.Security.EncryptionAtRest.Audit.KeyName == key.Name {
+			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for audit encryption on cluster %s", key.Name, cluster.Name))
+		}
+
+		if cluster.Spec.Security.EncryptionAtRest.Log != nil && cluster.Spec.Security.EncryptionAtRest.Log.KeyName == key.Name {
+			errs = append(errs, fmt.Errorf("encryption key %s is currently being used for log encryption on cluster %s", key.Name, cluster.Name))
+		}
+
+		if !cluster.Spec.Buckets.Managed {
+			continue
+		}
+
+		couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return err
+		}
+
+		for _, bucket := range couchbaseBuckets.Items {
+			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName == key.Name {
+				errs = append(errs, fmt.Errorf("encryption key %s is currently being used for encryption at rest on bucket %s on cluster %s", key.Name, bucket.Name, cluster.Name))
+			}
 		}
 	}
 

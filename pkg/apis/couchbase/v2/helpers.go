@@ -1731,6 +1731,10 @@ func (c *CouchbaseCluster) GetMaxUpgradable() (int, error) {
 	return upgradeLimit, nil
 }
 
+func (c *CouchbaseCluster) GetEncryptionKeyFinalizer() string {
+	return constants.EncryptionKeyFinalizerPrefix + "." + c.GetName()
+}
+
 func unmarshalDurationWithNegativeOverride(field string, negValue, defaultVal time.Duration) (*metav1.Duration, error) {
 	switch field {
 	case "":
@@ -1764,8 +1768,8 @@ func marshalDurationWithNegativeOverride(duration *metav1.Duration, negValue tim
 	}
 }
 
-func (c *CouchbaseEncryptionKey) GetUsage() CouchbaseEncryptionKeyUsage {
-	if c.Spec.Usage == nil {
+func (k *CouchbaseEncryptionKey) GetUsage() CouchbaseEncryptionKeyUsage {
+	if k.Spec.Usage == nil {
 		return CouchbaseEncryptionKeyUsage{
 			Configuration:          true,
 			Key:                    true,
@@ -1776,5 +1780,13 @@ func (c *CouchbaseEncryptionKey) GetUsage() CouchbaseEncryptionKeyUsage {
 		}
 	}
 
-	return *c.Spec.Usage
+	return *k.Spec.Usage
+}
+
+func (k *CouchbaseEncryptionKey) HasClusterFinalizer(c *CouchbaseCluster) bool {
+	if len(k.Finalizers) == 0 {
+		return false
+	}
+
+	return slices.Contains(k.Finalizers, c.GetEncryptionKeyFinalizer())
 }

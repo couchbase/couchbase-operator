@@ -2498,7 +2498,7 @@ const (
 // EncryptionAtRestRequest represents the request format for encryption at rest configuration.
 type EncryptionAtRestSettings struct {
 	EncryptionMethod    EncryptionMethod `json:"encryptionMethod,omitempty"`
-	EncryptionKeyID     int              `json:"encryptionKeyId"`
+	EncryptionKeyID     *int             `json:"encryptionKeyId,omitempty"`
 	DEKLifetime         int              `json:"dekLifetime,omitempty"`
 	DEKRotationInterval int              `json:"dekRotationInterval,omitempty"`
 }

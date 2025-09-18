@@ -18,6 +18,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1753,6 +1754,27 @@ func MustChangeClusterPassword(t *testing.T, k8s *types.Cluster, couchbase *couc
 	})
 
 	if err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForEncryptionKeyDeletion(t *testing.T, k8s *types.Cluster, key *couchbasev2.CouchbaseEncryptionKey, timeout time.Duration) {
+	if err := retryutil.RetryFor(timeout, func() error {
+		key, err := k8s.CRClient.CouchbaseV2().CouchbaseEncryptionKeys(key.Namespace).Get(context.Background(), key.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		if key == nil {
+			return nil
+		}
+
+		return fmt.Errorf("encryption key %s still exists", key.Name)
+	}); err != nil {
 		Die(t, err)
 	}
 }

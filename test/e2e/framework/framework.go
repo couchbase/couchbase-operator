@@ -38,6 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1134,6 +1135,23 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 		// Cleanup, which is now trivial.
 		if err := cluster.KubeClient.CoreV1().Namespaces().Delete(context.Background(), cluster.Namespace, *metav1.NewDeleteOptions(0)); err != nil {
 			logrus.Warnf("failed to delete namespace %s", cluster.Namespace)
+		}
+
+		// Remove any finalizers from the encryption keys``
+		keys, err := cluster.CRClient.CouchbaseV2().CouchbaseEncryptionKeys(cluster.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			if !apierrors.IsNotFound(err) {
+				logrus.Warnf("failed to list encryption keys in namespace %s", cluster.Namespace)
+			}
+		} else {
+			for _, key := range keys.Items {
+				if len(key.Finalizers) > 0 {
+					key.Finalizers = []string{}
+					if _, err := cluster.CRClient.CouchbaseV2().CouchbaseEncryptionKeys(cluster.Namespace).Update(context.Background(), &key, metav1.UpdateOptions{}); err != nil {
+						logrus.Warnf("failed to update encryption key %s in namespace %s", key.Name, cluster.Namespace)
+					}
+				}
+			}
 		}
 
 		// Update the scheduler.

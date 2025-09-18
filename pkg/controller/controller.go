@@ -7,9 +7,11 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/validationrunner"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -30,6 +32,81 @@ type CouchbaseClusterReconciler struct {
 	clusters          *ManagedClusters
 	clusterConfig     cluster.Config
 	operatorStartTime time.Time
+}
+
+// CouchbaseEncryptionKeyReconciler reconciles CouchbaseEncryptionKey resources to remove
+// per-cluster finalizers when their corresponding cluster no longer exists.
+type CouchbaseEncryptionKeyReconciler struct {
+	client client.Client
+}
+
+// Reconcile handles CouchbaseEncryptionKey deletion and cleans up cluster-scoped finalizers
+// if the referenced CouchbaseCluster no longer exists.
+func (r *CouchbaseEncryptionKeyReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	log.V(2).Info("Received encryption key event", "key", req.NamespacedName)
+
+	key := &couchbasev2.CouchbaseEncryptionKey{}
+	if err := r.client.Get(ctx, req.NamespacedName, key); err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+
+		log.Error(err, "Failed to get CouchbaseEncryptionKey", "key", req.NamespacedName)
+
+		return reconcile.Result{}, err
+	}
+
+	// Only act on deletion
+	if key.DeletionTimestamp == nil {
+		return reconcile.Result{}, nil
+	}
+
+	prefix := constants.EncryptionKeyFinalizerPrefix + "."
+	finalizers := key.Finalizers
+	clusterFinalizersRemain := false
+	kept := make([]string, 0, len(finalizers))
+
+	for _, f := range finalizers {
+		// Only consider our cluster-scoped finalizers
+		if !strings.HasPrefix(f, prefix) {
+			kept = append(kept, f)
+			continue
+		}
+
+		clusterName := strings.TrimPrefix(f, prefix)
+		// Verify if the cluster still exists
+		cluster := &couchbasev2.CouchbaseCluster{}
+		if err := r.client.Get(ctx, types.NamespacedName{Namespace: key.Namespace, Name: clusterName}, cluster); err != nil {
+			if errors.IsNotFound(err) {
+				// Cluster is gone; drop this finalizer
+				continue
+			} else {
+				// On transient errors, log and keep the finalizer
+				log.Error(err, "Failed to get CouchbaseCluster for finalizer check", "cluster", clusterName, "key", req.NamespacedName)
+			}
+		}
+
+		// Cluster exists; keep the finalizer
+		clusterFinalizersRemain = true
+
+		kept = append(kept, f)
+	}
+
+	if len(kept) != len(finalizers) {
+		key.Finalizers = kept
+		if err := r.client.Update(ctx, key); err != nil {
+			log.Error(err, "Failed to update CouchbaseEncryptionKey finalizers", "key", req.NamespacedName)
+			return reconcile.Result{RequeueAfter: 1 * time.Minute}, err
+		}
+
+		log.Info("Removed dangling encryption key finalizers for non-existent clusters", "key", req.NamespacedName)
+	}
+
+	if clusterFinalizersRemain {
+		return reconcile.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+
+	return reconcile.Result{}, nil
 }
 
 // Reconcile is triggered when an event occurs on a watched resource.
@@ -226,7 +303,25 @@ func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Co
 		return err
 	}
 
+	// Register Cluster controller to handle cluster reconciliation
 	src := source.Kind(mgr.GetCache(), &couchbasev2.CouchbaseCluster{})
+	if err := c.Watch(src, &handler.EnqueueRequestForObject{}); err != nil {
+		return err
+	}
 
-	return c.Watch(src, &handler.EnqueueRequestForObject{})
+	// Register Encryption Key controller to handle finalizer cleanup
+	ekReconciler := &CouchbaseEncryptionKeyReconciler{client: mgr.GetClient()}
+	ekOptions := controller.Options{
+		Reconciler:              ekReconciler,
+		MaxConcurrentReconciles: concurrency,
+	}
+
+	ekController, err := controller.New("couchbase-encryption-key-controller", mgr, ekOptions)
+	if err != nil {
+		return err
+	}
+
+	ekSrc := source.Kind(mgr.GetCache(), &couchbasev2.CouchbaseEncryptionKey{})
+
+	return ekController.Watch(ekSrc, &handler.EnqueueRequestForObject{})
 }

@@ -252,12 +252,22 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 		}
 	}
 
-	// Check that the CouchbaseCluster is correctly configured
-	if warnings, err := validator.CheckConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), couchbaseCluster); err != nil {
-		log.Error(err, "Rejecting resource")
-		return errorResponseWithWarnings(err, warnings)
-	} else if len(warnings) != 0 {
-		reviewResponse.Warnings = append(reviewResponse.Warnings, warnings...)
+	if ar.Request.Operation == admissionv1.Delete {
+		existingResource, err := decodeObject(ar, ar.Request.OldObject)
+		if err != nil {
+			log.Error(err, "Resource decode failed")
+		} else if err := validator.CheckDeleteConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingResource); err != nil {
+			log.Error(err, "Rejecting resource")
+			return errorResponse(err)
+		}
+	} else {
+		// Check that the CouchbaseCluster is correctly configured
+		if warnings, err := validator.CheckConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), couchbaseCluster); err != nil {
+			log.Error(err, "Rejecting resource")
+			return errorResponseWithWarnings(err, warnings)
+		} else if len(warnings) != 0 {
+			reviewResponse.Warnings = append(reviewResponse.Warnings, warnings...)
+		}
 	}
 
 	// Warn when recommended production values are missing and/or left as their defaults.

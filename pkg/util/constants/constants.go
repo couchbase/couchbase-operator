@@ -336,4 +336,7 @@ const (
 	// EncryptionKeyUsageBucketEncryptionPrefix is the prefix for bucket encryption usage
 	// a specific bucket. For a bucket names default the usage will be "bucket-encryption-default".
 	EncryptionKeyUsageBucketEncryptionPrefix = "bucket-encryption"
+
+	// EncryptionKeyFinalizerPrefix is the finalizer for encryption keys.
+	EncryptionKeyFinalizerPrefix = "encryptionkey.couchbase.com/finalizer"
 )

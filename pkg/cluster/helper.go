@@ -146,3 +146,7 @@ func (c *Cluster) GetHighestMemberVersion() string {
 
 	return versions[len(versions)-1]
 }
+
+func (c *Cluster) GetEncryptionKeyFinalizer() string {
+	return c.cluster.GetEncryptionKeyFinalizer()
+}

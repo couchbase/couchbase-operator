@@ -716,6 +716,7 @@ func (o *generateAdmissionOptions) getAdmissionValidatingWebhook(namespace strin
 						Operations: []admissionregistrationv1.OperationType{
 							admissionregistrationv1.Create,
 							admissionregistrationv1.Update,
+							admissionregistrationv1.Delete,
 						},
 					},
 				},

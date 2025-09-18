@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+
+	utilErrors "github.com/couchbase/couchbase-operator/pkg/errors"
 )
 
 var (
@@ -66,6 +69,7 @@ type testDef struct {
 	expectedErrors []string
 	// expectedWarnings is a list of expected warnings for the test. Warnings are only collected for the resources that are being patched.
 	expectedWarnings []string
+	deleteTargets    []string
 }
 
 type (
@@ -129,13 +133,13 @@ func loadResources(path string) (resourceList, error) {
 }
 
 // getResourceMeta takes raw JSON and returns the resource namespace and name.
-func getResourceMeta(resource []byte) (string, string, error) {
+func getResourceMeta(resource []byte) (string, error) {
 	object := &unstructured.Unstructured{}
 	if err := json.Unmarshal(resource, object); err != nil {
-		return "", "", err
+		return "", err
 	}
 
-	return object.GetNamespace(), object.GetName(), nil
+	return object.GetName(), nil
 }
 
 // getResource takes raw JSON and returns the resource type (used by the raw API),
@@ -227,8 +231,28 @@ func updateResources(k8s *types.Cluster, resources resourceList, wc *types.KubeW
 	return nil
 }
 
+func deleteSelectedResources(k8s *types.Cluster, resources resourceList, deleteTargetNames []string) error {
+	deleteTargets := resourceList{}
+
+	for _, resource := range resources {
+		name, err := getResourceMeta(resource)
+		if err != nil {
+			return err
+		}
+
+		if slices.Contains(deleteTargetNames, name) {
+			deleteTargets = append(deleteTargets, resource)
+		}
+	}
+
+	return deleteResources(k8s, deleteTargets)
+}
+
 // deleteResources deletes all defined resources.
 func deleteResources(k8s *types.Cluster, resources resourceList) error {
+	encryptionKeyResources := []*unstructured.Unstructured{}
+	encryptionKeyGroupVersion := couchbasev2.SchemeGroupVersion.WithResource("couchbaseencryptionkeys")
+
 	for _, resource := range resources {
 		object := &unstructured.Unstructured{}
 		if err := json.Unmarshal(resource, object); err != nil {
@@ -238,6 +262,12 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 		groupVersion, err := getResource(k8s, object)
 		if err != nil {
 			return err
+		}
+
+		// We need to delete encryption keys last as they are dependent on other resources.
+		if *groupVersion == encryptionKeyGroupVersion {
+			encryptionKeyResources = append(encryptionKeyResources, object)
+			continue
 		}
 
 		if _, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Get(context.Background(), object.GetName(), metav1.GetOptions{}); err != nil {
@@ -253,13 +283,27 @@ func deleteResources(k8s *types.Cluster, resources resourceList) error {
 		}
 	}
 
+	for _, resource := range encryptionKeyResources {
+		if _, err := k8s.DynamicClient.Resource(encryptionKeyGroupVersion).Namespace(k8s.Namespace).Get(context.Background(), resource.GetName(), metav1.GetOptions{}); err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+
+			return err
+		}
+
+		if err := k8s.DynamicClient.Resource(encryptionKeyGroupVersion).Namespace(k8s.Namespace).Delete(context.Background(), resource.GetName(), *metav1.NewDeleteOptions(0)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // patchResources applies JSON patches to all defined resources.
 func patchResources(resources resourceList, patches patchMap) error {
 	for i, resource := range resources {
-		_, name, err := getResourceMeta(resource)
+		name, err := getResourceMeta(resource)
 		if err != nil {
 			return err
 		}
@@ -322,6 +366,9 @@ const (
 
 	// operationApply creates objects, applies patches and updates them.
 	operationApply
+
+	// operationDelete applies patches to objects, creates them and then deletes them.
+	operationDelete
 )
 
 // validationTLSType determines the TLS strategy to use.
@@ -519,6 +566,9 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				err = createResources(kubernetes, objects, wc)
 			case operationApply:
 				err = updateResources(kubernetes, objects, wc)
+			case operationDelete:
+				err = createResources(kubernetes, objects, wc)
+				err = utilErrors.Join(err, deleteSelectedResources(kubernetes, objects, test.deleteTargets))
 			}
 
 			// Handle successes when it shoud have failed.
@@ -4746,9 +4796,15 @@ func TestValidationEncryptionKey(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"at least one usage field must be set to true in spec.usage"},
 		},
+		{
+			name:           "TestEncryptionKeyTypeChange",
+			mutations:      patchMap{"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/keyType", couchbasev2.CouchbaseEncryptionKeyTypeAWS)},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key type cannot be changed"},
+		},
 	}
 
-	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-80.yaml"})
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
 }
 
 func TestValidationEncryptionAtRest(t *testing.T) {
@@ -5164,4 +5220,66 @@ func TestAutoResourceAllocationValidation(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestDeleteInUseEncryptionKey(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestDeleteNotInUseEncryptionKey",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+			})},
+			deleteTargets: []string{"auto-generated-key-1"},
+			shouldFail:    false,
+		},
+		{
+			name: "TestDeleteInUseEncryptionKeyConfigEncryption",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+				Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+					Enabled: true,
+					KeyName: "auto-generated-key-1",
+				},
+			})},
+			deleteTargets: []string{"auto-generated-key-1"},
+			shouldFail:    true,
+		},
+		{
+			name: "TestDeleteInUseEncryptionKeyAuditEncryption",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+				Audit: &couchbasev2.EncryptionAtRestUsageConfiguration{
+					Enabled: true,
+					KeyName: "auto-generated-key-1",
+				},
+			})},
+			deleteTargets: []string{"auto-generated-key-1"},
+			shouldFail:    true,
+		},
+		{
+			name: "TestDeleteInUseEncryptionKeyLogEncryption",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+				Log: &couchbasev2.EncryptionAtRestUsageConfiguration{
+					Enabled: true,
+					KeyName: "auto-generated-key-1",
+				},
+			})},
+			deleteTargets: []string{"auto-generated-key-1"},
+			shouldFail:    true,
+		},
+		{
+			name: "TestDeleteInUseEncryptionKeyBucket",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+			}),
+				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyName: "auto-generated-key-1",
+				})},
+			deleteTargets: []string{"auto-generated-key-1"},
+			shouldFail:    true,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationDelete, validationFile: "validation-80.yaml"})
 }

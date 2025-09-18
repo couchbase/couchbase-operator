@@ -261,8 +261,19 @@ func (c *Cluster) Delete() {
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
 
+	// Remove finalizers on EncryptionKeys
+	c.removeEncryptionKeyFinalizers()
+
 	// Clean up caches.
 	c.k8s.Shutdown()
+}
+
+func (c *Cluster) removeEncryptionKeyFinalizers() {
+	encryptionKeys := c.k8s.CouchbaseEncryptionKeys.List()
+
+	for _, key := range encryptionKeys {
+		c.removeFinalizer(key)
+	}
 }
 
 func (c *Cluster) initializeClusterState() error {

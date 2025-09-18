@@ -721,6 +721,26 @@ func MustDeleteBackupRestore(t *testing.T, k8s *types.Cluster, restore *couchbas
 	}
 }
 
+func MustDeleteEncryptionKey(t *testing.T, k8s *types.Cluster, key *couchbasev2.CouchbaseEncryptionKey) {
+	if err := DeleteEncryptionKey(k8s, key); err != nil {
+		Die(t, err)
+	}
+}
+
+func DeleteEncryptionKey(k8s *types.Cluster, key *couchbasev2.CouchbaseEncryptionKey) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseEncryptionKeys(key.Namespace).Delete(context.Background(), key.Name, *metav1.NewDeleteOptions(0))
+}
+
+func MustDeleteCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	if err := DeleteCluster(k8s, cluster); err != nil {
+		Die(t, err)
+	}
+}
+
+func DeleteCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) error {
+	return k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace).Delete(context.Background(), cluster.Name, *metav1.NewDeleteOptions(0))
+}
+
 func DeleteBucket(k8s *types.Cluster, bucket metav1.Object) error {
 	switch t := bucket.(type) {
 	case *couchbasev2.CouchbaseBucket:
