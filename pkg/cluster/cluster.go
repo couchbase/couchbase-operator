@@ -317,10 +317,6 @@ func (c *Cluster) initializeClusterState() error {
 		return err
 	}
 
-	if err := c.state.Insert(persistence.NodeReplacementInProgress, "false"); err != nil {
-		return err
-	}
-
 	tls := c.api.GetTLS()
 
 	if tls != nil {

@@ -5114,7 +5114,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;ManualInterventionRequired;PodMoveInProgress;RescheduleInProgress;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;ManualInterventionRequired;
 type ClusterConditionType string
 
 const (
@@ -5139,8 +5139,6 @@ const (
 	ClusterUnreconcilable                      ClusterConditionType = "Unreconcilable"
 	ClusterConditionMixedMode                  ClusterConditionType = "MixedMode"
 	ClusterConditionManualInterventionRequired ClusterConditionType = "ManualInterventionRequired"
-	ClusterConditionPodMoveInProgress          ClusterConditionType = "PodMoveInProgress"
-	ClusterConditionRescheduleInProgess        ClusterConditionType = "RescheduleInProgress"
 )
 
 // ClusterStatus defines any read-only status fields for the Couchbase server cluster.

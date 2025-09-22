@@ -701,15 +701,6 @@ func (sml *ScalingMessageList) BuildMessage() string {
 	return strings.Join(builtMessages, ", ")
 }
 
-func (cs *ClusterStatus) SetRescheduleInProgressCondition() {
-	c := newClusterCondition(ClusterConditionRescheduleInProgess, v1.ConditionTrue, "Rescheduling", "The operator is rescheduling pods")
-	cs.setClusterCondition(c)
-}
-func (cs *ClusterStatus) SetPodMoveCondition() {
-	c := newClusterCondition(ClusterConditionPodMoveInProgress, v1.ConditionTrue, "Moving", "The operator is attempting to move pods")
-	cs.setClusterCondition(c)
-}
-
 func (cs *ClusterStatus) SetScalingCondition() {
 	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "ClusterScaling", "The operator is attempting to scale the cluster")
 	cs.setClusterCondition(c)

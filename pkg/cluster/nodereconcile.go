@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"context"
 	goerrors "errors"
 	"fmt"
 	"net/http"
@@ -344,6 +343,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleFailedNodes,
 		(*ReconcileMachine).handleUnknownServerConfigs,
 		(*ReconcileMachine).handleVolumeExpansion,
+		(*ReconcileMachine).handleMoveNodes,
 		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleUpgradeNode,
 		(*ReconcileMachine).handleBucketStorageBackendMigration,
@@ -355,11 +355,6 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleRebalance,
 		(*ReconcileMachine).handleDeadMembers,
 		(*ReconcileMachine).handleNotifyFinished,
-	}
-
-	if c.cluster.HasCondition(couchbasev2.ClusterConditionRescheduleInProgess) {
-		log.Info("Aborting topology reconcile", "cluster", c.namespacedName(), "reason", "reschedule in progress")
-		return true, nil
 	}
 
 	for i := 0; i < len(reconcileFunctions); i++ {
@@ -1598,56 +1593,32 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 	return nil
 }
 
-func (r *ReconcileMachine) handleMoveNodes(c *Cluster, ctx context.Context) {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for moved, err := r.moveNode(c); err != nil || !moved; moved, err = r.moveNode(c) {
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			if err != nil {
-				c.raiseEvent(k8sutil.RescheduleFailedEvent(c.cluster))
-				log.Error(err, "Error moving nodes", "cluster", c.namespacedName())
-			}
-
-			return
-		}
+func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
+	// Don't do anything if the cluster is currently upgrading
+	if upgrading, err := c.isUpgrading(); upgrading && err == nil {
+		return nil
+	} else if err != nil {
+		return err
 	}
-}
 
-func (r *ReconcileMachine) moveNode(c *Cluster) (bool, error) {
-	r.log()
-
-	// Needs a rebalance. Let's do that first.
+	// If the cluster needs a rebalance, let's do that first
 	if r.needsRebalance {
-		return false, nil
+		return nil
 	}
 
-	if c.cluster.HasCondition(couchbasev2.ClusterConditionPodMoveInProgress) {
-		return false, nil
-	}
-
-	if c.cluster.HasCondition(couchbasev2.ClusterConditionRescheduleInProgess) {
-		return false, nil
-	}
+	r.log()
 
 	// Check which pods need moving
 	candidates := c.needsMove()
 
 	if candidates.Empty() {
-		return false, nil
+		return nil
 	}
-
-	c.raiseEvent(k8sutil.RescheduleStartedEvent(c.cluster))
-	c.cluster.Status.SetRescheduleInProgressCondition()
-
-	defer c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRescheduleInProgess)
 
 	// Get the max upgradeable candidates
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
 	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		return false, err
+		return err
 	}
 
 	orchestratorName := clusterInfo.Orchestrator
@@ -1655,7 +1626,7 @@ func (r *ReconcileMachine) moveNode(c *Cluster) (bool, error) {
 	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
 
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	candidates = constrained
@@ -1689,39 +1660,17 @@ func (r *ReconcileMachine) moveNode(c *Cluster) (bool, error) {
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
 		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
-			return false, err
+			return err
 		}
 	} else {
 		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
 			log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
-		if err := r.swapRebalanceMembers(c, candidates); err != nil {
-			return false, err
-		}
-
-		var errs []error
-
-		if err := couchbaseutil.GracefulFailover(candidates.OTPNodes()).On(c.api, c.readyMembers()); err != nil {
-			return false, err
-		}
-
-		for _, candidate := range candidates {
-			if err := k8sutil.DeletePod(c.GetK8sClient(), c.cluster.Namespace, candidate.Name(), metav1.DeleteOptions{}); err != nil {
-				errs = append(errs, err)
-			}
-		}
-
-		r.needsRebalance = true
-
-		if len(errs) > 0 {
-			return false, errors.Join(errs...)
-		}
+		return r.swapRebalanceMembers(c, candidates)
 	}
 
-	c.raiseEvent(k8sutil.RescheduleCompletedEvent(c.cluster))
-
-	return true, nil
+	return nil
 }
 
 func (r *ReconcileMachine) checkIfValidUpgradePath() error {
@@ -1831,8 +1780,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	c.cluster.Status.SetPodMoveCondition()
-
 	if c.cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
 		inPlaceUpgrade := couchbasev2.InPlaceUpgrade
 		c.cluster.Spec.UpgradeProcess = &inPlaceUpgrade
@@ -1865,8 +1812,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			return err
 		}
 	}
-
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionPodMoveInProgress)
 
 	return nil
 }
