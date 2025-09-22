@@ -4802,7 +4802,7 @@ func checkChangeConstraintsMigration(v *types.Validator, current, updated *couch
 
 	if current.Spec.Migration != nil {
 		if updated.Spec.Migration != nil {
-			if vc, err := checkForVersionChange(current, updated); err == nil && vc {
+			if vc, err := checkForVersionChange(current, updated); err == nil && vc && current.Status.GetCondition(couchbasev2.ClusterConditionMigrating) != nil {
 				return fmt.Errorf("couchbase version cannot be changed while in migration mode")
 			} else if err != nil {
 				return err
