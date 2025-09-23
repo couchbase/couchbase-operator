@@ -862,6 +862,7 @@ Nil values can be used to explicitly unset merge functions for specific collecti
 ==== Description
 
 Mobile enables mobile (Sync Gateway) active-active mode.
+This feature is available in Couchbase Server 7.6.4 and later.
 
 === couchbasereplications.spec.networkUsageLimit
 

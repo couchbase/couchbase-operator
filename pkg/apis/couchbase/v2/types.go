@@ -1974,14 +1974,14 @@ type MergeFunctionMappingRules map[string]*string
 type CouchbaseReplicationSpec struct {
 	// === CORE IMMUTABLE FIELDS (validation runner enforced) ===
 
-	// Bucket is the source bucket to replicate from.  This refers to the Couchbase
-	// bucket name, not the resource name of the bucket.  A bucket with this name must
+	// Bucket is the source bucket to replicate from. This refers to the Couchbase
+	// bucket name, not the resource name of the bucket. A bucket with this name must
 	// be defined on this cluster.  Legal bucket names have a maximum length of 100
 	// characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
 	Bucket BucketName `json:"bucket"`
 
-	// RemoteBucket is the remote bucket name to synchronize to.  This refers to the
-	// Couchbase bucket name, not the resource name of the bucket.  Legal bucket names
+	// RemoteBucket is the remote bucket name to synchronize to. This refers to the
+	// Couchbase bucket name, not the resource name of the bucket. Legal bucket names
 	// have a maximum length of 100 characters and may be composed of any character from
 	// "a-z", "A-Z", "0-9" and "-_%\.".
 	RemoteBucket BucketName `json:"remoteBucket"`
@@ -2077,8 +2077,9 @@ type CouchbaseReplicationSpec struct {
 	LogLevel *string `json:"logLevel,omitempty"`
 
 	// Mobile enables mobile (Sync Gateway) active-active mode.
+	// This feature is available in Couchbase Server 7.6.4 and later
 	// +kubebuilder:validation:Enum=Off;Active
-	Mobile *string `json:"mobile,omitempty"`
+	Mobile *string `json:"mobile,omitempty" annotation:"mobile"`
 
 	// NetworkUsageLimit is the upper limit for replication network usage (MB/s).
 	// +kubebuilder:validation:Minimum=0
@@ -2185,13 +2186,6 @@ type CouchbaseConflictCustomCollectionRule struct {
 	// LogCollection defines the collection to log conflicts to.
 	LogCollection CouchbaseConflictLogCollection `json:"logCollection"`
 }
-
-type MobileReplication string
-
-const (
-	Active MobileReplication = "Active"
-	Off    MobileReplication = "Off"
-)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseReplicationList struct {

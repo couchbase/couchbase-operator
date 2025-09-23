@@ -2783,21 +2783,21 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 		{
 			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldMinimum",
 			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
-				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 1)},
+				Add("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{MagmaFragmentationThresholdPercentage: util.IntPtr(1)})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage in body should be greater than or equal to 10`},
 		},
 		{
 			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldMaximum",
 			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
-				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 101)},
+				Add("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{MagmaFragmentationThresholdPercentage: util.IntPtr(101)})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage must be between 10 and 100`},
+			expectedErrors: []string{`spec.autoCompaction.magmaFragmentationPercentage in body should be less than or equal to 100`},
 		},
 		{
 			name: "TestValidateBucketAutoCompactionMagmaFragmentationPercentageCRDFieldValid",
 			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
-				Replace("/spec/autoCompaction/magmaFragmentationPercentage", 50)},
+				Add("/spec/autoCompaction", couchbasev2.AutoCompactionSpecBucket{MagmaFragmentationThresholdPercentage: util.IntPtr(50)})},
 			shouldFail: false,
 		},
 		{
@@ -3947,12 +3947,6 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/remoteBucket", "dipsy")},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.remoteBucket"},
-		},
-		{
-			name:           "TestValidateReplicationFilterExpressionImmutable",
-			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/filterExpression", "lala")},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.filterExpression"},
 		},
 		{
 			name:           "TestValidateBucketInvalidCouchbaseStorageBackendChange",

@@ -933,6 +933,8 @@ var clusterRoles = []RoleName{
 	RoleQueryCurlAccess,
 	RoleQuestySystemAccess,
 	RoleAnalyticsReader,
+	RoleSecurityAdminExternal,
+	RoleSecurityAdminLocal,
 	RoleUserAdminExternal,
 	RoleUserAdminLocal,
 	RoleBackupAdmin,

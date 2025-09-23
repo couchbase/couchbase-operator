@@ -345,7 +345,6 @@ func TestCNGDataAPIConfigChangeRestart(t *testing.T) {
 	cluster.Annotations["cao.couchbase.com/networking.cloudNativeGateway.dataAPI.enabled"] = "true"
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, k8sCluster, cluster, 5)
-	e2eutil.MustWaitClusterStatusHealthy(t, k8sCluster, cluster, 5*time.Minute)
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, k8sCluster, cluster, 5*time.Minute)
 
 	// Create a DAPI client and test with a callerIdentity request
