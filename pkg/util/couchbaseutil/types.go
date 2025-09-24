@@ -488,6 +488,7 @@ type Bucket struct {
 	BucketName                          string                       `json:"name"`
 	BucketType                          string                       `json:"type"`
 	BucketStorageBackend                CouchbaseStorageBackend      `json:"storageBackend"`
+	NumVBuckets                         int                          `json:"numVBuckets"`
 	BucketMemoryQuota                   int64                        `json:"memoryQuota"`
 	BucketReplicas                      int                          `json:"replicas"`
 	IoPriority                          IoPriorityType               `json:"ioPriority"`
@@ -553,6 +554,7 @@ type BucketStatus struct {
 	BucketName                          string                       `json:"name"`
 	BucketType                          string                       `json:"bucketType"`
 	StorageBackend                      CouchbaseStorageBackend      `json:"storageBackend"`
+	NumVBuckets                         int                          `json:"numVBuckets"`
 	EvictionPolicy                      string                       `json:"evictionPolicy"`
 	ConflictResolution                  string                       `json:"conflictResolutionType"`
 	EnableIndexReplica                  bool                         `json:"replicaIndex"`
@@ -927,6 +929,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.WarmupBehavior = status.WarmupBehavior
 	b.MemoryLowWatermark = status.MemoryLowWatermark
 	b.MemoryHighWatermark = status.MemoryHighWatermark
+	b.NumVBuckets = status.NumVBuckets
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -1083,6 +1086,8 @@ func (b *Bucket) FormEncode(update bool) []byte {
 	if b.EncryptionAtRestDekLifetime != nil {
 		data.Set("encryptionAtRestDekLifetime", strconv.Itoa(*b.EncryptionAtRestDekLifetime))
 	}
+
+	data.Set("numVBuckets", strconv.Itoa(b.NumVBuckets))
 
 	return []byte(data.Encode())
 }

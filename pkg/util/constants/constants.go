@@ -313,6 +313,9 @@ const (
 
 	// DefaultEncryptionAtRestKeyID default key id for a bucket.
 	DefaultEncryptionAtRestKeyID = -1
+
+	// DefaultNumVBuckets is the default number of vbuckets for a magma bucket.
+	DefaultNumVBuckets = 1024
 )
 
 // Defaults for AutoFailover API.

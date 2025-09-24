@@ -1999,6 +1999,7 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	return errs
 }
 
+// nolint:gocognit
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
@@ -2018,12 +2019,16 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		}
 	}
 
-	if bucket.Spec.StorageBackend != "" && bucket.Spec.MemoryQuota == nil {
-		errs = append(errs, fmt.Errorf("spec.memoryQuota (nil) in body should be present and greater than or equal to 1024Mi for spec.storageBackend: magma"))
-	}
+	if bucket.Spec.StorageBackend != "" {
+		if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+			if (bucket.Spec.NumVBuckets == 1024 || bucket.Spec.NumVBuckets == 0) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
+			}
 
-	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-		errs = append(errs, fmt.Errorf("spec.memoryQuota (%v) in body should be greater than or equal to 1024Mi for spec.storageBackend: magma", bucket.Spec.MemoryQuota))
+			if bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+			}
+		}
 	}
 
 	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
@@ -4408,6 +4413,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 	return couchbaseutil.CheckUpgradePath(oldVersion, newVersion)
 }
 
+// nolint:gocognit,gocyclo
 func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
 
@@ -4444,6 +4450,26 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 
 			warnings = append(warnings, "Changing bucket storagebackend could have associated collections with history retention enabled. This must be disabled to prevent errors.")
+		}
+	}
+
+	if prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "magma" {
+		clusters, err := v.Abstraction.GetCouchbaseClusters(curr.Namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cluster := range clusters.Items {
+			after80, err := cluster.IsAtLeastVersion("8.0.0")
+			if err != nil {
+				return nil, err
+			}
+
+			if after80 {
+				if prev.Spec.NumVBuckets != curr.Spec.NumVBuckets {
+					errs = append(errs, fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets"))
+				}
+			}
 		}
 	}
 
@@ -4913,6 +4939,15 @@ func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbas
 
 			if !srvVerAfter71 {
 				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
+			}
+
+			srvVerAfter80, err := c.IsAtLeastVersion("8.0.0")
+			if err != nil {
+				return err
+			}
+
+			if bucket.Spec.NumVBuckets != 0 && !srvVerAfter80 {
+				return fmt.Errorf("spec.numVBuckets can only be set for magma buckets on Couchbase Server version 8.0.0 or later")
 			}
 
 			if err := checkBucketConstraintMagmaStorageBackend(&c); err != nil {

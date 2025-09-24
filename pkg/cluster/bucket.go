@@ -203,6 +203,12 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 					}
 				}
 			}
+
+			if bucket.Spec.NumVBuckets == 0 {
+				b.NumVBuckets = constants.DefaultNumVBuckets
+			}
+
+			b.NumVBuckets = bucket.Spec.NumVBuckets
 		}
 
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
@@ -724,6 +730,7 @@ func (c *Cluster) reconcileBuckets() error {
 			BucketName:           bucket.BucketName,
 			BucketType:           bucket.BucketType,
 			BucketStorageBackend: string(bucket.BucketStorageBackend),
+			NumVBuckets:          bucket.NumVBuckets,
 			BucketMemoryQuota:    bucket.BucketMemoryQuota,
 			BucketReplicas:       bucket.BucketReplicas,
 			IoPriority:           string(bucket.IoPriority),

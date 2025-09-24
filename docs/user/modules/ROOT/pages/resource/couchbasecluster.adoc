@@ -483,6 +483,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-status-buckets-iopriority,ioPriority>>: ""
     <<couchbaseclusters-status-buckets-memoryquota,memoryQuota>>: 0
     <<couchbaseclusters-status-buckets-name,name>>: ""
+    <<couchbaseclusters-status-buckets-numvbuckets,numVBuckets>>: 0
     <<couchbaseclusters-status-buckets-password,password>>: ""
     <<couchbaseclusters-status-buckets-replicas,replicas>>: 0
     <<couchbaseclusters-status-buckets-storagebackend,storageBackend>>: ""
@@ -6851,6 +6852,16 @@ BucketMemoryQuota is the bucket memory quota in megabytes.
 ==== Description
 
 BucketName is the full name of the bucket.
+
+=== couchbaseclusters.status.buckets.numVBuckets
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+NumVBuckets is the number of vbuckets in the bucket.
 
 === couchbaseclusters.status.buckets.password
 

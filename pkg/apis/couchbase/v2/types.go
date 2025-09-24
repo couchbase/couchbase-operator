@@ -1365,6 +1365,11 @@ type CouchbaseBucketSpec struct {
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
+	// NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
+	// Can be either 128 or 1024 for magma buckets. This setting can only be adjusted for magma buckets.
+	// +kubebuilder:default=1024
+	NumVBuckets int `json:"numVBuckets,omitempty"`
+
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
 	// documents will be evicted from memory to disk as defined by the eviction policy.  The
 	// memory quota is defined per Couchbase pod running the data service.  This field defaults
@@ -5254,6 +5259,9 @@ type BucketStatus struct {
 
 	// BucketStorageBackend is the storage backend of the bucket.
 	BucketStorageBackend string `json:"storageBackend,omitempty"`
+
+	// NumVBuckets is the number of vbuckets in the bucket.
+	NumVBuckets int `json:"numVBuckets,omitempty"`
 
 	// BucketMemoryQuota is the bucket memory quota in megabytes.
 	BucketMemoryQuota int64 `json:"memoryQuota"`

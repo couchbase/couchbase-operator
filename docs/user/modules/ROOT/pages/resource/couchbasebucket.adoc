@@ -56,6 +56,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-memoryquota,memoryQuota>>: 100Mi
   <<couchbasebuckets-spec-minimumdurability,minimumDurability>>: ""
   <<couchbasebuckets-spec-name,name>>: ""
+  <<couchbasebuckets-spec-numvbuckets,numVBuckets>>: 1024
   <<couchbasebuckets-spec-onlineevictionpolicychange,onlineEvictionPolicyChange>>: false
   <<couchbasebuckets-spec-rank,rank>>: 0
   <<couchbasebuckets-spec-replicas,replicas>>: 1
@@ -670,6 +671,20 @@ When specified, this
 field overrides `metadata.name`.
 Legal bucket names have a maximum length of 100
 characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_%\.".
+
+=== couchbasebuckets.spec.numVBuckets
+
+==== Constraints
+
+*Type*: `integer`
+
+*Default*: `1024`
+
+==== Description
+
+NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
+Can be either 128 or 1024 for magma buckets.
+This setting can only be adjusted for magma buckets.
 
 === couchbasebuckets.spec.onlineEvictionPolicyChange
 
