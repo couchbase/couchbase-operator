@@ -461,7 +461,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		specFailoverSettings.FailoverServerGroup = nil
 	}
 
-	if over80, err := c.IsAtLeastVersion("8.0.0"); over80 && err == nil {
+	if over80, err := couchbaseutil.VersionAfter(c.GetLowestMemberVersion(), "8.0.0"); over80 && err == nil {
 		if clusterSettings.AllowFailoverEphemeralNoReplicas != nil {
 			specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
 		} else {
