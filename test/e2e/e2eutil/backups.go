@@ -464,6 +464,9 @@ type Restore struct {
 
 	// annotations to be added to the restore
 	annotations map[string]string
+
+	// defaultRecoveryMethod specifies the default recovery method.
+	defaultRecoveryMethod couchbasev2.DefaultRecoveryType
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -493,6 +496,12 @@ func (r *Restore) FromObjStore(objStore string) *Restore {
 
 func (r *Restore) WithObjStoreSecret(secret *v1.Secret) *Restore {
 	r.objStoreSecret = secret
+	return r
+}
+
+// WithDefaultRecoveryMethod sets the default recovery method.
+func (r *Restore) WithDefaultRecoveryMethod(defaultRecoveryMethod couchbasev2.DefaultRecoveryType) *Restore {
+	r.defaultRecoveryMethod = defaultRecoveryMethod
 	return r
 }
 
@@ -704,6 +713,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 		if r.mapping != nil {
 			restore.Spec.Data.Map = r.mapping
 		}
+	}
+
+	if r.defaultRecoveryMethod != couchbasev2.DefaultRecoveryTypeNone {
+		restore.Spec.DefaultRecoveryMethod = r.defaultRecoveryMethod
 	}
 
 	if util.FrameworkBackupStorageClass != nil {

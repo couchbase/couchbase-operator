@@ -3547,7 +3547,7 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 
 	// Create a normal cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
@@ -3568,5 +3568,56 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 
 	if !slices.Contains(container.Args, "--default-recovery=purge") {
 		e2eutil.Die(t, fmt.Errorf("expected --default-recovery=purge in restore container args"))
+	}
+}
+
+func TestRestoreDefaultRecoveryMethod(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// create provider
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	// setup environmen
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create a normal cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithDefaultRecoveryMethod(v2.DefaultRecoveryTypePurge).UseBlankBackupName(false).MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
+	container := e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
+
+	found := false
+	for i, arg := range container.Args {
+		if arg == "--default-recovery" {
+			if container.Args[i+1] == string(v2.DefaultRecoveryTypePurge) {
+				found = true
+				break
+			}
+
+			e2eutil.Die(t, fmt.Errorf("expected '--default-recovery' and 'purge' in restore container args"))
+		}
+	}
+
+	if !found {
+		e2eutil.Die(t, fmt.Errorf("expected '--default-recovery' and 'purge' in restore container args"))
 	}
 }

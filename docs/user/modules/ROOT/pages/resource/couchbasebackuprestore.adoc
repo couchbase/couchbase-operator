@@ -30,6 +30,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebackuprestores-spec-data-map,map>>:
     - <<couchbasebackuprestores-spec-data-map-source,source>>: ""
       <<couchbasebackuprestores-spec-data-map-target,target>>: ""
+  <<couchbasebackuprestores-spec-defaultrecoverymethod,defaultRecoveryMethod>>: none
   <<couchbasebackuprestores-spec-end,end>>:
     <<couchbasebackuprestores-spec-end-int,int>>: 0
     <<couchbasebackuprestores-spec-end-str,str>>: ""
@@ -316,6 +317,21 @@ a bucket, scope or collection.
 Target defines the data target of the mapping, this may be either
 a bucket, scope or collection, and must refer to the same type
 as the restore source.
+
+=== couchbasebackuprestores.spec.defaultRecoveryMethod
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `none`
+
+*Enumerations*: `none, resume, purge`
+
+==== Description
+
+DefaultRecoveryMethod specifies how cbbackupmgr should
+recover from broken backup/restore attempts.
 
 === couchbasebackuprestores.spec.end
 

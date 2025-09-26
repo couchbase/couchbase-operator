@@ -683,6 +683,11 @@ type CouchbaseBackupRestoreSpec struct {
 	// These can be used to configure cbbackupmgr behavior via environment variables.
 	// +optional
 	Env []v1.EnvVar `json:"env,omitempty"`
+
+	// DefaultRecoveryMethod specifies how cbbackupmgr should
+	// recover from broken backup/restore attempts.
+	// +kubebuilder:default="none"
+	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryMethod,omitempty"`
 }
 
 type CouchbaseBackupStagingVolume struct {

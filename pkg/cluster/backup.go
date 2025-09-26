@@ -1338,6 +1338,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		}
 	}
 
+	if spec.DefaultRecoveryMethod != couchbasev2.DefaultRecoveryTypeNone {
+		args = append(args, "--default-recovery", string(spec.DefaultRecoveryMethod))
+	}
+
 	if spec.AdditionalArgs != "" {
 		args = append(args, spec.AdditionalArgs)
 	}

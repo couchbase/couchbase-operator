@@ -701,6 +701,14 @@ func MustGetBucket(bucketType BucketType, compressionMode couchbasev2.CouchbaseB
 	return bucket
 }
 
+func MustGetCouchstoreBucket(compressionMode couchbasev2.CouchbaseBucketCompressionMode) metav1.Object {
+	bucket := e2espec.DefaultBucket()
+	bucket.Spec.CompressionMode = compressionMode
+	bucket.Spec.StorageBackend = couchbasev2.CouchbaseStorageBackendCouchstore
+
+	return bucket
+}
+
 func DeleteBackup(k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup) error {
 	return k8s.CRClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Delete(context.Background(), backup.Name, *metav1.NewDeleteOptions(0))
 }
