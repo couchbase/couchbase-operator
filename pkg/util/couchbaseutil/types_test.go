@@ -830,7 +830,7 @@ func TestMarshalEncryptionKeys(t *testing.T) {
 			CertPath:      "testCertPath",
 			KeyPassphrase: "testKeyPassphrase",
 			ActiveKey: KMIPActiveKey{
-				KmipID: "testKmipId",
+				KMIPID: "testKmipId",
 			},
 		},
 	}

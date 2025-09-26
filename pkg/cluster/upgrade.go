@@ -322,6 +322,18 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
 
+		if is80, err := couchbaseutil.VersionAfter(member.Version(), "8.0.0"); err != nil {
+			return nil, err
+		} else if is80 {
+			// Ignore key shadow secret volume mount if it is not NEEDED
+			if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
+				return nil, err
+			} else if !keyShadowSecretNeeded {
+				removeKeyShadowSecretVolumeMount(requestedSpec)
+				removeKeyShadowSecretVolumeMount(actualSpec)
+			}
+		}
+
 		// Nothing to do, carry on...
 		if podsEqual && pvcsEqual {
 			continue
@@ -351,6 +363,27 @@ func removeMetricsContainer(initial []v1.Container) []v1.Container {
 	}
 
 	return containers
+}
+
+func removeKeyShadowSecretVolumeMount(podSpec *v1.PodSpec) {
+	container, err := k8sutil.GetCouchbaseContainerFromSpec(podSpec)
+	if err != nil {
+		return
+	}
+
+	filterMounts := func(initialMounts []v1.VolumeMount) []v1.VolumeMount {
+		volumeMounts := []v1.VolumeMount{}
+
+		for _, v := range initialMounts {
+			if v.Name != constants.CouchbaseKeyShadowVolumeName {
+				volumeMounts = append(volumeMounts, v)
+			}
+		}
+
+		return volumeMounts
+	}
+
+	container.VolumeMounts = filterMounts(container.VolumeMounts)
 }
 
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {

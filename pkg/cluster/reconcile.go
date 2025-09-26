@@ -120,6 +120,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).refreshTLSPassphraseResources,
 		(*Cluster).reconcileLogConfig,
 		(*Cluster).reconcileCloudNativeGatewayConfig,
+		(*Cluster).refreshKeyShadowSecret,
 	}
 
 	if err := preCreationReconcilers.run(c); err != nil {

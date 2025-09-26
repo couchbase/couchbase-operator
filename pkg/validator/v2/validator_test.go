@@ -318,3 +318,82 @@ func createKeyMap(specs []keySpec) map[string]*couchbasev2.CouchbaseEncryptionKe
 
 	return keyMap
 }
+
+func TestValidateAWSKeyARN(t *testing.T) {
+	testcases := []struct {
+		keyARN string
+		valid  bool
+	}{
+		{
+			keyARN: "arn:aws:kms:us-west-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+			valid:  true,
+		},
+		{
+			keyARN: "arn:aws:kms:eu-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+			valid:  true,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:111122223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  true,
+		},
+		{
+			keyARN: "arnald:aws:kms:us-west-2:111122223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aWS:kms:us-west-2:111122223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:iam:us-west-2:111122223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:11112 2223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:1112223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:11112223333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:1111222233333:key/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:111122223333:app/mrk-1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:111122223333:key/mrk-1234abcd12ab34cd 56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:111122223333:key/mrk/1234abcd12ab34cd56ef1234567890ab",
+			valid:  false,
+		},
+		{
+			keyARN: "arn:aws:kms:us-west-2:111122223333:key/mrk-1234abcd12ab34cd56ef1234567890ab!",
+			valid:  false,
+		},
+		{
+			keyARN: "",
+			valid:  false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		err := validateAWSKeyARN(testcase.keyARN)
+		if testcase.valid && err != nil {
+			t.Errorf("expected validation to pass but got error: %s", err)
+		}
+
+		if !testcase.valid && err == nil {
+			t.Errorf("expected validation to fail but it passed")
+		}
+	}
+}

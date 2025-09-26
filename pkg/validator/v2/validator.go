@@ -3707,6 +3707,11 @@ func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.Couc
 }
 
 func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) error {
+	// If the key is being deleted, we don't need to validate it
+	if key.DeletionTimestamp != nil {
+		return nil
+	}
+
 	var errs []error
 
 	// If usage is not set then we default it to all true
@@ -3717,8 +3722,96 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 		errs = append(errs, fmt.Errorf("at least one usage field must be set to true in spec.usage"))
 	}
 
+	if key.Spec.KeyType == couchbasev2.CouchbaseEncryptionKeyTypeAWS {
+		if key.Spec.AWSKey == nil {
+			errs = append(errs, fmt.Errorf("spec.awsKey is required when spec.keyType is AWS"))
+		} else {
+			if err := validateAWSKeyARN(key.Spec.AWSKey.KeyARN); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateAWSKeyCredentialsSecret(v, key, key.Spec.AWSKey.CredentialsSecret); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	if key.Spec.KeyType == couchbasev2.CouchbaseEncryptionKeyTypeKMIP {
+		if err := validateKMIPKey(v, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func validateAWSKeyCredentialsSecret(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey, credentialsSecret string) error {
+	if credentialsSecret == "" {
+		return nil
+	}
+
+	secret, found, err := v.Abstraction.GetSecret(key.Namespace, credentialsSecret)
+
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.awsKey.credentialsSecret must exist", credentialsSecret)
+	}
+
+	if secret.Data[constants.AWSCredentialsSecretKey] == nil {
+		return fmt.Errorf("spec.awsKey.credentialsSecret must contain %s", constants.AWSCredentialsSecretKey)
+	}
+
+	return nil
+}
+
+func validateAWSKeyARN(keyARN string) error {
+	keyARNRegex := regexp.MustCompile(`^arn:(aws|aws-us-gov|aws-cn):kms:\w+(?:-\w+)+:\d{12}:key\/[A-Za-z0-9-]+$`)
+	if !keyARNRegex.MatchString(keyARN) {
+		return fmt.Errorf("spec.awsKey.keyARN must match AWS KMS key ARN format")
+	}
+
+	return nil
+}
+
+func validateKMIPKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) error {
+	if key.Spec.KMIPKey == nil {
+		return fmt.Errorf("spec.kmipKey is required when spec.keyType is KMIP")
+	}
+
+	if key.Spec.KMIPKey.ClientSecret == "" {
+		return fmt.Errorf("spec.kmipKey.clientSecret is required when spec.keyType is KMIP")
+	}
+
+	secret, found, err := v.Abstraction.GetSecret(key.Namespace, key.Spec.KMIPKey.ClientSecret)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.kmipKey.clientSecret must exist", key.Spec.KMIPKey.ClientSecret)
+	}
+
+	if secret.Data[constants.KMIPClientSecretCertKey] == nil {
+		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretCertKey)
+	}
+
+	if secret.Data[constants.KMIPClientSecretKeyKey] == nil {
+		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretKeyKey)
+	}
+
+	if secret.Data[constants.KMIPClientSecretPassphraseKey] == nil {
+		return fmt.Errorf("spec.kmipKey.clientSecret must contain %s", constants.KMIPClientSecretPassphraseKey)
+	}
+
+	if err := util_x509.ValidateKMIPKeyAndPassphrase(secret.Data[constants.KMIPClientSecretKeyKey], secret.Data[constants.KMIPClientSecretPassphraseKey]); err != nil {
+		return fmt.Errorf("spec.kmipKey.clientSecret must contain a valid key and passphrase: %w", err)
 	}
 
 	return nil
@@ -4534,6 +4627,16 @@ func CheckChangeConstraintsEphemeralBucket(v *types.Validator, prev, curr *couch
 func CheckImmutableFieldsEncryptionKey(prev, current *couchbasev2.CouchbaseEncryptionKey) error {
 	if prev.Spec.KeyType != current.Spec.KeyType {
 		return fmt.Errorf("encryption key type cannot be changed")
+	}
+
+	if current.Spec.KeyType == couchbasev2.CouchbaseEncryptionKeyTypeAWS && current.Spec.AWSKey != nil && prev.Spec.AWSKey != nil {
+		if current.Spec.AWSKey.KeyARN != prev.Spec.AWSKey.KeyARN {
+			return fmt.Errorf("encryption key ARN cannot be changed")
+		}
+
+		if current.Spec.AWSKey.KeyRegion != prev.Spec.AWSKey.KeyRegion {
+			return fmt.Errorf("encryption key region cannot be changed")
+		}
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/youmark/pkcs8"
 	v1 "k8s.io/api/core/v1"
 	"software.sslmate.com/src/go-pkcs12"
 )
@@ -277,4 +278,19 @@ func ExtractPKCS12Info(secret *v1.Secret) ([]byte, string, bool, error) {
 	}
 
 	return nil, "", false, nil
+}
+
+// ValidateKMIPKeyAndPassphrase validates the KMIP key and passphrase.
+func ValidateKMIPKeyAndPassphrase(keyData, passphrase []byte) error {
+	keyBlock, _ := pem.Decode(keyData)
+	if keyBlock == nil {
+		return fmt.Errorf("%w: private key contains no PEM blocks", errors.NewStackTracedError(errors.ErrPrivateKeyInvalid))
+	}
+
+	_, err := pkcs8.ParsePKCS8PrivateKey(keyBlock.Bytes, passphrase)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

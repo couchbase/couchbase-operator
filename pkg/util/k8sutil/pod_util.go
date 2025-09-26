@@ -34,6 +34,7 @@ import (
 const (
 	couchbaseTLSVolumeMountDir                = "/opt/couchbase/var/lib/couchbase/inbox"
 	couchbaseTLSCAVolumeMountDir              = "/opt/couchbase/var/lib/couchbase/inbox/CA"
+	CouchbaseKeyShadowVolumeMountDir          = "/opt/couchbase/var/lib/couchbase/key"
 	couchbaseVolumeDefaultConfigDir           = "/opt/couchbase/var/lib/couchbase"
 	CouchbaseVolumeMountLogsDir               = "/opt/couchbase/var/lib/couchbase/logs"
 	couchbaseVolumeDefaultEtcDir              = "/opt/couchbase/etc"
@@ -1030,6 +1031,10 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 
 	// If TLS is specified then add the certificate volume.
 	if err := applyPodTLSConfiguration(cluster, pod, &serverConfig); err != nil {
+		return nil, err
+	}
+
+	if err := applyPodKeyShadowSecret(cluster, pod, &serverConfig); err != nil {
 		return nil, err
 	}
 
@@ -2130,9 +2135,14 @@ func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
 
 // Given a pod, return a pointer to the couchbase container.
 func GetCouchbaseContainer(pod *v1.Pod) (*v1.Container, error) {
-	for index := range pod.Spec.Containers {
-		if pod.Spec.Containers[index].Name == constants.CouchbaseContainerName {
-			return &pod.Spec.Containers[index], nil
+	return GetCouchbaseContainerFromSpec(&pod.Spec)
+}
+
+// Given a pod, return a pointer to the couchbase container.
+func GetCouchbaseContainerFromSpec(podSpec *v1.PodSpec) (*v1.Container, error) {
+	for index := range podSpec.Containers {
+		if podSpec.Containers[index].Name == constants.CouchbaseContainerName {
+			return &podSpec.Containers[index], nil
 		}
 	}
 
@@ -2147,6 +2157,10 @@ func ShadowTLSSecretName(cluster *couchbasev2.CouchbaseCluster) string {
 // ShadowTLSCASecretName generates a TLS secret name for CA certificates on CBS 7.1+.
 func ShadowTLSCASecretName(cluster *couchbasev2.CouchbaseCluster) string {
 	return cluster.Name + "-tls-ca-shadow"
+}
+
+func KeyShadowSecretName(cluster *couchbasev2.CouchbaseCluster) string {
+	return cluster.Name + "-key-shadow"
 }
 
 // ClientTLSSecretName generates a TLS secret name for the client certificates.
@@ -2237,6 +2251,47 @@ func applyPodTLSConfiguration(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod
 
 		container.VolumeMounts = append(container.VolumeMounts, caVolumeMount)
 	}
+
+	return nil
+}
+
+func applyPodKeyShadowSecret(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) error {
+	container, err := GetCouchbaseContainer(pod)
+	if err != nil {
+		return err
+	}
+
+	tag, err := CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(conf))
+	if err != nil {
+		return err
+	}
+
+	is80, err := couchbaseutil.VersionAfter(tag, "8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if !is80 {
+		return nil
+	}
+
+	volume := v1.Volume{
+		Name: constants.CouchbaseKeyShadowVolumeName,
+		VolumeSource: v1.VolumeSource{
+			Secret: &v1.SecretVolumeSource{
+				SecretName: KeyShadowSecretName(cluster),
+			},
+		},
+	}
+	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
+
+	volumeMount := v1.VolumeMount{
+		Name:      constants.CouchbaseKeyShadowVolumeName,
+		ReadOnly:  true,
+		MountPath: CouchbaseKeyShadowVolumeMountDir,
+	}
+
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 
 	return nil
 }

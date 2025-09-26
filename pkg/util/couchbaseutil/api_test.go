@@ -128,14 +128,63 @@ func MustDeleteTestKeys(t *testing.T, client *Client) {
 func TestUpdateConfigurationEncryptionSettings(t *testing.T) {
 	client := InitTest()
 
+	keyID := -1
 	settings := EncryptionAtRestSettings{
 		EncryptionMethod:    EncryptionMethodNodeSecretManager,
 		DEKLifetime:         211 * 24 * 60 * 60,
 		DEKRotationInterval: 43 * 24 * 60 * 60,
-		EncryptionKeyID:     -1,
+		EncryptionKeyID:     &keyID,
 	}
 
 	if err := UpdateConfigurationEncryptionSettings(&settings).On(client, defaultHost); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateAWSKey(t *testing.T) {
+	client := InitTest()
+
+	key := EncryptionKey{
+		Type: EncryptionKeyTypeAWSKMSSymmetric,
+		Name: "testAWSKey",
+		AWS: &AWSKeyData{
+			KeyARN:  "arn:aws:kms:us-west-2:123456789012:key/1234abcd-12ab-34cd-56ef-1234567890ab",
+			Region:  "us-west-2",
+			UseIMDS: true,
+		},
+		Usage: []string{EncryptionKeyUsageBucketEncryptionAll, EncryptionKeyUsageConfigEncryption, EncryptionKeyUsageKEKEncryption, EncryptionKeyUsageLogsEncryption, EncryptionKeyUsageAuditEncryption},
+	}
+
+	if err := CreateEncryptionKey(&key).On(client, defaultHost); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCreateKMIPKey(t *testing.T) {
+	client := InitTest()
+
+	key := EncryptionKey{
+		Type: EncryptionKeyTypeKMIPAES256,
+		Usage: []string{
+			EncryptionKeyUsageBucketEncryptionAll,
+			EncryptionKeyUsageConfigEncryption,
+			EncryptionKeyUsageKEKEncryption,
+			EncryptionKeyUsageLogsEncryption,
+			EncryptionKeyUsageAuditEncryption,
+		},
+		Name: "testKMIPKey",
+		KMIP: &KMIPKeyData{
+			Host:         "testHost",
+			Port:         1111,
+			ReqTimeoutMs: 1900,
+			ActiveKey: KMIPActiveKey{
+				KMIPID: "",
+			},
+			KeyPassphrase: "testKeyPassphrase",
+		},
+	}
+
+	if err := CreateEncryptionKey(&key).On(client, defaultHost); err != nil {
 		t.Fatal(err)
 	}
 }

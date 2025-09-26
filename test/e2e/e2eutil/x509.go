@@ -191,9 +191,9 @@ func CreatePrivateKey(key crypto.PrivateKey, keyEncoding KeyEncodingType) ([]byt
 	return data.Bytes(), nil
 }
 
-// addPKCS8Passphrase converts an unencrypted PKCS#8 key
+// AddPKCS8Passphrase converts an unencrypted PKCS#8 key
 // to an encrypted key with specified passphrase.
-func addPKCS8Passphrase(privateKey []byte, passphrase []byte) ([]byte, error) {
+func AddPKCS8Passphrase(privateKey []byte, passphrase []byte) ([]byte, error) {
 	// decode from pem and parse out binary key
 	p, _ := pem.Decode(privateKey)
 
@@ -880,7 +880,7 @@ func InitClusterTLS(k8s *types.Cluster, opts *TLSOpts) (ctx *TLSContext, err err
 
 	// Convert to password protected key if passphrase is provided
 	if opts.KeyPassphrase != "" {
-		clusterKey, err = addPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
+		clusterKey, err = AddPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
 		if err != nil {
 			return
 		}
@@ -982,7 +982,7 @@ func MustRotateServerCertificate(t *testing.T, ctx *TLSContext, opts *TLSOpts) {
 
 	// Encrypt key if passphrase provided
 	if opts != nil && opts.KeyPassphrase != "" {
-		clusterKey, err = addPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
+		clusterKey, err = AddPKCS8Passphrase(clusterKey, []byte(opts.KeyPassphrase))
 		if err != nil {
 			Die(t, err)
 		}

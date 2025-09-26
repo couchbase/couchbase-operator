@@ -141,9 +141,10 @@ const (
 	// Used to annotate services with names which will get syncronized to a cloud DNS provider.
 	DNSAnnotation = "external-dns.alpha.kubernetes.io/hostname"
 
-	CouchbaseContainerName   = "couchbase-server"
-	CouchbaseTLSVolumeName   = "couchbase-server-tls"
-	CouchbaseTLSCAVolumeName = "couchbase-server-tls-ca"
+	CouchbaseContainerName       = "couchbase-server"
+	CouchbaseTLSVolumeName       = "couchbase-server-tls"
+	CouchbaseTLSCAVolumeName     = "couchbase-server-tls-ca"
+	CouchbaseKeyShadowVolumeName = "couchbase-server-key-shadow"
 
 	// Name of private key mounted within server used to decrypt incoming passphrase.
 	CouchbaseTLSPassphraseKey = "tls-passphrase-key"
@@ -343,4 +344,16 @@ const (
 
 	// EncryptionKeyFinalizerPrefix is the finalizer for encryption keys.
 	EncryptionKeyFinalizerPrefix = "encryptionkey.couchbase.com/finalizer"
+
+	// AWSCredentialsSecretKey is the key in the AWS credentials secret that contains the credentials file.
+	AWSCredentialsSecretKey = "credentials"
+
+	// KMIPClientSecretKey is the key in the KMIP client secret that contains the client private key passphrase.
+	KMIPClientSecretPassphraseKey = "passphrase"
+
+	// KMIPClientSecretCertKey is the key in the KMIP client secret that contains the client private key certificate.
+	KMIPClientSecretCertKey = "tls.crt"
+
+	// KMIPClientSecretKeyKey is the key in the KMIP client secret that contains the client private key.
+	KMIPClientSecretKeyKey = "tls.key"
 )

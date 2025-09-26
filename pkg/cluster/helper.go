@@ -150,3 +150,16 @@ func (c *Cluster) GetHighestMemberVersion() string {
 func (c *Cluster) GetEncryptionKeyFinalizer() string {
 	return c.cluster.GetEncryptionKeyFinalizer()
 }
+
+func (c *Cluster) IsEncryptionAtRestManaged() bool {
+	isEncryptionAtRestSupported, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return false
+	}
+
+	if !isEncryptionAtRestSupported {
+		return false
+	}
+
+	return c.cluster.Spec.Security.EncryptionAtRest != nil && c.cluster.Spec.Security.EncryptionAtRest.Managed
+}

@@ -82,7 +82,7 @@ func TestOrderKeysForCreationWithExtras(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEncryptionKeySpec{
 				KeyType: couchbasev2.CouchbaseEncryptionKeyTypeAWS,
-				AwsKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
+				AWSKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
 			},
 		},
 		{
@@ -102,7 +102,7 @@ func TestOrderKeysForCreationWithExtras(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEncryptionKeySpec{
 				KeyType: couchbasev2.CouchbaseEncryptionKeyTypeAWS,
-				AwsKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
+				AWSKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func TestOrderKeysForCreationWithExtras(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEncryptionKeySpec{
 				KeyType: couchbasev2.CouchbaseEncryptionKeyTypeKMIP,
-				KmipKey: &couchbasev2.CouchbaseEncryptionKeyKMIP{},
+				KMIPKey: &couchbasev2.CouchbaseEncryptionKeyKMIP{},
 			},
 		},
 	}
@@ -192,7 +192,7 @@ func TestOrderKeysForCreationWithMultipleDependencyGraphs(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEncryptionKeySpec{
 				KeyType: couchbasev2.CouchbaseEncryptionKeyTypeKMIP,
-				KmipKey: &couchbasev2.CouchbaseEncryptionKeyKMIP{},
+				KMIPKey: &couchbasev2.CouchbaseEncryptionKeyKMIP{},
 			},
 		},
 		{
@@ -221,7 +221,7 @@ func TestOrderKeysForCreationWithMultipleDependencyGraphs(t *testing.T) {
 			},
 			Spec: couchbasev2.CouchbaseEncryptionKeySpec{
 				KeyType: couchbasev2.CouchbaseEncryptionKeyTypeAWS,
-				AwsKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
+				AWSKey:  &couchbasev2.CouchbaseEncryptionKeyAWS{},
 			},
 		},
 		{

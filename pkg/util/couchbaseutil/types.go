@@ -2475,20 +2475,20 @@ type AWSKeyData struct {
 }
 
 type KMIPActiveKey struct {
-	KmipID string `json:"kmipId,omitempty"`
+	KMIPID string `json:"kmipId"`
 }
 
 // KMIPKeyData contains settings for KMIP-managed encryption keys.
 type KMIPKeyData struct {
-	Host               string        `json:"host,omitempty"`
-	Port               int           `json:"port,omitempty"`
-	ReqTimeoutMs       int           `json:"reqTimeoutMs,omitempty"`
-	CaSelection        string        `json:"caSelection,omitempty"`
-	ActiveKey          KMIPActiveKey `json:"activeKey,omitempty"`
-	EncryptionApproach string        `json:"encryptionApproach,omitempty"`
+	Host               string             `json:"host,omitempty"`
+	Port               int                `json:"port,omitempty"`
+	ReqTimeoutMs       int                `json:"reqTimeoutMs,omitempty"`
+	CASelection        CASelection        `json:"caSelection,omitempty"`
+	ActiveKey          KMIPActiveKey      `json:"activeKey,omitempty"`
+	EncryptionApproach EncryptionApproach `json:"encryptionApproach,omitempty"`
 
-	KeyPath       string `json:"keyPath,omitempty"`
-	CertPath      string `json:"certPath,omitempty"`
+	KeyPath       string `json:"keyPath"`
+	CertPath      string `json:"certPath"`
 	KeyPassphrase string `json:"keyPassphrase,omitempty"`
 }
 
@@ -2498,6 +2498,22 @@ const (
 	EncryptionMethodDisabled          EncryptionMethod = "disabled"
 	EncryptionMethodNodeSecretManager EncryptionMethod = "nodeSecretManager"
 	EncryptionMethodEncryptionKey     EncryptionMethod = "encryptionKey"
+)
+
+type CASelection string
+
+const (
+	CASelectionBoth      CASelection = "useSysAndCbCa"
+	CASelectionSystem    CASelection = "useSysCa"
+	CASelectionCouchbase CASelection = "useCbCa"
+	CASelectionSkip      CASelection = "skipServerCertVerification"
+)
+
+type EncryptionApproach string
+
+const (
+	EncryptionApproachNativeEncryptDecrypt EncryptionApproach = "useEncryptDecrypt"
+	EncryptionApproachLocalEncrypt         EncryptionApproach = "useGet"
 )
 
 // EncryptionAtRestRequest represents the request format for encryption at rest configuration.
