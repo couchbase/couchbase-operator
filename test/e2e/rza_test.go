@@ -9,6 +9,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -866,6 +867,65 @@ func TestServerGroupReschedulingIgnoreUnschedulable(t *testing.T) {
 		},
 		e2eutil.ClusterCreateSequence(2),
 		e2eutil.ClusterScaleUpSequence(1),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestScaleDownAndRemoveServerGroupDeletesUnscheduledServerGroup tests that when a server class is scaled down at the same time
+// a server group is removed from that same class, any unscheduled server group pods are prioritised for removal.
+func TestScaleDownAndRemoveServerGroupDeletesUnscheduledServerGroup(t *testing.T) {
+	f := framework.Global
+	f.PodCreateTimeout = 1 * time.Minute
+
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	clusterSize := 2
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+	cluster.Spec.Servers[0].ServerGroups = availableServerGroups[:1]
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups[:1])
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Scale up the cluster at the same time as adding a new server group.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/serverGroups", availableServerGroups[:2]).Replace("/spec/servers/0/size", clusterSize+1), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingUp, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Check that the cluster is spread out as we expect.
+	expected = getExpectedRzaResultMap(clusterSize+1, availableServerGroups[:2])
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Scale down the cluster and remove the new server group.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/serverGroups", availableServerGroups[:1]).Replace("/spec/servers/0/size", clusterSize), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, corev1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// The scale down should be the only event that occurs, and the newly added pod should have been removed as it should have existed in the (now removed) new server group.
+	expected = getExpectedRzaResultMap(clusterSize, availableServerGroups[:1])
+	expected.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Check that the remaining pod is on the remaining server group.
+	expectedNodeSelLabels := map[string]string{
+		constants.FailureDomainZoneLabel: availableServerGroups[:1][0],
+	}
+
+	e2eutil.MustCheckPodSpecAnnotationsForNodeSelector(t, kubernetes, cluster, expectedNodeSelLabels)
+
+	// We expect the same pod to be scaled up and down/
+	victimIndex := couchbaseutil.CreateMemberName(cluster.Name, clusterSize)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterScaleUpSequenceWithMemberNames([]string{victimIndex}),
+		e2eutil.ClusterScaleDownSequenceWithMemberNames([]string{victimIndex}),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

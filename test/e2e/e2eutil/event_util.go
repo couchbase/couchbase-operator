@@ -307,6 +307,21 @@ func ClusterScaleUpSequence(size int) eventschema.Validatable {
 	}
 }
 
+func ClusterScaleUpSequenceWithMemberNames(names []string) eventschema.Validatable {
+	var validators []eventschema.Validatable
+
+	for _, name := range names {
+		validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: name})
+	}
+
+	validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted})
+	validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted})
+
+	return eventschema.Sequence{
+		Validators: validators,
+	}
+}
+
 // ClusterScaleDownSequence is a common function for generating cluster scaling down events.
 func ClusterScaleDownSequence(size int) eventschema.Validatable {
 	return eventschema.Sequence{
@@ -321,6 +336,22 @@ func ClusterScaleDownSequence(size int) eventschema.Validatable {
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
+	}
+}
+
+func ClusterScaleDownSequenceWithMemberNames(names []string) eventschema.Validatable {
+	validators := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+	}
+
+	for _, name := range names {
+		validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: name})
+	}
+
+	validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted})
+
+	return eventschema.Sequence{
+		Validators: validators,
 	}
 }
 

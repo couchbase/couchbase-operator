@@ -30,6 +30,11 @@ type stripeSchedulerImpl struct {
 	// group is no longer valid.
 	unschedulableServerClasses serverClassGroupMap
 
+	// removableUnscheduledServerClasses is for tracking pods that exist, but that aren't
+	// part of the cluster spec and therefore are allowed to be removed
+	// when determining which server group to remove a pod from.
+	removableUnscheduledServerClasses serverClassGroupMap
+
 	// removableServerClasses is for tracking our internal state of ordered removal
 	// of pods by server classes
 	removableServerClasses serverClassServerRemovalMap
@@ -153,6 +158,16 @@ func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 			sched.unschedulableServerClasses[class].addGroupIfDoesntExist(group)
 			sched.unschedulableServerClasses[class].getGroup(group).push(pod.Name)
 
+			// Given the pod exists but is no longer required by the spec, we should consider it for removal
+			// when determining which server group to remove a pod from. This differs to unschedulableServerClasses
+			// which includes pods that may not exist or have a marked server group.
+			if _, ok := sched.removableUnscheduledServerClasses[class]; !ok {
+				sched.removableUnscheduledServerClasses[class] = newLexicalServerGroups()
+			}
+
+			sched.removableUnscheduledServerClasses[class].addGroupIfDoesntExist(group)
+			sched.removableUnscheduledServerClasses[class].getGroup(group).push(pod.Name)
+
 			continue
 		}
 
@@ -168,9 +183,10 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
 	sched := &stripeSchedulerImpl{
-		serverClasses:              serverClassGroupMap{},
-		unschedulableServerClasses: serverClassGroupMap{},
-		removableServerClasses:     serverClassServerRemovalMap{},
+		serverClasses:                     serverClassGroupMap{},
+		unschedulableServerClasses:        serverClassGroupMap{},
+		removableUnscheduledServerClasses: serverClassGroupMap{},
+		removableServerClasses:            serverClassServerRemovalMap{},
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {
@@ -214,6 +230,27 @@ func (sched *stripeSchedulerImpl) Create(class, name, group string) (string, err
 	return group, nil
 }
 
+// removePodFromServerGroup removes a pod from either or both scheduled and removable unscheduled server classes.
+func (sched *stripeSchedulerImpl) removePodFromServerGroup(class, serverGroup, podName string) error {
+	// Try scheduled server classes first
+	if serverList := sched.serverClasses[class].getGroup(serverGroup); serverList != nil {
+		if serverList.find(podName) {
+			return serverList.del(podName)
+		}
+	}
+
+	// Try unscheduled server classes
+	if sched.removableUnscheduledServerClasses[class] != nil {
+		if serverList := sched.removableUnscheduledServerClasses[class].getGroup(serverGroup); serverList != nil {
+			if serverList.find(podName) {
+				return serverList.del(podName)
+			}
+		}
+	}
+
+	return fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+}
+
 func (sched *stripeSchedulerImpl) getSmallesGroupForClass(class string) string {
 	if len(sched.avoidGroups) == 0 {
 		return sched.serverClasses[class].smallestGroup()
@@ -253,33 +290,35 @@ func (sched *stripeSchedulerImpl) Delete(class string) (string, error) {
 			removalServerListsMap[group] = sched.serverClasses[class].getGroup(group)
 		}
 
+		if sched.removableUnscheduledServerClasses[class] != nil {
+			largestUnscheduledGroups := sched.removableUnscheduledServerClasses[class].largestGroups()
+			for _, group := range largestUnscheduledGroups {
+				removalServerListsMap[group] = sched.removableUnscheduledServerClasses[class].getGroup(group)
+			}
+		}
+
 		var serverGroup string
 		// Find the highest priority node in the list of candidates
 		podName, serverGroup = rq.dequeHighestRankedCandidate(removalServerListsMap)
 		if podName != "" {
-			if found := sched.serverClasses[class].getGroup(serverGroup).find(podName); found {
-				err := sched.serverClasses[class].getGroup(serverGroup).del(podName)
-				if err != nil {
-					return "", fmt.Errorf("%s: server named %s could not be deleted for class %s and server group %s: %w", stripeErrorHeader, podName, class, serverGroup, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-				}
+			if err := sched.removePodFromServerGroup(class, serverGroup, podName); err != nil {
+				return "", err
 			}
+
+			return podName, nil
 		}
 	}
 
 	// If the rq hasn't prioritized any thing then select the victim server
 	// deterministically based on alphabetical order.
-	if podName == "" {
-		serverGroup := sched.serverClasses[class].largestGroup()
+	serverGroup := sched.serverClasses[class].largestGroup()
 
-		server, err := sched.serverClasses[class].getGroup(serverGroup).pop()
-		if err != nil {
-			return "", fmt.Errorf("%s: no server list found for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
-		}
-
-		podName = server
+	server, err := sched.serverClasses[class].getGroup(serverGroup).pop()
+	if err != nil {
+		return "", fmt.Errorf("%s: no server list found for server class '%s': %w", stripeErrorHeader, class, errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	return podName, nil
+	return server, nil
 }
 
 // Upgrade removes a node from the scheduler as it's an upgrade target.
@@ -586,7 +625,7 @@ func (sched *stripeSchedulerImpl) Reschedule() ([]Move, error) {
 		s := newState(sched, class)
 
 		if s.Done() {
-			return nil, nil
+			continue
 		}
 
 		result, err := astar.AStar(s)

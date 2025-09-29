@@ -345,9 +345,9 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleVolumeExpansion,
 		(*ReconcileMachine).handleMoveNodes,
 		(*ReconcileMachine).handlePodHostname,
+		(*ReconcileMachine).handleRemoveNode,
 		(*ReconcileMachine).handleUpgradeNode,
 		(*ReconcileMachine).handleBucketStorageBackendMigration,
-		(*ReconcileMachine).handleRemoveNode,
 		(*ReconcileMachine).handleAddNode,
 		(*ReconcileMachine).handleServerGroups,
 		(*ReconcileMachine).handleNodeServices,
@@ -964,8 +964,6 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		return fmt.Errorf("server class not found %s: %w", serverClass, errors.NewStackTracedError(errors.ErrServerClassNotFound))
 	}
 
-	var queueMembers []string
-
 	prioritizedRemoveCandidates := couchbaseutil.NewMemberSet()
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
@@ -988,6 +986,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	}
 
 	// Add the candidates to the list of candidates to be removed.
+	var queueMembers []string
 	queueMembers = append(queueMembers, prioritizedRemoveCandidates.Names()...)
 
 	// Get remaining members that aren't in the above list.
