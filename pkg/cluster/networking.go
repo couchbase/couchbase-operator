@@ -213,15 +213,19 @@ func (c *Cluster) cleanMembersWithHostnameAAPersistence() error {
 		return nil
 	}
 
-	// If the persistence var doesn't exist, or is false, we don't need to do anything.
+	// If the persistence var is false, we don't need to do anything.
+	// If the persistence var doesn't exist, we need to set it to false, as fetching
+	// an empty persistence value takes a lot of time due to it retrying.
 	persistenceVar, err := c.state.Get(persistence.MembersWithHostnameAAadded)
-	if err != nil || persistenceVar == "false" {
+	if persistenceVar == "false" {
 		return nil
 	}
 
-	for _, member := range c.members {
-		if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
-			return err
+	if err == nil {
+		for _, member := range c.members {
+			if err := couchbaseutil.DeleteAlternateAddressesExternal().On(c.api, member); err != nil {
+				return err
+			}
 		}
 	}
 
