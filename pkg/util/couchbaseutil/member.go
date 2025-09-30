@@ -2,6 +2,7 @@ package couchbaseutil
 
 import (
 	"fmt"
+	"net"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,6 +19,13 @@ type HostName string
 
 // GetMemberName extracts the Operator member/pod name from the Couchbase host name.
 func (hostName HostName) GetMemberName() string {
+	stripped := strings.Split(string(hostName), ":")[0]
+
+	isNameIP := net.ParseIP(stripped) != nil
+	if isNameIP {
+		return stripped
+	}
+
 	return strings.Split(string(hostName), ".")[0]
 }
 
@@ -501,20 +509,28 @@ func GetAvailableIndexes(names []string, num int) ([]int, error) {
 
 // NewExternalMember returns a new member that is external to the operator's control.
 func NewExternalMember(host string, config string, useTLS bool) Member {
+	isIPName := net.ParseIP(host) != nil
+
 	return &externamMemberImpl{
-		useTLS: useTLS,
-		host:   host,
-		config: config,
+		useTLS:   useTLS,
+		host:     host,
+		config:   config,
+		isIPName: isIPName,
 	}
 }
 
 type externamMemberImpl struct {
-	useTLS bool
-	host   string
-	config string
+	useTLS   bool
+	host     string
+	config   string
+	isIPName bool
 }
 
 func (m *externamMemberImpl) Name() string {
+	if m.isIPName {
+		return m.host
+	}
+
 	return strings.Split(m.host, ".")[0]
 }
 
