@@ -606,7 +606,7 @@ type CouchbaseBackupRestoreSpec struct {
 	// End denotes the last backup to restore from.  Omitting this field will only
 	// restore the backup referenced by start.  This may be specified as
 	// an integer index (starting from 1), a string specifying a short date
-	// DD-MM-YYYY, the backup name, or one of either `start` or `oldest` keywords.
+	// DD-MM-YYYY, the backup name, or one of either `end` or `latest` keywords.
 	End *StrOrInt `json:"end,omitempty"`
 
 	// Number of hours to hold restore script logs for, everything older will be deleted.
