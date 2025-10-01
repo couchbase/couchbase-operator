@@ -2021,11 +2021,17 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 
 	if bucket.Spec.StorageBackend != "" {
 		if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-			if (bucket.Spec.NumVBuckets == 1024 || bucket.Spec.NumVBuckets == 0) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
+			if bucket.Spec.NumVBuckets != nil {
+				if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+				}
+
+				if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
+				}
 			}
 
-			if bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+			if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
 			}
 		}
@@ -5049,7 +5055,7 @@ func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbas
 				return err
 			}
 
-			if bucket.Spec.NumVBuckets != 0 && !srvVerAfter80 {
+			if bucket.Spec.NumVBuckets != nil && !srvVerAfter80 {
 				return fmt.Errorf("spec.numVBuckets can only be set for magma buckets on Couchbase Server version 8.0.0 or later")
 			}
 

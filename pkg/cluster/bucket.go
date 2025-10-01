@@ -76,6 +76,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			BucketName:         name,
 			SampleBucket:       bucket.Spec.SampleBucket,
 			BucketType:         constants.BucketTypeCouchbase,
+			NumVBuckets:        util.IntPtr(1024),
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         couchbaseutil.IoPriorityType(bucket.Spec.IoPriority),
@@ -204,11 +205,11 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				}
 			}
 
-			if bucket.Spec.NumVBuckets == 0 {
-				b.NumVBuckets = constants.DefaultNumVBuckets
+			if bucket.Spec.NumVBuckets != nil {
+				b.NumVBuckets = bucket.Spec.NumVBuckets
+			} else {
+				b.NumVBuckets = util.IntPtr(constants.DefaultNumVBuckets)
 			}
-
-			b.NumVBuckets = bucket.Spec.NumVBuckets
 		}
 
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
@@ -538,7 +539,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		return nil, nil, nil, nil, err
 	}
 
-	memcachedUnsupported, err := c.IsAtLeastVersion("8.0.0")
+	atLeast80, err := c.IsAtLeastVersion("8.0.0")
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -566,7 +567,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				doCrossClusterVersioningChecks(&r, &a, c.cluster)
 
 				// Ignore memcached buckets if the server version is 8.0.0 or higher.
-				if r.BucketType == constants.BucketTypeMemcached && memcachedUnsupported {
+				if r.BucketType == constants.BucketTypeMemcached && atLeast80 {
 					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "bucket-name", r.BucketName)
 					continue
 				}
@@ -598,6 +599,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		if !found {
 			setBucketFieldsForEncoding(&r, isOver71)
+
+			if !atLeast80 && r.BucketType == constants.BucketTypeCouchbase && r.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+				r.NumVBuckets = nil
+			}
 
 			create = append(create, r)
 		}

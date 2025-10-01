@@ -56,7 +56,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebuckets-spec-memoryquota,memoryQuota>>: 100Mi
   <<couchbasebuckets-spec-minimumdurability,minimumDurability>>: ""
   <<couchbasebuckets-spec-name,name>>: ""
-  <<couchbasebuckets-spec-numvbuckets,numVBuckets>>: 1024
+  <<couchbasebuckets-spec-numvbuckets,numVBuckets>>: 0
   <<couchbasebuckets-spec-onlineevictionpolicychange,onlineEvictionPolicyChange>>: false
   <<couchbasebuckets-spec-rank,rank>>: 0
   <<couchbasebuckets-spec-replicas,replicas>>: 1
@@ -677,8 +677,6 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 ==== Constraints
 
 *Type*: `integer`
-
-*Default*: `1024`
 
 ==== Description
 
