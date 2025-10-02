@@ -600,7 +600,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		if !found {
 			setBucketFieldsForEncoding(&r, isOver71)
 
-			if !atLeast80 && r.BucketType == constants.BucketTypeCouchbase && r.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+			if !atLeast80 {
 				r.NumVBuckets = nil
 			}
 
