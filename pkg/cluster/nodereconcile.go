@@ -890,27 +890,28 @@ type allMetrics struct {
 }
 
 // getMetrics retrives metrics for data, index and views services.
-func getMetrics(c *Cluster) (allMetrics, error) {
-	idxMetrics := couchbaseutil.StatsRangeMetrics{}
-	if err := couchbaseutil.GetStatsRangeAvgMetrics("index", &idxMetrics).On(c.api, c.readyMembers()); err != nil {
-		return allMetrics{}, fmt.Errorf("%w: error getting index metrics", err)
+
+func getMetrics(c *Cluster) allMetrics {
+	getServiceMetrics := func(serviceName string) couchbaseutil.StatsRangeMetrics {
+		metrics := couchbaseutil.StatsRangeMetrics{}
+		if err := couchbaseutil.GetStatsRangeAvgMetrics(serviceName, &metrics).On(c.api, c.readyMembers()); err != nil {
+			log.V(1).Info("Error getting "+serviceName+" metrics when server class removal queue is being populated", "cluster", c.namespacedName(), "error", err)
+		}
+		if serviceName == "index" {
+			metrics = couchbaseutil.StatsRangeMetrics{}
+		}
+		return metrics
 	}
 
-	dataMetrics := couchbaseutil.StatsRangeMetrics{}
-	if err := couchbaseutil.GetStatsRangeAvgMetrics("data", &dataMetrics).On(c.api, c.readyMembers()); err != nil {
-		return allMetrics{}, fmt.Errorf("%w: error getting data metrics", err)
+	return allMetrics{
+		idx:  getServiceMetrics("index"),
+		data: getServiceMetrics("data"),
+		view: getServiceMetrics("views"),
 	}
-
-	viewsMetrics := couchbaseutil.StatsRangeMetrics{}
-	if err := couchbaseutil.GetStatsRangeAvgMetrics("views", &viewsMetrics).On(c.api, c.readyMembers()); err != nil {
-		return allMetrics{}, fmt.Errorf("%w: error getting views metrics", err)
-	}
-
-	return allMetrics{idx: idxMetrics, data: dataMetrics, view: viewsMetrics}, nil
 }
 
-func parseSizePerMember(memberName string, allmetrices allMetrics) (float64, error) {
-	sizeByService := func(sm couchbaseutil.StatsRangeMetrics) (float64, error) {
+func parseSizePerMember(memberName string, allmetrices allMetrics) float64 {
+	sizeByService := func(sm couchbaseutil.StatsRangeMetrics) float64 {
 		var size float64
 
 		for _, data := range sm.Data {
@@ -928,7 +929,7 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) (float64, err
 				if ok {
 					i, err := strconv.ParseFloat(s, 64)
 					if err != nil {
-						return 0, fmt.Errorf("%w: error converting %s to float64 format", err, s)
+						log.V(1).Info("Error parsing size to float64 format", "error", err)
 					}
 
 					size += i
@@ -936,25 +937,10 @@ func parseSizePerMember(memberName string, allmetrices allMetrics) (float64, err
 			}
 		}
 
-		return size, nil
+		return size
 	}
 
-	idxSize, err := sizeByService(allmetrices.idx)
-	if err != nil {
-		return 0, err
-	}
-
-	dataSize, err := sizeByService(allmetrices.data)
-	if err != nil {
-		return 0, err
-	}
-
-	viewSize, err := sizeByService(allmetrices.view)
-	if err != nil {
-		return 0, err
-	}
-
-	return idxSize + dataSize + viewSize, nil
+	return sizeByService(allmetrices.idx) + sizeByService(allmetrices.data) + sizeByService(allmetrices.view)
 }
 
 // populateRemovalQueuePerServerClass enqueues pod(server) names which are version 7.0+.
@@ -996,16 +982,10 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	memberToSize := map[string]float64{}
 	memNames := make([]string, 0, len(memberToSize))
 
-	allm, err := getMetrics(c)
-	if err != nil {
-		return err
-	}
+	allm := getMetrics(c)
 
 	for name := range remainingMembers {
-		size, err := parseSizePerMember(name, allm)
-		if err != nil {
-			return fmt.Errorf("%w: error calculating member disk size", err)
-		}
+		size := parseSizePerMember(name, allm)
 
 		memberToSize[name] = size
 
