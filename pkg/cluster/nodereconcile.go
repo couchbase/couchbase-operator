@@ -1229,6 +1229,10 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	return nil
 }
 
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+	return c.selectUpgradeCandidates(candidates, "")
+}
+
 // selectUpgradeCandidates applies an upgrade heuristic to the set of all upgradable pods
 // and filters this down into a set of pods that will be upgraded this turn.
 func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, orchestrator string) (couchbaseutil.MemberSet, error) {
@@ -1236,7 +1240,7 @@ func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, or
 	// be increased to an absolute number or a relative size of the cluster.
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
 		// Remove orchestrator from list if rolling upgrade
-		if len(candidates) != 1 {
+		if len(candidates) != 1 && orchestrator != "" {
 			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
 		}
 
@@ -1728,14 +1732,8 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		}
 	}
 
-	clusterInfo := &couchbaseutil.TerseClusterInfo{}
-	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
-
-	orchestratorName := clusterInfo.Orchestrator
-
-	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
+	constrained, err := c.selectUpgradeCandidatesIgnoringOrchestrator(candidates)
 
 	if err != nil {
 		return err

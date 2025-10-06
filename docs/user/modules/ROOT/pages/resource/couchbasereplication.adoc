@@ -75,7 +75,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasereplications-spec-mobile,mobile>>: ""
   <<couchbasereplications-spec-networkusagelimit,networkUsageLimit>>: 0
   <<couchbasereplications-spec-optimisticreplicationthreshold,optimisticReplicationThreshold>>: 0
-  <<couchbasereplications-spec-pauserequested,pauseRequested>>: false
+  <<couchbasereplications-spec-paused,paused>>: false
   <<couchbasereplications-spec-priority,priority>>: ""
   <<couchbasereplications-spec-remotebucket,remoteBucket>>: ""
   <<couchbasereplications-spec-retryonremoteautherr,retryOnRemoteAuthErr>>: false
@@ -890,7 +890,7 @@ NetworkUsageLimit is the upper limit for replication network usage (MB/s).
 
 OptimisticReplicationThreshold is the size threshold below which documents replicate optimistically.
 
-=== couchbasereplications.spec.pauseRequested
+=== couchbasereplications.spec.paused
 
 ==== Constraints
 

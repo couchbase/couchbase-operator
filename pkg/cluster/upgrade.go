@@ -83,6 +83,21 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 		}
 	}
 
+	if finalCandidates.Size() == selectionSize {
+		return finalCandidates
+	}
+
+	// If the orchestrator is in the candidates list, then separate it from the rest and add it at the end
+	var orchestrator couchbaseutil.Member
+
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		log.Error(err, "failed to get cluster info")
+	} else {
+		orchestratorName := clusterInfo.Orchestrator
+		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
+	}
+
 	// Go through the rest in alphabetical order
 	sortedNodes := candidates.Names()
 	sort.Strings(sortedNodes)
@@ -95,6 +110,10 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 		if !finalCandidates.Contains(node) {
 			finalCandidates.Add(candidates[node])
 		}
+	}
+
+	if orchestrator != nil && finalCandidates.Size() < selectionSize {
+		finalCandidates.Add(orchestrator)
 	}
 
 	return finalCandidates
@@ -191,6 +210,10 @@ func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
 	allCandidates, err := c.needsUpgrade()
 	if err != nil {
 		return nil, err
+	}
+
+	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
+		return allCandidates, nil
 	}
 
 	numOldPods := allCandidates.Size()

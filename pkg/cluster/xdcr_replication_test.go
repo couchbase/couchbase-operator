@@ -18,7 +18,7 @@ var replicationSpec = couchbasev2.CouchbaseReplicationSpec{
 		s := ""
 		return &s
 	}(),
-	PauseRequested: func() *bool {
+	Paused: func() *bool {
 		s := false
 		return &s
 	}(),

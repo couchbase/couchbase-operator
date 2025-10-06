@@ -2023,7 +2023,7 @@ type CouchbaseReplicationSpec struct {
 
 	// PauseRequested indicates whether the replication has been issued a pause request.
 	// +kubebuilder:default=false
-	PauseRequested *bool `json:"pauseRequested,omitempty"`
+	Paused *bool `json:"paused,omitempty"`
 
 	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
 	// Nil values can be used to explicitly unset merge functions for specific collections.

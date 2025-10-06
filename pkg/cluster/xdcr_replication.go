@@ -763,7 +763,7 @@ func (c *Cluster) buildCreateFromSpec(spec *couchbasev2.CouchbaseReplicationSpec
 		FilterSkipRestream: spec.FilterSkipRestream,
 
 		// Legacy core fields (can be set during creation)
-		PauseRequested:   spec.PauseRequested,
+		PauseRequested:   spec.Paused,
 		ExplicitMapping:  spec.CollectionsExplicitMapping,
 		MigrationMapping: spec.CollectionsMigrationMode,
 		MappingRules:     convertColMappingRules(spec.ColMappingRules),
@@ -807,7 +807,7 @@ func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSp
 	var dest couchbaseutil.ReplicationSettings
 
 	// Legacy core fields (map from CRD spec to ReplicationSettings)
-	dest.PauseRequested = spec.PauseRequested
+	dest.PauseRequested = spec.Paused
 	dest.CollectionsExplicitMapping = spec.CollectionsExplicitMapping
 	dest.CollectionsMigrationMode = spec.CollectionsMigrationMode
 	dest.ColMappingRules = convertColMappingRules(spec.ColMappingRules)
