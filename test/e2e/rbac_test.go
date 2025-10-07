@@ -1314,11 +1314,22 @@ func TestRBACUpdateUser(t *testing.T) {
 	user, group, _ := mustCreateBoundUser(t, kubernetes)
 	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, 4*time.Minute)
 
-	locked := true
-	e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/locked", &locked), time.Minute)
+	fullName := "Administrator"
+	e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/fullName", &fullName), time.Minute)
 
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 1*time.Minute)
-	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Locked", &locked), time.Minute)
+	e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Name", fullName), time.Minute)
+
+	patchCycles := 1
+
+	if isAtleast80, err := couchbaseutil.VersionAfter(e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion), "8.0.0"); err == nil && isAtleast80 {
+		locked := true
+		e2eutil.MustPatchUser(t, kubernetes, user, jsonpatch.NewPatchSet().Replace("/spec/locked", &locked), time.Minute)
+
+		e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), 1*time.Minute)
+		e2eutil.MustPatchUserInfo(t, kubernetes, cluster, user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), jsonpatch.NewPatchSet().Test("/Locked", &locked), time.Minute)
+		patchCycles++
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1327,7 +1338,7 @@ func TestRBACUpdateUser(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
+		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonUserEdited}},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 
