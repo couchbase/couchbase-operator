@@ -13,7 +13,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
-
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -708,10 +708,13 @@ type CurrentReplicationState struct {
 func (c *Cluster) BuildDesiredReplicationStates() (map[string]DesiredReplicationState, error) {
 	states := make(map[string]DesiredReplicationState)
 
-	for _, remoteCluster := range c.cluster.Spec.XDCR.RemoteClusters {
-		// Get all replications that match this remote cluster's selector
-		apiReplications := c.k8s.CouchbaseReplications.List()
+	// Check if scopes and collections are supported for migration replications
+	xdcrScopesAndCollectionsSupported, err := c.isScopesAndCollectionsSupported()
+	if err != nil {
+		return nil, err
+	}
 
+	for _, remoteCluster := range c.cluster.Spec.XDCR.RemoteClusters {
 		// Convert the label selector.
 		selector := labels.Everything()
 
@@ -722,37 +725,134 @@ func (c *Cluster) BuildDesiredReplicationStates() (map[string]DesiredReplication
 			}
 		}
 
-		// Build states for matching replications
-		for _, replication := range apiReplications {
-			if !selector.Matches(labels.Set(replication.Labels)) {
-				continue
+		// Compute the operator-managed remote cluster name deterministically.
+		generatedName := remoteCluster.Name + RemoteClusterOperatorManagedSuffix
+
+		// Process migration replications first (if supported)
+		if xdcrScopesAndCollectionsSupported {
+			if err := c.processMigrationReplications(selector, generatedName, states); err != nil {
+				return nil, err
 			}
+		}
 
-			// Compute the operator-managed remote cluster name deterministically.
-			generatedName := remoteCluster.Name + RemoteClusterOperatorManagedSuffix
-
-			// Build creation struct (only creation-supported fields)
-			create := c.buildCreateFromSpec(&replication.Spec, generatedName)
-
-			// Build settings struct (all per-replication settings)
-			settings := c.buildSettingsFromSpec(&replication.Spec)
-
-			key := replicationKey(create)
-			states[key] = DesiredReplicationState{
-				Create:        create,
-				Settings:      settings,
-				CRDName:       replication.Name,
-				RemoteCluster: generatedName,
-				Key:           key,
-			}
+		// Process regular replications
+		if err := c.processRegularReplications(selector, generatedName, xdcrScopesAndCollectionsSupported, states); err != nil {
+			return nil, err
 		}
 	}
 
 	return states, nil
 }
 
+// processMigrationReplications processes CouchbaseMigrationReplication resources.
+func (c *Cluster) processMigrationReplications(selector labels.Selector, generatedName string, states map[string]DesiredReplicationState) error {
+	apiMigrations := c.k8s.CouchbaseMigrationReplications.List()
+
+	for _, migration := range apiMigrations {
+		if !selector.Matches(labels.Set(migration.Labels)) {
+			continue
+		}
+
+		// Populate spec from annotations (allows annotation-based overrides)
+		// Errors are logged but don't stop processing
+		if err := annotations.Populate(&migration.Spec, migration.Annotations); err != nil {
+			log.Error(err, "failed to populate migration with annotation")
+		}
+
+		// Build creation struct for migration
+		create := c.buildReplicationCreatePayload(&migration.Spec, generatedName)
+
+		// Enable migration mode - this tells the server to migrate documents from the
+		// default collection to collections determined by the mapping rules
+		migrationTrue := true
+		create.MigrationMapping = &migrationTrue
+
+		// Generate migration mapping rules from CouchbaseMigrationReplication.MigrationMapping.Mappings
+		// These rules specify which documents (via filter expressions) go to which target collections
+		rules, err := generateMigrationMappingRules(migration)
+		if err != nil {
+			return fmt.Errorf("%w: invalid migration replication for %s", errors.NewStackTracedError(err), replicationKey(create))
+		}
+		create.MappingRules = convertColMappingRulesFromJSON(rules)
+
+		// Build settings struct and propagate migration mode
+		settings := c.buildSettingsFromSpec(&migration.Spec)
+		settings.CollectionsMigrationMode = create.MigrationMapping
+
+		key := replicationKey(create)
+		if _, exists := states[key]; exists {
+			return fmt.Errorf("%w: duplicate migration replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
+		}
+		states[key] = DesiredReplicationState{
+			Create:        create,
+			Settings:      settings,
+			CRDName:       migration.Name,
+			RemoteCluster: generatedName,
+			Key:           key,
+		}
+	}
+
+	return nil
+}
+
+// processRegularReplications processes CouchbaseReplication resources.
+func (c *Cluster) processRegularReplications(selector labels.Selector, generatedName string, xdcrScopesAndCollectionsSupported bool, states map[string]DesiredReplicationState) error {
+	apiReplications := c.k8s.CouchbaseReplications.List()
+
+	for _, replication := range apiReplications {
+		if !selector.Matches(labels.Set(replication.Labels)) {
+			continue
+		}
+
+		// Populate spec from annotations (allows annotation-based overrides)
+		// Errors are logged but don't stop processing
+		if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
+			log.Error(err, "failed to populate replication with annotation")
+		}
+
+		// Build creation struct (only creation-supported fields)
+		create := c.buildReplicationCreatePayload(&replication.Spec, generatedName)
+
+		// Build settings struct (all per-replication settings)
+		settings := c.buildSettingsFromSpec(&replication.Spec)
+
+		// Handle explicit mapping rules from CouchbaseReplication.ExplicitMapping
+		// Explicit mapping allows replicating specific collections to specific target collections,
+		// with allow rules (replicate A->B) and deny rules (don't replicate C)
+		if xdcrScopesAndCollectionsSupported && (len(replication.ExplicitMapping.AllowRules) > 0 || len(replication.ExplicitMapping.DenyRules) > 0) {
+			rules, err := generateExplicitMappingRules(replication)
+			if err != nil {
+				return fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), replicationKey(create))
+			}
+
+			if rules != "{}" {
+				// Enable explicit mapping mode and set the mapping rules
+				explicitTrue := true
+				create.ExplicitMapping = &explicitTrue
+				create.MappingRules = convertColMappingRulesFromJSON(rules)
+				settings.CollectionsExplicitMapping = &explicitTrue
+				settings.ColMappingRules = create.MappingRules
+			}
+		}
+
+		key := replicationKey(create)
+		if _, exists := states[key]; exists {
+			return fmt.Errorf("%w: duplicate replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
+		}
+		states[key] = DesiredReplicationState{
+			Create:        create,
+			Settings:      settings,
+			CRDName:       replication.Name,
+			RemoteCluster: generatedName,
+			Key:           key,
+		}
+	}
+
+	return nil
+}
+
 // buildCreateFromSpec builds the creation API struct from a CRD spec (only creation-supported fields).
-func (c *Cluster) buildCreateFromSpec(spec *couchbasev2.CouchbaseReplicationSpec, remoteClusterName string) couchbaseutil.Replication {
+func (c *Cluster) buildReplicationCreatePayload(spec *couchbasev2.CouchbaseReplicationSpec, remoteClusterName string) couchbaseutil.Replication {
 	replication := couchbaseutil.Replication{
 		// Core immutable fields
 		FromBucket:         string(spec.Bucket),
@@ -763,10 +863,7 @@ func (c *Cluster) buildCreateFromSpec(spec *couchbasev2.CouchbaseReplicationSpec
 		FilterSkipRestream: spec.FilterSkipRestream,
 
 		// Legacy core fields (can be set during creation)
-		PauseRequested:   spec.Paused,
-		ExplicitMapping:  spec.CollectionsExplicitMapping,
-		MigrationMapping: spec.CollectionsMigrationMode,
-		MappingRules:     convertColMappingRules(spec.ColMappingRules),
+		PauseRequested: spec.Paused,
 
 		// Advanced settings supported during replication creation (from createReplication API docs)
 		CompressionType:                spec.CompressionType,
@@ -787,7 +884,6 @@ func (c *Cluster) buildCreateFromSpec(spec *couchbasev2.CouchbaseReplicationSpec
 		StatsInterval:                  spec.StatsInterval,
 		LogLevel:                       spec.LogLevel,
 		NetworkUsageLimit:              spec.NetworkUsageLimit,
-		Mobile:                         spec.Mobile,
 	}
 
 	// Add version-specific fields
@@ -808,9 +904,6 @@ func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSp
 
 	// Legacy core fields (map from CRD spec to ReplicationSettings)
 	dest.PauseRequested = spec.Paused
-	dest.CollectionsExplicitMapping = spec.CollectionsExplicitMapping
-	dest.CollectionsMigrationMode = spec.CollectionsMigrationMode
-	dest.ColMappingRules = convertColMappingRules(spec.ColMappingRules)
 
 	// Global / Per-replication advanced settings (from CRD spec)
 	dest.CompressionType = spec.CompressionType
@@ -1145,14 +1238,22 @@ func (c *Cluster) reconcileXDCR() error {
 	return c.updateCreateDeleteXDCRReplications(currentReplications)
 }
 
-// convertColMappingRules converts API ColMappingRules to util ColMappingRules.
-func convertColMappingRules(apiRules *couchbasev2.ColMappingRules) *couchbaseutil.ColMappingRules {
-	if apiRules == nil {
+// convertColMappingRulesFromJSON converts a JSON string to ColMappingRules.
+// This is used for migration replications where rules are generated as JSON strings.
+func convertColMappingRulesFromJSON(jsonRules string) *couchbaseutil.ColMappingRules {
+	if jsonRules == "" || jsonRules == "{}" {
+		return nil
+	}
+
+	var rulesMap map[string]*string
+	if err := json.Unmarshal([]byte(jsonRules), &rulesMap); err != nil {
+		// If unmarshal fails, return nil (should not happen with valid generateMigrationMappingRules output)
 		return nil
 	}
 
 	utilRules := make(couchbaseutil.ColMappingRules)
-	for k, v := range *apiRules {
+	for k, v := range rulesMap {
+		// Directly assign the pointer, which can be nil
 		utilRules[k] = v
 	}
 

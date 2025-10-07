@@ -33,9 +33,6 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbasereplications-spec,spec>>:
   <<couchbasereplications-spec-bucket,bucket>>: ""
   <<couchbasereplications-spec-checkpointinterval,checkpointInterval>>: 0
-  <<couchbasereplications-spec-colmappingrules,colMappingRules>>:
-  <<couchbasereplications-spec-collectionsexplicitmapping,collectionsExplicitMapping>>: false
-  <<couchbasereplications-spec-collectionsmigrationmode,collectionsMigrationMode>>: false
   <<couchbasereplications-spec-collectionsosomode,collectionsOSOMode>>: false
   <<couchbasereplications-spec-compressiontype,compressionType>>: ""
   <<couchbasereplications-spec-conflictlogging,conflictLogging>>:
@@ -352,42 +349,6 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 ==== Description
 
 CheckpointInterval is the interval in seconds between checkpoints.
-
-=== couchbasereplications.spec.colMappingRules
-
-==== Constraints
-
-*Type*: `map[string]string`
-
-==== Description
-
-ColMappingRules defines collection-related rules for explicit mapping or migration.
-
-=== couchbasereplications.spec.collectionsExplicitMapping
-
-==== Constraints
-
-*Type*: `boolean`
-
-*Default*: `False`
-
-==== Description
-
-CollectionsExplicitMapping enables explicit mapping rules from colMappingRules.
-When true, replication uses explicit mapping rules and implicit bucket-level mapping does not occur.
-
-=== couchbasereplications.spec.collectionsMigrationMode
-
-==== Constraints
-
-*Type*: `boolean`
-
-*Default*: `False`
-
-==== Description
-
-CollectionsMigrationMode enables migration mode for default collection documents.
-When true, documents from source default collection are replicated to collections determined by mapping rules.
 
 === couchbasereplications.spec.collectionsOSOMode
 

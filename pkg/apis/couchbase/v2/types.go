@@ -1964,16 +1964,6 @@ type CouchbaseMigrationMapping struct {
 	TargetKeyspace CouchbaseReplicationKeyspace `json:"targetKeyspace"`
 }
 
-// ColMappingRules represents collection mapping rules for XDCR explicit mapping or migration.
-// It's a map where keys are source collections/scopes and values are target collections/scopes.
-// Nil values represent denial rules (don't replicate).
-// The rules follow Couchbase Server priority order:
-// Priority 0: scope.collection to scope.collection affirmation
-// Priority 1: scope.collection denial (null value)
-// Priority 2: scope to scope affirmation
-// Priority 3: scope denial (null value)
-type ColMappingRules map[string]*string
-
 // MergeFunctionMappingRules represents merge function mapping rules for XDCR conflict resolution.
 // It's a map where keys are collection specifiers (scope.collection) and values are merge function names.
 // Nil values can be used to explicitly unset merge functions for specific collections.
@@ -2003,19 +1993,6 @@ type CouchbaseReplicationSpec struct {
 	// === PER-REPLICATION MUTABLE SETTINGS (all pointers) ===
 
 	// Per-replication-only settings (cannot be set globally)
-
-	// ColMappingRules defines collection-related rules for explicit mapping or migration.
-	ColMappingRules *ColMappingRules `json:"colMappingRules,omitempty"`
-
-	// CollectionsExplicitMapping enables explicit mapping rules from colMappingRules.
-	// When true, replication uses explicit mapping rules and implicit bucket-level mapping does not occur.
-	// +kubebuilder:default=false
-	CollectionsExplicitMapping *bool `json:"collectionsExplicitMapping,omitempty"`
-
-	// CollectionsMigrationMode enables migration mode for default collection documents.
-	// When true, documents from source default collection are replicated to collections determined by mapping rules.
-	// +kubebuilder:default=false
-	CollectionsMigrationMode *bool `json:"collectionsMigrationMode,omitempty"`
 
 	// FilterExpression is a filter expression to match against documents in the source bucket.
 	// Each document that produces a successful match is replicated.
