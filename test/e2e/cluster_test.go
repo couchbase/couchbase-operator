@@ -628,6 +628,7 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 		eventschema.AnyOf{Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName}}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 

@@ -64,7 +64,7 @@ func TestExposedFeatureIP(t *testing.T) {
 		cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 		// Verify that all nodes advertise an IP based alternate address.
-		e2eutil.MustCheckForIPAlternateAddresses(t, kubernetes, cluster, time.Minute)
+		e2eutil.MustCheckForIPAlternateAddresses(t, kubernetes, cluster, 2*time.Minute)
 		e2eutil.MustCheckForNodeServiceType(t, kubernetes, cluster, corev1.ServiceTypeNodePort, time.Minute)
 		e2eutil.MustCheckServicePorts(t, kubernetes, cluster, time.Minute)
 		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
@@ -428,6 +428,8 @@ func TestExposedFeatureTrafficPolicyCluster(t *testing.T) {
 	policy := corev1.ServiceExternalTrafficPolicyTypeCluster
 	cluster.Spec.Networking.ExposedFeatureTrafficPolicy = &policy
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

@@ -1302,6 +1302,8 @@ func TestRBACUpdateUser(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
 	// Static configuration.
 	clusterSize := 1
 

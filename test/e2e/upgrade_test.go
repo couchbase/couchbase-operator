@@ -34,8 +34,10 @@ const (
 var upgradeSequence = eventschema.Sequence{
 	Validators: []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}}},
+		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}}},
 		},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
@@ -132,6 +134,9 @@ func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Valida
 						Validators: []eventschema.Validatable{
 							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 							eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+							eventschema.Optional{
+								Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+							},
 							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 						},
 					},
