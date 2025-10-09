@@ -146,6 +146,34 @@ func (c *Cluster) getStatusFromTarget(target interface{}, members couchbaseutil.
 	return c.getStatusFromClusterInfo(info, members)
 }
 
+// getDownNodes returns a list of names for nodes that are down.
+// If there are no callable members, or an error occurs, this will return an empty list.
+func (c *Cluster) getDownNodes() []string {
+	info := &couchbaseutil.ClusterInfo{}
+
+	if len(c.callableMembers) == 0 {
+		return []string{}
+	}
+
+	if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.callableMembers); err != nil {
+		return []string{}
+	}
+
+	downNodes := []string{}
+	for i := range info.Nodes {
+		node := info.Nodes[i]
+
+		state, err := getNodeState(&node)
+		if err != nil || state != NodeStateDown {
+			continue
+		}
+
+		downNodes = append(downNodes, c.getNodeMemberName(c.callableMembers, &node))
+	}
+
+	return downNodes
+}
+
 // getStatusFromClusterInfo parses the Couchbase cluster status and makes it easier
 // to use.
 // nolint:gocognit
@@ -158,16 +186,8 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 	for i := range info.Nodes {
 		node := info.Nodes[i]
 
-		name := node.HostName.GetMemberName()
+		name := c.getNodeMemberName(members, &node)
 
-		if c.cluster.Spec.Networking.InitPodsWithNodeHostname && c.cluster.Spec.Networking.ImprovedHostNetwork {
-			for _, member := range members {
-				if member.GetHostName() == node.HostName {
-					name = member.Name()
-					break
-				}
-			}
-		}
 		// See if the member exists, if so the node is managed, otherwise it's come from
 		// some source we don't trust.
 		if _, ok := members[name]; !ok {
@@ -242,6 +262,20 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 	status.Balancing = info.RebalanceStatus == couchbaseutil.RebalanceStatusRunning
 
 	return status, nil
+}
+
+func (c *Cluster) getNodeMemberName(members couchbaseutil.MemberSet, node *couchbaseutil.NodeInfo) string {
+	name := node.HostName.GetMemberName()
+
+	if c.cluster.Spec.Networking.InitPodsWithNodeHostname && c.cluster.Spec.Networking.ImprovedHostNetwork {
+		for _, member := range members {
+			if member.GetHostName() == node.HostName {
+				return member.Name()
+			}
+		}
+	}
+
+	return name
 }
 
 func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) bool {

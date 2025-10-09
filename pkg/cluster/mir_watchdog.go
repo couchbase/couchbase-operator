@@ -198,22 +198,19 @@ func (w *mirWatchdog) checkForManualActionDownNodes(existingCondition *couchbase
 		return nil
 	}
 
-	status, err := w.cluster.GetStatusWithTimeout(20 * time.Second)
-	if err != nil {
+	downNodes := w.cluster.getDownNodes()
+	if len(downNodes) == 0 {
 		return nil
 	}
 
-	for memberName, nodeState := range status.NodeStates {
-		if nodeState != NodeStateDown {
-			continue
-		}
+	for _, downMember := range downNodes {
+		m, ok := w.cluster.members[downMember]
 
-		m, ok := w.cluster.members[memberName]
 		if !ok {
 			continue
 		}
 
-		r, _ := w.cluster.hasMemberRecoveryTimeElapsed(memberName)
+		r, _ := w.cluster.hasMemberRecoveryTimeElapsed(downMember)
 		if !r {
 			continue
 		}
