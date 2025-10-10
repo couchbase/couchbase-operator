@@ -64,7 +64,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
 		checkConstraintAdminSecret,
-		checkConstraintPrometheusAuthorizationSecret,
 		checkConstraintLoggingPermissible,
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
@@ -737,39 +736,6 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
-	}
-
-	return nil
-}
-
-// checkConstraintPrometheusAuthorizationSecret checks that if enabled, the Prometheus token
-// based authentication secret exists.  If it does then check that it includes a "token" key.
-func checkConstraintPrometheusAuthorizationSecret(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if !v.Options.ValidateSecrets {
-		return nil
-	}
-
-	if cluster.Spec.Monitoring == nil || cluster.Spec.Monitoring.Prometheus == nil {
-		return nil
-	}
-
-	if cluster.Spec.Monitoring.Prometheus.AuthorizationSecret == nil {
-		return nil
-	}
-
-	secretName := *cluster.Spec.Monitoring.Prometheus.AuthorizationSecret
-
-	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
-	if err != nil {
-		return err
-	}
-
-	if !found {
-		return fmt.Errorf("secret %s referenced by spec.monitoring.prometheus.authorizationSecret must exist", secretName)
-	}
-
-	if _, ok := secret.Data["token"]; !ok {
-		return fmt.Errorf("monitoring authorization secret %s must contain key 'token'", secretName)
 	}
 
 	return nil

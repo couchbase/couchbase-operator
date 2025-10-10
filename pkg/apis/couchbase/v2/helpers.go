@@ -374,20 +374,6 @@ func (cs *ClusterSpec) ConfigHasStatefulService(name string) bool {
 	return false
 }
 
-// Monitoring Image represents the image to use for metrics exporter for monitoring.
-// defaults to Spec.Image when provided then falls back to relatedImage env variable.
-func (cs *ClusterSpec) MetricsImage() string {
-	image := cs.Monitoring.Prometheus.Image
-
-	if annotatedImage, ok := os.LookupEnv(constants.EnvMetricsImageName); ok {
-		if cs.EnvImagePrecedence && annotatedImage != "" {
-			image = annotatedImage
-		}
-	}
-
-	return image
-}
-
 // CloudNativeGatewayImage represents the image to use for Cloud Native Gateway to access CB cluster.
 // defaults to Spec.Networking.CloudNativeGateway.Image when provided then falls back to relatedImage env variable.
 func (cs *ClusterSpec) CloudNativeGatewayImage() string {

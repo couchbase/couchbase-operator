@@ -1018,9 +1018,6 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 	// Note: anything using clients to look up state at this point, is probably doing
 	// it wrong, gut feeling.
 	// I agree,  That's why I'm removing it
-	if err := applyPodMonitoring(cluster, pod); err != nil {
-		return nil, err
-	}
 
 	// adding Cloud Native Gateway gRPC proxy for the cb cluster.
 	applyCloudNativeGateway(cluster, pod, &serverConfig)
@@ -1323,36 +1320,6 @@ func addSecretToPodVolume(container *v1.Container, pod *v1.Pod, volumeName, secr
 	)
 }
 
-// applyPodMonitoring adds any monitoring related hacks required to work.
-func applyPodMonitoring(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
-	// If monitoring is enabled add the necessary side cars.
-	if cluster.Spec.Monitoring == nil {
-		return nil
-	}
-
-	if cluster.Spec.Monitoring.Prometheus == nil {
-		return nil
-	}
-
-	if !cluster.Spec.Monitoring.Prometheus.Enabled {
-		return nil
-	}
-
-	metricsContainer := createMetricsContainer(cluster.Spec)
-
-	if err := applyMetricsPodSecurity(cluster.Spec, &metricsContainer, pod); err != nil {
-		return err
-	}
-
-	if cluster.IsTLSEnabled() {
-		applyMetricsPodTLS(cluster, &metricsContainer, pod)
-	}
-
-	pod.Spec.Containers = append(pod.Spec.Containers, metricsContainer)
-
-	return nil
-}
-
 func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *couchbasev2.ServerConfig) {
 	// Are we using a version of Server that has its own metrics exporter
 	serverVersionPrometheus := false
@@ -1362,8 +1329,6 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *cou
 		serverVersionPrometheus, _ = couchbaseutil.VersionAfter(tag, "7.0.0")
 	}
 
-	// Do we have the Prometheus exporter enabled
-	exporterEnabled := cluster.Spec.Monitoring != nil && cluster.Spec.Monitoring.Prometheus != nil && cluster.Spec.Monitoring.Prometheus.Enabled
 	// Do we have the logging side car enabled
 	loggingEnabled := cluster.Spec.Logging.Server != nil && cluster.Spec.Logging.Server.Enabled
 
@@ -1380,7 +1345,7 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *cou
 		if cluster.IsTLSEnabled() {
 			metricsPort = strconv.Itoa(AdminServicePortTLS)
 		}
-	} else if loggingEnabled && !exporterEnabled {
+	} else if loggingEnabled {
 		// logging metrics are only used if exporter and CBS 7 are not in place
 		metricsPath = "/api/v1/metrics/prometheus"
 		metricsPort = strconv.Itoa(loggingPort)
@@ -1395,7 +1360,7 @@ func applyMetadata(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, conf *cou
 	// Set up the annotations to apply by default
 	annotations := map[string]string{
 		// If we have at least one then we want to scrape, if not we want to make sure we disable scraping
-		constants.AnnotationPrometheusScrape: strconv.FormatBool(serverVersionPrometheus || exporterEnabled || loggingEnabled),
+		constants.AnnotationPrometheusScrape: strconv.FormatBool(serverVersionPrometheus || loggingEnabled),
 		constants.AnnotationPrometheusPath:   metricsPath,
 		constants.AnnotationPrometheusPort:   metricsPort,
 		constants.AnnotationPrometheusScheme: metricsScheme,
@@ -1717,67 +1682,6 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 	return nil
 }
 
-func applyMetricsPodTLS(cluster *couchbasev2.CouchbaseCluster, container *v1.Container, pod *v1.Pod) {
-	// Add the TLS server secret volume to the metrics pod
-	secretName := ClientTLSSecretName(cluster)
-	volume := v1.Volume{
-		Name: constants.CouchbaseTLSVolumeName + "-metrics",
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName: secretName,
-			},
-		},
-	}
-
-	// Mount the secret volume
-	pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
-	volumeMount := v1.VolumeMount{
-		Name:      constants.CouchbaseTLSVolumeName + "-metrics",
-		ReadOnly:  true,
-		MountPath: tlsSecretMountPath,
-	}
-
-	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-	container.ReadinessProbe.ProbeHandler.HTTPGet.Scheme = v1.URISchemeHTTPS
-	container.Args = append(container.Args,
-		"--ca", tlsSecretMountPath+"/ca.crt",
-		"--cert", tlsSecretMountPath+"/tls.crt",
-		"--key", tlsSecretMountPath+"/tls.key")
-
-	if cluster.IsMutualTLSEnabled() {
-		container.Args = append(container.Args,
-			"--client-cert", tlsSecretMountPath+"/mtls.crt",
-			"--client-key", tlsSecretMountPath+"/mtls.key")
-	}
-}
-
-func applyMetricsPodSecurity(cs couchbasev2.ClusterSpec, container *v1.Container, pod *v1.Pod) error {
-	// if bearer token is enabled for authorization, mount token as volume
-	if cs.Monitoring.Prometheus.AuthorizationSecret != nil {
-		volume := v1.Volume{
-			Name: "metrics-token",
-			VolumeSource: v1.VolumeSource{
-				Secret: &v1.SecretVolumeSource{
-					SecretName: *cs.Monitoring.Prometheus.AuthorizationSecret,
-				},
-			},
-		}
-		pod.Spec.Volumes = append(pod.Spec.Volumes, volume)
-
-		// Mount the secret volume
-		volumeMount := v1.VolumeMount{
-			Name:      "metrics-token",
-			ReadOnly:  true,
-			MountPath: metricsTokenMountPath,
-		}
-		container.VolumeMounts = append(container.VolumeMounts, volumeMount)
-
-		container.Args = append(container.Args, "--token", metricsTokenMountPath+"/token")
-	}
-
-	return nil
-}
-
 func createCouchbasePodLabels(memberName, clusterName string, ns couchbasev2.ServerConfig) map[string]string {
 	labels := map[string]string{
 		constants.LabelApp:      constants.App,
@@ -2040,94 +1944,6 @@ func createCloudNativeGatewayContainer(cluster *couchbasev2.CouchbaseCluster, po
 
 	if otlp := cluster.Spec.Networking.CloudNativeGateway.OTLP; otlp != nil && otlp.Endpoint != "" {
 		container.Args = append(container.Args, constants.CloudNativeGatewayOtlpFlag, otlp.Endpoint)
-	}
-
-	return container
-}
-
-func createMetricsContainer(cs couchbasev2.ClusterSpec) v1.Container {
-	var resources v1.ResourceRequirements
-
-	if cs.Monitoring.Prometheus.Resources != nil {
-		resources = *cs.Monitoring.Prometheus.Resources
-	}
-
-	// Check for no value and set to 60
-	if cs.Monitoring.Prometheus.RefreshRate <= 0 {
-		cs.Monitoring.Prometheus.RefreshRate = 60
-	}
-
-	// We added a readiness probe check a long time ago that is not permissioned
-	// For some reason it never got used
-	readinessCheckURL := "/readiness-probe"
-
-	var expImgVerAft180 bool
-
-	expImgVer, err := CouchbaseVersion(cs.Monitoring.Prometheus.Image)
-	if err == nil {
-		expImgVerAft180, _ = couchbaseutil.VersionAfter(expImgVer, "1.0.8")
-	}
-
-	if cs.Monitoring.Prometheus.Enabled && expImgVerAft180 {
-		readinessCheckURL = readinessProbeEndpointPath
-	}
-
-	container := v1.Container{
-		Name:  MetricsContainerName,
-		Image: cs.MetricsImage(),
-		Env: []v1.EnvVar{
-			{
-				Name: "COUCHBASE_OPERATOR_USER",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: cs.Security.AdminSecret,
-						},
-						Key: "username",
-					},
-				},
-			},
-			{
-				Name: "COUCHBASE_OPERATOR_PASS",
-				ValueFrom: &v1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: cs.Security.AdminSecret,
-						},
-						Key: "password",
-					},
-				},
-			},
-		},
-		Ports: []v1.ContainerPort{
-			{
-				Name:          "prometheus",
-				ContainerPort: int32(prometheusPort),
-				Protocol:      v1.ProtocolTCP,
-			},
-		},
-		ReadinessProbe: &v1.Probe{
-			ProbeHandler: v1.ProbeHandler{
-				HTTPGet: &v1.HTTPGetAction{
-					Path: readinessCheckURL,
-					Port: intstr.IntOrString{
-						Type:   intstr.Int,
-						IntVal: prometheusPort,
-					},
-					Scheme: v1.URISchemeHTTP,
-				},
-			},
-			InitialDelaySeconds: 10,
-			TimeoutSeconds:      5,
-			PeriodSeconds:       10,
-			FailureThreshold:    3,
-		},
-		Resources: resources,
-		Args:      []string{"--per-node-refresh", fmt.Sprintf("%d", cs.Monitoring.Prometheus.RefreshRate)},
-	}
-
-	if cs.Security.SecurityContext != nil {
-		container.SecurityContext = cs.Security.SecurityContext
 	}
 
 	return container

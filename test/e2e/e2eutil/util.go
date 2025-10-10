@@ -273,10 +273,6 @@ func applyAuditing(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.Co
 	cluster.Spec.Logging.Audit = config
 }
 
-func applyMonitoring(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CouchbaseClusterMonitoringSpec) {
-	cluster.Spec.Monitoring = config
-}
-
 // applyAnnotations optionally applies custom annotations to cluster pods.
 func applyAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[string]string) {
 	if annotations == nil {
@@ -341,8 +337,6 @@ type ClusterOptions struct {
 	LogStreaming *couchbasev2.CouchbaseClusterLoggingConfigurationSpec
 
 	AuditConfiguration *couchbasev2.CouchbaseClusterAuditLoggingSpec
-
-	MonitoringConfiguration *couchbasev2.CouchbaseClusterMonitoringSpec
 
 	CloudNativeGateway *couchbasev2.CloudNativeGateway
 
@@ -517,20 +511,6 @@ func (o *ClusterOptions) WithAuditing(garbageCollection AuditGarbageCollection) 
 	return o
 }
 
-func (o *ClusterOptions) WithMonitoring() *ClusterOptions {
-	o.MonitoringConfiguration = &couchbasev2.CouchbaseClusterMonitoringSpec{
-		Prometheus: &couchbasev2.CouchbaseClusterMonitoringPrometheusSpec{
-			Enabled: true,
-		},
-	}
-
-	if imageName := strings.TrimSpace(o.Options.MonitoringImage); imageName != "" {
-		o.MonitoringConfiguration.Prometheus.Image = imageName
-	}
-
-	return o
-}
-
 // WithTLS sets the cluster as having TLS configured.
 func (o *ClusterOptions) WithTLS(tls *TLSContext) *ClusterOptions {
 	o.TLS = tls
@@ -616,7 +596,6 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyGenericNetworking(cluster, o.GenericNetworking)
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)
-	applyMonitoring(cluster, o.MonitoringConfiguration)
 	applyAnnotations(cluster, o.Annotations)
 	applyCloudNativeGateway(cluster, o.CloudNativeGateway)
 
