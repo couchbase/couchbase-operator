@@ -2000,6 +2000,11 @@ func shouldRebalance(c *Cluster, r *ReconcileMachine) bool {
 		return false
 	}
 
+	return canRebalance(c, r)
+}
+
+// canRebalance checks if the cluster can be rebalanced. Pending members are ones that have been added to the cluster but not balanced in. We may want to avoid rebalancing the cluster if these pending members are still waiting for checks to pass.
+func canRebalance(c *Cluster, r *ReconcileMachine) bool {
 	// If the allowExternallyUnreachablePods flag is set, we will rebalance the cluster if all the pending members have had their DNS check delay elapsed.
 	// If it is not set, we will only rebalance if there are no pending members that have not been activated in the cluster.
 	if c.cluster.Spec.Networking.AllowExternallyUnreachablePods != nil && *c.cluster.Spec.Networking.AllowExternallyUnreachablePods {
@@ -2023,6 +2028,11 @@ func shouldRebalance(c *Cluster, r *ReconcileMachine) bool {
 // Dead members are members that the operator is tracking, but do not have a
 // corresponding running pod.
 func (r *ReconcileMachine) handleDeadMembers(c *Cluster) error {
+	// If we can't rebalance, we should not destroy eject members as they won't be ejected safely from the cluster yet.
+	if !canRebalance(c, r) {
+		return nil
+	}
+
 	for name := range r.ejectMembers {
 		if err := c.destroyMember(name, r.shouldRemoveVolumes(name)); err != nil {
 			return fmt.Errorf("failed to remove dead members: %w", err)

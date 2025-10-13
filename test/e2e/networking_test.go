@@ -901,3 +901,84 @@ func TestAllowExternallyUnreachablePodsActivatesUnreachablePods(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestPodUpgradesWaitForDNSAvailableBeforeEjection tests that ejected pods are not destroyed if we aren't able to rebalance the cluster, such
+// as during an upgrade where we are waiting for the DNS check delay to elapse for new pods.
+func TestPodUpgradesWaitForDNSAvailableBeforeEjection(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	testDomain := "dnstest.com"
+
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+	clusterSize := constants.Size2
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = clusterName
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	networking := couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 10 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 2 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	cluster.Spec.Networking = networking
+	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
+
+	// Once the pods have been created, we can add them to the dns forwarding list. This might take some time to propagate.
+	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Check the pods are marked as ready after the dns check delay has elapsed.
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[0].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+
+	// Check the DNS alternate addresses have been added to the cluster.
+	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, testDomain, 2*time.Minute)
+	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, testDomain, time.Minute)
+
+	// Start an upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// We'll need to wait for the new pods to be created before adding them to the dns forwarding list.
+	for range clusterSize {
+		pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize+1, 2*time.Minute)
+		e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods)
+		e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, 2*time.Minute)
+	}
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+	pods = e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+
+	// Check that the pods are marked as ready.
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[0].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
+
+	// Check that the cluster is on the upgrade version.
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect and there are no adverse ones caused by the non-blocking DNS propagation.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

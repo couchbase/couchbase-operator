@@ -324,6 +324,7 @@ func registerTests() {
 		framework.NewTestDef(TestUpdatingAlternateAddressExternalDNSCheckDoesNotEjectActivatedNodes).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestAlternateAddressExternalDNSCheckEjectsNewPods).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestAllowExternallyUnreachablePodsActivatesUnreachablePods).WithTags(TagSuiteP0, TagFeatureNetwork),
+		framework.NewTestDef(TestPodUpgradesWaitForDNSAvailableBeforeEjection).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureServiceTypeModify).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestConsoleServiceDNS).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestConsoleServiceDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
