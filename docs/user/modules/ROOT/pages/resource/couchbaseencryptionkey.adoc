@@ -45,7 +45,6 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseencryptionkeys-spec-usage-configuration,configuration>>: True
     <<couchbaseencryptionkeys-spec-usage-key,key>>: True
     <<couchbaseencryptionkeys-spec-usage-log,log>>: True
-    <<couchbaseencryptionkeys-spec-usage-managedbucketselection,managedBucketSelection>>: false
 ----
 
 == couchbaseencryptionkeys.apiVersion
@@ -367,7 +366,7 @@ VerifyWithSystemCA defines whether to verify with system CA.
 
 *Type*: `object`
 
-*Default*: `{'allBuckets': True, 'audit': True, 'configuration': True, 'key': True, 'log': True, 'managedBucketSelection': False}`
+*Default*: `{'allBuckets': True, 'audit': True, 'configuration': True, 'key': True, 'log': True}`
 
 ==== Description
 
@@ -442,13 +441,3 @@ Key defines whether the key should be used for keys.
 ==== Description
 
 Log defines whether the key should be used for logs.
-
-=== couchbaseencryptionkeys.spec.usage.managedBucketSelection
-
-==== Constraints
-
-*Type*: `boolean`
-
-==== Description
-
-ManagedBucketSelection defines whether the key should be used for managed bucket selection.

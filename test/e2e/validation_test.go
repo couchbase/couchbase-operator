@@ -4780,12 +4780,11 @@ func TestValidationEncryptionKey(t *testing.T) {
 		{
 			name: "TestEncryptionKeyEmptyUsage",
 			mutations: patchMap{"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage", couchbasev2.CouchbaseEncryptionKeyUsage{
-				Configuration:          false,
-				Key:                    false,
-				Log:                    false,
-				Audit:                  false,
-				AllBuckets:             false,
-				ManagedBucketSelection: false,
+				Configuration: false,
+				Key:           false,
+				Log:           false,
+				Audit:         false,
+				AllBuckets:    false,
 			})},
 			shouldFail:     true,
 			expectedErrors: []string{"at least one usage field must be set to true in spec.usage"},
@@ -4822,12 +4821,11 @@ func TestValidationEncryptionKeyCreate(t *testing.T) {
 		{
 			name: "TestEncryptionKeyEmptyUsage",
 			mutations: patchMap{"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage", couchbasev2.CouchbaseEncryptionKeyUsage{
-				Configuration:          false,
-				Key:                    false,
-				Log:                    false,
-				Audit:                  false,
-				AllBuckets:             false,
-				ManagedBucketSelection: false,
+				Configuration: false,
+				Key:           false,
+				Log:           false,
+				Audit:         false,
+				AllBuckets:    false,
 			})},
 			shouldFail:     true,
 			expectedErrors: []string{"at least one usage field must be set to true in spec.usage"},
@@ -5209,7 +5207,7 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 		{
 			name: "TestEncryptionAtRestKeyWithoutBucketUsage",
 			mutations: patchMap{
-				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage/allBuckets", false).Replace("/spec/usage/managedBucketSelection", false),
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage/allBuckets", false),
 				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
 					Managed: true,
 				}),
@@ -5232,24 +5230,6 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 			},
 			shouldFail:     true,
 			expectedErrors: []string{"encryption key non-existent-key does not exist"},
-		},
-		{
-			name: "TestEncryptionAtRestKeyWithOnlyBucketUsageAndNoBucket",
-			mutations: patchMap{
-				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/usage", &couchbasev2.CouchbaseEncryptionKeyUsage{
-					ManagedBucketSelection: true,
-					AllBuckets:             false,
-					Configuration:          false,
-					Key:                    false,
-					Log:                    false,
-					Audit:                  false,
-				}),
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-				}),
-			},
-			shouldFail:     true,
-			expectedErrors: []string{"encryption key auto-generated-key-1 is not used on any buckets. If only bucket usage is enabled, it must be used on at least one bucket"},
 		},
 		{
 			name: "TestBucketEncryptionAtRestRotationIntervalTooShort",

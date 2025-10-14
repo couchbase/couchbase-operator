@@ -3690,7 +3690,7 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 	usage := key.GetUsage()
 
 	// Check that at least one of the usage values is true
-	if !usage.Configuration && !usage.Key && !usage.Log && !usage.Audit && !usage.AllBuckets && !usage.ManagedBucketSelection {
+	if !usage.Configuration && !usage.Key && !usage.Log && !usage.Audit && !usage.AllBuckets {
 		errs = append(errs, fmt.Errorf("at least one usage field must be set to true in spec.usage"))
 	}
 
@@ -5594,8 +5594,6 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 		return err
 	}
 
-	usedKeys := make(map[string]bool)
-
 	// First check that the bucket is using an encryption key that exists
 	for _, bucket := range couchbaseBuckets.Items {
 		if bucket.Spec.EncryptionAtRest == nil || bucket.Spec.EncryptionAtRest.KeyName == "" {
@@ -5617,29 +5615,14 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 			}
 		}
 
-		// Mark the key as used for the second check
-		usedKeys[bucket.Spec.EncryptionAtRest.KeyName] = true
-
 		key, found := keyMap[bucket.Spec.EncryptionAtRest.KeyName]
 		if !found {
 			errs = append(errs, fmt.Errorf("encryption key %s does not exist or is not selected by the encryption at rest selector", bucket.Spec.EncryptionAtRest.KeyName))
 			continue
 		}
 
-		if !key.Spec.Usage.AllBuckets && !key.Spec.Usage.ManagedBucketSelection {
+		if !key.Spec.Usage.AllBuckets {
 			errs = append(errs, fmt.Errorf("encryption key %s does not have bucket usage enabled", bucket.Spec.EncryptionAtRest.KeyName))
-			continue
-		}
-	}
-
-	// Now we need to check that if an encryption key only has bucket usage enabled then it is used on at least one bucket
-	for _, key := range keyMap {
-		if !key.Spec.Usage.ManagedBucketSelection || key.Spec.Usage.AllBuckets || key.Spec.Usage.Configuration || key.Spec.Usage.Key || key.Spec.Usage.Log || key.Spec.Usage.Audit {
-			continue
-		}
-
-		if !usedKeys[key.Name] {
-			errs = append(errs, fmt.Errorf("encryption key %s is not used on any buckets. If only bucket usage is enabled, it must be used on at least one bucket", key.Name))
 			continue
 		}
 	}

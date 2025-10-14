@@ -10,7 +10,6 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util"
-	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -237,11 +236,6 @@ func (c *Cluster) createAndUpdateEncryptionKeys(requestedKeys []*couchbasev2.Cou
 		return err
 	}
 
-	keyToBucketsMap, err := c.getkeyToBucketsMap()
-	if err != nil {
-		return err
-	}
-
 	for _, requestedKey := range requestedKeys {
 		var actualKey *couchbaseutil.EncryptionKeyInfo
 
@@ -253,7 +247,7 @@ func (c *Cluster) createAndUpdateEncryptionKeys(requestedKeys []*couchbasev2.Cou
 			}
 		}
 
-		apiRequestedKey, err := c.convertEncryptionKey(requestedKey, &actualKeys, updateActualKeys, keyToBucketsMap)
+		apiRequestedKey, err := c.convertEncryptionKey(requestedKey, &actualKeys, updateActualKeys)
 		if err != nil {
 			return err
 		}
@@ -543,10 +537,10 @@ func (c *Cluster) configureKMIPKey(encryptionKey *couchbaseutil.EncryptionKey, r
 
 	return nil
 }
-func (c *Cluster) convertEncryptionKey(key *couchbasev2.CouchbaseEncryptionKey, currentKeys *couchbaseutil.EncryptionKeyList, updateActualKeys func() error, keyToBucketsMap map[string][]string) (*couchbaseutil.EncryptionKey, error) {
+func (c *Cluster) convertEncryptionKey(key *couchbasev2.CouchbaseEncryptionKey, currentKeys *couchbaseutil.EncryptionKeyList, updateActualKeys func() error) (*couchbaseutil.EncryptionKey, error) {
 	encryptionKey := &couchbaseutil.EncryptionKey{
 		Name:  key.Name,
-		Usage: c.getUsageList(key, keyToBucketsMap),
+		Usage: c.getUsageList(key),
 	}
 
 	switch key.Spec.KeyType {
@@ -569,17 +563,13 @@ func (c *Cluster) convertEncryptionKey(key *couchbasev2.CouchbaseEncryptionKey, 
 	return encryptionKey, nil
 }
 
-func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey, keyToBucketsMap map[string][]string) []string {
+func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey) []string {
 	usage := key.GetUsage()
 
 	usageList := make([]string, 0)
 
 	if usage.AllBuckets {
 		usageList = append(usageList, couchbaseutil.EncryptionKeyUsageBucketEncryptionAll)
-	} else if usage.ManagedBucketSelection && c.cluster.Spec.Buckets.Managed {
-		for _, bucketName := range keyToBucketsMap[key.Name] {
-			usageList = append(usageList, strings.Join([]string{constants.EncryptionKeyUsageBucketEncryptionPrefix, bucketName}, "-"))
-		}
 	}
 
 	if usage.Configuration {
@@ -599,44 +589,6 @@ func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey, keyToBuc
 	}
 
 	return usageList
-}
-
-// getkeyToBucketsMap gets a map of key names to the buckets that use it for encryption at rest.
-func (c *Cluster) getkeyToBucketsMap() (map[string][]string, error) {
-	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
-
-	// Get all the K8s buckets
-	bucketSelector, err := c.cluster.GetBucketLabelSelector()
-	if err != nil {
-		return nil, err
-	}
-
-	keyToBucketsMap := make(map[string][]string)
-
-	for _, bucket := range couchbaseBuckets {
-		if c.k8s != nil {
-			bucketA, found := c.k8s.CouchbaseBuckets.Get(bucket.Name)
-			if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
-				continue
-			}
-		}
-
-		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
-		if err != nil {
-			// we failed but its not worth stopping. log the error and continue
-			log.Error(err, "failed to populate bucket with annotation")
-		}
-
-		if !bucketSelector.Matches(labels.Set(bucket.Labels)) {
-			continue
-		}
-
-		if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
-			keyToBucketsMap[bucket.Spec.EncryptionAtRest.KeyName] = append(keyToBucketsMap[bucket.Spec.EncryptionAtRest.KeyName], bucket.GetCouchbaseName())
-		}
-	}
-
-	return keyToBucketsMap, nil
 }
 
 func (c *Cluster) refreshKeyShadowSecret() error {
