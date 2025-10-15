@@ -721,7 +721,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 }
 
 func (c *Cluster) reconcileResourceManagementSettings() error {
-	if atleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err != nil || !atleast80 {
+	if atleast80, err := couchbaseutil.VersionAfter(c.GetLowestMemberVersion(), "8.0.0"); err != nil || !atleast80 {
 		return err
 	}
 
