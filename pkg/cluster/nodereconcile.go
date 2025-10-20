@@ -160,7 +160,7 @@ type ReconcileMachine struct {
 }
 
 func (r *ReconcileMachine) logState() {
-	log.V(0).Info("reconciler", "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
+	log.V(0).Info("reconciler", "cluster", r.c.namespacedName(), "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
 }
 
 // addMember simulates creating and clustering a new member.
@@ -1457,7 +1457,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 				return err
 			}
 		} else {
-			log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+			log.Info("Unable to set delta recovery type. Reverting to full recovery.", "cluster", c.namespacedName())
 
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 				return err
@@ -1475,7 +1475,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 
 	// Rebalance failed. Time to set recovery type as full.
 	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
-		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()))
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err

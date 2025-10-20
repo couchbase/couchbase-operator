@@ -1320,9 +1320,14 @@ func (b *CouchbaseBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+// NamespacedName returns a canonical and unique bucket name for logging.
+func (b *CouchbaseBucket) NamespacedName() string {
+	return types.NamespacedName{Namespace: b.Namespace, Name: b.Name}.String()
+}
+
 func (b *CouchbaseBucket) HasCrossClusterVersioningEnabled() bool {
 	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
-		log.Error(err, "failed to populate annotations")
+		log.Error(err, "failed to populate annotations", "bucket", b.NamespacedName())
 	}
 
 	if b.Spec.EnableCrossClusterVersioning == nil {
@@ -1370,9 +1375,14 @@ func (b *CouchbaseEphemeralBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+// NamespacedName returns a canonical and unique bucket name for logging.
+func (b *CouchbaseEphemeralBucket) NamespacedName() string {
+	return types.NamespacedName{Namespace: b.Namespace, Name: b.Name}.String()
+}
+
 func (b *CouchbaseEphemeralBucket) HasCrossClusterVersioningEnabled() bool {
 	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
-		log.Error(err, "failed to populate annotations")
+		log.Error(err, "failed to populate annotations", "bucket", b.NamespacedName())
 	}
 
 	if b.Spec.EnableCrossClusterVersioning == nil {

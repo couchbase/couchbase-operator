@@ -1184,7 +1184,7 @@ func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod,
 	tag, err := CouchbaseVersion(cluster.Spec.ServerClassCouchbaseImage(conf))
 	if err == nil {
 		if minSrvVerForCNG, err := couchbaseutil.VersionAfter(tag, constants.MinimumCouchbaseVersionForCNG); !minSrvVerForCNG && err == nil {
-			log.Info("[WARN] invalid couchbase server version for cloud native gateway support. Check server version.", "Minimum version needed", constants.MinimumCouchbaseVersionForCNG)
+			log.Info("[WARN] invalid couchbase server version for cloud native gateway support. Check server version.", "cluster", cluster.NamespacedName(), "Minimum version needed", constants.MinimumCouchbaseVersionForCNG)
 			return
 		}
 	}
@@ -2539,7 +2539,9 @@ func FlagPodReady(client *client.Client, name string) error {
 		return err
 	}
 
-	log.V(1).Info("Pod marked ready by operator", "pod", pod.Name)
+	// Extract cluster name from pod labels for logging
+	clusterName := pod.Namespace + "/" + pod.Labels[constants.LabelCluster]
+	log.V(1).Info("Pod marked ready by operator", "cluster", clusterName, "pod", pod.Name)
 
 	return nil
 }

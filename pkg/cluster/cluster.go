@@ -1008,7 +1008,7 @@ func (c *Cluster) initCouchbaseClient() error {
 	// are two assumptions; this is either a new cluster, or it's an existing one
 	// being upgraded to this version.
 	if ca == nil && c.cluster.IsTLSEnabled() {
-		log.V(1).Info("No TLS configuration cached")
+		log.V(1).Info("No TLS configuration cached", "cluster", c.namespacedName())
 
 		rootCAs, err := c.getCAs()
 		if err != nil {

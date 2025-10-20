@@ -234,7 +234,7 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 			}
 
 			if len(backup.Status.Repo) == 0 {
-				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", backup.Name)
+				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", "cluster", c.namespacedName(), "backup", backup.Name)
 			} else {
 				incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
 				if err != nil {

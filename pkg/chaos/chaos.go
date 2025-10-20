@@ -52,19 +52,19 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 	for {
 		err := limiter.Wait(ctx)
 		if err != nil { // user cancellation
-			log.Error(err, "crushPods is canceled by the user")
+			log.Error(err, "crushPods is canceled by the user", "namespace", c.Namespace)
 			return
 		}
 
 		if p := rand.Float64(); p < c.OpKillProbability {
-			log.Info("Killing operator pod", "value", p, "threshold", c.OpKillProbability)
+			log.Info("Killing operator pod", "cluster", c.Namespace, "value", p, "threshold", c.OpKillProbability)
 			time.Sleep(5 * time.Second)
 			// fare thee well
 			os.Exit(0)
 		}
 
 		if p := rand.Float64(); p > c.CbKillProbability {
-			log.Info("Skipping pod deletion", "value", p, "threshold", c.CbKillProbability)
+			log.Info("Skipping pod deletion", "cluster", c.Namespace, "value", p, "threshold", c.CbKillProbability)
 			continue
 		}
 
@@ -75,12 +75,12 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		}
 
 		if err := cli.List(ctx, pods, options); err != nil {
-			log.Error(err, "failed to list pods", "selector", c.Selector.String())
+			log.Error(err, "failed to list pods", "cluster", c.Namespace, "selector", c.Selector.String())
 			continue
 		}
 
 		if len(pods.Items) == 0 {
-			log.Info("No pods listed", "selector", c.Selector.String())
+			log.Info("No pods listed", "cluster", c.Namespace, "selector", c.Selector.String())
 			continue
 		}
 
@@ -95,12 +95,12 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 		if len(pods.Items)-max < c.MinPods {
 			max--
 			if max == 0 {
-				log.Info("Too few pods to kill", "minimum_alive", c.MinPods, "pods_total", len(pods.Items), "pods_to_kill", max)
+				log.Info("Too few pods to kill", "cluster", c.Namespace, "minimum_alive", c.MinPods, "pods_total", len(pods.Items), "pods_to_kill", max)
 				continue
 			}
 		}
 
-		log.Info("Killing pods", "number", max, "selector", c.Selector.String())
+		log.Info("Killing pods", "cluster", c.Namespace, "number", max, "selector", c.Selector.String())
 
 		tokills := []*corev1.Pod{}
 		for len(tokills) < max {
@@ -109,11 +109,11 @@ func (m *Monkeys) CrushPods(ctx context.Context, c *CrashConfig) {
 
 		for _, tokill := range tokills {
 			if err := cli.Delete(ctx, tokill); err != nil {
-				log.Error(err, "Failed to kill pod", "name", tokill.Name)
+				log.Error(err, "Failed to kill pod", "cluster", tokill.Labels["cluster"], "name", tokill.Name)
 				continue
 			}
 
-			log.Info("Killed pod", "name", tokill.Name, "selector", c.Selector.String())
+			log.Info("Killed pod", "cluster", tokill.Labels["cluster"], "name", tokill.Name, "selector", c.Selector.String())
 		}
 	}
 }
@@ -190,7 +190,7 @@ func Start(ctx context.Context, mgr manager.Manager, ns string, chaosLevel int) 
 	}
 
 	if c != nil {
-		log.Info("Unleashing chaos monkies.", "rate", c.KillRate, "pod_threshold", c.CbKillProbability, "operator_threshold", c.OpKillProbability, "max_kills", c.KillMax, "min_pods", c.MinPods)
+		log.Info("Unleashing chaos monkies.", "cluster", c.Namespace, "rate", c.KillRate, "pod_threshold", c.CbKillProbability, "operator_threshold", c.OpKillProbability, "max_kills", c.KillMax, "min_pods", c.MinPods)
 
 		go func() {
 			time.Sleep(wait)

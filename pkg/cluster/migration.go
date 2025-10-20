@@ -285,7 +285,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 		ServerRebalanceReasons: status.RebalanceReasons,
 	}
 
-	log.V(1).Info("Node States", "states", status.NodeStates)
+	log.V(1).Info("Node States", "cluster", c.namespacedName(), "states", status.NodeStates)
 
 	for name, nodeState := range status.NodeStates {
 		switch nodeState {

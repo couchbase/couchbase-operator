@@ -92,7 +92,7 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
 	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "failed to get cluster info")
+		log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
 	} else {
 		orchestratorName := clusterInfo.Orchestrator
 		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
@@ -136,7 +136,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 		// The pod is likely down, so just skip it
 		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name())
 		if err != nil {
-			log.Error(err, "failed to get server group for candidate", "candidate", candidate.Name())
+			log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
 			continue
 		}
 
