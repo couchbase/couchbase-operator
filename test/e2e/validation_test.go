@@ -5073,12 +5073,40 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 			expectedErrors: []string{"rotation interval must be at least 7 days"},
 		},
 		{
+			name: "TestEncryptionAtRestWithoutKeyRotationIntervalTooShort",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+				Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+					Enabled: true,
+					RotationInterval: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+				},
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"rotation interval must be at least 7 days"},
+		},
+		{
 			name: "TestEncryptionAtRestKeyLifetimeTooShort",
 			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
 				Managed: true,
 				Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
 					Enabled: true,
 					KeyName: "auto-generated-key-1",
+					KeyLifetime: &metav1.Duration{
+						Duration: 1 * time.Hour,
+					},
+				},
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"key lifetime must be at least 30 days"},
+		},
+		{
+			name: "TestEncryptionAtRestWithoutKeyLifetimeTooShort",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+				Managed: true,
+				Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+					Enabled: true,
 					KeyLifetime: &metav1.Duration{
 						Duration: 1 * time.Hour,
 					},

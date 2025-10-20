@@ -5369,17 +5369,17 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 	var errs []error
 
 	// Check configuration encryption
-	if err := validateEncryptionKey(keyMap, encryptionAtRest.Configuration, constants.EncryptionAtRestUsageConfiguration); err != nil {
+	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Configuration, constants.EncryptionAtRestUsageConfiguration); err != nil {
 		errs = append(errs, fmt.Errorf("configuration encryption key validation failed: %w", err))
 	}
 
 	// Check audit encryption
-	if err := validateEncryptionKey(keyMap, encryptionAtRest.Audit, constants.EncryptionAtRestUsageAudit); err != nil {
+	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Audit, constants.EncryptionAtRestUsageAudit); err != nil {
 		errs = append(errs, fmt.Errorf("audit encryption key validation failed: %w", err))
 	}
 
 	// Check log encryption
-	if err := validateEncryptionKey(keyMap, encryptionAtRest.Log, constants.EncryptionAtRestUsageLog); err != nil {
+	if err := validateEncryptionSettings(keyMap, encryptionAtRest.Log, constants.EncryptionAtRestUsageLog); err != nil {
 		errs = append(errs, fmt.Errorf("log encryption key validation failed: %w", err))
 	}
 
@@ -5412,13 +5412,29 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 }
 
 // validateEncryptionKey validates that an encryption key exists in the map and has the appropriate usage setting.
-func validateEncryptionKey(keyMap map[string]*couchbasev2.CouchbaseEncryptionKey, config *couchbasev2.EncryptionAtRestUsageConfiguration, usageType string) error {
+func validateEncryptionSettings(keyMap map[string]*couchbasev2.CouchbaseEncryptionKey, config *couchbasev2.EncryptionAtRestUsageConfiguration, usageType string) error {
 	// Check if configuration is nil or not enabled
 	if config == nil || !config.Enabled {
 		return nil
 	}
 
-	// If key name is empty, master password will be used for encryption - no validation needed
+	// Check rotation interval is at least 7 days if set
+	if config.RotationInterval != nil {
+		rotationInterval := config.RotationInterval.Duration
+		if rotationInterval.Hours() < 7*24 {
+			return fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
+		}
+	}
+
+	// Check key lifetime is at least 30 days if set
+	if config.KeyLifetime != nil {
+		keyLifetime := config.KeyLifetime.Duration
+		if keyLifetime.Hours() < 30*24 {
+			return fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
+		}
+	}
+
+	// If key name is empty, master password will be used for encryption - key validation needed
 	if config.KeyName == "" {
 		return nil
 	}
@@ -5447,22 +5463,6 @@ func validateEncryptionKey(keyMap map[string]*couchbasev2.CouchbaseEncryptionKey
 		}
 	default:
 		return fmt.Errorf("invalid usage type: %s", usageType)
-	}
-
-	// Check rotation interval is at least 7 days if set
-	if config.RotationInterval != nil {
-		rotationInterval := config.RotationInterval.Duration
-		if rotationInterval.Hours() < 7*24 {
-			return fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
-		}
-	}
-
-	// Check key lifetime is at least 30 days if set
-	if config.KeyLifetime != nil {
-		keyLifetime := config.KeyLifetime.Duration
-		if keyLifetime.Hours() < 30*24 {
-			return fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
-		}
 	}
 
 	return nil
