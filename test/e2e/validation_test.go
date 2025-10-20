@@ -5262,9 +5262,6 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 		{
 			name: "TestBucketEncryptionAtRestRotationIntervalTooShort",
 			mutations: patchMap{
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-				}),
 				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
 					RotationInterval: &metav1.Duration{
 						Duration: 1 * time.Hour,
@@ -5278,9 +5275,6 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 		{
 			name: "TestBucketEncryptionAtRestKeyLifetimeTooShort",
 			mutations: patchMap{
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-				}),
 				"bucket1": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
 					KeyLifetime: &metav1.Duration{
 						Duration: 1 * time.Hour,

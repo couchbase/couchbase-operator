@@ -1965,7 +1965,7 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 	return errs
 }
 
-// nolint:gocognit
+//nolint:gocognit,gocyclo
 func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
@@ -2057,6 +2057,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
+	if err := checkBucketEncryptionAtRestSettings(bucket.Spec.EncryptionAtRest); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
@@ -2079,6 +2083,30 @@ func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) err
 
 		if low >= high {
 			return fmt.Errorf("spec.memoryLowWatermark (%d) must be less than spec.memoryHighWatermark (%d)", low, high)
+		}
+	}
+
+	return nil
+}
+
+func checkBucketEncryptionAtRestSettings(config *couchbasev2.BucketEncryptionAtRestConfiguration) error {
+	if config == nil {
+		return nil
+	}
+
+	// Check rotation interval is at least 7 days if set
+	if config.RotationInterval != nil {
+		rotationInterval := config.RotationInterval.Duration
+		if rotationInterval.Hours() < 7*24 {
+			return fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
+		}
+	}
+
+	// Check key lifetime is at least 30 days if set
+	if config.KeyLifetime != nil {
+		keyLifetime := config.KeyLifetime.Duration
+		if keyLifetime.Hours() < 30*24 {
+			return fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
 		}
 	}
 
