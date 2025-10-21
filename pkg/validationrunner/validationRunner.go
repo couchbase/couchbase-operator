@@ -733,7 +733,9 @@ func CheckCouchbaseClusterResourceUpdate(update *couchbasev2.CouchbaseCluster, c
 
 	couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
 
-	return validationv2.CheckChangeConstraintsCluster(v, cluster, update)
+	_, err := validationv2.CheckChangeConstraintsCluster(v, cluster, update)
+
+	return err
 }
 
 func CheckCouchbaseClusterResourceImmutableFields(update *couchbasev2.CouchbaseCluster, cluster *couchbasev2.CouchbaseCluster) error {

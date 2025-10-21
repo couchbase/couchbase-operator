@@ -2995,9 +2995,25 @@ type ClusterSpec struct {
 	// cluster to a managed Kubernetes cluster
 	Migration *ClusterAssimilationSpec `json:"migration,omitempty"`
 
-	// EnableMirWatchdog can be used to disable the manual intervention required watchdog for the cluster.
-	// This defaults to true and is not publicly documented.
-	EnableMirWatchdog *bool `json:"-" annotation:"enableMirWatchdog"`
+	// MirWatchdog runs a series of out-of-band checks on the cluster outside the reconciliation loop to detect conditions that require manual intervention by a user.
+	// These checks include but are not limited to cluster login authentication failures, multiple consecutive rebalance failures, down nodes that cannot be recovered, and TLS certificate expiration.
+	// When enabled, if the operator detects that manual intervention is needed in order to continue to reconcile the cluster, it will add a cluster condition, emit a Kubernetes Event, and increment a gauge metric to support external alerting.
+	// Once the operator determines that manual intervention is no longer needed, it will clear the cluster condition, emit a Kubernetes Event, and decrement the gauge metric.
+	// By default this is disabled.
+	MirWatchdog *MirWatchdog `json:"mirWatchdog,omitempty"`
+}
+
+type MirWatchdog struct {
+	// Enabled controls whether the additional out-of-band checks are enabled for the cluster.
+	// This defaults to false.
+	Enabled *bool `json:"enabled,omitempty"`
+	// SkipReconciliation controls whether the operator will skip reconciliation when we are in the ManualInterventionRequired state and this condition is set. Once we leave the state
+	// the operator will resume reconciliation.
+	// This defaults to false and should only be used when additional alerting is in place.
+	SkipReconciliation *bool `json:"skipReconciliation,omitempty"`
+	// Interval controls the interval at which the additional out-of-band checks will be performed.
+	// The default interval is 20 seconds.
+	Interval *metav1.Duration `json:"interval,omitempty"`
 }
 
 // ClusterAssimilationSpec defines the specification for a CouchbaseCluster assimilation of an unmanaged

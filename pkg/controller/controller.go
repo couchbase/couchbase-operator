@@ -151,13 +151,13 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	results, err := validationrunner.CheckCouchbaseClusterResource(couchbase)
+	warnings, err := validationrunner.CheckCouchbaseClusterResource(couchbase)
 	if err != nil {
 		return r.reconcileFailedValidationCluster(couchbase, err)
 	}
 
-	if results != nil {
-		log.V(1).Info("Validation warnings.", "warnings", results)
+	if warnings != nil {
+		log.V(1).Info("Validation warnings.", "warnings", warnings)
 	}
 
 	// See if we know about the cluster already.
@@ -205,11 +205,6 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 		r.clusters.Store(request.NamespacedName.String(), c)
 
-		return requeueResult, nil
-	}
-
-	if c.GetCouchbaseCluster().HasCondition(couchbasev2.ClusterConditionManualInterventionRequired) {
-		log.Info("Manual intervention required, skipping reconciliation", "cluster", c.GetCouchbaseCluster().NamespacedName())
 		return requeueResult, nil
 	}
 

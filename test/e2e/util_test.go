@@ -787,12 +787,14 @@ func registerTests() {
 		framework.NewTestDef(TestCreateEditDeleteCouchbaseBucketAutoCompactionSettingsMagmaBackend).WithTags(TagSuiteSanity),
 
 		// Manual Intervention Required Watchdog tests
-		framework.NewTestDef(TestMirWatchdogDisabledAnnotation).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogDefaultsToDisabled).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogDisabledWhenTurnedOffInSpec).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentials).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnConsecutiveRebalanceFailures).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnManualActionDownNodes).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnCACertTLSExpiration).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnClientCertTLSExpiration).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentialsSkipReconciliationWhenEnabled).WithTags(TagSuiteP1, TagFeatureMir),
 
 		// Encryption at rest tests
 		framework.NewTestDef(TestEncryptionAtRest).WithTags(TagSuiteP1, TagFeatureEAR),

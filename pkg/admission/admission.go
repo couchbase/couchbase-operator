@@ -244,7 +244,11 @@ func couchbaseClustersValidate(config *Config, ar admissionv1.AdmissionReview) *
 			return errorResponse(err)
 		}
 
-		if warnings, err := validator.CheckChangeConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); err != nil {
+		// Skip validation if the only change is to the status fields.
+		if statusOnly, warnings, err := validator.CheckChangeConstraints(validator.New(GetClient(), GetCouchbaseClient(), options), existingCouchbaseCluster, couchbaseCluster); statusOnly {
+			log.Info("Skipping validation due to status only changes")
+			return &reviewResponse
+		} else if err != nil {
 			log.Error(err, "Rejecting resource")
 			return errorResponse(err)
 		} else if warnings != nil {

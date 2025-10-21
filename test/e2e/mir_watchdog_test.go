@@ -15,8 +15,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-// TestMirWatchdogDisabledAnnotation tests that the manual intervention watchdog can be disabled using the annotation.
-func TestMirWatchdogDisabledAnnotation(t *testing.T) {
+// TestMirWatchdogDefaultsToDisabled tests that the manual intervention watchdog defaults to disabled.
+func TestMirWatchdogDefaultsToDisabled(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -25,9 +25,50 @@ func TestMirWatchdogDisabledAnnotation(t *testing.T) {
 
 	clusterSize := 1
 
+	// Initialise a new cluster with the default settings.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Fetch the auth secret so we can change the password back later.
+	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
+	password := string(authSecret.Data["password"])
+	updatedPassword := fmt.Sprintf("%s!", password)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+
+	// Change the password to something invalid so we know an intervention would be required.
+	e2eutil.MustChangeClusterPassword(t, kubernetes, cluster, "", updatedPassword, 1*time.Minute)
+
+	// Sleep for longer than the mirWatchdog interval so the watchdog (if it was running) would have looped at least once.
+	time.Sleep(30 * time.Second)
+
+	// Make sure the condition does not exist and metric is not incremented.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 2*time.Minute, couchbasev2.ClusterConditionManualInterventionRequired)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+
+	// Validate we don't see any mir events.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestMirWatchdogDisabledWhenSpecIsDisabled tests that the manual intervention watchdog is disabled when the spec is disabled.
+func TestMirWatchdogDisabledWhenTurnedOffInSpec(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	// Initialise a new cluster with the default settings.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster.Annotations = map[string]string{
-		"cao.couchbase.com/enableMirWatchdog": "false",
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled: boolPtr(false),
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -39,7 +80,7 @@ func TestMirWatchdogDisabledAnnotation(t *testing.T) {
 	// Check the current value of the intervention metric is 0.
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
 
-	// Change the password to something invalid so we know a intervention would be required.
+	// Change the password to something invalid so we know an intervention would be required.
 	e2eutil.MustChangeClusterPassword(t, kubernetes, cluster, "", updatedPassword, 1*time.Minute)
 
 	// Sleep for longer than the mirWatchdog interval so the watchdog (if it was running) would have looped at least once.
@@ -69,7 +110,11 @@ func TestMirWatchdogOnInvalidClusterCredentials(t *testing.T) {
 
 	clusterSize := 1
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Fetch the auth secret so we can change the password back later.
 	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
@@ -109,6 +154,65 @@ func TestMirWatchdogOnInvalidClusterCredentials(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestMirWatchdogSkipReconciliationWhenEnabledAndSet tests that the operator will skip reconciliation when we are in the ManualInterventionRequired state and the SkipReconciliation flag is set.
+// Once we leave the state, the operator will resume reconciliation.
+func TestMirWatchdogOnInvalidClusterCredentialsSkipReconciliationWhenEnabled(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled:            boolPtr(true),
+		SkipReconciliation: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Fetch the auth secret so we can change the password back later.
+	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
+	originalPassword := string(authSecret.Data["password"])
+	updatedPassword := fmt.Sprintf("%s!", originalPassword)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+
+	// Change the cluster password directly using the API.
+	e2eutil.MustChangeClusterPassword(t, kubernetes, cluster, "", updatedPassword, 1*time.Minute)
+
+	// Check the watchdog adds the cluster condition and updates the intervention metric.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Once we enter the MIR state, we should see a number of reconcile_total metrics with the result label set to "mir", which is only triggered when the SkipReconciliation flag is set.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "reconcile_total", map[string]string{"result": "mir"}, 4, 5*time.Minute)
+
+	// Change the cluster password back to the original password.
+	e2eutil.MustChangeClusterPassword(t, kubernetes, cluster, updatedPassword, originalPassword, 1*time.Minute)
+
+	// Check the cluster condition is now false and the intervention metric is 0.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 2*time.Minute, couchbasev2.ClusterConditionManualInterventionRequired)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
+
+	// Check the cluster is healthy.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Check the events match what we expect. Depending on where the reconciliation loop is when we add the condition, we may see a reconcile failed event before, during or after the manual intervention events are applied.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -118,7 +222,13 @@ func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 
 	clusterSize := 2
 
-	cluster := clusterOptions().WithPersistentTopology(clusterSize).MustCreate(t, kubernetes)
+	// We're going to block reconciliation here to make it easier to test.
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled:            boolPtr(true),
+		SkipReconciliation: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Create and populate a bucket (200 MB) to slow down the rebalance.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -141,6 +251,9 @@ func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 	// Check that we enter the manual intervention required state.
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Once we enter the MIR state, we should see a number of reconcile_total metrics with the result label set to "mir", which is only triggered when the SkipReconciliation flag is set.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "reconcile_total", map[string]string{"result": "mir"}, 4, 5*time.Minute)
 
 	// Manually rebalance the cluster to resolve the MIR condition.
 	e2eutil.MustRebalanceCluster(t, kubernetes, cluster, 2*time.Minute)
@@ -191,7 +304,12 @@ func TestMirWatchdogOnManualActionDownNodes(t *testing.T) {
 
 	clusterOptions := clusterOptions().WithEphemeralTopology(clusterSize)
 	clusterOptions.Options.AutoFailoverTimeout = e2espec.NewDurationS(5)
-	cluster := clusterOptions.MustCreate(t, kubernetes)
+	cluster := clusterOptions.Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled:            boolPtr(true),
+		SkipReconciliation: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the current value of the intervention metric is 0.
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
@@ -202,6 +320,9 @@ func TestMirWatchdogOnManualActionDownNodes(t *testing.T) {
 	// Check that we enter the manual intervention required state.
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Once we enter the MIR state, we should see a number of reconcile_total metrics with the result label set to "mir", which is only triggered when the SkipReconciliation flag is set.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "reconcile_total", map[string]string{"result": "mir"}, 4, 5*time.Minute)
 
 	// Manually failover the node we killed to resolve the MIR condition.
 	e2eutil.MustFailoverNode(t, kubernetes, cluster, victimIndex, true, 5*time.Minute)
@@ -243,7 +364,12 @@ func TestMirWatchdogOnCACertTLSExpiration(t *testing.T) {
 	// Init a cluster with a CA that expires in 2 minutes
 	validTo := time.Now().In(time.UTC).Add(4 * time.Minute)
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ValidTo: &validTo})
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled:            boolPtr(true),
+		SkipReconciliation: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Because the CA and Server certificates will be expired, we need to enable this to allow the operator to rotate them.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/allowPlainTextCertReload", true), time.Minute)
@@ -252,9 +378,8 @@ func TestMirWatchdogOnCACertTLSExpiration(t *testing.T) {
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
 
 	// Check that we enter the manual intervention required state once the CA expires.
-	// We can't use the cluster condition as the mirWatchdog will be unable to update the status because of the expired CA.
-	// However, we can still wait for the event and ensure the metric is incremented.
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionRequiredEvent(cluster, "TLS certificate has expired"), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
 
 	// Rotate the certificates and check that we are removed from the manual intervention required state.
@@ -263,18 +388,20 @@ func TestMirWatchdogOnCACertTLSExpiration(t *testing.T) {
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionResolvedEvent(cluster), 5*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 10*time.Minute)
 
-	// Check the events match what we expect.
+	// Check the events match what we expect. Because of the asynchronous nature of the MirWatchdog and reconciliation loop,
+	// we'll probably see a number of reconcile failed events throughout the test.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
-		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
@@ -296,16 +423,22 @@ func TestMirWatchdogOnClientCertTLSExpiration(t *testing.T) {
 	// Init a cluster with a CA that expires in 2 minutes
 	clientValidTo := time.Now().In(time.UTC).Add(4 * time.Minute)
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{ClientValidTo: &clientValidTo})
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled:            boolPtr(true),
+		SkipReconciliation: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the current value of the intervention metric is 0.
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
 
 	// Check that we enter the manual intervention required state once the CA expires.
-	// We can't use the cluster condition as the mirWatchdog will be unable to update the status because of the expired CA.
-	// However, we can still wait for the event and ensure the metric is incremented.
+
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ManualInterventionRequiredEvent(cluster, "TLS certificate has expired"), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "reconcile_total", map[string]string{"result": "mir"}, 2, 5*time.Minute)
 
 	// Rotate the client certificate and check that we are removed from the manual intervention required state.
 	e2eutil.MustRotateClientCertificate(t, ctx)
@@ -316,18 +449,24 @@ func TestMirWatchdogOnClientCertTLSExpiration(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
-	// Check the events match what we expect.
+	// Check the events match what we expect. Checking order of events with the out-of-bound Mir loop is a bit of a pain
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
-		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

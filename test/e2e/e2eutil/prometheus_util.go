@@ -374,9 +374,30 @@ func MustCheckPrometheusWithAuthSecret(t *testing.T, k8s *types.Cluster, couchba
 	return responseDataStr
 }
 
+// MustWaitForOperatorCounterMetric waits until either the timeout is reached or the value of a counter metric is equal to or greater than the given value.
+func MustWaitForOperatorCounterMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, labels map[string]string, expectedValue float64, timeout time.Duration) {
+	callback := func() error {
+		metricVal := getOperatorMetric(t, k8s, ctx, metric, labels, 10*time.Second)
+
+		if metricVal == nil || metricVal.GetCounter() == nil {
+			return fmt.Errorf("metric %q not found", metric)
+		}
+
+		if metricVal.GetCounter().GetValue() < expectedValue {
+			return fmt.Errorf("metric %q value %v does not match expected value %v", metric, metricVal.GetCounter().GetValue(), expectedValue)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustCheckOperatorGaugeMetric checks that the value of a gauge metric is equal to the given value.
 func MustCheckOperatorGaugeMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, expectedValue float64, timeout time.Duration) {
-	metricVal := getOperatorMetric(t, k8s, ctx, metric, timeout)
+	metricVal := getOperatorMetric(t, k8s, ctx, metric, nil, timeout)
 	if metricVal == nil || metricVal.GetGauge() == nil {
 		Die(t, fmt.Errorf("metric %q not found", metric))
 	}
@@ -386,7 +407,7 @@ func MustCheckOperatorGaugeMetric(t *testing.T, k8s *types.Cluster, ctx *TLSCont
 	}
 }
 
-func getOperatorMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, timeout time.Duration) *dto.Metric {
+func getOperatorMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, labels map[string]string, timeout time.Duration) *dto.Metric {
 	operatorMetricsPort := "8383"
 
 	var operatorPods *v1.PodList
@@ -416,12 +437,23 @@ func getOperatorMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric
 			Die(t, err)
 		}
 
-		// The metricDto slice contains one Metric pointer for each unique label set. For now, we'll return the first one.
-		// In most e2e test scenarios, we expect only one operator pod and a single metric instance per test cluster,
-		// so returning the first metric is appropriate (most metrics have name + namespace as labels exclusively).
-		// We might want to update this in the future for other test scenarios, but for now, returning the first is sufficient.
-		if len(metricDto) > 0 {
-			return metricDto[0]
+		// Iterate over the metrics and return the first that matches all the expected labels and their values.
+		// If no metric matches, or we can't find one that has at least all the expected labels, we'll try the next operator pod or (as in most cases) return nil.
+		for _, m := range metricDto {
+			labelPairs := labelPairsToMap(m.GetLabel())
+			match := true
+			// Check if the metric has all the expected labels and their values. We do not expect the lists to match, only that the expected labels are present.
+			for k, v := range labels {
+				if val, ok := labelPairs[k]; !ok || val != v {
+					match = false
+					break
+				}
+			}
+
+			// Return the metric if it matches all the expected labels and their
+			if match {
+				return m
+			}
 		}
 	}
 
@@ -445,4 +477,12 @@ func parseMetricFromString(metricsText string, metricName string) ([]*dto.Metric
 	}
 
 	return mf.Metric, nil
+}
+
+func labelPairsToMap(labelPairs []*dto.LabelPair) map[string]string {
+	labels := make(map[string]string, len(labelPairs))
+	for _, l := range labelPairs {
+		labels[l.GetName()] = l.GetValue()
+	}
+	return labels
 }

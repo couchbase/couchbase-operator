@@ -7,10 +7,10 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
-	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 )
 
 type mirWatchdog struct {
@@ -49,19 +49,8 @@ func newMirWatchdog(cluster *Cluster) *mirWatchdog {
 // raise a separate event for each of the reasons and set the cluster_manual_intervention metric to 1.
 // When manual intervention is no longer required, this will clear the condition,
 // raise a ManualInterventionResolved event and set the cluster_manual_intervention metric to 0.
-func (w *mirWatchdog) run() {
+func (w *mirWatchdog) run(interval time.Duration) {
 	log.Info("Manual intervention required checks starting", "cluster", w.cluster.namespacedName())
-
-	interval := 20 * time.Second
-
-	// The interval can be configured via the mirWatchdogInterval key in the persistency grid.
-	if val, err := w.cluster.state.Get(persistence.MirWatchdogInterval); err == nil {
-		if parsedInterval, err := time.ParseDuration(val); err == nil {
-			interval = parsedInterval
-		} else {
-			log.Error(err, "Invalid mirWatchdogInterval, using default", "cluster", w.cluster.namespacedName(), "interval", val)
-		}
-	}
 
 	for {
 		select {
@@ -101,7 +90,8 @@ func (w *mirWatchdog) checkCluster() {
 		w.handleNoManualInterventionRequired(existingCondition)
 	}
 
-	if err := w.cluster.updateCRStatus(); err != nil {
+	// Try to update the cluster status for up to 10 seconds in case of transient failures.
+	if err := retryutil.RetryFor(10*time.Second, w.cluster.updateCRStatus); err != nil {
 		log.Error(err, "MirWatchdog failed to update cluster status", "cluster", w.cluster.namespacedName())
 	}
 }
@@ -241,7 +231,6 @@ func (w *mirWatchdog) checkForTLSExpiration(existingCondition *couchbasev2.Clust
 	if inMirStateForReason(existingCondition, MIRTLSExpired) {
 		if err := w.cluster.initTLSCache(); err != nil {
 			log.Error(err, "MirWatchdog failed to refresh tls cache", "cluster", w.cluster.namespacedName())
-			return nil
 		}
 	}
 

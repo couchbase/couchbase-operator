@@ -250,8 +250,13 @@ func (c *Cluster) newCluster() error {
 	err = c.operatorUpgrade()
 
 	// Spawn the mirWatchdog process which monitors the cluster for issues that require manual intervention.
-	if c.cluster.Spec.EnableMirWatchdog == nil || *c.cluster.Spec.EnableMirWatchdog {
-		go newMirWatchdog(c).run()
+	if mw := c.cluster.Spec.MirWatchdog; mw != nil && mw.Enabled != nil && *mw.Enabled {
+		interval := 20 * time.Second
+		if mw.Interval != nil {
+			interval = mw.Interval.Duration
+		}
+
+		go newMirWatchdog(c).run(interval)
 	}
 
 	return err
@@ -588,6 +593,18 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
 
 		return
+	}
+
+	// If manual intervention is required, we will skip reconciliation if the SkipReconciliation flag is set.
+	if c.cluster.HasCondition(couchbasev2.ClusterConditionManualInterventionRequired) {
+		if c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.SkipReconciliation != nil && *c.cluster.Spec.MirWatchdog.SkipReconciliation {
+			log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName())
+			metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "mir"})...).Inc()
+
+			return
+		}
+
+		log.Info("Manual intervention required", "cluster", c.namespacedName())
 	}
 
 	// Otherwise indicate that we are in control.

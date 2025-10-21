@@ -199,6 +199,10 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-migration-numunmanagednodes,numUnmanagedNodes>>: 0
     <<couchbaseclusters-spec-migration-stabilizationperiod,stabilizationPeriod>>: ""
     <<couchbaseclusters-spec-migration-unmanagedclusterhost,unmanagedClusterHost>>: ""
+  <<couchbaseclusters-spec-mirwatchdog,mirWatchdog>>:
+    <<couchbaseclusters-spec-mirwatchdog-enabled,enabled>>: false
+    <<couchbaseclusters-spec-mirwatchdog-interval,interval>>: ""
+    <<couchbaseclusters-spec-mirwatchdog-skipreconciliation,skipReconciliation>>: false
   <<couchbaseclusters-spec-monitoring,monitoring>>:
     <<couchbaseclusters-spec-monitoring-prometheus,prometheus>>:
       <<couchbaseclusters-spec-monitoring-prometheus-authorizationsecret,authorizationSecret>>: ""
@@ -3060,6 +3064,55 @@ If not specified the operator will start the next migration immediately.
 UnmanagedClusterHost is a host of the unmanaged Couchbase cluster to be migrated.
 This is the host
 that the operator will connect to to start the migration process.
+
+=== couchbaseclusters.spec.mirWatchdog
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+MirWatchdog runs a series of out-of-band checks on the cluster outside the reconciliation loop to detect conditions that require manual intervention by a user.
+These checks include but are not limited to cluster login authentication failures, multiple consecutive rebalance failures, down nodes that cannot be recovered, and TLS certificate expiration.
+When enabled, if the operator detects that manual intervention is needed in order to continue to reconcile the cluster, it will add a cluster condition, emit a Kubernetes Event, and increment a gauge metric to support external alerting.
+Once the operator determines that manual intervention is no longer needed, it will clear the cluster condition, emit a Kubernetes Event, and decrement the gauge metric.
+By default this is disabled.
+
+=== couchbaseclusters.spec.mirWatchdog.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled controls whether the additional out-of-band checks are enabled for the cluster.
+This defaults to false.
+
+=== couchbaseclusters.spec.mirWatchdog.interval
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Interval controls the interval at which the additional out-of-band checks will be performed.
+The default interval is 20 seconds.
+
+=== couchbaseclusters.spec.mirWatchdog.skipReconciliation
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+SkipReconciliation controls whether the operator will skip reconciliation when we are in the ManualInterventionRequired state and this condition is set.
+Once we leave the state
+the operator will resume reconciliation.
+This defaults to false and should only be used when additional alerting is in place.
 
 === couchbaseclusters.spec.monitoring
 

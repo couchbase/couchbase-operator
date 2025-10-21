@@ -4334,23 +4334,30 @@ func CheckImmutableFieldsBucket(prev, curr *couchbasev2.CouchbaseBucket) error {
 	return nil
 }
 
-func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
+func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) (bool, error) {
 	err := annotations.Populate(&prev.Spec, prev.Annotations)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	err = annotations.Populate(&curr.Spec, curr.Annotations)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if checkAnnotationSkipValidation(curr.Annotations) {
-		return nil
+		return false, nil
 	}
 
+	// Check if only the status has updated
+	if reflect.DeepEqual(prev.Spec, curr.Spec) && !reflect.DeepEqual(prev.Status, curr.Status) {
+		return true, nil
+	}
+
+	var errs []error
+
 	if err := checkConstraintPerServiceClassPDB(v, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// We check here if the change in default storage backend would result in a bucket backend
@@ -4360,27 +4367,31 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	// This is a heavy check which is why we gate it behind if the default storage backend
 	// actually changes
 	if err := checkDefaultBucketStorageBackendConstraint(v, prev, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	// If the cluster is in hibernation, we should prohibit any changes
 	if err := checkChangeConstraintsHibernate(prev, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	if err := checkChangeConstraintsMigration(v, prev, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	if err := checkChangeConstraintsBucketMigratingAnnotation(prev, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
 	if err := checkClusterUpgradePrerequisites(v, prev, curr); err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
-	return nil
+	if errs != nil {
+		return false, errors.CompositeValidationError(errs...)
+	}
+
+	return false, nil
 }
 
 func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {

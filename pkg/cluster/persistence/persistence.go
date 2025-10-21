@@ -76,9 +76,6 @@ const (
 	ChangesMadeBeforeOperatorStart = "changesMadeBeforeOperatorStart"
 
 	RebalanceRetries = "rebalanceRetries"
-
-	// MirWatchdogInterval is the interval in at which the manual intervention required checks will run.
-	MirWatchdogInterval = "mirWatchdogInterval"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.
