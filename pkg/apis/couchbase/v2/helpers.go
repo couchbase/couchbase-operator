@@ -1792,3 +1792,16 @@ func (c *CouchbaseCluster) GetSpecFromAnnotation() *ClusterSpec {
 
 	return &spec
 }
+
+func (c *CouchbaseCluster) IsEncryptionAtRestManaged() bool {
+	isEncryptionAtRestSupported, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return false
+	}
+
+	if !isEncryptionAtRestSupported {
+		return false
+	}
+
+	return c.Spec.Security.EncryptionAtRest != nil && c.Spec.Security.EncryptionAtRest.Managed
+}
