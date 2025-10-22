@@ -1995,12 +1995,20 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 				if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
 					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
 				}
+
+				if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
+					errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
+				}
 			}
 
 			if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
 			}
 		}
+	}
+
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore && bucket.Spec.NumVBuckets != nil {
+		errs = append(errs, fmt.Errorf("spec.numVBuckets cannot be set for couchstore storage backend"))
 	}
 
 	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
@@ -4576,7 +4584,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 
 			if after80 {
-				if prev.Spec.NumVBuckets != curr.Spec.NumVBuckets {
+				if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
 					errs = append(errs, fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets"))
 				}
 			}
