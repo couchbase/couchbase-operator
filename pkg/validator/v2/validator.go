@@ -1979,30 +1979,44 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		return nil
 	}
 
-	if bucket.Spec.MemoryQuota != nil {
-		if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-			errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi"))
-		}
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return err
 	}
 
-	if bucket.Spec.StorageBackend != "" {
-		if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-			if bucket.Spec.NumVBuckets != nil {
-				if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
-				}
+	for _, c := range clusters.Items {
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
 
-				if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
-				}
+		if atLeast80 {
+			if bucket.Spec.StorageBackend != "" {
+				if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+					if bucket.Spec.NumVBuckets != nil {
+						if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+							errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+						}
 
-				if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
-					errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
+						if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+							errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
+						}
+
+						if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
+							errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
+						}
+					}
+
+					if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+						errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+					}
 				}
 			}
-
-			if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-				errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+		} else {
+			if bucket.Spec.MemoryQuota != nil {
+				if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi"))
+				}
 			}
 		}
 	}
@@ -4738,9 +4752,22 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 				return nil, err
 			}
 
+			changeErr := fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets")
+
 			if after80 {
-				if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
-					errs = append(errs, fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets"))
+				switch {
+				case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets != nil:
+					if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
+						errs = append(errs, changeErr)
+					}
+				case prev.Spec.NumVBuckets == nil && curr.Spec.NumVBuckets != nil:
+					if *curr.Spec.NumVBuckets != 128 {
+						errs = append(errs, changeErr)
+					}
+				case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets == nil:
+					if *prev.Spec.NumVBuckets != 128 {
+						errs = append(errs, changeErr)
+					}
 				}
 			}
 		}
