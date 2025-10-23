@@ -4869,6 +4869,37 @@ func TestValidationEncryptionKey(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.usage.allBuckets"},
 		},
+		{
+			name: "TestInvalidKeyNameOnBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"bucket3": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyName: "non-existent-key",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.encryptionAtRest.keyName non-existent-key does not exist"},
+		},
+		{
+			name: "TestInvalidKeyNoBucketUsage",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+				}),
+				"auto-generated-key-4": jsonpatch.NewPatchSet().Replace("/spec/usage", couchbasev2.CouchbaseEncryptionKeyUsage{
+					Configuration: true,
+					Key:           true,
+					Log:           true,
+					Audit:         true,
+					AllBuckets:    false,
+				}),
+				"bucket3": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
+					KeyName: "auto-generated-key-4",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.encryptionAtRest.keyName auto-generated-key-4 does not have bucket encryption"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})

@@ -2065,7 +2065,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketEncryptionAtRestSettings(bucket.Spec.EncryptionAtRest); err != nil {
+	if err := checkBucketEncryptionAtRestSettings(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2097,7 +2097,8 @@ func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) err
 	return nil
 }
 
-func checkBucketEncryptionAtRestSettings(config *couchbasev2.BucketEncryptionAtRestConfiguration) error {
+func checkBucketEncryptionAtRestSettings(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
+	config := bucket.Spec.EncryptionAtRest
 	if config == nil {
 		return nil
 	}
@@ -2118,6 +2119,46 @@ func checkBucketEncryptionAtRestSettings(config *couchbasev2.BucketEncryptionAtR
 		}
 	}
 
+	keyName := config.KeyName
+	if keyName == "" {
+		return nil
+	}
+
+	clusters, err := getBucketsRelatedClusters(v, bucket)
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusters {
+		if !cluster.IsEncryptionAtRestManaged() {
+			continue
+		}
+
+		encryptionAtRest := cluster.Spec.Security.EncryptionAtRest
+
+		// Get all encryption keys using the selector
+		encryptionKeys, err := v.Abstraction.GetCouchbaseEncryptionKeys(cluster.Namespace, encryptionAtRest.Selector)
+		if err != nil {
+			return fmt.Errorf("failed to get encryption keys: %w", err)
+		}
+
+		// Create a map of key names to their specs for easy lookup
+		keyMap := make(map[string]*couchbasev2.CouchbaseEncryptionKey)
+
+		for i := range encryptionKeys.Items {
+			key := &encryptionKeys.Items[i]
+			keyMap[key.Name] = key
+		}
+
+		key, ok := keyMap[keyName]
+		if !ok {
+			return fmt.Errorf("spec.encryptionAtRest.keyName %s does not exist for cluster %s", keyName, cluster.Name)
+		}
+
+		if !key.Spec.Usage.AllBuckets {
+			return fmt.Errorf("spec.encryptionAtRest.keyName %s does not have bucket encryption usage for cluster %s", keyName, cluster.Name)
+		}
+	}
 	return nil
 }
 
@@ -5867,4 +5908,34 @@ func CheckDeleteConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Co
 	}
 
 	return nil
+}
+
+func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.Buckets.Managed {
+			continue
+		}
+
+		if cluster.Spec.Buckets.Selector == nil {
+			relatedClusters = append(relatedClusters, &cluster)
+			continue
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		if selector.Matches(labels.Set(bucket.Labels)) {
+			relatedClusters = append(relatedClusters, &cluster)
+		}
+	}
+
+	return relatedClusters, nil
 }
