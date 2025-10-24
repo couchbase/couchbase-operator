@@ -76,7 +76,6 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			BucketName:         name,
 			SampleBucket:       bucket.Spec.SampleBucket,
 			BucketType:         constants.BucketTypeCouchbase,
-			NumVBuckets:        util.IntPtr(1024),
 			BucketMemoryQuota:  k8sutil.Megabytes(bucket.Spec.MemoryQuota),
 			BucketReplicas:     bucket.Spec.Replicas,
 			IoPriority:         couchbaseutil.IoPriorityType(bucket.Spec.IoPriority),
@@ -133,6 +132,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				defaultCrossClusterVersioning := false
 				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
 			}
+
+			b.NumVBuckets = util.IntPtr(1024)
 
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
