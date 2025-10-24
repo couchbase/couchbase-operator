@@ -251,8 +251,8 @@ REVISION := $(shell git rev-parse HEAD)
 GOPATH := $(shell go env GOPATH)
 GOBIN := $(if $(GOPATH),$(GOPATH)/bin,$(HOME)/go/bin)
 GOLINT_VERSION := v1.64.8
-CODE_GENERATOR_VERSION := v0.23.2 # Should be kept in sync with other libs in go.mod
-CONTROLLER_TOOLS_VERSION := v0.14.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
+CODE_GENERATOR_VERSION := v0.28.3 # Should be kept in sync with other libs in go.mod
+CONTROLLER_TOOLS_VERSION := v0.19.0 # See https://github.com/kubernetes-sigs/controller-tools/releases
 
 # Common environment settings for all Go builds.
 STATIC_GOENV := CGO_ENABLED=0 GOOS=$(TARGET_OS) GOARCH=$(TARGET_ARCH)

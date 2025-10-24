@@ -412,9 +412,7 @@ The key to select.
 ==== Description
 
 Name of the referent.
-More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-TODO: Add other useful fields.
-apiVersion, kind, uid?.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names.
 
 === couchbasebackups.spec.env.valueFrom.configMapKeyRef.optional
 
@@ -534,9 +532,7 @@ Must be a valid secret key.
 ==== Description
 
 Name of the referent.
-More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-TODO: Add other useful fields.
-apiVersion, kind, uid?.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names.
 
 === couchbasebackups.spec.env.valueFrom.secretKeyRef.optional
 
