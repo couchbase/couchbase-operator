@@ -1985,37 +1985,49 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	for _, c := range clusters.Items {
-		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
 		if err != nil {
 			return err
 		}
 
-		if atLeast80 {
-			if bucket.Spec.StorageBackend != "" {
-				if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-					if bucket.Spec.NumVBuckets != nil {
-						if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+		var atLeast80 bool
+		var versionErr error
+
+		if c.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+			atLeast80, versionErr = c.IsAtLeastVersion("8.0.0")
+			if versionErr != nil {
+				return versionErr
+			}
+
+			if atLeast80 {
+				if bucket.Spec.StorageBackend != "" {
+					if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+						if bucket.Spec.NumVBuckets != nil {
+							if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
+								errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
+							}
+
+							if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+								errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
+							}
+
+							if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
+								errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
+							}
+						}
+
+						if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
 							errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
 						}
-
-						if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-							errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
-						}
-
-						if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
-							errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
-						}
-					}
-
-					if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-						errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
 					}
 				}
-			}
-		} else {
-			if bucket.Spec.MemoryQuota != nil {
-				if bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-					errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi"))
+			} else {
+				if bucket.Spec.StorageBackend != "" && bucket.Spec.MemoryQuota == nil {
+					errs = append(errs, fmt.Errorf("spec.memoryQuota (nil) in body should be present and greater than or equal to 1024Mi for spec.storageBackend: magma"))
+				}
+
+				if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+					errs = append(errs, fmt.Errorf("spec.memoryQuota (%v) in body should be greater than or equal to 1024Mi for spec.storageBackend: magma", bucket.Spec.MemoryQuota))
 				}
 			}
 		}
