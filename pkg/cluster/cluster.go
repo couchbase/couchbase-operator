@@ -596,15 +596,15 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	// If manual intervention is required, we will skip reconciliation if the SkipReconciliation flag is set.
-	if c.cluster.HasCondition(couchbasev2.ClusterConditionManualInterventionRequired) {
+	if condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionManualInterventionRequired); condition != nil && condition.Status == v1.ConditionTrue {
 		if c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.SkipReconciliation != nil && *c.cluster.Spec.MirWatchdog.SkipReconciliation {
-			log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName())
+			log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName(), "reason", condition.Message)
 			metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "mir"})...).Inc()
 
 			return
 		}
 
-		log.Info("Manual intervention required", "cluster", c.namespacedName())
+		log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
 	}
 
 	// Otherwise indicate that we are in control.
