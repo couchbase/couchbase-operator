@@ -197,6 +197,21 @@ func TestIndexerSettings(t *testing.T) {
 	}
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
+	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
+
+	preIndexServicePatchCycles := 1
+
+	// Let's add the index service into the cluster for our other tests.
+	indexService := couchbasev2.ServerConfig{
+		Size:     constants.Size2,
+		Name:     "idx_only",
+		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/servers/-", indexService), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
 	// Edit the index settings so they aren't the defaults.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/threads", 8), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Threads", 8), time.Minute)
@@ -208,8 +223,6 @@ func TestIndexerSettings(t *testing.T) {
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MemSnapInterval", 1000), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/stableSnapshotInterval", &metav1.Duration{Duration: time.Second}), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StableSnapInterval", 1000), time.Minute)
-	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingStandard), time.Minute)
-	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/StorageMode", couchbaseutil.IndexStoragePlasma), time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/numReplica", 1), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/NumberOfReplica", 1), time.Minute)
 	// Check that we can set redistributeIndexes to both true and false
@@ -218,7 +231,7 @@ func TestIndexerSettings(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/redistributeIndexes", false), time.Minute)
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/RedistributeIndexes", false), time.Minute)
 
-	patchCycles := 9
+	postIndexServicePatchCycles := 8
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
@@ -230,7 +243,7 @@ func TestIndexerSettings(t *testing.T) {
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", v), time.Minute)
 		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnablePageBloomFilter", &v), time.Minute)
 
-		patchCycles++
+		postIndexServicePatchCycles++
 	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
@@ -241,7 +254,7 @@ func TestIndexerSettings(t *testing.T) {
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enableShardAffinity", v), time.Minute)
 		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnableShardAffinity", &v), time.Minute)
 
-		patchCycles++
+		postIndexServicePatchCycles++
 	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
@@ -252,13 +265,15 @@ func TestIndexerSettings(t *testing.T) {
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/deferBuild", v), time.Minute)
 		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/DeferBuild", &v), time.Minute)
 
-		patchCycles++
+		postIndexServicePatchCycles++
 	}
 
 	// Check that the user can see the cluster being edited.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: patchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: preIndexServicePatchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		e2eutil.ClusterScaleUpSequence(constants.Size2),
+		eventschema.Repeat{Times: postIndexServicePatchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

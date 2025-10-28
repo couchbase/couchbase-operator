@@ -706,11 +706,11 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
 
-	if err := c.updateCRSpecAnnotation(); err != nil {
+	if err := retryutil.RetryFor(4*time.Second, c.updateCRSpecAnnotation); err != nil {
 		log.Info("unable to update spec annotation", "cluster", c.namespacedName(), "error", err)
 	}
 
-	if err := c.updateCRStatus(); err != nil {
+	if err := retryutil.RetryFor(4*time.Second, c.updateCRStatus); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 

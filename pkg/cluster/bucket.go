@@ -430,11 +430,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		return nil, err
 	}
 
-	atleast80, err := c.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return nil, err
-	}
-
+	atleast80 := c.SupportsVersionFeatures("8.0.0")
 	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
 
 	supportedFeatures[Additional80Settings] = atleast80
@@ -540,10 +536,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		return nil, nil, nil, nil, err
 	}
 
-	atLeast80, err := c.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
+	atLeast80 := c.SupportsVersionFeatures("8.0.0")
 
 	create := []couchbaseutil.Bucket{}
 	update := []couchbaseutil.Bucket{}

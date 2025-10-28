@@ -462,7 +462,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 		specFailoverSettings.FailoverServerGroup = nil
 	}
 
-	if over80, err := couchbaseutil.VersionAfter(c.GetLowestMemberVersion(), "8.0.0"); over80 && err == nil {
+	if c.SupportsVersionFeatures("8.0.0") {
 		if clusterSettings.AllowFailoverEphemeralNoReplicas != nil {
 			specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
 		} else {
@@ -637,7 +637,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 	}
 
 	defaultThreadSetting := "default"
-	if ok, err := c.IsAtLeastVersion("8.0.0"); ok && err == nil {
+	if c.SupportsVersionFeatures("8.0.0") {
 		defaultThreadSetting = "balanced"
 	}
 
@@ -698,7 +698,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 			}
 		}
 
-		if ok, err := couchbaseutil.VersionAfter(c.GetLowestMemberVersion(), "8.0.0"); ok && err == nil {
+		if c.SupportsVersionFeatures("8.0.0") {
 			requested.TCPKeepAliveInterval = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveInterval
 			requested.TCPKeepAliveIdle = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveIdle
 			requested.TCPKeepAliveProbes = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveProbes
@@ -721,8 +721,8 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 }
 
 func (c *Cluster) reconcileResourceManagementSettings() error {
-	if atleast80, err := couchbaseutil.VersionAfter(c.GetLowestMemberVersion(), "8.0.0"); err != nil || !atleast80 {
-		return err
+	if !c.SupportsVersionFeatures("8.0.0") {
+		return nil
 	}
 
 	actual := couchbaseutil.ResourceManagementSettings{}
@@ -830,7 +830,7 @@ func (c *Cluster) reconcileIndexSettings() error {
 			requested.EnableShardAffinity = &apiSettings.EnableShardAffinity
 		}
 
-		if ok, err := c.IsAtLeastVersion("8.0.0"); ok && err == nil {
+		if c.SupportsVersionFeatures("8.0.0") {
 			requested.DeferBuild = &apiSettings.DeferBuild
 		}
 	}
@@ -925,17 +925,12 @@ func (c *Cluster) configureCompletedTrackingSettings(apiSettings *couchbasev2.Co
 
 // configureVersionSpecificSettings configures settings based on CB version using efficient if-else-if logic.
 func (c *Cluster) configureVersionSpecificSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) error {
-	atleast800, err := c.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return err
-	}
-
 	atleast76, err := c.IsAtLeastVersion("7.6.0")
 	if err != nil {
 		return err
 	}
 
-	if atleast800 {
+	if c.SupportsVersionFeatures("8.0.0") {
 		// CB 8.0.0+ - configure both 7.6.0+ and 8.0.0+ settings
 		c.configure76PlusSettings(apiSettings, requested)
 		c.configure80PlusSettings(apiSettings, requested)
@@ -1228,9 +1223,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 
 func (c *Cluster) reconcileAppTelemetrySettings() error {
 	// Only supported on version 8.0 and above
-	if over80, err := c.IsAtLeastVersion("8.0.0"); err != nil {
-		return err
-	} else if !over80 {
+	if !c.SupportsVersionFeatures("8.0.0") {
 		return nil
 	}
 

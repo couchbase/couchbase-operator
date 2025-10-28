@@ -323,15 +323,6 @@ func (c *Cluster) removeFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
 }
 
 func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, []*couchbasev2.CouchbaseEncryptionKey, error) {
-	earSupported, err := c.cluster.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if !earSupported {
-		return nil, nil, nil
-	}
-
 	if !c.IsEncryptionAtRestManaged() {
 		return nil, nil, nil
 	}
@@ -598,12 +589,7 @@ func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey) []string
 }
 
 func (c *Cluster) refreshKeyShadowSecret() error {
-	earSupported, err := c.cluster.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return err
-	}
-
-	if !earSupported {
+	if !c.SupportsVersionFeatures("8.0.0") {
 		return nil
 	}
 

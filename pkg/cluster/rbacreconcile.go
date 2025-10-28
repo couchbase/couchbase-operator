@@ -481,7 +481,7 @@ func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 		// the deprecated names are no longer valid. For older server
 		// versions, accept the old names as-is.
 		migrated := g.Spec.Roles
-		if ok, err := c.IsAtLeastVersion("8.0.0"); err == nil && ok {
+		if c.SupportsVersionFeatures("8.0.0") {
 			migrated = couchbasev2.MigrateDeprecatedRoles(g.Spec.Roles)
 			// emit an event to notify the user that migration occurred
 			deprecated := []string{}
@@ -650,10 +650,7 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 	users := map[string]couchbaseutil.User{}
 	unReconcilableUsers := map[string]bool{}
 
-	atLeast80, err := c.IsAtLeastVersion("8.0.0")
-	if err != nil {
-		return nil, nil, err
-	}
+	atLeast80 := c.SupportsVersionFeatures("8.0.0")
 
 	// For every rolebinding (SM: this is not filtered, why??) check if the
 	// group exists, if it does, then accumulate the subjects, that are selected
@@ -813,9 +810,8 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 // reconcileTemporaryPasswords reconciles the temporary password fields for users. This is only applicable for 8.0.0+ clusters.
 // By setting temporary password to true, a user will be prompted to change their password on next login.
 func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
-	atLeast80, err := c.IsAtLeastVersion("8.0.0")
-	if err != nil || !atLeast80 {
-		return err
+	if !c.SupportsVersionFeatures("8.0.0") {
+		return nil
 	}
 
 	users := &couchbaseutil.UserList{}

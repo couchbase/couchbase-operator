@@ -237,8 +237,6 @@ func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
 		}
 
 		finalCandidates.Add(member)
-
-		log.Info("Final pod upgrade candidate", "cluster", c.namespacedName(), "name", member.Name(), "version", member.Version())
 	}
 
 	return finalCandidates, nil
@@ -486,6 +484,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	}
 
 	if !candidates.Empty() {
+		log.Info("Pod upgrade candidates remaining", "cluster", c.namespacedName(), "names", candidates.Names())
 		return nil
 	}
 

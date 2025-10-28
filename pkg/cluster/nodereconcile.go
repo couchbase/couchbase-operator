@@ -1726,6 +1726,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	podRecoverable := true
 
 	for _, candidate := range candidates {
+		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", candidate.Name())
 		if !c.isPodRecoverable(candidate) {
 			podRecoverable = false
 			break

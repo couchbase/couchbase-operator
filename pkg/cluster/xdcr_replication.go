@@ -891,7 +891,7 @@ func (c *Cluster) buildReplicationCreatePayload(spec *couchbasev2.CouchbaseRepli
 		replication.Mobile = spec.Mobile
 	}
 
-	if isAtleast80, err := c.cluster.IsAtLeastVersion("8.0.0"); err == nil && isAtleast80 {
+	if c.SupportsVersionFeatures("8.0.0") {
 		replication.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
 	}
 

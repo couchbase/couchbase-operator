@@ -123,6 +123,28 @@ func (c *Cluster) GetRunningVersions() []string {
 	return versions
 }
 
+func (c *Cluster) SupportsVersionFeatures(version string) bool {
+	lowestVersion := c.GetLowestMemberVersion()
+
+	if lowestVersion == "" {
+		supports, err := c.IsAtLeastVersion(version)
+		if err != nil {
+			log.Error(err, "Failed to check cluster version for feature support", "version", version)
+			return false
+		}
+
+		return supports
+	}
+
+	supports, err := couchbaseutil.VersionAfter(lowestVersion, version)
+	if err != nil {
+		log.Error(err, "Failed to check cluster version for feature support", "version", version)
+		return false
+	}
+
+	return supports
+}
+
 func (c *Cluster) GetLowestMemberVersion() string {
 	versions := c.GetRunningVersions()
 
@@ -152,5 +174,5 @@ func (c *Cluster) GetEncryptionKeyFinalizer() string {
 }
 
 func (c *Cluster) IsEncryptionAtRestManaged() bool {
-	return c.cluster.IsEncryptionAtRestManaged()
+	return c.SupportsVersionFeatures("8.0.0") && c.cluster.IsEncryptionAtRestManaged()
 }
