@@ -1152,9 +1152,14 @@ Analytics allows the analytics service to be configured.
 
 *Type*: `integer`
 
+*Minimum*: `0`
+
+*Maximum*: `3`
+
 ==== Description
 
 NumReplicas specifies the number of replicas for Analytics.
+Changing the value in this field when the Analytics service is enabled will trigger a rebalance of the cluster.
 
 === couchbaseclusters.spec.cluster.analyticsServiceMemoryQuota
 

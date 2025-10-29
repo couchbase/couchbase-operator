@@ -54,24 +54,25 @@ func TestAnalyticsServiceSettings(t *testing.T) {
 	clusterSize := 3
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Services = append(cluster.Spec.Servers[0].Services, couchbasev2.AnalyticsService)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	numReplicas := 3
 	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/analytics", &couchbasev2.CouchbaseClusterAnalyticSettings{NumReplicas: &numReplicas}), time.Minute)
 	e2eutil.MustVerifyAnalyticsServiceSettings(t, kubernetes, cluster, &numReplicas, 2*time.Minute)
-
-	numPatches := 1
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
+	// * Rebalance so the new setting takes effect (Handled by cb server)
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.RepeatAtLeast{
-			Times:     numPatches,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
+
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 

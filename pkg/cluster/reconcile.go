@@ -596,9 +596,7 @@ func (c *Cluster) reconcileDataSettings() error {
 }
 
 func (c *Cluster) reconcileAnalyticSettings() error {
-	if ok, err := c.IsAtLeastVersion("7.6.0"); !ok && err == nil {
-		return nil
-	} else if err != nil {
+	if above72, err := c.IsAtLeastVersion("7.2.0"); err != nil || !above72 {
 		return err
 	}
 

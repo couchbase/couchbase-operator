@@ -4202,6 +4202,9 @@ func (q *CouchbaseClusterQuerySettings) MarshalJSON() ([]byte, error) {
 // CouchbaseClusterAnalyticSettings allow analytic service tweaks.
 type CouchbaseClusterAnalyticSettings struct {
 	// NumReplicas specifies the number of replicas for Analytics.
+	// Changing the value in this field when the Analytics service is enabled will trigger a rebalance of the cluster.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=3
 	NumReplicas *int `json:"numReplicas,omitempty"`
 }
 
