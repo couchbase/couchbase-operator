@@ -589,8 +589,11 @@ func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey) []string
 }
 
 func (c *Cluster) refreshKeyShadowSecret() error {
-	if !c.SupportsVersionFeatures("8.0.0") {
-		return nil
+	// If the cluster spec is at least 8.0, refresh the shadow secrets as during upgrades to 8.0, we want to create the
+	// shadow secrets for the new version so we can mount them while upgrading the pods.
+	earSupported, err := c.cluster.IsAtLeastVersion("8.0.0")
+	if err != nil || !earSupported {
+		return err
 	}
 
 	name := k8sutil.KeyShadowSecretName(c.cluster)
