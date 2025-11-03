@@ -1863,7 +1863,17 @@ func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName str
 	// the configuration.  By doing an unconditional non-clobbering copy, we will
 	// never overwrite if the file exists, and also probably hit an error condition
 	// that will cause the init process to fail if NFS is playing silly buggers.
-	initContainer.Args = []string{"bash", "-c", "cp -na /opt/couchbase/etc /mnt/"}
+	copyStr := "cp -na /opt/couchbase/etc /mnt/"
+
+	// We can't assume that the etc directory from older versions is compatible. When upgrading to 8.0 and onwards, we will
+	// clean the /opt/couchbase/etc directory of the existing default volume (mounted at /mnt/etc on the init container)
+	// and replace it with the default etc directory from the new image.
+	targetVersion, _ := couchbaseutil.CouchbaseImageVersion(image)
+	if after80, _ := couchbaseutil.VersionAfter(targetVersion, "8.0.0"); after80 {
+		copyStr = "rm -rf /mnt/etc && cp -a /opt/couchbase/etc /mnt/"
+	}
+
+	initContainer.Args = []string{"bash", "-c", copyStr}
 	initContainer.VolumeMounts = []v1.VolumeMount{
 		{
 			Name:      claimName,
