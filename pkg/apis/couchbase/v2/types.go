@@ -4022,10 +4022,10 @@ type CouchbaseClusterQuerySettings struct {
 	CompletedTrackingThreshold *metav1.Duration `json:"completedTrackingThreshold,omitempty"`
 
 	// CompletedThreshold sets the minimum request duration after which requests are added to the completed
-	// requests catalog. This field must either be a duration up to 2147483648ms, "0", or "-1".
+	// requests catalog. This field must either be a duration up to 2147483648s, "0", or "-1".
 	// Setting this field to "0" will log all requests. Setting this field to "-1" will disable request logging.
-	// This field defaults to 1ms.
-	// +kubebuilder:default="1ms"
+	// This field defaults to 1s.
+	// +kubebuilder:default="1s"
 	CompletedThreshold *metav1.Duration `json:"completedThreshold,omitempty"`
 
 	// LogLevel controls the verbosity of query logs. This field must be one of

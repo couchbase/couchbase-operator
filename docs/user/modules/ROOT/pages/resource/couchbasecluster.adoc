@@ -127,7 +127,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-completedlimit,completedLimit>>: 4000
       <<couchbaseclusters-spec-cluster-query-completedmaxplansize,completedMaxPlanSize>>: 262144
       <<couchbaseclusters-spec-cluster-query-completedstreamsize,completedStreamSize>>: 0
-      <<couchbaseclusters-spec-cluster-query-completedthreshold,completedThreshold>>: 1ms
+      <<couchbaseclusters-spec-cluster-query-completedthreshold,completedThreshold>>: 1s
       <<couchbaseclusters-spec-cluster-query-completedtrackingallrequests,completedTrackingAllRequests>>: false
       <<couchbaseclusters-spec-cluster-query-completedtrackingenabled,completedTrackingEnabled>>: false
       <<couchbaseclusters-spec-cluster-query-completedtrackingthreshold,completedTrackingThreshold>>: ""
@@ -2122,16 +2122,16 @@ Defaults to 0 (disabled), minimum value is 0.
 
 *Type*: `string`
 
-*Default*: `1ms`
+*Default*: `1s`
 
 ==== Description
 
 CompletedThreshold sets the minimum request duration after which requests are added to the completed
 requests catalog.
-This field must either be a duration up to 2147483648ms, "0", or "-1".
+This field must either be a duration up to 2147483648s, "0", or "-1".
 Setting this field to "0" will log all requests.
 Setting this field to "-1" will disable request logging.
-This field defaults to 1ms.
+This field defaults to 1s.
 
 === couchbaseclusters.spec.cluster.query.completedTrackingAllRequests
 
