@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	v12 "k8s.io/api/core/v1"
 )
 
 // TestDenyCommunityEdition tries installing with a CE version of Couchbase server
@@ -812,4 +813,34 @@ func TestGracefulShutdown(t *testing.T) {
 		fmt.Print(output.Stdout)
 		e2eutil.Die(t, fmt.Errorf("stdout does not contain 'Gracefully shutting down'"))
 	}
+}
+
+func TestServiceChangedOnNode(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := constants.Size2
+
+	cluster := clusterOptions().WithMixedEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	victimID := 3
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", true), time.Minute)
+
+	e2eutil.MustChangeServicesOnNode(t, kubernetes, cluster, victimName, couchbaseutil.SearchService)
+
+	// No option but to wait here for a second while server does its thing...
+	time.Sleep(30 * time.Second)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", false), time.Minute)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ServicesMismatchEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionServicesMismatch, v12.ConditionTrue, cluster, 5*time.Minute)
+
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionServicesMismatch)
 }

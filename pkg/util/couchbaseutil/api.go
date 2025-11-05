@@ -346,6 +346,18 @@ func Rebalance(known, eject OTPNodeList) *Request {
 	return NewRequest((*Client).Post, "/controller/rebalance", []byte(data.Encode()), nil)
 }
 
+func RebalanceChangeServices(known, eject OTPNodeList, topology map[ServiceName]OTPNodeList) *Request {
+	data := url.Values{}
+	data.Set("ejectedNodes", strings.Join(eject.StringSlice(), ","))
+	data.Set("knownNodes", strings.Join(known.StringSlice(), ","))
+
+	for service, nodes := range topology {
+		data.Set("topology["+string(service)+"]", strings.Join(nodes.StringSlice(), ","))
+	}
+
+	return NewRequest((*Client).Post, "/controller/rebalance", []byte(data.Encode()), nil)
+}
+
 // StopRebalance attempts to stop an in-progress rebalance.
 func StopRebalance() *Request {
 	data := url.Values{}

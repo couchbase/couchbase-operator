@@ -119,7 +119,19 @@ const (
 	EventReasonEncryptionKeyCreated = "EncryptionKeyCreated"
 	EventReasonEncryptionKeyUpdated = "EncryptionKeyUpdated"
 	EventReasonEncryptionKeyDeleted = "EncryptionKeyDeleted"
+
+	// Services mismatch.
+	EventReasonServicesMismatch = "ServicesMismatch"
 )
+
+func EventReasonServicesMismatchEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonServicesMismatch
+	event.Message = "Services mismatch in cluster"
+
+	return event
+}
 
 func EventReasonAdminPasswordChangedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)

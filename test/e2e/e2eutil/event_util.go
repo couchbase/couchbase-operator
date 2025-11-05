@@ -89,6 +89,10 @@ func NewMemberFailedOverEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v
 	return k8sutil.MemberFailedOverEvent(name, cl)
 }
 
+func ServicesMismatchEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	return k8sutil.EventReasonServicesMismatchEvent(cl)
+}
+
 func RebalanceStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceStartedEvent(cl)
 }
