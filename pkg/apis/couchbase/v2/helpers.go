@@ -688,6 +688,12 @@ func (sml *ScalingMessageList) BuildMessage() string {
 	return strings.Join(builtMessages, ", ")
 }
 
+func (cs *ClusterStatus) SetServicesMismatchCondition() {
+	c := newClusterCondition(ClusterConditionServicesMismatch, v1.ConditionTrue, "ServicesMismatch",
+		"The current services do not match the desired services for one or more server classes")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetScalingCondition() {
 	c := newClusterCondition(ClusterConditionScaling, v1.ConditionTrue, "ClusterScaling", "The operator is attempting to scale the cluster")
 	cs.setClusterCondition(c)

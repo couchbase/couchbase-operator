@@ -1840,6 +1840,58 @@ func GetTerseClusterInfo(client *CouchbaseClient) (*couchbaseutil.TerseClusterIn
 	return info, nil
 }
 
+func MustChangeServicesOnNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, victim string, service couchbaseutil.ServiceName) {
+	info := &couchbaseutil.ClusterInfo{}
+
+	client := MustCreateAdminConsoleClient(t, k8s, cluster)
+
+	if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	known := make(couchbaseutil.OTPNodeList, len(info.Nodes))
+	topology := make(map[couchbaseutil.ServiceName]couchbaseutil.OTPNodeList)
+
+	member := couchbaseutil.NewPartialMember(cluster.Namespace, cluster.Name, victim)
+
+	topology[service] = couchbaseutil.OTPNodeList{member.GetOTPNode()}
+
+	for i, node := range info.Nodes {
+		known[i] = node.OTPNode
+	}
+
+	if err := couchbaseutil.RebalanceChangeServices(known, nil, topology).On(client.client, client.host); err != nil {
+		Die(t, err)
+	}
+
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if info.RebalanceStatus != "none" {
+			return fmt.Errorf("rebalance is still running")
+		}
+
+		if info.Balanced != true {
+			return fmt.Errorf("cluster is not balanced")
+		}
+
+		// Cluster is balanced
+		return nil
+	}
+
+	if err := retryutil.Retry(context.Background(), time.Second, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustGetOrchestratorNode(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) string {
 	client := MustCreateAdminConsoleClient(t, k8s, cluster)
 

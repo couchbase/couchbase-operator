@@ -343,6 +343,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleFailedNodes,
 		(*ReconcileMachine).handleUnknownServerConfigs,
 		(*ReconcileMachine).handleVolumeExpansion,
+		(*ReconcileMachine).handleServerServices,
 		(*ReconcileMachine).handleMoveNodes,
 		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleRemoveNode,
@@ -415,6 +416,61 @@ func (r *ReconcileMachine) handlePodHostname(c *Cluster) error {
 	if membersToSwapRebalance.Size() > 0 {
 		return r.swapRebalanceMembers(c, constrained)
 	}
+
+	return nil
+}
+
+func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
+	if r.needsRebalance {
+		return nil
+	}
+
+	candidates := couchbaseutil.NewMemberSet()
+
+	for _, candidate := range c.members {
+		// Get the server configuration for the candidate
+		serverConfig := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+		if serverConfig == nil {
+			log.Info("Server configuration not found for candidate", "name", candidate.Name())
+			continue
+		}
+
+		// Compare the candidate's services with the expected services
+		nodesSelf := &couchbaseutil.NodeInfo{}
+		err := couchbaseutil.GetNodesSelf(nodesSelf).On(c.api, candidate)
+		if err != nil {
+			return err
+		}
+		candidateServices := nodesSelf.Services
+		expectedServices := serverConfig.Services
+		expectedServicesString := make([]string, 0, len(expectedServices))
+		for _, service := range expectedServices {
+			expectedServicesString = append(expectedServicesString, service.String())
+		}
+
+		for i := 0; i < len(candidateServices); i++ {
+			if candidateServices[i] == "kv" {
+				candidateServices[i] = "data"
+			} else if candidateServices[i] == "n1ql" {
+				candidateServices[i] = "query"
+			}
+		}
+
+		sort.Strings(candidateServices)
+		sort.Strings(expectedServicesString)
+
+		if !couchbaseutil.EqualStringSlices(candidateServices, expectedServicesString) {
+			c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
+			c.cluster.Status.SetServicesMismatchCondition()
+			candidates.Add(candidate)
+		}
+	}
+
+	if !candidates.Empty() {
+		return r.swapRebalanceMembers(c, candidates)
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
 
 	return nil
 }
