@@ -63,7 +63,6 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 		Spec: couchbasev2.CouchbaseBucketSpec{
 			Name:               couchbasev2.BucketName(bucket.BucketName),
 			StorageBackend:     couchbasev2.CouchbaseStorageBackend(bucket.BucketStorageBackend),
-			NumVBuckets:        bucket.NumVBuckets,
 			MemoryQuota:        resource.NewQuantity(bucket.BucketMemoryQuota<<20, resource.BinarySI),
 			Replicas:           bucket.BucketReplicas,
 			IoPriority:         couchbasev2.CouchbaseBucketIOPriority(bucket.IoPriority),
@@ -83,6 +82,7 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 	}
 
 	if bucket.BucketStorageBackend == "magma" {
+		cbBucket.Spec.NumVBuckets = bucket.NumVBuckets
 		cbBucket.Spec.HistoryRetentionSettings = &couchbasev2.HistoryRetentionSettings{
 			CollectionDefault: bucket.HistoryRetentionCollectionDefault,
 			Seconds:           bucket.HistoryRetentionSeconds,
