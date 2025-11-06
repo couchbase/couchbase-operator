@@ -2488,55 +2488,68 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestTLSRotateCAExpiring(t *testing.T) {
+// TestMandatoryMutualTLSRotateIntermediateCertExpiring tests the server's certificate chain is rotated when the intermediate certificate expires.
+func TestMandatoryMutualTLSRotateIntermediateCertExpiring(t *testing.T) {
+	testExpiringServerChain(t, 1*time.Hour, 2*time.Minute)
+}
+
+// TestMandatoryMutualTLSRotateLeafCertExpiring tests the server's certificate chain is rotated when the leaf certificate expires.
+func TestMandatoryMutualTLSRotateLeafCertExpiring(t *testing.T) {
+	testExpiringServerChain(t, 2*time.Minute, 1*time.Hour)
+}
+
+// TestExpiringServerChain tests scenarios where either the leaf or intermediate certificate in the server's certificate
+// chain expire. This should trigger a refresh of the shadowed tls certs and then reloadCertificate request to each node
+// using a plain text request. This is a separate method to avoid code duplication.
+func testExpiringServerChain(t *testing.T, leafExpiresIn time.Duration, intermediateExpiresIn time.Duration) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Set the client certs to expire some time in the future
-	validFrom := time.Now().In(time.UTC)
-	validTo := time.Now().Add(3 * time.Minute)
-	opts := &e2eutil.TLSOpts{
-		ValidFrom: &validFrom,
-		ValidTo:   &validTo,
-	}
-
-	// Create tls cluster with mandatory client auth
+	// Initialise the cluster with all the default settings
 	clusterSize := constants.Size3
 	policy := couchbasev2.ClientCertificatePolicyMandatory
-	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, opts)
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{Source: e2eutil.TLSSourceKubernetesSecret})
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).MustCreate(t, kubernetes)
 
-	// waiting additional time to ensure that the clients have expired
-	expiryTime := validTo.Add(15 * time.Second)
-	time.Sleep(time.Until(expiryTime))
-
-	// At this point the client is locked out but we should be able to rotate certs and proceed
-	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, ctx)
-
-	// patch to allow rotation of expired server certificates
+	// Patch to allow expired cert rotation
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/tls/allowPlainTextCertReload", true), time.Minute)
 
-	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonUpdateClientAuth), 15*time.Minute)
+	// Rotate so the leaf cert expires in a short duration (first duration is the leaf expiration, second duration is the intermediate expiration).
+	e2eutil.MustRotateServerCertificateChainWithExpiration(t, ctx, leafExpiresIn, intermediateExpiresIn)
+
+	// Wait until after we know the cert has expired and expect at some point to see received a reconcile failed event
+	// We can't check for TLSInvalid here as we don't know where we are in the reconciliation loop at the time when the certs become expired
+	time.Sleep(2 * time.Minute)
+	e2eutil.MustObserveClusterEventIgnoringMessage(t, kubernetes, cluster, e2eutil.ReconcileFailedEvent(cluster), 10*time.Minute)
+
+	// Once we know they've expired, rotate the certs again to valid ones
+	e2eutil.MustRotateServerCertificateChainWithExpiration(t, ctx, 1*time.Hour, 1*time.Hour)
+
+	// Wait until we see the TLSUpdated event for at least one of the members
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster, couchbaseutil.CreateMemberName(cluster.Name, clusterSize-1)), 10*time.Minute)
+
+	// Resize the cluster to add a new member and check the TLS changes allow for normal operation
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
 	// Check the events match what we expect:
-	// * Cluster created
-	// * Invalid TLS is raised for both root CA and server cert
-	// * Invalid Client TLS is raised for expired client cert
-	// * Client TLS updated
+	// * Cluster created with mutual TLS
+	// * TLS Updated for each member when we initially rotate the certs to ones that will expire during the test
+	// * Depending on where we are in the reconciliation loop at the time when the certs become expired, we may see a number
+	// of reconcile failed events beforehand, hence the optionals
+	// * TLS Updated for each member when we rotate the expired certs to the new ones
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
-		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid}},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated}},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

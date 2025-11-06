@@ -793,15 +793,6 @@ func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
 		return err
 	}
 
-	// I really don't like this but this is all we can do if the certs have expired, and we need to rotate them.
-	// This will succeed in rotating the certs using password authentication if allowPlainTextCertReload is true.
-	if c.cluster.Spec.Networking.TLS.AllowPlainTextCertReload {
-		request := couchbaseutil.ReloadNodeCert(settings).InPlaintext()
-		request.Authenticate = true
-
-		return request.On(c.api, member)
-	}
-
 	return couchbaseutil.ReloadNodeCert(settings).On(c.api, member)
 }
 
@@ -1030,6 +1021,8 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 		return nil, nil, nil, nil, err
 	}
 
+	// cacert is the trust anchor for verifying the server's certificate chain.
+	// chain is the server's certificate chain, containing the leaf followed by intermediates.
 	return cacert, chain, key, keystore, nil
 }
 
@@ -1243,17 +1236,13 @@ func (c *Cluster) updateTLS() error {
 	c.api.CloseIdleConnections()
 
 	// Update the CA and any server certificate chains that require it.
-	if err := c.updateClientCA(); err != nil {
-		return err
-	}
-
 	for _, member := range c.members {
 		if err := c.reconcileMemberTLS(member, cert); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return c.updateClientCA()
 }
 
 func (c *Cluster) updateClientCA() error {
@@ -1918,12 +1907,16 @@ func (c *Cluster) checkCertExpiration(cert []byte) bool {
 			return false
 		}
 
-		if time.Now().After(cert.NotAfter) {
+		if c.checkx509CertExpiration(cert) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (c *Cluster) checkx509CertExpiration(cert *x509.Certificate) bool {
+	return time.Now().After(cert.NotAfter)
 }
 
 // shouldRotateExpiredRootCAs checks if the servers root CAs have expired
@@ -2007,6 +2000,29 @@ func (c *Cluster) shouldRotateExpiredServerCerts() bool {
 		log.Error(errors.ErrCertificateInvalid, "The Couchbase Server Certificate(s) have expired and must be updated before proceeding", "cluster", c.namespacedName())
 	}
 
+	// Given we can't guarantee that the shadow certs are currently the ones in use by the server, we need to check the
+	// certificates presented by each recognised member for expiration.
+	for _, member := range c.readyMembers() {
+		certificates, err := netutil.GetTLSHandshakeCertificateChainInsecure(member.GetHostPortTLS())
+		if err != nil {
+			log.Error(err, "Failed to get node certificates using a TLS handshake when attempting to check for expired certs", "cluster", c.namespacedName(), "member", member.Name())
+		}
+
+		// We can skip our checks if a member doesn't present any certs.
+		if len(certificates) == 0 {
+			continue
+		}
+
+		// If a member presents any certificates which have expired, we should rotate them all.
+		// We don't need to compare the in-use certificate chain to the ones in the tlsCache as they will not be loaded into the cache unless they are valid
+		// and we'll bail out fo the reconcile loop before we get here.
+		for _, certificate := range certificates {
+			if c.checkx509CertExpiration(certificate) {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
@@ -2034,6 +2050,8 @@ func (c *Cluster) rotateExpiredServerCerts() error {
 		if err := request.On(c.api, member); err != nil {
 			return err
 		}
+
+		c.raiseEvent(k8sutil.TLSUpdatedEvent(c.cluster, member.Name()))
 	}
 
 	return nil

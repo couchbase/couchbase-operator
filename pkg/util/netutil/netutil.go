@@ -124,3 +124,30 @@ func GetFreePort() (string, error) {
 
 	return port, nil
 }
+
+// GetTLSHandshakeCertificateChainInsecure initiates a tls handshake with the target host and returns the certificate chain presented by the server.
+// CA's that are self-signed are excluded from the chain such that it should contain a leaf and intermediates which can be climbed to the root.
+// This should not be relied upon as a trusted or valid certificate chain as it is not verified.
+// The order of the returned slice should be respected as this is the order presented by the server.
+func GetTLSHandshakeCertificateChainInsecure(hostport string) ([]*x509.Certificate, error) {
+	cfg := &tls.Config{
+		InsecureSkipVerify: true, // intentionally skip verification to capture chain.
+	}
+
+	d := &net.Dialer{Timeout: 5 * time.Second}
+	conn, err := tls.DialWithDialer(d, "tcp", hostport, cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	var chain []*x509.Certificate
+	for _, c := range conn.ConnectionState().PeerCertificates {
+		if c.IsCA && c.CheckSignatureFrom(c) == nil {
+			break
+		}
+		chain = append(chain, c)
+	}
+
+	return chain, nil
+}
