@@ -3621,3 +3621,37 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("expected '--default-recovery' and 'purge' in restore container args"))
 	}
 }
+
+// TestBackupLogsCollection tests that backup logs are collected when using --backup-logs flag.
+func TestBackupLogsCollection(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a simple cluster for backup
+	cluster := clusterOptions().WithEphemeralTopology(constants.Size1).MustCreate(t, kubernetes)
+
+	// Create a simple full backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// Wait for the first backup job to actually complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
+
+	// Run cao collect-logs with --backup-logs flag and --backup-logs-keep-job to persist containers for debugging
+	commonArgs := e2eutil.ArgumentList{}
+	commonArgs.AddClusterDefaults(kubernetes)
+	commonArgs.AddEnvironmentDefaults(f.OpImage)
+	commonArgs.Add("--backup-logs", "")
+	commonArgs.Add("--backup-logs-keep-job", "")
+
+	archive, cleanCbopinfo := cbopinfo(t, commonArgs)
+	defer cleanCbopinfo()
+
+	// Verify backup logs are included in the archive
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, f.OpImage, false, true, true, 0, true, cluster.Name)
+	mustVerifyArchiveContents(t, archive, files)
+}

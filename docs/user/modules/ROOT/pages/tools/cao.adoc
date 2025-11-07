@@ -483,6 +483,12 @@ cao collect-logs --all
 
 # Collect only required resources, filtering potentially sensitive information
 cao collect-logs --log-level 0
+
+# Collect cbbackupmgr logs from all backups
+cao collect-logs --backup-logs
+
+# Collect cbbackupmgr logs from a specific backup
+cao collect-logs --backup-logs --backup-logs-name my-backup
 ----
 
 === Flags
@@ -493,6 +499,25 @@ cao collect-logs --log-level 0
 *Default*: false
 +
 Collect all resources from the namespace
+
+--backup-logs::
+*Type*: bool
++
+*Default*: false
++
+Collect cbbackupmgr logs from backup PVCs
+
+--backup-logs-keep-job::
+*Type*: bool
++
+*Default*: false
++
+Keep backup logs collection job after completion for debugging
+
+--backup-logs-name::
+*Type*: string
++
+Specify which backup to collect logs from (default: all backups)
 
 --collectinfo::
 *Type*: bool
