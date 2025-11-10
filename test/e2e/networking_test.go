@@ -786,7 +786,7 @@ func TestAlternateAddressExternalDNSCheckEjectsNewPods(t *testing.T) {
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
 	e2eutil.MustWaitForRebalanceEjectingNode(t, kubernetes, cluster, pods[1].Name, 10*time.Minute)
 
-	// Fetch the new pod created by the operatorand add it to the dns forwarding list.
+	// Fetch the new pod created by the operator and add it to the dns forwarding list.
 	newMemberName := couchbaseutil.CreateMemberName(cluster.Name, 2)
 	pod3 := e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMemberName, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Delaying DNS Check", 1*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, []corev1.Pod{*pod3})
