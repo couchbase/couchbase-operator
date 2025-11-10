@@ -298,6 +298,8 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			}
 
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
+
+			b.NumVBuckets = util.IntPtr(1024)
 		}
 
 		if supportedAdditional80Settings {
@@ -343,6 +345,8 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 		noRestart := true
 		b.NoRestart = &noRestart
 	}
+
+	b.NumVBuckets = util.IntPtr(1024)
 
 	b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
 }
@@ -580,6 +584,9 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					create = append(create, r)
 				} else if !reflect.DeepEqual(r, a) {
 					setBucketFieldsForEncoding(&r, isOver71)
+
+					fmt.Println(r)
+					fmt.Println(*a.NumVBuckets)
 
 					update = append(update, r)
 					c.logUpdate(a, r)
