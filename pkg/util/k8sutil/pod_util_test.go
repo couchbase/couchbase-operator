@@ -427,3 +427,108 @@ func TestCalculatePodResourcesOverhead(t *testing.T) {
 		})
 	}
 }
+
+func TestPasswordCompliesWithCouchbasePasswordPolicy(t *testing.T) {
+	testcases := []struct {
+		name     string
+		policy   *couchbasev2.PasswordPolicySpec
+		password string
+		expected bool
+	}{
+		{
+			name:     "no policy",
+			password: "Password123!",
+			expected: true,
+		},
+		{
+			name: "valid password with all character types",
+			policy: &couchbasev2.PasswordPolicySpec{
+				MinLength:           intPtr(8),
+				EnforceUppercase:    boolPtr(true),
+				EnforceLowercase:    boolPtr(true),
+				EnforceDigits:       boolPtr(true),
+				EnforceSpecialChars: boolPtr(true),
+			},
+			password: "Password123!",
+			expected: true,
+		},
+		{
+			name: "valid password with all character types with enforcement turned off",
+			policy: &couchbasev2.PasswordPolicySpec{
+				MinLength:           intPtr(8),
+				EnforceUppercase:    boolPtr(false),
+				EnforceLowercase:    boolPtr(false),
+				EnforceDigits:       boolPtr(false),
+				EnforceSpecialChars: boolPtr(false),
+			},
+			password: "Password123!",
+			expected: true,
+		},
+		{
+			name: "valid password short with only minlength",
+			policy: &couchbasev2.PasswordPolicySpec{
+				MinLength: intPtr(4),
+			},
+			password: "pass",
+			expected: true,
+		},
+		{
+			name: "invalid password with too short length",
+			policy: &couchbasev2.PasswordPolicySpec{
+				MinLength: intPtr(8),
+			},
+			password: "passwor",
+			expected: false,
+		},
+		{
+			name: "invalid password with no uppercase letters",
+			policy: &couchbasev2.PasswordPolicySpec{
+				EnforceUppercase: boolPtr(true),
+				MinLength:        intPtr(5),
+			},
+			password: "password123!",
+			expected: false,
+		},
+		{
+			name: "invalid password with no lowercase letters",
+			policy: &couchbasev2.PasswordPolicySpec{
+				EnforceLowercase:    boolPtr(true),
+				EnforceDigits:       boolPtr(true),
+				EnforceSpecialChars: boolPtr(true),
+			},
+			password: "PASSWORD123!",
+			expected: false,
+		},
+		{
+			name: "invalid password with no special characters",
+			policy: &couchbasev2.PasswordPolicySpec{
+				EnforceSpecialChars: boolPtr(true),
+				MinLength:           intPtr(5),
+				EnforceUppercase:    boolPtr(true),
+				EnforceLowercase:    boolPtr(false),
+			},
+			password: "PASSWORD123",
+			expected: false,
+		},
+		{
+			name: "invalid password with no digits",
+			policy: &couchbasev2.PasswordPolicySpec{
+				EnforceDigits: boolPtr(true),
+				MinLength:     intPtr(30),
+			},
+			password: "PasswordPasswordPasswordPasswordPassword!",
+			expected: false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		result := PasswordCompliesWithCouchbasePasswordPolicy(testcase.policy, testcase.password)
+		if result != testcase.expected {
+			t.Errorf("test %v failed, expected %v, got %v", testcase.name, testcase.expected, result)
+		}
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}

@@ -1,0 +1,66 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: password-policy-test-cluster
+spec:
+  image: couchbase/server:8.0.0
+  security:
+    adminSecret: basic-test-secret
+    rbac:
+      managed: true
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - analytics
+        - query
+        - search
+        - eventing
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-password-short
+data:
+  password: cGFzcw==
+---
+# Each of the following passwords is of length 12, and are each missing a password policy option to allow for validation of each type
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-password-nouppercase
+data:
+  password: cGFzc3dvcmQxMjM=
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-password-nolowercase
+data:
+  password: UEFTU1dPUkQxMjMh
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-password-nodigits
+data:
+  password: cGFzc3dvcmRwYXMh
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: user-password-nospecialchars
+data:
+  password: cGFzc3dvcmQxMjM0
+---
+# We'll use this user to test the password policy validation.
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: test-user-pw-policy
+spec:
+  fullName: Adminstrator
+  authDomain: local
+  authSecret: user-password-short

@@ -5420,7 +5420,7 @@ func TestAutoResourceAllocationValidation(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
 					Enabled:         true,
-					OverheadPercent: intPtr(20),
+					OverheadPercent: util.IntPtr(20),
 				})},
 			shouldFail: false,
 		},
@@ -5446,7 +5446,7 @@ func TestAutoResourceAllocationValidation(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Add("/spec/autoResourceAllocation", &couchbasev2.AutoResourceAllocation{
 					Enabled:         true,
-					OverheadPercent: intPtr(0),
+					OverheadPercent: util.IntPtr(0),
 					OverheadMemory:  resource.NewQuantity(1*1024*1024*1024, resource.BinarySI), // 1Gi
 				})},
 			shouldFail:     true,
@@ -5519,7 +5519,97 @@ func TestDeleteInUseEncryptionKey(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationDelete, validationFile: "validation-80.yaml"})
 }
 
-// intPtr returns a pointer to the given int value.
-func intPtr(i int) *int {
-	return &i
+func TestUserPasswordPolicyValidation(t *testing.T) {
+	testDefs := []testDef{
+		{
+			// The test-user-pw-policy will be the selected user and without mutations has a 4 length pw.
+			name: "TestNegUserPasswordTooShort",
+			mutations: patchMap{"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+				MinLength: util.IntPtr(8),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+		{
+			name: "TestUserPasswordValid",
+			mutations: patchMap{"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+				MinLength: util.IntPtr(4),
+			})},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegUserPasswordNoUppercase",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceUppercase: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nouppercase")},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+		{
+			name: "TestUserPasswordNoUppercaseValid",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceUppercase: util.BoolPtr(false)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nouppercase")},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegUserPasswordNoLowercase",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceLowercase: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nolowercase")},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+		{
+			name: "TestNegUserPasswordNoDigits",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceDigits: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nodigits")},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+		{
+			name: "TestNegUserPasswordNoSpecialChars	",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceSpecialChars: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nospecialchars")},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+		{
+			name: "TestPasswordPolicyMinLengthInvalidUserNotSelected",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/rbac/selector", &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"someLabel": "some-value",
+					},
+				}).Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceDigits: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nodigits"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegPasswordPolicyMinLengthInvalidUserNotSelected",
+			mutations: patchMap{
+				"password-policy-test-cluster": jsonpatch.NewPatchSet().Add("/spec/security/rbac/selector", &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"someLabel": "some-value",
+					},
+				}).Add("/spec/security/passwordPolicy", &couchbasev2.PasswordPolicySpec{
+					EnforceDigits: util.BoolPtr(true)}),
+				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-short").Add("/metadata/labels", map[string]string{
+					"someLabel": "some-value",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-user.yaml"})
 }

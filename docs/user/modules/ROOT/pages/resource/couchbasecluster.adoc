@@ -4806,6 +4806,7 @@ must be met by all passwords whose definition occurs subsequent to the
 establishing of the policy.
 If this is updated, previously defined passwords continue to be
 valid, even if they do not meet the requirements specified in the new policy.
+If RBAC is managed, any CouchbaseUser resources which match the RBAC resource selector will be checked against this policy.
 
 === couchbaseclusters.spec.security.passwordPolicy.enforceDigits
 

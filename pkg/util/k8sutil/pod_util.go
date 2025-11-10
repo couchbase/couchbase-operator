@@ -142,67 +142,69 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 func EstablishCNGPrerequisites(client *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
 	// we need to create the self-signed certificate for CNG if they do not provide TLS and it doesn't already exist
-	if cluster.Spec.Networking.CloudNativeGateway != nil {
-		if cluster.Spec.Networking.CloudNativeGateway.TLS == nil {
-			// check named cng self-signed secret exists
-			selfCertSecretName := getSelfCertSecretName(cluster.Name)
+	if cluster.Spec.Networking.CloudNativeGateway == nil {
+		return nil
+	}
 
-			_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), selfCertSecretName, metav1.GetOptions{})
-			if err != nil {
-				// named secret not found, create a new one
-				dnsName := ""
-				if cluster.Spec.Networking.DNS != nil {
-					dnsName = cluster.Spec.Networking.DNS.Domain
-				}
-
-				ssc, err := GenerateSelfSignedCert(cluster.Namespace, 10*365*24*time.Hour, dnsName)
-				if err != nil {
-					log.Error(err, "Error generating CNG self-signed certificate", "cluster", cluster.NamespacedName())
-					return err
-				}
-
-				selfSignedSecret := &v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: selfCertSecretName,
-					},
-					Data: map[string][]byte{
-						"tls.crt": ssc.cert,
-						"tls.key": ssc.key,
-					},
-				}
-
-				_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), selfSignedSecret, metav1.CreateOptions{})
-				if err != nil {
-					log.Error(err, "Error creating CNG self-signed certificate", "cluster", cluster.NamespacedName())
-					return err
-				}
-			}
-		}
-
+	if cluster.Spec.Networking.CloudNativeGateway.TLS == nil {
 		// check named cng self-signed secret exists
-		adminSecretName := getAdminUserSecretName(cluster.Name)
+		selfCertSecretName := getSelfCertSecretName(cluster.Name)
 
-		_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), adminSecretName, metav1.GetOptions{})
+		_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), selfCertSecretName, metav1.GetOptions{})
 		if err != nil {
 			// named secret not found, create a new one
-			username := generateUserName(cluster.Name)
-			password := generateCouchbasePassword()
-
-			cngAdminSecret := &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: adminSecretName,
-				},
-				Data: map[string][]byte{
-					"username": username,
-					"password": password,
-				},
+			dnsName := ""
+			if cluster.Spec.Networking.DNS != nil {
+				dnsName = cluster.Spec.Networking.DNS.Domain
 			}
 
-			_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), cngAdminSecret, metav1.CreateOptions{})
+			ssc, err := GenerateSelfSignedCert(cluster.Namespace, 10*365*24*time.Hour, dnsName)
 			if err != nil {
-				log.Error(err, "Error creating CNG user", "cluster", cluster.NamespacedName())
+				log.Error(err, "Error generating CNG self-signed certificate", "cluster", cluster.NamespacedName())
 				return err
 			}
+
+			selfSignedSecret := &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: selfCertSecretName,
+				},
+				Data: map[string][]byte{
+					"tls.crt": ssc.cert,
+					"tls.key": ssc.key,
+				},
+			}
+
+			_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), selfSignedSecret, metav1.CreateOptions{})
+			if err != nil {
+				log.Error(err, "Error creating CNG self-signed certificate", "cluster", cluster.NamespacedName())
+				return err
+			}
+		}
+	}
+
+	// check named cng admin user secret exists
+	adminSecretName := getAdminUserSecretName(cluster.Name)
+
+	_, err := client.KubeClient.CoreV1().Secrets(cluster.Namespace).Get(context.Background(), adminSecretName, metav1.GetOptions{})
+	if err != nil {
+		// named secret not found, create a new one
+		username := generateUserName(cluster.Name)
+		password := generateCouchbasePassword()
+
+		cngAdminSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: adminSecretName,
+			},
+			Data: map[string][]byte{
+				"username": username,
+				"password": password,
+			},
+		}
+
+		_, err = client.KubeClient.CoreV1().Secrets(cluster.Namespace).Create(context.TODO(), cngAdminSecret, metav1.CreateOptions{})
+		if err != nil {
+			log.Error(err, "Error creating CNG user", "cluster", cluster.NamespacedName())
+			return err
 		}
 	}
 
@@ -1249,11 +1251,46 @@ func generateCouchbasePassword() []byte {
 		passwordBytes[i] = charSet[rand.Intn(len(charSet))]
 	}
 
+	password := string(passwordBytes)
+	upper := true
+	lower := true
+	special := true
+	digit := true
+
+	policy := couchbasev2.PasswordPolicySpec{
+		EnforceUppercase:    &upper,
+		EnforceLowercase:    &lower,
+		EnforceDigits:       &digit,
+		EnforceSpecialChars: &special,
+	}
+
+	if PasswordCompliesWithCouchbasePasswordPolicy(&policy, password) {
+		return passwordBytes
+	}
+
+	return generateCouchbasePassword()
+}
+
+var allowedSpecials = map[rune]struct{}{
+	'@': {}, '%': {}, '+': {}, '/': {}, '\'': {}, '\\': {}, '"': {},
+	'!': {}, '#': {}, '$': {}, '^': {}, '?': {}, ':': {}, ',': {},
+	'(': {}, ')': {}, '{': {}, '}': {}, '[': {}, ']': {}, '~': {},
+	'`': {}, '-': {}, '_': {},
+}
+
+func PasswordCompliesWithCouchbasePasswordPolicy(policy *couchbasev2.PasswordPolicySpec, password string) bool {
+	if policy == nil {
+		return true
+	}
+
+	if policy.MinLength != nil && len(password) < *policy.MinLength {
+		return false
+	}
+
 	hasUpper := false
 	hasLower := false
 	hasSpecial := false
-	hasNumber := false
-	password := string(passwordBytes)
+	hasDigit := false
 
 	for _, c := range password {
 		if unicode.IsUpper(c) {
@@ -1265,20 +1302,31 @@ func generateCouchbasePassword() []byte {
 		}
 
 		if unicode.IsDigit(c) {
-			hasNumber = true
+			hasDigit = true
 		}
 
-		if unicode.IsPunct(c) || unicode.IsSymbol(c) {
+		if _, ok := allowedSpecials[c]; ok {
 			hasSpecial = true
 		}
 	}
 
-	match := hasUpper && hasLower && hasSpecial && hasNumber
-	if match {
-		return passwordBytes
+	if policy.EnforceDigits != nil && *policy.EnforceDigits && !hasDigit {
+		return false
 	}
 
-	return generateCouchbasePassword()
+	if policy.EnforceLowercase != nil && *policy.EnforceLowercase && !hasLower {
+		return false
+	}
+
+	if policy.EnforceUppercase != nil && *policy.EnforceUppercase && !hasUpper {
+		return false
+	}
+
+	if policy.EnforceSpecialChars != nil && *policy.EnforceSpecialChars && !hasSpecial {
+		return false
+	}
+
+	return true
 }
 
 func generateUserName(clusterName string) []byte {

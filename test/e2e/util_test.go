@@ -134,6 +134,7 @@ func registerTests() {
 		framework.NewTestDef(TestValidationEncryptionKeyCreate).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureEAR),
 		framework.NewTestDef(TestValidationEncryptionAtRest).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestDeleteInUseEncryptionKey).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestUserPasswordPolicyValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),

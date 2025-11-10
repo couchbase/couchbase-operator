@@ -2398,14 +2398,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
 			errs = append(errs, errors.Required(emsg, user.Name, nil))
 		} else if v.Options.ValidateSecrets {
-			// Check the ldap auth secret exists and has the correct keys
-			authSecret, found, err := v.Abstraction.GetSecret(user.Namespace, authSecretName)
-			if err != nil {
+			if err := checkConstraintUserCompliesWithPasswordPolicies(v, user); err != nil {
 				errs = append(errs, err)
-			} else if !found {
-				errs = append(errs, fmt.Errorf("secret %s referenced by user.spec.authSecret for `%s` must exist", authSecretName, user.Name))
-			} else if _, ok := authSecret.Data["password"]; !ok {
-				errs = append(errs, fmt.Errorf("ldap auth secret %s must contain password", authSecretName))
 			}
 		}
 	case couchbasev2.LDAPAuthDomain:
@@ -2427,6 +2421,91 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	}
 
 	return warnings, nil
+}
+
+func checkPasswordAuthSecret(v *types.Validator, user *couchbasev2.CouchbaseUser) (string, error) {
+	secret, found, err := v.Abstraction.GetSecret(user.Namespace, user.Spec.AuthSecret)
+	if err != nil {
+		return "", err
+	}
+
+	if !found {
+		return "", fmt.Errorf("secret %s referenced by user.spec.authSecret for user `%s` must exist", user.Spec.AuthSecret, user.Name)
+	}
+
+	pw, ok := secret.Data["password"]
+	if !ok {
+		return "", fmt.Errorf("secret %s referenced by user.spec.authSecret for user `%s` must contain password", user.Spec.AuthSecret, user.Name)
+	}
+
+	return string(pw), nil
+}
+
+// checkConstraintUserCompliesWithPasswordPolicies checks that the user's authSecret password complies with the password policy of every cluster that the user is/will be a member of.
+func checkConstraintUserCompliesWithPasswordPolicies(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
+	if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
+		return nil
+	}
+
+	allClusters, err := v.Abstraction.GetCouchbaseClusters(user.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// We need to check against every cluster that the user is/will be a member of to ensure the password complies with their password policy.
+	for _, cluster := range allClusters.Items {
+		if err := checkUserPasswordForCluster(v, &cluster, user); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkUserPasswordForCluster checks that a given password is valid for a CouchbaseCluster to create a new CouchbaseUser.
+// This will return nil if the user is not managed by the cluster and therefore not subject to the password policy, or if the user's authSecret password complies with the cluster's password policy.
+func checkUserPasswordForCluster(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) error {
+	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
+		return nil
+	}
+
+	name := user.Name
+	if user.Spec.Name != "" {
+		name = user.Spec.Name
+	}
+
+	// We can ignore users that already exist on a cluster as subsequent changes to the password secret are irrelevant.
+	if slices.Contains(cluster.Status.Users, name) {
+		return nil
+	}
+
+	// User's aren't created by the operator unless they are a member of a CouchbaseGroup and have roles bound to them. However, climbing this tree
+	// during validation may lead to confusing DAC rejections where changing a role is not allowed because of a user password issue, so
+	// instead we just use the rbac selector against the user.
+	selector := labels.Everything()
+	if cluster.Spec.Security.RBAC.Selector != nil {
+		s, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return err
+		}
+
+		selector = s
+	}
+
+	if !selector.Matches(labels.Set(user.Labels)) {
+		return nil
+	}
+
+	pw, err := checkPasswordAuthSecret(v, user)
+	if err != nil {
+		return err
+	}
+
+	if !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(cluster.Spec.Security.PasswordPolicy, pw) {
+		return fmt.Errorf("initial password for user `%s` does not comply with the password policy of cluster `%s`", user.Name, cluster.NamespacedName())
+	}
+
+	return nil
 }
 
 // validateCouchbaseUserNameConstraints checks that no other CouchbaseUser resources
@@ -5288,7 +5367,17 @@ func checkBucketConstraintMagmaStorageBackend(cluster *couchbasev2.CouchbaseClus
 
 // checkClusterRBACConstraints checks RBAC settings constraints for a cluster. Every CouchbaseGroup which qualifies for the RBAC selector for the cluster will be checked.
 func checkClusterRBACConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	return checkClusterGroupRBACConstraints(v, cluster, nil)
+	if err := checkClusterGroupRBACConstraints(v, cluster, nil); err != nil {
+		return err
+	}
+
+	if v.Options.ValidateSecrets {
+		if err := checkClusterUserPasswordConstraints(v, cluster); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // checkCouchbaseGroupRBACConstraints checks RBAC settings constraints, such as supported cluster versions, for a CouchbaseGroup. Every CouchbaseCluster which will reconcile the group will be checked.
@@ -5300,6 +5389,28 @@ func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.C
 
 	for _, c := range allClusters.Items {
 		return checkClusterGroupRBACConstraints(v, &c, group)
+	}
+
+	return nil
+}
+
+// checkClusterUserPasswordConstraints checks that any users who will be managed by the cluster but do not exist yet have an initial password that complies with the cluster's password policy.
+// This check excludes users that are already managed by the cluster (in the status.users slice), as changes to the authSecret password are irrelevant once a user has already been created.
+// We already validate this when a CouchbaseUser is created, but this will help protect against race conditions.
+func checkClusterUserPasswordConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
+		return nil
+	}
+
+	users, err := v.Abstraction.GetCouchbaseUsers(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
+	if err != nil {
+		return err
+	}
+
+	for _, user := range users.Items {
+		if err := checkUserPasswordForCluster(v, cluster, &user); err != nil {
+			return err
+		}
 	}
 
 	return nil

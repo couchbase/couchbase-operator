@@ -795,6 +795,14 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		r := requestedUsers[i]
 
 		if _, found := couchbasev2.HasItem(r.ID, existingUserNames); !found {
+			// We don't want to create the user if the initial password doesn't comply with the cluster's password policy.
+			// Instead, we'll just log that we can't create it and skip.
+			// This should already have been handled by the DAC but this is an extra safeguard to avoid being stuck in a reconcile failed loop
+			if !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(c.cluster.Spec.Security.PasswordPolicy, r.Password) {
+				log.Info("Unable to create CouchbaseUser as the initial password does not comply with the cluster's password policy", "cluster", c.cluster.NamespacedName(), "user", r.ID)
+				continue
+			}
+
 			if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
 				return existingUserNames, err
 			}

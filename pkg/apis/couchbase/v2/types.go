@@ -2217,8 +2217,10 @@ type CouchbaseUserSpec struct {
 	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
 
-	// Name of Kubernetes secret to be used as a user's initial password for the Couchbase domain.
-	// Once a user has been created, any further changes to this field will be ignored.
+	// Name of the Kubernetes Secret that provides the user's initial password for the Couchbase domain.
+	// Once the user is created, changes to this field will be ignored.
+	// The initial password must comply with all password policies defined for Couchbase clusters
+	// that have RBAC management enabled and for which the user matches the RBAC resource selector.
 	AuthSecret string `json:"authSecret,omitempty"`
 
 	// Locked defines whether the user is locked.
@@ -3321,6 +3323,7 @@ type CouchbaseClusterSecuritySpec struct {
 	// must be met by all passwords whose definition occurs subsequent to the
 	// establishing of the policy. If this is updated, previously defined passwords continue to be
 	// valid, even if they do not meet the requirements specified in the new policy.
+	// If RBAC is managed, any CouchbaseUser resources which match the RBAC resource selector will be checked against this policy.
 	PasswordPolicy *PasswordPolicySpec `json:"passwordPolicy,omitempty"`
 }
 
