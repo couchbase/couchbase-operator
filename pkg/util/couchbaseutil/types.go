@@ -1501,8 +1501,8 @@ type XDCRGlobalSettings struct {
 	WorkerBatchSize                   *int32                     `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
 
 	// Global-only settings (cannot be set per-replication)
-	GoGC       *string `json:"goGC,omitempty" url:"gogc,omitempty"`
-	GoMaxProcs *int32  `json:"goMaxProcs,omitempty" url:"gomaxprocs,omitempty"`
+	GoGC       *string `json:"goGC,omitempty" url:"goGC,omitempty"`
+	GoMaxProcs *int32  `json:"goMaxProcs,omitempty" url:"goMaxProcs,omitempty"`
 }
 
 // ConflictLoggingSettings is the configuration for the conflict logging.
