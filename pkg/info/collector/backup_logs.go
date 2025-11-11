@@ -17,7 +17,10 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 )
 
 const (
@@ -261,25 +264,20 @@ func buildBackupLogsJob(ctx *context.Context, jobName string, backup couchbasev2
 	// Build the cbbackupmgr command
 	cmd := buildCbBackupMgrCommand(&backup)
 
-	// Get cluster configuration
-	clusters, err := ctx.CouchbaseClient.CouchbaseV2().CouchbaseClusters(ctx.Namespace()).List(stdctx.Background(), metav1.ListOptions{})
+	// Get the cluster configuration for this backup.
+	// The operator uses a label selector (cluster.Spec.Backup.Selector) to match backups to clusters.
+	// For cao collect-logs, we use a simpler approach: find the cluster that matches the backup's selector,
+	// or if no selector is configured, use the first cluster in the namespace.
+	cluster, err := getClusterForBackup(ctx, &backup)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list CouchbaseClusters: %w", err)
-	}
-	if len(clusters.Items) == 0 {
-		return nil, fmt.Errorf("no CouchbaseClusters found in namespace %s", ctx.Namespace())
+		return nil, err
 	}
 
-	cluster := &clusters.Items[0]
 	image := cluster.Spec.BackupImage()
-	serviceAccount := cluster.Spec.Backup.ServiceAccount
 
 	// Validate that we have required configuration
-	if serviceAccount == "" {
-		return nil, fmt.Errorf("no service account configured for backup operations")
-	}
 	if image == "" {
-		return nil, fmt.Errorf("no backup image configured in cluster")
+		return nil, fmt.Errorf("no backup image configured in cluster %s", cluster.Name)
 	}
 
 	// Set up volumes and mounts
@@ -314,11 +312,14 @@ func buildBackupLogsJob(ctx *context.Context, jobName string, backup couchbasev2
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					SecurityContext:    securityContext,
-					Containers:         []corev1.Container{container},
-					Volumes:            volumes,
-					RestartPolicy:      corev1.RestartPolicyNever,
-					ServiceAccountName: serviceAccount,
+					SecurityContext:  securityContext,
+					Containers:       []corev1.Container{container},
+					Volumes:          volumes,
+					RestartPolicy:    corev1.RestartPolicyNever,
+					ImagePullSecrets: cluster.Spec.Backup.ImagePullSecrets,
+					// Note: No ServiceAccountName specified - log collection doesn't need K8s API access.
+					// The pod will use the namespace's default service account, which is sufficient
+					// for mounting secrets/volumes via kubelet. The securityContext handles PVC file permissions.
 				},
 			},
 			BackoffLimit: &[]int32{1}[0],
@@ -326,63 +327,94 @@ func buildBackupLogsJob(ctx *context.Context, jobName string, backup couchbasev2
 	}, nil
 }
 
+// getClusterForBackup finds the CouchbaseCluster that manages this backup.
+// The operator labels the backup PVC with "couchbase_cluster: <cluster-name>".
+// We use this label to definitively determine which cluster owns the backup.
+func getClusterForBackup(ctx *context.Context, backup *couchbasev2.CouchbaseBackup) (*couchbasev2.CouchbaseCluster, error) {
+	// Get the PVC for this backup
+	pvcName := backup.Name
+	pvc, err := ctx.KubeClient.CoreV1().PersistentVolumeClaims(ctx.Namespace()).Get(
+		stdctx.Background(),
+		pvcName,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PVC for backup %s: %w", backup.Name, err)
+	}
+
+	// The operator labels the PVC with "couchbase_cluster: <cluster-name>"
+	clusterName, ok := pvc.Labels["couchbase_cluster"]
+	if !ok || clusterName == "" {
+		return nil, fmt.Errorf("PVC %s is missing couchbase_cluster label", pvcName)
+	}
+
+	// Get the cluster by name
+	cluster, err := ctx.CouchbaseClient.CouchbaseV2().CouchbaseClusters(ctx.Namespace()).Get(
+		stdctx.Background(),
+		clusterName,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster %s for backup %s: %w", clusterName, backup.Name, err)
+	}
+
+	return cluster, nil
+}
+
 // waitForPodCompletion waits for the pod associated with the job to reach a terminal state.
 // This ensures all stdout has been flushed before we attempt to read logs.
 func waitForPodCompletion(ctx *context.Context, jobName string) error {
-	// Find the pod for this job
-	pods, err := ctx.KubeClient.CoreV1().Pods(ctx.Namespace()).List(stdctx.Background(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("job-name=%s", jobName),
-	})
-	if err != nil || len(pods.Items) == 0 {
-		return fmt.Errorf("pod not found for job %s: %w", jobName, err)
-	}
+	labelSelector := fmt.Sprintf("job-name=%s", jobName)
 
-	pod := &pods.Items[0]
-	podName := pod.Name
-
-	// Check if pod is already in terminal state (avoid race condition with watch)
-	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-		return nil
-	}
-
-	// Set up watch for pod state changes
 	watchCtx, cancel := stdctx.WithTimeout(stdctx.Background(), 2*time.Minute)
 	defer cancel()
 
-	watcher, err := ctx.KubeClient.CoreV1().Pods(ctx.Namespace()).Watch(watchCtx, metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to watch pod %s: %w", podName, err)
+	listWatch := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.LabelSelector = labelSelector
+			return ctx.KubeClient.CoreV1().Pods(ctx.Namespace()).List(watchCtx, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = labelSelector
+			return ctx.KubeClient.CoreV1().Pods(ctx.Namespace()).Watch(watchCtx, options)
+		},
 	}
-	defer watcher.Stop()
 
-	for {
-		select {
-		case event, ok := <-watcher.ResultChan():
+	_, err := watchtools.UntilWithSync(
+		watchCtx,
+		listWatch,
+		&corev1.Pod{},
+		nil,
+		func(event watch.Event) (bool, error) {
+			pod, ok := event.Object.(*corev1.Pod)
 			if !ok {
-				return fmt.Errorf("watch channel closed unexpectedly for pod %s", podName)
+				return false, fmt.Errorf("unexpected object type %T while waiting for pod for job %s", event.Object, jobName)
 			}
 
 			switch event.Type {
-			case watch.Modified:
-				pod, ok := event.Object.(*corev1.Pod)
-				if !ok {
-					return fmt.Errorf("unexpected object type in watch event for pod %s", podName)
-				}
-
-				// Wait for pod to reach terminal state (Succeeded or Failed)
-				if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
-					return nil
+			case watch.Added, watch.Modified:
+				switch pod.Status.Phase {
+				case corev1.PodSucceeded:
+					return true, nil
+				case corev1.PodFailed:
+					return true, fmt.Errorf("pod %s failed", pod.Name)
+				default:
+					return false, nil
 				}
 			case watch.Deleted:
-				return fmt.Errorf("pod %s was deleted before completion", podName)
+				return false, fmt.Errorf("pod %s was deleted before completion", pod.Name)
+			case watch.Error:
+				if status, ok := event.Object.(*metav1.Status); ok {
+					return false, fmt.Errorf("error watching pod for job %s: %s", jobName, status.Message)
+				}
+				return false, fmt.Errorf("error watching pod for job %s", jobName)
+			default:
+				return false, nil
 			}
+		},
+	)
 
-		case <-watchCtx.Done():
-			return watchCtx.Err()
-		}
-	}
+	return err
 }
 
 func captureZipFromLogs(ctx *context.Context, jobName string) ([]byte, error) {
