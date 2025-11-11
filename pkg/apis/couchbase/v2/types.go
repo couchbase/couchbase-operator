@@ -5730,7 +5730,7 @@ type PasswordPolicySpec struct {
 	// This field is only available for Couchbase Server 8.0.0+.
 	RequirePasswordResetOnPolicyChange *bool `json:"requirePasswordResetOnPolicyChange,omitempty"`
 
-	// PolicyChangePasswordResetExemptUsers defines a list of users who will not be required to change
+	// PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
 	// their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
 	// This field is only available for Couchbase Server 8.0.0+.
 	PasswordResetOnPolicyChangeExemptUsers []*string `json:"passwordResetOnPolicyChangeExemptUsers,omitempty"`

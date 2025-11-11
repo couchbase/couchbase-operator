@@ -827,8 +827,14 @@ func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
 		return err
 	}
 
+	// We need to map the couchbase user resources to the user ID that's used by cb server.
+	couchbaseUserResources := make(map[string]*couchbasev2.CouchbaseUser)
+	for _, user := range c.k8s.CouchbaseUsers.List() {
+		couchbaseUserResources[user.GetUserID()] = user
+	}
+
 	for _, user := range *users {
-		userSpec, ok := c.k8s.CouchbaseUsers.Get(user.ID)
+		userSpec, ok := couchbaseUserResources[user.ID]
 
 		// If we can't find an associated spec for the user, or the user already has a temporary password, we can't reconcile the password.
 		if !ok || user.HasTempPassword() {

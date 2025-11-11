@@ -1815,3 +1815,11 @@ func (c *CouchbaseCluster) IsEncryptionAtRestManaged() bool {
 
 	return c.Spec.Security.EncryptionAtRest != nil && c.Spec.Security.EncryptionAtRest.Managed
 }
+
+func (u *CouchbaseUser) GetUserID() string {
+	if u.Spec.Name != "" {
+		return u.Spec.Name
+	}
+
+	return u.GetName()
+}

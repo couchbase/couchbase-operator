@@ -1038,10 +1038,9 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 			return err
 		}
 
-		// find user in cluster status
-		_, found := couchbasev2.HasItem(user.Name, currCluster.Status.Users)
+		_, found := couchbasev2.HasItem(user.GetUserID(), currCluster.Status.Users)
 		if !found {
-			return fmt.Errorf("waiting for user `%s` to be created", user.Name)
+			return fmt.Errorf("waiting for user `%s` to be created", user.GetUserID())
 		}
 
 		// user must also be in couchbase
@@ -1051,7 +1050,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		}
 
 		u := &couchbaseutil.User{}
-		return couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
+		return couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
 	})
 }
 

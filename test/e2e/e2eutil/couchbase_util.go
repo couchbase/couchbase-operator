@@ -1267,7 +1267,7 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 }
 
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
-func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
@@ -1275,12 +1275,12 @@ func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 		}
 
 		actual := &couchbaseutil.User{}
-		if err := couchbaseutil.GetUser(userName, userAuthDomain, actual).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.GetUser(userID, userAuthDomain, actual).On(client.client, client.host); err != nil {
 			return err
 		}
 
 		expected := &couchbaseutil.User{}
-		if err := couchbaseutil.GetUser(userName, userAuthDomain, expected).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.GetUser(userID, userAuthDomain, expected).On(client.client, client.host); err != nil {
 			return err
 		}
 
@@ -1297,8 +1297,8 @@ func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 	})
 }
 
-func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchUserInfo(k8s, couchbase, userName, userAuthDomain, patches, timeout); err != nil {
+func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchUserInfo(k8s, couchbase, userID, userAuthDomain, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }

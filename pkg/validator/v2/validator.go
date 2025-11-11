@@ -2517,10 +2517,7 @@ func validateCouchbaseUserNameConstraints(v *types.Validator, user *couchbasev2.
 		return nil, err
 	}
 
-	userName := user.Spec.Name
-	if userName == "" {
-		userName = user.Name
-	}
+	userName := user.GetUserID()
 
 	// Check each existing user
 	for _, existingUser := range existingUsers.Items {
@@ -2529,14 +2526,9 @@ func validateCouchbaseUserNameConstraints(v *types.Validator, user *couchbasev2.
 			continue
 		}
 
-		existingUserName := existingUser.Spec.Name
-		if existingUserName == "" {
-			existingUserName = existingUser.Name
-		}
-
 		// Check if names match
-		if existingUserName == userName {
-			return []string{fmt.Sprintf("user name %s is already in use by CouchbaseUser %s", user.Spec.Name, existingUser.Name)}, nil
+		if existingUser.GetUserID() == userName {
+			return []string{fmt.Sprintf("user name %s is already in use by CouchbaseUser %s", userName, existingUser.GetUserID())}, nil
 		}
 	}
 

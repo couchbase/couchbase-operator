@@ -179,7 +179,7 @@ func NewMemberRemovedEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v1.E
 }
 
 func UserEditedEvent(cl *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) *v1.Event {
-	return k8sutil.UserEditEvent(user.Name, cl)
+	return k8sutil.UserEditEvent(user.GetUserID(), cl)
 }
 
 func ClusterSettingsEditedEvent(cl *couchbasev2.CouchbaseCluster, settingName string) *v1.Event {
