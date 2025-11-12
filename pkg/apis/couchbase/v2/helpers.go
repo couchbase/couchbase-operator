@@ -916,9 +916,11 @@ var clusterRoles = []RoleName{
 	RoleClusterAdmin,
 	RoleSecurityAdmin,
 	RoleReadOnlyAdmin,
+	RoleReadOnlySecurityAdmin,
 	RoleXDCRAdmin,
 	RoleQueryCurlAccess,
 	RoleQuestySystemAccess,
+	RoleQueryManageSystemCatalog,
 	RoleAnalyticsReader,
 	RoleSecurityAdminExternal,
 	RoleSecurityAdminLocal,
@@ -934,6 +936,7 @@ var clusterRoles = []RoleName{
 	RoleEventingAdmin,
 	RoleEventingManageFunctions,
 	RoleSyncDevOps,
+	RoleApplicationTelemetryWriter,
 }
 
 // bucketRoles can be bucket scoped.
@@ -1006,6 +1009,7 @@ var collectionRoles = []RoleName{
 	RoleQueryInsert,
 	RoleQueryDelete,
 	RoleQueryManageIndex,
+	RoleQueryListIndex,
 	RoleSearchReader,
 	RoleAnalyticsSelect,
 	RoleSyncGatewayApplication,

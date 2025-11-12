@@ -64,14 +64,15 @@ var clusterRoles7 = []string{
 	e2e_constants.RoleEventingAdmin,
 }
 
-// TODO: Use new 8.0.0 roles once couchbase-operator is updated.
 var clusterRoles8 = []string{
 	e2e_constants.RoleFullAdmin,
 	e2e_constants.ClusterAdminRole,
 	e2e_constants.RoleReadOnlyAdmin,
+	e2e_constants.RoleReadOnlySecurityAdmin,
 	e2e_constants.RoleXDCRAdmin,
 	e2e_constants.RoleQueryCurlAccess,
 	e2e_constants.RoleQuestySystemAccess,
+	e2e_constants.RoleQueryManageSystemCatalog,
 	e2e_constants.RoleAnalyticsReader,
 	// security + user admin roles for 8.0+
 	e2e_constants.RoleSecurityAdmin,
@@ -85,6 +86,7 @@ var clusterRoles8 = []string{
 	e2e_constants.RoleAnalyticsAdmin,
 	e2e_constants.RoleExternalStatsReader,
 	e2e_constants.RoleEventingAdmin,
+	e2e_constants.RoleApplicationTelemetryWriter,
 }
 
 // NewDefaultUser creates a new default user.

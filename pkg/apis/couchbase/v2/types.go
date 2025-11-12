@@ -2299,6 +2299,7 @@ const (
 	RoleSecurityAdminLocal                  RoleName = "security_admin_local"
 	RoleSecurityAdminExternal               RoleName = "security_admin_external"
 	RoleReadOnlyAdmin                       RoleName = "ro_admin"
+	RoleReadOnlySecurityAdmin               RoleName = "ro_security_admin"
 	RoleExternalStatsReader                 RoleName = "external_stats_reader"
 	RoleXDCRAdmin                           RoleName = "replication_admin"
 	RoleQueryCurlAccess                     RoleName = "query_external_access"
@@ -2331,6 +2332,8 @@ const (
 	RoleQueryInsert                         RoleName = "query_insert"
 	RoleQueryDelete                         RoleName = "query_delete"
 	RoleQueryManageIndex                    RoleName = "query_manage_index"
+	RoleQueryListIndex                      RoleName = "query_list_index"
+	RoleQueryManageSystemCatalog            RoleName = "query_manage_system_catalog"
 	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
 	RoleSyncGatewayApplication              RoleName = "sync_gateway_app"
 	RoleSyncGatewayApplicationReadOnly      RoleName = "sync_gateway_app_ro"
@@ -2345,11 +2348,12 @@ const (
 	RoleQueryUseSequentialScans             RoleName = "query_use_sequential_scans"
 	RoleQueryUseSequences                   RoleName = "query_use_sequences"
 	RoleQueryManageSequences                RoleName = "query_manage_sequences"
+	RoleApplicationTelemetryWriter          RoleName = "application_telemetry_writer"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;eventing_manage_functions;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_manage_sequences;query_select;query_system_catalog;query_update;query_use_sequences;query_use_sequential_scans;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;sync_gateway_app;sync_gateway_app_ro;sync_gateway_configurator;sync_gateway_dev_ops;sync_gateway_replicator;user_admin_external;user_admin_local;views_admin;views_reader
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;application_telemetry_writer;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;eventing_manage_functions;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_list_index;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_manage_sequences;query_manage_system_catalog;query_select;query_system_catalog;query_update;query_use_sequences;query_use_sequential_scans;replication_admin;replication_target;ro_admin;ro_security_admin;scope_admin;security_admin;security_admin_external;security_admin_local;sync_gateway_app;sync_gateway_app_ro;sync_gateway_configurator;sync_gateway_dev_ops;sync_gateway_replicator;user_admin_external;user_admin_local;views_admin;views_reader
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped

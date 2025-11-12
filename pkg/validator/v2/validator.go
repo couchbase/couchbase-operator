@@ -5486,7 +5486,9 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 
 			// New roles on older versions should error
 			if !is8Plus {
-				if r.Name == couchbasev2.RoleUserAdminLocal || r.Name == couchbasev2.RoleUserAdminExternal {
+				if r.Name == couchbasev2.RoleUserAdminLocal || r.Name == couchbasev2.RoleUserAdminExternal ||
+					r.Name == couchbasev2.RoleReadOnlySecurityAdmin || r.Name == couchbasev2.RoleQueryListIndex ||
+					r.Name == couchbasev2.RoleQueryManageSystemCatalog || r.Name == couchbasev2.RoleApplicationTelemetryWriter {
 					return fmt.Errorf("role %s in group %s requires Couchbase Server 8.0+", r.Name, g.Name)
 				}
 			}
