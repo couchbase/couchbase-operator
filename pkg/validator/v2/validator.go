@@ -2405,7 +2405,11 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	case couchbasev2.LDAPAuthDomain:
 		// authSecret not accepted for LDAP user
 		if authSecretName := user.Spec.AuthSecret; authSecretName != "" {
-			errs = append(errs, fmt.Errorf("secret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
+			errs = append(errs, fmt.Errorf("spec.authSecret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
+		}
+
+		if user.Spec.Locked != nil && *user.Spec.Locked {
+			errs = append(errs, fmt.Errorf("spec.locked not allowed for LDAP user `%s`", user.Name))
 		}
 	default:
 		return nil, fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)

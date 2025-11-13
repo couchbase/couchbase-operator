@@ -1366,7 +1366,8 @@ type CouchbaseBucketSpec struct {
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
-	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
+	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore" for server versions earlier than 8.0.0.
+	// Defaults to "magma" for server versions 8.0.0 and onward.
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
@@ -2223,7 +2224,7 @@ type CouchbaseUserSpec struct {
 	// that have RBAC management enabled and for which the user matches the RBAC resource selector.
 	AuthSecret string `json:"authSecret,omitempty"`
 
-	// Locked defines whether the user is locked.
+	// Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
 	// This field is only available for Couchbase Server 8.0.0+.
 	Locked *bool `json:"locked,omitempty"`
 

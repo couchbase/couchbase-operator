@@ -617,20 +617,6 @@ func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, at
 		Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
 	}
 
-	if atLeast80 {
-		userLockedDefault := false
-		user.Locked = &userLockedDefault
-
-		if subject.Spec.Locked != nil {
-			user.Locked = subject.Spec.Locked
-		}
-
-		// If we require an initial password change, we'll set this to true here but this should be overridden if the user already exists.
-		if subject.Spec.Password != nil && subject.Spec.Password.RequireInitialChange != nil {
-			user.TemporaryPassword = subject.Spec.Password.RequireInitialChange
-		}
-	}
-
 	if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
 		password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
 		if err != nil {
@@ -638,6 +624,20 @@ func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, at
 		}
 
 		user.Password = password
+
+		if atLeast80 {
+			userLockedDefault := false
+			user.Locked = &userLockedDefault
+
+			if subject.Spec.Locked != nil {
+				user.Locked = subject.Spec.Locked
+			}
+
+			// If we require an initial password change, we'll set this to true here but this should be overridden if the user already exists.
+			if subject.Spec.Password != nil && subject.Spec.Password.RequireInitialChange != nil {
+				user.TemporaryPassword = subject.Spec.Password.RequireInitialChange
+			}
+		}
 	}
 
 	return user, nil
@@ -747,7 +747,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		existingGroups := e.Groups
 		sort.Strings(existingGroups)
 
-		return !reflect.DeepEqual(requestedGroups, existingGroups) || !reflect.DeepEqual(r.Name, e.Name) || !reflect.DeepEqual(r.Locked, e.Locked)
+		return !reflect.DeepEqual(requestedGroups, existingGroups) || !reflect.DeepEqual(r.Name, e.Name) || (r.Locked != nil && !reflect.DeepEqual(r.Locked, e.Locked))
 	}
 
 	existingUserNames := []string{}
@@ -798,7 +798,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			// We don't want to create the user if the initial password doesn't comply with the cluster's password policy.
 			// Instead, we'll just log that we can't create it and skip.
 			// This should already have been handled by the DAC but this is an extra safeguard to avoid being stuck in a reconcile failed loop
-			if !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(c.cluster.Spec.Security.PasswordPolicy, r.Password) {
+			if r.Domain == couchbaseutil.InternalAuthDomain && !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(c.cluster.Spec.Security.PasswordPolicy, r.Password) {
 				log.Info("Unable to create CouchbaseUser as the initial password does not comply with the cluster's password policy", "cluster", c.cluster.NamespacedName(), "user", r.ID)
 				continue
 			}
@@ -834,10 +834,14 @@ func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
 	}
 
 	for _, user := range *users {
-		userSpec, ok := couchbaseUserResources[user.ID]
+		// If the user is not an internal user or already has a temporary password, we can't reconcile the password.
+		if user.Domain != couchbaseutil.InternalAuthDomain || user.HasTempPassword() {
+			continue
+		}
 
-		// If we can't find an associated spec for the user, or the user already has a temporary password, we can't reconcile the password.
-		if !ok || user.HasTempPassword() {
+		// If we can't find an associated spec for the user, we can't reconcile the password.
+		userSpec, ok := couchbaseUserResources[user.ID]
+		if !ok {
 			continue
 		}
 

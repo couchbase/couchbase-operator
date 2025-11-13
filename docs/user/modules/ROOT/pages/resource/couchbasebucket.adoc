@@ -860,7 +860,8 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselect
 
 StorageBackend to be assigned to and used by the bucket.
 Only valid for Couchbase Server 7.0.0 onward.
-Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
+Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore" for server versions earlier than 8.0.0.
+Defaults to "magma" for server versions 8.0.0 and onward.
 Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 
 === couchbasebuckets.spec.versionPruningWindowHrs

@@ -113,7 +113,7 @@ Full Name of Couchbase user.
 
 ==== Description
 
-Locked defines whether the user is locked.
+Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
 This field is only available for Couchbase Server 8.0.0+.
 
 === couchbaseusers.spec.name
