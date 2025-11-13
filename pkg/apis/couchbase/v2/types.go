@@ -1372,7 +1372,8 @@ type CouchbaseBucketSpec struct {
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
-	// Can be either 128 or 1024 for magma buckets. This setting can only be adjusted for magma buckets.
+	// Can be either 128 or 1024 and can only be set for buckets with a magma storage backend. This setting is immutable after
+	// a bucket has been created.
 	NumVBuckets *int `json:"numVBuckets,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,

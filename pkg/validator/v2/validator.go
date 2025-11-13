@@ -1990,70 +1990,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if checkAnnotationSkipValidation(bucket.Annotations) {
 		return nil
 	}
-
-	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
-	if err != nil {
-		return err
-	}
-
-	for _, c := range clusters.Items {
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
-		if err != nil {
-			return err
-		}
-
-		var atLeast80 bool
-		var versionErr error
-
-		if c.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
-			atLeast80, versionErr = c.IsAtLeastVersion("8.0.0")
-			if versionErr != nil {
-				return versionErr
-			}
-
-			if atLeast80 {
-				if bucket.Spec.StorageBackend != "" {
-					if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-						if bucket.Spec.NumVBuckets != nil {
-							if *bucket.Spec.NumVBuckets == 128 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-								errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
-							}
-
-							if (*bucket.Spec.NumVBuckets == 1024) && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-								errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 1024Mi when numVBuckets is 1024 for magma storage backend"))
-							}
-
-							if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
-								errs = append(errs, fmt.Errorf("spec.numVBuckets in body should be either 128 or 1024 for magma storage backend"))
-							}
-						}
-
-						if bucket.Spec.NumVBuckets == nil && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(100)) < 0 {
-							errs = append(errs, fmt.Errorf("spec.memoryQuota in body should be greater than or equal to 100Mi when numVBuckets is 128 for magma storage backend"))
-						}
-					}
-				}
-			} else {
-				if bucket.Spec.StorageBackend != "" && bucket.Spec.MemoryQuota == nil {
-					errs = append(errs, fmt.Errorf("spec.memoryQuota (nil) in body should be present and greater than or equal to 1024Mi for spec.storageBackend: magma"))
-				}
-
-				if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-					errs = append(errs, fmt.Errorf("spec.memoryQuota (%v) in body should be greater than or equal to 1024Mi for spec.storageBackend: magma", bucket.Spec.MemoryQuota))
-				}
-			}
-		}
-	}
-
-	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore && bucket.Spec.NumVBuckets != nil {
-		errs = append(errs, fmt.Errorf("spec.numVBuckets cannot be set for couchstore storage backend"))
-	}
-
-	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
-		errs = append(errs, fmt.Errorf("spec.evictionPolicy (%v) must be fullEviction for magma storage backend", bucket.Spec.EvictionPolicy))
-	}
-
-	if err := checkMagmaBucketSettings(v, bucket); err != nil {
+	if err := validateBucketStorageBackendConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2200,23 +2137,83 @@ func checkBucketEncryptionAtRestSettings(v *types.Validator, bucket *couchbasev2
 	return nil
 }
 
-func checkMagmaBucketSettings(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
-	var errs []error
+func checkMagmaBucketRequiredSettings(bucket *couchbasev2.CouchbaseBucket) error {
+	if bucket.Spec.EnableIndexReplica {
+		return fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets")
+	}
 
-	if bucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+	if bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
+		return fmt.Errorf("spec.evictionPolicy must be fullEviction for magma buckets")
+	}
+
+	return nil
+}
+
+func checkMagmaBucketClusterVersionSettings(v *types.Validator, c *couchbasev2.CouchbaseCluster, bucket *couchbasev2.CouchbaseBucket) error {
+	// If explicitly set to magma, check if the cluster version supports it.
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+		after71, err := c.IsAtLeastVersion("7.1.0")
+		if err != nil {
+			return err
+		}
+
+		if !after71 {
+			return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later for cluster: %s", c.NamespacedName())
+		}
+	}
+
+	after712, err := c.IsAtLeastVersion("7.1.2")
+	if err != nil {
+		return err
+	}
+
+	if !after712 {
+		// We shouldn't allow FTS, Eventing or Analytics services on magma buckets when the cb version is < 7.1.2
+		for _, config := range c.Spec.Servers {
+			services := couchbasev2.ServiceList(config.Services)
+			if services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService) {
+				return fmt.Errorf("search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v, for cluster: %s", services.StringSlice(), c.NamespacedName())
+			}
+		}
+	}
+
+	after80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if !after80 {
+		// MemoryQuota defaults to 100Mi, and pre-8.0 magma buckets require a minimum of 1024Mi.
+		if bucket.Spec.MemoryQuota == nil || bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+			return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
+		}
+
+		if bucket.Spec.NumVBuckets != nil {
+			return fmt.Errorf("spec.numVBuckets cannot be set for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
+		}
+	}
+
+	if err := checkMagmaVBucketsSettings(bucket, c.NamespacedName()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// checkMagmaVBucketsSettings checks if the bucket's numVBuckets is set to a valid value for the cluster.
+// This method is not dependent on cluster version and assumes 8.0.0 or later.
+func checkMagmaVBucketsSettings(bucket *couchbasev2.CouchbaseBucket, cName string) error {
+	if bucket.Spec.NumVBuckets == nil {
 		return nil
 	}
 
-	if err := checkBucketClustersMagmaStorageBackend(v, bucket); err != nil {
-		errs = append(errs, err)
+	if *bucket.Spec.NumVBuckets != 1024 && *bucket.Spec.NumVBuckets != 128 {
+		return fmt.Errorf("spec.numVBuckets can only be set to either 128 or 1024 for cluster: %s", cName)
 	}
 
-	if bucket.Spec.EnableIndexReplica {
-		errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
-	}
-
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	// If numVBuckets is 128, either explicitly by defaulting to that value by omission, we don't need to check memory quota as the minimum required is 100Mi which is already a constraint.
+	if *bucket.Spec.NumVBuckets == 1024 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+		return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for cluster: %s", cName)
 	}
 
 	return nil
@@ -4839,33 +4836,46 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		}
 	}
 
-	if prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "magma" {
-		clusters, err := v.Abstraction.GetCouchbaseClusters(curr.Namespace)
+	clusters, err := v.Abstraction.GetCouchbaseClusters(curr.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cluster := range clusters.Items {
+		after80, err := cluster.IsAtLeastVersion("8.0.0")
 		if err != nil {
 			return nil, err
 		}
 
-		for _, cluster := range clusters.Items {
-			after80, err := cluster.IsAtLeastVersion("8.0.0")
-			if err != nil {
-				return nil, err
-			}
+		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return nil, err
+		}
 
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(curr.Labels)) {
 			changeErr := fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets")
 
-			if after80 {
-				switch {
-				case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets != nil:
-					if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
-						errs = append(errs, changeErr)
-					}
-				case prev.Spec.NumVBuckets == nil && curr.Spec.NumVBuckets != nil:
-					if *curr.Spec.NumVBuckets != 128 {
-						errs = append(errs, changeErr)
-					}
-				case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets == nil:
-					if *prev.Spec.NumVBuckets != 128 {
-						errs = append(errs, changeErr)
+			backendAnnotation := cluster.Annotations["cao.couchbase.com/buckets.defaultStorageBackend"]
+
+			if backendAnnotation == string(couchbasev2.CouchbaseStorageBackendCouchstore) && curr.Spec.StorageBackend == "" {
+				continue
+			}
+
+			if (prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "magma") || (prev.Spec.StorageBackend == "" && curr.Spec.StorageBackend == "magma") || (prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "") || (prev.Spec.StorageBackend == "" && curr.Spec.StorageBackend == "") {
+				if after80 {
+					switch {
+					case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets != nil:
+						if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
+							errs = append(errs, changeErr)
+						}
+					case prev.Spec.NumVBuckets == nil && curr.Spec.NumVBuckets != nil:
+						if *curr.Spec.NumVBuckets != 128 {
+							errs = append(errs, changeErr)
+						}
+					case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets == nil:
+						if *prev.Spec.NumVBuckets != 128 {
+							errs = append(errs, changeErr)
+						}
 					}
 				}
 			}
@@ -5135,30 +5145,13 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 		return err
 	}
 
-	// // magma storageBackend is only allowed above CB version 7.1.0.
-	magmaStorageBackendSupported, err := cluster.IsAtLeastVersion("7.1.0")
-	if err != nil {
-		return err
-	}
-
-	magmaBucketFound := false
-
 	for _, cbBucket := range couchbaseBuckets.Items {
-		if cbBucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-			magmaBucketFound = true
-			break
+		if err := validateBucketStorageBackendConstraints(v, &cbBucket, cluster); err != nil {
+			return err
 		}
 	}
 
-	if !magmaBucketFound {
-		return nil
-	}
-
-	if !magmaStorageBackendSupported {
-		return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
-	}
-
-	return checkBucketConstraintMagmaStorageBackend(cluster)
+	return nil
 }
 
 func validateCloudNativeGatewayServerTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -5321,69 +5314,6 @@ func checkForVersionChange(current, updated *couchbasev2.CouchbaseCluster) (bool
 	}
 
 	return currentVersion != updatedVersion, nil
-}
-
-// checkBucketClustersMagmaStorageBackend checks all clusters that will use a given bucket for magma storage backend constraints.
-func checkBucketClustersMagmaStorageBackend(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
-	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
-	if err != nil {
-		return err
-	}
-
-	for _, c := range clusters.Items {
-		if !c.Spec.Buckets.Managed {
-			return nil
-		}
-
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
-		if err != nil {
-			return err
-		}
-
-		if c.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
-			srvVerAfter71, err := c.IsAtLeastVersion("7.1.0")
-			if err != nil {
-				return err
-			}
-
-			if !srvVerAfter71 {
-				return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later")
-			}
-
-			srvVerAfter80, err := c.IsAtLeastVersion("8.0.0")
-			if err != nil {
-				return err
-			}
-
-			if bucket.Spec.NumVBuckets != nil && !srvVerAfter80 {
-				return fmt.Errorf("spec.numVBuckets can only be set for magma buckets on Couchbase Server version 8.0.0 or later")
-			}
-
-			if err := checkBucketConstraintMagmaStorageBackend(&c); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// checkConstraintBucketMagmaStorageBackend checks a cluster is able to support the magma storage backend.
-func checkBucketConstraintMagmaStorageBackend(cluster *couchbasev2.CouchbaseCluster) error {
-	srvVerAfter712, err := cluster.IsAtLeastVersion("7.1.2")
-	if err != nil || srvVerAfter712 {
-		return err
-	}
-
-	// We shouldn't allow FTS, Eventing or Analytics services on magma buckets when the cb version is < 7.1.2
-	for _, config := range cluster.Spec.Servers {
-		services := couchbasev2.ServiceList(config.Services)
-		if services.Contains(couchbasev2.EventingService) || services.Contains(couchbasev2.AnalyticsService) || services.Contains(couchbasev2.SearchService) {
-			return fmt.Errorf("search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2. One or more of those services has been used as server class: %v, for cluster: %s", services.StringSlice(), cluster.NamespacedName())
-		}
-	}
-
-	return nil
 }
 
 // checkClusterRBACConstraints checks RBAC settings constraints for a cluster. Every CouchbaseGroup which qualifies for the RBAC selector for the cluster will be checked.
@@ -6103,4 +6033,51 @@ func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.Couchbase
 	}
 
 	return relatedClusters, nil
+}
+
+func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return err
+		}
+
+		clusters = append(clusters, bClusters...)
+	}
+
+	// If we don't find any clusters that will manage the bucket, but the storage backend is explicitly set on the bucket,
+	// we can still validate the bucket settings that are not dependent on the cluster version.
+	if len(clusters) == 0 && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+		if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
+			return err
+		}
+	}
+
+	for _, c := range clusters {
+		// There are a number of ways a bucket storagebackend can be set. By order of precedence:
+		// 1. Explicitly set in the bucket spec
+		// 2. Cluster default overridden by the defaultStorageBackend annotation
+		// 3. Defaulted by the server version (magma for 8.0.0+, couchstore for earlier)
+		storageBackend := bucket.Spec.StorageBackend
+		if storageBackend == "" {
+			storageBackend = c.GetDefaultBucketStorageBackend()
+		}
+
+		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+			if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
+				return err
+			}
+
+			if err := checkMagmaBucketClusterVersionSettings(v, c, bucket); err != nil {
+				return err
+			}
+		} else if bucket.Spec.NumVBuckets != nil {
+			return fmt.Errorf("spec.numVBuckets can only be set for magma buckets for cluster: %s", c.NamespacedName())
+		}
+	}
+
+	return nil
 }

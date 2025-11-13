@@ -2620,22 +2620,24 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{`spec.storageBackend`},
 		},
 		{
-			name:           "TestValidateBucketStorageBackendMagmaNeedsMoreThanDefaultMemoryQuota",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma")},
+			name: "TestValidateBucketStorageBackendMagmaNeedsMoreThanDefaultMemoryQuotaPre80",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.1.2")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.storageBackend`},
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
 		},
 		{
-			name:           "TestValidateBucketStorageBackendMagmaNeedsMoreThanOrEqualTo1024Mi",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1023Mi")},
+			name: "TestValidateBucketStorageBackendMagmaNeedsMoreThanOrEqualTo1024MiPre80",
+			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1023Mi"),
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.7")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.storageBackend`},
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
 		},
 		{
 			name:           "TestValidateBucketStorageBackendMagmaInvalidEvictionPolicy",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.storageBackend`},
+			expectedErrors: []string{`spec.evictionPolicy must be fullEviction for magma buckets`},
 		},
 		{
 			name: "TestValidateHistoryRetentionBytesBelowWorkingRange",
@@ -5626,4 +5628,171 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-user.yaml"})
+}
+
+func TestBucketStorageBackendValidationCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateMagma",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateCouchstore",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidateMagmaPre71",
+			mutations: patchMap{
+				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.0.0"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`magma storage backend requires Couchbase Server version 7.1.0 or later`},
+		},
+		{
+			name: "TestValidateMagmaPre80",
+			mutations: patchMap{
+				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1024Mi"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidateMagmaPre80MemQuotaDefault",
+			mutations: patchMap{
+				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
+		},
+		{
+			name: "TestNegValidateMagmaPre80MemoryQuota",
+			mutations: patchMap{
+				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1023Mi"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
+		},
+		{
+			name: "TestNegValidateMagmaPre80MemoryQuotaSelector",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "512Mi").Add("/metadata/labels", map[string]string{
+					"someLabel": "some-value",
+				}),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/spec/buckets/selector", &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"someLabel": "some-value",
+					},
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
+		},
+		{
+			name: "TestValidateMagmaPre80MemoryQuotaSelector",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1Gi").Add("/metadata/labels", map[string]string{
+					"someLabel": "some-value",
+				}),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/spec/buckets/selector", &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"someLabel": "some-value",
+					},
+				}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateCouchstoreValidPre80",
+			mutations: patchMap{
+				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidateCouchstoreNumVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+		},
+		{
+			name: "TestNegValidateCouchstoreFromClusterDefaultVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Add("/spec/numVBuckets", 1024),
+				"cluster0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend": "couchstore",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+		},
+		{
+			name: "TestNegValidateMagmaEvictionPolicy",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.evictionPolicy must be fullEviction for magma buckets`},
+		},
+		{
+			name: "TestNegValidateMagmaEnableIndexReplica",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/enableIndexReplica", true),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`cannot set spec.enableIndexReplica to true for magma buckets`},
+		},
+		{
+			name: "TestNegValidateMagmaClusterDefaultNumVBucketsOnPre80",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 1024).Replace("/spec/memoryQuota", "1024Mi"),
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/metadata/annotations", map[string]string{
+					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets cannot be set for magma buckets pre Couchbase Server 8.0.0`},
+		},
+		{
+			name: "TestNegValidateCouchstoreNumVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+		},
+		{
+			name: "TestNegValidateMagmaNumVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 1024),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024`},
+		},
+		{
+			name: "TestValidateMagmaNumVBuckets1024",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 1024).Replace("/spec/memoryQuota", "1024Mi"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateMagmaNumVBuckets128",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 128),
+			},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-storagebackend.yaml"})
 }
