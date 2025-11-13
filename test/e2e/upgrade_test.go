@@ -2045,6 +2045,15 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	// When the cluster is ready, start the upgrade.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
+	// Before upgrading the cluster, we need to fetch the orchestrator index. If the orchestrator is at index 0,
+	// we need to amend the expected upgrade order to initially skip this node. Once one node has been upgraded,
+	// this should then become a new orchestrator and we can continue with the expected upgrade order.
+	oNode := e2eutil.MustGetOrchestratorNode(t, kubernetes, cluster)
+	oIndex, err := couchbaseutil.GetIndexFromMemberName(strings.Split(strings.Split(oNode, "@")[1], ".")[0])
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
 	// Wait for the upgrade to finish
@@ -2065,6 +2074,10 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	}
 
 	expectedUpgradeOrderIndexes := []int{0, 1, 2, 3}
+
+	if oIndex == 0 {
+		expectedUpgradeOrderIndexes = []int{1, 0, 2, 3}
+	}
 
 	for _, podIndex := range expectedUpgradeOrderIndexes {
 		upgradeSequence := eventschema.Sequence{

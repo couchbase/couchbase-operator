@@ -3532,6 +3532,8 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
+
 	// create provider
 	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
 
@@ -3576,6 +3578,8 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
 
 	// create provider
 	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)

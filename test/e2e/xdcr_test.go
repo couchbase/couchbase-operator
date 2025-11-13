@@ -1945,6 +1945,8 @@ func TestXDCRConflictLogging(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
 	clusterSize := 1
 
 	scopeName := "pinky"

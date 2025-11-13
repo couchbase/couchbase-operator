@@ -2471,6 +2471,7 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Invalid TLS is raised for both root CA and server cert
+	// * TLS updated for each member
 	// * Invalid Client TLS is raised for expired client cert
 	// * Client TLS updated
 	// * Cluster resized successfully
@@ -2480,6 +2481,7 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
 		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateCA)},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
