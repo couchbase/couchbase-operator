@@ -1382,7 +1382,7 @@ type Replication struct {
 	ExplicitMapping  *bool                    `url:"collectionsExplicitMapping,omitempty"`
 	MigrationMapping *bool                    `url:"collectionsMigrationMode,omitempty"`
 	MappingRules     *ColMappingRules         `url:"colMappingRules,omitempty"`
-	ConflictLogging  *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,empty={}"`
+	ConflictLogging  *ConflictLoggingSettings `url:"conflictLogging,empty={}"`
 
 	// Advanced settings supported during replication creation (from createReplication API docs)
 	CompressionType                *string `url:"compressionType,omitempty"`
@@ -1391,6 +1391,7 @@ type Replication struct {
 	FilterDeletion                 *bool   `url:"filterDeletion,omitempty"`
 	FilterExpiration               *bool   `url:"filterExpiration,omitempty"`
 	FilterBypassExpiry             *bool   `url:"filterBypassExpiry,omitempty"`
+	FilterBypassUncommittedTxn     *bool   `url:"filterBypassUncommittedTxn,omitempty"`
 	FilterBinary                   *bool   `url:"filterBinary,omitempty"`
 	Priority                       *string `url:"priority,omitempty"`
 	OptimisticReplicationThreshold *int32  `url:"optimisticReplicationThreshold,omitempty"`
@@ -1455,6 +1456,7 @@ type ReplicationSettings struct {
 	CollectionsMigrationMode   *bool                      `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
 	CollectionsMirroringMode   *bool                      `json:"collectionsMirroringMode,omitempty" url:"collectionsMirroringMode,omitempty"`
 	FilterExpression           *string                    `json:"filterExpression,omitempty" url:"filterExpression,omitempty"`
+	FilterSkipRestream         *bool                      `json:"filterSkipRestream,omitempty" url:"filterSkipRestream,omitempty"`
 	MergeFunctionMapping       *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
 	PauseRequested             *bool                      `json:"pauseRequested,omitempty" url:"pauseRequested,omitempty"`
 	Type                       *string                    `json:"type,omitempty" url:"type,omitempty"`

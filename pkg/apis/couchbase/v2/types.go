@@ -1986,8 +1986,11 @@ type CouchbaseReplicationSpec struct {
 	// "a-z", "A-Z", "0-9" and "-_%\.".
 	RemoteBucket BucketName `json:"remoteBucket"`
 
+	// === IMMUTABLE FIELDS (create-only, validation runner enforced) ===
+
 	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
 	// When false (default), replication restarts after filter changes. When true, continues without restart.
+	// This field is immutable after replication creation.
 	// +kubebuilder:default=false
 	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
 

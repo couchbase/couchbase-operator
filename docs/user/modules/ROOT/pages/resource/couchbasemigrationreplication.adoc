@@ -654,6 +654,7 @@ Each document that produces a successful match is replicated.
 FilterSkipRestream controls whether replication restarts after filterExpression changes.
 When false (default), replication restarts after filter changes.
 When true, continues without restart.
+This field is immutable after replication creation.
 
 === couchbasemigrationreplications.spec.hlvPruningWindowSec
 

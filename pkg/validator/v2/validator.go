@@ -966,6 +966,25 @@ func isVersion7OrAbove(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 	return couchbaseutil.VersionAfter(tag, "7.0.0")
 }
 
+// checkHlvPruningWindowSecCompatibility checks if HlvPruningWindowSec is compatible with the cluster version.
+func checkHlvPruningWindowSecCompatibility(cluster *couchbasev2.CouchbaseCluster, resourceName string, fieldValue *int32) error {
+	if fieldValue == nil {
+		return nil
+	}
+
+	isAtLeast76, err := cluster.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return fmt.Errorf("unable to check cluster version for HlvPruningWindowSec validation: %w", err)
+	}
+
+	if isAtLeast76 {
+		// HlvPruningWindowSec is not supported in Couchbase Server 7.6+
+		return fmt.Errorf("HlvPruningWindowSec is not supported in Couchbase Server 7.6+, field will be ignored in %s", resourceName)
+	}
+
+	return nil
+}
+
 func createReplicationHash(remoteClusterName string, spec couchbasev2.CouchbaseReplicationSpec) string {
 	return fmt.Sprintf("%s/%s/%s", remoteClusterName, spec.Bucket, spec.RemoteBucket)
 }
@@ -997,9 +1016,12 @@ func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev
 
 			currentRules[hash] = true
 
-			err := checkConstraintXDCRReplicationMappings(replication)
-			if err != nil {
+			if err := checkConstraintXDCRReplicationMappings(replication); err != nil {
 				errs = append(errs, fmt.Errorf("invalid rule for XDCR replication in couchbasereplications.couchbase.com/%s: %w", replication.Name, err))
+			}
+
+			if err := checkHlvPruningWindowSecCompatibility(cluster, fmt.Sprintf("couchbasereplications.couchbase.com/%s", replication.Name), replication.Spec.HlvPruningWindowSec); err != nil {
+				errs = append(errs, err)
 			}
 		}
 
@@ -1012,20 +1034,23 @@ func checkConstraintXDCRReplicationRules(v *types.Validator, cluster *couchbasev
 		for _, migration := range migrations.Items {
 			hash := createReplicationHash(remoteCluster.Name, migration.Spec)
 			if _, exists := currentRules[hash]; exists {
-				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR migration in couchbasereplications.couchbase.com/%s", hash, migration.Name))
+				errs = append(errs, fmt.Errorf("duplicate rule (%s) for XDCR migration in couchbasemigrations.couchbase.com/%s", hash, migration.Name))
 				continue
 			}
 
 			currentRules[hash] = true
 
-			err := checkConstraintXDCRMigrationMappings(migration)
-			if err != nil {
+			if err := checkConstraintXDCRMigrationMappings(migration); err != nil {
 				errs = append(errs, fmt.Errorf("invalid rule for XDCR migration in couchbasemigrations.couchbase.com/%s: %w", migration.Name, err))
+			}
+
+			if err := checkHlvPruningWindowSecCompatibility(cluster, fmt.Sprintf("couchbasemigrationreplications.couchbase.com/%s", migration.Name), migration.Spec.HlvPruningWindowSec); err != nil {
+				errs = append(errs, err)
 			}
 		}
 	}
 
-	if errs != nil {
+	if len(errs) > 0 {
 		return errors.CompositeValidationError(errs...)
 	}
 
@@ -5051,6 +5076,11 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 
 	if prev.Spec.RemoteBucket != curr.Spec.RemoteBucket {
 		errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
+	}
+
+	// FilterSkipRestream is immutable after replication creation
+	if !reflect.DeepEqual(prev.Spec.FilterSkipRestream, curr.Spec.FilterSkipRestream) {
+		errs = append(errs, util.NewUpdateError("spec.filterSkipRestream", "body"))
 	}
 
 	if errs != nil {

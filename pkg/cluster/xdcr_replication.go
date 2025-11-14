@@ -85,11 +85,12 @@ func (c *Cluster) ListReplications() (couchbaseutil.ReplicationList, error) {
 		// By now your eyeballs will be dry from all the rolling they are doing.
 		newReplication := couchbaseutil.Replication{
 			// Core immutable fields
-			FromBucket:      task.Source,
-			ToCluster:       cluster.Name,
-			ToBucket:        to,
-			Type:            couchbaseutil.ReplicationTypeXMEM,
-			ReplicationType: couchbaseutil.ReplicationReplicationTypeContinuous,
+			FromBucket:         task.Source,
+			ToCluster:          cluster.Name,
+			ToBucket:           to,
+			Type:               couchbaseutil.ReplicationTypeXMEM,
+			ReplicationType:    couchbaseutil.ReplicationReplicationTypeContinuous,
+			FilterSkipRestream: settings.FilterSkipRestream,
 
 			// Legacy core fields (from server settings)
 			PauseRequested: settings.PauseRequested,
@@ -912,6 +913,7 @@ func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSp
 	dest.FilterExpiration = spec.FilterExpiration
 	dest.FilterBypassExpiry = spec.FilterBypassExpiry
 	dest.FilterBinary = spec.FilterBinary
+	// FilterSkipRestream is create-only (immutable), not included in settings updates
 	dest.Priority = spec.Priority
 	dest.OptimisticReplicationThreshold = spec.OptimisticReplicationThreshold
 	dest.FailureRestartInterval = spec.FailureRestartInterval
@@ -931,7 +933,15 @@ func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSp
 
 	// Additional settings only available in ReplicationSettings API
 	dest.CollectionsOSOMode = spec.CollectionsOSOMode
-	dest.HlvPruningWindowSec = spec.HlvPruningWindowSec
+
+	// HlvPruningWindowSec is not supported in Couchbase Server 8.0+
+	// Set to nil if version >= 7.6.0 to avoid issues
+	if isAtLeast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtLeast76 {
+		dest.HlvPruningWindowSec = nil
+	} else {
+		dest.HlvPruningWindowSec = spec.HlvPruningWindowSec
+	}
+
 	dest.JSFunctionTimeoutMs = spec.JSFunctionTimeoutMs
 	dest.RetryOnRemoteAuthErr = spec.RetryOnRemoteAuthErr
 	dest.RetryOnRemoteAuthErrMaxWaitSec = spec.RetryOnRemoteAuthErrMaxWaitSec
@@ -1055,7 +1065,7 @@ func (c *Cluster) reconcileXDCRGlobalSettings() error {
 		return nil
 	}
 
-	desired := toXDCRGlobalSettings(spec)
+	desired := c.toXDCRGlobalSettings(spec)
 
 	// Apply desired settings; urlencoding with omitempty will skip nil pointers
 	if err := couchbaseutil.SetXDCRGlobalSettings(desired).On(c.api, c.readyMembers()); err != nil {
@@ -1067,7 +1077,7 @@ func (c *Cluster) reconcileXDCRGlobalSettings() error {
 	return nil
 }
 
-func toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.XDCRGlobalSettings {
+func (c *Cluster) toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.XDCRGlobalSettings {
 	if spec == nil {
 		return nil
 	}
@@ -1083,7 +1093,6 @@ func toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.X
 		FilterBypassUncommittedTxn:     spec.FilterBypassUncommittedTxn,
 		FilterDeletion:                 spec.FilterDeletion,
 		FilterExpiration:               spec.FilterExpiration,
-		HlvPruningWindowSec:            spec.HlvPruningWindowSec,
 		JSFunctionTimeoutMs:            spec.JSFunctionTimeoutMs,
 		LogLevel:                       spec.LogLevel,
 		Mobile:                         spec.Mobile,
@@ -1098,6 +1107,13 @@ func toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.X
 		WorkerBatchSize:                spec.WorkerBatchSize,
 		GoGC:                           spec.GoGC,
 		GoMaxProcs:                     spec.GoMaxProcs,
+	}
+
+	// Apply version-specific logic
+	if isAtLeast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtLeast76 {
+		out.HlvPruningWindowSec = nil
+	} else {
+		out.HlvPruningWindowSec = spec.HlvPruningWindowSec
 	}
 
 	return out
