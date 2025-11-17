@@ -102,6 +102,7 @@ func (c *Cluster) ListReplications() (couchbaseutil.ReplicationList, error) {
 			FilterDeletion:                 settings.FilterDeletion,
 			FilterExpiration:               settings.FilterExpiration,
 			FilterBypassExpiry:             settings.FilterBypassExpiry,
+			FilterBypassUncommittedTxn:     settings.FilterBypassUncommittedTxn,
 			FilterBinary:                   settings.FilterBinary,
 			Priority:                       settings.Priority,
 			OptimisticReplicationThreshold: settings.OptimisticReplicationThreshold,
@@ -873,6 +874,7 @@ func (c *Cluster) buildReplicationCreatePayload(spec *couchbasev2.CouchbaseRepli
 		FilterDeletion:                 spec.FilterDeletion,
 		FilterExpiration:               spec.FilterExpiration,
 		FilterBypassExpiry:             spec.FilterBypassExpiry,
+		FilterBypassUncommittedTxn:     spec.FilterBypassUncommittedTxn,
 		FilterBinary:                   spec.FilterBinary,
 		Priority:                       spec.Priority,
 		OptimisticReplicationThreshold: spec.OptimisticReplicationThreshold,
@@ -912,6 +914,7 @@ func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSp
 	dest.FilterDeletion = spec.FilterDeletion
 	dest.FilterExpiration = spec.FilterExpiration
 	dest.FilterBypassExpiry = spec.FilterBypassExpiry
+	dest.FilterBypassUncommittedTxn = spec.FilterBypassUncommittedTxn
 	dest.FilterBinary = spec.FilterBinary
 	// FilterSkipRestream is create-only (immutable), not included in settings updates
 	dest.Priority = spec.Priority
