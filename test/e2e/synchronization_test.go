@@ -87,7 +87,7 @@ func TestDataSynchronizationUpdate(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).MustCreate(t, kubernetes)
+	bucket := e2eutil.NewBucket(f.BucketType).WithScopes(scope).WithEvictionPolicy("fullEviction").MustCreate(t, kubernetes)
 
 	// Create the cluster.
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)

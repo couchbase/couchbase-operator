@@ -5420,7 +5420,7 @@ func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.C
 	return nil
 }
 
-// checkClusterUserPasswordConstraints checks that any users who will be managed by the cluster but do not exist yet have an initial password that complies with the cluster's password policy.
+// checkClusterUserPasswordConstraints checks that any internal auth domain users who will be managed by the cluster but do not exist yet have an initial password that complies with the cluster's password policy.
 // This check excludes users that are already managed by the cluster (in the status.users slice), as changes to the authSecret password are irrelevant once a user has already been created.
 // We already validate this when a CouchbaseUser is created, but this will help protect against race conditions.
 func checkClusterUserPasswordConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -5434,6 +5434,11 @@ func checkClusterUserPasswordConstraints(v *types.Validator, cluster *couchbasev
 	}
 
 	for _, user := range users.Items {
+		// Only check internal auth domain users
+		if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
+			continue
+		}
+
 		if err := checkUserPasswordForCluster(v, cluster, &user); err != nil {
 			return err
 		}

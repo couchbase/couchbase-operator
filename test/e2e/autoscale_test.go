@@ -455,9 +455,9 @@ func TestAutoscaleEnabledAllowsStatefulTLS(t *testing.T) {
 	framework.Requires(t, kubernetes).StaticCluster() // Requires access to kube-system!!
 
 	// Create bucket resource
-	bucket := e2espec.DefaultBucket()
-	bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(256)
-	bucket.Spec.EnableIndexReplica = true
+	bucket := e2eutil.MustGetCouchstoreBucket(couchbasev2.CouchbaseBucketCompressionModePassive)
+	bucket.(*couchbasev2.CouchbaseBucket).Spec.MemoryQuota = e2espec.NewResourceQuantityMi(256)
+	bucket.(*couchbasev2.CouchbaseBucket).Spec.EnableIndexReplica = true
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// Create 2 node cluster with referencing HPA
