@@ -6,6 +6,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -34,8 +35,8 @@ var (
 			Reason: "Used to determine issues with Couchbase Cluster state, server environment variables, and logging configuration",
 		},
 		{
-			Resource: &corev1.Endpoints{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired,
-			Reason: "",
+			Resource: &discoveryv1.EndpointSlice{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired,
+			Reason: "Used to inspect service endpoint topology without hitting deprecated Endpoints API",
 		},
 		{
 			Resource: &corev1.Namespace{}, Scope: resource.ScopeNamespace, LogLevel: resource.LogLevelRequired,
