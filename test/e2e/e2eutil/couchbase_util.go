@@ -750,6 +750,14 @@ func MustPatchQuerySettings(t *testing.T, k8s *types.Cluster, couchbase *couchba
 	}
 }
 
+func MustPatchXDCRGlobalSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	xdcrGlobalSettingsFetcher := getClusterFetcher(couchbaseutil.GetXDCRGlobalSettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, xdcrGlobalSettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustPatchEncryptionAtRestSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	encryptionAtRestSettingsFetcher := getClusterFetcher(couchbaseutil.GetEncryptionAtRestSettings)
 

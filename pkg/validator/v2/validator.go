@@ -5078,11 +5078,6 @@ func CheckImmutableFieldsReplication(prev, curr *couchbasev2.CouchbaseReplicatio
 		errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
 	}
 
-	// FilterSkipRestream is immutable after replication creation
-	if !reflect.DeepEqual(prev.Spec.FilterSkipRestream, curr.Spec.FilterSkipRestream) {
-		errs = append(errs, util.NewUpdateError("spec.filterSkipRestream", "body"))
-	}
-
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}

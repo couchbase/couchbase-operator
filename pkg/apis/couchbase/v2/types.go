@@ -1986,14 +1986,6 @@ type CouchbaseReplicationSpec struct {
 	// "a-z", "A-Z", "0-9" and "-_%\.".
 	RemoteBucket BucketName `json:"remoteBucket"`
 
-	// === IMMUTABLE FIELDS (create-only, validation runner enforced) ===
-
-	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
-	// When false (default), replication restarts after filter changes. When true, continues without restart.
-	// This field is immutable after replication creation.
-	// +kubebuilder:default=false
-	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
-
 	// === PER-REPLICATION MUTABLE SETTINGS (all pointers) ===
 
 	// Per-replication-only settings (cannot be set globally)
@@ -2002,13 +1994,18 @@ type CouchbaseReplicationSpec struct {
 	// Each document that produces a successful match is replicated.
 	FilterExpression *string `json:"filterExpression,omitempty"`
 
+	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
+	// When false (default), replication restarts after filter changes. When true, continues without restart.
+	// Note: Server requires this field when filterExpression is set. If not specified, operator defaults to false.
+	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
+
 	// PauseRequested indicates whether the replication has been issued a pause request.
 	// +kubebuilder:default=false
 	Paused *bool `json:"paused,omitempty"`
 
 	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
 	// Nil values can be used to explicitly unset merge functions for specific collections.
-	MergeFunctionMapping MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
+	MergeFunctionMapping *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
 
 	// Shared settings (can override global defaults)
 
@@ -2040,6 +2037,12 @@ type CouchbaseReplicationSpec struct {
 	FailureRestartInterval *int32 `json:"failureRestartInterval,omitempty"`
 
 	// FilterBinary specifies whether binary documents should be replicated.
+	// The value can be true or false (the default). If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied. If the value is false:
+	// The behavior is identical to that of all Couchbase-Server versions prior to 7.2.1 (with the exception of 7.1.5), where the filterBinary flag did not exist.
+	// If a filter expression is not provided, binary documents are replicated.
+	// If a filter expression is provided, and the expression refers only to either the document's key, or its xattr, or to both, the expression is applied, and the document is replicated if the expression permits.
+	// If a filter expression is provided, and the expression refers only to the document's body, the document is replicated.
+	// If a filter expression is provided, and the expression refers to the document's key, or its xattr, or to both; and also refers to the document's body; the document is not replicated (regardless of whether the key or xattr might appear to permit replication).
 	FilterBinary *bool `json:"filterBinary,omitempty"`
 
 	// FilterBypassExpiry when true, TTL is removed before replication.
@@ -4567,6 +4570,10 @@ type XDCRGlobalSettings struct {
 	// This field defaults to false.
 	FilterBypassExpiry *bool `json:"filterBypassExpiry,omitempty"`
 
+	// FilterBinary specifies whether binary documents should be replicated.
+	// The value can be true or false (the default). If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied. If the value is false:
+	FilterBinary *bool `json:"filterBinary,omitempty"`
+
 	// FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
 	// This field defaults to false.
 	FilterBypassUncommittedTxn *bool `json:"filterBypassUncommittedTxn,omitempty"`
@@ -4646,11 +4653,22 @@ type XDCRGlobalSettings struct {
 	// +kubebuilder:validation:Maximum=10000
 	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
 
+	// ConflictLogging is the configuration for conflict logging.
+	// This feature is available in Couchbase Server 8.0.0 and later.
+	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
+
+	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
+	// Note: Global settings only support bucket-level mappings. Collection-level mappings will cause server errors.
+	// Nil values can be used to explicitly unset merge functions for specific collections.
+	MergeFunctionMapping *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
+
 	// Global-only settings (cannot be set per-replication)
 
 	// GoGC is the Go GC target percentage for XDCR processes.
-	// This field can be an integer (0-100) as a string or "off", defaulting to "100".
-	GoGC *string `json:"goGC,omitempty"`
+	// Valid values are integers from 1-100, defaulting to 100.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	GoGC *int32 `json:"goGC,omitempty"`
 
 	// GoMaxProcs is the max threads per node for XDCR.
 	// This field defaults to 4.

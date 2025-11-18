@@ -40,6 +40,10 @@ func replicationKey(r couchbaseutil.Replication) string {
 	return fmt.Sprintf("%s/%s/%s", r.ToCluster, r.FromBucket, r.ToBucket)
 }
 
+func replicationKeyFromSpec(spec *couchbasev2.CouchbaseReplicationSpec, remoteClusterName string) string {
+	return fmt.Sprintf("%s/%s/%s", remoteClusterName, spec.Bucket, spec.RemoteBucket)
+}
+
 func (c *Cluster) ListReplications() (couchbaseutil.ReplicationList, error) {
 	mappingsPossible, err := c.isScopesAndCollectionsSupported()
 	if err != nil {
@@ -619,21 +623,13 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 	}
 
 	// Handle updates (settings changes only)
-	for _, desired := range toUpdate {
-		log.Info("Updating XDCR replication settings", "cluster", c.namespacedName(), "replication", desired.Key)
+	for _, update := range toUpdate {
+		log.Info("Updating XDCR replication settings", "cluster", c.namespacedName(), "replication", update.Desired.Key)
 
-		current := currentStates[desired.Key]
+		current := currentStates[update.Desired.Key]
 
-		// Compute minimal patch
-		patch := c.computeSettingsPatch(&desired.Settings, &current.Settings)
-
-		// If patch is empty, skip
-		if c.isEmptySettings(patch) {
-			continue
-		}
-
-		// Apply settings patch
-		if err := couchbaseutil.UpdateReplicationSettings(&patch, current.RemoteUUID, current.Create.FromBucket, current.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+		// Use pre-computed patch (already validated to be different)
+		if err := couchbaseutil.UpdateReplicationSettings(update.Patch, current.RemoteUUID, current.Create.FromBucket, current.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
@@ -641,34 +637,34 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 	}
 
 	// Handle creations
-	for _, desired := range toCreate {
-		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", desired.Key)
+	for _, createPayload := range toCreate {
+		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
 
 		// Create via creation API
-		if err := couchbaseutil.CreateReplication(&desired.Create).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.CreateReplication(createPayload.Create).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, desired.Key))
+		c.raiseEvent(k8sutil.ReplicationAddedEvent(c.cluster, createPayload.Desired.Key))
 
 		// Apply settings immediately after creation
-		cluster, err := c.getRemoteClusterByName(desired.RemoteCluster)
+		cluster, err := c.getRemoteClusterByName(createPayload.Desired.RemoteCluster)
 		if err != nil {
 			return err
 		}
 
 		// Fetch current settings (should be defaults/globals)
 		currentSettings := &couchbaseutil.ReplicationSettings{}
-		if err := couchbaseutil.GetReplicationSettings(currentSettings, cluster.UUID, desired.Create.FromBucket, desired.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.GetReplicationSettings(currentSettings, cluster.UUID, createPayload.Create.FromBucket, createPayload.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		// Compute patch against current settings
-		patch := c.computeSettingsPatch(&desired.Settings, currentSettings)
+		// Compute patch against current settings (includes operator-generated fields)
+		patch := c.computeSettingsPatch(&createPayload.Desired, currentSettings)
 
-		// Apply settings if there are changes
-		if !c.isEmptySettings(patch) {
-			if err := couchbaseutil.UpdateReplicationSettings(&patch, cluster.UUID, desired.Create.FromBucket, desired.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
+		// Apply settings if patch is different from current
+		if !reflect.DeepEqual(patch, currentSettings) {
+			if err := couchbaseutil.UpdateReplicationSettings(patch, cluster.UUID, createPayload.Create.FromBucket, createPayload.Create.ToBucket).On(c.api, c.readyMembers()); err != nil {
 				return err
 			}
 
@@ -681,11 +677,14 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 // DesiredReplicationState represents the complete desired state of a replication from CRD.
 type DesiredReplicationState struct {
-	// Creation fields (sent to /controller/createReplication)
-	Create couchbaseutil.Replication
 
-	// Settings fields (sent to /settings/replications/<id>)
-	Settings couchbaseutil.ReplicationSettings
+	// Original CRD spec for patch computation
+	Spec *couchbasev2.CouchbaseReplicationSpec
+
+	// Operator-generated fields (not from CRD spec)
+	ColMappingRules            *couchbaseutil.ColMappingRules // Generated from ExplicitMapping
+	CollectionsExplicitMapping *bool                          // Set to true when explicit mapping is used
+	CollectionsMigrationMode   *bool                          // Set for migration replications
 
 	// Metadata
 	CRDName       string
@@ -761,37 +760,34 @@ func (c *Cluster) processMigrationReplications(selector labels.Selector, generat
 			log.Error(err, "failed to populate migration with annotation")
 		}
 
-		// Build creation struct for migration
-		create := c.buildReplicationCreatePayload(&migration.Spec, generatedName)
-
-		// Enable migration mode - this tells the server to migrate documents from the
-		// default collection to collections determined by the mapping rules
-		migrationTrue := true
-		create.MigrationMapping = &migrationTrue
+		// Build replication key
+		key := replicationKeyFromSpec(&migration.Spec, generatedName)
+		if _, exists := states[key]; exists {
+			return fmt.Errorf("%w: duplicate migration replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
+		}
 
 		// Generate migration mapping rules from CouchbaseMigrationReplication.MigrationMapping.Mappings
 		// These rules specify which documents (via filter expressions) go to which target collections
 		rules, err := generateMigrationMappingRules(migration)
 		if err != nil {
-			return fmt.Errorf("%w: invalid migration replication for %s", errors.NewStackTracedError(err), replicationKey(create))
+			return fmt.Errorf("%w: invalid migration replication for %s", errors.NewStackTracedError(err), key)
 		}
-		create.MappingRules = convertColMappingRulesFromJSON(rules)
 
-		// Build settings struct and propagate migration mode
-		settings := c.buildSettingsFromSpec(&migration.Spec)
-		settings.CollectionsMigrationMode = create.MigrationMapping
+		// Enable migration mode - this tells the server to migrate documents from the
+		// default collection to collections determined by the mapping rules
+		migrationTrue := true
 
-		key := replicationKey(create)
-		if _, exists := states[key]; exists {
-			return fmt.Errorf("%w: duplicate migration replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
+		state := DesiredReplicationState{
+			Spec:                       &migration.Spec,
+			ColMappingRules:            convertColMappingRulesFromJSON(rules),
+			CollectionsExplicitMapping: nil,
+			CollectionsMigrationMode:   &migrationTrue,
+			CRDName:                    migration.Name,
+			RemoteCluster:              generatedName,
+			Key:                        key,
 		}
-		states[key] = DesiredReplicationState{
-			Create:        create,
-			Settings:      settings,
-			CRDName:       migration.Name,
-			RemoteCluster: generatedName,
-			Key:           key,
-		}
+
+		states[key] = state
 	}
 
 	return nil
@@ -812,11 +808,22 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 			log.Error(err, "failed to populate replication with annotation")
 		}
 
-		// Build creation struct (only creation-supported fields)
-		create := c.buildReplicationCreatePayload(&replication.Spec, generatedName)
+		// Build replication key
+		key := replicationKeyFromSpec(&replication.Spec, generatedName)
+		if _, exists := states[key]; exists {
+			return fmt.Errorf("%w: duplicate replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
+		}
 
-		// Build settings struct (all per-replication settings)
-		settings := c.buildSettingsFromSpec(&replication.Spec)
+		// Initialize state with basic fields
+		state := DesiredReplicationState{
+			Spec:                       &replication.Spec,
+			CRDName:                    replication.Name,
+			RemoteCluster:              generatedName,
+			CollectionsMigrationMode:   nil,
+			CollectionsExplicitMapping: nil,
+			ColMappingRules:            nil,
+			Key:                        key,
+		}
 
 		// Handle explicit mapping rules from CouchbaseReplication.ExplicitMapping
 		// Explicit mapping allows replicating specific collections to specific target collections,
@@ -824,47 +831,37 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 		if xdcrScopesAndCollectionsSupported && (len(replication.ExplicitMapping.AllowRules) > 0 || len(replication.ExplicitMapping.DenyRules) > 0) {
 			rules, err := generateExplicitMappingRules(replication)
 			if err != nil {
-				return fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), replicationKey(create))
+				return fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), key)
 			}
 
 			if rules != "{}" {
 				// Enable explicit mapping mode and set the mapping rules
 				explicitTrue := true
-				create.ExplicitMapping = &explicitTrue
-				create.MappingRules = convertColMappingRulesFromJSON(rules)
-				settings.CollectionsExplicitMapping = &explicitTrue
-				settings.ColMappingRules = create.MappingRules
+				state.CollectionsExplicitMapping = &explicitTrue
+				state.ColMappingRules = convertColMappingRulesFromJSON(rules)
 			}
 		}
 
-		key := replicationKey(create)
-		if _, exists := states[key]; exists {
-			return fmt.Errorf("%w: duplicate replication for %s", errors.NewStackTracedError(ErrXDCRDuplicateReplication), key)
-		}
-		states[key] = DesiredReplicationState{
-			Create:        create,
-			Settings:      settings,
-			CRDName:       replication.Name,
-			RemoteCluster: generatedName,
-			Key:           key,
-		}
+		states[key] = state
 	}
 
 	return nil
 }
 
-// buildCreateFromSpec builds the creation API struct from a CRD spec (only creation-supported fields).
-func (c *Cluster) buildReplicationCreatePayload(spec *couchbasev2.CouchbaseReplicationSpec, remoteClusterName string) couchbaseutil.Replication {
+// buildReplicationCreatePayload builds the creation API struct from a DesiredReplicationState (only creation-supported fields).
+func (c *Cluster) buildReplicationCreatePayload(desired DesiredReplicationState) couchbaseutil.Replication {
+	spec := desired.Spec
+	remoteClusterName := desired.RemoteCluster
+
 	replication := couchbaseutil.Replication{
 		// Core immutable fields
-		FromBucket:         string(spec.Bucket),
-		ToCluster:          remoteClusterName,
-		ToBucket:           string(spec.RemoteBucket),
-		Type:               couchbaseutil.ReplicationTypeXMEM,
-		ReplicationType:    couchbaseutil.ReplicationReplicationTypeContinuous,
-		FilterSkipRestream: spec.FilterSkipRestream,
+		FromBucket:      string(spec.Bucket),
+		ToCluster:       remoteClusterName,
+		ToBucket:        string(spec.RemoteBucket),
+		Type:            couchbaseutil.ReplicationTypeXMEM,
+		ReplicationType: couchbaseutil.ReplicationReplicationTypeContinuous,
 
-		// Legacy core fields (can be set during creation)
+		// Core fields (can be set during creation)
 		PauseRequested: spec.Paused,
 
 		// Advanced settings supported during replication creation (from createReplication API docs)
@@ -898,63 +895,31 @@ func (c *Cluster) buildReplicationCreatePayload(spec *couchbasev2.CouchbaseRepli
 		replication.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
 	}
 
+	// Special handling: Server requires filterSkipRestream when filterExpression is set
+	// Only set filterSkipRestream if filterExpression is being set
+	if spec.FilterExpression != nil {
+		if spec.FilterSkipRestream != nil {
+			replication.FilterSkipRestream = spec.FilterSkipRestream
+		} else {
+			// Default to false when filterExpression is set but filterSkipRestream is not
+			defaultFalse := false
+			replication.FilterSkipRestream = &defaultFalse
+		}
+	}
+	// If filterExpression is nil, don't set filterSkipRestream (both omitted from request)
+
+	// Set operator-generated fields from DesiredReplicationState
+	if desired.CollectionsMigrationMode != nil {
+		replication.MigrationMapping = desired.CollectionsMigrationMode
+	}
+	if desired.CollectionsExplicitMapping != nil {
+		replication.ExplicitMapping = desired.CollectionsExplicitMapping
+	}
+	if desired.ColMappingRules != nil {
+		replication.MappingRules = desired.ColMappingRules
+	}
+
 	return replication
-}
-
-// buildSettingsFromSpec builds the settings API struct from a CRD spec (all per-replication settings).
-func (c *Cluster) buildSettingsFromSpec(spec *couchbasev2.CouchbaseReplicationSpec) couchbaseutil.ReplicationSettings {
-	var dest couchbaseutil.ReplicationSettings
-
-	// Legacy core fields (map from CRD spec to ReplicationSettings)
-	dest.PauseRequested = spec.Paused
-
-	// Global / Per-replication advanced settings (from CRD spec)
-	dest.CompressionType = spec.CompressionType
-	dest.DesiredLatency = spec.DesiredLatency
-	dest.FilterDeletion = spec.FilterDeletion
-	dest.FilterExpiration = spec.FilterExpiration
-	dest.FilterBypassExpiry = spec.FilterBypassExpiry
-	dest.FilterBypassUncommittedTxn = spec.FilterBypassUncommittedTxn
-	dest.FilterBinary = spec.FilterBinary
-	// FilterSkipRestream is create-only (immutable), not included in settings updates
-	dest.Priority = spec.Priority
-	dest.OptimisticReplicationThreshold = spec.OptimisticReplicationThreshold
-	dest.FailureRestartInterval = spec.FailureRestartInterval
-	dest.DocBatchSizeKb = spec.DocBatchSizeKb
-	dest.WorkerBatchSize = spec.WorkerBatchSize
-	dest.CheckpointInterval = spec.CheckpointInterval
-	dest.SourceNozzlePerNode = spec.SourceNozzlePerNode
-	dest.TargetNozzlePerNode = spec.TargetNozzlePerNode
-	dest.StatsInterval = spec.StatsInterval
-	dest.LogLevel = spec.LogLevel
-	dest.NetworkUsageLimit = spec.NetworkUsageLimit
-	dest.Mobile = spec.Mobile
-
-	// Per-replication only settings (from CRD spec)
-	dest.FilterExpression = spec.FilterExpression
-	dest.MergeFunctionMapping = convertMergeFunctionMappingRules(&spec.MergeFunctionMapping)
-
-	// Additional settings only available in ReplicationSettings API
-	dest.CollectionsOSOMode = spec.CollectionsOSOMode
-
-	// HlvPruningWindowSec is not supported in Couchbase Server 8.0+
-	// Set to nil if version >= 7.6.0 to avoid issues
-	if isAtLeast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtLeast76 {
-		dest.HlvPruningWindowSec = nil
-	} else {
-		dest.HlvPruningWindowSec = spec.HlvPruningWindowSec
-	}
-
-	dest.JSFunctionTimeoutMs = spec.JSFunctionTimeoutMs
-	dest.RetryOnRemoteAuthErr = spec.RetryOnRemoteAuthErr
-	dest.RetryOnRemoteAuthErrMaxWaitSec = spec.RetryOnRemoteAuthErrMaxWaitSec
-
-	// Conflict logging (convert from CRD spec)
-	if spec.ConflictLogging != nil {
-		dest.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
-	}
-
-	return dest
 }
 
 // FetchCurrentReplicationStates fetches current state from the server.
@@ -987,43 +952,127 @@ func (c *Cluster) FetchCurrentReplicationStates(currentReplications couchbaseuti
 	return states, nil
 }
 
-// computeSettingsPatch computes a minimal patch containing only changed fields.
-func (c *Cluster) computeSettingsPatch(desired, current *couchbaseutil.ReplicationSettings) couchbaseutil.ReplicationSettings {
-	var patch couchbaseutil.ReplicationSettings
+// computeSettingsPatch creates patch for replication settings.
+// Starts with current server values, overrides with CRD spec values if set.
+func (c *Cluster) computeSettingsPatch(desired *DesiredReplicationState, current *couchbaseutil.ReplicationSettings) *couchbaseutil.ReplicationSettings {
+	// Start with current server state
+	patch := *current
+	spec := desired.Spec
 
-	// Use reflection to iterate over all fields and copy changed ones
-	desiredVal := reflect.ValueOf(desired).Elem()
-	currentVal := reflect.ValueOf(current).Elem()
-	patchVal := reflect.ValueOf(&patch).Elem()
+	// Normalize current and patch MergeFunctionMapping: if it's empty struct {}, set to nil
+	// Set patch to nil too, or else it will be set to empty struct {} which is not accepted by the server.
+	if current.MergeFunctionMapping != nil && len(*current.MergeFunctionMapping) == 0 {
+		current.MergeFunctionMapping = nil
+		patch.MergeFunctionMapping = nil
+	}
 
-	for i := 0; i < desiredVal.NumField(); i++ {
-		desiredField := desiredVal.Field(i)
-		currentField := currentVal.Field(i)
-		patchField := patchVal.Field(i)
+	// Override with CRD spec values if set (simple fields)
+	patch.PauseRequested = c.useSpecIfSetBool(spec.Paused, current.PauseRequested)
+	patch.CheckpointInterval = c.useSpecIfSetInt32(spec.CheckpointInterval, current.CheckpointInterval)
+	patch.CollectionsOSOMode = c.useSpecIfSetBool(spec.CollectionsOSOMode, current.CollectionsOSOMode)
+	patch.CompressionType = c.useSpecIfSetString(spec.CompressionType, current.CompressionType)
+	patch.DesiredLatency = c.useSpecIfSetInt32(spec.DesiredLatency, current.DesiredLatency)
+	patch.DocBatchSizeKb = c.useSpecIfSetInt32(spec.DocBatchSizeKb, current.DocBatchSizeKb)
+	patch.FailureRestartInterval = c.useSpecIfSetInt32(spec.FailureRestartInterval, current.FailureRestartInterval)
+	patch.FilterBinary = c.useSpecIfSetBool(spec.FilterBinary, current.FilterBinary)
+	patch.FilterBypassExpiry = c.useSpecIfSetBool(spec.FilterBypassExpiry, current.FilterBypassExpiry)
+	patch.FilterBypassUncommittedTxn = c.useSpecIfSetBool(spec.FilterBypassUncommittedTxn, current.FilterBypassUncommittedTxn)
+	patch.FilterDeletion = c.useSpecIfSetBool(spec.FilterDeletion, current.FilterDeletion)
+	patch.FilterExpiration = c.useSpecIfSetBool(spec.FilterExpiration, current.FilterExpiration)
+	patch.JSFunctionTimeoutMs = c.useSpecIfSetInt32(spec.JSFunctionTimeoutMs, current.JSFunctionTimeoutMs)
+	patch.LogLevel = c.useSpecIfSetString(spec.LogLevel, current.LogLevel)
 
-		// Only process settable fields
-		if !patchField.CanSet() {
-			continue
+	// Mobile is only supported in Couchbase Server 7.6.0 and later
+	if supportsMobile, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && supportsMobile {
+		patch.Mobile = c.useSpecIfSetString(spec.Mobile, current.Mobile)
+	}
+
+	patch.NetworkUsageLimit = c.useSpecIfSetInt32(spec.NetworkUsageLimit, current.NetworkUsageLimit)
+	patch.OptimisticReplicationThreshold = c.useSpecIfSetInt32(spec.OptimisticReplicationThreshold, current.OptimisticReplicationThreshold)
+	patch.Priority = c.useSpecIfSetString(spec.Priority, current.Priority)
+	patch.RetryOnRemoteAuthErr = c.useSpecIfSetBool(spec.RetryOnRemoteAuthErr, current.RetryOnRemoteAuthErr)
+	patch.RetryOnRemoteAuthErrMaxWaitSec = c.useSpecIfSetInt32(spec.RetryOnRemoteAuthErrMaxWaitSec, current.RetryOnRemoteAuthErrMaxWaitSec)
+	patch.SourceNozzlePerNode = c.useSpecIfSetInt32(spec.SourceNozzlePerNode, current.SourceNozzlePerNode)
+	patch.StatsInterval = c.useSpecIfSetInt32(spec.StatsInterval, current.StatsInterval)
+	patch.TargetNozzlePerNode = c.useSpecIfSetInt32(spec.TargetNozzlePerNode, current.TargetNozzlePerNode)
+	patch.WorkerBatchSize = c.useSpecIfSetInt32(spec.WorkerBatchSize, current.WorkerBatchSize)
+
+	// Handle complex fields requiring special processing/conversion:
+	// - ConflictLogging: converts CRD CouchbaseConflictLoggingSpec to util ConflictLoggingSettings
+	// - MergeFunctionMapping: converts CRD MergeFunctionMappingRules to util type
+
+	// ConflictLogging is only supported in Couchbase Server 8.0.0 and later
+	if supportsConflictLogging, err := c.cluster.IsAtLeastVersion("8.0.0"); err == nil && supportsConflictLogging {
+		if spec.ConflictLogging != nil {
+			patch.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
 		}
+		// else: keep current value (already in patch from copying current)
+	}
 
-		// Check if the field has changed
-		if !reflect.DeepEqual(desiredField.Interface(), currentField.Interface()) {
-			patchField.Set(desiredField)
+	if spec.MergeFunctionMapping != nil {
+		// If spec.MergeFunctionMapping is empty struct {}, treat as nil (unset) because server does not accept empty struct.
+		if len(*spec.MergeFunctionMapping) == 0 {
+			patch.MergeFunctionMapping = nil
+		} else {
+			patch.MergeFunctionMapping = convertMergeFunctionMappingRules(spec.MergeFunctionMapping)
+		}
+	}
+	// else: keep current value (already normalized to nil if empty above)
+
+	// Handle filterExpression and filterSkipRestream:
+	// Start from current, ensure current.FilterSkipRestream (not returned by server) and patch.FilterSkipRestream both defaults to false, this will make make the desired vs current comparison work.
+	// then override FilterExpression and FilterSkipRestream only if spec sets FilterExpression.
+	// This guarantees FilterSkipRestream is present when sending a filter, avoiding server validation errors.
+	defaultFalse := false
+	current.FilterSkipRestream = &defaultFalse
+	patch.FilterSkipRestream = &defaultFalse
+
+	// If spec provides a filter expression, apply it and honor spec's skip value if present.
+	if spec.FilterExpression != nil {
+		patch.FilterExpression = spec.FilterExpression
+		if spec.FilterSkipRestream != nil {
+			patch.FilterSkipRestream = spec.FilterSkipRestream
 		}
 	}
 
-	return patch
+	// Handle version-specific logic for HlvPruningWindowSec
+	if isAtLeast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtLeast76 {
+		current.HlvPruningWindowSec = nil
+		patch.HlvPruningWindowSec = nil
+	} else {
+		patch.HlvPruningWindowSec = c.useSpecIfSetInt32(spec.HlvPruningWindowSec, current.HlvPruningWindowSec)
+	}
+
+	// Only override mapping-related fields when desired state explicitly sets them.
+	// Otherwise, keep current value (already in patch from copying current).
+	if desired.ColMappingRules != nil {
+		patch.ColMappingRules = desired.ColMappingRules
+	}
+	if desired.CollectionsExplicitMapping != nil {
+		patch.CollectionsExplicitMapping = desired.CollectionsExplicitMapping
+	}
+	if desired.CollectionsMigrationMode != nil {
+		patch.CollectionsMigrationMode = desired.CollectionsMigrationMode
+	}
+
+	return &patch
 }
 
-// isEmptySettings checks if a settings struct has no non-nil fields.
-func (c *Cluster) isEmptySettings(settings couchbaseutil.ReplicationSettings) bool {
-	return reflect.DeepEqual(settings, couchbaseutil.ReplicationSettings{})
+// ReplicationUpdate represents a replication that needs settings updated.
+type ReplicationUpdate struct {
+	Desired DesiredReplicationState
+	Patch   *couchbaseutil.ReplicationSettings
+}
+
+type ReplicationCreate struct {
+	Desired DesiredReplicationState
+	Create  *couchbaseutil.Replication
 }
 
 // diffReplicationStates compares desired vs current states and returns what needs to be done.
 func (c *Cluster) diffReplicationStates(desired map[string]DesiredReplicationState, current map[string]CurrentReplicationState) (
-	toCreate []DesiredReplicationState,
-	toUpdate []DesiredReplicationState,
+	toCreate []ReplicationCreate,
+	toUpdate []ReplicationUpdate,
 	toDelete []CurrentReplicationState,
 ) {
 	// Find creates and updates
@@ -1031,12 +1080,19 @@ func (c *Cluster) diffReplicationStates(desired map[string]DesiredReplicationSta
 		if currentState, exists := current[key]; exists {
 			// Exists - check if settings need updating
 			// Note: Immutable field changes are prevented by validation layers
-			if c.needsSettingsUpdate(desiredState.Settings, currentState.Settings) {
-				toUpdate = append(toUpdate, desiredState)
+			patch := c.computeSettingsPatch(&desiredState, &currentState.Settings)
+			if !reflect.DeepEqual(patch, &currentState.Settings) {
+				toUpdate = append(toUpdate, ReplicationUpdate{
+					Desired: desiredState,
+					Patch:   patch,
+				})
 			}
 		} else {
-			// Doesn't exist - needs creation
-			toCreate = append(toCreate, desiredState)
+			createPayload := ReplicationCreate{}
+			createPayload.Desired = desiredState
+			createSettings := c.buildReplicationCreatePayload(desiredState)
+			createPayload.Create = &createSettings
+			toCreate = append(toCreate, createPayload)
 		}
 	}
 
@@ -1050,13 +1106,6 @@ func (c *Cluster) diffReplicationStates(desired map[string]DesiredReplicationSta
 	return toCreate, toUpdate, toDelete
 }
 
-// needsSettingsUpdate determines if settings need updating.
-func (c *Cluster) needsSettingsUpdate(desired, current couchbaseutil.ReplicationSettings) bool {
-	// Compute patch and check if it's empty
-	patch := c.computeSettingsPatch(&desired, &current)
-	return !c.isEmptySettings(patch)
-}
-
 // reconcileXDCRGlobalSettings applies cluster-wide XDCR settings before handling replications.
 func (c *Cluster) reconcileXDCRGlobalSettings() error {
 	if !c.cluster.Spec.XDCR.Managed {
@@ -1068,10 +1117,22 @@ func (c *Cluster) reconcileXDCRGlobalSettings() error {
 		return nil
 	}
 
-	desired := c.toXDCRGlobalSettings(spec)
+	// Get current server state to check if update is needed
+	var current couchbaseutil.XDCRGlobalSettings
+	if err := couchbaseutil.GetXDCRGlobalSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
 
-	// Apply desired settings; urlencoding with omitempty will skip nil pointers
-	if err := couchbaseutil.SetXDCRGlobalSettings(desired).On(c.api, c.readyMembers()); err != nil {
+	// Compute patch from CRD spec vs current server state
+	patch := c.computeGlobalSettingsPatch(spec, &current)
+
+	// Only update if patch is different from current state
+	if reflect.DeepEqual(*patch, current) {
+		return nil
+	}
+
+	// Apply settings patch; urlencoding with omitempty will skip nil pointers
+	if err := couchbaseutil.SetXDCRGlobalSettings(patch).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
@@ -1080,46 +1141,113 @@ func (c *Cluster) reconcileXDCRGlobalSettings() error {
 	return nil
 }
 
-func (c *Cluster) toXDCRGlobalSettings(spec *couchbasev2.XDCRGlobalSettings) *couchbaseutil.XDCRGlobalSettings {
-	if spec == nil {
-		return nil
-	}
-	// Shallow pointer copy into util model; fields align by name
-	out := &couchbaseutil.XDCRGlobalSettings{
-		CheckpointInterval:             spec.CheckpointInterval,
-		CollectionsOSOMode:             spec.CollectionsOSOMode,
-		CompressionType:                spec.CompressionType,
-		DesiredLatency:                 spec.DesiredLatency,
-		DocBatchSizeKb:                 spec.DocBatchSizeKb,
-		FailureRestartInterval:         spec.FailureRestartInterval,
-		FilterBypassExpiry:             spec.FilterBypassExpiry,
-		FilterBypassUncommittedTxn:     spec.FilterBypassUncommittedTxn,
-		FilterDeletion:                 spec.FilterDeletion,
-		FilterExpiration:               spec.FilterExpiration,
-		JSFunctionTimeoutMs:            spec.JSFunctionTimeoutMs,
-		LogLevel:                       spec.LogLevel,
-		Mobile:                         spec.Mobile,
-		NetworkUsageLimit:              spec.NetworkUsageLimit,
-		OptimisticReplicationThreshold: spec.OptimisticReplicationThreshold,
-		Priority:                       spec.Priority,
-		RetryOnRemoteAuthErr:           spec.RetryOnRemoteAuthErr,
-		RetryOnRemoteAuthErrMaxWaitSec: spec.RetryOnRemoteAuthErrMaxWaitSec,
-		SourceNozzlePerNode:            spec.SourceNozzlePerNode,
-		StatsInterval:                  spec.StatsInterval,
-		TargetNozzlePerNode:            spec.TargetNozzlePerNode,
-		WorkerBatchSize:                spec.WorkerBatchSize,
-		GoGC:                           spec.GoGC,
-		GoMaxProcs:                     spec.GoMaxProcs,
+// computeGlobalSettingsPatch creates patch for global settings.
+// Starts with current server values, overrides with CRD spec values if set.
+//
+//nolint:dupl
+func (c *Cluster) computeGlobalSettingsPatch(spec *couchbasev2.XDCRGlobalSettings, current *couchbaseutil.XDCRGlobalSettings) *couchbaseutil.XDCRGlobalSettings {
+	// Start with current server state
+	patch := *current
+
+	// Normalize current and patch MergeFunctionMapping: if it's empty struct {}, set to nil
+	// Set patch to nil too, or else it will be set to empty struct {} which is not accepted by the server.
+	if current.MergeFunctionMapping != nil && len(*current.MergeFunctionMapping) == 0 {
+		current.MergeFunctionMapping = nil
+		patch.MergeFunctionMapping = nil
 	}
 
-	// Apply version-specific logic
+	// Override with CRD spec values if set
+	patch.CheckpointInterval = c.useSpecIfSetInt32(spec.CheckpointInterval, current.CheckpointInterval)
+	patch.CollectionsOSOMode = c.useSpecIfSetBool(spec.CollectionsOSOMode, current.CollectionsOSOMode)
+	patch.CompressionType = c.useSpecIfSetString(spec.CompressionType, current.CompressionType)
+	patch.DesiredLatency = c.useSpecIfSetInt32(spec.DesiredLatency, current.DesiredLatency)
+	patch.DocBatchSizeKb = c.useSpecIfSetInt32(spec.DocBatchSizeKb, current.DocBatchSizeKb)
+	patch.FailureRestartInterval = c.useSpecIfSetInt32(spec.FailureRestartInterval, current.FailureRestartInterval)
+	patch.FilterBypassExpiry = c.useSpecIfSetBool(spec.FilterBypassExpiry, current.FilterBypassExpiry)
+	patch.FilterBinary = c.useSpecIfSetBool(spec.FilterBinary, current.FilterBinary)
+	patch.FilterBypassUncommittedTxn = c.useSpecIfSetBool(spec.FilterBypassUncommittedTxn, current.FilterBypassUncommittedTxn)
+	patch.FilterDeletion = c.useSpecIfSetBool(spec.FilterDeletion, current.FilterDeletion)
+	patch.FilterExpiration = c.useSpecIfSetBool(spec.FilterExpiration, current.FilterExpiration)
+	// FilterExpression and FilterSkipRestream are handled together below due to server requirement
+	patch.JSFunctionTimeoutMs = c.useSpecIfSetInt32(spec.JSFunctionTimeoutMs, current.JSFunctionTimeoutMs)
+	patch.LogLevel = c.useSpecIfSetString(spec.LogLevel, current.LogLevel)
+
+	// Mobile is only supported in Couchbase Server 7.6.0 and later
+	if supportsMobile, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && supportsMobile {
+		patch.Mobile = c.useSpecIfSetString(spec.Mobile, current.Mobile)
+	}
+
+	patch.NetworkUsageLimit = c.useSpecIfSetInt32(spec.NetworkUsageLimit, current.NetworkUsageLimit)
+	patch.OptimisticReplicationThreshold = c.useSpecIfSetInt32(spec.OptimisticReplicationThreshold, current.OptimisticReplicationThreshold)
+	patch.Priority = c.useSpecIfSetString(spec.Priority, current.Priority)
+	patch.RetryOnRemoteAuthErr = c.useSpecIfSetBool(spec.RetryOnRemoteAuthErr, current.RetryOnRemoteAuthErr)
+	patch.RetryOnRemoteAuthErrMaxWaitSec = c.useSpecIfSetInt32(spec.RetryOnRemoteAuthErrMaxWaitSec, current.RetryOnRemoteAuthErrMaxWaitSec)
+	patch.SourceNozzlePerNode = c.useSpecIfSetInt32(spec.SourceNozzlePerNode, current.SourceNozzlePerNode)
+	patch.StatsInterval = c.useSpecIfSetInt32(spec.StatsInterval, current.StatsInterval)
+	patch.TargetNozzlePerNode = c.useSpecIfSetInt32(spec.TargetNozzlePerNode, current.TargetNozzlePerNode)
+	patch.WorkerBatchSize = c.useSpecIfSetInt32(spec.WorkerBatchSize, current.WorkerBatchSize)
+	patch.GoGC = c.useSpecIfSetInt32(spec.GoGC, current.GoGC)
+	patch.GoMaxProcs = c.useSpecIfSetInt32(spec.GoMaxProcs, current.GoMaxProcs)
+	// FilterSkipRestream is handled separately below due to server requirement
+
+	// Handle complex fields requiring special processing/conversion:
+	// - ConflictLogging: converts CRD CouchbaseConflictLoggingSpec to util ConflictLoggingSettings
+
+	// ConflictLogging is only supported in Couchbase Server 8.0.0 and later
+	if supportsConflictLogging, err := c.cluster.IsAtLeastVersion("8.0.0"); err == nil && supportsConflictLogging {
+		if spec.ConflictLogging != nil {
+			patch.ConflictLogging = generateConflictLoggingSettings(spec.ConflictLogging)
+		}
+		// else: keep current value (already in patch from copying current)
+	}
+
+	// MergeFunctionMapping: Global settings support bucket-level mappings only
+	// Collection-level mappings will cause server error
+	if spec.MergeFunctionMapping != nil {
+		// If spec.MergeFunctionMapping is empty struct {}, treat as nil (unset) because server does not accept empty struct.
+		if len(*spec.MergeFunctionMapping) == 0 {
+			patch.MergeFunctionMapping = nil
+		} else {
+			utilMapping := couchbaseutil.MergeFunctionMappingRules(*spec.MergeFunctionMapping)
+			patch.MergeFunctionMapping = &utilMapping
+		}
+	}
+	// else: keep current value (already normalized to nil if empty above)
+
+	// Note: FilterExpression and FilterSkipRestream are NOT supported in global settings
+	// They are per-replication settings only
+
+	// Handle version-specific logic for HlvPruningWindowSec
 	if isAtLeast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && isAtLeast76 {
-		out.HlvPruningWindowSec = nil
+		current.HlvPruningWindowSec = nil
+		patch.HlvPruningWindowSec = nil
 	} else {
-		out.HlvPruningWindowSec = spec.HlvPruningWindowSec
+		patch.HlvPruningWindowSec = c.useSpecIfSetInt32(spec.HlvPruningWindowSec, current.HlvPruningWindowSec)
 	}
 
-	return out
+	return &patch
+}
+
+// Helper functions return spec value if set, otherwise current value.
+func (c *Cluster) useSpecIfSetInt32(spec, current *int32) *int32 {
+	if spec != nil {
+		return spec
+	}
+	return current
+}
+
+func (c *Cluster) useSpecIfSetBool(spec, current *bool) *bool {
+	if spec != nil {
+		return spec
+	}
+	return current
+}
+
+func (c *Cluster) useSpecIfSetString(spec, current *string) *string {
+	if spec != nil {
+		return spec
+	}
+	return current
 }
 
 // checkXDCRTask checks the XDCR connections.

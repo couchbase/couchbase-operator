@@ -1416,45 +1416,40 @@ type ReplicationSettings struct {
 	ConflictLogging *ConflictLoggingSettings `json:"conflictLogging,omitempty" url:"conflictLogging,omitempty"`
 
 	// Global / Per-replication advanced settings (from settings API docs)
-	CasDriftThresholdSecs             *int32  `json:"casDriftThresholdSecs,omitempty" url:"casDriftThresholdSecs,omitempty"`
-	CheckpointInterval                *int32  `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
-	CkptSvcCacheEnabled               *bool   `json:"ckptSvcCacheEnabled,omitempty" url:"ckptSvcCacheEnabled,omitempty"`
-	CollectionsOSOMode                *bool   `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
-	CompressionType                   *string `json:"compressionType,omitempty" url:"compressionType,omitempty"`
-	DcpEnablePurgeRollback            *bool   `json:"dcpEnablePurgeRollback,omitempty" url:"dcpEnablePurgeRollback,omitempty"`
-	DesiredLatency                    *int32  `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
-	DocBatchSizeKb                    *int32  `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
-	FailureRestartInterval            *int32  `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
-	FilterBinary                      *bool   `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
-	FilterBypassExpiry                *bool   `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
-	FilterBypassUncommittedTxn        *bool   `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
-	FilterDeletion                    *bool   `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
-	FilterExpiration                  *bool   `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
-	HlvPruningWindowSec               *int32  `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
-	JSFunctionTimeoutMs               *int32  `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
-	LogLevel                          *string `json:"logLevel,omitempty" url:"logLevel,omitempty"`
-	Mobile                            *string `json:"mobile,omitempty" url:"mobile,omitempty"`
-	NetworkUsageLimit                 *int32  `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
-	OptimisticReplicationThreshold    *int32  `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
-	PreCheckCasDriftThresholdHours    *int32  `json:"preCheckCasDriftThresholdHours,omitempty" url:"preCheckCasDriftThresholdHours,omitempty"`
-	PreReplicateVBMasterCheck         *bool   `json:"preReplicateVBMasterCheck,omitempty" url:"preReplicateVBMasterCheck,omitempty"`
-	Priority                          *string `json:"priority,omitempty" url:"priority,omitempty"`
-	ReplicateCkptIntervalMin          *int32  `json:"replicateCkptIntervalMin,omitempty" url:"replicateCkptIntervalMin,omitempty"`
-	RetryOnErrExceptAuthErrMaxWaitSec *int32  `json:"retryOnErrExceptAuthErrMaxWaitSec,omitempty" url:"retryOnErrExceptAuthErrMaxWaitSec,omitempty"`
-	RetryOnRemoteAuthErr              *bool   `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
-	RetryOnRemoteAuthErrMaxWaitSec    *int32  `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
-	SkipReplSpecAutoGc                *bool   `json:"skipReplSpecAutoGc,omitempty" url:"skipReplSpecAutoGc,omitempty"`
-	SourceNozzlePerNode               *int32  `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
-	StatsInterval                     *int32  `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
-	TargetNozzlePerNode               *int32  `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
-	TargetTopologyLogFrequency        *int32  `json:"targetTopologyLogFrequency,omitempty" url:"targetTopologyLogFrequency,omitempty"`
-	WorkerBatchSize                   *int32  `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
+	// Removed undocumented fields (not exposed in CRD, except those actively used by operator):
+	// CasDriftThresholdSecs, CkptSvcCacheEnabled, DcpEnablePurgeRollback, PreCheckCasDriftThresholdHours,
+	// PreReplicateVBMasterCheck, ReplicateCkptIntervalMin, RetryOnErrExceptAuthErrMaxWaitSec,
+	// SkipReplSpecAutoGc, TargetTopologyLogFrequency, CollectionsMirroringMode
+	// Kept for operator use: CollectionsExplicitMapping, CollectionsMigrationMode, ColMappingRules, PauseRequested, Type
+	CheckpointInterval             *int32  `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
+	CollectionsOSOMode             *bool   `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
+	CompressionType                *string `json:"compressionType,omitempty" url:"compressionType,omitempty"`
+	DesiredLatency                 *int32  `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
+	DocBatchSizeKb                 *int32  `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
+	FailureRestartInterval         *int32  `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
+	FilterBinary                   *bool   `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
+	FilterBypassExpiry             *bool   `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
+	FilterBypassUncommittedTxn     *bool   `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
+	FilterDeletion                 *bool   `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
+	FilterExpiration               *bool   `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
+	HlvPruningWindowSec            *int32  `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
+	JSFunctionTimeoutMs            *int32  `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
+	LogLevel                       *string `json:"logLevel,omitempty" url:"logLevel,omitempty"`
+	Mobile                         *string `json:"mobile,omitempty" url:"mobile,omitempty"`
+	NetworkUsageLimit              *int32  `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
+	OptimisticReplicationThreshold *int32  `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
+	Priority                       *string `json:"priority,omitempty" url:"priority,omitempty"`
+	RetryOnRemoteAuthErr           *bool   `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
+	RetryOnRemoteAuthErrMaxWaitSec *int32  `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+	SourceNozzlePerNode            *int32  `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
+	StatsInterval                  *int32  `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
+	TargetNozzlePerNode            *int32  `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
+	WorkerBatchSize                *int32  `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
 
 	// Per-replication only settings (from settings API docs)
 	ColMappingRules            *ColMappingRules           `json:"colMappingRules,omitempty" url:"colMappingRules,omitempty"`
 	CollectionsExplicitMapping *bool                      `json:"collectionsExplicitMapping,omitempty" url:"collectionsExplicitMapping,omitempty"`
 	CollectionsMigrationMode   *bool                      `json:"collectionsMigrationMode,omitempty" url:"collectionsMigrationMode,omitempty"`
-	CollectionsMirroringMode   *bool                      `json:"collectionsMirroringMode,omitempty" url:"collectionsMirroringMode,omitempty"`
 	FilterExpression           *string                    `json:"filterExpression,omitempty" url:"filterExpression,omitempty"`
 	FilterSkipRestream         *bool                      `json:"filterSkipRestream,omitempty" url:"filterSkipRestream,omitempty"`
 	MergeFunctionMapping       *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
@@ -1467,44 +1462,39 @@ type ReplicationSettings struct {
 // are pointers to allow selective updates and to distinguish between absent and zero values.
 type XDCRGlobalSettings struct {
 	// Global / Per-replication settings (can be set globally as defaults)
-	CasDriftThresholdSecs             *int32                     `json:"casDriftThresholdSecs,omitempty" url:"casDriftThresholdSecs,omitempty"`
-	CheckpointInterval                *int32                     `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
-	CkptSvcCacheEnabled               *bool                      `json:"ckptSvcCacheEnabled,omitempty" url:"ckptSvcCacheEnabled,omitempty"`
-	CollectionsOSOMode                *bool                      `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
-	CompressionType                   *string                    `json:"compressionType,omitempty" url:"compressionType,omitempty"`
-	DcpEnablePurgeRollback            *bool                      `json:"dcpEnablePurgeRollback,omitempty" url:"dcpEnablePurgeRollback,omitempty"`
-	DesiredLatency                    *int32                     `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
-	DocBatchSizeKb                    *int32                     `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
-	FailureRestartInterval            *int32                     `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
-	FilterBinary                      *bool                      `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
-	FilterBypassExpiry                *bool                      `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
-	FilterBypassUncommittedTxn        *bool                      `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
-	FilterDeletion                    *bool                      `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
-	FilterExpiration                  *bool                      `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
-	HlvPruningWindowSec               *int32                     `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
-	JSFunctionTimeoutMs               *int32                     `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
-	LogLevel                          *string                    `json:"logLevel,omitempty" url:"logLevel,omitempty"`
-	MergeFunctionMapping              *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
-	Mobile                            *string                    `json:"mobile,omitempty" url:"mobile,omitempty"`
-	NetworkUsageLimit                 *int32                     `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
-	OptimisticReplicationThreshold    *int32                     `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
-	PreCheckCasDriftThresholdHours    *int32                     `json:"preCheckCasDriftThresholdHours,omitempty" url:"preCheckCasDriftThresholdHours,omitempty"`
-	PreReplicateVBMasterCheck         *bool                      `json:"preReplicateVBMasterCheck,omitempty" url:"preReplicateVBMasterCheck,omitempty"`
-	Priority                          *string                    `json:"priority,omitempty" url:"priority,omitempty"`
-	ReplicateCkptIntervalMin          *int32                     `json:"replicateCkptIntervalMin,omitempty" url:"replicateCkptIntervalMin,omitempty"`
-	RetryOnErrExceptAuthErrMaxWaitSec *int32                     `json:"retryOnErrExceptAuthErrMaxWaitSec,omitempty" url:"retryOnErrExceptAuthErrMaxWaitSec,omitempty"`
-	RetryOnRemoteAuthErr              *bool                      `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
-	RetryOnRemoteAuthErrMaxWaitSec    *int32                     `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
-	SkipReplSpecAutoGc                *bool                      `json:"skipReplSpecAutoGc,omitempty" url:"skipReplSpecAutoGc,omitempty"`
-	SourceNozzlePerNode               *int32                     `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
-	StatsInterval                     *int32                     `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
-	TargetNozzlePerNode               *int32                     `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
-	TargetTopologyLogFrequency        *int32                     `json:"targetTopologyLogFrequency,omitempty" url:"targetTopologyLogFrequency,omitempty"`
-	WorkerBatchSize                   *int32                     `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
+	// Removed undocumented fields (not exposed in CRD): CasDriftThresholdSecs, CkptSvcCacheEnabled,
+	// DcpEnablePurgeRollback, PreCheckCasDriftThresholdHours, PreReplicateVBMasterCheck,
+	// ReplicateCkptIntervalMin, RetryOnErrExceptAuthErrMaxWaitSec, SkipReplSpecAutoGc, TargetTopologyLogFrequency
+	CheckpointInterval             *int32                     `json:"checkpointInterval,omitempty" url:"checkpointInterval,omitempty"`
+	CollectionsOSOMode             *bool                      `json:"collectionsOSOMode,omitempty" url:"collectionsOSOMode,omitempty"`
+	CompressionType                *string                    `json:"compressionType,omitempty" url:"compressionType,omitempty"`
+	DesiredLatency                 *int32                     `json:"desiredLatency,omitempty" url:"desiredLatency,omitempty"`
+	DocBatchSizeKb                 *int32                     `json:"docBatchSizeKb,omitempty" url:"docBatchSizeKb,omitempty"`
+	FailureRestartInterval         *int32                     `json:"failureRestartInterval,omitempty" url:"failureRestartInterval,omitempty"`
+	FilterBypassExpiry             *bool                      `json:"filterBypassExpiry,omitempty" url:"filterBypassExpiry,omitempty"`
+	FilterBinary                   *bool                      `json:"filterBinary,omitempty" url:"filterBinary,omitempty"`
+	FilterBypassUncommittedTxn     *bool                      `json:"filterBypassUncommittedTxn,omitempty" url:"filterBypassUncommittedTxn,omitempty"`
+	FilterDeletion                 *bool                      `json:"filterDeletion,omitempty" url:"filterDeletion,omitempty"`
+	FilterExpiration               *bool                      `json:"filterExpiration,omitempty" url:"filterExpiration,omitempty"`
+	HlvPruningWindowSec            *int32                     `json:"hlvPruningWindowSec,omitempty" url:"hlvPruningWindowSec,omitempty"`
+	JSFunctionTimeoutMs            *int32                     `json:"jsFunctionTimeoutMs,omitempty" url:"jsFunctionTimeoutMs,omitempty"`
+	LogLevel                       *string                    `json:"logLevel,omitempty" url:"logLevel,omitempty"`
+	Mobile                         *string                    `json:"mobile,omitempty" url:"mobile,omitempty"`
+	NetworkUsageLimit              *int32                     `json:"networkUsageLimit,omitempty" url:"networkUsageLimit,omitempty"`
+	OptimisticReplicationThreshold *int32                     `json:"optimisticReplicationThreshold,omitempty" url:"optimisticReplicationThreshold,omitempty"`
+	Priority                       *string                    `json:"priority,omitempty" url:"priority,omitempty"`
+	RetryOnRemoteAuthErr           *bool                      `json:"retryOnRemoteAuthErr,omitempty" url:"retryOnRemoteAuthErr,omitempty"`
+	RetryOnRemoteAuthErrMaxWaitSec *int32                     `json:"retryOnRemoteAuthErrMaxWaitSec,omitempty" url:"retryOnRemoteAuthErrMaxWaitSec,omitempty"`
+	SourceNozzlePerNode            *int32                     `json:"sourceNozzlePerNode,omitempty" url:"sourceNozzlePerNode,omitempty"`
+	StatsInterval                  *int32                     `json:"statsInterval,omitempty" url:"statsInterval,omitempty"`
+	TargetNozzlePerNode            *int32                     `json:"targetNozzlePerNode,omitempty" url:"targetNozzlePerNode,omitempty"`
+	WorkerBatchSize                *int32                     `json:"workerBatchSize,omitempty" url:"workerBatchSize,omitempty"`
+	ConflictLogging                *ConflictLoggingSettings   `json:"conflictLogging,omitempty" url:"conflictLogging,omitempty"`
+	MergeFunctionMapping           *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty" url:"mergeFunctionMapping,omitempty"`
 
 	// Global-only settings (cannot be set per-replication)
-	GoGC       *string `json:"goGC,omitempty" url:"goGC,omitempty"`
-	GoMaxProcs *int32  `json:"goMaxProcs,omitempty" url:"goMaxProcs,omitempty"`
+	GoGC       *int32 `json:"goGC,omitempty" url:"goGC,omitempty"`
+	GoMaxProcs *int32 `json:"goMaxProcs,omitempty" url:"goMaxProcs,omitempty"`
 }
 
 // ConflictLoggingSettings is the configuration for the conflict logging.

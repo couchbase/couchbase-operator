@@ -699,6 +699,14 @@ FailureRestartInterval is the seconds to wait before restarting after a failure.
 ==== Description
 
 FilterBinary specifies whether binary documents should be replicated.
+The value can be true or false (the default).
+If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied.
+If the value is false:
+The behavior is identical to that of all Couchbase-Server versions prior to 7.2.1 (with the exception of 7.1.5), where the filterBinary flag did not exist.
+If a filter expression is not provided, binary documents are replicated.
+If a filter expression is provided, and the expression refers only to either the document's key, or its xattr, or to both, the expression is applied, and the document is replicated if the expression permits.
+If a filter expression is provided, and the expression refers only to the document's body, the document is replicated.
+If a filter expression is provided, and the expression refers to the document's key, or its xattr, or to both; and also refers to the document's body; the document is not replicated (regardless of whether the key or xattr might appear to permit replication).
 
 === couchbasereplications.spec.filterBypassExpiry
 
@@ -757,14 +765,13 @@ Each document that produces a successful match is replicated.
 
 *Type*: `boolean`
 
-*Default*: `False`
-
 ==== Description
 
 FilterSkipRestream controls whether replication restarts after filterExpression changes.
 When false (default), replication restarts after filter changes.
 When true, continues without restart.
-This field is immutable after replication creation.
+Note: Server requires this field when filterExpression is set.
+If not specified, operator defaults to false.
 
 === couchbasereplications.spec.hlvPruningWindowSec
 
