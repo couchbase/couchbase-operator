@@ -57,7 +57,7 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 }
 
 func checkAutoCompactionDefaults(autoCompaction *couchbasev2.AutoCompaction) bool {
-	return autoCompaction != nil && *autoCompaction.DatabaseFragmentationThreshold.Percent == 30 && *autoCompaction.ViewFragmentationThreshold.Percent == 30 && autoCompaction.DatabaseFragmentationThreshold.Size == nil && autoCompaction.ViewFragmentationThreshold.Size == nil && *autoCompaction.TombstonePurgeInterval == metav1.Duration{Duration: 72 * time.Hour}
+	return autoCompaction != nil && *autoCompaction.DatabaseFragmentationThreshold.Percent == 30 && *autoCompaction.ViewFragmentationThreshold.Percent == 30 && autoCompaction.DatabaseFragmentationThreshold.Size == nil && autoCompaction.ViewFragmentationThreshold.Size == nil && *autoCompaction.TombstonePurgeInterval == metav1.Duration{Duration: 72 * time.Hour} && autoCompaction.MagmaFragmentationThresholdPercentage == nil
 }
 
 func checkAutoFailoverDefaults(clusterSettings couchbasev2.ClusterConfig) bool {
