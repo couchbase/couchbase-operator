@@ -81,7 +81,7 @@ func TestMigrateLeaveUnmanagedCluster(t *testing.T) {
 	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize)
 }
 
-func TestPremigrationNodes(t *testing.T) {
+func TestMigratePremigrationNodes(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -115,7 +115,7 @@ func TestPremigrationNodes(t *testing.T) {
 	MustValidateClusterSize(t, kubernetes, dstCluster, clusterSize+preMigrationSize)
 }
 
-func TestStabilizationPeriod(t *testing.T) {
+func TestMigrateStabilizationPeriod(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -161,7 +161,7 @@ func TestStabilizationPeriod(t *testing.T) {
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, dstCluster, 5*time.Minute, couchbasev2.ClusterConditionMigrating, couchbasev2.ClusterConditionWaitingBetweenMigrations)
 }
 
-func TestMaxConcurrency(t *testing.T) {
+func TestMigrateMaxConcurrency(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)

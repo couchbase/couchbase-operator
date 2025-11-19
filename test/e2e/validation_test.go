@@ -4205,7 +4205,7 @@ func TestRBACValidationLDAP(t *testing.T) {
 			name:           "TestValidateAuthSecretRejected",
 			mutations:      patchMap{"user2": jsonpatch.NewPatchSet().Add("/spec/authSecret", "auth-secret")},
 			shouldFail:     true,
-			expectedErrors: []string{"secret auth-secret not allowed for LDAP user `user2`"},
+			expectedErrors: []string{"spec.authSecret auth-secret not allowed for LDAP user `user2`"},
 		},
 		{
 			name:           "TestValidateAuthDomain",
@@ -4539,10 +4539,24 @@ func TestVersionUpgradePath(t *testing.T) {
 func TestCouchbaseClusterWarnings(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:             "TestAutoCompactionDefaultsWarning",
+			name:             "TestAutoCompactionDefaultsWarningWhenRemoved",
 			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/autoCompaction")},
 			shouldFail:       false,
 			expectedWarnings: []string{"CouchbaseCluster spec.cluster.autoCompaction settings have been left as their defaults. It is recommended these are tuned for production clusters."},
+		},
+		{
+			name:             "TestAutoCompactionDefaultsWarningWhenSetToEmpty",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction", &couchbasev2.AutoCompaction{})},
+			shouldFail:       false,
+			expectedWarnings: []string{"CouchbaseCluster spec.cluster.autoCompaction settings have been left as their defaults. It is recommended these are tuned for production clusters."},
+		},
+		{
+			name: "TestAutoCompactionDefaultsNoWarningWhenMagmaSet",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction", &couchbasev2.AutoCompaction{
+				MagmaFragmentationThresholdPercentage: util.IntPtr(10),
+			})},
+			shouldFail:       false,
+			expectedWarnings: []string{},
 		},
 		{
 			name: "TestPasswordPolicyZeroMinLengthWarning",
@@ -5528,7 +5542,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 				MinLength: util.IntPtr(8),
 			})},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 		{
 			name: "TestUserPasswordValid",
@@ -5544,7 +5558,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 					EnforceUppercase: util.BoolPtr(true)}),
 				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nouppercase")},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 		{
 			name: "TestUserPasswordNoUppercaseValid",
@@ -5561,7 +5575,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 					EnforceLowercase: util.BoolPtr(true)}),
 				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nolowercase")},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 		{
 			name: "TestNegUserPasswordNoDigits",
@@ -5570,7 +5584,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 					EnforceDigits: util.BoolPtr(true)}),
 				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nodigits")},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 		{
 			name: "TestNegUserPasswordNoSpecialChars	",
@@ -5579,7 +5593,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 					EnforceSpecialChars: util.BoolPtr(true)}),
 				"test-user-pw-policy": jsonpatch.NewPatchSet().Replace("/spec/authSecret", "user-password-nospecialchars")},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 		{
 			name: "TestPasswordPolicyMinLengthInvalidUserNotSelected",
@@ -5607,7 +5621,7 @@ func TestUserPasswordPolicyValidation(t *testing.T) {
 					"someLabel": "some-value",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{"Initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
+			expectedErrors: []string{"initial password for user `test-user-pw-policy` does not comply with the password policy of cluster"},
 		},
 	}
 

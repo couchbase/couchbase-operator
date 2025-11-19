@@ -773,9 +773,9 @@ func registerTests() {
 		// Migration tests
 		framework.NewTestDef(TestMigrateCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateLeaveUnmanagedCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestPremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigratePremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrateStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrateMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateClusterWithMultipleServerGroups).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationByServerClass).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationByNode).WithTags(TagSuiteP1, TagFeatureAssimilation),
