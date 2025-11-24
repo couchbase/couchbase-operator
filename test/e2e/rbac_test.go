@@ -1508,3 +1508,46 @@ func TestRBACUserPasswordSpec(t *testing.T) {
 	role := e2eutil.NewRole(string(couchbasev2.RoleClusterAdmin)).Create()
 	e2eutil.MustHaveRoles(t, kubernetes, cluster, group, role)
 }
+
+// TestRBACReconcileDirectRoles verifies that when a user has a direct role added via the Couchbase UI/API,
+// the operator reconciles and removes it, leaving only roles inherited from groups.
+func TestRBACReconcileDirectRoles(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	timeout := 2 * time.Minute
+
+	// Create Cluster
+	clusterSize := 1
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Create user with a group that has ro_admin role
+	user, _, _ := mustCreateBoundUserWithRoles(t, kubernetes, []string{string(couchbasev2.RoleReadOnlyAdmin)})
+	e2eutil.MustWaitUntilUserExists(t, kubernetes, cluster, user, timeout)
+
+	// Verify user has no direct roles initially (only group-inherited roles)
+	e2eutil.MustWaitUntilUserHasNoDirectRoles(t, kubernetes, cluster, user, timeout)
+
+	// Add a direct role via the Couchbase API (simulating UI manual addition)
+	e2eutil.MustAddDirectUserRole(t, kubernetes, cluster, user, string(couchbasev2.RoleAnalyticsReader))
+
+	// Verify the direct role was added
+	e2eutil.MustWaitUntilUserHasDirectRole(t, kubernetes, cluster, user, string(couchbasev2.RoleAnalyticsReader), 30*time.Second)
+
+	// Wait for operator to reconcile and emit UserEdited event
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.UserEditedEvent(cluster, user), timeout)
+
+	// Verify the direct role was removed by the operator
+	e2eutil.MustWaitUntilUserHasNoDirectRoles(t, kubernetes, cluster, user, timeout)
+
+	// Check the events match what we expect
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonGroupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonUserEdited},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

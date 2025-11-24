@@ -739,7 +739,26 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	if err := couchbaseutil.ListUsers(existingUsers).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
 	}
+	existingUserNames, err := c.reconcileExistingUsers(requestedUsers, unreconcilableUsers, existingUsers)
+	if err != nil {
+		return nil, err
+	}
 
+	if err := c.createMissingUsers(requestedUsers, existingUserNames); err != nil {
+		return nil, err
+	}
+
+	return existingUserNames, nil
+}
+
+// reconcileExistingUsers reconciles users that already exist on the server:
+// - updates users that differ from requested state
+// - deletes users that are not requested (unless unreconcilable)
+// Returns a list of existing user IDs that should be considered present.
+func (c *Cluster) reconcileExistingUsers(requestedUsers map[string]couchbaseutil.User, unreconcilableUsers map[string]bool, existingUsers *couchbaseutil.UserList) ([]string, error) {
+	existingUserNames := []string{}
+
+	// helper that determines whether the requested user differs from existing user
 	shouldUpdateUser := func(r couchbaseutil.User, e couchbaseutil.User) bool {
 		requestedGroups := r.Groups
 		sort.Strings(requestedGroups)
@@ -747,10 +766,22 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		existingGroups := e.Groups
 		sort.Strings(existingGroups)
 
-		return !reflect.DeepEqual(requestedGroups, existingGroups) || !reflect.DeepEqual(r.Name, e.Name) || (r.Locked != nil && !reflect.DeepEqual(r.Locked, e.Locked))
-	}
+		// Filter out inherited roles from existing user.
+		existingDirectRoles := []couchbaseutil.UserRole{}
+		for _, role := range e.Roles {
+			if role.IsDirectRole() {
+				existingDirectRoles = append(existingDirectRoles, role)
+			}
+		}
 
-	existingUserNames := []string{}
+		requestedRoles := couchbaseutil.RolesToStr(r.Roles)
+		existingRoles := couchbaseutil.RolesToStr(existingDirectRoles)
+
+		return !reflect.DeepEqual(requestedGroups, existingGroups) ||
+			!reflect.DeepEqual(requestedRoles, existingRoles) ||
+			!reflect.DeepEqual(r.Name, e.Name) ||
+			(r.Locked != nil && !reflect.DeepEqual(r.Locked, e.Locked))
+	}
 
 	for _, user := range *existingUsers {
 		e := user
@@ -790,7 +821,11 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		}
 	}
 
-	// create requested groups that do not exist
+	return existingUserNames, nil
+}
+
+// createMissingUsers creates requested users that do not yet exist on the server.
+func (c *Cluster) createMissingUsers(requestedUsers map[string]couchbaseutil.User, existingUserNames []string) error {
 	for i := range requestedUsers {
 		r := requestedUsers[i]
 
@@ -804,7 +839,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 			}
 
 			if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
-				return existingUserNames, err
+				return err
 			}
 
 			c.raiseEvent(k8sutil.UserCreateEvent(r.ID, c.cluster))
@@ -812,7 +847,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		}
 	}
 
-	return existingUserNames, nil
+	return nil
 }
 
 // reconcileTemporaryPasswords reconciles the temporary password fields for users. This is only applicable for 8.0.0+ clusters.

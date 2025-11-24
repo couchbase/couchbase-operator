@@ -735,11 +735,17 @@ type LDAPStatus struct {
 	Reason string           `json:"reason"`
 }
 
+type UserRoleOrigin struct {
+	Type string `json:"type"` // "user" or "group"
+	Name string `json:"name"` // group name if type is "group"
+}
+
 type UserRole struct {
-	Role           string `json:"role"`
-	BucketName     string `json:"bucket_name"`
-	ScopeName      string `json:"scope_name"`
-	CollectionName string `json:"collection_name"`
+	Role           string           `json:"role"`
+	BucketName     string           `json:"bucket_name"`
+	ScopeName      string           `json:"scope_name"`
+	CollectionName string           `json:"collection_name"`
+	Origins        []UserRoleOrigin `json:"origins,omitempty"`
 }
 
 func (u *UserRole) IsBucketRole() bool {
@@ -754,6 +760,18 @@ func (u *UserRole) IsCollectionRole() bool {
 	return u.CollectionName != "*" && u.CollectionName != ""
 }
 
+// IsDirectRole returns true if the role is directly assigned to the user,
+// not inherited from a group. Checks if any origin has type "user".
+// This is only called on roles returned from Couchbase Server.
+func (u *UserRole) IsDirectRole() bool {
+	for _, origin := range u.Origins {
+		if origin.Type == "user" {
+			return true
+		}
+	}
+	return false
+}
+
 func NewRole(role, bucket, scope, collection string) *UserRole {
 	return &UserRole{
 		Role:           role,
@@ -766,26 +784,14 @@ func NewRole(role, bucket, scope, collection string) *UserRole {
 // This is to remove "*" from collection_name and scope_name as we can't
 // pass those back to the API, so we might as well dump it.
 func (u *UserRole) UnmarshalJSON(data []byte) error {
-	var dat map[string]interface{}
-	if err := json.Unmarshal(data, &dat); err != nil {
+	type userRoleAlias UserRole
+	alias := &userRoleAlias{}
+
+	if err := json.Unmarshal(data, alias); err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	if val, ok := dat["bucket_name"]; ok {
-		u.BucketName, _ = val.(string)
-	}
-
-	if val, ok := dat["role"]; ok {
-		u.Role, _ = val.(string)
-	}
-
-	if val, ok := dat["scope_name"]; ok {
-		u.ScopeName, _ = val.(string)
-	}
-
-	if val, ok := dat["collection_name"]; ok {
-		u.CollectionName, _ = val.(string)
-	}
+	*u = UserRole(*alias)
 
 	if u.CollectionName == "*" {
 		u.CollectionName = ""

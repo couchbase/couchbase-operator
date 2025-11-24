@@ -35,6 +35,16 @@ type CouchbaseClient struct {
 	host   string
 }
 
+// Client returns the underlying couchbaseutil.Client.
+func (c *CouchbaseClient) Client() *couchbaseutil.Client {
+	return c.client
+}
+
+// Host returns the host URL for the cluster.
+func (c *CouchbaseClient) Host() string {
+	return c.host
+}
+
 // newClient returns a new Couchbase management client (internal not go SDK).
 func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, host string) (*CouchbaseClient, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
@@ -1945,6 +1955,35 @@ func MustDeleteUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 		if err := couchbaseutil.DeleteUser(user).On(client.client, client.host); err != nil {
 			Die(t, err)
 		}
+	}
+}
+
+// AddDirectUserRole adds a direct role to a Couchbase user via the admin API.
+func AddDirectUserRole(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, authDomain couchbaseutil.AuthDomain, roleName string) error {
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+
+	u := &couchbaseutil.User{}
+	if err := couchbaseutil.GetUser(userID, authDomain, u).On(client.client, client.host); err != nil {
+		return err
+	}
+
+	u.Roles = append(u.Roles, couchbaseutil.UserRole{
+		Role: roleName,
+	})
+	// Do not change password when updating roles via admin API.
+	u.Password = ""
+
+	return couchbaseutil.CreateUser(u).On(client.client, client.host)
+}
+
+// MustAddDirectUserRole is a test helper that adds a direct role to a Couchbase user and
+// fails the test on error.
+func MustAddDirectUserRole(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string) {
+	if err := AddDirectUserRole(k8s, couchbase, user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), roleName); err != nil {
+		Die(t, err)
 	}
 }
 

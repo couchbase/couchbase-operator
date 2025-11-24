@@ -1788,3 +1788,61 @@ func MustWaitForEncryptionKeyDeletion(t *testing.T, k8s *types.Cluster, key *cou
 		Die(t, err)
 	}
 }
+
+// WaitUntilUserHasNoDirectRoles waits until a user has no direct roles (only group-inherited roles).
+func WaitUntilUserHasNoDirectRoles(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		u := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, role := range u.Roles {
+			if role.IsDirectRole() {
+				return fmt.Errorf("user %s still has direct role: %s", user.GetUserID(), role.Role)
+			}
+		}
+
+		return nil
+	})
+}
+
+func MustWaitUntilUserHasNoDirectRoles(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) {
+	if err := WaitUntilUserHasNoDirectRoles(k8s, couchbase, user, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitUntilUserHasDirectRole waits until a user has a specific direct role.
+func WaitUntilUserHasDirectRole(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		u := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, role := range u.Roles {
+			if role.IsDirectRole() && role.Role == roleName {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("user %s does not have direct role: %s", user.GetUserID(), roleName)
+	})
+}
+
+func MustWaitUntilUserHasDirectRole(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string, timeout time.Duration) {
+	if err := WaitUntilUserHasDirectRole(k8s, couchbase, user, roleName, timeout); err != nil {
+		Die(t, err)
+	}
+}
