@@ -4535,6 +4535,12 @@ func TestVersionUpgradePath(t *testing.T) {
 			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.0.0")},
 			shouldFail: true,
 		},
+		{
+			name:           "InvalidUpgradePathPre72To80",
+			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0")},
+			shouldFail:     true,
+			expectedErrors: []string{"cannot upgrade"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-701.yaml"})
