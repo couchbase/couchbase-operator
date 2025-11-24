@@ -2141,11 +2141,6 @@ func checkMagmaBucketRequiredSettings(bucket *couchbasev2.CouchbaseBucket) error
 	if bucket.Spec.EnableIndexReplica {
 		return fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets")
 	}
-
-	if bucket.Spec.EvictionPolicy != couchbasev2.CouchbaseBucketEvictionPolicyFullEviction {
-		return fmt.Errorf("spec.evictionPolicy must be fullEviction for magma buckets")
-	}
-
 	return nil
 }
 

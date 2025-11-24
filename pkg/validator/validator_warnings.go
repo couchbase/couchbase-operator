@@ -85,6 +85,10 @@ func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While enabled, the bucket will not be updated to match the CRD specification.")
 	}
 
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy == couchbasev2.CouchbaseBucketEvictionPolicyValueOnly {
+		warnings = append(warnings, "CouchbaseBucket spec.evictionPolicy is set to valueOnly for magma storage backend. This is discouraged for production deployments and fullEviction is recommended.")
+	}
+
 	return warnings
 }
 

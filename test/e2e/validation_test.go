@@ -2634,10 +2634,10 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
 		},
 		{
-			name:           "TestValidateBucketStorageBackendMagmaInvalidEvictionPolicy",
+			name:           "TestValidateBucketStorageBackendMagmaValueOnlyEvictionPolicy",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.evictionPolicy must be fullEviction for magma buckets`},
+			shouldFail:     false,
+			expectedErrors: []string{},
 		},
 		{
 			name: "TestValidateHistoryRetentionBytesBelowWorkingRange",
