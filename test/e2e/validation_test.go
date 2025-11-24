@@ -3970,7 +3970,7 @@ func TestNegValidationImmutableApply(t *testing.T) {
 			name:           "TestValidateBucketInvalidCouchbaseStorageBackendChange",
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Add("/spec/storageBackend", "magma")},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.storageBackend`},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationApply})
@@ -4368,8 +4368,10 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			name: "TestBucketMigrationToCouchstoreInvalid",
 			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
 				Replace("/spec/storageBackend", "couchstore")},
-			expectedErrors: []string{"can only be changed from magma to couchstore if history retention is first disabled on the bucket"},
-			shouldFail:     true,
+			expectedErrors: []string{"spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket",
+				"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true",
+			},
+			shouldFail: true,
 		},
 		{
 			name: "TestBucketMigrationToMagmaValid",
@@ -4386,7 +4388,7 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 			mutations: patchMap{
 				"bucket2": jsonpatch.NewPatchSet().
 					Replace("/spec/storageBackend", "couchstore")},
-			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true"},
+			expectedErrors: []string{"spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
 			shouldFail:     true,
 		},
 	}
@@ -5719,22 +5721,33 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 			shouldFail: false,
 		},
 		{
+			// We need to allow numVBuckets to be set for couchstore buckets to aid with migration from couchstore to magma.
+			// This isn't used by anything in the cluster, so we can allow it to be set to 1024 for couchstore buckets.
 			name: "TestNegValidateCouchstoreNumVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 128),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets can only be set to 1024 for couchstore buckets`},
+		},
+		{
+			// We need to allow numVBuckets to be set for couchstore buckets to aid with migration from couchstore to magma.
+			// This isn't used by anything in the cluster, so we can allow it to be set to 1024 for couchstore buckets.
+			name: "TestValidateCouchstoreNumVBucketsValid",
 			mutations: patchMap{
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
 			},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+			shouldFail: false,
 		},
 		{
 			name: "TestNegValidateCouchstoreFromClusterDefaultVBuckets",
 			mutations: patchMap{
-				"bucket0": jsonpatch.NewPatchSet().Add("/spec/numVBuckets", 1024),
+				"bucket0": jsonpatch.NewPatchSet().Add("/spec/numVBuckets", 128),
 				"cluster0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
 					"cao.couchbase.com/buckets.defaultStorageBackend": "couchstore",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+			expectedErrors: []string{`spec.numVBuckets can only be set to 1024 for couchstore buckets`},
 		},
 		{
 			name: "TestNegValidateMagmaEvictionPolicy",
@@ -5760,15 +5773,7 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.numVBuckets cannot be set for magma buckets pre Couchbase Server 8.0.0`},
-		},
-		{
-			name: "TestNegValidateCouchstoreNumVBuckets",
-			mutations: patchMap{
-				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
-			},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.numVBuckets can only be set for magma buckets`},
+			expectedErrors: []string{`spec.numVBuckets cannot be set for buckets pre Couchbase Server 8.0.0`},
 		},
 		{
 			name: "TestNegValidateMagmaNumVBuckets",
@@ -5795,4 +5800,296 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-storagebackend.yaml"})
+}
+
+func TestBucketStorageBackendValidationApply(t *testing.T) {
+	// bucket0 is a bucket with an implied storageBackend (numVBuckets 128, memoryQuota 100Mi)
+	// bucket1 is a magma bucket with numVBuckets 1024
+	// bucket2 is a couchstore bucket with defaults (numVBuckets 1024, memoryQuota 100Mi)
+	// bucket3, bucket4 and bucket5 are the same as the above, but with labels so that
+	// they are selected by cluster0 and cluster1.
+	// bucket6 is a bucket without an explciit storage backend and 500Mi memory quota.
+	// This is useful to check upgrades from pre 80 to post 80.
+	// bucket7 is a standard pre 8.0 magma bucket.
+	// bucket8 is a standard pre 8.0 non-explit bucket (couchstore via defaultStorageBackend on cluster1).
+	// cluster0 is a cluster on 8.0
+	// cluster1 is a cluster on 7.6
+	testDefs := []testDef{
+		{
+			// We should be able to change the memory quota on a magma bucket.
+			name: "TestValidateMagmaMemoryQuotaChange",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "500Mi"),
+			},
+			shouldFail: false,
+		},
+		{
+			// We should not be able to change the numVBuckets on a magma bucket.
+			name: "TestNegValidateMagmaNumVBucketsChange",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024).
+					Replace("/spec/memoryQuota", "1024Mi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// numVBuckets defaults to 128, and are immutable. Therefore, we should not be able to migrate to couchstore (which require 1024 vBuckets)
+			name: "TestNegValidateMagmaToCouchstore",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// We should not be able to migrate from magma to couchstore with an explicit numVBuckets of 128.
+			name: "TestNegValidateMagmaToCouchstoreWithExplicitNumVBuckets",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// We should be able to migrate from magma to couchstore with an explicit numVBuckets of 1024.
+			name: "TestValidateMagmaToCouchstoreWithExplicitNumVBuckets",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore").
+					Add("/spec/numVBuckets", 1024),
+			},
+			shouldFail: false,
+		},
+		{
+			// The above but with history retention and enableBucketMigrationRoutines not configured correctly.
+			name: "TestNegValidateMagmaToCouchstoreDisabledMigrationRoutines",
+			mutations: patchMap{
+				"cluster0": jsonpatch.NewPatchSet().Remove(`/spec/buckets/enableBucketMigrationRoutines`),
+				"bucket1":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore").Add("/spec/numVBuckets", 1024),
+			},
+			shouldFail: true,
+			expectedErrors: []string{
+				`spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true`,
+			},
+		},
+		{
+			// If you migrate from magma to couchstore, the memory quota can be anything above 100Mi.
+			name: "TestMigrateMagmaToCouchstoreValidMemory",
+			mutations: patchMap{
+				"cluster0": jsonpatch.NewPatchSet().
+					Add(`/spec/buckets/enableBucketMigrationRoutines`, true),
+				"bucket1": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024).
+					Add(`/spec/historyRetention`, &couchbasev2.HistoryRetentionSettings{
+						CollectionDefault: boolPtr(false),
+					}).
+					Replace("/spec/storageBackend", "couchstore").
+					Replace("/spec/memoryQuota", "500Mi"),
+			},
+			shouldFail: false,
+		},
+		{
+			// Migrating from couchstore to magma with numVBuckets 1024 requires memoryQuota >= 1024Mi
+			name: "TestNegMigrateCouchstoreToMagmaInvalidMemoryQuota",
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024).
+					Add("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction).
+					Replace("/spec/storageBackend", "magma"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024`},
+		},
+		{
+			// NumVBuckets is 1024 if migrating to couchstore from magma.
+			// Omitting nuMVBuckets from the magma bucket spec is invalid as it would be changed to the magma default of 128.
+			name: "TestNegMigrateCouchstoreToMagmaInvalidNumVBuckets",
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma").
+					Add("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestMigrateCouchstoreToMagmaValid",
+			mutations: patchMap{
+				"bucket2": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024).
+					Replace("/spec/storageBackend", "magma").
+					Add("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction).
+					Add("/spec/memoryQuota", "1024Mi"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestMigrateMagmaToCouchstoreValid",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail: false,
+		},
+		{
+			// If the default storage backend is not set explicitly, we should be able to upgrade to 8.0.0 assuming we've set numVBuckets so they aren't
+			// assumed to be the magma defaults and have a memory quota of 1024Mi.
+			name: "TestUpgradeClusterTo80AllowedDueToImplicit",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace(`/spec/cluster/dataServiceMemoryQuota`, "6Gi").
+					Remove("/metadata/annotations"),
+				"bucket3": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024).
+					Replace("/spec/memoryQuota", "1024Mi"),
+				"bucket4": jsonpatch.NewPatchSet().Add("/spec/numVBuckets", 1024),
+			},
+			shouldFail: false,
+		},
+		{
+			// The same test as above, but without setting numVBuckets so they are changed to magma defaults.
+			// This would therefore be a numVBucketChange (as couchstore defaults to 1024) and therefore invalid.
+			name: "TestUpgradeClusterTo80NotAllowedDueToNumVBucketsChange",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// Buckets 3 and 4 (5 is explicitly couchstore) are couchstore buckets, so upgrading to 8.0.0 and changing the defaultStorageBackend to magma
+			// is invalid both bucket 3 and 4 are not valid magma buckets (missing numVBuckets).
+			name: "TestUpgradeClusterToExplicitMagmaInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// We should be able to upgrade a cluster to 8.0.0 without changing buckets, and given the storage backend is
+			// explicitly set to couchstore we don't need to set numVBuckets.
+			name: "TestUpgradeClusterTo80AllowedDueToExplicitCouchstore",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0"),
+			},
+			shouldFail: false,
+		},
+		{
+			// bucket6 pre 80 is a couchstore bucket that would not be valid as a magma bucket.
+			// However, the cluster explicitly sets the default storage backend to coushtore, and therefore
+			// we should still consider it valid as it is a couchstore bucket.
+			name: "TestUpgradeTo80AllowedIfExplicitCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace("/spec/buckets/selector/matchLabels", map[string]string{
+						"cluster": "cluster1-invalid-magma",
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			// If we remove the explicit storage backend setting, the bucket will be validated against magma constraints when upgrading to 8.0.0.
+			name: "TestUpgradeTo80NotAllowedIfImplicitCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestNegValidationStoragebackendExplicitChangeVBucket",
+			mutations: patchMap{
+				"bucket0": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			// We should be able to upgrade to 8.0 and make changes that would be invalid on a magma bucket given we
+			// have an explicit storage backend.
+			name: "TestValidateUpgradeTo80OnCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0"),
+				"bucket1":  jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "1025Mi"),
+			},
+			shouldFail: false,
+		},
+		{
+			// We should not be able to upgrade to 8.0 and make changes that would be invalid on a magma bucket given we
+			// don't have an explicit storage backend.
+			name: "TestValidateUpgradeTo80OnCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestNegValidateUpgradeTo80OnMemoryQuota",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Add("/spec/storageBackend", "magma"),
+			},
+			shouldFail: true,
+			// Shouldn't allow migration to magma as numVBuckets is immutable and magma bucket (migrated from a couchstore one) requires 1024 vBuckets.
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestValidateUpgradeTo80ExplicitCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Add("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidateUpgradeTo80ImplicitCouchstoreBucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Add("/spec/numVBuckets", 1024),
+			},
+			// Backend recognised as couchstore and therefore numVBuckets is invalid
+			// Even if it's a valid number
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestValidateUpgradeOn70Bucket",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Remove("/metadata/annotations"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Add("/spec/storageBackend", "magma").
+					Add("/spec/numVBuckets", 128),
+			},
+			// Changing numVBuckets invalid, even though it's a magma bucket.
+			shouldFail:     true,
+			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-storagebackend.yaml"})
 }

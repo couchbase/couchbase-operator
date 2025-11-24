@@ -564,21 +564,23 @@ func (c *CouchbaseCluster) IndexStorageMode() CouchbaseClusterIndexStorageSettin
 
 // GetDefaultBucketStorageBackend gets the default storage backend if it is set,
 // otherwise it returns the default default (I know), Couchstore (for now).
-func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() CouchbaseStorageBackend {
+// It also returns true if the default storage backend was explicitly set on the cluster
+// or false if it is implied by the cluster version.
+func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() (CouchbaseStorageBackend, bool) {
 	if c.Spec.Buckets.DefaultStorageBackend != "" {
-		return c.Spec.Buckets.DefaultStorageBackend
+		return c.Spec.Buckets.DefaultStorageBackend, true
 	}
 
 	after8, err := c.IsAtLeastVersion(constants.MinimumVersionForMagmaDefaultBackend)
 	if err != nil {
-		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 	}
 
 	if after8 {
-		return CouchbaseStorageBackendMagma
+		return CouchbaseStorageBackendMagma, false
 	}
 
-	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 }
 
 // IsSupportable tells us whether a specific server class is supportable, it must
@@ -890,6 +892,26 @@ func (cs *ClusterStatus) setClusterCondition(c *ClusterCondition) {
 	}
 
 	cs.Conditions = append(cs.Conditions, *c)
+}
+
+func (cs *ClusterStatus) GetBucketVBucketsFromStatus(bucketName string) *int {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return bucket.NumVBuckets
+		}
+	}
+
+	return nil
+}
+
+func (cs *ClusterStatus) GetBucketStorageBackendFromStatus(bucketName string) CouchbaseStorageBackend {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return CouchbaseStorageBackend(bucket.BucketStorageBackend)
+		}
+	}
+
+	return ""
 }
 
 func newClusterCondition(t ClusterConditionType, status v1.ConditionStatus, reason, message string) *ClusterCondition {
@@ -1286,30 +1308,32 @@ func (b *CouchbaseBucket) AddScopeResource(resource ScopeLocalObjectReference) {
 	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
 }
 
-func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) CouchbaseStorageBackend {
+// GetStorageBackend returns the bucket’s storage backend and true if it was explicitly set on the bucket or via the cluster defaultStorageBackend annotation,
+// false if it was implied by the cluster version or if a cluster version can't be found.
+// We should only ever migrate bucket storage backends if the backend is declared explicitly.
+func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) (CouchbaseStorageBackend, bool) {
 	// If there is no cluster then we can't check if cluster version supports the backend,
 	// or get the cluster default so we trust the bucket and get the default default
 	if cluster == nil {
-		return b.getStorageBackend()
+		return b.getStorageBackend(), false
 	}
 
 	magmaSupported, err := cluster.IsAtLeastVersion("7.1.0")
-
 	if err != nil {
 		// we couldn't parse the cluster version so we'll trust the bucket/get default default
 		log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
-		return b.getStorageBackend()
+		return b.getStorageBackend(), false
 	}
 
 	if !magmaSupported || b.IsSampleBucket() {
-		return CouchbaseStorageBackendCouchstore
+		return CouchbaseStorageBackendCouchstore, false
 	}
 
 	if b.Spec.StorageBackend == "" {
 		return cluster.GetDefaultBucketStorageBackend()
 	}
 
-	return b.Spec.StorageBackend
+	return b.Spec.StorageBackend, true
 }
 
 func (b *CouchbaseBucket) getStorageBackend() CouchbaseStorageBackend {

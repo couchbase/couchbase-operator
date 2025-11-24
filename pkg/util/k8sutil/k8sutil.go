@@ -665,5 +665,6 @@ func GetBucketStorageBackend(bucket *couchbasev2.CouchbaseBucket, storageBackend
 		log.Info("[WARN] spec.storageBackend cannot be magma for server version below 7.1.0 - default to couchstore", "cluster", cluster.NamespacedName())
 	}
 
-	return bucket.GetStorageBackend(cluster)
+	storageBackend, _ := bucket.GetStorageBackend(cluster)
+	return storageBackend
 }

@@ -206,10 +206,12 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				}
 			}
 
-			if bucket.Spec.NumVBuckets != nil {
-				b.NumVBuckets = bucket.Spec.NumVBuckets
-			} else if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
-				b.NumVBuckets = util.IntPtr(constants.DefaultNumVBuckets)
+			if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+				numVBuckets := constants.DefaultNumVBuckets
+				if bucket.Spec.NumVBuckets != nil {
+					numVBuckets = *bucket.Spec.NumVBuckets
+				}
+				b.NumVBuckets = util.IntPtr(numVBuckets)
 			}
 		}
 

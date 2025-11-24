@@ -491,7 +491,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			// check if couchbase bucket
 			cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
 
-			bucketStorageBackend := cbBucket.GetStorageBackend(c.cluster)
+			bucketStorageBackend, _ := cbBucket.GetStorageBackend(c.cluster)
 			if ok && cdcEnabled && bucketStorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 				apiCollection.History = collection.Spec.History
 			}

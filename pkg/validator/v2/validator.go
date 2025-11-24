@@ -2183,13 +2183,13 @@ func checkMagmaBucketClusterVersionSettings(v *types.Validator, c *couchbasev2.C
 	}
 
 	if !after80 {
+		if bucket.Spec.NumVBuckets != nil {
+			return fmt.Errorf("spec.numVBuckets cannot be set for buckets pre Couchbase Server 8.0.0")
+		}
+
 		// MemoryQuota defaults to 100Mi, and pre-8.0 magma buckets require a minimum of 1024Mi.
 		if bucket.Spec.MemoryQuota == nil || bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
 			return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
-		}
-
-		if bucket.Spec.NumVBuckets != nil {
-			return fmt.Errorf("spec.numVBuckets cannot be set for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
 		}
 	}
 
@@ -2211,7 +2211,7 @@ func checkMagmaVBucketsSettings(bucket *couchbasev2.CouchbaseBucket, cName strin
 		return fmt.Errorf("spec.numVBuckets can only be set to either 128 or 1024 for cluster: %s", cName)
 	}
 
-	// If numVBuckets is 128, either explicitly by defaulting to that value by omission, we don't need to check memory quota as the minimum required is 100Mi which is already a constraint.
+	// If numVBuckets is 128, either explicitly or by defaulting to that value by omission, we don't need to check memory quota as the minimum required is 100Mi which is already a constraint.
 	if *bucket.Spec.NumVBuckets == 1024 && bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
 		return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for cluster: %s", cName)
 	}
@@ -4667,47 +4667,84 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	return false, nil
 }
 
+// nolint:gocognit
 func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
-	if curr.GetDefaultBucketStorageBackend() != prev.GetDefaultBucketStorageBackend() {
-		tag, err := k8sutil.CouchbaseVersion(curr.Spec.Image)
+	currDefault, _ := curr.GetDefaultBucketStorageBackend()
+	prevDefault, _ := prev.GetDefaultBucketStorageBackend()
+	if currDefault == prevDefault {
+		return nil
+	}
+
+	// If the default storage backend is changing, we need to check the managed bucket's numVBuckets if the version is also changing
+	// from pre 8.0.0 to post 8.0.0.
+	checkVBuckets := false
+
+	// If it's after 7.6.0 then backend can be changed
+	currAbove76, err := curr.IsAtLeastVersion("7.6.0")
+	if err != nil {
+		return nil
+	}
+
+	if currAbove76 {
+		currAbove80, err := curr.IsAtLeastVersion("8.0.0")
 		if err != nil {
 			return err
 		}
 
-		// If it's after 7.6.0 then backend can be changed so we don't need to check further
-		if after76, err := couchbaseutil.VersionAfter(tag, "7.6.0"); after76 && err == nil {
+		if currAbove80 {
+			prevAbove80, err := prev.IsAtLeastVersion("8.0.0")
+			if err != nil {
+				return err
+			}
+
+			checkVBuckets = currAbove80 && !prevAbove80
+		}
+	}
+
+	// If we don't need to check v buckets and the cluster is after 7.6.0, we can return early as the backend change is allowed.
+	if !checkVBuckets && currAbove76 {
+		return nil
+	}
+
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(curr.Namespace, curr.Spec.Buckets.Selector)
+	if err != nil {
+		return err
+	}
+
+	prevSelector := labels.Everything()
+	if prev.Spec.Buckets.Selector != nil {
+		prevSelector, err = metav1.LabelSelectorAsSelector(prev.Spec.Buckets.Selector)
+		if err != nil {
 			return nil
 		}
+	}
 
-		buckets, err := v.Abstraction.GetCouchbaseBuckets(curr.Namespace, curr.Spec.Buckets.Selector)
+	var errs []error
 
-		if err != nil {
-			return err
+	for _, bucket := range buckets.Items {
+		if !prevSelector.Matches(labels.Set(bucket.Labels)) {
+			continue
 		}
 
-		prevSelector := labels.Everything()
-		if prev.Spec.Buckets.Selector != nil {
-			prevSelector, err = metav1.LabelSelectorAsSelector(prev.Spec.Buckets.Selector)
-			if err != nil {
-				return nil
+		if checkVBuckets {
+			if err := checkNumVBucketsChangeConstraint(v, &bucket, &bucket, prev, curr); err != nil {
+				errs = append(errs, err)
 			}
 		}
 
-		var errs []error
+		// If the cluster is before 7.6.0, we need to check if the backend change would change the bucket backend.
+		if !currAbove76 {
+			prevBackend, _ := bucket.GetStorageBackend(prev)
+			currBackend, _ := bucket.GetStorageBackend(curr)
 
-		for _, bucket := range buckets.Items {
-			if !prevSelector.Matches(labels.Set(bucket.Labels)) {
-				continue
-			}
-
-			if bucket.GetStorageBackend(prev) != bucket.GetStorageBackend(curr) {
+			if prevBackend != currBackend {
 				errs = append(errs, fmt.Errorf("cannot change default bucket backend as %s backend would change, backend changes are only supported for server version >= 7.6.0", bucket.Name))
 			}
 		}
+	}
 
-		if errs != nil {
-			return errors.CompositeValidationError(errs...)
-		}
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
@@ -4816,78 +4853,6 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		return nil, nil
 	}
 
-	storageBackendEmptyOrCouchstore := func(prevStorageBackend, currStorageBackend couchbasev2.CouchbaseStorageBackend) bool {
-		return prevStorageBackend == "" && currStorageBackend == "couchstore" || prevStorageBackend == "couchstore" && currStorageBackend == ""
-	}
-
-	// We want to validate whether a bucket can be migrated to a new storage backend if the storage backend has been explicitly changed on the CRD,
-	// or it's changed from being a sample bucket and has magma in the CRD, in which case a migration will also take place.
-	if (prev.Spec.StorageBackend != curr.Spec.StorageBackend && !storageBackendEmptyOrCouchstore(prev.Spec.StorageBackend, curr.Spec.StorageBackend)) || (prev.Spec.SampleBucket && !curr.Spec.SampleBucket && curr.Spec.StorageBackend == "magma") {
-		if err := checkAllBucketsClustersValidForMigration(v, curr, cluster); err != nil {
-			errs = append(errs, err)
-		}
-
-		if prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "couchstore" {
-			if err := CheckBucketHistoryDisabled(prev); err != nil {
-				errs = append(errs, fmt.Errorf("spec.storageBackend backend can only be changed from magma to couchstore if history retention is first disabled on the bucket: %w", err))
-			}
-
-			warnings = append(warnings, "Changing bucket storagebackend could have associated collections with history retention enabled. This must be disabled to prevent errors.")
-		}
-	}
-
-	clusters, err := v.Abstraction.GetCouchbaseClusters(curr.Namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, cluster := range clusters.Items {
-		after80, err := cluster.IsAtLeastVersion("8.0.0")
-		if err != nil {
-			return nil, err
-		}
-
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
-		if err != nil {
-			return nil, err
-		}
-
-		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(curr.Labels)) {
-			changeErr := fmt.Errorf("spec.numVBuckets cannot be changed for magma buckets")
-
-			backendAnnotation := cluster.Annotations["cao.couchbase.com/buckets.defaultStorageBackend"]
-
-			if backendAnnotation == string(couchbasev2.CouchbaseStorageBackendCouchstore) && curr.Spec.StorageBackend == "" {
-				continue
-			}
-
-			if (prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "magma") || (prev.Spec.StorageBackend == "" && curr.Spec.StorageBackend == "magma") || (prev.Spec.StorageBackend == "magma" && curr.Spec.StorageBackend == "") || (prev.Spec.StorageBackend == "" && curr.Spec.StorageBackend == "") {
-				if after80 {
-					switch {
-					case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets != nil:
-						if *prev.Spec.NumVBuckets != *curr.Spec.NumVBuckets {
-							errs = append(errs, changeErr)
-						}
-					case prev.Spec.NumVBuckets == nil && curr.Spec.NumVBuckets != nil:
-						if *curr.Spec.NumVBuckets != 128 {
-							errs = append(errs, changeErr)
-						}
-					case prev.Spec.NumVBuckets != nil && curr.Spec.NumVBuckets == nil:
-						if *prev.Spec.NumVBuckets != 128 {
-							errs = append(errs, changeErr)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	if curr.Spec.StorageBackend == "magma" {
-		if curr.Spec.EnableIndexReplica {
-			errs = append(errs, fmt.Errorf("cannot set spec.enableIndexReplica to true for magma buckets"))
-		}
-	}
-
 	if !prev.Spec.SampleBucket && curr.Spec.SampleBucket {
 		errs = append(errs, fmt.Errorf("cao.couchbase.com/sampleBucket annotation cannot be added to an existing bucket"))
 	}
@@ -4895,6 +4860,70 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	if prev.Spec.EnableCrossClusterVersioning != nil && *prev.Spec.EnableCrossClusterVersioning {
 		if curr.Spec.EnableCrossClusterVersioning == nil || !*curr.Spec.EnableCrossClusterVersioning {
 			errs = append(errs, fmt.Errorf("enableCrossClusterVersioning cannot be disabled once enabled"))
+		}
+	}
+
+	// This function is used to get the storage backend for a given bucket. If the bucket storage backend set explicitly, return it.
+	// If not, check the cluster status for the bucket storage backend. If not set, return the implicitly set storage backend.
+	getBackend := func(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) couchbasev2.CouchbaseStorageBackend {
+		backend, explicit := bucket.GetStorageBackend(cluster)
+		if explicit {
+			return backend
+		}
+
+		if statusBackend := cluster.Status.GetBucketStorageBackendFromStatus(bucket.GetCouchbaseName()); statusBackend != "" {
+			return statusBackend
+		}
+
+		return backend
+	}
+
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, curr)
+		if err != nil {
+			return nil, err
+		}
+
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return nil, err
+		}
+
+		currBackend := getBackend(curr, c)
+		prevBackend := getBackend(prev, c)
+
+		if prevBackend != currBackend || prev.IsSampleBucket() && !curr.IsSampleBucket() {
+			if err := checkClusterValidForBucketMigration(v, curr, c); err != nil {
+				errs = append(errs, err)
+			}
+
+			if prevBackend == couchbasev2.CouchbaseStorageBackendMagma && currBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+				// Bucket history must have been disabled on the previous bucket spec. Cannot be done as part of the same change operation.
+				if err := checkBucketHistoryDisabled(prev); err != nil {
+					errs = append(errs, err)
+				}
+
+				warnings = append(warnings, "Changing bucket storagebackend could have associated collections with history retention enabled. This must be disabled to prevent errors.")
+			}
+		}
+
+		after80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if !after80 {
+			continue
+		}
+
+		if err := checkNumVBucketsChangeConstraint(v, prev, curr, c, c); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
@@ -4907,6 +4936,42 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	}
 
 	return nil, nil
+}
+
+// We need to validate numVBucket constraints when a bucket is changed, or if a cluster is upgraded from pre 8.0 to post 8.0 (due to default changes).
+// If a cluster is changed, we need to run this against all managed buckets.
+// If we are validating cluster changes, pass prevBucket and currBucket as the same bucket.
+// If we are validating bucket changes, pass prevCluster and currCluster as the same cluster.
+func checkNumVBucketsChangeConstraint(v *types.Validator, prevBucket, currBucket *couchbasev2.CouchbaseBucket, prevCluster, currCluster *couchbasev2.CouchbaseCluster) error {
+	var errs []error
+
+	// getVBuckets returns the number of vBuckets for a given bucket and cluster. The bucket spec field takes precedence,
+	// but if not set, we'll check the cluster status or finally then make an assumption based on cluster version/default storage backend.
+	getVBuckets := func(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) int {
+		if bucket.Spec.NumVBuckets != nil {
+			return *bucket.Spec.NumVBuckets
+		}
+
+		if vbuckets := cluster.Status.GetBucketVBucketsFromStatus(bucket.GetCouchbaseName()); vbuckets != nil {
+			return *vbuckets
+		}
+
+		if backend, _ := bucket.GetStorageBackend(cluster); backend == couchbasev2.CouchbaseStorageBackendCouchstore {
+			return 1024
+		}
+
+		return 128
+	}
+
+	if getVBuckets(prevBucket, prevCluster) != getVBuckets(currBucket, currCluster) {
+		errs = append(errs, fmt.Errorf("spec.numVBuckets is immutable for cluster: %s", currCluster.NamespacedName()))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
 }
 
 func CheckChangeConstraintsEphemeralBucket(v *types.Validator, prev, curr *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
@@ -4958,94 +5023,51 @@ func CheckImmutableFieldsEncryptionKey(prev, current *couchbasev2.CouchbaseEncry
 	return nil
 }
 
-func CheckBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
+func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	// History retention labels have been deprecated, bucket.Spec.HistoryRetentionSettings resource object should be used instead
+	fmt.Println("HISTORY RETENTION SETTINGS: ", bucket.Spec.HistoryRetentionSettings)
 	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil {
-		if *bucket.Spec.HistoryRetentionSettings.CollectionDefault {
-			return fmt.Errorf("bucket doesn't have spec.historyRetention.collectionHistoryDefault set to false")
-		} else {
-			return nil
-		}
+		fmt.Println("HISTORY RETENTION SETTINGS: ", *bucket.Spec.HistoryRetentionSettings.CollectionDefault)
+	}
+	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil && !*bucket.Spec.HistoryRetentionSettings.CollectionDefault {
+		return nil
 	}
 
-	if bucket.Annotations == nil {
-		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
-	}
-
-	if val, ok := bucket.Annotations["cao.couchbase.com/historyRetention.collectionHistoryDefault"]; ok {
-		if historyRetentionEnabled, err := strconv.ParseBool(val); err != nil {
-			return err
-		} else if historyRetentionEnabled {
-			return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
-		}
-	} else {
-		return fmt.Errorf("bucket doesn't have cao.couchbase.com/historyRetention.collectionHistoryDefault annotation set to false")
-	}
-
-	return nil
+	return fmt.Errorf("spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket")
 }
 
 //nolint:gocognit
-func checkAllBucketsClustersValidForMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	var clusters = new(couchbasev2.CouchbaseClusterList)
-
-	if cluster != nil {
-		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
-	} else {
-		allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
-		if err != nil {
-			return err
-		}
-
-		clusters = allClusters
+func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true")
 	}
 
-	for _, cluster := range clusters.Items {
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
-		if err != nil {
-			return err
-		}
+	upgradeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+	if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
+	}
 
-		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
-			if err := annotations.Populate(&cluster.Spec, cluster.Annotations); err != nil {
-				return err
-			}
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
 
-			if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true")
-			}
+	after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
+	if err != nil {
+		return err
+	}
 
-			upgradeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
+	if cluster.Status.CurrentVersion == "" {
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have current version 7.6.0 or greater")
+	}
 
-			if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
-				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
-			}
+	currentVersionAfter76, err := couchbaseutil.VersionAfter(cluster.Status.CurrentVersion, "7.6.0")
+	if err != nil {
+		return err
+	}
 
-			tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
-			if err != nil {
-				return err
-			}
-
-			after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
-
-			if err != nil {
-				return err
-			}
-
-			if cluster.Status.CurrentVersion == "" {
-				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have current version 7.6.0 or greater")
-			}
-
-			currentVersionAfter76, err := couchbaseutil.VersionAfter(cluster.Status.CurrentVersion, "7.6.0")
-
-			if err != nil {
-				return err
-			}
-
-			if !after76 || !currentVersionAfter76 {
-				return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater")
-			}
-		}
+	if !after76 || !currentVersionAfter76 {
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater")
 	}
 
 	return nil
@@ -6063,7 +6085,7 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 		// 3. Defaulted by the server version (magma for 8.0.0+, couchstore for earlier)
 		storageBackend := bucket.Spec.StorageBackend
 		if storageBackend == "" {
-			storageBackend = c.GetDefaultBucketStorageBackend()
+			storageBackend, _ = c.GetDefaultBucketStorageBackend()
 		}
 
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma {
@@ -6074,8 +6096,10 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 			if err := checkMagmaBucketClusterVersionSettings(v, c, bucket); err != nil {
 				return err
 			}
-		} else if bucket.Spec.NumVBuckets != nil {
-			return fmt.Errorf("spec.numVBuckets can only be set for magma buckets for cluster: %s", c.NamespacedName())
+		} else if bucket.Spec.NumVBuckets != nil && *bucket.Spec.NumVBuckets != 1024 {
+			// We need to allow numVBuckets to be set for couchstore buckets to aid with migration from couchstore to magma.
+			// This isn't used by anything in the cluster, so we can allow it to be set to 1024 for couchstore buckets.
+			return fmt.Errorf("spec.numVBuckets can only be set to 1024 for couchstore buckets for cluster: %s", c.NamespacedName())
 		}
 	}
 
