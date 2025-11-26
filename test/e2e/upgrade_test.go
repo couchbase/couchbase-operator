@@ -1143,6 +1143,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	// Static Config
 	clusterSize := 3
 	numOfDocs := f.DocsCount
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
@@ -1169,13 +1170,20 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 
+	// Upgrades from pre 8.0 to post 8.0 will add an additional event as the bucket encryption settings are updated
+	// to the operator defaults.
+	editCount := 1
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		editCount = 2
+	}
+
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Repeat{Times: editCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

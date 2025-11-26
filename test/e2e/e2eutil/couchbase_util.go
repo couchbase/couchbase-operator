@@ -1550,6 +1550,22 @@ func MustGetCouchbaseVersion(t *testing.T, image string, overrideVersion string)
 	return version
 }
 
+// IsUpgradeOverVersion checks if an upgrade will occur over a specific version. I.e. if startVersion < thresholdVersion < endVersion.
+// This is useful for tests that might need to add additional expected events when upgrading over a major version like 8.0.
+func MustCheckIfUpgradeOverVersion(t *testing.T, initialVersion, upgradeVersion, thresholdVersion string) bool {
+	before, err := couchbaseutil.VersionBefore(initialVersion, thresholdVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	after, err := couchbaseutil.VersionAfter(upgradeVersion, thresholdVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return before && after
+}
+
 func MustVerifyDataServerSettingsMemcachedTCPSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tcpUserTimeout, tcpKeepAliveProbes, tcpKeepAliveInterval, tcpKeepAliveIdle int, timeout time.Duration) {
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(k8s, cluster)

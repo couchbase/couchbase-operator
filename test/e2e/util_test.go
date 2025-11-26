@@ -659,7 +659,7 @@ func registerTests() {
 		framework.NewTestDef(TestMagmaBucketToCouchstoreMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
-		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestMagmaBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationWithMultiMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestEvictionPolicyOnlineChange).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),

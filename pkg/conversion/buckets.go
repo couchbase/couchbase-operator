@@ -81,7 +81,7 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 		},
 	}
 
-	if bucket.BucketStorageBackend == "magma" {
+	if bucket.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
 		cbBucket.Spec.NumVBuckets = bucket.NumVBuckets
 		cbBucket.Spec.HistoryRetentionSettings = &couchbasev2.HistoryRetentionSettings{
 			CollectionDefault: bucket.HistoryRetentionCollectionDefault,

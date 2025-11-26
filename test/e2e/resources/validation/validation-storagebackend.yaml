@@ -142,6 +142,45 @@ status:
     replicas: 1
     storageBackend: couchstore
     type: couchbase
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: fullEviction
+    ioPriority: low
+    memoryQuota: 100
+    name: bucket3
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    storageBackend: couchstore
+    type: couchbase
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: fullEviction
+    ioPriority: low
+    memoryQuota: 1024
+    name: bucket4
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    storageBackend: couchstore
+    type: couchbase
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: fullEviction
+    ioPriority: low
+    memoryQuota: 1024
+    name: bucket7
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    storageBackend: magma
+    type: couchbase
   currentVersion: 7.6.5
   size: 1
 ---

@@ -1309,39 +1309,48 @@ func (b *CouchbaseBucket) AddScopeResource(resource ScopeLocalObjectReference) {
 }
 
 // GetStorageBackend returns the bucket’s storage backend and true if it was explicitly set on the bucket or via the cluster defaultStorageBackend annotation,
-// false if it was implied by the cluster version or if a cluster version can't be found.
+// false if it was implicit.
 // We should only ever migrate bucket storage backends if the backend is declared explicitly.
 func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) (CouchbaseStorageBackend, bool) {
-	// If there is no cluster then we can't check if cluster version supports the backend,
-	// or get the cluster default so we trust the bucket and get the default default
+	// If there is no cluster or we get an error when checking the cluster version,
+	// we'll fallback to the value set in the spec, or finally the default.
+	fallback := func() (CouchbaseStorageBackend, bool) {
+		if b.Spec.StorageBackend != "" {
+			return b.Spec.StorageBackend, true
+		}
+
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
+	}
+
 	if cluster == nil {
-		return b.getStorageBackend(), false
+		return fallback()
 	}
 
 	magmaSupported, err := cluster.IsAtLeastVersion("7.1.0")
 	if err != nil {
-		// we couldn't parse the cluster version so we'll trust the bucket/get default default
 		log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
-		return b.getStorageBackend(), false
+		return fallback()
 	}
 
 	if !magmaSupported || b.IsSampleBucket() {
 		return CouchbaseStorageBackendCouchstore, false
 	}
 
-	if b.Spec.StorageBackend == "" {
-		return cluster.GetDefaultBucketStorageBackend()
+	if b.Spec.StorageBackend != "" {
+		return b.Spec.StorageBackend, true
 	}
 
-	return b.Spec.StorageBackend, true
-}
-
-func (b *CouchbaseBucket) getStorageBackend() CouchbaseStorageBackend {
-	if b.Spec.StorageBackend == "" {
-		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	defaultBackend, explicit := cluster.GetDefaultBucketStorageBackend()
+	if explicit {
+		return defaultBackend, explicit
 	}
 
-	return b.Spec.StorageBackend
+	backend := cluster.Status.GetBucketStorageBackendFromStatus(b.GetCouchbaseName())
+	if backend != "" {
+		return backend, false
+	}
+
+	return defaultBackend, false
 }
 
 func (b *CouchbaseBucket) IsSampleBucket() bool {
@@ -1363,6 +1372,28 @@ func (b *CouchbaseBucket) HasCrossClusterVersioningEnabled() bool {
 	}
 
 	return *b.Spec.EnableCrossClusterVersioning
+}
+
+// getVBuckets returns the number of vBuckets. The bucket spec field takes precedence,
+// but if not set, we'll check the cluster status or finally then make an assumption based on cluster version/default storage backend.
+func (b *CouchbaseBucket) GetNumVBuckets(cluster *CouchbaseCluster) int {
+	if b.Spec.NumVBuckets != nil {
+		return *b.Spec.NumVBuckets
+	}
+
+	if vbuckets := cluster.Status.GetBucketVBucketsFromStatus(b.GetCouchbaseName()); vbuckets != nil {
+		return *vbuckets
+	}
+
+	if backend, _ := b.GetStorageBackend(cluster); backend == CouchbaseStorageBackendCouchstore {
+		return constants.DefaultNumVBucketsCouchstore
+	}
+
+	if after80, err := cluster.IsAtLeastVersion("8.0.0"); err == nil && after80 {
+		return constants.DefaultNumVBucketsMagma
+	}
+
+	return constants.DefaultNumVBucketsCouchstore
 }
 
 func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {

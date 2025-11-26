@@ -133,7 +133,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
 			}
 
-			b.NumVBuckets = util.IntPtr(1024)
+			// NumVBuckets can only be changed after 8.0, but is returned for 7.6 as well.
+			b.NumVBuckets = util.IntPtr(bucket.GetNumVBuckets(cluster))
 
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
@@ -204,14 +205,6 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 						b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
 					}
 				}
-			}
-
-			if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
-				numVBuckets := constants.DefaultNumVBuckets
-				if bucket.Spec.NumVBuckets != nil {
-					numVBuckets = *bucket.Spec.NumVBuckets
-				}
-				b.NumVBuckets = util.IntPtr(numVBuckets)
 			}
 		}
 
@@ -589,10 +582,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					remove = append(remove, a)
 					create = append(create, r)
 				} else if !reflect.DeepEqual(r, a) {
+					if r.BucketStorageBackend != a.BucketStorageBackend && !isStorageBackendExplicitlySet(c, &r) {
+						log.Info("Skipping bucket storage backend change as the backend was not set explicitly.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-backend", a.BucketStorageBackend, "requested-backend", r.BucketStorageBackend)
+						continue
+					}
 					setBucketFieldsForEncoding(&r, isOver71)
-
-					fmt.Println(r)
-					fmt.Println(*a.NumVBuckets)
 
 					update = append(update, r)
 					c.logUpdate(a, r)
@@ -640,6 +634,18 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	}
 
 	return create, update, remove, requested, nil
+}
+
+func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
+	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
+	for _, bucket := range couchbaseBuckets {
+		if bucket.GetCouchbaseName() == r.BucketName {
+			_, explicit := bucket.GetStorageBackend(c.cluster)
+			return explicit
+		}
+	}
+
+	return true
 }
 
 // Since, BucketStorageBackend is non-editable, once created for CB version < 7.6.0.

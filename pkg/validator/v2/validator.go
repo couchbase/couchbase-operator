@@ -2177,19 +2177,17 @@ func checkMagmaBucketClusterVersionSettings(v *types.Validator, c *couchbasev2.C
 		return err
 	}
 
-	if !after80 {
-		if bucket.Spec.NumVBuckets != nil {
-			return fmt.Errorf("spec.numVBuckets cannot be set for buckets pre Couchbase Server 8.0.0")
-		}
-
-		// MemoryQuota defaults to 100Mi, and pre-8.0 magma buckets require a minimum of 1024Mi.
-		if bucket.Spec.MemoryQuota == nil || bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
-			return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
-		}
+	if after80 {
+		return checkMagmaVBucketsSettings(bucket, c.NamespacedName())
 	}
 
-	if err := checkMagmaVBucketsSettings(bucket, c.NamespacedName()); err != nil {
-		return err
+	if bucket.Spec.NumVBuckets != nil {
+		return fmt.Errorf("spec.numVBuckets cannot be set for buckets pre Couchbase Server 8.0.0")
+	}
+
+	// MemoryQuota defaults to 100Mi, and pre-8.0 magma buckets require a minimum of 1024Mi.
+	if bucket.Spec.MemoryQuota == nil || bucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+		return fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0 for cluster: %s", c.NamespacedName())
 	}
 
 	return nil
@@ -4722,7 +4720,7 @@ func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *
 		}
 
 		if checkVBuckets {
-			if err := checkNumVBucketsChangeConstraint(v, &bucket, &bucket, prev, curr); err != nil {
+			if err := checkNumVBucketsChangeConstraint(&bucket, &bucket, prev, curr); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -4917,7 +4915,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			continue
 		}
 
-		if err := checkNumVBucketsChangeConstraint(v, prev, curr, c, c); err != nil {
+		if err := checkNumVBucketsChangeConstraint(prev, curr, c, c); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -4937,29 +4935,19 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 // If a cluster is changed, we need to run this against all managed buckets.
 // If we are validating cluster changes, pass prevBucket and currBucket as the same bucket.
 // If we are validating bucket changes, pass prevCluster and currCluster as the same cluster.
-func checkNumVBucketsChangeConstraint(v *types.Validator, prevBucket, currBucket *couchbasev2.CouchbaseBucket, prevCluster, currCluster *couchbasev2.CouchbaseCluster) error {
+func checkNumVBucketsChangeConstraint(prevBucket, currBucket *couchbasev2.CouchbaseBucket, prevCluster, currCluster *couchbasev2.CouchbaseCluster) error {
 	var errs []error
 
-	// getVBuckets returns the number of vBuckets for a given bucket and cluster. The bucket spec field takes precedence,
-	// but if not set, we'll check the cluster status or finally then make an assumption based on cluster version/default storage backend.
-	getVBuckets := func(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) int {
-		if bucket.Spec.NumVBuckets != nil {
-			return *bucket.Spec.NumVBuckets
-		}
-
-		if vbuckets := cluster.Status.GetBucketVBucketsFromStatus(bucket.GetCouchbaseName()); vbuckets != nil {
-			return *vbuckets
-		}
-
-		if backend, _ := bucket.GetStorageBackend(cluster); backend == couchbasev2.CouchbaseStorageBackendCouchstore {
-			return 1024
-		}
-
-		return 128
+	prevVBuckets := prevBucket.GetNumVBuckets(prevCluster)
+	currVBuckets := currBucket.GetNumVBuckets(currCluster)
+	if prevVBuckets != currVBuckets {
+		errs = append(errs, fmt.Errorf("spec.numVBuckets is immutable for bucket %s and cluster %s", currBucket.GetCouchbaseName(), currCluster.NamespacedName()))
 	}
 
-	if getVBuckets(prevBucket, prevCluster) != getVBuckets(currBucket, currCluster) {
-		errs = append(errs, fmt.Errorf("spec.numVBuckets is immutable for cluster: %s", currCluster.NamespacedName()))
+	// If the storage backend is magma and the numVBuckets is 1024, we need to check if the memory quota is greater than or equal to 1024Mi.
+	storageBackend, _ := currBucket.GetStorageBackend(currCluster)
+	if storageBackend == couchbasev2.CouchbaseStorageBackendMagma && currVBuckets == 1024 && currBucket.Spec.MemoryQuota.Cmp(*k8sutil.NewResourceQuantityMi(1024)) < 0 {
+		errs = append(errs, fmt.Errorf("spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket %s and cluster %s", currBucket.GetCouchbaseName(), currCluster.NamespacedName()))
 	}
 
 	if errs != nil {
@@ -5020,10 +5008,6 @@ func CheckImmutableFieldsEncryptionKey(prev, current *couchbasev2.CouchbaseEncry
 
 func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 	// History retention labels have been deprecated, bucket.Spec.HistoryRetentionSettings resource object should be used instead
-	fmt.Println("HISTORY RETENTION SETTINGS: ", bucket.Spec.HistoryRetentionSettings)
-	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil {
-		fmt.Println("HISTORY RETENTION SETTINGS: ", *bucket.Spec.HistoryRetentionSettings.CollectionDefault)
-	}
 	if bucket.Spec.HistoryRetentionSettings != nil && bucket.Spec.HistoryRetentionSettings.CollectionDefault != nil && !*bucket.Spec.HistoryRetentionSettings.CollectionDefault {
 		return nil
 	}
@@ -5034,7 +5018,7 @@ func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 //nolint:gocognit
 func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have the enableBucketMigrationRoutines annotation set to true")
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true")
 	}
 
 	upgradeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
@@ -5443,7 +5427,7 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
 	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
 		if cond := prev.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
-			return fmt.Errorf("cao.couchbase.com/buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
+			return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
 		}
 	}
 
