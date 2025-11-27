@@ -299,12 +299,16 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
 			}
 
+			b.NumVBuckets = util.IntPtr(1024)
+
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 
 			b.NumVBuckets = util.IntPtr(1024)
 		}
 
 		if supportedAdditional80Settings {
+			b.NumVBuckets = util.IntPtr(1024)
+
 			apply80Settings(&b, bucket)
 		}
 
