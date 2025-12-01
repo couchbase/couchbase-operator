@@ -2888,6 +2888,7 @@ type ClusterSpec struct {
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.
 	// +listType=set
+	// +kubebuilder:validation:items:Pattern="^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// PerServiceClassPDB determines whether a pod disruption budget (PDB) should be created for each service class.
@@ -4796,6 +4797,7 @@ type ServerConfig struct {
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.
 	// +listType=set
+	// +kubebuilder:validation:items:Pattern="^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// Pod defines a template used to create pod for each Couchbase server

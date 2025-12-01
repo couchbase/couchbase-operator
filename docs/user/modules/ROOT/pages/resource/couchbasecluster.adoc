@@ -5619,6 +5619,8 @@ https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
 
 *Type*: `[]string`
 
+*Pattern (Regular Expression)*: `^[A-Za-z0-9]([A-Za-z0-9._-]\*[A-Za-z0-9])?$`
+
 ==== Description
 
 ServerGroups define the set of availability zones you want to distribute
@@ -5762,6 +5764,8 @@ This field overrides any automatic allocation as defined by
 ==== Constraints
 
 *Type*: `[]string`
+
+*Pattern (Regular Expression)*: `^[A-Za-z0-9]([A-Za-z0-9._-]\*[A-Za-z0-9])?$`
 
 ==== Description
 
