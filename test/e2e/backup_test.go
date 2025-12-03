@@ -729,10 +729,10 @@ func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Second, 5*time.Minute)
 
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 8*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Second, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created

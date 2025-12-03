@@ -744,6 +744,17 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev
 	mustWaitForResourceEventFromNow(t, k8s, backup, event, timeout)
 }
 
+// MustObserveBackupEventFrom checks events that occur in the future until the timeout, but also checks for events that occurred from a given time before the method call time.
+// This is useful for backup tests where a (typically incremental) backup is started and finished within 1 second of eachother and therefore might be missed by the default waitForResourceEventFromNow.
+func MustObserveBackupEventFrom(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, event *v1.Event, from, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, backup, event, time.Now().Add(-from), false); err != nil {
+		Die(t, err)
+	}
+}
+
 // waits until the provided condition type with associated status.
 func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {

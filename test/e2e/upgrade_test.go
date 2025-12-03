@@ -540,6 +540,12 @@ func TestUpgradeSupportable(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
+	}
+
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
@@ -594,6 +600,12 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 		// therefore, these 2 do not need to be accounted for here
 		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -777,6 +789,12 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		upgradeDownUnrecoverableSequence(victimName),
 		eventschema.Repeat{Times: clusterSize - (victimCycle + 1), Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
