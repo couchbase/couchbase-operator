@@ -569,6 +569,13 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					continue
 				}
 
+				// We should never set the numVBuckets field for buckets pre 8.0.0.
+				// This shouldn't get through the dac but we're adding some extra protection.
+				if !atLeast80 {
+					r.NumVBuckets = nil
+					a.NumVBuckets = nil
+				}
+
 				// We have to do this to prevent deepEqual from updating the bucket just because of the NoRestart field.
 				// This is OK to do as we don't actually get a.NoRestart from the API endpoint we just infer it and
 				// once an offline eviction policy change is requested, we can't do anything about it so this difference doesn't matter.
@@ -599,11 +606,17 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 
 		if !found {
-			setBucketFieldsForEncoding(&r, isOver71)
-
 			if !atLeast80 {
+				if r.BucketType == constants.BucketTypeMemcached {
+					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
+					continue
+				}
+
+				// Dac should prevent this from getting through but we're adding some extra protection.
 				r.NumVBuckets = nil
 			}
+
+			setBucketFieldsForEncoding(&r, isOver71)
 
 			create = append(create, r)
 		}
