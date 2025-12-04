@@ -571,7 +571,7 @@ func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() (CouchbaseStorageBac
 		return c.Spec.Buckets.DefaultStorageBackend, true
 	}
 
-	after8, err := c.IsAtLeastVersion(constants.MinimumVersionForMagmaDefaultBackend)
+	after8, err := c.RunningVersion(constants.MinimumVersionForMagmaDefaultBackend)
 	if err != nil {
 		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 	}
@@ -1332,7 +1332,7 @@ func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) (Couchbas
 		return fallback()
 	}
 
-	magmaSupported, err := cluster.IsAtLeastVersion("7.1.0")
+	magmaSupported, err := cluster.RunningVersion("7.1.0")
 	if err != nil {
 		log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
 		return fallback()
@@ -1395,7 +1395,7 @@ func (b *CouchbaseBucket) GetNumVBuckets(cluster *CouchbaseCluster) int {
 		return constants.DefaultNumVBucketsCouchstore
 	}
 
-	if after80, err := cluster.IsAtLeastVersion("8.0.0"); err == nil && after80 {
+	if after80, err := cluster.RunningVersion("8.0.0"); err == nil && after80 {
 		return constants.DefaultNumVBucketsMagma
 	}
 
@@ -1887,4 +1887,14 @@ func (u *CouchbaseUser) GetUserID() string {
 	}
 
 	return u.GetName()
+}
+
+// ClusterRunningVersion checks if the cluster is running on or above a given version. It checks the cluster status first, and if not set, it checks the cluster spec version.
+// This should be used to check for version compatibility with currently incompatible changes.
+func (c *CouchbaseCluster) RunningVersion(tag string) (bool, error) {
+	if c.Status.CurrentVersion != "" {
+		return couchbaseutil.VersionAfter(c.Status.CurrentVersion, tag)
+	}
+
+	return c.IsAtLeastVersion(tag)
 }

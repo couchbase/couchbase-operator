@@ -2172,7 +2172,7 @@ func checkMagmaBucketClusterVersionSettings(v *types.Validator, c *couchbasev2.C
 		}
 	}
 
-	after80, err := c.IsAtLeastVersion("8.0.0")
+	after80, err := c.RunningVersion("8.0.0")
 	if err != nil {
 		return err
 	}
@@ -4856,21 +4856,6 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		}
 	}
 
-	// This function is used to get the storage backend for a given bucket. If the bucket storage backend set explicitly, return it.
-	// If not, check the cluster status for the bucket storage backend. If not set, return the implicitly set storage backend.
-	getBackend := func(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) couchbasev2.CouchbaseStorageBackend {
-		backend, explicit := bucket.GetStorageBackend(cluster)
-		if explicit {
-			return backend
-		}
-
-		if statusBackend := cluster.Status.GetBucketStorageBackendFromStatus(bucket.GetCouchbaseName()); statusBackend != "" {
-			return statusBackend
-		}
-
-		return backend
-	}
-
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
@@ -4888,8 +4873,16 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			return nil, err
 		}
 
-		currBackend := getBackend(curr, c)
-		prevBackend := getBackend(prev, c)
+		// currBackend is the desired backend
+		currBackend, _ := curr.GetStorageBackend(c)
+
+		// prevBackend is the one currently in use. If it isn't explicitly set, we'll check the cluster status.
+		prevBackend, explicit := prev.GetStorageBackend(c)
+		if !explicit {
+			if statusBackend := c.Status.GetBucketStorageBackendFromStatus(prev.GetCouchbaseName()); statusBackend != "" {
+				prevBackend = statusBackend
+			}
+		}
 
 		if prevBackend != currBackend || prev.IsSampleBucket() && !curr.IsSampleBucket() {
 			if err := checkClusterValidForBucketMigration(v, curr, c); err != nil {
@@ -4906,7 +4899,7 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 		}
 
-		after80, err := c.IsAtLeastVersion("8.0.0")
+		after80, err := c.RunningVersion("8.0.0")
 		if err != nil {
 			return nil, err
 		}
@@ -5026,26 +5019,32 @@ func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
 	}
 
-	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	mixedModeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionMixedMode)
+	if mixedModeCondition != nil && mixedModeCondition.Status == v1.ConditionTrue {
+		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not running in mixed mode")
+	}
+
+	lowestImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
 	if err != nil {
 		return err
 	}
 
-	after76, err := couchbaseutil.VersionAfter(tag, "7.6.0")
+	tag, err := couchbaseutil.CouchbaseImageVersion(lowestImage)
 	if err != nil {
 		return err
 	}
 
-	if cluster.Status.CurrentVersion == "" {
-		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have current version 7.6.0 or greater")
+	// Should have already errord before here with the upgrade conditions but this helps with validation testing.
+	if tag != cluster.Status.CurrentVersion {
+		return fmt.Errorf("spec.storageBackend can only be changed if all referencing clusters are not in an upgrade")
 	}
 
-	currentVersionAfter76, err := couchbaseutil.VersionAfter(cluster.Status.CurrentVersion, "7.6.0")
+	after76, err := cluster.RunningVersion("7.6.0")
 	if err != nil {
 		return err
 	}
 
-	if !after76 || !currentVersionAfter76 {
+	if !after76 {
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are version 7.6.0 or greater")
 	}
 
@@ -5392,7 +5391,7 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 	}
 
 	// Check if we're on 8.0+ for role validation
-	is8Plus, err := cluster.IsAtLeastVersion("8.0.0")
+	is8Plus, err := cluster.RunningVersion("8.0.0")
 	if err != nil {
 		return err
 	}
@@ -6062,11 +6061,7 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 		// 1. Explicitly set in the bucket spec
 		// 2. Cluster default overridden by the defaultStorageBackend annotation
 		// 3. Defaulted by the server version (magma for 8.0.0+, couchstore for earlier)
-		storageBackend := bucket.Spec.StorageBackend
-		if storageBackend == "" {
-			storageBackend, _ = c.GetDefaultBucketStorageBackend()
-		}
-
+		storageBackend, _ := bucket.GetStorageBackend(c)
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 			if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
 				return err

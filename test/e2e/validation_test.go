@@ -2982,7 +2982,8 @@ func TestUpgradeInvalidMemcachedBucket(t *testing.T) {
 		{
 			name: "TestValidateDeprecatedMemcachedBucket",
 			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
-				Replace("/spec/image", "couchbase/server:8.0.0"),
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Replace("/status/currentVersion", "8.0.0"),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{`cluster has memcached buckets`},
@@ -5656,10 +5657,12 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name: "TestNegValidateMagmaPre71",
+			name: "TestNegUpgradeClusterToExplicitMagmaInvalidBeforeUpgrade",
 			mutations: patchMap{
-				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.0.0"),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.0.0").
+					Replace("/status/currentVersion", "7.0.0"),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{`magma storage backend requires Couchbase Server version 7.1.0 or later`},
@@ -5675,8 +5678,10 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 		{
 			name: "TestNegValidateMagmaPre80MemQuotaDefault",
 			mutations: patchMap{
-				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma"),
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.6.5").
+					Replace("/status/currentVersion", "7.6.5"),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
@@ -5684,8 +5689,12 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 		{
 			name: "TestNegValidateMagmaPre80MemoryQuota",
 			mutations: patchMap{
-				"bucket0":  jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1023Mi"),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5"),
+				"bucket0": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1023Mi"),
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.6.5").
+					Replace("/status/currentVersion", "7.6.5"),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
@@ -5696,11 +5705,14 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "512Mi").Add("/metadata/labels", map[string]string{
 					"someLabel": "some-value",
 				}),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/spec/buckets/selector", &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"someLabel": "some-value",
-					},
-				}),
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.6.5").
+					Replace("/status/currentVersion", "7.6.5").
+					Add("/spec/buckets/selector", &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"someLabel": "some-value",
+						},
+					}),
 			},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi for magma buckets pre Couchbase Server 8.0.0`},
@@ -5711,11 +5723,14 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "magma").Replace("/spec/memoryQuota", "1Gi").Add("/metadata/labels", map[string]string{
 					"someLabel": "some-value",
 				}),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/spec/buckets/selector", &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"someLabel": "some-value",
-					},
-				}),
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.6.5").
+					Replace("/status/currentVersion", "7.6.5").
+					Add("/spec/buckets/selector", &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"someLabel": "some-value",
+						},
+					}),
 			},
 			shouldFail: false,
 		},
@@ -5775,9 +5790,12 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 			name: "TestNegValidateMagmaClusterDefaultNumVBucketsOnPre80",
 			mutations: patchMap{
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 1024).Replace("/spec/memoryQuota", "1024Mi"),
-				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.5").Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
-				})},
+				"cluster0": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:7.6.5").
+					Replace("/status/currentVersion", "7.6.5").
+					Add("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+					})},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.numVBuckets cannot be set for buckets pre Couchbase Server 8.0.0`},
 		},
@@ -5948,8 +5966,8 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 		},
 		{
 			// Buckets 3,4 (5 is explicitly couchstore) and 8 are couchstore buckets (implicitly), so upgrading to 8.0.0 and changing the defaultStorageBackend to magma
-			// is effectively a migration. 3 and 8 cannot be migrated as they do not have a valid memory quota for their current numVBuckets (1024 couchstore amount).
-			name: "TestNegUpgradeClusterToExplicitMagmaInvalid",
+			// is effectively a migration. 3 and 8 cannot be migrated as they do not have a valid memory quota given as the min required for magma buckets pre running 8.0 is 1024Mi.
+			name: "TestNegUpgradeClusterToExplicitMagmaInvalidBeforeUpgradeCompletes",
 			mutations: patchMap{
 				"cluster1": jsonpatch.NewPatchSet().
 					Replace("/spec/image", "couchbase/server:8.0.0").
@@ -5958,9 +5976,23 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 					}),
 			},
 			shouldFail: true,
-			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket bucket3`,
-				`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket bucket8`,
+			expectedErrors: []string{
+				`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket bucket3`,
+				`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket bucket80`},
+		},
+		{
+			// This is the same test as above, however assuming an upgrade has completed/we're on 8.0, we should not be able to change the default backend as the current memory quotas are invalid.
+			name: "TestNegChangeDefaultToExplicitMagmaInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace("/status/currentVersion", "8.0.0").
+					Replace("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/buckets.defaultStorageBackend": "magma",
+					}),
 			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024 for bucket bucket3`},
 		},
 		{
 			// We should be able to upgrade a cluster to 8.0.0 without changing buckets, and given the storage backend is
@@ -6033,6 +6065,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			mutations: patchMap{
 				"cluster1": jsonpatch.NewPatchSet().
 					Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace("/status/currentVersion", "8.0.0").
 					Remove("/metadata/annotations"),
 				"bucket8": jsonpatch.NewPatchSet().
 					Add("/spec/storageBackend", "magma"),
@@ -6051,23 +6084,24 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			// Even though it's a valid numVBuckets, we're going to validate against a magma backend once the version is above 8.0, which requires 1024 Mi for 1024 numVBuckets.
-			name: "TestNegValidateUpgradeTo80ImplicitCouchstoreBucket",
+			// Because we don't explicitly say the storage backend, we should read couchstore from the status and validate from there.
+			name: "TestValidateUpgradeTo80ImplicitCouchstoreBucket",
 			mutations: patchMap{
 				"cluster1": jsonpatch.NewPatchSet().
 					Replace("/spec/image", "couchbase/server:8.0.0").
 					Remove("/metadata/annotations"),
 				"bucket8": jsonpatch.NewPatchSet().
-					Add("/spec/numVBuckets", 1024),
+					Add("/spec/numVBuckets", 1024).
+					Replace("/spec/memoryQuota", "500Mi"),
 			},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.memoryQuota must be greater than or equal to 1024Mi when numVBuckets is 1024`},
+			shouldFail: false,
 		},
 		{
 			name: "TestValidateUpgradeOn70Bucket",
 			mutations: patchMap{
 				"cluster1": jsonpatch.NewPatchSet().
 					Replace("/spec/image", "couchbase/server:8.0.0").
+					Replace("/status/currentVersion", "8.0.0").
 					Remove("/metadata/annotations"),
 				"bucket8": jsonpatch.NewPatchSet().
 					Add("/spec/storageBackend", "magma").
