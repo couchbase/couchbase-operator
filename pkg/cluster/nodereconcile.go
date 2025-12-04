@@ -449,10 +449,17 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		}
 
 		for i := 0; i < len(candidateServices); i++ {
-			if candidateServices[i] == "kv" {
+			switch candidateServices[i] {
+			case "kv":
 				candidateServices[i] = "data"
-			} else if candidateServices[i] == "n1ql" {
+			case "n1ql":
 				candidateServices[i] = "query"
+			case "fts":
+				candidateServices[i] = "search"
+			case "cbas":
+				candidateServices[i] = "analytics"
+			default:
+				// no mapping needed
 			}
 		}
 
