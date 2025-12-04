@@ -466,8 +466,20 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		}
 	}
 
-	if !candidates.Empty() {
-		return r.swapRebalanceMembers(c, candidates)
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
+	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+	if err != nil {
+		return err
+	}
+
+	if !constrained.Empty() {
+		return r.swapRebalanceMembers(c, constrained)
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
