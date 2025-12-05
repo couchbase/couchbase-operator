@@ -1,12 +1,8 @@
-variable "kubernetes-version" {
-  type    = string
-  default = "1.17"
-}
-
 variable "name" {
-  type = string
+  description = "Name of the EKS cluster"
+  type        = string
 }
-
-variable "remote" {
-  default = false
+variable "kubernetes-version" {
+  description = "Kubernetes version for the EKS cluster"
+  type        = string
 }
