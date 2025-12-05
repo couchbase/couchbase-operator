@@ -467,9 +467,8 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		sort.Strings(expectedServicesString)
 
 		if !couchbaseutil.EqualStringSlices(candidateServices, expectedServicesString) {
-			c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
-			c.cluster.Status.SetServicesMismatchCondition()
 			candidates.Add(candidate)
+			log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name(), "expectedServices", expectedServicesString, "actualServices", candidateServices)
 		}
 	}
 
@@ -486,6 +485,8 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 	}
 
 	if !constrained.Empty() {
+		c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
+		c.cluster.Status.SetServicesMismatchCondition()
 		return r.swapRebalanceMembers(c, constrained)
 	}
 
