@@ -949,7 +949,7 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 
 func (r *ReconcileMachine) removeMemberIfUnknownServerConfig(c *Cluster, name string, m couchbaseutil.Member) {
 	if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
-		log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+		log.Info("Node does not match any server config in the specification. Ejecting from cluster", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
 		// Check the node is actually active before we attempt to delete the log volumes.
 		info := &couchbaseutil.PoolsInfo{}
