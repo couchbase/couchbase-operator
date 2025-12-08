@@ -5279,11 +5279,11 @@ func checkChangeConstraintsMigration(v *types.Validator, current, updated *couch
 		}
 
 		if len(buckets) == 0 && updated.Spec.Buckets.Managed {
-			return fmt.Errorf("cannot remove migration spec as buckets were not migrated")
+			return fmt.Errorf("cannot remove migration spec: create bucket CRDs or disable bucket management")
 		}
 
 		if len(users.Items) == 0 && updated.Spec.Security.RBAC.Managed {
-			return fmt.Errorf("cannot remove migration spec as users were not migrated")
+			return fmt.Errorf("cannot remove migration spec: create user CRDs or disable user management")
 		}
 	}
 
