@@ -2146,15 +2146,13 @@ func checkMagmaBucketRequiredSettings(bucket *couchbasev2.CouchbaseBucket) error
 
 func checkMagmaBucketClusterVersionSettings(v *types.Validator, c *couchbasev2.CouchbaseCluster, bucket *couchbasev2.CouchbaseBucket) error {
 	// If explicitly set to magma, check if the cluster version supports it.
-	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
-		after71, err := c.IsAtLeastVersion("7.1.0")
-		if err != nil {
-			return err
-		}
+	after71, err := c.IsAtLeastVersion("7.1.0")
+	if err != nil {
+		return err
+	}
 
-		if !after71 {
-			return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later for cluster: %s", c.NamespacedName())
-		}
+	if !after71 {
+		return fmt.Errorf("magma storage backend requires Couchbase Server version 7.1.0 or later for cluster: %s", c.NamespacedName())
 	}
 
 	after712, err := c.IsAtLeastVersion("7.1.2")
@@ -6061,8 +6059,10 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 		// 1. Explicitly set in the bucket spec
 		// 2. Cluster default overridden by the defaultStorageBackend annotation
 		// 3. Defaulted by the server version (magma for 8.0.0+, couchstore for earlier)
+		// The operator will use GetStorageBackend, which in some cases will return a different value for compatibility. Therefore we'll run these checks
+		// if it's set specifically on the bucket as well so we can validate values that the operator would override.
 		storageBackend, _ := bucket.GetStorageBackend(c)
-		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma {
+		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma || bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 			if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
 				return err
 			}
