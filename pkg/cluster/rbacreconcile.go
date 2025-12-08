@@ -887,6 +887,10 @@ func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
 
 		if resetPassword {
 			user.TemporaryPassword = &resetPassword
+			// We'll clear the roles as when encoded they would be added back to the user as a direct role.
+			// We don't need to worry about the CNG user here as we should only be setting the temporary password for user's
+			// with an associated resource.
+			user.Roles = []couchbaseutil.UserRole{}
 
 			if err := couchbaseutil.CreateUser(&user).On(c.api, c.readyMembers()); err != nil {
 				return err
