@@ -427,7 +427,7 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 
 	candidates := couchbaseutil.NewMemberSet()
 
-	for _, candidate := range c.members {
+	for _, candidate := range c.readyMembers() {
 		// Get the server configuration for the candidate
 		serverConfig := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if serverConfig == nil {
