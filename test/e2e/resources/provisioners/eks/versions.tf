@@ -1,6 +1,20 @@
-output "cluster_name" {
-  value = aws_eks_cluster.this.name
+terraform {
+  required_version = ">= 1.3"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.27"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.13"
+    }
+  }
 }
-output "cluster_endpoint" {
-  value = aws_eks_cluster.this.endpoint
+provider "aws" {
+  region = "us-east-2"
 }
