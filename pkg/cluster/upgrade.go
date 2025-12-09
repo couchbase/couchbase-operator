@@ -221,7 +221,23 @@ func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
 	numToUpgrade := numOldPods
 
 	if c.cluster.Spec.Upgrade != nil {
-		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
+		// Check if this is a rollback (target version == baseline version)
+		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+		if err != nil {
+			return nil, err
+		}
+		baselineVersion, err := c.state.Get(persistence.Version)
+		if err != nil {
+			return nil, err
+		}
+		isRollback := targetVersion == baselineVersion
+
+		// Only apply PreviousVersionPodCount for forward upgrades, not rollbacks
+		if !isRollback {
+			// Ensure we don't go negative - at minimum, we should upgrade 0 pods
+			numToUpgrade = max(numOldPods-c.cluster.Spec.Upgrade.PreviousVersionPodCount, 0)
+		}
+		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
 	}
 
 	filteredCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates, numToUpgrade)

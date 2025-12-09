@@ -4504,18 +4504,16 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 		return err
 	}
 
-	upgradeCondition := current.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
-
-	migratingCondition := current.Status.GetCondition(couchbasev2.ClusterConditionMigrating)
-
 	fullyUpgraded, err := isFullyUpgraded(current)
-
 	if err != nil {
 		return err
 	}
 
-	// Condition is not set, therefore we are starting an upgrade.
-	if (upgradeCondition == nil && migratingCondition == nil) && fullyUpgraded {
+	// Not currently upgrading/migrating and cluster is fully upgraded, therefore we are starting an upgrade.
+	isUpgrading := current.HasCondition(couchbasev2.ClusterConditionUpgrading)
+	isMigrating := current.HasCondition(couchbasev2.ClusterConditionMigrating)
+
+	if !isUpgrading && !isMigrating && fullyUpgraded {
 		if updatedVersion == "9.9.9" {
 			// we have no idea what this is so we trust the user
 			return nil
@@ -4538,7 +4536,17 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 		return false, err
 	}
 
-	return imageVersion == c.Status.CurrentVersion, nil
+	// Spec must match status
+	if imageVersion != c.Status.CurrentVersion {
+		return false, nil
+	}
+
+	// If MixedMode condition exists and is true, cluster is not fully upgraded
+	if c.HasCondition(couchbasev2.ClusterConditionMixedMode) {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // checkImmutableVolumeTemplateSize checks that you aren't downscaling volumes
