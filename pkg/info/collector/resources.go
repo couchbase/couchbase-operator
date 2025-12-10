@@ -30,6 +30,7 @@ var (
 		{Resource: &couchbasev2.CouchbaseScopeGroup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
 		{Resource: &couchbasev2.CouchbaseCollection{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
 		{Resource: &couchbasev2.CouchbaseCollectionGroup{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
+		{Resource: &couchbasev2.CouchbaseEncryptionKey{}, Scope: resource.ScopeAll, LogLevel: resource.LogLevelRequired},
 		{
 			Resource: &corev1.ConfigMap{}, Scope: resource.ScopeCluster, LogLevel: resource.LogLevelRequired,
 			Reason: "Used to determine issues with Couchbase Cluster state, server environment variables, and logging configuration",

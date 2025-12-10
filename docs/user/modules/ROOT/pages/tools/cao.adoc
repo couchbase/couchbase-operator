@@ -345,6 +345,10 @@ CouchbaseCollectionGroup::
 Log Level: Required
 +
 Scope: all
+CouchbaseEncryptionKey::
+Log Level: Required
++
+Scope: all
 ConfigMap::
 Log Level: Required
 +
