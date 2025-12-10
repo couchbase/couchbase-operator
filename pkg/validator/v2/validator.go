@@ -4659,11 +4659,32 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		errs = append(errs, err)
 	}
 
+	if err := checkChangeConstraintsSidecar(prev, curr); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return false, errors.CompositeValidationError(errs...)
 	}
 
 	return false, nil
+}
+
+func checkChangeConstraintsSidecar(prev, curr *couchbasev2.CouchbaseCluster) error {
+	upgradeCondition := curr.HasCondition(couchbasev2.ClusterConditionUpgrading)
+	mixedModeCondition := curr.HasCondition(couchbasev2.ClusterConditionMixedMode)
+
+	if upgradeCondition || mixedModeCondition {
+		if !reflect.DeepEqual(prev.Spec.Logging, curr.Spec.Logging) {
+			return fmt.Errorf("server logging is immutable in mixed mode or during upgrade")
+		}
+
+		if !reflect.DeepEqual(prev.Spec.Networking.CloudNativeGateway, curr.Spec.Networking.CloudNativeGateway) {
+			return fmt.Errorf("cloud native gateway spec cannot be changed in mixed mode or during upgrade")
+		}
+	}
+
+	return nil
 }
 
 // nolint:gocognit
