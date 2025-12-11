@@ -1502,7 +1502,7 @@ func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil
 
 	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
 
-	if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+	if err := couchbaseutil.Failover(otpNodeList, false).RetryFor(1*time.Minute).On(c.api, candidate); err != nil {
 		return false, err
 	}
 
