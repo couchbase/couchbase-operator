@@ -425,6 +425,44 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		return nil
 	}
 
+	candidates, err := c.getNodeServiceMismatchCandidates()
+	if err != nil {
+		return err
+	}
+
+	if candidates.Empty() {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
+		return nil
+	}
+
+	for _, candidate := range candidates {
+		log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name())
+	}
+
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
+	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+	if err != nil {
+		return err
+	}
+
+	if !constrained.Empty() {
+		c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
+		c.cluster.Status.SetServicesMismatchCondition()
+		return r.swapRebalanceMembers(c, constrained)
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
+
+	return nil
+}
+
+func (c *Cluster) getNodeServiceMismatchCandidates() (couchbaseutil.MemberSet, error) {
 	candidates := couchbaseutil.NewMemberSet()
 
 	for _, candidate := range c.readyMembers() {
@@ -439,7 +477,7 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		nodesSelf := &couchbaseutil.NodeInfo{}
 		err := couchbaseutil.GetNodesSelf(nodesSelf).On(c.api, candidate)
 		if err != nil {
-			return err
+			return candidates, err
 		}
 		candidateServices := nodesSelf.Services
 		expectedServices := serverConfig.Services
@@ -468,31 +506,10 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 
 		if !couchbaseutil.EqualStringSlices(candidateServices, expectedServicesString) {
 			candidates.Add(candidate)
-			log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name(), "expectedServices", expectedServicesString, "actualServices", candidateServices)
 		}
 	}
 
-	clusterInfo := &couchbaseutil.TerseClusterInfo{}
-	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
-
-	orchestratorName := clusterInfo.Orchestrator
-
-	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
-	if err != nil {
-		return err
-	}
-
-	if !constrained.Empty() {
-		c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
-		c.cluster.Status.SetServicesMismatchCondition()
-		return r.swapRebalanceMembers(c, constrained)
-	}
-
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
-
-	return nil
+	return candidates, nil
 }
 
 // If we have nodes that are warming up then we need to wait for them to finish
@@ -1031,6 +1048,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
 		c.needsUpgrade,
 		c.getBucketMigrationCandidates,
+		c.getNodeServiceMismatchCandidates,
 	}
 
 	for _, getCandidatesFunc := range getCandidatesFuncs {
