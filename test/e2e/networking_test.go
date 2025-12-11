@@ -713,9 +713,9 @@ func TestUpdatingAlternateAddressExternalDNSCheckDoesNotEjectActivatedNodes(t *t
 	// We expect the cluster to enter a healthy state once all the pods' external addresses can be reached.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
-	// Make sure the pods no longer have the pending external DNS condition.
-	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[0].Name, k8sutil.PodPendingExternalDNSCondition, time.Minute)
-	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, time.Minute)
+	// Make sure the pods no longer have the pending external DNS condition. It might take a bit for the coreDNS to update, hence the 3 minute timeout.
+	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[0].Name, k8sutil.PodPendingExternalDNSCondition, 3*time.Minute)
+	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, 3*time.Minute)
 
 	// Check that the alternate addresses have been added to the cluster.
 	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, testDomain, 2*time.Minute)

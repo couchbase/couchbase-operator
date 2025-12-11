@@ -698,9 +698,9 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	victimCycle := mdsGroupSize + 1
-	victimIndex := clusterSize + victimCycle
+	clusterSize := mdsGroupSize * 2          //4
+	victimCycle := mdsGroupSize + 1          //3
+	victimIndex := clusterSize + victimCycle // 7
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
