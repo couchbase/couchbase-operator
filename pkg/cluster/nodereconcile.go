@@ -1763,6 +1763,11 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return err
 	}
 
+	// We use 9.9.9 to represent an unknown version, so we don't need to check the upgrade path.
+	if newVersion.String() == "9.9.9" {
+		return nil
+	}
+
 	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
 }
 

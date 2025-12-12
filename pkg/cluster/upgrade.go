@@ -355,21 +355,17 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		requestedSpec.Containers = removeMetricsContainer(requestedSpec.Containers)
 		actualSpec.Containers = removeMetricsContainer(actualSpec.Containers)
 
+		// Ignore key shadow secret volume mount if it is not needed. But if it already exists there's no point in removing it so we do this before the comparison.
+		if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
+			return nil, err
+		} else if !keyShadowSecretNeeded {
+			removeKeyShadowSecretVolumeMount(requestedSpec)
+			removeKeyShadowSecretVolumeMount(actualSpec)
+		}
+
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
-
-		if is80, err := couchbaseutil.VersionAfter(member.Version(), "8.0.0"); err != nil {
-			return nil, err
-		} else if is80 {
-			// Ignore key shadow secret volume mount if it is not NEEDED
-			if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
-				return nil, err
-			} else if !keyShadowSecretNeeded {
-				removeKeyShadowSecretVolumeMount(requestedSpec)
-				removeKeyShadowSecretVolumeMount(actualSpec)
-			}
-		}
 
 		// Nothing to do, carry on...
 		if podsEqual && pvcsEqual {
@@ -421,6 +417,21 @@ func removeKeyShadowSecretVolumeMount(podSpec *v1.PodSpec) {
 	}
 
 	container.VolumeMounts = filterMounts(container.VolumeMounts)
+
+	// Also remove the volume itself from podSpec.Volumes
+	filterVolumes := func(initialVolumes []v1.Volume) []v1.Volume {
+		volumes := []v1.Volume{}
+
+		for _, v := range initialVolumes {
+			if v.Name != constants.CouchbaseKeyShadowVolumeName {
+				volumes = append(volumes, v)
+			}
+		}
+
+		return volumes
+	}
+
+	podSpec.Volumes = filterVolumes(podSpec.Volumes)
 }
 
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {

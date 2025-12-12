@@ -4536,6 +4536,11 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 		return false, err
 	}
 
+	if imageVersion == "9.9.9" {
+		// we have no idea what this is so we trust the user
+		return true, nil
+	}
+
 	// Spec must match status
 	if imageVersion != c.Status.CurrentVersion {
 		return false, nil
@@ -5041,29 +5046,12 @@ func checkClusterValidForBucketMigration(v *types.Validator, bucket *couchbasev2
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true")
 	}
 
-	upgradeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionUpgrading)
-	if upgradeCondition != nil && upgradeCondition.Status == v1.ConditionTrue {
+	if cluster.HasCondition(couchbasev2.ClusterConditionUpgrading) {
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not in an upgrade")
 	}
 
-	mixedModeCondition := cluster.Status.GetCondition(couchbasev2.ClusterConditionMixedMode)
-	if mixedModeCondition != nil && mixedModeCondition.Status == v1.ConditionTrue {
+	if cluster.HasCondition(couchbasev2.ClusterConditionMixedMode) {
 		return fmt.Errorf("spec.storageBackend backend can only be changed if all referencing clusters are not running in mixed mode")
-	}
-
-	lowestImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	tag, err := couchbaseutil.CouchbaseImageVersion(lowestImage)
-	if err != nil {
-		return err
-	}
-
-	// Should have already errord before here with the upgrade conditions but this helps with validation testing.
-	if tag != cluster.Status.CurrentVersion {
-		return fmt.Errorf("spec.storageBackend can only be changed if all referencing clusters are not in an upgrade")
 	}
 
 	after76, err := cluster.RunningVersion("7.6.0")

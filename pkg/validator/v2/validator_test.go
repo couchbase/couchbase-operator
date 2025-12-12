@@ -434,6 +434,13 @@ func TestIsFullyUpgraded(t *testing.T) {
 			mixedMode:      v1.ConditionTrue,
 			expectedResult: false,
 		},
+		{
+			name:           "unknown cluster version - trust the user",
+			specImage:      "couchbase/server@sha256:8485d9a4f6a9f288e0b1bac2c89383387f1091cf3b53c22f667748e2b4c5dd33",
+			statusVersion:  "8.0.0",
+			mixedMode:      v1.ConditionFalse,
+			expectedResult: true,
+		},
 	}
 
 	for _, tc := range testcases {

@@ -1310,14 +1310,14 @@ func (r *TestRequirement) HasIAMParameters() *TestRequirement {
 
 // AtLeastVersion skips the test for Couchbase versions before this threshold.
 func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
-	parts := strings.Split(Global.CouchbaseServerImage, ":")
-	if len(parts) != 2 {
+	version := getVersionFromImage(Global.CouchbaseServerImage)
+	if version == "" {
 		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
-	v1, err := couchbaseutil.NewVersion(parts[1])
+	v1, err := couchbaseutil.NewVersion(version)
 	if err != nil {
-		r.t.Skipf("malformed version: %s: %v", parts[1], err)
+		r.t.Skipf("malformed version: %s: %v", version, err)
 	}
 
 	v2, err := couchbaseutil.NewVersion(v)
@@ -1333,14 +1333,14 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 }
 
 func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
-	parts := strings.Split(Global.CouchbaseServerImage, ":")
-	if len(parts) != 2 {
+	version := getVersionFromImage(Global.CouchbaseServerImage)
+	if version == "" {
 		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
-	testVersion, err := couchbaseutil.NewVersion(parts[1])
+	testVersion, err := couchbaseutil.NewVersion(version)
 	if err != nil {
-		r.t.Skipf("malformed version: %s: %v", parts[1], err)
+		r.t.Skipf("malformed version: %s: %v", version, err)
 	}
 
 	upperBoundVersion, err := couchbaseutil.NewVersion(v)
@@ -1370,14 +1370,14 @@ func (r *TestRequirement) upgradable(inplaceUpgrade bool) *TestRequirement {
 		r.t.Skip("Upgrade version not specified")
 	}
 
-	parts1 := strings.Split(Global.CouchbaseServerImage, ":")
-	if len(parts1) != 2 {
+	version1 := getVersionFromImage(Global.CouchbaseServerImage)
+	if version1 == "" {
 		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
 	}
 
-	parts2 := strings.Split(Global.CouchbaseServerImageUpgrade, ":")
-	if len(parts2) != 2 {
-		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImage)
+	version2 := getVersionFromImage(Global.CouchbaseServerImageUpgrade)
+	if version2 == "" {
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImageUpgrade)
 	}
 
 	var version *couchbaseutil.Version
@@ -1385,9 +1385,9 @@ func (r *TestRequirement) upgradable(inplaceUpgrade bool) *TestRequirement {
 	var err error
 
 	if Global.CouchbaseServerImageVersion == "" {
-		version, err = couchbaseutil.NewVersion(parts1[1])
+		version, err = couchbaseutil.NewVersion(version1)
 		if err != nil {
-			r.t.Skipf("malformed version: %s: %v", parts1[1], err)
+			r.t.Skipf("malformed version: %s: %v", version1, err)
 		}
 	} else {
 		version, err = couchbaseutil.NewVersion(Global.CouchbaseServerImageVersion)
@@ -1398,15 +1398,20 @@ func (r *TestRequirement) upgradable(inplaceUpgrade bool) *TestRequirement {
 
 	var upgrade *couchbaseutil.Version
 	if Global.CouchbaseServerImageUpgradeVersion == "" {
-		upgrade, err = couchbaseutil.NewVersion(parts2[1])
+		upgrade, err = couchbaseutil.NewVersion(version2)
 		if err != nil {
-			r.t.Skipf("malformed version: %s: %v", parts2[1], err)
+			r.t.Skipf("malformed version: %s: %v", version2, err)
 		}
 	} else {
 		upgrade, err = couchbaseutil.NewVersion(Global.CouchbaseServerImageUpgradeVersion)
 		if err != nil {
 			r.t.Skipf("malformed override version: %s: %v", Global.CouchbaseServerImageUpgradeVersion, err)
 		}
+	}
+
+	// If we can't map an image sha to a version, trust the user.
+	if version.GreaterEqualString("9.9.9") || upgrade.GreaterEqualString("9.9.9") {
+		return r
 	}
 
 	if upgrade.GreaterEqual(version) {
@@ -1755,4 +1760,17 @@ func FrameworkBackupStorageClass() string {
 	}
 
 	return ""
+}
+
+func getVersionFromImage(image string) string {
+	version := couchbaseutil.GetVersionTag(image)
+	if couchbaseutil.IsSHA256Version(version) {
+		return couchbaseutil.GetSHA256Version(version)
+	} else {
+		parts := strings.Split(image, ":")
+		if len(parts) != 2 {
+			return ""
+		}
+		return parts[1]
+	}
 }
