@@ -97,7 +97,17 @@ func GetSHA256Version(version string) string {
 		return v
 	}
 
-	// attempt additional lookup on associated config map
+	userVersion := GetVersionFromEnvConfigMap(version)
+	if userVersion != "" {
+		return userVersion
+	}
+
+	// Trusting user provided a valid version since we don't
+	// know what version the digest maps to
+	return "9.9.9"
+}
+
+func GetVersionFromEnvConfigMap(version string) string {
 	if digests, ok := os.LookupEnv(constants.EnvDigestsConfigMap); ok {
 		// match against digests presented as list of equalities
 		re := regexp.MustCompile(version + `=(.*)\s?\n`)
@@ -108,8 +118,6 @@ func GetSHA256Version(version string) string {
 		}
 	}
 
-	// Trusting user provided a valid version since we don't
-	// know what version the digest maps to
 	return "9.9.9"
 }
 
