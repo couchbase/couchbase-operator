@@ -705,7 +705,7 @@ func recreateCRDs(k8s *types.Cluster) error {
 			}
 
 			// wait for crd delete
-			if err := retryutil.RetryFor(2*time.Minute, e2eutil.ResourceDeleted(k8s, crd)); err != nil {
+			if err := retryutil.RetryFor(5*time.Minute, e2eutil.ResourceDeleted(k8s, crd)); err != nil {
 				return err
 			}
 		}
