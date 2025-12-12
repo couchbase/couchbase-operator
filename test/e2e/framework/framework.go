@@ -704,8 +704,18 @@ func recreateCRDs(k8s *types.Cluster) error {
 				return fmt.Errorf("failed to delete CRD: %w", err)
 			}
 
-			// wait for crd delete
-			if err := retryutil.RetryFor(5*time.Minute, e2eutil.ResourceDeleted(k8s, crd)); err != nil {
+			// Wait for the CRD to be deleted by checking directly using the API Client.
+			if err := retryutil.RetryFor(2*time.Minute, func() error {
+				_, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Get(context.Background(), crd.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+
+				if err != nil {
+					return err
+				}
+				return fmt.Errorf("CRD %s still exists", crd.Name)
+			}); err != nil {
 				return err
 			}
 		}
