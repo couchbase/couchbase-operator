@@ -208,6 +208,8 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return requeueResult, nil
 	}
 
+	c.ReconcileMirWatchdogContext()
+
 	if err := validationrunner.CheckClusterChangeConstraints(c.GetCouchbaseCluster(), couchbase); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 

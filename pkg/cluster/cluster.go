@@ -131,6 +131,11 @@ type Cluster struct {
 	// tlsCache allows us to load up and verify TLS data at the beginning of
 	// a reconcile so it appears atomic throughout the process.
 	tlsCache *tlsCache
+
+	// mirWatchdog is the context for the MIR watchdog goroutine.
+	// It is separate from the main cluster context to allow starting/stopping
+	// the watchdog based on the spec.
+	mirWatchdog *MirWatchdogContext
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -249,22 +254,17 @@ func (c *Cluster) newCluster() error {
 	// Perform any necessary upgrades to the cluster and kubernetes resources.
 	err = c.operatorUpgrade()
 
-	// Spawn the mirWatchdog process which monitors the cluster for issues that require manual intervention.
-	if mw := c.cluster.Spec.MirWatchdog; mw != nil && mw.Enabled != nil && *mw.Enabled {
-		interval := 20 * time.Second
-		if mw.Interval != nil {
-			interval = mw.Interval.Duration
-		}
-
-		go newMirWatchdog(c).run(interval)
-	}
-
 	return err
 }
 
 func (c *Cluster) Delete() {
 	// Notify client operations to stop what they are doing e.g. abort retry loops
 	c.cancel()
+
+	// Stop the MIR watchdog if it's running
+	if c.mirWatchdog != nil && c.mirWatchdog.cancel != nil {
+		c.mirWatchdog.cancel()
+	}
 
 	// Remove finalizers on EncryptionKeys
 	c.removeEncryptionKeyFinalizers()
@@ -604,7 +604,11 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			return
 		}
 
-		log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
+		if c.cluster.Spec.MirWatchdog == nil || (c.cluster.Spec.MirWatchdog.Enabled != nil && !*c.cluster.Spec.MirWatchdog.Enabled) {
+			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+		} else {
+			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
+		}
 	}
 
 	// Otherwise indicate that we are in control.
@@ -1299,6 +1303,35 @@ func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
 	}
 
 	return nil
+}
+
+// ReconcileMirWatchdogContext manages the MIR watchdog lifecycle based on the cluster spec.
+func (c *Cluster) ReconcileMirWatchdogContext() {
+	mw := c.cluster.Spec.MirWatchdog
+
+	enabled := mw != nil && mw.Enabled != nil && *mw.Enabled
+	running := c.mirWatchdog != nil && c.mirWatchdog.isRunning()
+
+	// Stop the watchdog if it's disabled and running.
+	if !enabled && running {
+		log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+		c.mirWatchdog.Stop()
+		return
+	}
+
+	// Start the watchdog if it's enabled but not running.
+	if enabled && !running {
+		// Determine the desired interval
+		desiredInterval := 20 * time.Second
+		if mw != nil && mw.Interval != nil {
+			desiredInterval = mw.Interval.Duration
+		}
+
+		log.Info("Starting Manual Intervention Required watchdog", "cluster", c.namespacedName(), "interval", desiredInterval)
+		c.mirWatchdog = StartMirWatchdog(c, desiredInterval)
+		return
+	}
 }
 
 func (c *Cluster) InitCounterMetrics() {

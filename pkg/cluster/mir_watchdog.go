@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -15,6 +16,29 @@ import (
 
 type mirWatchdog struct {
 	cluster *Cluster
+}
+
+// MirWatchdogContext is a context for the MIR watchdog goroutine.
+type MirWatchdogContext struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func StartMirWatchdog(cluster *Cluster, interval time.Duration) *MirWatchdogContext {
+	mwc := MirWatchdogContext{}
+	mwc.ctx, mwc.cancel = context.WithCancel(context.Background())
+	go newMirWatchdog(cluster).run(mwc.ctx, interval)
+	return &mwc
+}
+
+func (mwc *MirWatchdogContext) isRunning() bool {
+	return mwc.ctx != nil && mwc.cancel != nil
+}
+
+func (mwc *MirWatchdogContext) Stop() {
+	mwc.cancel()
+	mwc.ctx = nil
+	mwc.cancel = nil
 }
 
 type ManualInterventionRequired string
@@ -49,12 +73,13 @@ func newMirWatchdog(cluster *Cluster) *mirWatchdog {
 // raise a separate event for each of the reasons and set the cluster_manual_intervention metric to 1.
 // When manual intervention is no longer required, this will clear the condition,
 // raise a ManualInterventionResolved event and set the cluster_manual_intervention metric to 0.
-func (w *mirWatchdog) run(interval time.Duration) {
-	log.Info("Manual intervention required checks starting", "cluster", w.cluster.namespacedName())
+func (w *mirWatchdog) run(ctx context.Context, interval time.Duration) {
+	log.Info("Manual intervention required checks started", "cluster", w.cluster.namespacedName())
 
 	for {
 		select {
-		case <-w.cluster.ctx.Done():
+		case <-ctx.Done():
+			log.Info("Manual intervention required checks stopped", "cluster", w.cluster.namespacedName())
 			return
 		case <-time.After(interval):
 			w.checkCluster()
