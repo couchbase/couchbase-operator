@@ -824,7 +824,7 @@ func (c *Cluster) reconcileIndexSettings() error {
 			requested.EnablePageBloomFilter = &apiSettings.EnablePageBloomFilter
 		}
 
-		if ok, err := c.IsAtLeastVersion("7.6.0"); ok && err == nil {
+		if c.SupportsVersionFeatures("7.6.0") {
 			requested.EnableShardAffinity = &apiSettings.EnableShardAffinity
 		}
 
