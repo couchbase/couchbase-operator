@@ -700,6 +700,18 @@ func recreateCRDs(k8s *types.Cluster) error {
 		crd := &crds.Items[i]
 
 		if crd.Spec.Group == "couchbase.com" {
+			// In Kubernetes 1.33+, CRD deletion can hang if finalizers exist or custom resources still reference it.
+			// Remove finalizers first to allow immediate deletion.
+			if len(crd.Finalizers) > 0 {
+				crd.Finalizers = []string{}
+				updatedCRD, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Update(context.Background(), crd, metav1.UpdateOptions{})
+				if err != nil {
+					logrus.Warnf("Failed to remove finalizers from CRD %s: %v, attempting deletion anyway", crd.Name, err)
+				} else {
+					crd = updatedCRD
+				}
+			}
+
 			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %w", err)
 			}
