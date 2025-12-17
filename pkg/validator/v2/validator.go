@@ -3718,7 +3718,15 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 		}
 	case couchbasev2.ImmediateFull:
 	case couchbasev2.ImmediateIncremental:
+		// No validation needed - these run immediately
 	case couchbasev2.PeriodicMerge:
+		if err := validateCronJobString(backup.Spec.Incremental, "spec.incremental"); err != nil {
+			errs = append(errs, err)
+		}
+
+		if err := validateCronJobString(backup.Spec.Merge, "spec.merge"); err != nil {
+			errs = append(errs, err)
+		}
 	default:
 		errs = append(errs, fmt.Errorf("spec.strategy %s not valid, must be one of %s | %s | %s | %s",
 			backup.Spec.Strategy, couchbasev2.FullIncremental, couchbasev2.FullOnly, couchbasev2.ImmediateFull, couchbasev2.ImmediateIncremental))

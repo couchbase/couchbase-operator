@@ -3311,6 +3311,42 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.strategy cannot be periodicMerge when using a cloud object store`},
 		},
+		{
+			name:           "TestValidateBackupPeriodicMergeMissingIncrementalSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Remove("/spec/incremental")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.incremental.schedule`},
+		},
+		{
+			name:           "TestValidateBackupPeriodicMergeEmptyIncrementalSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Replace("/spec/incremental/schedule", "")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.incremental.schedule`},
+		},
+		{
+			name:           "TestValidateBackupPeriodicMergeMissingMergeSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Remove("/spec/merge")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.merge.schedule`},
+		},
+		{
+			name:           "TestValidateBackupPeriodicMergeEmptyMergeSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Replace("/spec/merge/schedule", "")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.merge.schedule`},
+		},
+		{
+			name:           "TestValidateBackupPeriodicMergeInvalidIncrementalSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Replace("/spec/incremental/schedule", "*7 * * * *")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.incremental.schedule`},
+		},
+		{
+			name:           "TestValidateBackupPeriodicMergeInvalidMergeSchedule",
+			mutations:      patchMap{"backup3": jsonpatch.NewPatchSet().Replace("/spec/merge/schedule", "invalid cron")},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.merge.schedule`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
