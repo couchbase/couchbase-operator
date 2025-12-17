@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -16,10 +17,12 @@ import (
 
 type mirWatchdog struct {
 	cluster *Cluster
+	ctx     context.Context
 }
 
 // MirWatchdogContext is a context for the MIR watchdog goroutine.
 type MirWatchdogContext struct {
+	mu     sync.Mutex
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -27,16 +30,22 @@ type MirWatchdogContext struct {
 func StartMirWatchdog(cluster *Cluster, interval time.Duration) *MirWatchdogContext {
 	mwc := MirWatchdogContext{}
 	mwc.ctx, mwc.cancel = context.WithCancel(context.Background())
-	go newMirWatchdog(cluster).run(mwc.ctx, interval)
+	go newMirWatchdog(cluster, mwc.ctx).run(mwc.ctx, interval)
 	return &mwc
 }
 
 func (mwc *MirWatchdogContext) isRunning() bool {
+	mwc.mu.Lock()
+	defer mwc.mu.Unlock()
 	return mwc.ctx != nil && mwc.cancel != nil
 }
 
 func (mwc *MirWatchdogContext) Stop() {
-	mwc.cancel()
+	mwc.mu.Lock()
+	defer mwc.mu.Unlock()
+	if mwc.cancel != nil {
+		mwc.cancel()
+	}
 	mwc.ctx = nil
 	mwc.cancel = nil
 }
@@ -61,9 +70,10 @@ func (mirl *ManualInterventionRequiredList) clusterConditionMessage() string {
 	return strings.Join(reasons, "\n")
 }
 
-func newMirWatchdog(cluster *Cluster) *mirWatchdog {
+func newMirWatchdog(cluster *Cluster, ctx context.Context) *mirWatchdog {
 	return &mirWatchdog{
 		cluster: cluster,
+		ctx:     ctx,
 	}
 }
 
@@ -88,6 +98,14 @@ func (w *mirWatchdog) run(ctx context.Context, interval time.Duration) {
 }
 
 func (w *mirWatchdog) checkCluster() {
+	// Check if the context is cancelled before proceeding to avoid race conditions
+	// where the watchdog modifies conditions/raises events after being told to stop.
+	select {
+	case <-w.ctx.Done():
+		return
+	default:
+	}
+
 	// List of checks that should be ran on a predetermined interval to alert the user if manual intervention is required.
 	// There should be clear lines on how to get and how to get out of each possible MIR state. Checks should be reluctant
 	// to enter MIR states, and aggressive to exit them.

@@ -597,14 +597,16 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 
 	// If manual intervention is required, we will skip reconciliation if the SkipReconciliation flag is set.
 	if condition := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionManualInterventionRequired); condition != nil && condition.Status == v1.ConditionTrue {
-		if c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.SkipReconciliation != nil && *c.cluster.Spec.MirWatchdog.SkipReconciliation {
+		running := c.isMirWatchdogRunning()
+		enabled := c.isMirWatchdogEnabled()
+		if running && enabled && c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.SkipReconciliation != nil && *c.cluster.Spec.MirWatchdog.SkipReconciliation {
 			log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName(), "reason", condition.Message)
 			metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "mir"})...).Inc()
 
 			return
 		}
 
-		if c.cluster.Spec.MirWatchdog == nil || (c.cluster.Spec.MirWatchdog.Enabled != nil && !*c.cluster.Spec.MirWatchdog.Enabled) {
+		if !running || !enabled {
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
 		} else {
 			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
@@ -1310,7 +1312,7 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 	mw := c.cluster.Spec.MirWatchdog
 
 	enabled := mw != nil && mw.Enabled != nil && *mw.Enabled
-	running := c.mirWatchdog != nil && c.mirWatchdog.isRunning()
+	running := c.isMirWatchdogRunning()
 
 	// Stop the watchdog if it's disabled and running.
 	if !enabled && running {
@@ -1347,4 +1349,12 @@ func (c *Cluster) InitCounterMetrics() {
 	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 	metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 	metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
+}
+
+func (c *Cluster) isMirWatchdogEnabled() bool {
+	return c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.Enabled != nil && *c.cluster.Spec.MirWatchdog.Enabled
+}
+
+func (c *Cluster) isMirWatchdogRunning() bool {
+	return c.mirWatchdog != nil && c.mirWatchdog.isRunning()
 }
