@@ -184,26 +184,28 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			if bucket.Spec.OnlineEvictionPolicyChange {
 				noRestart := true
 				b.NoRestart = &noRestart
+			} else if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
 			}
+		}
 
-			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
-			b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
-			b.EncryptionAtRestKeyID = util.IntPtr(constants.DefaultEncryptionAtRestKeyID)
+		b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
+		b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
+		b.EncryptionAtRestKeyID = util.IntPtr(constants.DefaultEncryptionAtRestKeyID)
 
-			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
-				if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
-					log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
-				} else if !key.CanEncryptBucket(bucket.Name) {
-					log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
-				} else {
-					b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
+		if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
+			if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
+				log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+			} else if !key.CanEncryptBucket(bucket.Name) {
+				log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+			} else {
+				b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
 
-					if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
-						b.EncryptionAtRestDekRotationInterval = util.IntPtr(int(bucket.Spec.EncryptionAtRest.RotationInterval.Seconds()))
-					}
-					if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
-						b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
-					}
+				if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
+					b.EncryptionAtRestDekRotationInterval = util.IntPtr(int(bucket.Spec.EncryptionAtRest.RotationInterval.Seconds()))
+				}
+				if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
+					b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
 				}
 			}
 		}
@@ -231,7 +233,7 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
-func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
@@ -282,6 +284,12 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		if supportedRank {
 			b.Rank = &bucket.Spec.Rank
+		}
+
+		if !bucket.Spec.OnlineEvictionPolicyChange {
+			if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
+			}
 		}
 
 		if supportedCrossClusterVersioning {
@@ -452,7 +460,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	}
 
 	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s, encryptionKeys)
-	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s, c.cluster)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
 
 	return allBuckets, nil

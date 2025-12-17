@@ -4931,6 +4931,12 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 		}
 
+		if !c.Spec.Buckets.EnableBucketMigrationRoutines {
+			if curr.Spec.EvictionPolicy != prev.Spec.EvictionPolicy && curr.Spec.OnlineEvictionPolicyChange {
+				errs = append(errs, fmt.Errorf("spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"))
+			}
+		}
+
 		after80, err := c.RunningVersion("8.0.0")
 		if err != nil {
 			return nil, err
