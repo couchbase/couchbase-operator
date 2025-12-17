@@ -498,9 +498,19 @@ func (c *Cluster) reportMixedMode() error {
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
-	if upgrading, err := c.isUpgrading(); err != nil || !upgrading {
-		// There is no condition, we weren't upgrading, do nothing
+	upgrading, err := c.isUpgrading()
+	if err != nil {
 		return err
+	}
+
+	// If we're not upgrading, let's ensure the version is set to the lowest member version.
+	if !upgrading {
+		lowestImageVer := c.GetLowestMemberVersion()
+		if lowestImageVer == "" {
+			return nil
+		}
+
+		return c.state.Update(persistence.Version, lowestImageVer)
 	}
 
 	// Check to see if there are any more upgrade candidates.
