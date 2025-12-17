@@ -1147,8 +1147,15 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		}
 	}
 
+	additionalArgsEnvVar := corev1.EnvVar{
+		Name:      "ADDITIONAL_CBBACKUPMGR_COMMANDS",
+		Value:     "",
+		ValueFrom: nil,
+	}
+
 	if backup.Spec.AdditionalArgs != "" {
-		args = append(args, backup.Spec.AdditionalArgs)
+		additionalArgsEnvVar.Value = backup.Spec.AdditionalArgs
+		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
 	}
 
 	return args
