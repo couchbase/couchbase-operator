@@ -205,7 +205,7 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 	if inMirStateForReason(existingCondition, MIRRebalanceRetriesExhausted) {
 		status, err := w.cluster.GetStatus()
 		if err != nil {
-			return nil
+			return mir(MIRRebalanceRetriesExhausted)
 		}
 
 		if status.Balanced && areAllNodesActive(status.NodeStates) {
@@ -217,7 +217,14 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 
 	// Entry
 	if w.cluster.cluster.Status.GetRebalanceAttempts() >= 3 {
-		return mir(MIRRebalanceRetriesExhausted)
+		status, err := w.cluster.GetStatus()
+		if err != nil {
+			return nil
+		}
+
+		if !status.Balanced || !areAllNodesActive(status.NodeStates) {
+			return mir(MIRRebalanceRetriesExhausted)
+		}
 	}
 
 	return nil
