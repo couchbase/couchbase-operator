@@ -327,8 +327,11 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:default=false
 	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
 
-	// AdditionalArgs is used to pass additional arguments to the backup script container.
+	// AdditionalArgs is used to pass additional arguments to cbbackupmgr.
 	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
+
+	// AdditionalOperatorBackupArgs is used to pass additional arguments to the operator backup container.
+	AdditionalOperatorBackupArgs string `json:"-" annotation:"additionalOperatorBackupArgs"`
 
 	// Env defines environment variables to be set on the backup container.
 	// These can be used to configure cbbackupmgr behavior via environment variables.
