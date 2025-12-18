@@ -187,25 +187,25 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			} else if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
 				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
 			}
-		}
 
-		b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
-		b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
-		b.EncryptionAtRestKeyID = util.IntPtr(constants.DefaultEncryptionAtRestKeyID)
+			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
+			b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
+			b.EncryptionAtRestKeyID = util.IntPtr(constants.DefaultEncryptionAtRestKeyID)
 
-		if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
-			if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
-				log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
-			} else if !key.CanEncryptBucket(bucket.Name) {
-				log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
-			} else {
-				b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
+			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
+				if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
+					log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+				} else if !key.CanEncryptBucket(bucket.Name) {
+					log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+				} else {
+					b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
 
-				if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
-					b.EncryptionAtRestDekRotationInterval = util.IntPtr(int(bucket.Spec.EncryptionAtRest.RotationInterval.Seconds()))
-				}
-				if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
-					b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
+					if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
+						b.EncryptionAtRestDekRotationInterval = util.IntPtr(int(bucket.Spec.EncryptionAtRest.RotationInterval.Seconds()))
+					}
+					if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
+						b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
+					}
 				}
 			}
 		}
