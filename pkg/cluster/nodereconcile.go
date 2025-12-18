@@ -1912,6 +1912,14 @@ func (r *ReconcileMachine) handleApplyingUpgradeStabilizationPeriod() {
 
 func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
 	upgradeSpec := r.c.cluster.Spec.Upgrade
+	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
+		isWaiting := r.c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+		if isWaiting {
+			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
+		}
+
+		return
+	}
 
 	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 
