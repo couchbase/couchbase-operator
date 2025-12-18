@@ -397,3 +397,81 @@ func TestValidateAWSKeyARN(t *testing.T) {
 		}
 	}
 }
+
+func TestIsFullyUpgraded(t *testing.T) {
+	testcases := []struct {
+		name           string
+		specImage      string
+		statusVersion  string
+		mixedMode      v1.ConditionStatus
+		expectedResult bool
+	}{
+		{
+			name:           "fully upgraded - spec matches status, no mixed mode",
+			specImage:      "couchbase/server:7.6.7",
+			statusVersion:  "7.6.7",
+			mixedMode:      v1.ConditionFalse,
+			expectedResult: true,
+		},
+		{
+			name:           "not fully upgraded - spec doesn't match status",
+			specImage:      "couchbase/server:8.0.0",
+			statusVersion:  "7.6.7",
+			mixedMode:      v1.ConditionFalse,
+			expectedResult: false,
+		},
+		{
+			name:           "not fully upgraded - in mixed mode",
+			specImage:      "couchbase/server:7.6.7",
+			statusVersion:  "7.6.7",
+			mixedMode:      v1.ConditionTrue,
+			expectedResult: false,
+		},
+		{
+			name:           "not fully upgraded - spec matches status but in mixed mode",
+			specImage:      "couchbase/server:8.0.0",
+			statusVersion:  "8.0.0",
+			mixedMode:      v1.ConditionTrue,
+			expectedResult: false,
+		},
+		{
+			name:           "unknown cluster version - trust the user",
+			specImage:      "couchbase/server@sha256:8485d9a4f6a9f288e0b1bac2c89383387f1091cf3b53c22f667748e2b4c5dd33",
+			statusVersion:  "8.0.0",
+			mixedMode:      v1.ConditionFalse,
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Image: tc.specImage,
+				},
+				Status: couchbasev2.ClusterStatus{
+					CurrentVersion: tc.statusVersion,
+				},
+			}
+
+			// Set mixed mode condition if needed
+			if tc.mixedMode != "" {
+				cluster.Status.Conditions = []couchbasev2.ClusterCondition{
+					{
+						Type:   couchbasev2.ClusterConditionMixedMode,
+						Status: tc.mixedMode,
+					},
+				}
+			}
+
+			result, err := isFullyUpgraded(cluster)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if result != tc.expectedResult {
+				t.Errorf("expected %v, got %v", tc.expectedResult, result)
+			}
+		})
+	}
+}

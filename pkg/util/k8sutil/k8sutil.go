@@ -649,21 +649,22 @@ func GetBucketStorageBackend(bucket *couchbasev2.CouchbaseBucket, storageBackend
 	// cb server version below 7.0.0.
 	if !storageBackendCouchstoreSupported && bucket.Spec.StorageBackend != "" {
 		// warning log for user why spec.StorageBackend is ignored.
-		log.Info("[WARN] spec.storageBackend cannot be present for server version below 7.0.0", "CB image version", "lesser than 7.0.0")
+		log.Info("[WARN] spec.storageBackend cannot be present for server version below 7.0.0", "cluster", cluster.NamespacedName(), "CB image version", "lesser than 7.0.0")
 	}
 
 	// cb server version greater or equal to 7.0.0 but less than 7.1.0.
 	// default is "couchstore"
 	if storageBackendCouchstoreSupported && !storageBackendMagmaSupported && bucket.Spec.StorageBackend == "" {
-		log.Info("[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore")
+		log.Info("[WARN] spec.storageBackend cannot be empty for server version below 7.1.0 - default to couchstore", "cluster", cluster.NamespacedName())
 	}
 
 	// cb server version greater or equal to 7.0.0 but less than 7.1.0.
 	// magma is not supported.
 	// default is "couchstore"
 	if storageBackendCouchstoreSupported && !storageBackendMagmaSupported && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackend(couchbaseutil.CouchbaseStorageBackendMagma) {
-		log.Info("[WARN] spec.storageBackend cannot be magma for server version below 7.1.0 - default to couchstore")
+		log.Info("[WARN] spec.storageBackend cannot be magma for server version below 7.1.0 - default to couchstore", "cluster", cluster.NamespacedName())
 	}
 
-	return bucket.GetStorageBackend(cluster)
+	storageBackend, _ := bucket.GetStorageBackend(cluster)
+	return storageBackend
 }

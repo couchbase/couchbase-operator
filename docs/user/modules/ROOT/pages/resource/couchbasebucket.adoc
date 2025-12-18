@@ -681,8 +681,9 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 ==== Description
 
 NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
-Can be either 128 or 1024 for magma buckets.
-This setting can only be adjusted for magma buckets.
+Can be either 128 or 1024 and is only configurable for magma buckets on server versions 8.0.0 and onward.
+If migrating from a couchstore
+to magma bucket, this must be set to 1024.
 
 === couchbasebuckets.spec.onlineEvictionPolicyChange
 
@@ -860,7 +861,8 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselect
 
 StorageBackend to be assigned to and used by the bucket.
 Only valid for Couchbase Server 7.0.0 onward.
-Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
+Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore" for server versions earlier than 8.0.0.
+Defaults to "magma" for server versions 8.0.0 and onward.
 Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 
 === couchbasebuckets.spec.versionPruningWindowHrs

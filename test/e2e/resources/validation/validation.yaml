@@ -588,6 +588,20 @@ spec:
   ephemeralVolume: true
 ---
 apiVersion: couchbase.com/v2
+kind: CouchbaseBackup
+metadata:
+  name: backup3
+spec:
+  strategy: periodic_merge
+  incremental:
+    schedule: "*/15 * * * *"
+  merge:
+    schedule: "*/30 * * * *"
+  failedJobsHistoryLimit: 3
+  logRetention: 2h
+  size: "20Gi"
+---
+apiVersion: couchbase.com/v2
 kind: CouchbaseBackupRestore
 metadata:
   name: restore0

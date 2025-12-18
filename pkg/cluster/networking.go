@@ -189,6 +189,7 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 	}
 
 	if !c.hasDNSCheckDelayElapsed(pod) {
+		log.Info("Delaying external DNS check", "cluster", c.namespacedName(), "pod", pod.Name, "waitUntil", c.getPodDNSCheckExpiry(pod))
 		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Delaying DNS Check")
 	}
 
@@ -491,16 +492,15 @@ func (c *Cluster) hasDNSCheckDelayElapsed(pod *v1.Pod) bool {
 		return true
 	}
 
-	delayDuration := c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration
-	waitUntil := pod.CreationTimestamp.Time.Add(delayDuration)
-
-	if time.Now().After(waitUntil) {
+	if time.Now().After(c.getPodDNSCheckExpiry(pod)) {
 		return true
 	}
 
-	log.Info("Delaying external DNS check", "cluster", c.namespacedName(), "pod", pod.Name, "waitUntil", waitUntil)
-
 	return false
+}
+
+func (c *Cluster) getPodDNSCheckExpiry(pod *v1.Pod) time.Time {
+	return pod.CreationTimestamp.Time.Add(c.cluster.Spec.Networking.WaitForAddressReachableDelay.Duration)
 }
 
 func (c *Cluster) hasDNSCheckTimeoutElapsed(pod *v1.Pod) bool {

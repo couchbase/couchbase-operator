@@ -11,7 +11,7 @@ import (
 // Each version is put into a group based on the versions in this array,
 // Versions are only valid if they are within the same group or to the next group.
 // E.g. Group 1 is version >= 5.0.0 AND < 6.6.0.
-var SupportedUpgradePath = []string{"0.0.0", "5.0.0", "6.6.0", "7.1.0", "7.2.4"}
+var SupportedUpgradePath = []string{"0.0.0", "5.0.0", "6.6.0", "7.2.0", "7.2.4"}
 
 func ValidUpgrade(old, new string) (bool, error) {
 	if isUpgrade, err := VersionAfter(new, old); err != nil {

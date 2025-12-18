@@ -1019,11 +1019,18 @@ func MustRotateClientCertificate(t *testing.T, ctx *TLSContext) {
 
 // MustRotateServerCertificateChain generates a new intermediate CA and server certificate and updates the existing secret.
 func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
+	tenYears := 10 * 365 * 24 * time.Hour
+	MustRotateServerCertificateChainWithExpiration(t, ctx, tenYears, tenYears)
+}
+
+// MustRotateServerCertificateChainWithExpiration generates a new intermediate CA and server certificate with custom expiration dates and updates the existing secret with the new certificate chain.
+func MustRotateServerCertificateChainWithExpiration(t *testing.T, ctx *TLSContext, leafExpiresIn time.Duration, intermediateExpiresIn time.Duration) {
 	validFrom := time.Now().In(time.UTC)
-	validTo := validFrom.AddDate(10, 0, 0)
+	intermediateValidTo := validFrom.Add(intermediateExpiresIn)
+	leafValidTo := validFrom.Add(leafExpiresIn)
 
 	// Create an intermediate CA
-	intermediate, err := ctx.CA.NewIntermediateCertificateAuthority(KeyTypeRSA, intermediateCACN, validFrom, validTo)
+	intermediate, err := ctx.CA.NewIntermediateCertificateAuthority(KeyTypeRSA, intermediateCACN, validFrom, intermediateValidTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1032,7 +1039,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	clusterReq := CreateCertReqDNS(clusterCN, ctx.clusterSANs())
 	clusterReqKeyPair := CreateKeyPairReqData(KeyTypeRSA, KeyEncodingPKCS1, CertTypeServer, clusterReq)
 
-	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, validTo)
+	_, clusterKey, clusterCert, err := clusterReqKeyPair.Generate(intermediate, validFrom, leafValidTo)
 	if err != nil {
 		Die(t, err)
 	}
@@ -1044,7 +1051,7 @@ func MustRotateServerCertificateChain(t *testing.T, ctx *TLSContext) {
 	// Update the existing server secret
 	chain := append(clusterCert, intermediate.Certificate...)
 
-	mustRotateServerSecret(t, ctx, nil, chain, clusterKey)
+	mustRotateServerSecret(t, ctx, ctx.CA.Certificate, chain, clusterKey)
 }
 
 // MustRotateClientCertificateChain generates a new intermediate CA and client certificate and updates the existing secret.

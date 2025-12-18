@@ -202,11 +202,11 @@ func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []erro
 		if currentState, exists := currentStates[key]; exists {
 			// Only validate truly immutable user-configurable fields
 			// Note: ToCluster, Type, ReplicationType are not user-configurable.
-			if currentState.Create.FromBucket != desiredState.Create.FromBucket {
+			if currentState.Create.FromBucket != string(desiredState.Spec.Bucket) {
 				errs = append(errs, util.NewUpdateError("spec.bucket", "body"))
 			}
 
-			if currentState.Create.ToBucket != desiredState.Create.ToBucket {
+			if currentState.Create.ToBucket != string(desiredState.Spec.RemoteBucket) {
 				errs = append(errs, util.NewUpdateError("spec.remoteBucket", "body"))
 			}
 		}

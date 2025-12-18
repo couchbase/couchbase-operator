@@ -8,6 +8,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	"github.com/couchbase/couchbase-operator/test/e2e/util"
 
@@ -750,10 +751,22 @@ func MustGetBackupContainer(t *testing.T, kubernetes *types.Cluster, backup *cou
 }
 
 func MustGetRestoreContainer(t *testing.T, kubernetes *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore) *v1.Container {
-	job, err := kubernetes.KubeClient.BatchV1().Jobs(restore.Namespace).Get(context.Background(), restore.Name, metav1.GetOptions{})
-	if err != nil {
+	var container *v1.Container
+
+	getRestoreContainer := func() error {
+		job, err := kubernetes.KubeClient.BatchV1().Jobs(restore.Namespace).Get(context.Background(), restore.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		container = &job.Spec.Template.Spec.Containers[0]
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(1*time.Minute, getRestoreContainer); err != nil {
 		Die(t, err)
 	}
 
-	return &job.Spec.Template.Spec.Containers[0]
+	return container
 }

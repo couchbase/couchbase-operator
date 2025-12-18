@@ -333,14 +333,14 @@ func getSaveDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.Com
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.validate(args); err != nil {
-				log.Info(err)
+				log.Info(err, "cluster", o.cluster)
 				os.Exit(1)
 			}
 
 			o.prepare()
 
 			if err := o.save(flags); err != nil {
-				log.Info(err)
+				log.Info(err, "cluster", o.cluster)
 				os.Exit(1)
 			}
 		},
@@ -655,7 +655,7 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 	targetPort := k8sutil.AdminServicePort
 
 	if cluster.IsTLSEnabled() {
-		log.V(1).Info("Cluster using TLS, defaulting to https")
+		log.V(1).Info("Cluster using TLS, defaulting to https", "cluster", cluster.NamespacedName())
 
 		scheme = "https"
 		targetPort = k8sutil.AdminServicePortTLS
@@ -1021,14 +1021,14 @@ func getRestoreDataTopologyCommand(flags *genericclioptions.ConfigFlags) *cobra.
 		`),
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := o.validate(args); err != nil {
-				log.Info(err)
+				log.Info(err, "cluster", o.cluster)
 				os.Exit(1)
 			}
 
 			o.prepare()
 
 			if err := o.restore(flags); err != nil {
-				log.Info(err)
+				log.Info(err, "cluster", o.cluster)
 				os.Exit(1)
 			}
 		},
@@ -1085,7 +1085,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	// Grab any existing resources associated with the cluster, we're going
 	// to kill them off for the user.
-	log.V(cli.Debug).Info("Collecting data topology resources...")
+	log.V(cli.Debug).Info("Collecting data topology resources...", "cluster", cluster.NamespacedName())
 
 	resources, err := gatherDataTopologyResources(clients, cluster)
 	if err != nil {
@@ -1099,7 +1099,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Gather all the resources associated with that cluster and create a topology tree.
-	log.V(cli.Debug).Info("Loading current cluster topology...")
+	log.V(cli.Debug).Info("Loading current cluster topology...", "cluster", cluster.NamespacedName())
 
 	currentResources, err := gatherClusterResources(clients, cluster, defaultPath)
 	if err != nil {
@@ -1116,7 +1116,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Load up the save data and create a topology tree.
-	log.V(cli.Debug).Info("Loading requested cluster topology...")
+	log.V(cli.Debug).Info("Loading requested cluster topology...", "cluster", cluster.NamespacedName())
 
 	requestedResources, err := o.loadRestoreObjects()
 	if err != nil {
@@ -1134,7 +1134,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	// Next up, splice the requested tree into the current tree at the chosen
 	// path if required.
-	log.V(cli.Debug).Info("Splicing requested cluster topology...")
+	log.V(cli.Debug).Info("Splicing requested cluster topology...", "cluster", cluster.NamespacedName())
 
 	spliced, err := splice(current, requested, o.path)
 	if err != nil {
@@ -1146,7 +1146,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Finally for phase 1, solve the problem e.g. what's going to happen?
-	log.V(cli.Debug).Info("Merging cluster topology...")
+	log.V(cli.Debug).Info("Merging cluster topology...", "cluster", cluster.NamespacedName())
 
 	merged, err := o.merge(current, spliced)
 	if err != nil {
@@ -1155,13 +1155,13 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	// Report back to the user what's going to happen, and get them to agree,
 	// especially when you're about to delete all your data.
-	log.Info(ansi.Color(ansi.White) + "Data topology solution:" + ansi.Reset())
+	log.Info(ansi.Color(ansi.White)+"Data topology solution:"+ansi.Reset(), "cluster", cluster.NamespacedName())
 	log.Info()
 
 	Dump(merged)
 	log.Info()
 
-	log.Info(ansi.Color(ansi.Yellow) + "WARNING!" + ansi.Reset() + " resources marked as " + ansi.Color(ansi.Red) + "delete" + ansi.Reset() + " may result in data loss.")
+	log.Info(ansi.Color(ansi.Yellow)+"WARNING!"+ansi.Reset()+" resources marked as "+ansi.Color(ansi.Red)+"delete"+ansi.Reset()+" may result in data loss.", "cluster", cluster.NamespacedName())
 	log.Info()
 
 	if err := o.promptOkay(); err != nil {
@@ -1169,7 +1169,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 	}
 
 	// Compact the merged tree to yield the resources we need to create.
-	log.V(cli.Debug).Info("Compacting cluster topology...")
+	log.V(cli.Debug).Info("Compacting cluster topology...", "cluster", cluster.NamespacedName())
 
 	compacted, err := o.compact(merged)
 	if err != nil {
@@ -1182,7 +1182,7 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	// Link the final tree together into a set of resources, and also grab
 	// a label selector for atomically switching trees...
-	log.V(cli.Debug).Info("Linking cluster topology...")
+	log.V(cli.Debug).Info("Linking cluster topology...", "cluster", cluster.NamespacedName())
 
 	l, linked, err := o.link(cluster.Name, compacted)
 	if err != nil {
@@ -1191,17 +1191,17 @@ func (o *restoreOptions) restore(flags *genericclioptions.ConfigFlags) error {
 
 	// Go live!  As we are using a pivot, and that's the last operation, then
 	// we can safely do a rollback but just deleting the new stuff.
-	log.V(cli.Debug).Info("Creating new resources and pivoting root...")
+	log.V(cli.Debug).Info("Creating new resources and pivoting root...", "cluster", cluster.NamespacedName())
 
 	if err := pivotRoot(clients, cluster, l, linked); err != nil {
-		log.V(cli.Debug).Info("Rolling back new resources...")
+		log.V(cli.Debug).Info("Rolling back new resources...", "cluster", cluster.NamespacedName())
 
 		_ = cleanup(clients, linked)
 
 		return err
 	}
 
-	log.V(cli.Debug).Info("Cleaning up old resources...")
+	log.V(cli.Debug).Info("Cleaning up old resources...", "cluster", cluster.NamespacedName())
 
 	return cleanup(clients, resources)
 }

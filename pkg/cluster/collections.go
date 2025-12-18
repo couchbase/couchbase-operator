@@ -96,7 +96,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	current := &couchbaseutil.ScopeList{}
 
 	if !c.bucketExists(bucket.GetCouchbaseName()) {
-		log.Info("Bucket does not yet exist", "bucket", bucket.GetCouchbaseName())
+		log.Info("Bucket does not yet exist", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName())
 		return nil
 	}
 
@@ -248,7 +248,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 		case couchbasev2.ScopeCRDResourceKind:
 			scope, ok := c.k8s.CouchbaseScopes.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find scope resource", "kind", couchbasev2.ScopeCRDResourceKind, "name", resource.Name)
+				log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeCRDResourceKind, "name", resource.Name)
 				break
 			}
 
@@ -266,7 +266,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 			// e.g. you're only dealing with one type.
 			scopeGroup, ok := c.k8s.CouchbaseScopeGroups.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find scope resource", "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
+				log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
 				break
 			}
 
@@ -443,7 +443,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 		err := annotations.Populate(&collection.Spec, collection.Annotations)
 		if err != nil {
-			log.Error(err, "failed to parse collection annotations")
+			log.Error(err, "failed to parse collection annotations", "cluster", c.namespacedName())
 		}
 
 		if current.GetScope(scope.CouchbaseName()).HasCollection(collection.CouchbaseName()) {
@@ -491,7 +491,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			// check if couchbase bucket
 			cbBucket, ok := bucket.(*couchbasev2.CouchbaseBucket)
 
-			bucketStorageBackend := cbBucket.GetStorageBackend(c.cluster)
+			bucketStorageBackend, _ := cbBucket.GetStorageBackend(c.cluster)
 			if ok && cdcEnabled && bucketStorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 				apiCollection.History = collection.Spec.History
 			}
@@ -548,7 +548,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 		case couchbasev2.CollectionCRDResourceKind:
 			collection, ok := c.k8s.CouchbaseCollections.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find collection resource", "kind", couchbasev2.CollectionCRDResourceKind, "name", resource.Name)
+				log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionCRDResourceKind, "name", resource.Name)
 				continue
 			}
 
@@ -562,7 +562,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 			// e.g. you're only dealing with one type.
 			collectionGroup, ok := c.k8s.CouchbaseCollectionGroups.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find collection resource", "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
+				log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
 				continue
 			}
 

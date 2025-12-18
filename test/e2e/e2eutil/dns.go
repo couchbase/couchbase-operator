@@ -88,34 +88,56 @@ func provisionCoreDNS(local, remote *types.Cluster) (*corev1.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Get a remote DNS endpoint.
-	endpoints, err := remote.KubeClient.CoreV1().Endpoints(namespace).Get(context.Background(), service, metav1.GetOptions{})
+
+	// List EndpointSlices for the DNS service using the standard label selector.
+	slices, err := remote.KubeClient.DiscoveryV1().EndpointSlices(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "kubernetes.io/service-name=" + service,
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list endpoint slices for service %s/%s: %w", namespace, service, err)
 	}
 
-	if len(endpoints.Subsets) != 1 {
-		return nil, fmt.Errorf("dns endpoints object contains unexpected number of subsets: %d", len(endpoints.Subsets))
+	if len(slices.Items) == 0 {
+		return nil, fmt.Errorf("no EndpointSlice objects found for DNS service %s/%s", namespace, service)
 	}
 
-	if len(endpoints.Subsets[0].Addresses) == 0 {
-		return nil, fmt.Errorf("dns endpoints object contains no addresses")
-	}
+	// Find first ready endpoint with an address.
+	var address string
+	var dnsPort int32
 
-	remoteAddress := endpoints.Subsets[0].Addresses[0].IP
-	if remoteAddress == "" {
-		return nil, fmt.Errorf("dns endpoint address is empty")
-	}
+	for _, slice := range slices.Items {
+		// Find DNS port from slice ports (typically port 53).
+		for _, p := range slice.Ports {
+			if p.Name != nil && *p.Name == "dns" && p.Port != nil {
+				dnsPort = *p.Port
+				break
+			}
+		}
 
-	// Add the dns port
-	for _, port := range endpoints.Subsets[0].Ports {
-		if port.Name == "dns" {
-			remoteAddress = fmt.Sprintf("%s:%d", remoteAddress, port.Port)
+		// Find a ready endpoint with an address.
+		for _, ep := range slice.Endpoints {
+			if len(ep.Addresses) > 0 {
+				address = ep.Addresses[0]
+				break
+			}
+		}
+
+		if address != "" && dnsPort > 0 {
 			break
 		}
 	}
 
-	// Get the local DNS endpoint.
+	if address == "" {
+		return nil, fmt.Errorf("no ready endpoint addresses found for DNS service %s/%s", namespace, service)
+	}
+
+	if dnsPort == 0 {
+		return nil, fmt.Errorf("no dns port found in EndpointSlices for service %s/%s", namespace, service)
+	}
+
+	remoteAddress := fmt.Sprintf("%s:%d", address, dnsPort)
+
+	// Get the local DNS service cluster IP.
 	localDNSService, err := local.KubeClient.CoreV1().Services(namespace).Get(context.Background(), service, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

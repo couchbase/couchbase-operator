@@ -744,6 +744,17 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev
 	mustWaitForResourceEventFromNow(t, k8s, backup, event, timeout)
 }
 
+// MustObserveBackupEventFrom checks events that occur in the future until the timeout, but also checks for events that occurred from a given time before the method call time.
+// This is useful for backup tests where a (typically incremental) backup is started and finished within 1 second of eachother and therefore might be missed by the default waitForResourceEventFromNow.
+func MustObserveBackupEventFrom(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, event *v1.Event, from, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, backup, event, time.Now().Add(-from), false); err != nil {
+		Die(t, err)
+	}
+}
+
 // waits until the provided condition type with associated status.
 func MustWaitForClusterCondition(t *testing.T, k8s *types.Cluster, conditionType couchbasev2.ClusterConditionType, status v1.ConditionStatus, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, cl, string(conditionType), string(status))); err != nil {
@@ -1038,10 +1049,9 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 			return err
 		}
 
-		// find user in cluster status
-		_, found := couchbasev2.HasItem(user.Name, currCluster.Status.Users)
+		_, found := couchbasev2.HasItem(user.GetUserID(), currCluster.Status.Users)
 		if !found {
-			return fmt.Errorf("waiting for user `%s` to be created", user.Name)
+			return fmt.Errorf("waiting for user `%s` to be created", user.GetUserID())
 		}
 
 		// user must also be in couchbase
@@ -1051,7 +1061,7 @@ func WaitUntilUserExists(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseClu
 		}
 
 		u := &couchbaseutil.User{}
-		return couchbaseutil.GetUser(user.Name, couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
+		return couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host)
 	})
 }
 
@@ -1775,6 +1785,64 @@ func MustWaitForEncryptionKeyDeletion(t *testing.T, k8s *types.Cluster, key *cou
 
 		return fmt.Errorf("encryption key %s still exists", key.Name)
 	}); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitUntilUserHasNoDirectRoles waits until a user has no direct roles (only group-inherited roles).
+func WaitUntilUserHasNoDirectRoles(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		u := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, role := range u.Roles {
+			if role.IsDirectRole() {
+				return fmt.Errorf("user %s still has direct role: %s", user.GetUserID(), role.Role)
+			}
+		}
+
+		return nil
+	})
+}
+
+func MustWaitUntilUserHasNoDirectRoles(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, timeout time.Duration) {
+	if err := WaitUntilUserHasNoDirectRoles(k8s, couchbase, user, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+// WaitUntilUserHasDirectRole waits until a user has a specific direct role.
+func WaitUntilUserHasDirectRole(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		u := &couchbaseutil.User{}
+		if err := couchbaseutil.GetUser(user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), u).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		for _, role := range u.Roles {
+			if role.IsDirectRole() && role.Role == roleName {
+				return nil
+			}
+		}
+
+		return fmt.Errorf("user %s does not have direct role: %s", user.GetUserID(), roleName)
+	})
+}
+
+func MustWaitUntilUserHasDirectRole(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string, timeout time.Duration) {
+	if err := WaitUntilUserHasDirectRole(k8s, couchbase, user, roleName, timeout); err != nil {
 		Die(t, err)
 	}
 }

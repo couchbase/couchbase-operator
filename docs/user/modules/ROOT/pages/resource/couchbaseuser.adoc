@@ -90,8 +90,10 @@ The domain which provides user authentication.
 
 ==== Description
 
-Name of Kubernetes secret to be used as a user's initial password for the Couchbase domain.
-Once a user has been created, any further changes to this field will be ignored.
+Name of the Kubernetes Secret that provides the user's initial password for the Couchbase domain.
+Once the user is created, changes to this field will be ignored.
+The initial password must comply with all password policies defined for Couchbase clusters
+that have RBAC management enabled and for which the user matches the RBAC resource selector.
 
 === couchbaseusers.spec.fullName
 
@@ -111,7 +113,7 @@ Full Name of Couchbase user.
 
 ==== Description
 
-Locked defines whether the user is locked.
+Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
 This field is only available for Couchbase Server 8.0.0+.
 
 === couchbaseusers.spec.name

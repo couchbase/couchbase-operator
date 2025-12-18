@@ -165,6 +165,7 @@ func (c *Cluster) reconcileMigrationCluster() error {
 		(*Cluster).refreshTLSPassphraseResources,
 		(*Cluster).reconcileLogConfig,
 		(*Cluster).reconcileCloudNativeGatewayConfig,
+		(*Cluster).refreshKeyShadowSecret,
 	}
 
 	if err := preCreationReconcilers.run(c); err != nil {
@@ -285,7 +286,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 		ServerRebalanceReasons: status.RebalanceReasons,
 	}
 
-	log.V(1).Info("Node States", "states", status.NodeStates)
+	log.V(1).Info("Node States", "cluster", c.namespacedName(), "states", status.NodeStates)
 
 	for name, nodeState := range status.NodeStates {
 		switch nodeState {

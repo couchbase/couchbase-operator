@@ -225,7 +225,7 @@ func TestCouchstoreBucketToMagmaMigrationUnmanagedBucket(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestCouchstoreBucketToCouchstoreMigrationFromDefault(t *testing.T) {
+func TestMagmaBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)

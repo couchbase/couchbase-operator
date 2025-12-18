@@ -25,7 +25,7 @@ spec:
   cluster:
     dataServiceMemoryQuota: 2048Mi  
 status:
-  currentVersion: 7.6.0
+  currentVersion: 7.5.0
   size: 1
 ---
 apiVersion: couchbase.com/v2

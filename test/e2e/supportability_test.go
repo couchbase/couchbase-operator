@@ -69,6 +69,7 @@ func isIgnroableResource(path string) bool {
 	ignored := []string{
 		"persistentvolume", // global resources provisioned by other tests
 		"node",             // may be dynamic (e.g. cluster auto scaling)
+		"job",              // may be created by platform (e.g. helm install jobs in k3d)
 	}
 
 	for _, i := range ignored {
@@ -655,7 +656,9 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		e2eutil.Die(t, err)
 	}
 
-	endpoints, err := k8s.KubeClient.CoreV1().Endpoints(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	// EndpointSlice collection: Use the same label selector as cao does (ScopeCluster).
+	// EndpointSlices for Couchbase services will have the app=couchbase label.
+	endpointSlices, err := k8s.KubeClient.DiscoveryV1().EndpointSlices(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -685,8 +688,8 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		e2eutil.Die(t, err)
 	}
 
-	for _, endpoint := range endpoints.Items {
-		files = append(files, fmt.Sprintf("%s/namespace/%s/endpoints/%s/%s.yaml", base, namespace, endpoint.Name, endpoint.Name))
+	for _, slice := range endpointSlices.Items {
+		files = append(files, fmt.Sprintf("%s/namespace/%s/endpointslice/%s/%s.yaml", base, namespace, slice.Name, slice.Name))
 	}
 
 	for _, pvc := range pvcs.Items {

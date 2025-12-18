@@ -59,7 +59,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 		if err != nil {
 			// we failed but its not worth stopping. log the error and continue
-			log.Error(err, "failed to populate bucket with annotation")
+			log.Error(err, "failed to populate bucket with annotation", "cluster", cluster.NamespacedName())
 		}
 
 		if !selector.Matches(labels.Set(bucket.Labels)) {
@@ -133,7 +133,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
 			}
 
-			b.NumVBuckets = util.IntPtr(1024)
+			// NumVBuckets can only be changed after 8.0, but is returned for 7.6 as well.
+			b.NumVBuckets = util.IntPtr(bucket.GetNumVBuckets(cluster))
 
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
 		}
@@ -183,6 +184,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			if bucket.Spec.OnlineEvictionPolicyChange {
 				noRestart := true
 				b.NoRestart = &noRestart
+			} else if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
 			}
 
 			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
@@ -191,9 +194,9 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
 				if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
-					log.Info("Encryption key not found for bucket", "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+					log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
 				} else if !key.CanEncryptBucket(bucket.Name) {
-					log.Info("Encryption key cannot encrypt bucket", "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
+					log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
 				} else {
 					b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
 
@@ -204,12 +207,6 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 						b.EncryptionAtRestDekLifetime = util.IntPtr(int(bucket.Spec.EncryptionAtRest.KeyLifetime.Seconds()))
 					}
 				}
-			}
-
-			if bucket.Spec.NumVBuckets != nil {
-				b.NumVBuckets = bucket.Spec.NumVBuckets
-			} else if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
-				b.NumVBuckets = util.IntPtr(constants.DefaultNumVBuckets)
 			}
 		}
 
@@ -236,7 +233,7 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
-func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
@@ -289,6 +286,12 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.Rank = &bucket.Spec.Rank
 		}
 
+		if !bucket.Spec.OnlineEvictionPolicyChange {
+			if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
+			}
+		}
+
 		if supportedCrossClusterVersioning {
 			if bucket.Spec.EnableCrossClusterVersioning != nil {
 				b.EnableCrossClusterVersioning = bucket.Spec.EnableCrossClusterVersioning
@@ -297,10 +300,16 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.EnableCrossClusterVersioning = &defaultCrossClusterVersioning
 			}
 
+			b.NumVBuckets = util.IntPtr(1024)
+
 			b.VersionPruningWindowHrs = notNilOrDefault(bucket.Spec.VersionPruningWindowHrs, constants.VersionPruningWindowHrsDefault)
+
+			b.NumVBuckets = util.IntPtr(1024)
 		}
 
 		if supportedAdditional80Settings {
+			b.NumVBuckets = util.IntPtr(1024)
+
 			apply80Settings(&b, bucket)
 		}
 
@@ -343,6 +352,8 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 		noRestart := true
 		b.NoRestart = &noRestart
 	}
+
+	b.NumVBuckets = util.IntPtr(1024)
 
 	b.DurabilityImpossibleFallback = couchbaseutil.DurabilityImpossibleFallback(bucket.Spec.DurabilityImpossibleFallback)
 }
@@ -449,7 +460,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	}
 
 	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s, encryptionKeys)
-	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s, c.cluster)
 	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
 
 	return allBuckets, nil
@@ -562,8 +573,15 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 				// Ignore memcached buckets if the server version is 8.0.0 or higher.
 				if r.BucketType == constants.BucketTypeMemcached && atLeast80 {
-					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "bucket-name", r.BucketName)
+					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
 					continue
+				}
+
+				// We should never set the numVBuckets field for buckets pre 8.0.0.
+				// This shouldn't get through the dac but we're adding some extra protection.
+				if !atLeast80 {
+					r.NumVBuckets = nil
+					a.NumVBuckets = nil
 				}
 
 				// We have to do this to prevent deepEqual from updating the bucket just because of the NoRestart field.
@@ -575,10 +593,14 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				}
 
 				if a.BucketType != r.BucketType {
-					log.Info("Bucket type cannot be changed so recreating with requested type", "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
+					log.Info("Bucket type cannot be changed so recreating with requested type", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
 					remove = append(remove, a)
 					create = append(create, r)
 				} else if !reflect.DeepEqual(r, a) {
+					if r.BucketStorageBackend != a.BucketStorageBackend && !isStorageBackendExplicitlySet(c, &r) {
+						log.Info("Skipping bucket storage backend change as the backend was not set explicitly.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-backend", a.BucketStorageBackend, "requested-backend", r.BucketStorageBackend)
+						continue
+					}
 					setBucketFieldsForEncoding(&r, isOver71)
 
 					update = append(update, r)
@@ -592,11 +614,17 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 
 		if !found {
-			setBucketFieldsForEncoding(&r, isOver71)
-
 			if !atLeast80 {
+				if r.BucketType == constants.BucketTypeMemcached {
+					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
+					continue
+				}
+
+				// Dac should prevent this from getting through but we're adding some extra protection.
 				r.NumVBuckets = nil
 			}
+
+			setBucketFieldsForEncoding(&r, isOver71)
 
 			create = append(create, r)
 		}
@@ -629,6 +657,18 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	return create, update, remove, requested, nil
 }
 
+func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
+	couchbaseBuckets := c.k8s.CouchbaseBuckets.List()
+	for _, bucket := range couchbaseBuckets {
+		if bucket.GetCouchbaseName() == r.BucketName {
+			_, explicit := bucket.GetStorageBackend(c.cluster)
+			return explicit
+		}
+	}
+
+	return true
+}
+
 // Since, BucketStorageBackend is non-editable, once created for CB version < 7.6.0.
 // This avoids running any update reconcile loop,
 // if BucketStorageBackend seems to be the only one different.
@@ -638,14 +678,14 @@ func matchBackendsIfBefore76(r, a *couchbaseutil.Bucket, cluster *couchbasev2.Co
 		if r.BucketStorageBackend != a.BucketStorageBackend {
 			r.BucketStorageBackend = a.BucketStorageBackend
 
-			log.Info("[WARN] spec.storageBackend cannot be changed for server version below 7.6.0")
+			log.Info("[WARN] spec.storageBackend cannot be changed for server version below 7.6.0", "cluster", cluster.NamespacedName())
 		}
 	}
 }
 
 func doCrossClusterVersioningChecks(r, a *couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster) {
 	if isAtleast762, err := cluster.IsAtLeastVersion("7.6.2"); err != nil {
-		log.Error(err, "Failed to check server version for cross cluster versioning")
+		log.Error(err, "Failed to check server version for cross cluster versioning", "cluster", cluster.NamespacedName())
 		return
 	} else if !isAtleast762 {
 		return
@@ -653,7 +693,7 @@ func doCrossClusterVersioningChecks(r, a *couchbaseutil.Bucket, cluster *couchba
 
 	if a.EnableCrossClusterVersioning != nil && *a.EnableCrossClusterVersioning {
 		if r.EnableCrossClusterVersioning == nil || !*r.EnableCrossClusterVersioning {
-			log.Info("[WARN] spec.enableCrossClusterVersioning cannot be disabled once enabled")
+			log.Info("[WARN] spec.enableCrossClusterVersioning cannot be disabled once enabled", "cluster", cluster.NamespacedName())
 		}
 
 		// For some reason, the API doesn't like us setting this to ever again if it's true.
@@ -776,15 +816,15 @@ func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
 		}
 
 		if ok, reason := c.canBucketBeMigrated(bucket, couchbaseutil.CouchbaseStorageBackend(targetBackend)); !ok {
-			log.Info("[WARN] Cannot migrate bucket as it doesn't meet requirements for backend change.", "bucket-name", bucket.BucketName, "reason", reason, "target-backend", targetBackend)
+			log.Info("[WARN] Cannot migrate bucket as it doesn't meet requirements for backend change.", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName, "reason", reason, "target-backend", targetBackend)
 			continue
 		}
 
-		log.Info("Updating storage backend of unmanaged bucket", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+		log.Info("Updating storage backend of unmanaged bucket", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName, "target-backend", targetBackend)
 
 		bucket.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(targetBackend)
 		if err := couchbaseutil.UpdateBucket(&bucket).On(c.api, c.readyMembers()); err != nil {
-			log.Error(err, "Bucket update failed", "bucket-name", bucket.BucketName, "target-backend", targetBackend)
+			log.Error(err, "Bucket update failed", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName, "target-backend", targetBackend)
 			errs = append(errs, err)
 		}
 	}

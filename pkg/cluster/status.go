@@ -238,7 +238,7 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 		for _, node := range nodes {
 			nodeCurrentVersion, _, found = strings.Cut(node.Version, "-")
 			if !found {
-				log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "node", node.HostName)
+				log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "cluster", c.namespacedName(), "node", node.HostName)
 				continue
 			}
 

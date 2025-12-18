@@ -234,7 +234,7 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 			}
 
 			if len(backup.Status.Repo) == 0 {
-				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", backup.Name)
+				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", "cluster", c.namespacedName(), "backup", backup.Name)
 			} else {
 				incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
 				if err != nil {
@@ -773,6 +773,12 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 		}
 	}
 
+	if resource.mergeCronJob != nil {
+		if err := c.k8s.KubeClient.BatchV1().CronJobs(c.cluster.Namespace).Delete(context.Background(), resource.mergeCronJob.Name, metav1.DeleteOptions{}); err != nil {
+			return err
+		}
+	}
+
 	if resource.immediateBackupJob != nil {
 		propagationPolicy := metav1.DeletePropagationBackground
 		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), resource.immediateBackupJob.Name, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
@@ -1147,8 +1153,15 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		}
 	}
 
+	additionalArgsEnvVar := corev1.EnvVar{
+		Name:      "ADDITIONAL_CBBACKUPMGR_COMMANDS",
+		Value:     "",
+		ValueFrom: nil,
+	}
+
 	if backup.Spec.AdditionalArgs != "" {
-		args = append(args, backup.Spec.AdditionalArgs)
+		additionalArgsEnvVar.Value = backup.Spec.AdditionalArgs
+		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
 	}
 
 	return args

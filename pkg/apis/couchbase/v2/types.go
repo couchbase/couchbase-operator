@@ -1366,12 +1366,14 @@ type CouchbaseBucketSpec struct {
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
 	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
-	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore".
+	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore" for server versions earlier than 8.0.0.
+	// Defaults to "magma" for server versions 8.0.0 and onward.
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
-	// Can be either 128 or 1024 for magma buckets. This setting can only be adjusted for magma buckets.
+	// Can be either 128 or 1024 and is only configurable for magma buckets on server versions 8.0.0 and onward. If migrating from a couchstore
+	// to magma bucket, this must be set to 1024.
 	NumVBuckets *int `json:"numVBuckets,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
@@ -1985,11 +1987,6 @@ type CouchbaseReplicationSpec struct {
 	// "a-z", "A-Z", "0-9" and "-_%\.".
 	RemoteBucket BucketName `json:"remoteBucket"`
 
-	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
-	// When false (default), replication restarts after filter changes. When true, continues without restart.
-	// +kubebuilder:default=false
-	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
-
 	// === PER-REPLICATION MUTABLE SETTINGS (all pointers) ===
 
 	// Per-replication-only settings (cannot be set globally)
@@ -1998,13 +1995,18 @@ type CouchbaseReplicationSpec struct {
 	// Each document that produces a successful match is replicated.
 	FilterExpression *string `json:"filterExpression,omitempty"`
 
+	// FilterSkipRestream controls whether replication restarts after filterExpression changes.
+	// When false (default), replication restarts after filter changes. When true, continues without restart.
+	// Note: Server requires this field when filterExpression is set. If not specified, operator defaults to false.
+	FilterSkipRestream *bool `json:"filterSkipRestream,omitempty"`
+
 	// PauseRequested indicates whether the replication has been issued a pause request.
 	// +kubebuilder:default=false
 	Paused *bool `json:"paused,omitempty"`
 
 	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
 	// Nil values can be used to explicitly unset merge functions for specific collections.
-	MergeFunctionMapping MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
+	MergeFunctionMapping *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
 
 	// Shared settings (can override global defaults)
 
@@ -2036,6 +2038,12 @@ type CouchbaseReplicationSpec struct {
 	FailureRestartInterval *int32 `json:"failureRestartInterval,omitempty"`
 
 	// FilterBinary specifies whether binary documents should be replicated.
+	// The value can be true or false (the default). If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied. If the value is false:
+	// The behavior is identical to that of all Couchbase-Server versions prior to 7.2.1 (with the exception of 7.1.5), where the filterBinary flag did not exist.
+	// If a filter expression is not provided, binary documents are replicated.
+	// If a filter expression is provided, and the expression refers only to either the document's key, or its xattr, or to both, the expression is applied, and the document is replicated if the expression permits.
+	// If a filter expression is provided, and the expression refers only to the document's body, the document is replicated.
+	// If a filter expression is provided, and the expression refers to the document's key, or its xattr, or to both; and also refers to the document's body; the document is not replicated (regardless of whether the key or xattr might appear to permit replication).
 	FilterBinary *bool `json:"filterBinary,omitempty"`
 
 	// FilterBypassExpiry when true, TTL is removed before replication.
@@ -2217,11 +2225,13 @@ type CouchbaseUserSpec struct {
 	// +kubebuilder:validation:Enum=local;external
 	AuthDomain AuthDomain `json:"authDomain"`
 
-	// Name of Kubernetes secret to be used as a user's initial password for the Couchbase domain.
-	// Once a user has been created, any further changes to this field will be ignored.
+	// Name of the Kubernetes Secret that provides the user's initial password for the Couchbase domain.
+	// Once the user is created, changes to this field will be ignored.
+	// The initial password must comply with all password policies defined for Couchbase clusters
+	// that have RBAC management enabled and for which the user matches the RBAC resource selector.
 	AuthSecret string `json:"authSecret,omitempty"`
 
-	// Locked defines whether the user is locked.
+	// Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
 	// This field is only available for Couchbase Server 8.0.0+.
 	Locked *bool `json:"locked,omitempty"`
 
@@ -2293,6 +2303,7 @@ const (
 	RoleSecurityAdminLocal                  RoleName = "security_admin_local"
 	RoleSecurityAdminExternal               RoleName = "security_admin_external"
 	RoleReadOnlyAdmin                       RoleName = "ro_admin"
+	RoleReadOnlySecurityAdmin               RoleName = "ro_security_admin"
 	RoleExternalStatsReader                 RoleName = "external_stats_reader"
 	RoleXDCRAdmin                           RoleName = "replication_admin"
 	RoleQueryCurlAccess                     RoleName = "query_external_access"
@@ -2325,6 +2336,8 @@ const (
 	RoleQueryInsert                         RoleName = "query_insert"
 	RoleQueryDelete                         RoleName = "query_delete"
 	RoleQueryManageIndex                    RoleName = "query_manage_index"
+	RoleQueryListIndex                      RoleName = "query_list_index"
+	RoleQueryManageSystemCatalog            RoleName = "query_manage_system_catalog"
 	RoleSyncGateway                         RoleName = "mobile_sync_gateway"
 	RoleSyncGatewayApplication              RoleName = "sync_gateway_app"
 	RoleSyncGatewayApplicationReadOnly      RoleName = "sync_gateway_app_ro"
@@ -2339,11 +2352,12 @@ const (
 	RoleQueryUseSequentialScans             RoleName = "query_use_sequential_scans"
 	RoleQueryUseSequences                   RoleName = "query_use_sequences"
 	RoleQueryManageSequences                RoleName = "query_manage_sequences"
+	RoleApplicationTelemetryWriter          RoleName = "application_telemetry_writer"
 )
 
 type Role struct {
 	// Name of role.
-	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;eventing_manage_functions;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_manage_sequences;query_select;query_system_catalog;query_update;query_use_sequences;query_use_sequential_scans;replication_admin;replication_target;ro_admin;scope_admin;security_admin;security_admin_external;security_admin_local;sync_gateway_app;sync_gateway_app_ro;sync_gateway_configurator;sync_gateway_dev_ops;sync_gateway_replicator;user_admin_external;user_admin_local;views_admin;views_reader
+	// +kubebuilder:validation:Enum=admin;analytics_admin;analytics_manager;analytics_reader;analytics_select;application_telemetry_writer;backup_admin;bucket_admin;bucket_full_access;cluster_admin;data_backup;data_dcp_reader;data_monitoring;data_reader;data_writer;eventing_admin;eventing_manage_functions;external_stats_reader;fts_admin;fts_searcher;mobile_sync_gateway;query_delete;query_execute_external_functions;query_execute_functions;query_execute_global_external_functions;query_execute_global_functions;query_external_access;query_insert;query_list_index;query_manage_external_functions;query_manage_functions;query_manage_global_external_functions;query_manage_global_functions;query_manage_index;query_manage_sequences;query_manage_system_catalog;query_select;query_system_catalog;query_update;query_use_sequences;query_use_sequential_scans;replication_admin;replication_target;ro_admin;ro_security_admin;scope_admin;security_admin;security_admin_external;security_admin_local;sync_gateway_app;sync_gateway_app_ro;sync_gateway_configurator;sync_gateway_dev_ops;sync_gateway_replicator;user_admin_external;user_admin_local;views_admin;views_reader
 	Name RoleName `json:"name"`
 
 	// Bucket name for bucket admin roles.  When not specified for a role that can be scoped
@@ -2874,6 +2888,7 @@ type ClusterSpec struct {
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.
 	// +listType=set
+	// +kubebuilder:validation:items:Pattern="^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// PerServiceClassPDB determines whether a pod disruption budget (PDB) should be created for each service class.
@@ -3321,6 +3336,7 @@ type CouchbaseClusterSecuritySpec struct {
 	// must be met by all passwords whose definition occurs subsequent to the
 	// establishing of the policy. If this is updated, previously defined passwords continue to be
 	// valid, even if they do not meet the requirements specified in the new policy.
+	// If RBAC is managed, any CouchbaseUser resources which match the RBAC resource selector will be checked against this policy.
 	PasswordPolicy *PasswordPolicySpec `json:"passwordPolicy,omitempty"`
 }
 
@@ -4022,10 +4038,10 @@ type CouchbaseClusterQuerySettings struct {
 	CompletedTrackingThreshold *metav1.Duration `json:"completedTrackingThreshold,omitempty"`
 
 	// CompletedThreshold sets the minimum request duration after which requests are added to the completed
-	// requests catalog. This field must either be a duration up to 2147483648ms, "0", or "-1".
-	// Setting this field to "0" will log all requests. Setting this field to "-1" will disable request logging.
-	// This field defaults to 1ms.
-	// +kubebuilder:default="1ms"
+	// requests catalog. This field accepts a duration string (e.g. "1s", "500ms") which is converted to
+	// milliseconds internally. Valid values are "-1" (disable logging), "0" (log all requests), or a
+	// positive duration. The maximum value is 2147483647ms (approximately 24.8 days). This field defaults to 1s.
+	// +kubebuilder:default="1s"
 	CompletedThreshold *metav1.Duration `json:"completedThreshold,omitempty"`
 
 	// LogLevel controls the verbosity of query logs. This field must be one of
@@ -4556,6 +4572,10 @@ type XDCRGlobalSettings struct {
 	// This field defaults to false.
 	FilterBypassExpiry *bool `json:"filterBypassExpiry,omitempty"`
 
+	// FilterBinary specifies whether binary documents should be replicated.
+	// The value can be true or false (the default). If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied. If the value is false:
+	FilterBinary *bool `json:"filterBinary,omitempty"`
+
 	// FilterBypassUncommittedTxn when true, documents with uncommitted txn xattrs are not replicated.
 	// This field defaults to false.
 	FilterBypassUncommittedTxn *bool `json:"filterBypassUncommittedTxn,omitempty"`
@@ -4635,11 +4655,22 @@ type XDCRGlobalSettings struct {
 	// +kubebuilder:validation:Maximum=10000
 	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
 
+	// ConflictLogging is the configuration for conflict logging.
+	// This feature is available in Couchbase Server 8.0.0 and later.
+	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
+
+	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
+	// Note: Global settings only support bucket-level mappings. Collection-level mappings will cause server errors.
+	// Nil values can be used to explicitly unset merge functions for specific collections.
+	MergeFunctionMapping *MergeFunctionMappingRules `json:"mergeFunctionMapping,omitempty"`
+
 	// Global-only settings (cannot be set per-replication)
 
 	// GoGC is the Go GC target percentage for XDCR processes.
-	// This field can be an integer (0-100) as a string or "off", defaulting to "100".
-	GoGC *string `json:"goGC,omitempty"`
+	// Valid values are integers from 1-100, defaulting to 100.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	GoGC *int32 `json:"goGC,omitempty"`
 
 	// GoMaxProcs is the max threads per node for XDCR.
 	// This field defaults to 4.
@@ -4766,6 +4797,7 @@ type ServerConfig struct {
 	// applied to all server classes, and may be overridden on a per-server class
 	// basis to give more control over scheduling and server groups.
 	// +listType=set
+	// +kubebuilder:validation:items:Pattern="^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$"
 	ServerGroups []string `json:"serverGroups,omitempty"`
 
 	// Pod defines a template used to create pod for each Couchbase server
@@ -5399,9 +5431,8 @@ type LogShipperSidecarSpec struct {
 	// TLS configures mounting kubernetes TLS secrets into the logging sidecar.
 	// The operator will (in a later release) mount each secret under
 	// <mountPath>/<secretName>/ and the files within the secret will retain
-	// their keys as filenames. In 2.9.0 this field is accepted by the CRD but
-	// currently not implemented - usage will be rejected by the admission
-	// controller. Implementation (mounting) is planned for 2.9.1.
+	// their keys as filenames. This field is accepted by the CRD but not currently implemented.
+	// Functionality (mounting) is planned for Operator version 2.9.1.
 	TLS *LogShipperSidecarTLSSpec `json:"tls,omitempty"`
 }
 
@@ -5729,7 +5760,7 @@ type PasswordPolicySpec struct {
 	// This field is only available for Couchbase Server 8.0.0+.
 	RequirePasswordResetOnPolicyChange *bool `json:"requirePasswordResetOnPolicyChange,omitempty"`
 
-	// PolicyChangePasswordResetExemptUsers defines a list of users who will not be required to change
+	// PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
 	// their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
 	// This field is only available for Couchbase Server 8.0.0+.
 	PasswordResetOnPolicyChangeExemptUsers []*string `json:"passwordResetOnPolicyChangeExemptUsers,omitempty"`

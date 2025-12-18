@@ -564,21 +564,23 @@ func (c *CouchbaseCluster) IndexStorageMode() CouchbaseClusterIndexStorageSettin
 
 // GetDefaultBucketStorageBackend gets the default storage backend if it is set,
 // otherwise it returns the default default (I know), Couchstore (for now).
-func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() CouchbaseStorageBackend {
+// It also returns true if the default storage backend was explicitly set on the cluster
+// or false if it is implied by the cluster version.
+func (c *CouchbaseCluster) GetDefaultBucketStorageBackend() (CouchbaseStorageBackend, bool) {
 	if c.Spec.Buckets.DefaultStorageBackend != "" {
-		return c.Spec.Buckets.DefaultStorageBackend
+		return c.Spec.Buckets.DefaultStorageBackend, true
 	}
 
-	after8, err := c.IsAtLeastVersion(constants.MinimumVersionForMagmaDefaultBackend)
+	after8, err := c.RunningVersion(constants.MinimumVersionForMagmaDefaultBackend)
 	if err != nil {
-		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 	}
 
 	if after8 {
-		return CouchbaseStorageBackendMagma
+		return CouchbaseStorageBackendMagma, false
 	}
 
-	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 }
 
 // IsSupportable tells us whether a specific server class is supportable, it must
@@ -898,6 +900,26 @@ func (cs *ClusterStatus) setClusterCondition(c *ClusterCondition) {
 	cs.Conditions = append(cs.Conditions, *c)
 }
 
+func (cs *ClusterStatus) GetBucketVBucketsFromStatus(bucketName string) *int {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return bucket.NumVBuckets
+		}
+	}
+
+	return nil
+}
+
+func (cs *ClusterStatus) GetBucketStorageBackendFromStatus(bucketName string) CouchbaseStorageBackend {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return CouchbaseStorageBackend(bucket.BucketStorageBackend)
+		}
+	}
+
+	return ""
+}
+
 func newClusterCondition(t ClusterConditionType, status v1.ConditionStatus, reason, message string) *ClusterCondition {
 	now := time.Now().Format(time.RFC3339)
 
@@ -922,9 +944,11 @@ var clusterRoles = []RoleName{
 	RoleClusterAdmin,
 	RoleSecurityAdmin,
 	RoleReadOnlyAdmin,
+	RoleReadOnlySecurityAdmin,
 	RoleXDCRAdmin,
 	RoleQueryCurlAccess,
 	RoleQuestySystemAccess,
+	RoleQueryManageSystemCatalog,
 	RoleAnalyticsReader,
 	RoleSecurityAdminExternal,
 	RoleSecurityAdminLocal,
@@ -940,6 +964,7 @@ var clusterRoles = []RoleName{
 	RoleEventingAdmin,
 	RoleEventingManageFunctions,
 	RoleSyncDevOps,
+	RoleApplicationTelemetryWriter,
 }
 
 // bucketRoles can be bucket scoped.
@@ -1012,6 +1037,7 @@ var collectionRoles = []RoleName{
 	RoleQueryInsert,
 	RoleQueryDelete,
 	RoleQueryManageIndex,
+	RoleQueryListIndex,
 	RoleSearchReader,
 	RoleAnalyticsSelect,
 	RoleSyncGatewayApplication,
@@ -1288,47 +1314,63 @@ func (b *CouchbaseBucket) AddScopeResource(resource ScopeLocalObjectReference) {
 	b.Spec.Scopes.Resources = append(b.Spec.Scopes.Resources, resource)
 }
 
-func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) CouchbaseStorageBackend {
-	// If there is no cluster then we can't check if cluster version supports the backend,
-	// or get the cluster default so we trust the bucket and get the default default
-	if cluster == nil {
-		return b.getStorageBackend()
+// GetStorageBackend returns the bucket’s storage backend and true if it was explicitly set on the bucket or via the cluster defaultStorageBackend annotation,
+// false if it was implicit.
+// We should only ever migrate bucket storage backends if the backend is declared explicitly.
+func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) (CouchbaseStorageBackend, bool) {
+	// If there is no cluster or we get an error when checking the cluster version,
+	// we'll fallback to the value set in the spec, or finally the default.
+	fallback := func() (CouchbaseStorageBackend, bool) {
+		if b.Spec.StorageBackend != "" {
+			return b.Spec.StorageBackend, true
+		}
+
+		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend), false
 	}
 
-	magmaSupported, err := cluster.IsAtLeastVersion("7.1.0")
+	if cluster == nil {
+		return fallback()
+	}
 
+	magmaSupported, err := cluster.RunningVersion("7.1.0")
 	if err != nil {
-		// we couldn't parse the cluster version so we'll trust the bucket/get default default
 		log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
-		return b.getStorageBackend()
+		return fallback()
 	}
 
 	if !magmaSupported || b.IsSampleBucket() {
-		return CouchbaseStorageBackendCouchstore
+		return CouchbaseStorageBackendCouchstore, false
 	}
 
-	if b.Spec.StorageBackend == "" {
-		return cluster.GetDefaultBucketStorageBackend()
+	if b.Spec.StorageBackend != "" {
+		return b.Spec.StorageBackend, true
 	}
 
-	return b.Spec.StorageBackend
-}
-
-func (b *CouchbaseBucket) getStorageBackend() CouchbaseStorageBackend {
-	if b.Spec.StorageBackend == "" {
-		return CouchbaseStorageBackend(constants.DefaultBucketStorageBackend)
+	defaultBackend, explicit := cluster.GetDefaultBucketStorageBackend()
+	if explicit {
+		return defaultBackend, explicit
 	}
 
-	return b.Spec.StorageBackend
+	backend := cluster.Status.GetBucketStorageBackendFromStatus(b.GetCouchbaseName())
+	if backend != "" {
+		return backend, false
+	}
+
+	return defaultBackend, false
 }
 
 func (b *CouchbaseBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+// NamespacedName returns a canonical and unique bucket name for logging.
+func (b *CouchbaseBucket) NamespacedName() string {
+	return types.NamespacedName{Namespace: b.Namespace, Name: b.Name}.String()
+}
+
 func (b *CouchbaseBucket) HasCrossClusterVersioningEnabled() bool {
 	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
-		log.Error(err, "failed to populate annotations")
+		log.Error(err, "failed to populate annotations", "bucket", b.NamespacedName())
 	}
 
 	if b.Spec.EnableCrossClusterVersioning == nil {
@@ -1336,6 +1378,28 @@ func (b *CouchbaseBucket) HasCrossClusterVersioningEnabled() bool {
 	}
 
 	return *b.Spec.EnableCrossClusterVersioning
+}
+
+// getVBuckets returns the number of vBuckets. The bucket spec field takes precedence,
+// but if not set, we'll check the cluster status or finally then make an assumption based on cluster version/default storage backend.
+func (b *CouchbaseBucket) GetNumVBuckets(cluster *CouchbaseCluster) int {
+	if b.Spec.NumVBuckets != nil {
+		return *b.Spec.NumVBuckets
+	}
+
+	if vbuckets := cluster.Status.GetBucketVBucketsFromStatus(b.GetCouchbaseName()); vbuckets != nil {
+		return *vbuckets
+	}
+
+	if backend, _ := b.GetStorageBackend(cluster); backend == CouchbaseStorageBackendCouchstore {
+		return constants.DefaultNumVBucketsCouchstore
+	}
+
+	if after80, err := cluster.RunningVersion("8.0.0"); err == nil && after80 {
+		return constants.DefaultNumVBucketsMagma
+	}
+
+	return constants.DefaultNumVBucketsCouchstore
 }
 
 func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
@@ -1376,9 +1440,14 @@ func (b *CouchbaseEphemeralBucket) IsSampleBucket() bool {
 	return b.Spec.SampleBucket
 }
 
+// NamespacedName returns a canonical and unique bucket name for logging.
+func (b *CouchbaseEphemeralBucket) NamespacedName() string {
+	return types.NamespacedName{Namespace: b.Namespace, Name: b.Name}.String()
+}
+
 func (b *CouchbaseEphemeralBucket) HasCrossClusterVersioningEnabled() bool {
 	if err := annotations.Populate(&b.Spec, b.Annotations); err != nil {
-		log.Error(err, "failed to populate annotations")
+		log.Error(err, "failed to populate annotations", "bucket", b.NamespacedName())
 	}
 
 	if b.Spec.EnableCrossClusterVersioning == nil {
@@ -1810,4 +1879,22 @@ func (c *CouchbaseCluster) IsEncryptionAtRestManaged() bool {
 	}
 
 	return c.Spec.Security.EncryptionAtRest != nil && c.Spec.Security.EncryptionAtRest.Managed
+}
+
+func (u *CouchbaseUser) GetUserID() string {
+	if u.Spec.Name != "" {
+		return u.Spec.Name
+	}
+
+	return u.GetName()
+}
+
+// ClusterRunningVersion checks if the cluster is running on or above a given version. It checks the cluster status first, and if not set, it checks the cluster spec version.
+// This should be used to check for version compatibility with currently incompatible changes.
+func (c *CouchbaseCluster) RunningVersion(tag string) (bool, error) {
+	if c.Status.CurrentVersion != "" {
+		return couchbaseutil.VersionAfter(c.Status.CurrentVersion, tag)
+	}
+
+	return c.IsAtLeastVersion(tag)
 }

@@ -49,11 +49,15 @@ func checkFieldsCouchbaseCluster(cluster couchbasev2.CouchbaseCluster) []string 
 		warnings = append(warnings, "CouchbaseCluster spec.security.passwordPolicy.minLength is set to 0. This is highly insecure and should not be used for production clusters.")
 	}
 
+	if checkCRDFieldsNotYetImplemented(cluster) {
+		warnings = append(warnings, "CouchbaseCluster spec.logging.server.sidecar.tls is not implemented in this operator version.")
+	}
+
 	return warnings
 }
 
 func checkAutoCompactionDefaults(autoCompaction *couchbasev2.AutoCompaction) bool {
-	return autoCompaction != nil && *autoCompaction.DatabaseFragmentationThreshold.Percent == 30 && *autoCompaction.ViewFragmentationThreshold.Percent == 30 && autoCompaction.DatabaseFragmentationThreshold.Size == nil && autoCompaction.ViewFragmentationThreshold.Size == nil && *autoCompaction.TombstonePurgeInterval == metav1.Duration{Duration: 72 * time.Hour}
+	return autoCompaction != nil && *autoCompaction.DatabaseFragmentationThreshold.Percent == 30 && *autoCompaction.ViewFragmentationThreshold.Percent == 30 && autoCompaction.DatabaseFragmentationThreshold.Size == nil && autoCompaction.ViewFragmentationThreshold.Size == nil && *autoCompaction.TombstonePurgeInterval == metav1.Duration{Duration: 72 * time.Hour} && autoCompaction.MagmaFragmentationThresholdPercentage == nil
 }
 
 func checkAutoFailoverDefaults(clusterSettings couchbasev2.ClusterConfig) bool {
@@ -81,9 +85,17 @@ func checkFieldsCouchbaseBucket(bucket couchbasev2.CouchbaseBucket) []string {
 		warnings = append(warnings, "CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled. This is intended for development and should not be used for production clusters. While enabled, the bucket will not be updated to match the CRD specification.")
 	}
 
+	if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma && bucket.Spec.EvictionPolicy == couchbasev2.CouchbaseBucketEvictionPolicyValueOnly {
+		warnings = append(warnings, "CouchbaseBucket spec.evictionPolicy is set to valueOnly for magma storage backend. This is discouraged for production deployments and fullEviction is recommended.")
+	}
+
 	return warnings
 }
 
 func checkPasswordPolicyZeroLength(passwordPolicy *couchbasev2.PasswordPolicySpec) bool {
 	return passwordPolicy != nil && passwordPolicy.MinLength != nil && *passwordPolicy.MinLength == 0
+}
+
+func checkCRDFieldsNotYetImplemented(cluster couchbasev2.CouchbaseCluster) bool {
+	return cluster.Spec.Logging.Server != nil && cluster.Spec.Logging.Server.Sidecar != nil && cluster.Spec.Logging.Server.Sidecar.TLS != nil
 }

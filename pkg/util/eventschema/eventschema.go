@@ -131,11 +131,11 @@ func (e Event) Validate(c *Validator) error {
 	}
 
 	if e.Message != "" && e.Message != c.Events[c.index].Message {
-		return fmt.Errorf("%w: expected %s, got %s", ErrMessageMismatch, e.Reason, c.Events[c.index].Reason)
+		return fmt.Errorf("%w: expected %s, got %s", ErrMessageMismatch, e.Message, c.Events[c.index].Message)
 	}
 
 	if e.FuzzyMessage != "" && !regexp.MustCompile(e.FuzzyMessage).MatchString(c.Events[c.index].Message) {
-		return fmt.Errorf("%w: expected %s, got %s", ErrFuzzyMessageMismatch, e.Reason, c.Events[c.index].Reason)
+		return fmt.Errorf("%w: expected %s, got %s", ErrFuzzyMessageMismatch, e.FuzzyMessage, c.Events[c.index].Message)
 	}
 
 	c.index++

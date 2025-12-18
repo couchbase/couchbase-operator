@@ -844,3 +844,62 @@ func TestServiceChangedOnNode(t *testing.T) {
 
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionServicesMismatch)
 }
+
+func TestScaleDownPrioritizesServiceMumatchedNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	clusterSize := constants.Size2 * 2 // MixedTopology = 2 service classes. Therefore we have a 4 node cluster.
+	cluster := clusterOptions().WithMixedEphemeralTopology(constants.Size2).MustCreate(t, kubernetes)
+
+	// We'll kill the final member to create a service mismatch.
+	victimID := 3
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", true), time.Minute)
+
+	e2eutil.MustChangeServicesOnNode(t, kubernetes, cluster, victimName, couchbaseutil.SearchService)
+
+	// No option but to wait here for a second while server does its thing...
+	time.Sleep(30 * time.Second)
+
+	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", false), time.Minute)
+
+	// Once the services are mismatched, we will kill the rebalance that's adding/removing the mismatched node.
+	// On the next loop, we should expect the mismatched node to be removed.
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.ServicesMismatchEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
+	e2eutil.MustFailRebalance(t, kubernetes, cluster, time.Minute)
+
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionServicesMismatch)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Services mismatch event
+	// * New member added to the cluster to replace the mismatched node
+	// * Rebalance started by handleServerServices()
+	// * Rebalance killed by the test
+	// * Reconcile failed due to the incomplete rebalance
+	// - We then enter a new reconcile loop, but won't handleServerServices() as the rebalancing condition still exists
+	// * Rebalance started by handleRemoveNode() method as we're in a scale down operation
+	// * Mismatched services node removed in scale down operation as the cluster size is 1 greater than expected because we added a new member to the cluster to replace the mismatched node
+	// * Rebalance completed
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonServicesMismatch},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

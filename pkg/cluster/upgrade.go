@@ -92,7 +92,7 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
 	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "failed to get cluster info")
+		log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
 	} else {
 		orchestratorName := clusterInfo.Orchestrator
 		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
@@ -136,7 +136,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 		// The pod is likely down, so just skip it
 		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name())
 		if err != nil {
-			log.Error(err, "failed to get server group for candidate", "candidate", candidate.Name())
+			log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
 			continue
 		}
 
@@ -221,7 +221,23 @@ func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
 	numToUpgrade := numOldPods
 
 	if c.cluster.Spec.Upgrade != nil {
-		numToUpgrade = numOldPods - c.cluster.Spec.Upgrade.PreviousVersionPodCount
+		// Check if this is a rollback (target version == baseline version)
+		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+		if err != nil {
+			return nil, err
+		}
+		baselineVersion, err := c.state.Get(persistence.Version)
+		if err != nil {
+			return nil, err
+		}
+		isRollback := targetVersion == baselineVersion
+
+		// Only apply PreviousVersionPodCount for forward upgrades, not rollbacks
+		if !isRollback {
+			// Ensure we don't go negative - at minimum, we should upgrade 0 pods
+			numToUpgrade = max(numOldPods-c.cluster.Spec.Upgrade.PreviousVersionPodCount, 0)
+		}
+		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
 	}
 
 	filteredCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates, numToUpgrade)
@@ -339,21 +355,17 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		requestedSpec.Containers = removeMetricsContainer(requestedSpec.Containers)
 		actualSpec.Containers = removeMetricsContainer(actualSpec.Containers)
 
+		// Ignore key shadow secret volume mount if it is not needed. But if it already exists there's no point in removing it so we do this before the comparison.
+		if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
+			return nil, err
+		} else if !keyShadowSecretNeeded {
+			removeKeyShadowSecretVolumeMount(requestedSpec)
+			removeKeyShadowSecretVolumeMount(actualSpec)
+		}
+
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
 
 		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
-
-		if is80, err := couchbaseutil.VersionAfter(member.Version(), "8.0.0"); err != nil {
-			return nil, err
-		} else if is80 {
-			// Ignore key shadow secret volume mount if it is not NEEDED
-			if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
-				return nil, err
-			} else if !keyShadowSecretNeeded {
-				removeKeyShadowSecretVolumeMount(requestedSpec)
-				removeKeyShadowSecretVolumeMount(actualSpec)
-			}
-		}
 
 		// Nothing to do, carry on...
 		if podsEqual && pvcsEqual {
@@ -405,6 +417,21 @@ func removeKeyShadowSecretVolumeMount(podSpec *v1.PodSpec) {
 	}
 
 	container.VolumeMounts = filterMounts(container.VolumeMounts)
+
+	// Also remove the volume itself from podSpec.Volumes
+	filterVolumes := func(initialVolumes []v1.Volume) []v1.Volume {
+		volumes := []v1.Volume{}
+
+		for _, v := range initialVolumes {
+			if v.Name != constants.CouchbaseKeyShadowVolumeName {
+				volumes = append(volumes, v)
+			}
+		}
+
+		return volumes
+	}
+
+	podSpec.Volumes = filterVolumes(podSpec.Volumes)
 }
 
 func ignoreMigratedHostnameAlias(actual *v1.Pod, requested *v1.PodSpec) {
@@ -471,9 +498,19 @@ func (c *Cluster) reportMixedMode() error {
 // If there was an unpgrade condition and the cluster no longer needs an upgrade clear
 // the condition and raise any necessary events.
 func (c *Cluster) reportUpgradeComplete() error {
-	if upgrading, err := c.isUpgrading(); err != nil || !upgrading {
-		// There is no condition, we weren't upgrading, do nothing
+	upgrading, err := c.isUpgrading()
+	if err != nil {
 		return err
+	}
+
+	// If we're not upgrading, let's ensure the version is set to the lowest member version.
+	if !upgrading {
+		lowestImageVer := c.GetLowestMemberVersion()
+		if lowestImageVer == "" {
+			return nil
+		}
+
+		return c.state.Update(persistence.Version, lowestImageVer)
 	}
 
 	// Check to see if there are any more upgrade candidates.

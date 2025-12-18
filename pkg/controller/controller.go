@@ -157,7 +157,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	if warnings != nil {
-		log.V(1).Info("Validation warnings.", "warnings", warnings)
+		log.V(1).Info("Validation warnings.", "cluster", request.NamespacedName, "warnings", warnings)
 	}
 
 	// See if we know about the cluster already.
@@ -207,6 +207,8 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 		return requeueResult, nil
 	}
+
+	c.ReconcileMirWatchdogContext()
 
 	if err := validationrunner.CheckClusterChangeConstraints(c.GetCouchbaseCluster(), couchbase); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())

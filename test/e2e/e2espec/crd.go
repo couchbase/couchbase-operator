@@ -403,7 +403,7 @@ func GenerateValidBucketSettings(bucketTypes []string) []metav1.Object {
 				true,
 			}
 			enableIndexReplicas := []bool{
-				true,
+				false,
 			}
 
 			for _, bucketMemoryQuota := range bucketMemoryQuotas {

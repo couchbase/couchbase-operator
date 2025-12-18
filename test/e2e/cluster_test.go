@@ -202,6 +202,22 @@ func TestIndexerSettings(t *testing.T) {
 
 	preIndexServicePatchCycles := 1
 
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// We'll enable the page bloom filter before we add the index service, as cb server seems to change it to true when an index service is started when the storage mode is plasma.
+	// This avoids some test flakiness where the operator changes it to false and then true again, adding	 patch cycles.
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		v := true
+
+		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", v), time.Minute)
+		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnablePageBloomFilter", &v), time.Minute)
+
+		// We add two updates here, as once an index service is added with plasma storage mode, this defaults to true initially, but the operator defaults will automatically set it to false.
+		preIndexServicePatchCycles++
+	}
+
 	// Let's add the index service into the cluster for our other tests.
 	indexService := couchbasev2.ServerConfig{
 		Size:     constants.Size2,
@@ -232,19 +248,6 @@ func TestIndexerSettings(t *testing.T) {
 	e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/RedistributeIndexes", false), time.Minute)
 
 	postIndexServicePatchCycles := 8
-
-	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
-
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
-		e2eutil.Die(t, err)
-	} else if ok {
-		v := true
-
-		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/indexer/enablePageBloomFilter", v), time.Minute)
-		e2eutil.MustPatchIndexSettingInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/EnablePageBloomFilter", &v), time.Minute)
-
-		postIndexServicePatchCycles++
-	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)

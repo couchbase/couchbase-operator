@@ -89,10 +89,12 @@ const (
 	ClusterAdminRole                        = "cluster_admin"
 	RoleFullAdmin                           = "admin"
 	RoleReadOnlyAdmin                       = "ro_admin"
+	RoleReadOnlySecurityAdmin               = "ro_security_admin"
 	RoleSecurityAdmin                       = "security_admin"
 	RoleXDCRAdmin                           = "replication_admin"
 	RoleQueryCurlAccess                     = "query_external_access"
 	RoleQuestySystemAccess                  = "query_system_catalog"
+	RoleQueryManageSystemCatalog            = "query_manage_system_catalog"
 	RoleAnalyticsReader                     = "analytics_reader"
 	RoleBackupAdmin                         = "backup_admin"
 	RoleQueryManageGlobalFunctions          = "query_manage_global_functions"
@@ -104,6 +106,7 @@ const (
 	RoleEventingAdmin                       = "eventing_admin"
 	RoleUserAdminExternal                   = "user_admin_external"
 	RoleUserAdminLocal                      = "user_admin_local"
+	RoleApplicationTelemetryWriter          = "application_telemetry_writer"
 
 	// Deprecated: These roles are removed in Morpheus (8.0+).
 	RoleSecurityAdminExternal = "security_admin_external"

@@ -1,9 +1,11 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -15,6 +17,37 @@ import (
 
 type mirWatchdog struct {
 	cluster *Cluster
+	ctx     context.Context
+}
+
+// MirWatchdogContext is a context for the MIR watchdog goroutine.
+type MirWatchdogContext struct {
+	mu     sync.Mutex
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+func StartMirWatchdog(cluster *Cluster, interval time.Duration) *MirWatchdogContext {
+	mwc := MirWatchdogContext{}
+	mwc.ctx, mwc.cancel = context.WithCancel(context.Background())
+	go newMirWatchdog(cluster, mwc.ctx).run(mwc.ctx, interval)
+	return &mwc
+}
+
+func (mwc *MirWatchdogContext) isRunning() bool {
+	mwc.mu.Lock()
+	defer mwc.mu.Unlock()
+	return mwc.ctx != nil && mwc.cancel != nil
+}
+
+func (mwc *MirWatchdogContext) Stop() {
+	mwc.mu.Lock()
+	defer mwc.mu.Unlock()
+	if mwc.cancel != nil {
+		mwc.cancel()
+	}
+	mwc.ctx = nil
+	mwc.cancel = nil
 }
 
 type ManualInterventionRequired string
@@ -37,9 +70,10 @@ func (mirl *ManualInterventionRequiredList) clusterConditionMessage() string {
 	return strings.Join(reasons, "\n")
 }
 
-func newMirWatchdog(cluster *Cluster) *mirWatchdog {
+func newMirWatchdog(cluster *Cluster, ctx context.Context) *mirWatchdog {
 	return &mirWatchdog{
 		cluster: cluster,
+		ctx:     ctx,
 	}
 }
 
@@ -49,12 +83,13 @@ func newMirWatchdog(cluster *Cluster) *mirWatchdog {
 // raise a separate event for each of the reasons and set the cluster_manual_intervention metric to 1.
 // When manual intervention is no longer required, this will clear the condition,
 // raise a ManualInterventionResolved event and set the cluster_manual_intervention metric to 0.
-func (w *mirWatchdog) run(interval time.Duration) {
-	log.Info("Manual intervention required checks starting", "cluster", w.cluster.namespacedName())
+func (w *mirWatchdog) run(ctx context.Context, interval time.Duration) {
+	log.Info("Manual intervention required checks started", "cluster", w.cluster.namespacedName())
 
 	for {
 		select {
-		case <-w.cluster.ctx.Done():
+		case <-ctx.Done():
+			log.Info("Manual intervention required checks stopped", "cluster", w.cluster.namespacedName())
 			return
 		case <-time.After(interval):
 			w.checkCluster()
@@ -63,6 +98,14 @@ func (w *mirWatchdog) run(interval time.Duration) {
 }
 
 func (w *mirWatchdog) checkCluster() {
+	// Check if the context is cancelled before proceeding to avoid race conditions
+	// where the watchdog modifies conditions/raises events after being told to stop.
+	select {
+	case <-w.ctx.Done():
+		return
+	default:
+	}
+
 	// List of checks that should be ran on a predetermined interval to alert the user if manual intervention is required.
 	// There should be clear lines on how to get and how to get out of each possible MIR state. Checks should be reluctant
 	// to enter MIR states, and aggressive to exit them.
@@ -162,7 +205,7 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 	if inMirStateForReason(existingCondition, MIRRebalanceRetriesExhausted) {
 		status, err := w.cluster.GetStatus()
 		if err != nil {
-			return nil
+			return mir(MIRRebalanceRetriesExhausted)
 		}
 
 		if status.Balanced && areAllNodesActive(status.NodeStates) {
@@ -174,7 +217,14 @@ func (w *mirWatchdog) checkForConsecutiveRebalanceFailures(existingCondition *co
 
 	// Entry
 	if w.cluster.cluster.Status.GetRebalanceAttempts() >= 3 {
-		return mir(MIRRebalanceRetriesExhausted)
+		status, err := w.cluster.GetStatus()
+		if err != nil {
+			return nil
+		}
+
+		if !status.Balanced || !areAllNodesActive(status.NodeStates) {
+			return mir(MIRRebalanceRetriesExhausted)
+		}
 	}
 
 	return nil

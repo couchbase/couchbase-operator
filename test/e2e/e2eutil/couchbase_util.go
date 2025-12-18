@@ -35,6 +35,16 @@ type CouchbaseClient struct {
 	host   string
 }
 
+// Client returns the underlying couchbaseutil.Client.
+func (c *CouchbaseClient) Client() *couchbaseutil.Client {
+	return c.client
+}
+
+// Host returns the host URL for the cluster.
+func (c *CouchbaseClient) Host() string {
+	return c.host
+}
+
 // newClient returns a new Couchbase management client (internal not go SDK).
 func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, host string) (*CouchbaseClient, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
@@ -750,6 +760,14 @@ func MustPatchQuerySettings(t *testing.T, k8s *types.Cluster, couchbase *couchba
 	}
 }
 
+func MustPatchXDCRGlobalSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
+	xdcrGlobalSettingsFetcher := getClusterFetcher(couchbaseutil.GetXDCRGlobalSettings)
+
+	if err := PatchCluster(k8s, couchbase, patches, timeout, xdcrGlobalSettingsFetcher); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustPatchEncryptionAtRestSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet, timeout time.Duration) {
 	encryptionAtRestSettingsFetcher := getClusterFetcher(couchbaseutil.GetEncryptionAtRestSettings)
 
@@ -1267,7 +1285,7 @@ func MustCreateBucket(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 }
 
 // PatchUserInfo tries patching the user returned directly from Couchbase server.
-func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
+func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		client, err := CreateAdminConsoleClient(k8s, couchbase)
 		if err != nil {
@@ -1275,12 +1293,12 @@ func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 		}
 
 		actual := &couchbaseutil.User{}
-		if err := couchbaseutil.GetUser(userName, userAuthDomain, actual).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.GetUser(userID, userAuthDomain, actual).On(client.client, client.host); err != nil {
 			return err
 		}
 
 		expected := &couchbaseutil.User{}
-		if err := couchbaseutil.GetUser(userName, userAuthDomain, expected).On(client.client, client.host); err != nil {
+		if err := couchbaseutil.GetUser(userID, userAuthDomain, expected).On(client.client, client.host); err != nil {
 			return err
 		}
 
@@ -1297,8 +1315,8 @@ func PatchUserInfo(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, 
 	})
 }
 
-func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userName string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
-	if err := PatchUserInfo(k8s, couchbase, userName, userAuthDomain, patches, timeout); err != nil {
+func MustPatchUserInfo(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, userAuthDomain couchbaseutil.AuthDomain, patches jsonpatch.PatchSet, timeout time.Duration) {
+	if err := PatchUserInfo(k8s, couchbase, userID, userAuthDomain, patches, timeout); err != nil {
 		Die(t, err)
 	}
 }
@@ -1540,6 +1558,22 @@ func MustGetCouchbaseVersion(t *testing.T, image string, overrideVersion string)
 	}
 
 	return version
+}
+
+// IsUpgradeOverVersion checks if an upgrade will occur over a specific version. I.e. if startVersion < thresholdVersion < endVersion.
+// This is useful for tests that might need to add additional expected events when upgrading over a major version like 8.0.
+func MustCheckIfUpgradeOverVersion(t *testing.T, initialVersion, upgradeVersion, thresholdVersion string) bool {
+	before, err := couchbaseutil.VersionBefore(initialVersion, thresholdVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	after, err := couchbaseutil.VersionAfter(upgradeVersion, thresholdVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return before && after
 }
 
 func MustVerifyDataServerSettingsMemcachedTCPSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tcpUserTimeout, tcpKeepAliveProbes, tcpKeepAliveInterval, tcpKeepAliveIdle int, timeout time.Duration) {
@@ -1921,6 +1955,35 @@ func MustDeleteUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 		if err := couchbaseutil.DeleteUser(user).On(client.client, client.host); err != nil {
 			Die(t, err)
 		}
+	}
+}
+
+// AddDirectUserRole adds a direct role to a Couchbase user via the admin API.
+func AddDirectUserRole(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, userID string, authDomain couchbaseutil.AuthDomain, roleName string) error {
+	client, err := CreateAdminConsoleClient(k8s, couchbase)
+	if err != nil {
+		return err
+	}
+
+	u := &couchbaseutil.User{}
+	if err := couchbaseutil.GetUser(userID, authDomain, u).On(client.client, client.host); err != nil {
+		return err
+	}
+
+	u.Roles = append(u.Roles, couchbaseutil.UserRole{
+		Role: roleName,
+	})
+	// Do not change password when updating roles via admin API.
+	u.Password = ""
+
+	return couchbaseutil.CreateUser(u).On(client.client, client.host)
+}
+
+// MustAddDirectUserRole is a test helper that adds a direct role to a Couchbase user and
+// fails the test on error.
+func MustAddDirectUserRole(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser, roleName string) {
+	if err := AddDirectUserRole(k8s, couchbase, user.GetUserID(), couchbaseutil.AuthDomain(user.Spec.AuthDomain), roleName); err != nil {
+		Die(t, err)
 	}
 }
 

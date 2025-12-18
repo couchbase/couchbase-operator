@@ -134,6 +134,9 @@ func registerTests() {
 		framework.NewTestDef(TestValidationEncryptionKeyCreate).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureEAR),
 		framework.NewTestDef(TestValidationEncryptionAtRest).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestDeleteInUseEncryptionKey).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestUserPasswordPolicyValidation).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketStorageBackendValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketStorageBackendValidationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -256,6 +259,7 @@ func registerTests() {
 		framework.NewTestDef(TestTLSScriptCreateRestRotate).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestBareHostnameValidation).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestServiceChangedOnNode).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestScaleDownPrioritizesServiceMumatchedNodes).WithTags(TagSuiteP0),
 
 		framework.NewTestDef(TestXDCRCreateClusterLocal).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterLocalTLS).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS, TagFeatureXDCR),
@@ -319,6 +323,7 @@ func registerTests() {
 		framework.NewTestDef(TestServerGroupDefaultOrderUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestNodeUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestNodeUpgradeDefaultOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestUpgradePrevent3Versions).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
@@ -459,7 +464,8 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRCreateClusterLocalMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestMandatoryMutualTLSRotateClientExpiring).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSRotateCAExpiring).WithTags(TagSuiteP1, TagFeatureTLS),
-		framework.NewTestDef(TestTLSRotateCAExpiring).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSRotateLeafCertExpiring).WithTags(TagSuiteP1, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSRotateIntermediateCertExpiring).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKI).WithTags(TagSuiteP1, TagFeatureTLS, TagSuitePlatform),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateServerPKIWithOperatorDown).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKI).WithTags(TagSuiteP1, TagFeatureTLS, TagSuitePlatform),
@@ -656,7 +662,7 @@ func registerTests() {
 		framework.NewTestDef(TestMagmaBucketToCouchstoreMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestMultipleCouchstoreBucketsToMagmaMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
-		framework.NewTestDef(TestCouchstoreBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestMagmaBucketToCouchstoreMigrationFromDefault).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketToMagmaUpdateUnmanagedBucket).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationWithMultiMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestEvictionPolicyOnlineChange).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
@@ -692,6 +698,7 @@ func registerTests() {
 		framework.NewTestDef(TestRBACWithBucketSelector).WithTags(TagSuiteP1, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACUpdateUser).WithTags(TagSuiteP1, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACUserPasswordSpec).WithTags(TagSuiteP1, TagFeatureRBAC),
+		framework.NewTestDef(TestRBACReconcileDirectRoles).WithTags(TagSuiteP1, TagFeatureRBAC),
 		// end RBAC
 
 		framework.NewTestDef(TestFailedBackupBehaviour).WithTags(TagSuiteP1, TagFeatureBackup),
@@ -774,9 +781,9 @@ func registerTests() {
 		// Migration tests
 		framework.NewTestDef(TestMigrateCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateLeaveUnmanagedCluster).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestPremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
-		framework.NewTestDef(TestMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigratePremigrationNodes).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrateStabilizationPeriod).WithTags(TagSuiteP1, TagFeatureAssimilation),
+		framework.NewTestDef(TestMigrateMaxConcurrency).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrateClusterWithMultipleServerGroups).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationByServerClass).WithTags(TagSuiteP1, TagFeatureAssimilation),
 		framework.NewTestDef(TestMigrationByNode).WithTags(TagSuiteP1, TagFeatureAssimilation),

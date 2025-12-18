@@ -417,7 +417,7 @@ func (c *Cluster) reconcilePodServerVersions() error {
 	couchbaseImageToVersion := map[string]string{}
 	couchbaseImageToVersion[c.cluster.Spec.CouchbaseImage()] = ""
 
-	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.cluster.Name)
+	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.namespacedName())
 
 	for _, member := range c.callableMembers {
 		info := &couchbaseutil.PoolsInfo{}
@@ -451,7 +451,7 @@ func (c *Cluster) reconcilePodServerVersions() error {
 		}
 
 		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion); newVersion != "" && updated {
-			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.cluster.Name)
+			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.namespacedName())
 
 			err := c.updatePersistenceVersion(newVersion)
 

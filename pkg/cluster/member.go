@@ -220,7 +220,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 		return nil, err
 	}
 
-	log.V(1).Info("creating pods with indexes", "indexes", availableIndexes)
+	log.V(1).Info("creating pods with indexes", "cluster", c.namespacedName(), "indexes", availableIndexes)
 	// Create a new member
 	memberSpecs := make([]couchbaseutil.Member, len(serverSpecs))
 
@@ -241,7 +241,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	// we want to track members and if they fail
 	results := make([]*couchbaseutil.PodCreationResult, len(memberSpecs))
 
-	log.V(1).Info("starting pod creation", "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
+	log.V(1).Info("starting pod creation", "cluster", c.namespacedName())
 
 	for index, newMember := range memberSpecs {
 		results[index] = &couchbaseutil.PodCreationResult{
@@ -263,7 +263,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	}
 
 	wg.Wait()
-	log.V(1).Info("finished pod creation", "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
+	log.V(1).Info("finished pod creation", "cluster", c.namespacedName())
 
 	var allErr = true
 
@@ -278,7 +278,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	if allErr {
 		err = c.setPodIndex(availableIndexes[0])
 		if err != nil {
-			log.Error(err, "failed to rollback index", "index", availableIndexes[0], "cluster", c.cluster.Name, "namespace", c.cluster.Namespace)
+			log.Error(err, "failed to rollback index", "cluster", c.namespacedName(), "index", availableIndexes[0])
 		}
 	}
 
@@ -344,7 +344,7 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	// check the member version, if it's different then update EVERYTHING.
 	if newVersion != "" {
 		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
-			log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.cluster.Name)
+			log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
 			return err
 		}
 	}
@@ -353,10 +353,10 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	// i.e this is a new cluster. We don't want to change versions until we're finished
 	// upgrading.
 	if updated {
-		log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.cluster.Name)
+		log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.namespacedName())
 
 		if err := c.updatePersistenceVersion(newVersion); err != nil {
-			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.cluster.Name)
+			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.namespacedName())
 
 			return err
 		}
@@ -497,7 +497,7 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 		// Check if node already exists in cluster
 		for _, node := range clusterInfo.Nodes {
 			if string(node.HostName) == url {
-				log.V(1).Info("node already exists in cluster", "hostname", url)
+				log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
 				return nil
 			}
 		}

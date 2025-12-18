@@ -216,7 +216,7 @@ func TestBucketAddRemoveBasic(t *testing.T) {
 				EvictionPolicy:     couchbasev2.CouchbaseBucketEvictionPolicyFullEviction,
 				ConflictResolution: couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber,
 				EnableFlush:        true,
-				EnableIndexReplica: true,
+				EnableIndexReplica: false,
 				CompressionMode:    couchbasev2.CouchbaseBucketCompressionModePassive,
 			},
 		},

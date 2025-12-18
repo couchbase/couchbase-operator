@@ -418,7 +418,7 @@ func (c *Cluster) handleRole(role couchbasev2.Role) ([]couchbaseutil.UserRole, e
 
 	available, err := c.IsAtLeastVersion("7.0.0")
 	if err != nil {
-		log.Error(err, "error during rbac reconciliation due to version check")
+		log.Error(err, "error during rbac reconciliation due to version check", "cluster", c.namespacedName())
 		return roles, err
 	}
 
@@ -617,20 +617,6 @@ func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, at
 		Domain: couchbaseutil.AuthDomain(subject.Spec.AuthDomain),
 	}
 
-	if atLeast80 {
-		userLockedDefault := false
-		user.Locked = &userLockedDefault
-
-		if subject.Spec.Locked != nil {
-			user.Locked = subject.Spec.Locked
-		}
-
-		// If we require an initial password change, we'll set this to true here but this should be overridden if the user already exists.
-		if subject.Spec.Password != nil && subject.Spec.Password.RequireInitialChange != nil {
-			user.TemporaryPassword = subject.Spec.Password.RequireInitialChange
-		}
-	}
-
 	if subject.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
 		password, err := c.getRBACAuthPassword(subject.Spec.AuthSecret)
 		if err != nil {
@@ -638,6 +624,20 @@ func (c *Cluster) createAPIUserFromSubject(subject couchbasev2.CouchbaseUser, at
 		}
 
 		user.Password = password
+
+		if atLeast80 {
+			userLockedDefault := false
+			user.Locked = &userLockedDefault
+
+			if subject.Spec.Locked != nil {
+				user.Locked = subject.Spec.Locked
+			}
+
+			// If we require an initial password change, we'll set this to true here but this should be overridden if the user already exists.
+			if subject.Spec.Password != nil && subject.Spec.Password.RequireInitialChange != nil {
+				user.TemporaryPassword = subject.Spec.Password.RequireInitialChange
+			}
+		}
 	}
 
 	return user, nil
@@ -739,7 +739,26 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 	if err := couchbaseutil.ListUsers(existingUsers).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
 	}
+	existingUserNames, err := c.reconcileExistingUsers(requestedUsers, unreconcilableUsers, existingUsers)
+	if err != nil {
+		return nil, err
+	}
 
+	if err := c.createMissingUsers(requestedUsers, existingUserNames); err != nil {
+		return nil, err
+	}
+
+	return existingUserNames, nil
+}
+
+// reconcileExistingUsers reconciles users that already exist on the server:
+// - updates users that differ from requested state
+// - deletes users that are not requested (unless unreconcilable)
+// Returns a list of existing user IDs that should be considered present.
+func (c *Cluster) reconcileExistingUsers(requestedUsers map[string]couchbaseutil.User, unreconcilableUsers map[string]bool, existingUsers *couchbaseutil.UserList) ([]string, error) {
+	existingUserNames := []string{}
+
+	// helper that determines whether the requested user differs from existing user
 	shouldUpdateUser := func(r couchbaseutil.User, e couchbaseutil.User) bool {
 		requestedGroups := r.Groups
 		sort.Strings(requestedGroups)
@@ -747,10 +766,22 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		existingGroups := e.Groups
 		sort.Strings(existingGroups)
 
-		return !reflect.DeepEqual(requestedGroups, existingGroups) || !reflect.DeepEqual(r.Name, e.Name) || !reflect.DeepEqual(r.Locked, e.Locked)
-	}
+		// Filter out inherited roles from existing user.
+		existingDirectRoles := []couchbaseutil.UserRole{}
+		for _, role := range e.Roles {
+			if role.IsDirectRole() {
+				existingDirectRoles = append(existingDirectRoles, role)
+			}
+		}
 
-	existingUserNames := []string{}
+		requestedRoles := couchbaseutil.RolesToStr(r.Roles)
+		existingRoles := couchbaseutil.RolesToStr(existingDirectRoles)
+
+		return !reflect.DeepEqual(requestedGroups, existingGroups) ||
+			!reflect.DeepEqual(requestedRoles, existingRoles) ||
+			!reflect.DeepEqual(r.Name, e.Name) ||
+			(r.Locked != nil && !reflect.DeepEqual(r.Locked, e.Locked))
+	}
 
 	for _, user := range *existingUsers {
 		e := user
@@ -790,13 +821,25 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		}
 	}
 
-	// create requested groups that do not exist
+	return existingUserNames, nil
+}
+
+// createMissingUsers creates requested users that do not yet exist on the server.
+func (c *Cluster) createMissingUsers(requestedUsers map[string]couchbaseutil.User, existingUserNames []string) error {
 	for i := range requestedUsers {
 		r := requestedUsers[i]
 
 		if _, found := couchbasev2.HasItem(r.ID, existingUserNames); !found {
+			// We don't want to create the user if the initial password doesn't comply with the cluster's password policy.
+			// Instead, we'll just log that we can't create it and skip.
+			// This should already have been handled by the DAC but this is an extra safeguard to avoid being stuck in a reconcile failed loop
+			if r.Domain == couchbaseutil.InternalAuthDomain && !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(c.cluster.Spec.Security.PasswordPolicy, r.Password) {
+				log.Info("Unable to create CouchbaseUser as the initial password does not comply with the cluster's password policy", "cluster", c.cluster.NamespacedName(), "user", r.ID)
+				continue
+			}
+
 			if err := couchbaseutil.CreateUser(&r).On(c.api, c.readyMembers()); err != nil {
-				return existingUserNames, err
+				return err
 			}
 
 			c.raiseEvent(k8sutil.UserCreateEvent(r.ID, c.cluster))
@@ -804,7 +847,7 @@ func (c *Cluster) reconcileUsers(groups []string) ([]string, error) {
 		}
 	}
 
-	return existingUserNames, nil
+	return nil
 }
 
 // reconcileTemporaryPasswords reconciles the temporary password fields for users. This is only applicable for 8.0.0+ clusters.
@@ -819,11 +862,21 @@ func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
 		return err
 	}
 
-	for _, user := range *users {
-		userSpec, ok := c.k8s.CouchbaseUsers.Get(user.ID)
+	// We need to map the couchbase user resources to the user ID that's used by cb server.
+	couchbaseUserResources := make(map[string]*couchbasev2.CouchbaseUser)
+	for _, user := range c.k8s.CouchbaseUsers.List() {
+		couchbaseUserResources[user.GetUserID()] = user
+	}
 
-		// If we can't find an associated spec for the user, or the user already has a temporary password, we can't reconcile the password.
-		if !ok || user.HasTempPassword() {
+	for _, user := range *users {
+		// If the user is not an internal user or already has a temporary password, we can't reconcile the password.
+		if user.Domain != couchbaseutil.InternalAuthDomain || user.HasTempPassword() {
+			continue
+		}
+
+		// If we can't find an associated spec for the user, we can't reconcile the password.
+		userSpec, ok := couchbaseUserResources[user.ID]
+		if !ok {
 			continue
 		}
 
@@ -834,6 +887,10 @@ func (c *Cluster) reconcileTemporaryPasswords(policyChange bool) error {
 
 		if resetPassword {
 			user.TemporaryPassword = &resetPassword
+			// We'll clear the roles as when encoded they would be added back to the user as a direct role.
+			// We don't need to worry about the CNG user here as we should only be setting the temporary password for user's
+			// with an associated resource.
+			user.Roles = []couchbaseutil.UserRole{}
 
 			if err := couchbaseutil.CreateUser(&user).On(c.api, c.readyMembers()); err != nil {
 				return err

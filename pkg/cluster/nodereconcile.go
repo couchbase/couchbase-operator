@@ -160,7 +160,7 @@ type ReconcileMachine struct {
 }
 
 func (r *ReconcileMachine) logState() {
-	log.V(0).Info("reconciler", "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
+	log.V(0).Info("reconciler", "cluster", r.c.namespacedName(), "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
 }
 
 // addMember simulates creating and clustering a new member.
@@ -425,9 +425,47 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		return nil
 	}
 
+	candidates, err := c.getNodeServiceMismatchCandidates()
+	if err != nil {
+		return err
+	}
+
+	if candidates.Empty() {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
+		return nil
+	}
+
+	for _, candidate := range candidates {
+		log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name())
+	}
+
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	orchestratorName := clusterInfo.Orchestrator
+
+	constrained, err := c.selectUpgradeCandidates(candidates, orchestratorName)
+	if err != nil {
+		return err
+	}
+
+	if !constrained.Empty() {
+		c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
+		c.cluster.Status.SetServicesMismatchCondition()
+		return r.swapRebalanceMembers(c, constrained)
+	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
+
+	return nil
+}
+
+func (c *Cluster) getNodeServiceMismatchCandidates() (couchbaseutil.MemberSet, error) {
 	candidates := couchbaseutil.NewMemberSet()
 
-	for _, candidate := range c.members {
+	for _, candidate := range c.readyMembers() {
 		// Get the server configuration for the candidate
 		serverConfig := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if serverConfig == nil {
@@ -439,7 +477,7 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		nodesSelf := &couchbaseutil.NodeInfo{}
 		err := couchbaseutil.GetNodesSelf(nodesSelf).On(c.api, candidate)
 		if err != nil {
-			return err
+			return candidates, err
 		}
 		candidateServices := nodesSelf.Services
 		expectedServices := serverConfig.Services
@@ -449,10 +487,17 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		}
 
 		for i := 0; i < len(candidateServices); i++ {
-			if candidateServices[i] == "kv" {
+			switch candidateServices[i] {
+			case "kv":
 				candidateServices[i] = "data"
-			} else if candidateServices[i] == "n1ql" {
+			case "n1ql":
 				candidateServices[i] = "query"
+			case "fts":
+				candidateServices[i] = "search"
+			case "cbas":
+				candidateServices[i] = "analytics"
+			default:
+				// no mapping needed
 			}
 		}
 
@@ -460,19 +505,11 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 		sort.Strings(expectedServicesString)
 
 		if !couchbaseutil.EqualStringSlices(candidateServices, expectedServicesString) {
-			c.raiseEvent(k8sutil.EventReasonServicesMismatchEvent(c.cluster))
-			c.cluster.Status.SetServicesMismatchCondition()
 			candidates.Add(candidate)
 		}
 	}
 
-	if !candidates.Empty() {
-		return r.swapRebalanceMembers(c, candidates)
-	}
-
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionServicesMismatch)
-
-	return nil
+	return candidates, nil
 }
 
 // If we have nodes that are warming up then we need to wait for them to finish
@@ -929,7 +966,7 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 
 func (r *ReconcileMachine) removeMemberIfUnknownServerConfig(c *Cluster, name string, m couchbaseutil.Member) {
 	if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
-		log.Info("Pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+		log.Info("Node does not match any server config in the specification. Ejecting from cluster", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
 		// Check the node is actually active before we attempt to delete the log volumes.
 		info := &couchbaseutil.PoolsInfo{}
@@ -1011,6 +1048,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
 		c.needsUpgrade,
 		c.getBucketMigrationCandidates,
+		c.getNodeServiceMismatchCandidates,
 	}
 
 	for _, getCandidatesFunc := range getCandidatesFuncs {
@@ -1482,7 +1520,7 @@ func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil
 
 	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
 
-	if err := couchbaseutil.Failover(otpNodeList, false).On(c.api, candidate); err != nil {
+	if err := couchbaseutil.Failover(otpNodeList, false).RetryFor(1*time.Minute).On(c.api, candidate); err != nil {
 		return false, err
 	}
 
@@ -1513,7 +1551,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 				return err
 			}
 		} else {
-			log.Info("Unable to set delta recovery type. Reverting to full recovery.")
+			log.Info("Unable to set delta recovery type. Reverting to full recovery.", "cluster", c.namespacedName())
 
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 				return err
@@ -1531,7 +1569,7 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 
 	// Rebalance failed. Time to set recovery type as full.
 	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
-		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()))
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
 
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -1725,6 +1763,11 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return err
 	}
 
+	// We use 9.9.9 to represent an unknown version, so we don't need to check the upgrade path.
+	if newVersion.String() == "9.9.9" {
+		return nil
+	}
+
 	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
 }
 
@@ -1869,6 +1912,14 @@ func (r *ReconcileMachine) handleApplyingUpgradeStabilizationPeriod() {
 
 func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
 	upgradeSpec := r.c.cluster.Spec.Upgrade
+	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
+		isWaiting := r.c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+		if isWaiting {
+			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
+		}
+
+		return
+	}
 
 	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 

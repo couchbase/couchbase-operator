@@ -730,10 +730,10 @@ func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupStartedEvent(cluster, backup1.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 5*time.Second, 5*time.Minute)
 
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 8*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Second, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -3202,14 +3202,37 @@ func TestPeriodicMergeBackup(t *testing.T) {
 	// wait for the merge backup to complete
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupMergeCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
+	// Get references to the cronjobs before deletion
+	incrementalCronJobName := backup.Name + "-incremental"
+	mergeCronJobName := backup.Name + "-merge"
+
+	incrementalCronJob, err := kubernetes.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), incrementalCronJobName, v1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to get incremental cronjob: %w", err))
+	}
+
+	mergeCronJob, err := kubernetes.KubeClient.BatchV1().CronJobs(backup.Namespace).Get(context.Background(), mergeCronJobName, v1.GetOptions{})
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to get merge cronjob: %w", err))
+	}
+
+	// Delete the backup object
+	e2eutil.MustDeleteBackup(t, kubernetes, backup)
+
+	// Verify that both cronjobs are deleted
+	e2eutil.MustWaitForResourceDeletion(t, kubernetes, incrementalCronJob, 2*time.Minute)
+	e2eutil.MustWaitForResourceDeletion(t, kubernetes, mergeCronJob, 2*time.Minute)
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Bucket created
 	// * Backup created
+	// * Backup deleted
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3533,6 +3556,8 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
+
 	// create provider
 	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
 
@@ -3577,6 +3602,8 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster().AtLeastBackupVersion("1.4.3")
 
 	// create provider
 	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)

@@ -540,6 +540,12 @@ func TestUpgradeSupportable(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
+	}
+
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
@@ -594,6 +600,12 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 		// therefore, these 2 do not need to be accounted for here
 		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -686,9 +698,9 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2
-	victimCycle := mdsGroupSize + 1
-	victimIndex := clusterSize + victimCycle
+	clusterSize := mdsGroupSize * 2          //4
+	victimCycle := mdsGroupSize + 1          //3
+	victimIndex := clusterSize + victimCycle // 7
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -777,6 +789,12 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 		upgradeDownUnrecoverableSequence(victimName),
 		eventschema.Repeat{Times: clusterSize - (victimCycle + 1), Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1020,7 +1038,7 @@ func TestUpgradePVCStorageClass(t *testing.T) {
 	// Create the cluster.
 	cluster := clusterOptions().WithMixedTopology(mdsGroupSize).WithDefaultStorageClass().MustCreate(t, kubernetes)
 
-	// Update the PVC storage class from none to the configure one.
+	// Update the PVC storage class from none to the configured one.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/storageClassName", f.StorageClassName), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -1143,6 +1161,7 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	// Static Config
 	clusterSize := 3
 	numOfDocs := f.DocsCount
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	bucket := e2eutil.GetBucket(f.BucketType, f.CompressionMode)
@@ -1169,13 +1188,20 @@ func TestUpgradeBucketDurability(t *testing.T) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 2*numOfDocs, time.Minute)
 
+	// Upgrades from pre 8.0 to post 8.0 will add an additional event as the bucket encryption settings are updated
+	// to the operator defaults.
+	editCount := 1
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		editCount = 2
+	}
+
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Repeat{Times: editCount, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2045,6 +2071,15 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	// When the cluster is ready, start the upgrade.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
+	// Before upgrading the cluster, we need to fetch the orchestrator index. If the orchestrator is at index 0,
+	// we need to amend the expected upgrade order to initially skip this node. Once one node has been upgraded,
+	// this should then become a new orchestrator and we can continue with the expected upgrade order.
+	oNode := e2eutil.MustGetOrchestratorNode(t, kubernetes, cluster)
+	oIndex, err := couchbaseutil.GetIndexFromMemberName(strings.Split(strings.Split(oNode, "@")[1], ".")[0])
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
 	// Wait for the upgrade to finish
@@ -2065,6 +2100,10 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	}
 
 	expectedUpgradeOrderIndexes := []int{0, 1, 2, 3}
+
+	if oIndex == 0 {
+		expectedUpgradeOrderIndexes = []int{1, 0, 2, 3}
+	}
 
 	for _, podIndex := range expectedUpgradeOrderIndexes {
 		upgradeSequence := eventschema.Sequence{
@@ -2202,4 +2241,104 @@ func TestServerClassesDefaultOrderUpgrade(t *testing.T) {
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+}
+
+// TestUpgradePrevent3Versions tests that the operator prevents a cluster from having 3 different versions
+// by blocking image changes when the cluster is in mixed mode. It also tests rollback during mixed mode.
+func TestUpgradePrevent3Versions(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := constants.Size5
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	// Create the cluster at initial version (CouchbaseServerImageUpgrade)
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	// Set previousVersionPodCount to keep 3 pods at old version during upgrade
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: 3,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Step 1: Partial upgrade to new version with previousVersionPodCount=3
+	// This should result in 2 pods at new version, 3 at old version
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we're in mixed mode
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	// Verify we have 2 versions: 3 at old (initialVersion), 2 at new (upgradeVersion)
+	expectedImageCountMapMixed := map[string]int{
+		f.CouchbaseServerImageUpgrade: 3, // Old version
+		f.CouchbaseServerImage:        2, // New version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapMixed)
+
+	// Step 2: Attempt to change to a third version while in mixed mode
+	// This should be REJECTED by the DAC
+	thirdVersionImage := "couchbase/server:enterprise-8.1.0" // Hypothetical third version
+
+	// Attempt to patch to third version - this should fail validation
+	// MustNotPatchCluster will die if the patch succeeds, which it shouldn't
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", thirdVersionImage))
+
+	// Verify we're still in mixed mode with only 2 versions
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapMixed)
+
+	// Step 3: Test rollback during mixed mode
+	// Rollback to original version - this SHOULD be allowed because it's rolling back to status.CurrentVersion
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify rollback complete - all pods back at initial version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	expectedImageCountMapRollback := map[string]int{
+		f.CouchbaseServerImageUpgrade: clusterSize, // All back to old version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapRollback)
+
+	// Step 4: Upgrade again with previousVersionPodCount=3
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we're back in mixed mode
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapMixed)
+
+	// Step 5: Complete the upgrade by setting previousVersionPodCount to 0
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify upgrade is complete and mixed mode is cleared
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	// Verify all pods are at the new version
+	expectedImageCountMapFinal := map[string]int{
+		f.CouchbaseServerImage: clusterSize, // All at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
 }

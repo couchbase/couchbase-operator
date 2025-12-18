@@ -22,7 +22,7 @@ func TestViewsCreateCluster(t *testing.T) {
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -65,7 +65,7 @@ func TestViewsResizeCluster(t *testing.T) {
 	numOfDocs := f.DocsCount
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
@@ -132,7 +132,7 @@ func TestViewsWithScopesAndCollections(t *testing.T) {
 	scope := e2eutil.NewScope(scopeName).WithCollections(collection).MustCreate(t, kubernetes)
 
 	// Link to a bucket and create that.
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
 	e2eutil.LinkBucketToScopesExplicit(bucket, scope)
 	bucket = e2eutil.MustNewBucket(t, kubernetes, bucket)
 

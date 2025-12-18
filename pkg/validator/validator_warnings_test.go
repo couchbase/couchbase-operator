@@ -224,6 +224,14 @@ func TestCheckFieldsCouchbaseBuckets(t *testing.T) {
 			},
 			expectedWarnings: []string{"CouchbaseBucket cao.couchbase.com/sampleBucket annotation has been enabled"},
 		},
+		{
+			name: "warning expected for magma backend with valueOnly eviction policy",
+			bucketSpec: v2.CouchbaseBucketSpec{
+				StorageBackend: v2.CouchbaseStorageBackendMagma,
+				EvictionPolicy: v2.CouchbaseBucketEvictionPolicyValueOnly,
+			},
+			expectedWarnings: []string{"CouchbaseBucket spec.evictionPolicy is set to valueOnly for magma storage backend"},
+		},
 	}
 
 	for _, testcase := range testcases {

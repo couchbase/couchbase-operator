@@ -127,7 +127,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-completedlimit,completedLimit>>: 4000
       <<couchbaseclusters-spec-cluster-query-completedmaxplansize,completedMaxPlanSize>>: 262144
       <<couchbaseclusters-spec-cluster-query-completedstreamsize,completedStreamSize>>: 0
-      <<couchbaseclusters-spec-cluster-query-completedthreshold,completedThreshold>>: 1ms
+      <<couchbaseclusters-spec-cluster-query-completedthreshold,completedThreshold>>: 1s
       <<couchbaseclusters-spec-cluster-query-completedtrackingallrequests,completedTrackingAllRequests>>: false
       <<couchbaseclusters-spec-cluster-query-completedtrackingenabled,completedTrackingEnabled>>: false
       <<couchbaseclusters-spec-cluster-query-completedtrackingthreshold,completedTrackingThreshold>>: ""
@@ -431,18 +431,40 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-xdcr-globalsettings-checkpointinterval,checkpointInterval>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-collectionsosomode,collectionsOSOMode>>: false
       <<couchbaseclusters-spec-xdcr-globalsettings-compressiontype,compressionType>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging,conflictLogging>>:
+        <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-enabled,enabled>>: false
+        <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-logcollection,logCollection>>:
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-logcollection-bucket,bucket>>: ""
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-logcollection-collection,collection>>: ""
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-logcollection-scope,scope>>: ""
+        <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules,loggingRules>>:
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules,customCollectionRules>>:
+          - <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-collection,collection>>: ""
+            <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-logcollection,logCollection>>:
+              <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-logcollection-bucket,bucket>>: ""
+              <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-logcollection-collection,collection>>: ""
+              <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-logcollection-scope,scope>>: ""
+            <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-customcollectionrules-scope,scope>>: ""
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-defaultcollectionrules,defaultCollectionRules>>:
+          - <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-defaultcollectionrules-collection,collection>>: ""
+            <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-defaultcollectionrules-scope,scope>>: ""
+          <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-nologgingrules,noLoggingRules>>:
+          - <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-nologgingrules-collection,collection>>: ""
+            <<couchbaseclusters-spec-xdcr-globalsettings-conflictlogging-loggingrules-nologgingrules-scope,scope>>: ""
       <<couchbaseclusters-spec-xdcr-globalsettings-desiredlatency,desiredLatency>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-docbatchsizekb,docBatchSizeKb>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-failurerestartinterval,failureRestartInterval>>: 0
+      <<couchbaseclusters-spec-xdcr-globalsettings-filterbinary,filterBinary>>: false
       <<couchbaseclusters-spec-xdcr-globalsettings-filterbypassexpiry,filterBypassExpiry>>: false
       <<couchbaseclusters-spec-xdcr-globalsettings-filterbypassuncommittedtxn,filterBypassUncommittedTxn>>: false
       <<couchbaseclusters-spec-xdcr-globalsettings-filterdeletion,filterDeletion>>: false
       <<couchbaseclusters-spec-xdcr-globalsettings-filterexpiration,filterExpiration>>: false
-      <<couchbaseclusters-spec-xdcr-globalsettings-gogc,goGC>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-gogc,goGC>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-gomaxprocs,goMaxProcs>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-hlvpruningwindowsec,hlvPruningWindowSec>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-jsfunctiontimeoutms,jsFunctionTimeoutMs>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-loglevel,logLevel>>: ""
+      <<couchbaseclusters-spec-xdcr-globalsettings-mergefunctionmapping,mergeFunctionMapping>>:
       <<couchbaseclusters-spec-xdcr-globalsettings-mobile,mobile>>: ""
       <<couchbaseclusters-spec-xdcr-globalsettings-networkusagelimit,networkUsageLimit>>: 0
       <<couchbaseclusters-spec-xdcr-globalsettings-optimisticreplicationthreshold,optimisticReplicationThreshold>>: 0
@@ -2122,16 +2144,19 @@ Defaults to 0 (disabled), minimum value is 0.
 
 *Type*: `string`
 
-*Default*: `1ms`
+*Default*: `1s`
 
 ==== Description
 
 CompletedThreshold sets the minimum request duration after which requests are added to the completed
 requests catalog.
-This field must either be a duration up to 2147483648ms, "0", or "-1".
-Setting this field to "0" will log all requests.
-Setting this field to "-1" will disable request logging.
-This field defaults to 1ms.
+This field accepts a duration string (e.g.
+"1s", "500ms") which is converted to
+milliseconds internally.
+Valid values are "-1" (disable logging), "0" (log all requests), or a
+positive duration.
+The maximum value is 2147483647ms (approximately 24.8 days).
+This field defaults to 1s.
 
 === couchbaseclusters.spec.cluster.query.completedTrackingAllRequests
 
@@ -2907,10 +2932,8 @@ TLS configures mounting kubernetes TLS secrets into the logging sidecar.
 The operator will (in a later release) mount each secret under
 <mountPath>/<secretName>/ and the files within the secret will retain
 their keys as filenames.
-In 2.9.0 this field is accepted by the CRD but
-currently not implemented - usage will be rejected by the admission
-controller.
-Implementation (mounting) is planned for 2.9.1.
+This field is accepted by the CRD but not currently implemented.
+Functionality (mounting) is planned for Operator version 2.9.1.
 
 === couchbaseclusters.spec.logging.server.sidecar.tls.mountPath
 
@@ -4808,6 +4831,7 @@ must be met by all passwords whose definition occurs subsequent to the
 establishing of the policy.
 If this is updated, previously defined passwords continue to be
 valid, even if they do not meet the requirements specified in the new policy.
+If RBAC is managed, any CouchbaseUser resources which match the RBAC resource selector will be checked against this policy.
 
 === couchbaseclusters.spec.security.passwordPolicy.enforceDigits
 
@@ -4875,7 +4899,7 @@ zero-length passwords which is not recommended.
 
 ==== Description
 
-PolicyChangePasswordResetExemptUsers defines a list of users who will not be required to change
+PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
 their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
 This field is only available for Couchbase Server 8.0.0+.
 
@@ -5598,6 +5622,8 @@ https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
 
 *Type*: `[]string`
 
+*Pattern (Regular Expression)*: `^[A-Za-z0-9]([A-Za-z0-9._-]\*[A-Za-z0-9])?$`
+
 ==== Description
 
 ServerGroups define the set of availability zones you want to distribute
@@ -5741,6 +5767,8 @@ This field overrides any automatic allocation as defined by
 ==== Constraints
 
 *Type*: `[]string`
+
+*Pattern (Regular Expression)*: `^[A-Za-z0-9]([A-Za-z0-9._-]\*[A-Za-z0-9])?$`
 
 ==== Description
 
@@ -6201,6 +6229,284 @@ This field defaults to true.
 CompressionType is the compression used for XDCR traffic.
 This field must be one of "Auto" or "None", defaulting to "Auto".
 
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ConflictLogging is the configuration for conflict logging.
+This feature is available in Couchbase Server 8.0.0 and later.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+Enabled defines whether conflict logging is enabled.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.logCollection
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+LogCollection defines the collection to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.logCollection.bucket
+
+==== Constraints
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
+
+==== Description
+
+Bucket defines the bucket to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.logCollection.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.logCollection.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+LoggingRules defines the list of logging rules for conflict logging.
+The rules can
+be scoped to a specific scope or a specific collection in a scope.
+The rules can disable
+logging, log to the default collection defined at `spec.conflictLogging.logCollection`, or
+log to a different collection.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+CustomCollectionRules defines the rules for logging to a different collection.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.logCollection
+
+==== Constraints
+
+*Required*
+
+*Type*: `object`
+
+==== Description
+
+LogCollection defines the collection to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.logCollection.bucket
+
+==== Constraints
+
+*Type*: `string`
+
+*Maximum Length*: `100`
+
+*Pattern (Regular Expression)*: `^[a-zA-Z0-9-_%\.]{1,100}$`
+
+==== Description
+
+Bucket defines the bucket to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.logCollection.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.logCollection.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to log conflicts to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.customCollectionRules.scope
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.defaultCollectionRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+DefaultCollectionRules defines the rules for logging to the default collection.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.defaultCollectionRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.defaultCollectionRules.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.noLoggingRules
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+NoLoggingRules defines the rules for disabling logging to for conflicts in a specific scope or collection.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.noLoggingRules.collection
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Collection defines the collection to apply the rule to.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.loggingRules.noLoggingRules.scope
+
+==== Constraints
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `251`
+
+*Pattern (Regular Expression)*: `^(_default|[a-zA-Z0-9\-][a-zA-Z0-9\-%_]{0,250})$`
+
+==== Description
+
+Scope defines the scope to apply the rule to.
+
 === couchbaseclusters.spec.xdcr.globalSettings.desiredLatency
 
 ==== Constraints
@@ -6242,6 +6548,19 @@ This field defaults to 2048 and must be between 10 and 10000.
 
 FailureRestartInterval is the seconds to wait before restarting after a failure.
 This field defaults to 10 and must be between 1 and 300.
+
+=== couchbaseclusters.spec.xdcr.globalSettings.filterBinary
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+FilterBinary specifies whether binary documents should be replicated.
+The value can be true or false (the default).
+If the value is true, binary documents are not replicated, regardless of whether a filterExpression is applied.
+If the value is false:.
 
 === couchbaseclusters.spec.xdcr.globalSettings.filterBypassExpiry
 
@@ -6291,12 +6610,16 @@ This field defaults to false.
 
 ==== Constraints
 
-*Type*: `string`
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `100`
 
 ==== Description
 
 GoGC is the Go GC target percentage for XDCR processes.
-This field can be an integer (0-100) as a string or "off", defaulting to "100".
+Valid values are integers from 1-100, defaulting to 100.
 
 === couchbaseclusters.spec.xdcr.globalSettings.goMaxProcs
 
@@ -6345,6 +6668,19 @@ JSFunctionTimeoutMs is the timeout for JS custom conflict-resolution functions (
 
 LogLevel is the logging verbosity for XDCR.
 This field must be one of "Error", "Info", "Debug", or "Trace", defaulting to "Info".
+
+=== couchbaseclusters.spec.xdcr.globalSettings.mergeFunctionMapping
+
+==== Constraints
+
+*Type*: `map[string]string`
+
+==== Description
+
+MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
+Note: Global settings only support bucket-level mappings.
+Collection-level mappings will cause server errors.
+Nil values can be used to explicitly unset merge functions for specific collections.
 
 === couchbaseclusters.spec.xdcr.globalSettings.mobile
 
