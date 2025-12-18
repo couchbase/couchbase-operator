@@ -13,7 +13,6 @@ import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -25,9 +24,9 @@ type FakeCouchbaseMemcachedBuckets struct {
 	ns   string
 }
 
-var couchbasememcachedbucketsResource = schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasememcachedbuckets"}
+var couchbasememcachedbucketsResource = v2.SchemeGroupVersion.WithResource("couchbasememcachedbuckets")
 
-var couchbasememcachedbucketsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseMemcachedBucket"}
+var couchbasememcachedbucketsKind = v2.SchemeGroupVersion.WithKind("CouchbaseMemcachedBucket")
 
 // Get takes name of the couchbaseMemcachedBucket, and returns the corresponding couchbaseMemcachedBucket object, and an error if there is any.
 func (c *FakeCouchbaseMemcachedBuckets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseMemcachedBucket, err error) {

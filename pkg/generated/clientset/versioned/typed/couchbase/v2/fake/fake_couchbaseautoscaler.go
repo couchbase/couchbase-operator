@@ -14,7 +14,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -26,9 +25,9 @@ type FakeCouchbaseAutoscalers struct {
 	ns   string
 }
 
-var couchbaseautoscalersResource = schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbaseautoscalers"}
+var couchbaseautoscalersResource = v2.SchemeGroupVersion.WithResource("couchbaseautoscalers")
 
-var couchbaseautoscalersKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseAutoscaler"}
+var couchbaseautoscalersKind = v2.SchemeGroupVersion.WithKind("CouchbaseAutoscaler")
 
 // Get takes name of the couchbaseAutoscaler, and returns the corresponding couchbaseAutoscaler object, and an error if there is any.
 func (c *FakeCouchbaseAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseAutoscaler, err error) {

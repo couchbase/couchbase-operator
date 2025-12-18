@@ -8,7 +8,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3
 	github.com/Masterminds/semver v1.5.0
-	github.com/andygrunwald/go-jira v1.16.0
+	github.com/andygrunwald/go-jira v1.17.0
 	github.com/aws/aws-sdk-go v1.55.3
 	github.com/couchbase/gocb/v2 v2.7.1
 	github.com/couchbase/gocbcoreps v0.1.1
@@ -19,7 +19,7 @@ require (
 	github.com/go-openapi/errors v0.20.4
 	github.com/golang/glog v1.2.5
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
-	github.com/google/go-cmp v0.6.0
+	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/prometheus/client_golang v1.17.0
@@ -76,7 +76,7 @@ require (
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
