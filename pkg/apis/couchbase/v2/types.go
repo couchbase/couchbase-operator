@@ -232,15 +232,15 @@ type CouchbaseBackupSpec struct {
 
 	// Incremental is the schedule on when to take incremental backups.
 	// Used in Full/Incremental backup strategies.
-	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty"`
+	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty" annotation:"incremental"`
 
 	// Full is the schedule on when to take full backups.
 	// Used in Full/Incremental and FullOnly backup strategies.
-	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
+	Full *CouchbaseBackupSchedule `json:"full,omitempty" annotation:"full"`
 
 	// Merge is the schedule on when to merge incremental backups.
 	// Used in PeriodicMerge backup strategy.
-	Merge *CouchbaseBackupSchedule `json:"merge,omitempty"`
+	Merge *CouchbaseBackupSchedule `json:"merge,omitempty" annotation:"merge"`
 
 	// Amount of time to elapse before a completed job is deleted.
 	// +kubebuilder:validation:Minimum=0
@@ -326,9 +326,6 @@ type CouchbaseBackupSpec struct {
 	// This is used to force delete the lock file when the backup is deleted.
 	// +kubebuilder:default=false
 	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
-
-	// AdditionalArgs is used to pass additional arguments to cbbackupmgr.
-	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
 
 	// AdditionalOperatorBackupArgs is used to pass additional arguments to the operator backup container.
 	AdditionalOperatorBackupArgs string `json:"-" annotation:"additionalOperatorBackupArgs"`
@@ -556,6 +553,8 @@ type CouchbaseBackupList struct {
 type CouchbaseBackupSchedule struct {
 	// Schedule takes a cron schedule in string format.
 	Schedule string `json:"schedule"`
+	// AdditionalArgs is used to pass additional arguments to cbbackupmgr.
+	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
 }
 
 type BackupStatus struct {
