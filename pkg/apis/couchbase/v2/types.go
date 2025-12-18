@@ -682,6 +682,9 @@ type CouchbaseBackupRestoreSpec struct {
 	// AdditionalArgs is used to pass additional arguments to the backup script container.
 	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
 
+	// AdditionalOperatorRestoreArgs is used to pass additional arguments to the operator restore container.
+	AdditionalOperatorRestoreArgs string `json:"-" annotation:"additionalOperatorRestoreArgs"`
+
 	// Env defines environment variables to be set on the restore container.
 	// These can be used to configure cbbackupmgr behavior via environment variables.
 	// +optional

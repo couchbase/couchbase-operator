@@ -1359,8 +1359,19 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--default-recovery", string(spec.DefaultRecoveryMethod))
 	}
 
-	if spec.AdditionalArgs != "" {
+	additionalArgsEnvVar := corev1.EnvVar{
+		Name:      "ADDITIONAL_CBBACKUPMGR_COMMANDS",
+		Value:     "",
+		ValueFrom: nil,
+	}
+
+	if spec.AdditionalOperatorRestoreArgs != "" {
 		args = append(args, spec.AdditionalArgs)
+	}
+
+	if spec.AdditionalArgs != "" {
+		additionalArgsEnvVar.Value = spec.AdditionalArgs
+		spec.Env = append(spec.Env, additionalArgsEnvVar)
 	}
 
 	container := corev1.Container{
