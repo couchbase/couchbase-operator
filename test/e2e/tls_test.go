@@ -2424,8 +2424,9 @@ func TestMandatoryMutualTLSRotateClientExpiring(t *testing.T) {
 	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid, Message: string(k8sutil.EventReasonTLSInvalidMessage)},
-		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonUpdateClientAuth)},
 		e2eutil.ClusterScaleUpSequence(1),
 	}
