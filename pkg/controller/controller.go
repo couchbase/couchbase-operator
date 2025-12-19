@@ -255,7 +255,9 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(couchbase *couchbasev2.CouchbaseCluster, validationErr error) (reconcile.Result, error) {
 	c, existingCluster := r.clusters.Load(couchbase.NamespacedName())
-	reconcileResult := reconcile.Result{}
+	reconcileResult := reconcile.Result{
+		RequeueAfter: 10 * time.Second,
+	}
 
 	if !existingCluster {
 		// Cluster created or detected during a restart, start a new management routine.
@@ -270,10 +272,6 @@ func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(couchbase 
 		}
 
 		r.clusters.Store(couchbase.NamespacedName(), c)
-
-		reconcileResult = reconcile.Result{
-			RequeueAfter: 10 * time.Second,
-		}
 	}
 
 	log.Error(validationErr, "Validation failed.", "cluster", couchbase.NamespacedName())
@@ -282,7 +280,8 @@ func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(couchbase 
 		log.Error(err, "Failed to update cluster status", "cluster", couchbase.NamespacedName())
 	}
 
-	return reconcileResult, validationErr
+	// Do not return an error here. Controller runtime will ignore RequeueAfter and wait apply an exponential backoff.
+	return reconcileResult, nil
 }
 
 // AddToManager registers a controller reconciler with the manager and triggers updates

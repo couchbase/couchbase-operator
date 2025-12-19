@@ -6086,6 +6086,10 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 	}
 
 	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return err
+		}
+
 		// There are a number of ways a bucket storagebackend can be set. By order of precedence:
 		// 1. Explicitly set in the bucket spec
 		// 2. Cluster default overridden by the defaultStorageBackend annotation
