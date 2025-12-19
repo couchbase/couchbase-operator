@@ -823,26 +823,33 @@ func TestServiceChangedOnNode(t *testing.T) {
 
 	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
 
-	clusterSize := constants.Size2
+	serverClassSize := constants.Size2
+	clusterSize := serverClassSize * 2
 
-	cluster := clusterOptions().WithMixedEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).MustCreate(t, kubernetes)
 
 	victimID := 3
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
 
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", true), time.Minute)
-
 	e2eutil.MustChangeServicesOnNode(t, kubernetes, cluster, victimName, couchbaseutil.SearchService)
 
-	// No option but to wait here for a second while server does its thing...
-	time.Sleep(30 * time.Second)
-
-	e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/paused", false), time.Minute)
-
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.ServicesMismatchEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionServicesMismatch, v12.ConditionTrue, cluster, 5*time.Minute)
-
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionServicesMismatch)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Service mismatch event
+	// * Service mismatch victim swap rebalanced out of the cluster and replaced with a new member
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonServicesMismatch},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestScaleDownPrioritizesServiceMumatchedNodes(t *testing.T) {

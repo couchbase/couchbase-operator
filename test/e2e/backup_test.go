@@ -395,9 +395,9 @@ func testReplaceFullOnlyBackup(t *testing.T, providerType cloud.ProviderType) {
 
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 10*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute, 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
