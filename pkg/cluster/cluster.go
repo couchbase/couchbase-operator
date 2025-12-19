@@ -606,7 +606,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			return
 		}
 
-		if !running || !enabled {
+		if !running {
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
 		} else {
 			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
