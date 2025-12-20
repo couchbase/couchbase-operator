@@ -1990,7 +1990,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if checkAnnotationSkipValidation(bucket.Annotations) {
 		return nil
 	}
-	if err := validateBucketStorageBackendConstraints(v, bucket, cluster); err != nil {
+	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -5175,7 +5175,7 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	}
 
 	for _, cbBucket := range couchbaseBuckets.Items {
-		if err := validateBucketStorageBackendConstraints(v, &cbBucket, cluster); err != nil {
+		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster); err != nil {
 			return err
 		}
 	}
@@ -6064,7 +6064,7 @@ func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.Couchbase
 	return relatedClusters, nil
 }
 
-func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
@@ -6109,6 +6109,17 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 			// We need to allow numVBuckets to be set for couchstore buckets to aid with migration from couchstore to magma.
 			// This isn't used by anything in the cluster, so we can allow it to be set to 1024 for couchstore buckets.
 			return fmt.Errorf("spec.numVBuckets can only be set to 1024 for couchstore buckets for cluster: %s", c.NamespacedName())
+		}
+
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
+
+		if !atLeast80 {
+			if bucket.Spec.OnlineEvictionPolicyChange != false {
+				return fmt.Errorf("spec.onlineEvictionPolicyChange can only be set for Couchbase Server 8.0.0+")
+			}
 		}
 	}
 
