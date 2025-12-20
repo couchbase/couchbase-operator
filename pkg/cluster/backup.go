@@ -1384,7 +1384,7 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 	}
 
 	if spec.AdditionalOperatorRestoreArgs != "" {
-		args = append(args, spec.AdditionalArgs)
+		args = append(args, spec.AdditionalOperatorRestoreArgs)
 	}
 
 	if spec.AdditionalArgs != "" {
