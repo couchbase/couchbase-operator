@@ -1779,7 +1779,8 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	r.checkUpgradeStabilizationPeriod()
 
-	if !c.cluster.IsReadyToUpgrade() {
+	if !r.c.cluster.IsReadyToUpgrade() {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 		log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.namespacedName())
 		return nil
 	}
@@ -1925,8 +1926,22 @@ func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
 
 	// If we are waiting then check if the stabilization period has passed.
 	if waitingCond != nil && waitingCond.Status == v1.ConditionTrue {
-		lastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
+		balancedCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionBalanced)
+		if balancedCond == nil || balancedCond.Status == v1.ConditionFalse {
+			return
+		}
 
+		balancedLastTransitionTime, err := time.Parse(time.RFC3339, balancedCond.LastTransitionTime)
+		if err != nil {
+			// This can happen if someone has messed with the status fields.
+			// We'll just assume that we don't need to wait.
+			log.Info("[WARN]]: failed to parse last update time for node balanced condition", "error", err)
+			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
+
+			return
+		}
+
+		waitingLastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
 		if err != nil {
 			// This can happen if someone has messed with the status fields.
 			// We'll just assume that we don't need to wait.
@@ -1936,9 +1951,13 @@ func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
 			return
 		}
 
-		stabilizationPeriodFinished := time.Since(lastTransitionTime) > upgradeSpec.StabilizationPeriod.Duration
+		if waitingLastTransitionTime.After(balancedLastTransitionTime) {
+			return
+		}
 
-		if stabilizationPeriodFinished {
+		stabilizationDuration := upgradeSpec.StabilizationPeriod.Duration
+
+		if time.Now().After(balancedLastTransitionTime.Add(stabilizationDuration)) {
 			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
 		}
 	}
