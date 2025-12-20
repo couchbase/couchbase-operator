@@ -1927,6 +1927,9 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 
 func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
+		if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
+		}
 		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
@@ -4911,6 +4914,10 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 	for _, c := range clusters {
 		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
 			return nil, err
+		}
+
+		if c.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration) != nil && prev != curr {
+			errs = append(errs, fmt.Errorf("cannot change bucket configuration while any referencing cluster is performing bucket migration"))
 		}
 
 		// currBackend is the desired backend
