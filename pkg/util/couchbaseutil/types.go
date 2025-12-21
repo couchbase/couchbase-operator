@@ -961,16 +961,25 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 }
 
 //nolint:gocognit,gocyclo
-func (b *Bucket) FormEncode(update bool) []byte {
+func (b *Bucket) FormEncode(update bool, storageBackendOnly bool, evictionPolicyOnly bool) []byte {
 	data := url.Values{}
-	data.Set("name", b.BucketName)
-	data.Set("bucketType", b.BucketType)
-	data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
-
 	// Adds storageBackend for CB Server 7.0.0 onwards.
+	if evictionPolicyOnly && b.EvictionPolicy != "" {
+		data.Set("evictionPolicy", b.EvictionPolicy)
+		return []byte(data.Encode())
+	}
+
 	if b.BucketStorageBackend != "" {
 		data.Set("storageBackend", string(b.BucketStorageBackend))
 	}
+
+	if storageBackendOnly {
+		return []byte(data.Encode())
+	}
+
+	data.Set("name", b.BucketName)
+	data.Set("bucketType", b.BucketType)
+	data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
 
 	if b.BucketType != "memcached" {
 		data.Set("replicaNumber", strconv.Itoa(b.BucketReplicas))

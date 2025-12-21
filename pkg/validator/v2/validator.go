@@ -4918,10 +4918,6 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			return nil, err
 		}
 
-		if c.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration) != nil && prev != curr {
-			errs = append(errs, fmt.Errorf("cannot change bucket configuration while any referencing cluster is performing bucket migration"))
-		}
-
 		// currBackend is the desired backend
 		currBackend, _ := curr.GetStorageBackend(c)
 

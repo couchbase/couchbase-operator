@@ -262,8 +262,8 @@ func (c *Cluster) Delete() {
 	c.cancel()
 
 	// Stop the MIR watchdog if it's running
-	if c.mirWatchdog != nil && c.mirWatchdog.cancel != nil {
-		c.mirWatchdog.cancel()
+	if c.mirWatchdog != nil {
+		c.mirWatchdog.Stop()
 	}
 
 	// Remove finalizers on EncryptionKeys
