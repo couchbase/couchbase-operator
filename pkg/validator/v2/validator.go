@@ -1925,11 +1925,13 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 	return nil
 }
 
-func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket) error {
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
-		if bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		backend, _ := bucket.GetStorageBackend(cluster)
+		if backend == couchbasev2.CouchbaseStorageBackendCouchstore {
 			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
 		}
+
 		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
@@ -2019,7 +2021,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketHistoryRetentionSettings(bucket); err != nil {
+	if err := checkBucketHistoryRetentionSettings(bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
