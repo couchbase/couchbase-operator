@@ -522,15 +522,15 @@ func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 // of buckets to create, update or remove and the requested set for status updates.
 //
 //nolint:gocognit,gocyclo
-func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
+func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
 	requested, err := c.gatherBuckets()
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	unfilteredActual := couchbaseutil.BucketList{}
 	if err := couchbaseutil.ListBuckets(&unfilteredActual).On(c.api, c.readyMembers()); err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// Filter out unreconcilable buckets.
@@ -544,15 +544,14 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 	isOver71, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	atLeast80 := c.SupportsVersionFeatures("8.0.0")
 
 	create := []couchbaseutil.Bucket{}
 	update := []couchbaseutil.Bucket{}
-	updateStorageBackend := []couchbaseutil.Bucket{}
-	updateEvictionPolicy := []couchbaseutil.Bucket{}
+	updateDuringMigration := []couchbaseutil.Bucket{}
 	remove := []couchbaseutil.Bucket{}
 
 	// Do an exhaustive search of requested buckets in the actual list, creating and
@@ -606,12 +605,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 					setBucketFieldsForEncoding(&r, isOver71)
 
-					switch {
-					case c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) && a.BucketStorageBackend != r.BucketStorageBackend:
-						updateStorageBackend = append(updateStorageBackend, r)
-					case c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) && a.EvictionPolicy != r.EvictionPolicy && a.NoRestart != nil && *a.NoRestart:
-						updateEvictionPolicy = append(updateEvictionPolicy, r)
-					case !c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration):
+					// During migration, use specialized API that only sends allowed fields.
+					// Otherwise, use normal full update.
+					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
+						updateDuringMigration = append(updateDuringMigration, r)
+					} else {
 						update = append(update, r)
 					}
 					c.logUpdate(a, r)
@@ -664,7 +662,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 	}
 
-	return create, update, updateStorageBackend, updateEvictionPolicy, remove, requested, nil
+	return create, update, updateDuringMigration, remove, requested, nil
 }
 
 func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
@@ -720,7 +718,7 @@ func (c *Cluster) reconcileBuckets() error {
 		return nil
 	}
 
-	create, update, updateStorageBackend, updateEvictionPolicy, remove, requested, err := c.inspectBuckets()
+	create, update, updateDuringMigration, remove, requested, err := c.inspectBuckets()
 	if err != nil {
 		return err
 	}
@@ -766,23 +764,13 @@ func (c *Cluster) reconcileBuckets() error {
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
 	}
 
-	for i := range updateStorageBackend {
-		bucket := &updateStorageBackend[i]
-		if err := couchbaseutil.UpdateBucketStorageBackend(bucket).On(c.api, c.readyMembers()); err != nil {
+	for i := range updateDuringMigration {
+		bucket := &updateDuringMigration[i]
+		if err := couchbaseutil.UpdateBucketDuringMigration(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
-		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
-	}
-
-	for i := range updateEvictionPolicy {
-		bucket := &updateEvictionPolicy[i]
-		if err := couchbaseutil.UpdateBucketEvictionPolicy(bucket).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
+		log.Info("Bucket updated during migration", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
 	}
 

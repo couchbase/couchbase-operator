@@ -961,20 +961,27 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 }
 
 //nolint:gocognit,gocyclo
-func (b *Bucket) FormEncode(update bool, storageBackendOnly bool, evictionPolicyOnly bool) []byte {
+func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 	data := url.Values{}
-	// Adds storageBackend for CB Server 7.0.0 onwards.
-	if evictionPolicyOnly && b.EvictionPolicy != "" {
-		data.Set("evictionPolicy", b.EvictionPolicy)
+
+	// During migration, only send fields that the server allows to be modified.
+	// Couchbase Server allows: storageBackend, evictionPolicy (with noRestart=true), and ramQuota.
+	if duringMigration {
+		if b.BucketStorageBackend != "" {
+			data.Set("storageBackend", string(b.BucketStorageBackend))
+		}
+		// EvictionPolicy changes during migration require noRestart=true
+		if b.EvictionPolicy != "" && b.NoRestart != nil && *b.NoRestart {
+			data.Set("evictionPolicy", b.EvictionPolicy)
+			data.Set("noRestart", BoolAsStr(*b.NoRestart))
+		}
+		data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
 		return []byte(data.Encode())
 	}
 
+	// Normal operation: encode all fields
 	if b.BucketStorageBackend != "" {
 		data.Set("storageBackend", string(b.BucketStorageBackend))
-	}
-
-	if storageBackendOnly {
-		return []byte(data.Encode())
 	}
 
 	data.Set("name", b.BucketName)
