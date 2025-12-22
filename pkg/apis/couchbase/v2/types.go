@@ -232,15 +232,15 @@ type CouchbaseBackupSpec struct {
 
 	// Incremental is the schedule on when to take incremental backups.
 	// Used in Full/Incremental backup strategies.
-	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty"`
+	Incremental *CouchbaseBackupSchedule `json:"incremental,omitempty" annotation:"incremental"`
 
 	// Full is the schedule on when to take full backups.
 	// Used in Full/Incremental and FullOnly backup strategies.
-	Full *CouchbaseBackupSchedule `json:"full,omitempty"`
+	Full *CouchbaseBackupSchedule `json:"full,omitempty" annotation:"full"`
 
 	// Merge is the schedule on when to merge incremental backups.
 	// Used in PeriodicMerge backup strategy.
-	Merge *CouchbaseBackupSchedule `json:"merge,omitempty"`
+	Merge *CouchbaseBackupSchedule `json:"merge,omitempty" annotation:"merge"`
 
 	// Amount of time to elapse before a completed job is deleted.
 	// +kubebuilder:validation:Minimum=0
@@ -327,8 +327,8 @@ type CouchbaseBackupSpec struct {
 	// +kubebuilder:default=false
 	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
 
-	// AdditionalArgs is used to pass additional arguments to the backup script container.
-	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
+	// AdditionalOperatorBackupArgs is used to pass additional arguments to the operator backup container.
+	AdditionalOperatorBackupArgs string `json:"-" annotation:"additionalOperatorBackupArgs"`
 
 	// Env defines environment variables to be set on the backup container.
 	// These can be used to configure cbbackupmgr behavior via environment variables.
@@ -553,6 +553,8 @@ type CouchbaseBackupList struct {
 type CouchbaseBackupSchedule struct {
 	// Schedule takes a cron schedule in string format.
 	Schedule string `json:"schedule"`
+	// AdditionalArgs is used to pass additional arguments to cbbackupmgr.
+	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
 }
 
 type BackupStatus struct {
@@ -678,6 +680,9 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// AdditionalArgs is used to pass additional arguments to the backup script container.
 	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
+
+	// AdditionalOperatorRestoreArgs is used to pass additional arguments to the operator restore container.
+	AdditionalOperatorRestoreArgs string `json:"-" annotation:"additionalOperatorRestoreArgs"`
 
 	// Env defines environment variables to be set on the restore container.
 	// These can be used to configure cbbackupmgr behavior via environment variables.
@@ -3015,19 +3020,23 @@ type ClusterSpec struct {
 	// When enabled, if the operator detects that manual intervention is needed in order to continue to reconcile the cluster, it will add a cluster condition, emit a Kubernetes Event, and increment a gauge metric to support external alerting.
 	// Once the operator determines that manual intervention is no longer needed, it will clear the cluster condition, emit a Kubernetes Event, and decrement the gauge metric.
 	// By default this is disabled.
+	// DEVELOPER_PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	MirWatchdog *MirWatchdog `json:"mirWatchdog,omitempty"`
 }
 
 type MirWatchdog struct {
 	// Enabled controls whether the additional out-of-band checks are enabled for the cluster.
 	// This defaults to false.
+	// DEVELOPER_PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	Enabled *bool `json:"enabled,omitempty"`
 	// SkipReconciliation controls whether the operator will skip reconciliation when we are in the ManualInterventionRequired state and this condition is set. Once we leave the state
 	// the operator will resume reconciliation.
 	// This defaults to false and should only be used when additional alerting is in place.
+	// DEVELOPER_PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	SkipReconciliation *bool `json:"skipReconciliation,omitempty"`
 	// Interval controls the interval at which the additional out-of-band checks will be performed.
 	// The default interval is 20 seconds.
+	// DEVELOPER_PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	Interval *metav1.Duration `json:"interval,omitempty"`
 }
 

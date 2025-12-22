@@ -252,6 +252,7 @@ func (c *Cluster) reconcile() error {
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 
 	c.cluster.Status.SetBalancedCondition()
 	c.cluster.Status.SetReadyCondition()

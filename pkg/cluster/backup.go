@@ -1072,12 +1072,27 @@ func (c *Cluster) generateMergeContainer(containerName string, backup *couchbase
 }
 
 func (c *Cluster) generateMergeArgs(backup *couchbasev2.CouchbaseBackup) []string {
-	return []string{
+	args := []string{
 		"--mode", "merge",
 		"--backup-ret", fmt.Sprintf("%.2f", backup.Spec.BackupRetention.Hours()),
 		"--log-ret", fmt.Sprintf("%.2f", backup.Spec.LogRetention.Hours()),
 		"-v", "INFO",
 	}
+
+	additionalArgsEnvVar := corev1.EnvVar{
+		Name:      "ADDITIONAL_CBBACKUPMGR_COMMANDS",
+		Value:     "",
+		ValueFrom: nil,
+	}
+
+	if backup.Spec.AdditionalOperatorBackupArgs != "" {
+		args = append(args, backup.Spec.AdditionalOperatorBackupArgs)
+	}
+
+	additionalArgsEnvVar.Value = backup.Spec.Merge.AdditionalArgs
+	backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+
+	return args
 }
 
 func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full bool) []string {
@@ -1159,8 +1174,15 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 		ValueFrom: nil,
 	}
 
-	if backup.Spec.AdditionalArgs != "" {
-		additionalArgsEnvVar.Value = backup.Spec.AdditionalArgs
+	if backup.Spec.AdditionalOperatorBackupArgs != "" {
+		args = append(args, backup.Spec.AdditionalOperatorBackupArgs)
+	}
+
+	if full {
+		additionalArgsEnvVar.Value = backup.Spec.Full.AdditionalArgs
+		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+	} else {
+		additionalArgsEnvVar.Value = backup.Spec.Incremental.AdditionalArgs
 		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
 	}
 
@@ -1355,8 +1377,19 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--default-recovery", string(spec.DefaultRecoveryMethod))
 	}
 
+	additionalArgsEnvVar := corev1.EnvVar{
+		Name:      "ADDITIONAL_CBBACKUPMGR_COMMANDS",
+		Value:     "",
+		ValueFrom: nil,
+	}
+
+	if spec.AdditionalOperatorRestoreArgs != "" {
+		args = append(args, spec.AdditionalOperatorRestoreArgs)
+	}
+
 	if spec.AdditionalArgs != "" {
-		args = append(args, spec.AdditionalArgs)
+		additionalArgsEnvVar.Value = spec.AdditionalArgs
+		spec.Env = append(spec.Env, additionalArgsEnvVar)
 	}
 
 	container := corev1.Container{

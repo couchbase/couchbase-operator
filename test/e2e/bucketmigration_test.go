@@ -5,6 +5,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -370,10 +371,17 @@ func TestEvictionPolicyOnlineChangeMigrationDisabled(t *testing.T) {
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
+	skipDacValidation := make(map[string]string)
+	skipDacValidation[constants.AnnotationDisableAdmissionController] = "true"
+
+	cluster.Annotations = skipDacValidation
+
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Create a bucket with eviction policy valueOnly
 	bucket := testCouchstoreBucket(e2e_constants.DefaultBucket)
+
+	bucket.Annotations = skipDacValidation
 
 	bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(int64(100))
 	bucket.Spec.OnlineEvictionPolicyChange = true

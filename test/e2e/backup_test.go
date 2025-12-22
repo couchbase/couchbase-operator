@@ -19,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil/cloud"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -394,9 +395,9 @@ func testReplaceFullOnlyBackup(t *testing.T, providerType cloud.ProviderType) {
 
 	// wait for backups to complete
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 10*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute, 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupStartedEvent(cluster, backup2.Name), 5*time.Minute)
-	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute)
+	e2eutil.MustObserveBackupEventFrom(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 5*time.Minute, 5*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -3578,22 +3579,41 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--default-recovery=resume"}).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/full.additionalArgs": "--resume"}).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	container := e2eutil.MustGetBackupContainer(t, kubernetes, backup)
-
-	if !slices.Contains(container.Args, "--default-recovery=resume") {
-		e2eutil.Die(t, fmt.Errorf("expected --default-recovery=resume in backup container args"))
+	var backupAdditionalArgsEnvVar *corev1.EnvVar
+	for i := range container.Env {
+		if container.Env[i].Name == "ADDITIONAL_CBBACKUPMGR_COMMANDS" {
+			backupAdditionalArgsEnvVar = &container.Env[i]
+			break
+		}
+	}
+	if backupAdditionalArgsEnvVar == nil {
+		e2eutil.Die(t, fmt.Errorf("expected ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable in backup container"))
+	}
+	if !strings.Contains(backupAdditionalArgsEnvVar.Value, "--resume") {
+		e2eutil.Die(t, fmt.Errorf("expected --resume in ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable, got: %s", backupAdditionalArgsEnvVar.Value))
 	}
 
-	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--default-recovery=purge"}).UseBlankBackupName(false).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--purge"}).UseBlankBackupName(false).MustCreate(t, kubernetes)
 
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
-	container = e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
 
-	if !slices.Contains(container.Args, "--default-recovery=purge") {
-		e2eutil.Die(t, fmt.Errorf("expected --default-recovery=purge in restore container args"))
+	container = e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
+	var restoreAdditionalArgsEnvVar *corev1.EnvVar
+	for i := range container.Env {
+		if container.Env[i].Name == "ADDITIONAL_CBBACKUPMGR_COMMANDS" {
+			restoreAdditionalArgsEnvVar = &container.Env[i]
+			break
+		}
+	}
+	if restoreAdditionalArgsEnvVar == nil {
+		e2eutil.Die(t, fmt.Errorf("expected ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable in restore container"))
+	}
+	if !strings.Contains(restoreAdditionalArgsEnvVar.Value, "--purge") {
+		e2eutil.Die(t, fmt.Errorf("expected --purge in ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable, got: %s", restoreAdditionalArgsEnvVar.Value))
 	}
 }
 

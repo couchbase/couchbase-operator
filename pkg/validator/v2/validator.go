@@ -1925,8 +1925,13 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 	return nil
 }
 
-func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket) error {
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
+		backend, _ := bucket.GetStorageBackend(cluster)
+		if backend == couchbasev2.CouchbaseStorageBackendCouchstore {
+			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
+		}
+
 		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
@@ -1990,7 +1995,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if checkAnnotationSkipValidation(bucket.Annotations) {
 		return nil
 	}
-	if err := validateBucketStorageBackendConstraints(v, bucket, cluster); err != nil {
+	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2016,7 +2021,7 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketHistoryRetentionSettings(bucket); err != nil {
+	if err := checkBucketHistoryRetentionSettings(bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -4939,12 +4944,6 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 		}
 
-		if !c.Spec.Buckets.EnableBucketMigrationRoutines {
-			if curr.Spec.EvictionPolicy != prev.Spec.EvictionPolicy && curr.Spec.OnlineEvictionPolicyChange {
-				errs = append(errs, fmt.Errorf("spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"))
-			}
-		}
-
 		after80, err := c.RunningVersion("8.0.0")
 		if err != nil {
 			return nil, err
@@ -4952,6 +4951,12 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 
 		if !after80 {
 			continue
+		}
+
+		if !c.Spec.Buckets.EnableBucketMigrationRoutines {
+			if curr.Spec.EvictionPolicy != prev.Spec.EvictionPolicy && curr.Spec.OnlineEvictionPolicyChange {
+				errs = append(errs, fmt.Errorf("spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"))
+			}
 		}
 
 		if err := checkNumVBucketsChangeConstraint(prev, curr, c, c); err != nil {
@@ -5175,7 +5180,7 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	}
 
 	for _, cbBucket := range couchbaseBuckets.Items {
-		if err := validateBucketStorageBackendConstraints(v, &cbBucket, cluster); err != nil {
+		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster); err != nil {
 			return err
 		}
 	}
@@ -6064,7 +6069,7 @@ func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.Couchbase
 	return relatedClusters, nil
 }
 
-func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
@@ -6086,6 +6091,10 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 	}
 
 	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return err
+		}
+
 		// There are a number of ways a bucket storagebackend can be set. By order of precedence:
 		// 1. Explicitly set in the bucket spec
 		// 2. Cluster default overridden by the defaultStorageBackend annotation
@@ -6105,6 +6114,17 @@ func validateBucketStorageBackendConstraints(v *types.Validator, bucket *couchba
 			// We need to allow numVBuckets to be set for couchstore buckets to aid with migration from couchstore to magma.
 			// This isn't used by anything in the cluster, so we can allow it to be set to 1024 for couchstore buckets.
 			return fmt.Errorf("spec.numVBuckets can only be set to 1024 for couchstore buckets for cluster: %s", c.NamespacedName())
+		}
+
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
+
+		if !atLeast80 {
+			if bucket.Spec.OnlineEvictionPolicyChange != false {
+				return fmt.Errorf("spec.onlineEvictionPolicyChange can only be set for Couchbase Server 8.0.0+")
+			}
 		}
 	}
 

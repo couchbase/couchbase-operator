@@ -13,7 +13,6 @@ import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -25,9 +24,9 @@ type FakeCouchbaseRoleBindings struct {
 	ns   string
 }
 
-var couchbaserolebindingsResource = schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbaserolebindings"}
+var couchbaserolebindingsResource = v2.SchemeGroupVersion.WithResource("couchbaserolebindings")
 
-var couchbaserolebindingsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseRoleBinding"}
+var couchbaserolebindingsKind = v2.SchemeGroupVersion.WithKind("CouchbaseRoleBinding")
 
 // Get takes name of the couchbaseRoleBinding, and returns the corresponding couchbaseRoleBinding object, and an error if there is any.
 func (c *FakeCouchbaseRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseRoleBinding, err error) {

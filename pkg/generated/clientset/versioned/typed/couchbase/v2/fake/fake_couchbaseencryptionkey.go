@@ -13,7 +13,6 @@ import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -25,9 +24,9 @@ type FakeCouchbaseEncryptionKeys struct {
 	ns   string
 }
 
-var couchbaseencryptionkeysResource = schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbaseencryptionkeys"}
+var couchbaseencryptionkeysResource = v2.SchemeGroupVersion.WithResource("couchbaseencryptionkeys")
 
-var couchbaseencryptionkeysKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseEncryptionKey"}
+var couchbaseencryptionkeysKind = v2.SchemeGroupVersion.WithKind("CouchbaseEncryptionKey")
 
 // Get takes name of the couchbaseEncryptionKey, and returns the corresponding couchbaseEncryptionKey object, and an error if there is any.
 func (c *FakeCouchbaseEncryptionKeys) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseEncryptionKey, err error) {

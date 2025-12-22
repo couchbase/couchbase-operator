@@ -262,8 +262,8 @@ func (c *Cluster) Delete() {
 	c.cancel()
 
 	// Stop the MIR watchdog if it's running
-	if c.mirWatchdog != nil && c.mirWatchdog.cancel != nil {
-		c.mirWatchdog.cancel()
+	if c.mirWatchdog != nil {
+		c.mirWatchdog.Stop()
 	}
 
 	// Remove finalizers on EncryptionKeys
@@ -606,7 +606,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			return
 		}
 
-		if !running || !enabled {
+		if !running {
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
 		} else {
 			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)

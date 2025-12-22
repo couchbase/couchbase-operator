@@ -261,6 +261,7 @@ func TestMirWatchdogOnConsecutiveRebalanceFailures(t *testing.T) {
 	// Once the cluster is healthy, we should remove the manual intervention condition and reset the metric.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 2*time.Minute, couchbasev2.ClusterConditionManualInterventionRequired)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 2*time.Minute, couchbasev2.ClusterConditionRebalancing)
 	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 1*time.Minute)
 
 	// Check the events match what we expect.

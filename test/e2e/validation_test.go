@@ -3927,6 +3927,12 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 		{
+			name:           "TestValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
+			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
+		},
+		{
 			name: "TestValidateVolumeClaimTemplatesShrinkRejected",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/enableOnlineVolumeExpansion", true).

@@ -13,7 +13,6 @@ import (
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -25,9 +24,9 @@ type FakeCouchbaseScopeGroups struct {
 	ns   string
 }
 
-var couchbasescopegroupsResource = schema.GroupVersionResource{Group: "couchbase.com", Version: "v2", Resource: "couchbasescopegroups"}
+var couchbasescopegroupsResource = v2.SchemeGroupVersion.WithResource("couchbasescopegroups")
 
-var couchbasescopegroupsKind = schema.GroupVersionKind{Group: "couchbase.com", Version: "v2", Kind: "CouchbaseScopeGroup"}
+var couchbasescopegroupsKind = v2.SchemeGroupVersion.WithKind("CouchbaseScopeGroup")
 
 // Get takes name of the couchbaseScopeGroup, and returns the corresponding couchbaseScopeGroup object, and an error if there is any.
 func (c *FakeCouchbaseScopeGroups) Get(ctx context.Context, name string, options v1.GetOptions) (result *v2.CouchbaseScopeGroup, err error) {

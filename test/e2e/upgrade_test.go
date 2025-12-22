@@ -736,6 +736,13 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
+	// If we're upgrading over 8.0.0, we need to add the bucket edited event where we disable the encryption defaults.
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.0") {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketEdited})
+	}
+
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 

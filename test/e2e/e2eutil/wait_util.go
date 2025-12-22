@@ -731,6 +731,16 @@ func MustObserveClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	}
 }
 
+// MustObserveClusterEventFrom works the same as MustObserveClusterEvent, but limits checks to a given time before the method call time.
+func MustObserveClusterEventFrom(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, from, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, cluster, event, time.Now().Add(-from), false); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustObserveClusterEventIgnoringMessage(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
