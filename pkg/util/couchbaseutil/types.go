@@ -2082,7 +2082,7 @@ func (t *DataThreadSetting) ToIntOrString() *intstr.IntOrString {
 	return nil
 }
 
-func ToDataThreadSetting(intOrStr *intstr.IntOrString) *DataThreadSetting {
+func ToDataThreadSetting(intOrStr *intstr.IntOrString, after80 bool) *DataThreadSetting {
 	if intOrStr == nil {
 		return nil
 	}
@@ -2096,6 +2096,12 @@ func ToDataThreadSetting(intOrStr *intstr.IntOrString) *DataThreadSetting {
 	}
 
 	val := intOrStr.String()
+
+	// There's a bug in server that requires us to use "default" instead of "balanced" until the entire
+	// cluster is upgraded to 8.0.0, or memcached will crash on a loop.
+	if val == "balanced" && !after80 {
+		val = "default"
+	}
 
 	return &DataThreadSetting{
 		Setting: &val,

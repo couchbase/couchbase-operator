@@ -635,8 +635,9 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		return err
 	}
 
+	after80 := c.SupportsVersionFeatures("8.0.0")
 	defaultThreadSetting := "default"
-	if c.SupportsVersionFeatures("8.0.0") {
+	if after80 {
 		defaultThreadSetting = "balanced"
 	}
 
@@ -667,13 +668,13 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		requested.NumAuxIOThreads = defaultIfExists(current.NumAuxIOThreads, &ioDefault)
 	} else {
 		// If anything is not set in the spec, we will set it to the default value.
-		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.ReaderThreads); setting != nil {
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.ReaderThreads, after80); setting != nil {
 			requested.ReaderThreads = setting
 		} else {
 			requested.ReaderThreads = &readWriteDefault
 		}
 
-		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.WriterThreads); setting != nil {
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.WriterThreads, after80); setting != nil {
 			requested.WriterThreads = setting
 		} else {
 			requested.WriterThreads = &readWriteDefault
@@ -697,7 +698,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 			}
 		}
 
-		if c.SupportsVersionFeatures("8.0.0") {
+		if after80 {
 			requested.TCPKeepAliveInterval = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveInterval
 			requested.TCPKeepAliveIdle = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveIdle
 			requested.TCPKeepAliveProbes = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveProbes
