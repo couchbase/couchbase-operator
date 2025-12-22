@@ -232,8 +232,8 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileAdminService,
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileUnmanagedBucketsBackends,
-		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcilePasswordPolicy,
+		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
@@ -1362,7 +1362,7 @@ func (c *Cluster) reconcileRBAC() error {
 	// such as users, groups, collections, and scopes, are fully managed.
 	if c.cluster.Spec.Security.RBAC.Managed {
 		if err := c.reconcileRBACResources(); err != nil {
-			return err
+			log.Error(err, "RBAC reconciliation failed", "cluster", c.namespacedName())
 		}
 	} else if c.cluster.Spec.Networking.CloudNativeGateway != nil {
 		// need to create the admin user
