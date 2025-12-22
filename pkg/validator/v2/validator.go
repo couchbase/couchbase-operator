@@ -2256,30 +2256,43 @@ func checkEphemeralBucketCrossClusterVersioning(v *types.Validator, bucket *couc
 }
 
 func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	var clusters = new(couchbasev2.CouchbaseClusterList)
-
+	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
-		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
 	} else {
-		allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
 		if err != nil {
 			return err
 		}
 
-		clusters = allClusters
+		clusters = append(clusters, bClusters...)
 	}
 
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MinReplicasCount <= bucket.Spec.Replicas {
-			continue
+	for _, cluster := range clusters {
+		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
+			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
+				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
 		}
+	}
 
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+	return nil
+}
+
+func checkEphemeralBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getEphemeralBucketsRelatedClusters(v, bucket)
 		if err != nil {
 			return err
 		}
 
-		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, cluster := range clusters {
+		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
 			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
 				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
 		}
@@ -2322,6 +2335,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.EphemeralBucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkEphemeralBucketReplicasCount(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -6040,6 +6057,36 @@ func CheckDeleteConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Co
 }
 
 func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.Buckets.Managed {
+			continue
+		}
+
+		if cluster.Spec.Buckets.Selector == nil {
+			relatedClusters = append(relatedClusters, &cluster)
+			continue
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		if selector.Matches(labels.Set(bucket.Labels)) {
+			relatedClusters = append(relatedClusters, &cluster)
+		}
+	}
+
+	return relatedClusters, nil
+}
+
+func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) ([]*couchbasev2.CouchbaseCluster, error) {
 	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
 	if err != nil {
 		return nil, err
