@@ -1925,10 +1925,9 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 	return nil
 }
 
-func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, storageBackend couchbasev2.CouchbaseStorageBackend) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
-		backend, _ := bucket.GetStorageBackend(cluster)
-		if backend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		if storageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
 			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
 		}
 
@@ -2018,10 +2017,6 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketReplicasCount(v, bucket, cluster); err != nil {
-		errs = append(errs, err)
-	}
-
-	if err := checkBucketHistoryRetentionSettings(bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -6149,6 +6144,11 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		// The operator will use GetStorageBackend, which in some cases will return a different value for compatibility. Therefore we'll run these checks
 		// if it's set specifically on the bucket as well so we can validate values that the operator would override.
 		storageBackend, _ := bucket.GetStorageBackend(c)
+
+		if err := checkBucketHistoryRetentionSettings(bucket, storageBackend); err != nil {
+			return err
+		}
+
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma || bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 			if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
 				return err
