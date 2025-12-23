@@ -286,12 +286,6 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			b.Rank = &bucket.Spec.Rank
 		}
 
-		if !bucket.Spec.OnlineEvictionPolicyChange {
-			if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
-			}
-		}
-
 		if supportedCrossClusterVersioning {
 			if bucket.Spec.EnableCrossClusterVersioning != nil {
 				b.EnableCrossClusterVersioning = bucket.Spec.EnableCrossClusterVersioning
@@ -346,11 +340,6 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 	} else {
 		defaultMemoryHighWatermark := constants.MemoryHighWatermarkDefault
 		b.MemoryHighWatermark = &defaultMemoryHighWatermark
-	}
-
-	if bucket.Spec.OnlineEvictionPolicyChange {
-		noRestart := true
-		b.NoRestart = &noRestart
 	}
 
 	b.NumVBuckets = util.IntPtr(1024)
