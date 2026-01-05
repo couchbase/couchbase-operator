@@ -83,7 +83,9 @@ func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *
 		Hidden:       true,
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to create a pod for a since removed pod, or a new pod when
-							support needs to do so.`),
+							support needs to do so.
+
+Note: The Couchbase Operator watches CouchbaseCluster resources and may immediately delete pods it considers unclustered.  Pause or stop the Operator before using this command.`),
 		Example: normalize(fmt.Sprintf(`
                         # Create pod.
                         %[1]s create pod
