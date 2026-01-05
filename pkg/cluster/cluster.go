@@ -606,9 +606,16 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			return
 		}
 
-		if !running {
+		switch {
+		case !running:
+			// If we have the condition but it's not running, we should have already cleared it. This is just a safety check.
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
-		} else {
+		case !enabled:
+			// If the MirWatchdog is running but not enabled, it's possible that the spec has been updated to disable it before the mirWatchdogContext is reconciled.
+			// We can handle stopping it here if this occurs.
+			c.StopMirWatchdog()
+		default:
+			// We have the condition and the MirWatchdog is running and enabled, but we don't want to skip reconciliation so we should log the reason and continue.
 			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
 		}
 	}
@@ -1316,9 +1323,7 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 
 	// Stop the watchdog if it's disabled and running.
 	if !enabled && running {
-		log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
-		c.mirWatchdog.Stop()
+		c.StopMirWatchdog()
 		return
 	}
 
@@ -1334,6 +1339,12 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 		c.mirWatchdog = StartMirWatchdog(c, desiredInterval)
 		return
 	}
+}
+
+func (c *Cluster) StopMirWatchdog() {
+	log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+	c.mirWatchdog.Stop()
 }
 
 func (c *Cluster) InitCounterMetrics() {
