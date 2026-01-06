@@ -107,6 +107,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintsResourceManagement,
 		checkConstraintsIndexerSettings,
 		checkConstraintEncryptionKeys,
+		checkConstraintsPasswordPolicy,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -5607,6 +5608,31 @@ func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2
 
 		if !atleast80 {
 			return fmt.Errorf("spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later")
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintsPasswordPolicy validates passwordPolicy fields that are only supported on 8.0.0+.
+func checkConstraintsPasswordPolicy(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Security.PasswordPolicy == nil {
+		return nil
+	}
+
+	atleast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if !atleast80 {
+		pp := cluster.Spec.Security.PasswordPolicy
+		if pp.RequirePasswordResetOnPolicyChange != nil {
+			return fmt.Errorf("spec.security.passwordPolicy.requirePasswordResetOnPolicyChange requires Couchbase Server version 8.0.0 or later")
+		}
+
+		if len(pp.PasswordResetOnPolicyChangeExemptUsers) > 0 {
+			return fmt.Errorf("spec.security.passwordPolicy.passwordResetOnPolicyChangeExemptUsers requires Couchbase Server version 8.0.0 or later")
 		}
 	}
 
