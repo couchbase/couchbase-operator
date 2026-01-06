@@ -702,7 +702,8 @@ func checkMemcachedBucketsConstraints(bucket *couchbasev2.CouchbaseMemcachedBuck
 }
 
 func checkCouchbaseBucketsConstraints(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	return validationv2.CheckConstraintsBucket(v, bucket, cluster)
+	_, err := validationv2.CheckConstraintsBucket(v, bucket, cluster)
+	return err
 }
 
 func CheckCouchbaseClusterResource(cluster *couchbasev2.CouchbaseCluster) ([]string, error) {

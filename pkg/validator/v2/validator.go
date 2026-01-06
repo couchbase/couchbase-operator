@@ -2011,17 +2011,17 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 }
 
 //nolint:gocognit,gocyclo
-func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
 
 	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
+		return nil, nil
 	}
 	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
@@ -2073,11 +2073,22 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	var warnings []string
+
+	w, err := checkBucketCRDFieldsForNonDefaultUnsupportedFields(v, bucket, cluster)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	if len(w) > 0 {
+		warnings = append(warnings, w...)
+	}
+
+	if errs != nil {
+		return warnings, errors.CompositeValidationError(errs...)
+	}
+
+	return warnings, nil
 }
 
 func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) error {
@@ -6275,4 +6286,61 @@ func checkUpgradeOrderEntriesExist(t couchbasev2.UpgradeOrderType, cluster *couc
 	}
 
 	return errs
+}
+
+// There are several 8.0 only fields that were added with kubebuilder:default annotations. We can't remove these from the CRD's without breaking backwards compatibility,
+// and we can't warn if they are the defaults or we'll barrage users with warnings.
+// The compromise is to warn if the fields have been changed from the default.
+// checkBucketCRDFieldsForNonDefaultUnsupportedFields handles the bucket fields.
+func checkBucketCRDFieldsForNonDefaultUnsupportedFields(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return nil, err
+		}
+		clusters = append(clusters, bClusters...)
+	}
+
+	warnings := []string{}
+	for _, c := range clusters {
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if atLeast80 {
+			continue
+		}
+
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return nil, err
+		}
+
+		fields := []string{}
+
+		if bucket.Spec.AccessScannerEnabled != nil && !*bucket.Spec.AccessScannerEnabled {
+			fields = append(fields, "spec.accessScannerEnabled")
+		}
+
+		if bucket.Spec.MemoryLowWatermark != nil && *bucket.Spec.MemoryLowWatermark != 75 {
+			fields = append(fields, "spec.memoryLowWatermark")
+		}
+
+		if bucket.Spec.MemoryHighWatermark != nil && *bucket.Spec.MemoryHighWatermark != 85 {
+			fields = append(fields, "spec.memoryHighWatermark")
+		}
+
+		if warmupBehavior := bucket.Spec.WarmupBehavior; warmupBehavior != couchbasev2.CouchbaseBucketWarmupBehaviorBackground {
+			fields = append(fields, "spec.warmupBehavior")
+		}
+
+		for _, field := range fields {
+			warnings = append(warnings, fmt.Sprintf("CouchbaseBucket %s has been configured for cluster %s. This will be ignored for Couchbase Server versions below 8.0.0.", field, c.NamespacedName()))
+		}
+	}
+
+	return warnings, nil
 }

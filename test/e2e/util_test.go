@@ -138,6 +138,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketStorageBackendValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketStorageBackendValidationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidateUpgradeField).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),

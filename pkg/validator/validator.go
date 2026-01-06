@@ -32,7 +32,7 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 	case *couchbasev2.CouchbaseCluster:
 		return validationv2.CheckConstraints(v, t)
 	case *couchbasev2.CouchbaseBucket:
-		return []string{}, validationv2.CheckConstraintsBucket(v, t, nil)
+		return validationv2.CheckConstraintsBucket(v, t, nil)
 	case *couchbasev2.CouchbaseEphemeralBucket:
 		return []string{}, validationv2.CheckConstraintsEphemeralBucket(v, t, nil)
 	case *couchbasev2.CouchbaseMemcachedBucket:

@@ -6212,3 +6212,23 @@ func TestValidateUpgradeField(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
 }
+
+func TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateBucketCRDFieldsForNonDefaultUnsupportedFields",
+			mutations: patchMap{
+				"bucket7": jsonpatch.NewPatchSet().Replace("/spec/accessScannerEnabled", false).Replace("/spec/memoryLowWatermark", 50).Replace("/spec/memoryHighWatermark", 90).Replace("/spec/warmupBehavior", "none"),
+			},
+			shouldFail: false,
+			expectedWarnings: []string{
+				"CouchbaseBucket spec.accessScannerEnabled has been configured for cluster",
+				"CouchbaseBucket spec.memoryLowWatermark has been configured for cluster",
+				"CouchbaseBucket spec.memoryHighWatermark has been configured for cluster",
+				"CouchbaseBucket spec.warmupBehavior has been configured for cluster",
+			},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation.yaml"})
+}
