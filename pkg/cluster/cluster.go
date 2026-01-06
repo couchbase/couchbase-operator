@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -136,6 +137,11 @@ type Cluster struct {
 	// It is separate from the main cluster context to allow starting/stopping
 	// the watchdog based on the spec.
 	mirWatchdog *MirWatchdogContext
+
+	// failedGroupsMu protects read-modify-write operations on the failed
+	// scheduling server groups tracker to prevent lost updates when multiple
+	// pod creation goroutines run concurrently.
+	failedGroupsMu sync.RWMutex
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -363,6 +369,11 @@ func (c *Cluster) addFailedSchedulingServerGroups(serverGroup string) error {
 		return nil
 	}
 
+	// Protect the read-modify-write operation to prevent lost updates
+	// when multiple pod creation goroutines run concurrently.
+	c.failedGroupsMu.Lock()
+	defer c.failedGroupsMu.Unlock()
+
 	failedGroupsTracker, err := c.getFailedServerGroupsTracker()
 	if err != nil {
 		return err
@@ -421,6 +432,11 @@ func (c *Cluster) clearFailedSchedulingServerGroupsIfReady() {
 	if c.cluster.Status.Size != desiredSize {
 		return
 	}
+
+	// Protect the delete operation to ensure consistency with concurrent
+	// reads and writes from pod creation goroutines.
+	c.failedGroupsMu.Lock()
+	defer c.failedGroupsMu.Unlock()
 
 	if err := c.state.Delete(persistence.FailedSchedulingServerGroupsTracker); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
 		log.Error(err, "Failed to clear failed scheduling server groups", "cluster", c.namespacedName())

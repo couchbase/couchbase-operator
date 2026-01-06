@@ -59,6 +59,11 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 type failedSchedulingServerGroupsTracker map[string]int
 
 func (c *Cluster) getServerGroupsToAvoid() ([]string, error) {
+	// Protect read to ensure we see the latest writes from concurrent
+	// pod creation goroutines that may be updating the tracker.
+	c.failedGroupsMu.RLock()
+	defer c.failedGroupsMu.RUnlock()
+
 	failedGroupsTracker, err := c.getFailedServerGroupsTracker()
 	if err != nil {
 		return nil, err

@@ -780,6 +780,11 @@ func (sched *stripeSchedulerImpl) LogStatus(cluster string) {
 }
 
 func (sched *stripeSchedulerImpl) AvoidGroups(groups ...string) {
+	// Avoid concurrent map writes when multiple goroutines call AvoidGroups
+	// during parallel pod creation. Use the scheduler mutex to protect access.
+	sched.mu.Lock()
+	defer sched.mu.Unlock()
+
 	for _, group := range groups {
 		sched.avoidGroups[group] = true
 	}
