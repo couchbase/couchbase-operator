@@ -6157,3 +6157,58 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-storagebackend.yaml"})
 }
+
+func TestValidateUpgradeField(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateUpgradeOrderServerGroupInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerGroups",
+						UpgradeOrder:     []string{"group1", "group2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains servergroup group1 not found in the cluster spec", "upgrade order contains servergroup group2 not found in the cluster spec"},
+		},
+		{
+			name: "TestValidateUpgradeOrderServerClassesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerClasses",
+						UpgradeOrder:     []string{"class1", "class2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains serverclass class1 not found in spec.servers", "upgrade order contains serverclass class2 not found in spec.servers"},
+		},
+		{
+			name: "TestValidateUpgradeOrderServicesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "Services",
+						UpgradeOrder:     []string{"service1", "service2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains service service1 not found in spec.servers", "upgrade order contains service service2 not found in spec.servers"},
+		},
+		{
+			name: "TestValidateUpgradeOrderDuplicatesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerGroups",
+						UpgradeOrder:     []string{"group1", "group1"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains duplicate entry: group1"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
+}

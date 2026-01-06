@@ -108,6 +108,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintsIndexerSettings,
 		checkConstraintEncryptionKeys,
 		checkConstraintsPasswordPolicy,
+		checkConstraintsUpgrade,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -170,6 +171,33 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintsUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Upgrade == nil {
+		return nil
+	}
+
+	var errs []error
+
+	errs = append(errs, checkUpgradeOrderEntriesExist(cluster.Spec.Upgrade.UpgradeOrderType, cluster)...)
+
+	uniqueMap := make(map[string]bool)
+
+	for _, entry := range cluster.Spec.Upgrade.UpgradeOrder {
+		if _, exists := uniqueMap[entry]; !exists {
+			uniqueMap[entry] = true
+			continue
+		}
+
+		errs = append(errs, fmt.Errorf("upgrade order contains duplicate entry: %s", entry))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
 }
 
 func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -6202,4 +6230,49 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 	}
 
 	return nil
+}
+
+func checkUpgradeOrderEntriesExist(t couchbasev2.UpgradeOrderType, cluster *couchbasev2.CouchbaseCluster) []error {
+	var errs []error
+
+	servers := cluster.Spec.Servers
+
+	switch t {
+	case couchbasev2.UpgradeOrderTypeServices:
+		servicesMap := make(map[string]bool)
+
+		for _, server := range servers {
+			for _, item := range server.Services {
+				servicesMap[item.String()] = true
+			}
+		}
+
+		for _, uOService := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !servicesMap[uOService] {
+				errs = append(errs, fmt.Errorf("upgrade order contains service %s not found in spec.servers", uOService))
+			}
+		}
+	case couchbasev2.UpgradeOrderTypeServerClasses:
+		var serverNames []string
+
+		for _, server := range servers {
+			serverNames = append(serverNames, server.Name)
+		}
+
+		for _, uOServer := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !slices.Contains(serverNames, uOServer) {
+				errs = append(errs, fmt.Errorf("upgrade order contains serverclass %s not found in spec.servers", uOServer))
+			}
+		}
+	case couchbasev2.UpgradeOrderTypeServerGroups:
+		for _, uOServerGroup := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !slices.Contains(cluster.Spec.ServerGroups, uOServerGroup) {
+				errs = append(errs, fmt.Errorf("upgrade order contains servergroup %s not found in the cluster spec", uOServerGroup))
+			}
+		}
+	default:
+		errs = append(errs, fmt.Errorf("unknown upgrade order type %v", t))
+	}
+
+	return errs
 }
