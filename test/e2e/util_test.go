@@ -185,6 +185,7 @@ func registerTests() {
 		framework.NewTestDef(TestRBACCreateAdminUser).WithTags(TagSuiteSanity, TagFeatureRBAC),
 		framework.NewTestDef(TestRBACCreateUserClusterRoles).WithTags(TagSuiteSanity, TagFeatureRBAC),
 		framework.NewTestDef(TestRotateAdminPassword).WithTags(TagSuiteSanity),
+		framework.NewTestDef(TestRotateAdminPasswordWithPasswordPolicy).WithTags(TagFeatureRBAC),
 		framework.NewTestDef(TestNoLogOrAuditConfig).WithTags(TagSuiteSanity, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingAndAuditingDefaults).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),
 		framework.NewTestDef(TestLoggingAndAuditingNativeCleanup).WithTags(TagSuiteSanity, TagFeatureLogging, TagSuitePlatform),

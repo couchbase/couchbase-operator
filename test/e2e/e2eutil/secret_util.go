@@ -95,15 +95,15 @@ func GetClusterAuth(kubeClient kubernetes.Interface, namespace string, secretNam
 // password.  Note this will affect all subsequent tests, but that's not a bad thing
 // because they all should refer to the secret and not hard code "password" anywhere!
 func MustRotateClusterPassword(t *testing.T, k8s *types.Cluster) {
+	MustRotateClusterPasswordToValue(t, k8s, RandomString(32))
+}
+
+func MustRotateClusterPasswordToValue(t *testing.T, k8s *types.Cluster, value string) {
 	secret := MustGetSecret(t, k8s, k8s.DefaultSecret.Name)
 
-	password := []byte(RandomString(32))
-
-	secret.Data["password"] = password
+	secret.Data["password"] = []byte(value)
 
 	if err := UpdateSecret(k8s.KubeClient, secret.Namespace, secret); err != nil {
 		Die(t, err)
 	}
-
-	k8s.DefaultSecret.Data["password"] = password
 }

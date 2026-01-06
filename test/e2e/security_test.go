@@ -7,9 +7,11 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 )
 
 // testRotateAdminPassword is a basic sanity test to ensure the operator rotates
@@ -42,6 +44,43 @@ func TestRotateAdminPassword(t *testing.T) {
 	defer cleanup()
 
 	testRotateAdminPassword(t, kubernetes, nil, nil)
+}
+
+func TestRotateAdminPasswordWithPasswordPolicy(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	// Create the cluster with a password policy.
+	cluster := clusterOptions().WithEphemeralTopology(constants.Size1).Generate(kubernetes)
+	cluster.Spec.Security.PasswordPolicy = &couchbasev2.PasswordPolicySpec{
+		EnforceSpecialChars: util.BoolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Rotate the password to a random value without a special character.
+	e2eutil.MustRotateClusterPassword(t, kubernetes)
+
+	// Sleep to ensure we go over reconcile loops.
+	time.Sleep(20 * time.Second)
+
+	// Rotate the password to a value that complies with the password policy.
+	e2eutil.MustRotateClusterPasswordToValue(t, kubernetes, e2eutil.RandomString(32)+"!")
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, k8sutil.EventReasonAdminPasswordChangedEvent(cluster), 10*time.Second, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Password policy edited
+	// * Password rotated only once
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestRotateAdminPasswordTLS(t *testing.T) {
