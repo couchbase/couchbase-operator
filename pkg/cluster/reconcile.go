@@ -1458,36 +1458,34 @@ func (c *Cluster) reconcileStatus() error {
 }
 
 func (c *Cluster) reconcilePasswordPolicy() error {
-	if c.cluster.Spec.Security.PasswordPolicy == nil {
-		return nil
-	}
-
 	current := couchbaseutil.PasswordPolicySettings{}
 	if err := couchbaseutil.GetPasswordPolicySettings(&current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
-	requested := current
+	requested := defaultPasswordPolicySettings()
 
-	policy := c.cluster.Spec.Security.PasswordPolicy
-	if policy.MinLength != nil {
-		requested.MinLength = policy.MinLength
-	}
+	// If password policy is set in the spec, override defaults with spec values
+	if policy := c.cluster.Spec.Security.PasswordPolicy; policy != nil {
+		if policy.MinLength != nil {
+			requested.MinLength = policy.MinLength
+		}
 
-	if policy.EnforceUppercase != nil {
-		requested.EnforceUppercase = policy.EnforceUppercase
-	}
+		if policy.EnforceUppercase != nil {
+			requested.EnforceUppercase = policy.EnforceUppercase
+		}
 
-	if policy.EnforceLowercase != nil {
-		requested.EnforceLowercase = policy.EnforceLowercase
-	}
+		if policy.EnforceLowercase != nil {
+			requested.EnforceLowercase = policy.EnforceLowercase
+		}
 
-	if policy.EnforceDigits != nil {
-		requested.EnforceDigits = policy.EnforceDigits
-	}
+		if policy.EnforceDigits != nil {
+			requested.EnforceDigits = policy.EnforceDigits
+		}
 
-	if policy.EnforceSpecialChars != nil {
-		requested.EnforceSpecialChars = policy.EnforceSpecialChars
+		if policy.EnforceSpecialChars != nil {
+			requested.EnforceSpecialChars = policy.EnforceSpecialChars
+		}
 	}
 
 	if reflect.DeepEqual(current, requested) {
@@ -1500,5 +1498,20 @@ func (c *Cluster) reconcilePasswordPolicy() error {
 
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("password policy", c.cluster))
 
+	// Only reconcile temporary passwords if a policy was explicitly set, the function handles the nil case.
 	return c.reconcileTemporaryPasswords(true)
+}
+
+// defaultPasswordPolicySettings returns the Couchbase Server default password policy settings.
+func defaultPasswordPolicySettings() couchbaseutil.PasswordPolicySettings {
+	defaultMinLength := 6
+	defaultFalse := false
+
+	return couchbaseutil.PasswordPolicySettings{
+		MinLength:           &defaultMinLength,
+		EnforceUppercase:    &defaultFalse,
+		EnforceLowercase:    &defaultFalse,
+		EnforceDigits:       &defaultFalse,
+		EnforceSpecialChars: &defaultFalse,
+	}
 }
