@@ -1712,7 +1712,48 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 					},
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later`},
+			expectedErrors: []string{`spec.cluster.data.diskUsageLimit can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpUserTimeoutUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPUserTimeout: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpUserTimeout can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveProbesUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveProbes: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveProbes can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveIntervalUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveInterval: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveInterval can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveIntervalUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					TCPKeepAliveInterval: util.IntPtr(10),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateTcpKeepAliveIdleUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveIdle: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveIdle can only be set for Couchbase Server 8.0.0+`},
 		},
 		{
 			name: "TestValidateDataThreadSettingsFixedValueInvalid",
@@ -2865,6 +2906,15 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.warmupBehavior"},
+		},
+		{
+			name: "TestValidateBucketInvalidDurabilityImpossibleFallback",
+			mutations: patchMap{
+				"bucket7": jsonpatch.NewPatchSet().
+					Replace("/spec/durabilityImpossibleFallback", "fallbackToActiveAck"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+"},
 		},
 	}
 

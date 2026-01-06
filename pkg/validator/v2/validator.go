@@ -104,7 +104,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
-		checkConstraintsResourceManagement,
+		checkConstraintsDataSettings,
 		checkConstraintsIndexerSettings,
 		checkConstraintEncryptionKeys,
 		checkConstraintsPasswordPolicy,
@@ -2070,6 +2070,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketEncryptionAtRestSettings(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketUnsupportedFields(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -5634,20 +5638,39 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 	return nil
 }
 
-func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.ClusterSettings.Data == nil {
+func checkConstraintsDataSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	dataSettings := cluster.Spec.ClusterSettings.Data
+	if dataSettings == nil {
 		return nil
 	}
 
-	if cluster.Spec.ClusterSettings.Data.DiskUsageLimit != nil {
-		atleast80, err := cluster.IsAtLeastVersion("8.0.0")
-		if err != nil {
-			return err
-		}
+	atLeast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
 
-		if !atleast80 {
-			return fmt.Errorf("spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later")
-		}
+	if atLeast80 {
+		return nil
+	}
+
+	if dataSettings.DiskUsageLimit != nil {
+		return fmt.Errorf("spec.cluster.data.diskUsageLimit can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPUserTimeout != nil {
+		return fmt.Errorf("spec.cluster.data.tcpUserTimeout can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveProbes != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveProbes can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveInterval != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveInterval can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveIdle != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveIdle can only be set for Couchbase Server 8.0.0+")
 	}
 
 	return nil
@@ -6343,4 +6366,39 @@ func checkBucketCRDFieldsForNonDefaultUnsupportedFields(v *types.Validator, buck
 	}
 
 	return warnings, nil
+}
+
+func checkBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return err
+		}
+
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return err
+		}
+
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
+
+		if atLeast80 {
+			continue
+		}
+
+		if bucket.Spec.DurabilityImpossibleFallback != "" {
+			return fmt.Errorf("spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+")
+		}
+	}
+
+	return nil
 }
