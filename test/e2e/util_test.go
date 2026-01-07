@@ -109,6 +109,7 @@ func registerTests() {
 		framework.NewTestDef(TestRBACRoleValidation76).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestRBACRoleValidation80).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestRBACScopeValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestRBACUserVersionConstraints).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestRBACCollectionValidationCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestRBACValidationLDAP).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscalerValidation).WithTags(TagSuiteValidation, TagSuitePlatform),

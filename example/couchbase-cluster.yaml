@@ -13,6 +13,9 @@ spec:
     adminSecret: cb-example-auth
     rbac:
       managed: true
+      selector:
+        matchLabels:
+          cluster: "cb-example"
   buckets:
     managed: true
   upgradeProcess: InPlaceUpgrade

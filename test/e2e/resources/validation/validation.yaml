@@ -651,3 +651,14 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket7
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: user3
+  labels:
+    cluster: some-cluster-label
+spec:
+  fullName: Administrator
+  authDomain: local
+  authSecret: test-example-auth

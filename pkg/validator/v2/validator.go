@@ -2471,15 +2471,15 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		if authSecretName == "" {
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
 			errs = append(errs, errors.Required(emsg, user.Name, nil))
-		} else if v.Options.ValidateSecrets {
-			if err := checkConstraintUserCompliesWithPasswordPolicies(v, user); err != nil {
-				errs = append(errs, err)
-			}
 		}
 	case couchbasev2.LDAPAuthDomain:
 		// authSecret not accepted for LDAP user
 		if authSecretName := user.Spec.AuthSecret; authSecretName != "" {
 			errs = append(errs, fmt.Errorf("spec.authSecret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
+		}
+
+		if user.Spec.Password != nil {
+			errs = append(errs, fmt.Errorf("spec.password not allowed for LDAP user `%s`", user.Name))
 		}
 
 		if user.Spec.Locked != nil && *user.Spec.Locked {
@@ -2488,6 +2488,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	default:
 		return nil, fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
+
+	errs = append(errs, checkClusterUserConstraints(v, user, nil)...)
 
 	if errs != nil {
 		return nil, errors.CompositeValidationError(errs...)
@@ -2519,58 +2521,15 @@ func checkPasswordAuthSecret(v *types.Validator, user *couchbasev2.CouchbaseUser
 	return string(pw), nil
 }
 
-// checkConstraintUserCompliesWithPasswordPolicies checks that the user's authSecret password complies with the password policy of every cluster that the user is/will be a member of.
-func checkConstraintUserCompliesWithPasswordPolicies(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
-	if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
-		return nil
-	}
-
-	allClusters, err := v.Abstraction.GetCouchbaseClusters(user.Namespace)
-	if err != nil {
-		return err
-	}
-
-	// We need to check against every cluster that the user is/will be a member of to ensure the password complies with their password policy.
-	for _, cluster := range allClusters.Items {
-		if err := checkUserPasswordForCluster(v, &cluster, user); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // checkUserPasswordForCluster checks that a given password is valid for a CouchbaseCluster to create a new CouchbaseUser.
 // This will return nil if the user is not managed by the cluster and therefore not subject to the password policy, or if the user's authSecret password complies with the cluster's password policy.
 func checkUserPasswordForCluster(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) error {
-	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
+	if cluster.Spec.Security.PasswordPolicy == nil {
 		return nil
-	}
-
-	name := user.Name
-	if user.Spec.Name != "" {
-		name = user.Spec.Name
 	}
 
 	// We can ignore users that already exist on a cluster as subsequent changes to the password secret are irrelevant.
-	if slices.Contains(cluster.Status.Users, name) {
-		return nil
-	}
-
-	// User's aren't created by the operator unless they are a member of a CouchbaseGroup and have roles bound to them. However, climbing this tree
-	// during validation may lead to confusing DAC rejections where changing a role is not allowed because of a user password issue, so
-	// instead we just use the rbac selector against the user.
-	selector := labels.Everything()
-	if cluster.Spec.Security.RBAC.Selector != nil {
-		s, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
-		if err != nil {
-			return err
-		}
-
-		selector = s
-	}
-
-	if !selector.Matches(labels.Set(user.Labels)) {
+	if slices.Contains(cluster.Status.Users, user.GetUserID()) {
 		return nil
 	}
 
@@ -5437,10 +5396,8 @@ func checkClusterRBACConstraints(v *types.Validator, cluster *couchbasev2.Couchb
 		return err
 	}
 
-	if v.Options.ValidateSecrets {
-		if err := checkClusterUserPasswordConstraints(v, cluster); err != nil {
-			return err
-		}
+	if err := checkClusterUserRbacConstraints(v, cluster, nil); err != nil {
+		return err
 	}
 
 	return nil
@@ -5455,33 +5412,6 @@ func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.C
 
 	for _, c := range allClusters.Items {
 		return checkClusterGroupRBACConstraints(v, &c, group)
-	}
-
-	return nil
-}
-
-// checkClusterUserPasswordConstraints checks that any internal auth domain users who will be managed by the cluster but do not exist yet have an initial password that complies with the cluster's password policy.
-// This check excludes users that are already managed by the cluster (in the status.users slice), as changes to the authSecret password are irrelevant once a user has already been created.
-// We already validate this when a CouchbaseUser is created, but this will help protect against race conditions.
-func checkClusterUserPasswordConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
-		return nil
-	}
-
-	users, err := v.Abstraction.GetCouchbaseUsers(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
-	if err != nil {
-		return err
-	}
-
-	for _, user := range users.Items {
-		// Only check internal auth domain users
-		if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
-			continue
-		}
-
-		if err := checkUserPasswordForCluster(v, cluster, &user); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -6224,6 +6154,36 @@ func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.
 	return relatedClusters, nil
 }
 
+func getUserRelatedClusters(v *types.Validator, user *couchbasev2.CouchbaseUser) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(user.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.Security.RBAC.Managed {
+			continue
+		}
+
+		selector := labels.Everything()
+		if cluster.Spec.Security.RBAC.Selector != nil {
+			selector, err = metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if !selector.Matches(labels.Set(user.Labels)) {
+			continue
+		}
+
+		relatedClusters = append(relatedClusters, &cluster)
+	}
+
+	return relatedClusters, nil
+}
+
 func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
@@ -6423,6 +6383,113 @@ func checkBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.Couchb
 		if bucket.Spec.DurabilityImpossibleFallback != "" {
 			return fmt.Errorf("spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+")
 		}
+	}
+
+	return nil
+}
+
+func checkClusterUserRbacConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) error {
+	if !cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	users := []*couchbasev2.CouchbaseUser{}
+	if user != nil {
+		users = append(users, user)
+	} else {
+		allUsers, err := v.Abstraction.GetCouchbaseUsers(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return err
+		}
+
+		for _, user := range allUsers.Items {
+			selector := labels.Everything()
+			if cluster.Spec.Security.RBAC.Selector != nil {
+				s, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
+				if err != nil {
+					return err
+				}
+				selector = s
+			}
+
+			// Current user pw and version validation currently only applies to internal users.
+			if selector.Matches(labels.Set(user.Labels)) && user.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
+				users = append(users, &user)
+			}
+		}
+	}
+
+	for _, user := range users {
+		if errs := checkClusterUserConstraints(v, user, cluster); errs != nil {
+			return errors.CompositeValidationError(errs...)
+		}
+	}
+
+	return nil
+}
+
+// checkClusterUserConstraints validates user constraints that are cluster specific, e.g. versions.
+// A user must be provided and if a cluster is provided, we will validate against that cluster. If not, we will fetch all clusters that have an rbac selector
+// that matches the user. The Operator uses a tree of groups/users/rolebindings to determine which clusters are relevant to a given user,
+// but for validation this becomes quite a heavy check, so until we can correctly cache the tree, we'll just do a more lightweight check.
+func checkClusterUserConstraints(v *types.Validator, user *couchbasev2.CouchbaseUser, cluster *couchbasev2.CouchbaseCluster) []error {
+	var errs []error
+	if user == nil {
+		return errs
+	}
+
+	var clusters []*couchbasev2.CouchbaseCluster
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		allClusters, err := getUserRelatedClusters(v, user)
+		if err != nil {
+			return []error{err}
+		}
+
+		clusters = allClusters
+	}
+
+	for _, cluster := range clusters {
+		if !cluster.Spec.Security.RBAC.Managed {
+			continue
+		}
+
+		if v.Options.ValidateSecrets {
+			if err := checkUserPasswordForCluster(v, cluster, user); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if err := checkUserClusterVersionConstraints(user, cluster); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func checkUserClusterVersionConstraints(user *couchbasev2.CouchbaseUser, cluster *couchbasev2.CouchbaseCluster) error {
+	atLeast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if atLeast80 {
+		return nil
+	}
+
+	errs := []error{}
+	if user.Spec.Password != nil {
+		errs = append(errs, fmt.Errorf("spec.password is only supported for Couchbase Server versions 8.0.0+ for user `%s`", user.Name))
+	}
+
+	if user.Spec.Locked != nil && *user.Spec.Locked {
+		errs = append(errs, fmt.Errorf("spec.locked is only supported for Couchbase Server versions 8.0.0+ for user `%s`", user.Name))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil

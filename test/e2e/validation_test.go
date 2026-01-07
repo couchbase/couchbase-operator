@@ -4079,6 +4079,14 @@ func TestRBACValidationCreate(t *testing.T) {
 			shouldFail: false,
 		},
 		{
+			name: "TestValidateLDAPDomain",
+			mutations: patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "external").Add("/spec/locked", true).Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+				ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password not allowed for LDAP user `user2`", "spec.locked not allowed for LDAP user `user2`"},
+		},
+		{
 			name:        "TestValidateClusterRole",
 			mutations:   patchMap{"admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0/name", "cluster_admin")},
 			validations: patchMap{"admin-group": jsonpatch.NewPatchSet().Test("/spec/roles/0/name", "cluster_admin")},
@@ -4224,6 +4232,41 @@ func TestRBACRoleValidation76(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_external"})},
 			shouldFail:     true,
 			expectedErrors: []string{`role user_admin_external in group admin-group requires Couchbase Server 8.0\+`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestRBACUserVersionConstraints(t *testing.T) {
+	testDefs := []testDef{
+		{
+			// user1 is created before the cluster, but we should still fail on cluster validation.
+			name: "TestUserVersionConstraintsValidatedOnCluster",
+			mutations: patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+				ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+			}).Add("/spec/locked", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password is only supported for Couchbase Server versions 8.0.0+", "spec.locked is only supported for Couchbase Server versions 8.0.0+"},
+		},
+		{
+			// user3 is created after the cluster, so it should pass validation on an 8.0.0 cluster
+			name: "TestUserVersionConstraintsValidatedAfterCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/spec/image", "couchbase/server:8.0.0"),
+				"user3": jsonpatch.NewPatchSet().Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+					ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+				}).Add("/spec/locked", true)},
+			shouldFail: false,
+		},
+		{
+			// user3 should fail when it has a password and locked spec and is selected by a non 8.0.0 cluster selector.
+			name: "TestUserVersionConstraintsSelectedByNon80ClusterSelector",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/security/rbac/selector", &metav1.LabelSelector{MatchLabels: map[string]string{"cluster": "some-cluster-label"}}),
+				"user3": jsonpatch.NewPatchSet().Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+					ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+				}).Add("/spec/locked", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password is only supported for Couchbase Server versions 8.0.0\\+ for user `user3`", "spec.locked is only supported for Couchbase Server versions 8.0.0\\+ for user `user3`"},
 		},
 	}
 
