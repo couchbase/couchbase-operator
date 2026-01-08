@@ -2745,11 +2745,36 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		}
 	}
 
+	errs = append(errs, checkConstraintsEnvVarsBackup(backup)...)
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
+}
+
+func checkConstraintsEnvVarsBackup(backup *couchbasev2.CouchbaseBackup) []error {
+	var errs []error
+
+	for _, env := range backup.Spec.Env {
+		if env.Value != "" && env.ValueFrom != nil {
+			errs = append(errs, fmt.Errorf("spec.env[%s] cannot have both value and valueFrom set", env.Name))
+		}
+
+		if env.ValueFrom != nil && env.ValueFrom.ConfigMapKeyRef != nil {
+			match, err := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`, env.ValueFrom.ConfigMapKeyRef.Name)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			if !match {
+				errs = append(errs, fmt.Errorf("spec.env[%s].valueFrom.configMapKeyRef.name %s is not a valid config map name", env.Name, env.ValueFrom.ConfigMapKeyRef.Name))
+			}
+		}
+	}
+
+	return errs
 }
 
 // checks that if the secret for the object store exists,
