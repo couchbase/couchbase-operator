@@ -5260,6 +5260,10 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	}
 
 	for _, cbBucket := range couchbaseBuckets.Items {
+		if err := annotations.Populate(&cbBucket.Spec, cbBucket.Annotations); err != nil {
+			return err
+		}
+
 		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster); err != nil {
 			return err
 		}
@@ -6229,6 +6233,7 @@ func getUserRelatedClusters(v *types.Validator, user *couchbasev2.CouchbaseUser)
 	return relatedClusters, nil
 }
 
+//nolint:gocognit
 func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
@@ -6246,6 +6251,12 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 	// we can still validate the bucket settings that are not dependent on the cluster version.
 	if len(clusters) == 0 && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 		if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
+			return err
+		}
+	}
+
+	if len(clusters) == 0 && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		if err := checkBucketHistoryRetentionSettings(bucket, couchbasev2.CouchbaseStorageBackendCouchstore); err != nil {
 			return err
 		}
 	}
