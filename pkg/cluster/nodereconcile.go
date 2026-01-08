@@ -2058,8 +2058,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
 
-		c.cluster.Status.SetRebalancingCondition()
-
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
 			return err
 		}

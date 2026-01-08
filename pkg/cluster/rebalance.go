@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -200,6 +200,8 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	// Notify that we are starting a rebalance, the actual client operation
 	// is blocking so we need to report now or kubernetes will be out of sync
 	c.cluster.Status.SetUnbalancedCondition()
+	c.cluster.Status.SetRebalancingCondition()
+	defer c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 
 	if err := c.updateCRStatus(); err != nil {
 		return err
@@ -300,7 +302,6 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
-	c.cluster.Status.ClearCondition(v2.ClusterConditionRebalancing)
 
 	if err := c.state.Delete(persistence.RebalanceClusteredMembers); err != nil {
 		return err
