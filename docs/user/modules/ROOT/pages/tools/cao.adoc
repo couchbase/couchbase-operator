@@ -1232,6 +1232,13 @@ Whether to scope the Operator to a 'namespace' or to the 'cluster'.
 +
 Separates cluster name and namespace from certain metrics.
 
+--use-high-cardinality-metrics::
+*Type*: bool
++
+*Default*: false
++
+Adds high cardinality labels for http request metrics.
+
 --with-resources::
 *Type*: bool
 +
@@ -2334,6 +2341,13 @@ Whether to scope the Operator to a 'namespace' or to the 'cluster'.
 *Default*: true
 +
 Separates cluster name and namespace from certain metrics.
+
+--use-high-cardinality-metrics::
+*Type*: bool
++
+*Default*: false
++
+Adds high cardinality labels for http request metrics.
 
 --with-resources::
 *Type*: bool
