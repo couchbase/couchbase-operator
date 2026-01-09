@@ -113,7 +113,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
 		checkConstraintTwoDataNodesForDeltaRecovery,
-		checkConstraintDeltaRecoveryDeprecated,
+		checkConstraintUpgradeFieldsDeprecated,
 		checkConstraintServicelessOverAdminService,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
@@ -1219,9 +1219,23 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 	return nil
 }
 
-func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+func checkConstraintUpgradeFieldsDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	var warnings []string
+
 	if cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
-		return []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"}, nil
+		warnings = append(warnings, "DeltaRecovery is deprecated, please use InPlaceUpgrade instead")
+	}
+
+	if cluster.Spec.UpgradeProcess != nil {
+		warnings = append(warnings, "spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead")
+	}
+
+	if cluster.Spec.UpgradeStrategy != nil {
+		warnings = append(warnings, "spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead")
+	}
+
+	if len(warnings) > 0 {
+		return warnings, nil
 	}
 
 	return nil, nil
@@ -6289,6 +6303,8 @@ func checkUpgradeOrderEntriesExist(t couchbasev2.UpgradeOrderType, cluster *couc
 				errs = append(errs, fmt.Errorf("upgrade order contains servergroup %s not found in the cluster spec", uOServerGroup))
 			}
 		}
+	case couchbasev2.UpgradeOrderTypeNodes:
+	// We don't generate node names from the spec as they are ephemeral, so we'll skip validation here for now.
 	default:
 		errs = append(errs, fmt.Errorf("unknown upgrade order type %v", t))
 	}

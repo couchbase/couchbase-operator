@@ -773,6 +773,29 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"},
 		},
 		{
+			name:             "TestValidateUpgradeProcessDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "SwapRebalance")},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
+			name:             "TestValidateUpgradeStrategyDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "RollingUpgrade")},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
+			name: "TestValidateMultipleDeprecatedUpgradeFields",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.DeltaRecovery}).
+				Replace("/spec/upgradeStrategy", "RollingUpgrade").
+				Replace("/spec/upgradeProcess", "DeltaRecovery")},
+			shouldFail: false,
+			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead",
+				"spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead",
+				"spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
 			name: "TestValidateInPlaceUpgradeWithOneDataNodeMultiNodeCluster",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "InPlaceUpgrade").
 				Replace("/spec/servers", []couchbasev2.ServerConfig{
