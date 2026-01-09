@@ -17,7 +17,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -354,6 +353,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleNodeServices,
 		(*ReconcileMachine).handleAutoscaleServerConfigs,
 		(*ReconcileMachine).handleRebalance,
+		(*ReconcileMachine).handleUpgradeStabilizationPeriod,
 		(*ReconcileMachine).handleDeadMembers,
 		(*ReconcileMachine).handleNotifyFinished,
 	}
@@ -1777,13 +1777,12 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	r.checkUpgradeStabilizationPeriod()
-
-	if !r.c.cluster.IsReadyToUpgrade() {
+	if c.cluster.UpgradeWaitingForStabilizationPeriod() {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
-		log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.namespacedName())
 		return nil
 	}
+
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 
 	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
@@ -1868,9 +1867,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	// Handle the stabilization period after the upgrade has completed even if some nodes fail upgrade.
-	defer r.handleApplyingUpgradeStabilizationPeriod()
-
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
 		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 
@@ -1894,73 +1890,28 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	return nil
 }
 
-func (r *ReconcileMachine) handleApplyingUpgradeStabilizationPeriod() {
+// handleApplyingUpgradeStabilizationPeriod adds the waiting between upgrades condition to the cluster
+// if a stabilization period is configured in the spec and at least one member has been upgraded this
+// reconcile loop.
+func (r *ReconcileMachine) handleUpgradeStabilizationPeriod(c *Cluster) error {
 	upgradeSpec := r.c.cluster.Spec.Upgrade
 	if upgradeSpec == nil {
-		return
+		return nil
 	}
 
 	if upgradeSpec.StabilizationPeriod == nil {
-		return
+		return nil
 	}
 
 	if len(r.upgradedMembers) == 0 {
-		return
+		return nil
 	}
 
-	r.c.cluster.Status.SetWaitingBetweenUpgrades()
-}
-
-func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
-	upgradeSpec := r.c.cluster.Spec.Upgrade
-	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
-		isWaiting := r.c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
-		if isWaiting {
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-		}
-
-		return
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
+		r.c.cluster.Status.SetWaitingBetweenUpgrades()
 	}
 
-	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
-
-	// If we are waiting then check if the stabilization period has passed.
-	if waitingCond != nil && waitingCond.Status == v1.ConditionTrue {
-		balancedCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionBalanced)
-		if balancedCond == nil || balancedCond.Status == v1.ConditionFalse {
-			return
-		}
-
-		balancedLastTransitionTime, err := time.Parse(time.RFC3339, balancedCond.LastTransitionTime)
-		if err != nil {
-			// This can happen if someone has messed with the status fields.
-			// We'll just assume that we don't need to wait.
-			log.Info("[WARN]]: failed to parse last update time for node balanced condition", "error", err)
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-
-			return
-		}
-
-		waitingLastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
-		if err != nil {
-			// This can happen if someone has messed with the status fields.
-			// We'll just assume that we don't need to wait.
-			log.Info("[WARN]]: failed to parse last update time for node upgrade condition", "error", err)
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-
-			return
-		}
-
-		if waitingLastTransitionTime.After(balancedLastTransitionTime) {
-			return
-		}
-
-		stabilizationDuration := upgradeSpec.StabilizationPeriod.Duration
-
-		if time.Now().After(balancedLastTransitionTime.Add(stabilizationDuration)) {
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-		}
-	}
+	return nil
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.

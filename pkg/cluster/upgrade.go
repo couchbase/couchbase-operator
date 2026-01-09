@@ -521,7 +521,6 @@ func (c *Cluster) reportUpgradeComplete() error {
 	}
 
 	if !candidates.Empty() {
-		log.Info("Pod upgrade candidates remaining", "cluster", c.namespacedName(), "names", candidates.Names())
 		return nil
 	}
 
@@ -541,6 +540,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	c.raiseEvent(k8sutil.UpgradeFinishedEvent(c.cluster))
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 
 	upgradeStartTime, err := c.state.Get(persistence.UpgradeTime)
 	if err != nil {

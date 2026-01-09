@@ -822,11 +822,6 @@ func (cs *ClusterStatus) SetWaitingBetweenUpgrades() {
 	cs.setClusterCondition(c)
 }
 
-func (cs *ClusterStatus) SetNotWaitingBetweenUpgrades() {
-	c := newClusterCondition(ClusterConditionWaitingBetweenUpgrades, v1.ConditionFalse, "Waiting", "Waiting before starting next upgrade")
-	cs.setClusterCondition(c)
-}
-
 func (cs *ClusterStatus) SetWaitingBetweenMigrations() {
 	c := newClusterCondition(ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, "Waiting", "Waiting before starting next migration")
 	cs.setClusterCondition(c)
@@ -1656,14 +1651,34 @@ func ServerServiceListToSpecServiceList(services []string) (ServiceList, error) 
 
 	return list, nil
 }
-func (c *CouchbaseCluster) IsReadyToUpgrade() bool {
-	cond := c.Status.GetCondition(ClusterConditionWaitingBetweenUpgrades)
 
-	if cond == nil {
-		return true
+func (c *CouchbaseCluster) UpgradeWaitingForStabilizationPeriod() bool {
+	upgradeSpec := c.Spec.Upgrade
+	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
+		return false
 	}
 
-	return cond.Status != v1.ConditionTrue
+	waitingCond := c.Status.GetCondition(ClusterConditionWaitingBetweenUpgrades)
+	if waitingCond == nil || waitingCond.Status == v1.ConditionFalse {
+		return false
+	}
+
+	waitingLastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
+	if err != nil {
+		// This can happen if someone has messed with the status fields.
+		// We'll just assume that we don't need to wait.
+		log.Info("[WARN]]: failed to parse last update time for node upgrade condition", "error", err)
+		return false
+	}
+
+	stabalizationEndTime := waitingLastTransitionTime.Add(upgradeSpec.StabilizationPeriod.Duration)
+
+	if time.Now().After(stabalizationEndTime) {
+		return false
+	}
+
+	log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.NamespacedName(), "stabilizationEndTime", stabalizationEndTime)
+	return true
 }
 
 func (c *CouchbaseCluster) IsReadyToAttemptMigration() bool {

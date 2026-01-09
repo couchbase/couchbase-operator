@@ -307,17 +307,16 @@ func TestUpgradeStabilizationPeriod(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-
 	// Check that the cluster goes into the waiting state the right number of times
-	for i := 0; i < clusterSize-1; i++ {
-		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 10*time.Minute)
+	for i := 0; i < clusterSize; i++ {
+		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
-		// Validate that it stays in the waiting state for the right amount of time (minus 10 seconds so not too flakey)
-		e2eutil.AssertClusterConditionFor(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, time.Duration(stabilizationPeriodS-10)*time.Second)
-
-		if i < clusterSize-2 {
-			e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionFalse, cluster, 10*time.Minute)
+		if i < clusterSize-1 {
+			e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+			e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 10*time.Minute)
+			// Validate that it stays in the waiting state for the right amount of time (minus 10 seconds so not too flakey)
+			e2eutil.AssertClusterConditionFor(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, time.Duration(stabilizationPeriodS-10)*time.Second)
+			e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 		}
 	}
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
