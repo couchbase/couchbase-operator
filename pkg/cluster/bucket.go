@@ -523,7 +523,7 @@ func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 //
 //nolint:gocognit,gocyclo
 func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
-	requested, err := c.gatherBuckets()
+	unfilteredRequested, err := c.gatherBuckets()
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
@@ -545,6 +545,21 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	isOver71, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
+	}
+
+	targetVersion80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	requested := []couchbaseutil.Bucket{}
+	for _, bucket := range unfilteredRequested {
+		if bucket.BucketType == constants.BucketTypeMemcached && targetVersion80 {
+			log.Info("Memcached buckets are not supported on Couchbase Server versions 8.0.0+ and will be ignored.", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName)
+			continue
+		}
+
+		requested = append(requested, bucket)
 	}
 
 	atLeast80 := c.SupportsVersionFeatures("8.0.0")
@@ -571,12 +586,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				}
 
 				doCrossClusterVersioningChecks(&r, &a, c.cluster)
-
-				// Ignore memcached buckets if the server version is 8.0.0 or higher.
-				if r.BucketType == constants.BucketTypeMemcached && atLeast80 {
-					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
-					continue
-				}
 
 				// We should never set the numVBuckets field for buckets pre 8.0.0.
 				// This shouldn't get through the dac but we're adding some extra protection.
@@ -623,11 +632,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		if !found {
 			if !atLeast80 {
-				if r.BucketType == constants.BucketTypeMemcached {
-					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
-					continue
-				}
-
 				// Dac should prevent this from getting through but we're adding some extra protection.
 				r.NumVBuckets = nil
 			}
@@ -643,7 +647,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	for _, a := range actual {
 		found := false
 
-		for _, r := range requested {
+		for _, r := range unfilteredRequested {
 			if a.BucketName == r.BucketName {
 				if found = c.isUnreconilableBucket(a); found {
 					continue
