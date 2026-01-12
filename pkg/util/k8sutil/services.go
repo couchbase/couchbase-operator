@@ -502,9 +502,15 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 }
 
 // applyIPFamilyConfig sets the IPFamilies and IPFamilyPolicy on a service based on
-// the cluster's addressFamily configuration.
+// the cluster's addressFamily configuration. If the address family is not explicitly set,
+// we won't configure the service and let the cluster handle it.
 func applyIPFamilyConfig(service *v1.Service, cluster *couchbasev2.CouchbaseCluster) {
-	switch cluster.AddressFamily() {
+	aFamily := cluster.Spec.Networking.AddressFamily
+	if aFamily == nil {
+		return
+	}
+
+	switch *aFamily {
 	case couchbasev2.IPv4, couchbasev2.IPv4Only:
 		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
 		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicySingleStack}[0]
