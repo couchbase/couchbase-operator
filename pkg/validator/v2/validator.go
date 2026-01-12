@@ -4847,6 +4847,10 @@ func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev
 		return nil
 	}
 
+	if (curr.HasCondition(couchbasev2.ClusterConditionBucketMigration) || prev.HasCondition(couchbasev2.ClusterConditionBucketMigration)) && prev.Spec.Image != curr.Spec.Image {
+		return fmt.Errorf("cannot upgrade cluster while bucket migration is in progress")
+	}
+
 	startVersion, err := k8sutil.CouchbaseVersion(prev.Spec.CouchbaseImage())
 	if err != nil {
 		return err
