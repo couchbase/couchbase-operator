@@ -933,17 +933,7 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 		port = AdminServicePortTLS
 	}
 
-	container.ReadinessProbe = &v1.Probe{
-		ProbeHandler: v1.ProbeHandler{
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromInt(port),
-			},
-		},
-		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
-		TimeoutSeconds:      5,
-		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
-		FailureThreshold:    1,
-	}
+	container.ReadinessProbe = createReadinessProbe(port, readinessConfig)
 
 	applyContainerStorage(&container, pvcState)
 
@@ -1069,6 +1059,23 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 	addOwnerRefToObject(pod, cluster.AsOwner())
 
 	return pod, nil
+}
+
+// createReadinessProbe creates a TCP socket readiness probe that connects to the pod's IP.
+// Since IPv6 can now be configured as the primary pod IP, the TCP socket probe will
+// connect to the appropriate IP family (IPv4 or IPv6) based on pod.status.podIP.
+func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Probe {
+	return &v1.Probe{
+		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
+		TimeoutSeconds:      5,
+		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
+		FailureThreshold:    1,
+		ProbeHandler: v1.ProbeHandler{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.FromInt(port),
+			},
+		},
+	}
 }
 
 func applyContainerStorage(container *v1.Container, pvcState *PersistentVolumeClaimState) {
