@@ -1155,7 +1155,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	var scheduledScaling couchbasev2.ScalingMessageList
 
-	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return err
 	}
@@ -1171,8 +1171,8 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 			continue
 		}
 
-		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
-			log.Info("[WARN] Serviceless nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !arbiterNodesSupported {
+			log.Info("[WARN] Arbiter nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
 			continue
 		}
 
@@ -1784,13 +1784,13 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 
-	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}
 
 	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
-	if CheckNodesToCreate(c.cluster, r.clusteredMembers, servicelessNodesSupported) {
+	if CheckNodesToCreate(c.cluster, r.clusteredMembers, arbiterNodesSupported) {
 		return nil
 	}
 
@@ -1915,9 +1915,9 @@ func (r *ReconcileMachine) handleUpgradeStabilizationPeriod(c *Cluster) error {
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
-func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, servicelessNodesSupported bool) bool {
+func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, arbiterNodesSupported bool) bool {
 	for _, serverSpec := range cluster.Spec.Servers {
-		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !arbiterNodesSupported {
 			continue
 		}
 

@@ -1851,6 +1851,69 @@ func TestServicesUpgradeOrder(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size2
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	cluster := clusterOptionsUpgrade().WithEphemeralAndArbiterTopology(classSize).Generate(kubernetes)
+	// servers [0] -> Data + Index + Query
+	// servers [1] -> Arbiter
+
+	// Set the upgrade order to upgrade the arbiter first, followed by anything else.
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServices,
+		UpgradeOrder: []string{
+			"arbiter",
+		},
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Start the upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	expectedIndexUpgradeOrder := []int{2, 3, 0, 1}
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(classSize * 2),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	for _, podIndex := range expectedIndexUpgradeOrder {
+		upgradeSequence := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, podIndex)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+		expectedEvents = append(expectedEvents, upgradeSequence)
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestServicesUpgradeOrderSharedServices(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

@@ -193,6 +193,10 @@ func (sc *ServerConfig) AutoscalerName(cluster string) string {
 	return name + "." + cluster
 }
 
+func (sc *ServerConfig) HasService(service Service) bool {
+	return slices.Contains(sc.Services, service) || (service == "arbiter" && len(sc.Services) == 0)
+}
+
 func (cs *ClusterSpec) Cleanup() {
 }
 

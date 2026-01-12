@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"encoding/json"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,7 +18,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing"}
+var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing", "arbiter"}
 
 func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	candidates := couchbaseutil.MemberSet{}
@@ -170,7 +169,7 @@ func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.Membe
 	for _, service := range servicesOrder {
 		for configName, members := range groupedCandidates {
 			serverClass := c.cluster.Spec.GetServerConfigByName(configName)
-			if serverClass != nil && slices.Contains(serverClass.Services, couchbasev2.Service(service)) {
+			if serverClass != nil && serverClass.HasService(couchbasev2.Service(service)) {
 				filteredCandidates.Merge(members)
 			}
 		}

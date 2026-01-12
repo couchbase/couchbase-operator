@@ -435,10 +435,10 @@ func (o *ClusterOptions) WithSplitEphemeralTopology(size int) *ClusterOptions {
 	return o
 }
 
-// WithEphemeralAndServicelessTopology just adds a serviceless class to the
+// WithEphemeralAndArbiterTopology just adds a arbiter class to the
 // Ephemeral topology.
-func (o *ClusterOptions) WithEphemeralAndServicelessTopology(size int) *ClusterOptions {
-	topology := e2espec.EphemeralAndServicelessTopology.DeepCopy()
+func (o *ClusterOptions) WithEphemeralAndArbiterTopology(size int) *ClusterOptions {
+	topology := e2espec.EphemeralAndArbiterTopology.DeepCopy()
 	topology[0].Size = size
 	topology[1].Size = size
 

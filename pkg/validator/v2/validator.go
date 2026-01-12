@@ -70,7 +70,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
-		checkoutConstraintNoServicelessClassBelow76,
+		checkoutConstraintNoArbiterClassBelow76,
 		checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
@@ -114,7 +114,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
 		checkConstraintTwoDataNodesForDeltaRecovery,
 		checkConstraintUpgradeFieldsDeprecated,
-		checkConstraintServicelessOverAdminService,
+		checkConstraintArbiterOverAdminService,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
@@ -1193,7 +1193,7 @@ func checkConstraintServerClassContainsDataService(_ *types.Validator, cluster *
 	return errors.Required("at least one \"data\" service", "spec.servers.services", nil)
 }
 
-func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkoutConstraintNoArbiterClassBelow76(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	clusterVersionImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
 	if err != nil {
 		return err
@@ -5496,13 +5496,13 @@ func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.
 	return nil
 }
 
-// checkConstraintServicelessOverAdminService returns a warning if the AdminService is used, recommending
-// using a serviceless server class instead.
-func checkConstraintServicelessOverAdminService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+// checkConstraintArbiterOverAdminService returns a warning if the AdminService is used, recommending
+// using an arbiter server class instead.
+func checkConstraintArbiterOverAdminService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	for _, server := range cluster.Spec.Servers {
 		for _, service := range server.Services {
 			if service == couchbasev2.AdminService {
-				return []string{fmt.Sprintf("Server class %s uses the admin service - it is recommended to use a serviceless server class ('[]') instead", server.Name)}, nil
+				return []string{fmt.Sprintf("Server class %s uses the admin service - it is recommended to use an arbiter server class ('[]') instead", server.Name)}, nil
 			}
 		}
 	}
@@ -6279,6 +6279,10 @@ func checkUpgradeOrderEntriesExist(t couchbasev2.UpgradeOrderType, cluster *couc
 		servicesMap := make(map[string]bool)
 
 		for _, server := range servers {
+			if len(server.Services) == 0 {
+				servicesMap["arbiter"] = true
+			}
+
 			for _, item := range server.Services {
 				servicesMap[item.String()] = true
 			}

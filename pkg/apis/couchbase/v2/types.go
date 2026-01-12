@@ -4792,7 +4792,7 @@ type ServerConfig struct {
 	// At least one class must contain the data service.  The field may contain
 	// any of "data", "index", "query", "search", "eventing" or "analytics".
 	// Each service may only be specified once. An empty list can also be specified
-	// for a serviceless class ("[]") if Couchbase version is 7.6.0 or greater.
+	// for an Arbiter class ("[]") if Couchbase version is 7.6.0 or greater.
 	// +listType=set
 	Services []Service `json:"services"`
 

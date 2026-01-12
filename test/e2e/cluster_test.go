@@ -1345,7 +1345,7 @@ func TestMovePod(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestServicelessClass(t *testing.T) {
+func TestArbiterClass(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1357,7 +1357,7 @@ func TestServicelessClass(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	cluster := clusterOptions().WithEphemeralAndServicelessTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralAndArbiterTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check the events match what we expect:
