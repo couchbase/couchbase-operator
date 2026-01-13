@@ -1613,6 +1613,14 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 		},
 	}
 
+	if sidecarConfig.TLS != nil {
+		loggingContainer.Ports = append(loggingContainer.Ports, v1.ContainerPort{
+			Name:          "https",
+			ContainerPort: tlsBasePort + loggingPort,
+			Protocol:      v1.ProtocolTCP,
+		})
+	}
+
 	if cluster.Spec.Security.SecurityContext != nil {
 		loggingContainer.SecurityContext = cluster.Spec.Security.SecurityContext
 	}
