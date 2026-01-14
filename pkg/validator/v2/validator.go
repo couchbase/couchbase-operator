@@ -5782,6 +5782,11 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 		return fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
 	}
 
+	// Encryption at rest cannot be enabled in mixed mode as it requires all nodes to be running Couchbase Server 8.0.0+
+	if cluster.HasCondition(couchbasev2.ClusterConditionMixedMode) {
+		return fmt.Errorf("encryption at rest cannot be enabled while cluster is in mixed mode")
+	}
+
 	encryptionAtRest := cluster.Spec.Security.EncryptionAtRest
 
 	// Get all encryption keys using the selector
