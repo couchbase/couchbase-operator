@@ -242,6 +242,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		c.GetCouchbaseCluster().Status.SetErrorCondition(strings.Join(validationErrors, "; "))
 	} else {
 		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterConditionError)
+		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterUnreconcilable)
 	}
 
 	if validationFailed {
