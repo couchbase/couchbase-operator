@@ -5,8 +5,10 @@ import (
 	"strconv"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func UniqueString(strList []string) bool {
@@ -96,4 +98,52 @@ func CheckDefaultStorageClassExists(scList *storagev1.StorageClassList) bool {
 
 func GenerateMemcachedBucketWarning(cluster *v2.CouchbaseCluster, memcachedBucket *v2.CouchbaseMemcachedBucket) string {
 	return fmt.Sprintf("memcached buckets are deprecated in Couchbase Server 8.0.0 and later, CouchbaseMemcachedBucket %s will be ignored for cluster %s", memcachedBucket.Name, cluster.NamespacedName())
+}
+
+func BucketStatusToCouchbaseBucket(status v2.BucketStatus) *v2.CouchbaseBucket {
+	return &v2.CouchbaseBucket{
+		Spec: v2.CouchbaseBucketSpec{
+			Name:               v2.BucketName(status.BucketName),
+			StorageBackend:     v2.CouchbaseStorageBackend(status.BucketStorageBackend),
+			NumVBuckets:        status.NumVBuckets,
+			MemoryQuota:        resource.NewQuantity(status.BucketMemoryQuota<<20, resource.BinarySI),
+			Replicas:           status.BucketReplicas,
+			IoPriority:         v2.CouchbaseBucketIOPriority(status.IoPriority),
+			EvictionPolicy:     v2.CouchbaseBucketEvictionPolicy(status.EvictionPolicy),
+			ConflictResolution: v2.CouchbaseBucketConflictResolution(status.ConflictResolution),
+			EnableFlush:        status.EnableFlush,
+			EnableIndexReplica: status.EnableIndexReplica,
+			CompressionMode:    v2.CouchbaseBucketCompressionMode(status.CompressionMode),
+		},
+	}
+}
+
+func BucketStatusToEphemeralBucket(status v2.BucketStatus) *v2.CouchbaseEphemeralBucket {
+	return &v2.CouchbaseEphemeralBucket{
+		Spec: v2.CouchbaseEphemeralBucketSpec{
+			Name:               v2.BucketName(status.BucketName),
+			MemoryQuota:        resource.NewQuantity(status.BucketMemoryQuota<<20, resource.BinarySI),
+			Replicas:           status.BucketReplicas,
+			IoPriority:         v2.CouchbaseBucketIOPriority(status.IoPriority),
+			EvictionPolicy:     v2.CouchbaseEphemeralBucketEvictionPolicy(status.EvictionPolicy),
+			ConflictResolution: v2.CouchbaseBucketConflictResolution(status.ConflictResolution),
+			EnableFlush:        status.EnableFlush,
+			CompressionMode:    v2.CouchbaseBucketCompressionMode(status.CompressionMode),
+		},
+	}
+}
+
+func GetCouchbaseBucketNameResourceNameMap(v *types.Validator, cluster *v2.CouchbaseCluster) map[string]string {
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil
+	}
+
+	bucketNameResourceNameMap := make(map[string]string)
+
+	for _, bucket := range couchbaseBuckets.Items {
+		bucketNameResourceNameMap[bucket.GetCouchbaseName()] = bucket.GetResourceName()
+	}
+
+	return bucketNameResourceNameMap
 }

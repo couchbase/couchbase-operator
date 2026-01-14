@@ -4957,6 +4957,27 @@ func TestValidationClusterMigrationApply(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
 }
 
+// TestBucketValidationClusterLeavingMigrationApply tests the bucket change constraints are ran when leaving migration mode.
+// The DAC will compare bucket CRD's with buckets from the cluster status to check those CRD's are valid.
+func TestBucketValidationClusterLeavingMigrationApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			// If the buckets are valid (They are in validation-leaving-migration.yaml to start with) and the migration spec is removed, we should be allowed to leave migration.
+			name: "TestLeavingMigrationAllowedWhenBucketsValid",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Remove("/spec/migration")},
+			shouldFail: true,
+			expectedErrors: []string{
+				"spec.numVBuckets is immutable for bucket bucket1 and cluster", // bucket1 in status has 1024 vBuckets, but spec has 128
+				"spec.numVBuckets is immutable for bucket bucket2 and cluster", // bucket2 in status has 1024 vBuckets, but spec has 128 (tests the validation works with different spec.Name/metadata.Name values)
+				"spec.conflictResolution in body cannot be updated",            // bucket3 in status has seqno conflict resolution, but spec has lww
+			},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-leaving-migration.yaml"})
+}
+
 func TestMidUpgradeImageValidations(t *testing.T) {
 	midUpgradeTestDefs := []testDef{
 		{

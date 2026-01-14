@@ -3350,6 +3350,30 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 	return
 }
 
+func getClusterBucketsByType(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (map[string]*couchbasev2.CouchbaseBucket, map[string]*couchbasev2.CouchbaseEphemeralBucket, error) {
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	couchbaseBucketsMap := make(map[string]*couchbasev2.CouchbaseBucket)
+	for i := range couchbaseBuckets.Items {
+		couchbaseBucketsMap[couchbaseBuckets.Items[i].GetCouchbaseName()] = &couchbaseBuckets.Items[i]
+	}
+
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ephemeralBucketsMap := make(map[string]*couchbasev2.CouchbaseEphemeralBucket)
+	for i := range ephemeralBuckets.Items {
+		ephemeralBucketsMap[ephemeralBuckets.Items[i].GetCouchbaseName()] = &ephemeralBuckets.Items[i]
+	}
+
+	return couchbaseBucketsMap, ephemeralBucketsMap, nil
+}
+
 // getClusterBuckets returns all abstract buckets for a cluster as per its scoping rules.
 func getClusterBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]couchbasev2.AbstractBucket, error) {
 	// Collect all the buckets referenced by the cluster using the same
@@ -5385,18 +5409,66 @@ func checkChangeConstraintsMigration(v *types.Validator, current, updated *couch
 			return err
 		}
 
-		buckets, err := v.Abstraction.GetBuckets(updated.Namespace, updated.Spec.Buckets.Selector)
-		if err != nil {
-			return err
-		}
-
-		if len(buckets) == 0 && updated.Spec.Buckets.Managed {
-			return fmt.Errorf("cannot remove migration spec: create bucket CRDs or disable bucket management")
-		}
-
 		if len(users.Items) == 0 && updated.Spec.Security.RBAC.Managed {
 			return fmt.Errorf("cannot remove migration spec: create user CRDs or disable user management")
 		}
+
+		if err := checkChangeConstraintsBucketLeavingMigrationMode(v, current, updated); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkChangeConstraintsBucketLeavingMigrationMode validates all CRD resources are valid
+// for buckets that already exist in the cluster after a cluster migration has completed.
+// This method should only be called when leaving migration mode.
+func checkChangeConstraintsBucketLeavingMigrationMode(v *types.Validator, current *couchbasev2.CouchbaseCluster, updated *couchbasev2.CouchbaseCluster) error {
+	if !current.Spec.Buckets.Managed {
+		return nil
+	}
+
+	requestedCBuckets, requestedEBuckets, err := getClusterBucketsByType(v, updated)
+	if err != nil {
+		return err
+	}
+
+	if len(requestedCBuckets) == 0 && len(requestedEBuckets) == 0 {
+		return fmt.Errorf("cannot remove migration spec: create bucket CRDs or disable bucket management")
+	}
+
+	errs := []error{}
+	actualBuckets := current.Status.Buckets
+	for _, statusBucket := range actualBuckets {
+		switch statusBucket.BucketType {
+		case couchbasev2.BucketTypeCouchbase:
+			if requested, ok := requestedCBuckets[statusBucket.BucketName]; ok {
+				actualAsCRD := util.BucketStatusToCouchbaseBucket(statusBucket)
+				if err := CheckImmutableFieldsBucket(actualAsCRD, requested); err != nil {
+					errs = append(errs, err)
+				}
+
+				if _, err = CheckChangeConstraintsBucket(v, actualAsCRD, requested, updated); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		case couchbasev2.BucketTypeEphemeral:
+			if requested, ok := requestedEBuckets[statusBucket.BucketName]; ok {
+				actualAsCRD := util.BucketStatusToEphemeralBucket(statusBucket)
+				if err := CheckImmutableFieldsEphemeralBucket(actualAsCRD, requested); err != nil {
+					errs = append(errs, err)
+				}
+
+				if err := CheckChangeConstraintsEphemeralBucket(v, actualAsCRD, requested, updated); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil

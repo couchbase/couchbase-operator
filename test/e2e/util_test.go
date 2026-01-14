@@ -129,6 +129,7 @@ func registerTests() {
 		framework.NewTestDef(TestNegValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationClusterMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestMidUpgradeImageValidations).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketValidationClusterLeavingMigrationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestCouchbaseClusterWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestAnnotationWarnings).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationEncryptionKey).WithTags(TagSuiteValidation, TagSuitePlatform, TagFeatureEAR),

@@ -1277,6 +1277,9 @@ type AbstractBucket interface {
 
 	// HasCrossClusterVersioningEnabled returns true if the bucket has cross cluster versioning enabled.
 	HasCrossClusterVersioningEnabled() bool
+
+	// GetResourceName returns the resource name (metadata.name) of the bucket.
+	GetResourceName() string
 }
 
 func (b *CouchbaseBucket) GetCouchbaseName() string {
@@ -1287,6 +1290,10 @@ func (b *CouchbaseBucket) GetCouchbaseName() string {
 	}
 
 	return name
+}
+
+func (b *CouchbaseBucket) GetResourceName() string {
+	return b.Name
 }
 
 func (b *CouchbaseBucket) GetLabels() map[string]string {
@@ -1411,6 +1418,10 @@ func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
 	return name
 }
 
+func (b *CouchbaseEphemeralBucket) GetResourceName() string {
+	return b.Name
+}
+
 func (b *CouchbaseEphemeralBucket) GetLabels() map[string]string {
 	return b.Labels
 }
@@ -1464,6 +1475,10 @@ func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 	}
 
 	return name
+}
+
+func (b *CouchbaseMemcachedBucket) GetResourceName() string {
+	return b.Name
 }
 
 func (b *CouchbaseMemcachedBucket) GetLabels() map[string]string {

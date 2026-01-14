@@ -786,20 +786,7 @@ func (c *Cluster) reconcileBuckets() error {
 	for i, bucket := range requested {
 		names[i] = bucket.BucketName
 
-		statuses[bucket.BucketName] = couchbasev2.BucketStatus{
-			BucketName:           bucket.BucketName,
-			BucketType:           bucket.BucketType,
-			BucketStorageBackend: string(bucket.BucketStorageBackend),
-			NumVBuckets:          bucket.NumVBuckets,
-			BucketMemoryQuota:    bucket.BucketMemoryQuota,
-			BucketReplicas:       bucket.BucketReplicas,
-			IoPriority:           string(bucket.IoPriority),
-			EvictionPolicy:       bucket.EvictionPolicy,
-			ConflictResolution:   bucket.ConflictResolution,
-			EnableFlush:          bucket.EnableFlush,
-			EnableIndexReplica:   bucket.EnableIndexReplica,
-			CompressionMode:      string(bucket.CompressionMode),
-		}
+		statuses[bucket.BucketName] = bucketToClusterStatus(bucket)
 	}
 
 	sort.Strings(names)
@@ -811,6 +798,23 @@ func (c *Cluster) reconcileBuckets() error {
 	}
 
 	return nil
+}
+
+func bucketToClusterStatus(b couchbaseutil.Bucket) couchbasev2.BucketStatus {
+	return couchbasev2.BucketStatus{
+		BucketName:           b.BucketName,
+		BucketType:           b.BucketType,
+		BucketStorageBackend: string(b.BucketStorageBackend),
+		NumVBuckets:          b.NumVBuckets,
+		BucketMemoryQuota:    b.BucketMemoryQuota,
+		BucketReplicas:       b.BucketReplicas,
+		IoPriority:           string(b.IoPriority),
+		EvictionPolicy:       b.EvictionPolicy,
+		ConflictResolution:   b.ConflictResolution,
+		EnableFlush:          b.EnableFlush,
+		EnableIndexReplica:   b.EnableIndexReplica,
+		CompressionMode:      string(b.CompressionMode),
+	}
 }
 
 func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
