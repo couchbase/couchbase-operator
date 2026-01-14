@@ -104,6 +104,10 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 		if t2, ok := updated.(*couchbasev2.CouchbaseEncryptionKey); ok {
 			return validationv2.CheckImmutableFieldsEncryptionKey(t, t2)
 		}
+	case *couchbasev2.CouchbaseUser:
+		if t2, ok := updated.(*couchbasev2.CouchbaseUser); ok {
+			return validationv2.CheckImmutableFieldsUser(t, t2)
+		}
 	}
 
 	return nil

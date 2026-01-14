@@ -5224,6 +5224,28 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	return nil
 }
 
+// CheckImmutableFieldsUser checks for field changes that are invalid for CouchbaseUser.
+// The authDomain field is immutable because changing it would require deleting the existing
+// user and creating a new one with a different authentication domain.
+func CheckImmutableFieldsUser(prev, curr *couchbasev2.CouchbaseUser) error {
+	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
+	// authDomain cannot be changed as external and local users are separate entities
+	if prev.Spec.AuthDomain != curr.Spec.AuthDomain {
+		errs = append(errs, util.NewUpdateError("spec.authDomain", "body"))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
 // checkClusterConstraintMagmaStorageBackend checks if any buckets selected by the cluster have a magma storage backend
 // and if so, checks if the cluster is able to support it.
 func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
