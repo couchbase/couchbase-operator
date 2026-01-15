@@ -2148,6 +2148,17 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 		return nil, nil
 	}
 
+	bucketSpecs, err := c.gatherBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	bucketMap := make(map[string]couchbaseutil.Bucket, len(bucketSpecs))
+
+	for _, bucketSpec := range bucketSpecs {
+		bucketMap[bucketSpec.BucketName] = bucketSpec
+	}
+
 	clusterBuckets := couchbaseutil.BucketStatusList{}
 	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
@@ -2158,7 +2169,7 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 	for _, bucket := range clusterBuckets {
 		for _, node := range bucket.Nodes {
 			// node.StorageBackend/EvictionPolicy is empty if it matches the bucket storageMode/evictionPolicy
-			if node.StorageBackend != "" || node.EvictionPolicy != "" {
+			if (node.StorageBackend != "" || node.EvictionPolicy != "") && bucket.StorageBackend == bucketMap[bucket.BucketName].BucketStorageBackend && bucket.EvictionPolicy == bucketMap[bucket.BucketName].EvictionPolicy {
 				candidates.Add(c.members[node.HostName.GetMemberName()])
 			}
 		}

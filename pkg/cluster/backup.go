@@ -1179,11 +1179,15 @@ func (c *Cluster) generateBackupArgs(backup *couchbasev2.CouchbaseBackup, full b
 	}
 
 	if full {
-		additionalArgsEnvVar.Value = backup.Spec.Full.AdditionalArgs
-		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+		if backup.Spec.Full != nil {
+			additionalArgsEnvVar.Value = backup.Spec.Full.AdditionalArgs
+			backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+		}
 	} else {
-		additionalArgsEnvVar.Value = backup.Spec.Incremental.AdditionalArgs
-		backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+		if backup.Spec.Incremental != nil {
+			additionalArgsEnvVar.Value = backup.Spec.Incremental.AdditionalArgs
+			backup.Spec.Env = append(backup.Spec.Env, additionalArgsEnvVar)
+		}
 	}
 
 	return args

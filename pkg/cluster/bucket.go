@@ -466,7 +466,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	return allBuckets, nil
 }
 
-func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
+func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.CouchbaseBucket) (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
 	updateBuckets := make(map[couchbaseutil.Bucket]couchbaseutil.Bucket)
 
 	requested, err := c.gatherBuckets()
@@ -482,12 +482,21 @@ func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.B
 	for _, r := range requested {
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
+				val, ok := couchbaseBucketMap[r.BucketName]
+				if ok && string(val.Spec.StorageBackend) == string(r.BucketStorageBackend) {
+					r.BucketStorageBackend = a.BucketStorageBackend
+				}
+
+				if ok && string(val.Spec.EvictionPolicy) == r.EvictionPolicy {
+					r.EvictionPolicy = a.EvictionPolicy
+				}
+
 				if !reflect.DeepEqual(r, a) {
 					updateBuckets[a] = r
 				}
-
-				break
 			}
+
+			break
 		}
 	}
 
@@ -616,7 +625,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 					// During migration, use specialized API that only sends allowed fields.
 					// Otherwise, use normal full update.
-					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
+					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) || r.BucketStorageBackend != a.BucketStorageBackend {
 						updateDuringMigration = append(updateDuringMigration, r)
 					} else {
 						update = append(update, r)

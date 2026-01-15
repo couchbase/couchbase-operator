@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/cluster"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 
 	storagev1 "k8s.io/api/storage/v1"
@@ -133,6 +135,16 @@ func BucketStatusToEphemeralBucket(status v2.BucketStatus) *v2.CouchbaseEphemera
 	}
 }
 
+func BucketStatusToMemcachedBucket(status v2.BucketStatus) *v2.CouchbaseMemcachedBucket {
+	return &v2.CouchbaseMemcachedBucket{
+		Spec: v2.CouchbaseMemcachedBucketSpec{
+			Name:        v2.BucketName(status.BucketName),
+			MemoryQuota: resource.NewQuantity(status.BucketMemoryQuota<<20, resource.BinarySI),
+			EnableFlush: status.EnableFlush,
+		},
+	}
+}
+
 func GetCouchbaseBucketNameResourceNameMap(v *types.Validator, cluster *v2.CouchbaseCluster) map[string]string {
 	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
@@ -146,4 +158,27 @@ func GetCouchbaseBucketNameResourceNameMap(v *types.Validator, cluster *v2.Couch
 	}
 
 	return bucketNameResourceNameMap
+}
+
+func GetBucketsFromStatus(cluster *cluster.Cluster) ([]*v2.CouchbaseBucket, []*v2.CouchbaseMemcachedBucket, []*v2.CouchbaseEphemeralBucket) {
+	statusBuckets := cluster.GetCouchbaseCluster().Status.Buckets
+
+	var couchbaseBuckets []*v2.CouchbaseBucket
+	var memcachedBuckets []*v2.CouchbaseMemcachedBucket
+	var ephemeralBuckets []*v2.CouchbaseEphemeralBucket
+
+	for _, b := range statusBuckets {
+		switch b.BucketType {
+		case constants.BucketTypeCouchbase:
+			couchbaseBuckets = append(couchbaseBuckets, BucketStatusToCouchbaseBucket(b))
+		case constants.BucketTypeEphemeral:
+			ephemeralBuckets = append(ephemeralBuckets, BucketStatusToEphemeralBucket(b))
+		case constants.BucketTypeMemcached:
+			memcachedBuckets = append(memcachedBuckets, BucketStatusToMemcachedBucket(b))
+		default:
+			continue
+		}
+	}
+
+	return couchbaseBuckets, memcachedBuckets, ephemeralBuckets
 }

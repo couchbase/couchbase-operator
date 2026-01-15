@@ -218,7 +218,15 @@ func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []erro
 func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
-	updateBuckets, err := currentCluster.GetBucketsToUpdate()
+	var couchbaseBucketMap = make(map[string]*couchbasev2.CouchbaseBucket)
+
+	couchbaseBucketList, _, _ := util.GetBucketsFromStatus(currentCluster)
+
+	for _, b := range couchbaseBucketList {
+		couchbaseBucketMap[string(b.Spec.Name)] = b
+	}
+
+	updateBuckets, err := currentCluster.GetBucketsToUpdate(couchbaseBucketMap)
 	if err != nil {
 		if checkIsMemberError(err) {
 			return nil
@@ -307,7 +315,15 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 		c: currentCluster,
 	}
 
-	updateBuckets, err := currentCluster.GetBucketsToUpdate()
+	var couchbaseBucketMap = make(map[string]*couchbasev2.CouchbaseBucket)
+
+	couchbaseBucketList, _, _ := util.GetBucketsFromStatus(currentCluster)
+
+	for _, b := range couchbaseBucketList {
+		couchbaseBucketMap[string(b.Spec.Name)] = b
+	}
+
+	updateBuckets, err := currentCluster.GetBucketsToUpdate(couchbaseBucketMap)
 	if err != nil {
 		if checkIsMemberError(err) {
 			return nil
@@ -529,19 +545,15 @@ func validateBuckets(cluster *cluster.Cluster) []error {
 
 	client := cluster.GetK8sClient()
 
-	couchbaseBuckets := client.CouchbaseBuckets.List()
-	memcachedBuckets := client.CouchbaseMemcachedBuckets.List()
-	ephemeralBuckets := client.CouchbaseEphemeralBuckets.List()
-
-	if err := validateCouchbaseBuckets(couchbaseBuckets, client, cluster.GetCouchbaseCluster()); len(err) != 0 {
+	if err := validateCouchbaseBuckets(client.CouchbaseBuckets.List(), client, cluster.GetCouchbaseCluster()); len(err) != 0 {
 		errs = append(errs, err...)
 	}
 
-	if err := validateMemcachedBuckets(memcachedBuckets, client, cluster.GetCouchbaseCluster()); len(err) != 0 {
+	if err := validateMemcachedBuckets(client.CouchbaseMemcachedBuckets.List(), client, cluster.GetCouchbaseCluster()); len(err) != 0 {
 		errs = append(errs, err...)
 	}
 
-	if err := validateEphemeralBuckets(ephemeralBuckets, client, cluster.GetCouchbaseCluster()); len(err) != 0 {
+	if err := validateEphemeralBuckets(client.CouchbaseEphemeralBuckets.List(), client, cluster.GetCouchbaseCluster()); len(err) != 0 {
 		errs = append(errs, err...)
 	}
 
