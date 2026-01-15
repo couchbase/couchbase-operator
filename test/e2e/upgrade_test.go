@@ -2411,3 +2411,233 @@ func TestUpgradePrevent3Versions(t *testing.T) {
 	}
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
 }
+
+// TestInPlaceUpgradeRecoverabilityOnServerGroupChanges tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeGlobalServerGroupChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 2 server groups and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = serverGroups[:2]
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the two available server groups
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Remove the second zone from the cluster.spec.serverGroups list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", serverGroups[:1]), time.Minute)
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for each of the pods in the now removed server group
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize / 2, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeClassServerGroupChangesWithPV tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.servers[i].serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeClassServerGroupChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 2 server groups and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].ServerGroups = serverGroups[:2]
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the two available server groups
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Remove the second zone from the cluster.spec.serverGroups list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/serverGroups", serverGroups[:1]), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for each of the pods in the now removed server group
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize / 2, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeNodeSelectorZoneChangesWithPV tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.servers[i].pod.spec.nodeSelector as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeNodeSelectorZoneChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with one server group in the nodeselector
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{
+				constants.FailureDomainZoneLabel: serverGroups[0],
+			},
+		},
+	}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the only available server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Replace the node selector zone with the second zone in the list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/pod/spec/nodeSelector", map[string]string{
+		constants.FailureDomainZoneLabel: serverGroups[1],
+	}), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[1:2])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for all pods given we've moved from serverGroups[0] to serverGroups[1]
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV tests the Operator will upgrade pods in place if the explicit node selector is removed
+// but PVC's already exist for the pod, meaning the pods can be recreated in place as the existing zone's are still valid.
+func TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV(t *testing.T) {
+	f := framework.Global
+
+	// TODO Check that no pod changes happen, given that the "old" server groups are still valid
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with one server group in the nodeselector
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{
+				constants.FailureDomainZoneLabel: serverGroups[0],
+			},
+		},
+	}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the only available server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Remove the zone node selector from the server class
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/servers/0/pod"), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// There should not be any changes in the RZA map as pods should be re-created in place as the existing zone's are still valid
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// We can't check for the rza map as the pods will not have zone selectors as none exist in the spec,
+	// but the events should show InPlaceUpgrade happening for each pod instead of SwapRebalance,
+	// meaning they must have been re-created in place to allow for the PVC's to be recovered.
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * Given the pod spec has changed (removed explicit nodeselector), every node should be upgraded via InPlaceUpgrade
+	// - This does not consist of a new member being added but an existing member recreated and rebalanced into the cluster
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

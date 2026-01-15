@@ -387,6 +387,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by my "favourite" synchronization feature
+				"update", // used for adding the unreconcilable annotation
 			},
 		},
 		{

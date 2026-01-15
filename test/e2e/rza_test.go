@@ -13,6 +13,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	"github.com/couchbase/couchbase-operator/test/e2e/clustercapabilities"
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
@@ -48,9 +49,25 @@ func (expected rzaMap) accumulateRzaServerClass(groupSize int, serverGroups []st
 	}
 }
 
+func MustWaitForRzaMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expected rzaMap, timeout time.Duration) {
+	err := retryutil.RetryFor(timeout, func() error {
+		return validateRzaMap(t, k8s, couchbase, expected)
+	})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
 // mustValidateRzaMap accepts an expected scheduling and compares against reality.
-func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
-	pods, err := cluster.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name})
+func (expected rzaMap) mustValidateRzaMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
+	err := validateRzaMap(t, k8s, couchbase, expected)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+func validateRzaMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expected rzaMap) error {
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name})
 	if err != nil {
 		e2eutil.Die(t, err)
 	}
@@ -61,8 +78,10 @@ func (expected rzaMap) mustValidateRzaMap(t *testing.T, cluster *types.Cluster, 
 	}
 
 	if !reflect.DeepEqual(expected, rzaMap) {
-		e2eutil.Die(t, fmt.Errorf("RZA scheduling mismatch: requested %v actual %v", expected, rzaMap))
+		return fmt.Errorf("RZA scheduling mismatch: requested %v actual %v", expected, rzaMap)
 	}
+
+	return nil
 }
 
 // getAvailabilityZones returns a sorted list of configured availability zones from the cluster.

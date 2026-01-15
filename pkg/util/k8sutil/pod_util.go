@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -112,6 +113,14 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	pod, err := CreateCouchbasePodSpec(m, cluster, config, serverGroup, pvcState, image, readinessConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	// If servergroups aren't set, but a server group node selector is, the NullScheduler.Create() will return "",
+	// but it's going to be scheduled on a node with the node selector, so we should add that annotation to the PVC.
+	if serverGroup == "" {
+		if group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			serverGroup = group
+		}
 	}
 
 	// Create PVCs if required.
@@ -2298,7 +2307,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool) error {
+func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool, restrictedServerGroups []string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2317,9 +2326,11 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 	}
 
 	for _, mountMapping := range mountMappings {
-		if pvc, err := findMemberPVC(client, member.Name(), mountMapping.mountPath); err != nil {
+		pvc, err := findMemberPVC(client, member.Name(), mountMapping.mountPath)
+		if err != nil {
 			return err
-		} else if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
+		}
+		if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
 			pvcServerVersion, err := couchbaseutil.NewVersion(pvc.Annotations[constants.CouchbaseVersionAnnotationKey])
 			if err != nil {
 				return err
@@ -2328,6 +2339,12 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 			}
 		} else if checkForLPV && isLPV(pvc) {
 			return fmt.Errorf("%w: pvc is a LPV", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		// If the existing pod volumes already have an availability zone, we need to check that it's still available in the cluster spec.
+		// Otherwise, we can't recover this pod correctly and we should SwapRebalance/start full recovery instead.
+		if len(restrictedServerGroups) > 0 && pvc.Annotations[constants.ServerGroupLabel] != "" && !slices.Contains(restrictedServerGroups, pvc.Annotations[constants.ServerGroupLabel]) {
+			return fmt.Errorf("%w: pvc exists in server group %s. The server groups restricted by the cluster spec are %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), pvc.Annotations[constants.ServerGroupLabel], strings.Join(restrictedServerGroups, ", "))
 		}
 	}
 
