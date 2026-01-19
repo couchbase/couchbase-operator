@@ -634,10 +634,10 @@ Note: The Couchbase Operator watches CouchbaseCluster resources and may immediat
 cbopcfg create pod
 
 # Create pod scoped to the cluster with a specific index.
-cbopcfg create pod --cluster-name cb-example --server-class all_services --index 3
+cbopcfg create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 # Create pod scoped to a cluster with the next available index.
-cbopcfg create pod --cluster-name cb-example --server-class all_services --auto-index
+cbopcfg create pod --couchbase-cluster cb-example --server-class all_services --auto-index
 ----
 
 === Flags
@@ -1742,10 +1742,10 @@ support needs to do so.
 cbopcfg generate pod
 
 # Create pod scoped to the cluster with a specific index.
-cbopcfg generate pod --cluster-name cb-example --server-class all_services --index 3
+cbopcfg generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 # Create pod scoped to a cluster with the next available index.
-cbopcfg generate pod --cluster-name cb-example --server-class all_services --auto-index
+cbopcfg generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
 ----
 
 === Flags

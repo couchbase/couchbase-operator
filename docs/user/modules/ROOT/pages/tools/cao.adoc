@@ -1364,10 +1364,10 @@ Note: The Couchbase Operator watches CouchbaseCluster resources and may immediat
 cao create pod
 
 # Create pod scoped to the cluster with a specific index.
-cao create pod --cluster-name cb-example --server-class all_services --index 3
+cao create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 # Create pod scoped to a cluster with the next available index.
-cao create pod --cluster-name cb-example --server-class all_services --auto-index
+cao create pod --couchbase-cluster cb-example --server-class all_services --auto-index
 ----
 
 === Flags
@@ -2472,10 +2472,10 @@ support needs to do so.
 cao generate pod
 
 # Create pod scoped to the cluster with a specific index.
-cao generate pod --cluster-name cb-example --server-class all_services --index 3
+cao generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 # Create pod scoped to a cluster with the next available index.
-cao generate pod --cluster-name cb-example --server-class all_services --auto-index
+cao generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
 ----
 
 === Flags

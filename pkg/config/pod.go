@@ -55,10 +55,10 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
                         %[1]s generate pod
 
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s generate pod --cluster-name cb-example --server-class all_services --index 3
+			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s generate pod --cluster-name cb-example --server-class all_services --auto-index
+			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
@@ -91,10 +91,10 @@ Note: The Couchbase Operator watches CouchbaseCluster resources and may immediat
                         %[1]s create pod
 
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s create pod --cluster-name cb-example --server-class all_services --index 3
+			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s create pod --cluster-name cb-example --server-class all_services --auto-index
+			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --auto-index
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
