@@ -37,6 +37,9 @@ func (o *podOptions) registerPodGenerateFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.serverClass, "server-class", "", "The server class from which to create a pod definition for.")
 	cmd.Flags().IntVar(&o.index, "index", 0, "The index of the pod to create")
 	cmd.Flags().BoolVar(&o.autoIndex, "auto-index", false, "Use the persistence secret's to generate a new pod with a new index")
+
+	_ = cmd.MarkFlagRequired("couchbase-cluster")
+	_ = cmd.MarkFlagRequired("server-class")
 }
 
 func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
@@ -51,9 +54,6 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 							to generate a pod definition for a since removed pod, or a new pod when
 							support needs to do so.`),
 		Example: normalize(fmt.Sprintf(`
-                        # Create pod.
-                        %[1]s generate pod
-
 			# Create pod scoped to the cluster with a specific index.
 			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
@@ -87,9 +87,6 @@ func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *
 
 Note: The Couchbase Operator watches CouchbaseCluster resources and may immediately delete pods it considers unclustered.  Pause or stop the Operator before using this command.`),
 		Example: normalize(fmt.Sprintf(`
-                        # Create pod.
-                        %[1]s create pod
-
 			# Create pod scoped to the cluster with a specific index.
 			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
