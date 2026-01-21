@@ -323,6 +323,7 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradeBucketDurability).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeWithTLS).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradeStabilizationPeriod).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestChangeClusterSettingsDuringUpgradeStabilizationPeriod).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestPartialUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestServerClassesUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestServerClassesDefaultOrderUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),

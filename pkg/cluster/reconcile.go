@@ -207,7 +207,10 @@ func (c *Cluster) reconcile() error {
 	// If the cluster is upgrading, then don't interfere with anything else
 	// as the data returned from Couchbase will vary depending on the version
 	// leading to some very strange and possibly dangerous behaviour.
-	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
+	// If we're actively upgrading but we are also waiting for the stabalization period, we can run the postTopology reconcilers.
+	// Settings should only be set if allowed by the lowest member version (c.SupportsVersionFeatures())
+	upgrading, err := c.isUpgrading()
+	if (err == nil && upgrading) && !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
 		return nil
 	}
 
