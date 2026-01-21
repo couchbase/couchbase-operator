@@ -333,6 +333,14 @@ metadata:
 data:
   password: YmxhaCBibGFoIGJsYWgK
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app: couchbase
+    couchbase_cluster: cluster-2
+  name: cluster-2-fluent-bit-config
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:

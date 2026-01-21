@@ -774,14 +774,29 @@ func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.C
 	return fmt.Errorf("spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+")
 }
 
-// checkConstraintLoggingPermissible checks persistent volumes are being used.
-func checkConstraintLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// checkConstraintLoggingPermissible checks that server logging is properly configured:
+// - persistent volumes are configured via volumeMounts.
+// - the configuration secret is not already in use by another cluster (if ValidateSecrets is enabled).
+func checkConstraintLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsServerLoggingEnabled() {
 		return nil
 	}
 
 	if !cluster.IsSupportable() {
 		return fmt.Errorf("server logging requires 'spec.servers.volumeMounts' to be configured")
+	}
+
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Logging.Server.ConfigurationName)
+	if err != nil || !found {
+		return err
+	}
+
+	if val, ok := secret.Labels[constants.LabelCluster]; ok && val != cluster.Name {
+		return fmt.Errorf("spec.logging.server.configurationName is already in use for cluster %s", val)
 	}
 
 	return nil

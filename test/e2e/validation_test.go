@@ -1446,6 +1446,18 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "TestValidateLoggingFailsForDuplicateConfigurationSecret",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled:           true,
+						ConfigurationName: "cluster-2-fluent-bit-config",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.logging.server.configurationName is already in use for cluster cluster-2`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
