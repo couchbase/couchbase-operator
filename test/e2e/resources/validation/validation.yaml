@@ -659,6 +659,8 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket7
+spec:
+  memoryQuota: 100Mi
 ---
 apiVersion: couchbase.com/v2
 kind: CouchbaseUser

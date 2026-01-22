@@ -4012,12 +4012,6 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 		{
-			name:           "TestValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
-		},
-		{
 			name: "TestValidateVolumeClaimTemplatesShrinkRejected",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/enableOnlineVolumeExpansion", true).
@@ -4532,7 +4526,8 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
 				}),
 				"bucket2": jsonpatch.NewPatchSet().
-					Replace("/spec/storageBackend", "couchstore"),
+					Replace("/spec/storageBackend", "couchstore").
+					Remove("/spec/historyRetention"),
 			},
 			shouldFail: false,
 		},
@@ -4757,13 +4752,18 @@ func TestAnnotationWarnings(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name: "TestHistoryRetentionSecondsOverwrite",
-			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
-				Add("/spec/historyRetention", couchbasev2.HistoryRetentionSettings{
-					Seconds: 1000,
-				}).
-				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/historyRetention.seconds": "4",
-				})},
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/cluster/dataServiceMemoryQuota", "2048Mi"),
+				"bucket7": jsonpatch.NewPatchSet().
+					Add("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1024Mi").
+					Add("/spec/historyRetention", couchbasev2.HistoryRetentionSettings{
+						Seconds: 1000,
+					}).
+					Add("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/historyRetention.seconds": "4",
+					})},
 			shouldFail:       false,
 			expectedWarnings: []string{"Overwriting existing value for annotation"},
 		},
@@ -6072,6 +6072,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			name: "TestValidateMagmaToCouchstoreWithExplicitNumVBuckets",
 			mutations: patchMap{
 				"bucket1": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
 					Replace("/spec/storageBackend", "couchstore").
 					Add("/spec/numVBuckets", 1024),
 			},
@@ -6097,9 +6098,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 					Add(`/spec/buckets/enableBucketMigrationRoutines`, true),
 				"bucket1": jsonpatch.NewPatchSet().
 					Add("/spec/numVBuckets", 1024).
-					Add(`/spec/historyRetention`, &couchbasev2.HistoryRetentionSettings{
-						CollectionDefault: boolPtr(false),
-					}).
+					Remove(`/spec/historyRetention`).
 					Replace("/spec/storageBackend", "couchstore").
 					Replace("/spec/memoryQuota", "500Mi"),
 			},
@@ -6140,9 +6139,20 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 		{
 			name: "TestMigrateMagmaToCouchstoreValid",
 			mutations: patchMap{
-				"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+				"bucket1": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
+					Replace("/spec/storageBackend", "couchstore"),
 			},
 			shouldFail: false,
+		},
+		{
+			name: "TestMigrateMagmaToCouchstoreValidInvalidHistoryRetention",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`historyRetentionSettings can only be used with magma storage backend`},
 		},
 		{
 			name: "TestUpgradeClusterTo80AllowedDueToImplicit",
@@ -6301,6 +6311,20 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			// Changing numVBuckets invalid, even though it's a magma bucket.
 			shouldFail:     true,
 			expectedErrors: []string{`spec.numVBuckets is immutable`},
+		},
+		{
+			name: "TestNegValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
+			mutations: patchMap{
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/buckets/enableBucketMigrationRoutines", false),
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Replace("/metadata/labels", map[string]string{
+						"cluster": "cluster0",
+					}).
+					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
+					Replace("/spec/onlineEvictionPolicyChange", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
 		},
 	}
 

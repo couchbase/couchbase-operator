@@ -32,8 +32,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket1
-  annotations:
-    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"  
 spec:
   memoryQuota: 1024Mi
   evictionPolicy: fullEviction
@@ -42,8 +40,6 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket2
-  annotations:
-    cao.couchbase.com/historyRetention.collectionHistoryDefault: "false"
 spec:
   storageBackend: magma
   memoryQuota: 1024Mi
