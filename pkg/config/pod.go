@@ -48,8 +48,8 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 	cmd := &cobra.Command{
 		Use:          "pod",
 		Short:        "Generates YAML for a pod of a specific cluster.",
-		SilenceUsage: true,
-		Hidden:       true,
+		SilenceUsage: false,
+		Hidden:       false,
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to generate a pod definition for a since removed pod, or a new pod when
 							support needs to do so.`),
@@ -79,8 +79,8 @@ func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *
 	cmd := &cobra.Command{
 		Use:          "pod",
 		Short:        "Creates a pod of a specific cluster.",
-		SilenceUsage: true,
-		Hidden:       true,
+		SilenceUsage: false,
+		Hidden:       false,
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to create a pod for a since removed pod, or a new pod when
 							support needs to do so.
