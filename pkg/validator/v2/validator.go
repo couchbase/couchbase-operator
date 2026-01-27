@@ -64,6 +64,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintIndexerStableSnapshotInterval,
 		checkConstraintAdminSecret,
 		checkConstraintLoggingPermissible,
+		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
 		checkConstraintXDCRReplicationBuckets,
@@ -757,8 +758,11 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 	return nil
 }
 
-// checkConstraintLoggingSidecarTLS checks that if enabled, the logging sidecar TLS configs passed.
-func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// checkConstraintLoggingSidecarTLS validates the logging sidecar TLS configuration.
+// It ensures that when TLS is configured:
+// - At least one secret name is provided.
+// - The mount path is valid.
+func checkConstraintLoggingSidecarTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	fbs := cluster.Spec.Logging.Server
 	if fbs == nil {
 		return nil
@@ -768,10 +772,37 @@ func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.C
 		return nil
 	}
 
-	// In operator 2.9.0 the `spec.logging.server.sidecar.tls` field is not
-	// implemented. Reject usage via the admission controller so users cannot
-	// rely on it until mounting/rotation is implemented in 2.9.1.
-	return fmt.Errorf("spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+")
+	tlsConfig := fbs.Sidecar.TLS
+
+	// Ensure at least one secret name is provided when TLS is configured
+	if len(tlsConfig.SecretNames) == 0 {
+		return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames must contain at least one secret when TLS is configured")
+	}
+
+	// Validate mount path is not empty
+	if tlsConfig.MountPath == "" {
+		return fmt.Errorf("spec.logging.server.sidecar.tls.mountPath cannot be empty when TLS is configured")
+	}
+
+	// Validate that secrets exist if secret validation is enabled
+	if v != nil && v.Options.ValidateSecrets {
+		for _, secretName := range tlsConfig.SecretNames {
+			if secretName == "" {
+				return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames cannot contain empty values")
+			}
+
+			_, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+			if err != nil {
+				return fmt.Errorf("failed to get secret %q for logging sidecar TLS: %w", secretName, err)
+			}
+
+			if !found {
+				return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames references secret %q which does not exist", secretName)
+			}
+		}
+	}
+
+	return nil
 }
 
 // checkConstraintLoggingPermissible checks that server logging is properly configured:

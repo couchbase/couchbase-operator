@@ -56,6 +56,7 @@ const (
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
 	loggingSidecarMetadataMountName           = "podinfo"
 	loggingPort                               = 2020
+	loggingTLSVolumePrefix                    = "logging-tls-"
 	LoggingConfigurationFile                  = "fluent-bit.conf"
 	passphraseScriptName                      = "tls-passphrase-script"
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
@@ -1622,11 +1623,35 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 		},
 	}
 
+	// Add TLS configuration if enabled - mount each secret under <mountPath>/<secretName>/
 	if sidecarConfig.TLS != nil {
 		loggingContainer.Ports = append(loggingContainer.Ports, v1.ContainerPort{
 			Name:          "https",
 			ContainerPort: tlsBasePort + loggingPort,
 			Protocol:      v1.ProtocolTCP,
+		})
+
+		// Add volume mounts to containers and volumes to pods for each TLS secret
+		for _, secretName := range sidecarConfig.TLS.SecretNames {
+			loggingContainer.VolumeMounts = append(loggingContainer.VolumeMounts, v1.VolumeMount{
+				Name:      loggingTLSVolumePrefix + secretName,
+				MountPath: filepath.Join(sidecarConfig.TLS.MountPath, secretName),
+				ReadOnly:  true,
+			})
+			pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+				Name: loggingTLSVolumePrefix + secretName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: secretName,
+					},
+				},
+			})
+		}
+
+		// Add environment variable for TLS certificate path (for rotation detection)
+		loggingContainer.Env = append(loggingContainer.Env, v1.EnvVar{
+			Name:  "COUCHBASE_LOGS_TLS_CERTS",
+			Value: sidecarConfig.TLS.MountPath,
 		})
 	}
 

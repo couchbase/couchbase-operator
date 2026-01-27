@@ -478,6 +478,25 @@ func (o *ClusterOptions) WithCustomLogStreaming() *ClusterOptions {
 	return o
 }
 
+// WithLoggingTLS configures TLS for the logging sidecar with the specified mount path and secrets.
+func (o *ClusterOptions) WithLoggingTLS(mountPath string, secretNames []string) *ClusterOptions {
+	if o.LogStreaming == nil {
+		// Initialize logging if not already set
+		o.WithCustomLogStreaming()
+	}
+
+	if o.LogStreaming.Sidecar == nil {
+		o.LogStreaming.Sidecar = &couchbasev2.LogShipperSidecarSpec{}
+	}
+
+	o.LogStreaming.Sidecar.TLS = &couchbasev2.LogShipperSidecarTLSSpec{
+		MountPath:   mountPath,
+		SecretNames: secretNames,
+	}
+
+	return o
+}
+
 type AuditGarbageCollection int
 
 const (

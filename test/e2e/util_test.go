@@ -428,6 +428,7 @@ func registerTests() {
 		framework.NewTestDef(TestRebalanceLogProcessing).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingDynamicConfigReload).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestLoggingUpgrade).WithTags(TagSuiteP0, TagFeatureLogging, TagFeatureUpgrade),
+		framework.NewTestDef(TestLoggingTLSSecretsMounted).WithTags(TagSuiteP0, TagFeatureLogging, TagFeatureTLS),
 		framework.NewTestDef(TestScopeCreateExplicit).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureCollections),
 		framework.NewTestDef(TestScopeCreateImplicit).WithTags(TagSuiteP0, TagFeatureCollections),
 		framework.NewTestDef(TestScopeCreateMixed).WithTags(TagSuiteP0, TagFeatureCollections),

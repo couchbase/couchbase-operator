@@ -430,3 +430,120 @@ func MustFindLog(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couchbas
 		Die(t, err)
 	}
 }
+
+// checkLoggingTLSSecretsMounted verifies that TLS secrets are correctly mounted
+// in the FluentBit logging sidecar container at the expected paths.
+func checkLoggingTLSSecretsMounted(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, mountPath string, secretNames []string) error {
+	if couchbase.Spec.Logging.Server == nil || !couchbase.Spec.Logging.Server.Enabled {
+		return nil
+	}
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	if len(pods.Items) == 0 {
+		return fmt.Errorf("no pods found for cluster %s", couchbase.Name)
+	}
+
+	for _, pod := range pods.Items {
+		// Find the logging sidecar container
+		var loggingContainer *v1.Container
+		for i := range pod.Spec.Containers {
+			if pod.Spec.Containers[i].Name == k8sutil.CouchbaseLogSidecarContainerName {
+				loggingContainer = &pod.Spec.Containers[i]
+				break
+			}
+		}
+
+		if loggingContainer == nil {
+			return fmt.Errorf("logging sidecar container not found in pod %s", pod.Name)
+		}
+
+		// Check that each secret is mounted at the expected path
+		for _, secretName := range secretNames {
+			expectedPath := mountPath + "/" + secretName
+			found := false
+
+			for _, mount := range loggingContainer.VolumeMounts {
+				if mount.MountPath == expectedPath {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				return fmt.Errorf("TLS secret %q not mounted at expected path %q in pod %s",
+					secretName, expectedPath, pod.Name)
+			}
+		}
+
+		// Check for the TLS certs environment variable
+		tlsEnvFound := false
+		for _, env := range loggingContainer.Env {
+			if env.Name == "COUCHBASE_LOGS_TLS_CERTS" && env.Value == mountPath {
+				tlsEnvFound = true
+				break
+			}
+		}
+
+		if !tlsEnvFound {
+			return fmt.Errorf("COUCHBASE_LOGS_TLS_CERTS env var not found or incorrect in pod %s", pod.Name)
+		}
+	}
+
+	return nil
+}
+
+// MustCheckLoggingTLSSecretsMounted verifies TLS secrets are mounted in the logging sidecar.
+func MustCheckLoggingTLSSecretsMounted(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, mountPath string, secretNames []string) {
+	t.Helper()
+	err := checkLoggingTLSSecretsMounted(k8s, couchbase, mountPath, secretNames)
+	if err != nil {
+		Die(t, err)
+	}
+}
+
+// CreateLoggingTLSSecrets creates the TLS secrets needed for mTLS logging.
+// Returns the secret names that were created.
+func CreateLoggingTLSSecrets(t *testing.T, k8s *types.Cluster, caSecretName, clientCertSecretName string) []string {
+	t.Helper()
+
+	secretNames := []string{}
+
+	// Create CA certificate secret
+	if caSecretName != "" {
+		caSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: caSecretName,
+			},
+			StringData: map[string]string{
+				"ca.crt": "-----BEGIN CERTIFICATE-----\nTEST CA CERTIFICATE FOR E2E TESTING\n-----END CERTIFICATE-----\n",
+			},
+		}
+		MustCreateSecret(t, k8s, caSecret)
+		secretNames = append(secretNames, caSecretName)
+	}
+
+	// Create client certificate secret
+	if clientCertSecretName != "" {
+		clientCertSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: clientCertSecretName,
+			},
+			StringData: map[string]string{
+				"tls.crt": "-----BEGIN CERTIFICATE-----\nTEST CLIENT CERTIFICATE FOR E2E TESTING\n-----END CERTIFICATE-----\n",
+				"tls.key": "-----BEGIN RSA PRIVATE KEY-----\nTEST CLIENT KEY FOR E2E TESTING\n-----END RSA PRIVATE KEY-----\n",
+			},
+		}
+		MustCreateSecret(t, k8s, clientCertSecret)
+		secretNames = append(secretNames, clientCertSecretName)
+	}
+
+	return secretNames
+}

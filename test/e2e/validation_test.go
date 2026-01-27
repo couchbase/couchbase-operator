@@ -918,20 +918,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"IPv6Only should be used in place of IPv6 for spec.networking.addressFamily. IPv6 is deprecated and will be removed in a future release"},
 		},
 		{
-			name: "TestValidateLoggingTLSCRDFieldsNotYetImplemented",
+			name: "TestValidateLoggingTLSConfigurationValid",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
-								MountPath:   "some-value",
-								SecretNames: []string{"some-value", "some-other-value"},
+								MountPath:   "/fluent-bit/certs/",
+								SecretNames: []string{"fluent-bit-ca", "fluent-bit-client-cert"},
 							},
 						},
 					},
 				})},
 			shouldFail:       false,
-			expectedWarnings: []string{"CouchbaseCluster spec.logging.server.sidecar.tls is not implemented in this operator version."},
+			expectedWarnings: []string{},
 		},
 	}
 

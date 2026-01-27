@@ -226,7 +226,7 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "should reject usage of logging sidecar TLS in 2.9.0",
+			name: "should allow valid TLS configuration with secrets",
 			clusterSpec: &couchbasev2.CouchbaseCluster{
 				Spec: couchbasev2.ClusterSpec{
 					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
@@ -241,7 +241,43 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+",
+			expectedErr: "",
+		},
+		{
+			name: "should reject TLS configuration without secret names",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "/fluent-bit/certs/",
+									SecretNames: []string{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "spec.logging.server.sidecar.tls.secretNames must contain at least one secret when TLS is configured",
+		},
+		{
+			name: "should reject TLS configuration with empty mount path",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "",
+									SecretNames: []string{"fluent-bit-ca"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "spec.logging.server.sidecar.tls.mountPath cannot be empty when TLS is configured",
 		},
 		{
 			name: "should allow if logging sidecar TLS is nil",
