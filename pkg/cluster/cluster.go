@@ -1229,25 +1229,6 @@ func (c *Cluster) setPodIndex(index int) error {
 	return c.state.Update(persistence.PodIndex, strconv.Itoa(index))
 }
 
-// setVolumeExpansionState sets volume expansion state
-// if enable flag is 'true' otherwise state is deleted.
-func (c *Cluster) setVolumeExpansionState(enable bool) (err error) {
-	if enable {
-		c.cluster.Status.SetExpandingVolumeCondition()
-	} else {
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
-	}
-
-	return err
-}
-
-// checkVolumeExpansionState simplifies inquiries as to
-// whether or not the volume expansion state is set.
-func (c *Cluster) checkVolumeExpansionState() bool {
-	cond := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionExpandingVolume)
-	return cond != nil
-}
-
 func (c *Cluster) logStatus(status *MemberState) {
 	status.LogStatus(c.namespacedName())
 	c.scheduler.LogStatus(c.namespacedName())

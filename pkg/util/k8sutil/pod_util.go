@@ -277,7 +277,7 @@ func NewPersistentVolumeClaimState() *PersistentVolumeClaimState {
 // A PVC is an update candidate if its requested spec
 // differs from currently deployed spec.
 func (p *PersistentVolumeClaimState) NeedsUpdate() bool {
-	return len(p.update) != 0 || len(p.create) != 0 || len(p.expanding) != 0 || len(p.resizeFailed) != 0
+	return len(p.update) != 0 || len(p.create) != 0 || len(p.resizeFailed) != 0
 }
 
 // IsUpdated indicates whether specific PVC spec has been updated.
@@ -2386,25 +2386,18 @@ func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeC
 		return nil
 	}
 
-	// retries until there is VolumeResizeSuccessful.
-	callback := func() error {
-		events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
-		if err != nil {
-			return err
-		}
+	events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
+	if err != nil {
+		return err
+	}
 
-		for _, event := range events {
-			// Only consider events which occur after the resize condition is presented
-			if expansionTimestamp.Before(&event.LastTimestamp) {
-				if event.Reason == "VolumeResizeSuccessful" || event.Reason == "FileSystemResizeSuccessful" {
-					return nil
-				}
+	for _, event := range events {
+		// Only consider events which occur after the resize condition is presented
+		if expansionTimestamp.Before(&event.LastTimestamp) {
+			if event.Reason == "VolumeResizeSuccessful" || event.Reason == "FileSystemResizeSuccessful" {
+				return nil
 			}
 		}
-		// Since, no VolumeResizeSuccessful has been raised for 10 mins,
-		// it could be assumed there is a VolumeResizeError...
-		// In actual, it could be any event but none of the above two.
-		return errors.ErrVolumeResizeError
 	}
 
 	timeout := 10
@@ -2412,7 +2405,11 @@ func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeC
 		timeout = *expansionTimeout
 	}
 
-	return retryutil.RetryFor(time.Duration(timeout)*time.Minute, callback)
+	if time.Now().After(expansionTimestamp.Add(time.Duration(timeout) * time.Minute)) {
+		return errors.ErrVolumeResizeError
+	}
+
+	return nil
 }
 
 // GetVolumeStorageSize returns requested storage size of a volume claim.

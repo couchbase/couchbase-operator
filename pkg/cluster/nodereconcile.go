@@ -1233,7 +1233,6 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 // handleVolumeExpansion attempts to perform online expansion of Persistent Volumes.
 func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	if !c.cluster.Spec.EnableOnlineVolumeExpansion {
-		// currently only volumes are allowed for online upgrade
 		return nil
 	}
 
@@ -1247,7 +1246,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			continue
 		}
 
-		// Get state of persistent volumes
+		// Get state of persistent volumes for the member
 		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return err
@@ -1261,23 +1260,14 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			// normal rolling upgrade since the Pod must be recreated.
 			case pvcState.IsResizeFailed(pvc.Name):
 				err := pvcState.GetReasonForResizeFailed(pvc.Name)
-				log.Info("Unable to expand volume in place, falling back to rolling upgrade", "cluster", c.namespacedName(), "volume", pvc.Name, "error", err)
+				log.Info("Volume expansion failed, falling back to rolling upgrade", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "error", err)
 				c.raiseEvent(k8sutil.ExpandVolumeFallbackEvent(pvc.Name, c.cluster, err.Error()))
+				c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 
-				// Remove volume expansion flag.
-				if c.checkVolumeExpansionState() {
-					return nil
-				}
-
-				return c.setVolumeExpansionState(false)
-
+				return nil
 			// Check if a volume expansion is already in progress and end reconciliation loop if so.
 			case pvcState.IsExpanding(pvc.Name):
-				// NOTE: might consider a timeout here, but since we've already sent the request
-				// to the storageclass there isn't really a good action to take while volumes
-				// are in an unstable state.
-				log.Info("Pod volume expansion is in progress", "cluster", c.namespacedName(), "volume", pvc.Name)
-				r.abort("persisitent volumes expanding")
+				log.Info("Volume expansion is in progress", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name)
 
 				return nil
 			// Check if volume spec has been updated and apply changes.
@@ -1286,39 +1276,33 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				if err != nil {
 					return err
 				}
+
 				// Flag that a volume expansion is occurring.
-				if err := c.setVolumeExpansionState(true); err != nil {
-					return err
-				}
+				c.cluster.Status.SetExpandingVolumeCondition()
 
 				// Log and raise event that expansion started.
 				currentSize := k8sutil.GetVolumeStorageSize(pvc)
 				requestedSize := k8sutil.GetVolumeStorageSize(requestedClaim)
 				c.raiseEvent(k8sutil.ExpandVolumeStartedEvent(pvc.Name, currentSize, requestedSize, c.cluster))
-				log.Info("Volume expanding", "cluster", c.namespacedName(), "name", pvc.Name, "current", currentSize, "requested", requestedSize)
+				log.Info("Volume expansion started", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "current", currentSize, "requested", requestedSize)
 
 				metrics.VolumeExpansionMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, pvc.Name})...).Inc()
 
-				// Done for now. Not going to upgrade all volumes at once.
-				r.abort("persistent volumes expanding")
-
 				return nil
 			}
-			// volume expansion state is not set
-			if !c.checkVolumeExpansionState() {
-				continue
-			}
-
-			// At this point the volume matches our desired state.
-			// If this is a result of a volume expansion then
-			// send an event, otherwise carry on.
-			if err := c.setVolumeExpansionState(false); err != nil {
-				return err
-			}
-
-			c.raiseEvent(k8sutil.ExpandVolumeSucceededEvent(pvc.Name, c.cluster))
 		}
 	}
+
+	// We can't raise expansion completed events for each PVC as there's no reliable way to determine when a specific volume has "completed" it's expansion.
+	// Instead, if we get to this point in the method, we can assume there are no more PVC's that are expanding/failed expanding/updated, so we'll raise a single event
+	// if the condition still exists.
+	if c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
+		log.Info("Volume expansion completed", "cluster", c.namespacedName())
+		c.raiseEvent(k8sutil.ExpandVolumeSucceededEvent(c.cluster))
+	}
+
+	// Clear the condition regardless of whether we raised an event or not for safety.
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 
 	return nil
 }
@@ -1777,7 +1761,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	if c.cluster.UpgradeWaitingForStabilizationPeriod() {
+	if c.cluster.UpgradeWaitingForStabilizationPeriod() || c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 		return nil
 	}

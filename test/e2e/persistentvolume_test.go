@@ -778,7 +778,7 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 	pvcName := e2eutil.GetPvcName(f.LocalPV)
 
 	// Create cluster with Online Resizing Enabled
-	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	bucket := e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
 	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.EnableOnlineVolumeExpansion = true
 	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
@@ -795,16 +795,26 @@ func TestOnlinePersistentVolumeResize(t *testing.T) {
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
 
+	// Once we get the expanding condition, let's patch the bucket to check the volume expansion is non-blocking.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionExpandingVolume, corev1.ConditionTrue, cluster, 5*time.Minute)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/enableFlush", false), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/EnableFlush", false), time.Minute)
+
 	// Verify resize state
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcName, requestedQuantity, VolumeExpansionWaitTimeout)
 
 	// Events indirectly verify that upgrade did not occur
-	// since no scale up events should be present
+	// since no scale up events should be present.
+	// The cluster settings edit event should be after the first volume starts expanding,
+	// but before the second volume starts expanding.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 2 * clusterSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -859,15 +869,23 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	// Resize and data services from 2Gi to 3Gi
 	requestedQuantity := e2espec.NewResourceQuantityGi(3)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+
+	// Verify data volumes are resized
 	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, VolumeExpansionWaitTimeout)
+
 	// Verify index service volumes are still 2Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(2)
 	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
+
 	// Scale index service volumes to 4Gi
 	requestedQuantity = e2espec.NewResourceQuantityGi(4)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/1/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+
+	// Verify index volumes are resized
 	memberName = couchbaseutil.CreateMemberName(cluster.Name, 1)
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
 
@@ -875,7 +893,10 @@ func TestOnlinePersistentVolumeResizeMDS(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(groupSize * 2),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 4 * groupSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
+		eventschema.Repeat{Times: 2 * groupSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+		eventschema.Repeat{Times: 2 * groupSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -927,7 +948,8 @@ func TestOnlinePersistentVolumeResizeMixedClaims(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(groupSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 2 * groupSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
+		eventschema.Repeat{Times: 2 * groupSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -1029,7 +1051,8 @@ func TestOnlinePersistentVolumeResizeWithDocs(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 2 * clusterSize, Validator: e2eutil.VolumeExpansionSuccessSequence()},
+		eventschema.Repeat{Times: 2 * clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -1087,8 +1110,8 @@ func TestOnlinePersistentVolumeResizeWhenPodKilled(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRecovered},
-		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
 	}

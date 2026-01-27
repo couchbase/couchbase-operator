@@ -842,7 +842,7 @@ func (cs *ClusterStatus) SetMigratingCondition() {
 }
 
 func (cs *ClusterStatus) SetExpandingVolumeCondition() {
-	c := newClusterCondition(ClusterConditionExpandingVolume, v1.ConditionTrue, "ExpandingVolume", "Expanding volume")
+	c := newClusterCondition(ClusterConditionExpandingVolume, v1.ConditionTrue, "ExpandingVolume", "Volumes are being expanded")
 	cs.setClusterCondition(c)
 }
 

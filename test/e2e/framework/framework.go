@@ -1648,7 +1648,7 @@ func (r *TestRequirement) getDefaultStorageClassName() (string, error) {
 	}
 
 	for _, sc := range scs.Items {
-		if _, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok {
+		if v, ok := sc.Annotations["storageclass.kubernetes.io/is-default-class"]; ok && v == "true" {
 			return sc.Name, nil
 		}
 	}
