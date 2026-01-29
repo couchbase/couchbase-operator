@@ -40,22 +40,18 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	return candidates
 }
 
-func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet, numToUpgrade int) (couchbaseutil.MemberSet, error) {
+// filterCandidatesByUpgradeOrder returns the upgrade candidates ordered by the upgrade order specified in the cluster spec.
+// This method does not apply any limits to the number of candidates that can be upgraded at once.
+func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
 	if c.cluster.Spec.Upgrade == nil {
-		return candidates, nil
+		return candidates.ToList(), nil
 	}
 
 	upgradeOrderType := c.cluster.Spec.Upgrade.UpgradeOrderType
 
-	// Default to one at a time
-	maxUpgradable, err := c.cluster.GetMaxUpgradable()
-	if err != nil {
-		return nil, err
-	}
-
 	switch upgradeOrderType {
 	case couchbasev2.UpgradeOrderTypeNodes:
-		return c.selectCandidatesByNodesOrder(candidates, maxUpgradable, numToUpgrade), nil
+		return c.selectCandidatesByNodesOrder(candidates), nil
 	case couchbasev2.UpgradeOrderTypeServerGroups:
 		return c.selectCandidatesByServerGroupsOrder(candidates)
 	case couchbasev2.UpgradeOrderTypeServerClasses:
@@ -64,29 +60,20 @@ func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.Member
 		return c.selectCandidatesByServicesOrder(candidates), nil
 	}
 
-	return candidates, nil
+	return candidates.ToList(), nil
 }
 
-func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet, maxUpgradable int, numToUpgrade int) couchbaseutil.MemberSet {
-	selectionSize := min(maxUpgradable, numToUpgrade)
+func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
 	nodeOrder := c.cluster.Spec.Upgrade.UpgradeOrder
-	finalCandidates := couchbaseutil.NewMemberSet()
+	finalCandidates := couchbaseutil.MemberList{}
 
 	for _, node := range nodeOrder {
-		if finalCandidates.Size() >= selectionSize {
-			return finalCandidates
-		}
-
 		if candidates.Contains(node) {
-			finalCandidates.Add(candidates[node])
+			finalCandidates = append(finalCandidates, candidates[node])
 		}
 	}
 
-	if finalCandidates.Size() == selectionSize {
-		return finalCandidates
-	}
-
-	// If the orchestrator is in the candidates list, then separate it from the rest and add it at the end
+	// If the orchestrator is not specified in the upgrade order, but it is in the candidates list, move it to the end of the list to upgrade last.
 	var orchestrator couchbaseutil.Member
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
@@ -94,7 +81,9 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 		log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
 	} else {
 		orchestratorName := clusterInfo.Orchestrator
-		candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
+		if !finalCandidates.Contains(orchestratorName) {
+			candidates, orchestrator = separateCandidatesAndOrchestrator(candidates, orchestratorName)
+		}
 	}
 
 	// Go through the rest in alphabetical order
@@ -102,23 +91,19 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 	sort.Strings(sortedNodes)
 
 	for _, node := range sortedNodes {
-		if finalCandidates.Size() >= selectionSize {
-			return finalCandidates
-		}
-
 		if !finalCandidates.Contains(node) {
-			finalCandidates.Add(candidates[node])
+			finalCandidates = append(finalCandidates, candidates[node])
 		}
 	}
 
-	if orchestrator != nil && finalCandidates.Size() < selectionSize {
-		finalCandidates.Add(orchestrator)
+	if orchestrator != nil {
+		finalCandidates = append(finalCandidates, orchestrator)
 	}
 
 	return finalCandidates
 }
 
-func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
+func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
 	serverGroupOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
 
 	// Append all the server groups to the end of the order, to ensure we upgrade
@@ -146,18 +131,33 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 		}
 	}
 
+	// Only nodes from one server group can be upgraded at a time.
+	// We'll move arbiter nodes to the end of the upgrade list so
+	// they will be upgraded last.
 	for _, group := range serverGroupOrder {
-		if members, ok := groupedCandidates[group]; ok {
-			if members.Size() > 0 {
-				return members, nil
+		if members, ok := groupedCandidates[group]; ok && members.Size() > 0 {
+			filteredMembers := couchbaseutil.MemberList{}
+			arbiterMembers := couchbaseutil.MemberList{}
+
+			for _, member := range members {
+				serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
+				if serverClass != nil && serverClass.HasService("arbiter") {
+					arbiterMembers = append(arbiterMembers, member)
+					continue
+				}
+
+				filteredMembers = append(filteredMembers, member)
 			}
+
+			filteredMembers = append(filteredMembers, arbiterMembers...)
+			return filteredMembers, nil
 		}
 	}
 
 	// If there are remaining candidates not in a server group then they go last
-	return candidates, nil
+	return candidates.ToList(), nil
 }
-func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberSet {
+func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
 	servicesOrder := c.cluster.Spec.Upgrade.UpgradeOrder
 	groupedCandidates := candidates.GroupByServerConfigs()
 	filteredCandidates := couchbaseutil.MemberSet{}
@@ -175,14 +175,14 @@ func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.Membe
 		}
 
 		if filteredCandidates.Size() > 0 {
-			return filteredCandidates
+			return filteredCandidates.ToList()
 		}
 	}
 
-	return candidates
+	return candidates.ToList()
 }
 
-func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberSet {
+func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
 	serverClassOrder := c.cluster.Spec.Upgrade.UpgradeOrder
 
 	// Add all the server classes to the end of the order, to ensure we upgrade
@@ -196,23 +196,23 @@ func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.
 	for _, sc := range serverClassOrder {
 		if members, ok := groupedCandidates[sc]; ok {
 			if members.Size() > 0 {
-				return members
+				return members.ToList()
 			}
 		}
 	}
 
 	// We should never get here, but just in case
-	return candidates
+	return candidates.ToList()
 }
 
-func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
+func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberList, error) {
 	allCandidates, err := c.needsUpgrade()
 	if err != nil {
 		return nil, err
 	}
 
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
-		return allCandidates, nil
+		return allCandidates.ToList(), nil
 	}
 
 	numOldPods := allCandidates.Size()
@@ -239,19 +239,24 @@ func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberSet, error) {
 		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
 	}
 
-	filteredCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates, numToUpgrade)
+	finalCandidates := couchbaseutil.MemberList{}
+
+	if numToUpgrade == 0 {
+		return finalCandidates, nil
+	}
+
+	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates)
 	if err != nil {
 		return nil, err
 	}
 
-	finalCandidates := couchbaseutil.MemberSet{}
-
-	for _, member := range filteredCandidates {
-		if finalCandidates.Size() >= numToUpgrade {
+	// Trim the candidates to keep previousVersionPodCount.
+	for _, member := range orderedCandidates {
+		if len(finalCandidates) >= numToUpgrade {
 			break
 		}
 
-		finalCandidates.Add(member)
+		finalCandidates = append(finalCandidates, member)
 	}
 
 	return finalCandidates, nil
@@ -519,7 +524,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	if !candidates.Empty() {
+	if len(candidates) > 0 {
 		return nil
 	}
 

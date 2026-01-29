@@ -1307,46 +1307,47 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	return nil
 }
 
-func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
-	return c.selectUpgradeCandidates(candidates, "")
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList) (couchbaseutil.MemberSet, error) {
+	return c.selectOrderedUpgradeCandidates(candidates, "")
 }
 
-// selectUpgradeCandidates applies an upgrade heuristic to the set of all upgradable pods
-// and filters this down into a set of pods that will be upgraded this turn.
+// selectUpgradeCandidates returns the candidates that can be upgraded this turn, determined by the upgrade strategy and
+// the maximum number of candidates that can be upgraded at once.
 func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, orchestrator string) (couchbaseutil.MemberSet, error) {
-	// Rolling upgrade defaults to a single node at a time, however this can
-	// be increased to an absolute number or a relative size of the cluster.
-	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
-		// Remove orchestrator from list if rolling upgrade
-		if len(candidates) != 1 && orchestrator != "" {
-			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
-		}
+	return c.selectOrderedUpgradeCandidates(candidates.ToList(), orchestrator)
+}
 
-		upgradeLimit, err := c.cluster.GetMaxUpgradable()
-		if err != nil {
-			return nil, err
-		}
-
-		// Cap the number of upgrades at the number of candidates.
-		maxUpgradable := len(candidates)
-		if upgradeLimit < maxUpgradable {
-			maxUpgradable = upgradeLimit
-		}
-
-		constrained := couchbaseutil.MemberSet{}
-
-		for _, name := range candidates.Names()[:maxUpgradable] {
-			constrained.Add(candidates[name])
-		}
-
-		candidates = constrained
+func (c *Cluster) selectOrderedUpgradeCandidates(candidates couchbaseutil.MemberList, orchestrator string) (couchbaseutil.MemberSet, error) {
+	if c.cluster.GetUpgradeStrategy() != couchbasev2.RollingUpgrade {
+		return candidates.ToSet(), nil
 	}
 
-	return candidates, nil
+	// Remove orchestrator from list if rolling upgrade and orchestrator is specified.
+	if len(candidates) != 1 && orchestrator != "" {
+		candidates, _ = separateOrderedCandidatesAndOrchestrator(candidates, orchestrator)
+	}
+
+	maxUpgradable, err := c.cluster.GetMaxUpgradable()
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the max upgradable constraint
+	// The ordering of the candidates does not matter as the upgrade process will be done in parallel.
+	constrained := couchbaseutil.MemberSet{}
+	for _, candidate := range candidates {
+		if constrained.Size() >= maxUpgradable {
+			break
+		}
+
+		constrained.Add(candidate)
+	}
+
+	return constrained, nil
 }
 
-func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orchestratorName string) (couchbaseutil.MemberSet, couchbaseutil.Member) {
-	var candidatesNoOrchestrator = couchbaseutil.MemberSet{}
+func separateOrderedCandidatesAndOrchestrator(candidates couchbaseutil.MemberList, orchestratorName string) (couchbaseutil.MemberList, couchbaseutil.Member) {
+	var candidatesNoOrchestrator = couchbaseutil.MemberList{}
 
 	var orchestrator couchbaseutil.Member
 
@@ -1362,10 +1363,15 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 			continue
 		}
 
-		candidatesNoOrchestrator.Add(candidate)
+		candidatesNoOrchestrator = append(candidatesNoOrchestrator, candidate)
 	}
 
 	return candidatesNoOrchestrator, orchestrator
+}
+
+func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orchestratorName string) (couchbaseutil.MemberSet, couchbaseutil.Member) {
+	candidatesNoOrchestrator, orchestrator := separateOrderedCandidatesAndOrchestrator(candidates.ToList(), orchestratorName)
+	return candidatesNoOrchestrator.ToSet(), orchestrator
 }
 
 func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member, c *Cluster) error {
@@ -1794,40 +1800,27 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	// Nothing to do, move along.
-	candidates, err := c.getUpgradeCandidates()
+	orderedCandidates, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}
 
-	if candidates.Empty() {
+	// Nothing to do, move along.
+	if len(orderedCandidates) == 0 {
 		return nil
 	}
 
 	r.log()
 
-	podRecoverable := true
-
-	for _, candidate := range candidates {
-		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", candidate.Name())
-		if !c.isPodRecoverable(candidate) {
-			podRecoverable = false
-			break
-		}
-	}
-
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
-	constrained, err := c.selectUpgradeCandidatesIgnoringOrchestrator(candidates)
-
+	constrainedCandidates, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates)
 	if err != nil {
 		return err
 	}
 
-	candidates = constrained
-
 	// Calculate the number of nodes already in the target state before we
 	// potentially mutate the candidates.
-	upgraded := len(c.members) - len(candidates)
+	upgraded := len(c.members) - len(constrainedCandidates)
 
 	// Do any events/conditions that make the upgrade observable.
 	status := &couchbasev2.UpgradeStatus{
@@ -1851,27 +1844,26 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
-		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
-
-		err = r.handleInPlaceUpgrade(c, candidates, targetVersion)
-		if err != nil {
-			return err
-		}
-	} else {
-		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !podRecoverable {
-			log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
+		allCandidatesRecoverable := true
+		for _, candidate := range constrainedCandidates {
+			if !c.isPodRecoverable(candidate) {
+				allCandidatesRecoverable = false
+				break
+			}
 		}
 
-		log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
+		if allCandidatesRecoverable {
+			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 
-		err = r.swapRebalanceMembers(c, candidates)
-		if err != nil {
-			return err
+			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
 		}
+
+		log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	}
 
-	return nil
+	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
+	return r.swapRebalanceMembers(c, constrainedCandidates)
 }
 
 // handleApplyingUpgradeStabilizationPeriod adds the waiting between upgrades condition to the cluster

@@ -332,6 +332,7 @@ func registerTests() {
 		framework.NewTestDef(TestServicesUpgradeOrderSharedServices).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestServerGroupUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestServerGroupDefaultOrderUpgrade).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestServerGroupUpgradeOrderWithArbiterNodes).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestNodeUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestNodeUpgradeDefaultOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradePrevent3Versions).WithTags(TagSuiteP0, TagFeatureUpgrade),

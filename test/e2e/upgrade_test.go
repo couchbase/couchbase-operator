@@ -2046,6 +2046,101 @@ func TestServerGroupUpgradeOrder(t *testing.T) {
 	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImage, upgradeVersion)
 }
 
+// TestServerGroupUpgradeOrderWithArbiterNodes tests that arbiter nodes are upgraded last when upgrading by server groups
+// and maxUpgradable is less than the size of the server group.
+func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	classSize := 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Add an arbiter serverclass to the cluster at the start of the cluster servers list.
+	cluster.Spec.Servers = append([]couchbasev2.ServerConfig{{
+		Name:         "no_services",
+		Size:         classSize,
+		Services:     []couchbasev2.Service{},
+		VolumeMounts: cluster.Spec.Servers[0].VolumeMounts.DeepCopy(),
+	}}, cluster.Spec.Servers...)
+
+	// Enable server groups
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+
+	// Set the upgrade order to upgrade by server groups
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+		UpgradeOrder: []string{
+			availableServerGroups[1],
+			availableServerGroups[0],
+		},
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server group to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded in the expected order (with arbiter nodes upgraded last for each server group)
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(classSize * 3),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	// The arbiter nodes should have index 1 (serverGroup[0]) and 2 (serverGroup[1]). Index 0 is the initial node which cannot be an arbiter node.
+	// We expect arbiter nodes to be upgraded last for each server group.
+	normalUpgradeSequence := eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+
+	arbiterUpgradeSequence := func(i int) eventschema.Sequence {
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, i)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
+	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(2))
+	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
+	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(1))
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestNodeUpgradeOrder(t *testing.T) {
 	f := framework.Global
 
