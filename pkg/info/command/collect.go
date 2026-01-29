@@ -180,9 +180,19 @@ func collect(c config.Configuration) {
 		if context.Config.Upload {
 			verifyUploadInputs(context)
 
-			address := context.Config.UploadHost + "/" + context.Config.Customer + "/" + context.Config.Ticket + "/"
 			proxy := context.Config.UploadProxy
 			payload := util.ArchiveName() + ".tar.gz"
+
+			// Build the upload URL path, including the filename
+			// If ticket is provided: [host]/[customer]/[ticket]/[filename]
+			// If ticket is empty: [host]/[customer]/[filename]
+			var address string
+			if context.Config.Ticket != "" {
+				address = context.Config.UploadHost + "/" + context.Config.Customer + "/" + context.Config.Ticket + "/" + payload
+			} else {
+				address = context.Config.UploadHost + "/" + context.Config.Customer + "/" + payload
+			}
+
 			err := upload(address, payload, proxy)
 
 			if err != nil {
