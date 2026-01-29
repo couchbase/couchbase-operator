@@ -26,6 +26,7 @@ type podOptions struct {
 	serverClass string
 	index       int
 	autoIndex   bool
+	image       string
 }
 
 func newPodOptions() *podOptions {
@@ -37,6 +38,7 @@ func (o *podOptions) registerPodGenerateFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.serverClass, "server-class", "", "The server class from which to create a pod definition for.")
 	cmd.Flags().IntVar(&o.index, "index", 0, "The index of the pod to create")
 	cmd.Flags().BoolVar(&o.autoIndex, "auto-index", false, "Use the persistence secret's to generate a new pod with a new index")
+	cmd.Flags().StringVar(&o.image, "image", "", "The Couchbase Server image to use for the pod")
 
 	_ = cmd.MarkFlagRequired("couchbase-cluster")
 	_ = cmd.MarkFlagRequired("server-class")
@@ -193,6 +195,10 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 	serverGroup, image, err := getServerGroupAndImageFromScheduler(k8sClient, cbc, m, pvcState, serverClass)
 	if err != nil {
 		return nil, err
+	}
+
+	if o.image != "" {
+		image = o.image
 	}
 
 	//TODO:  Pull this from the Couchbase Operator Deployment?

@@ -651,6 +651,11 @@ Use the persistence secret's to generate a new pod with a new index
 +
 The cluster from which to create a pod definition for.
 
+--image::
+*Type*: string
++
+The Couchbase Server image to use for the pod
+
 --index::
 *Type*: int
 +
@@ -1755,6 +1760,11 @@ Use the persistence secret's to generate a new pod with a new index
 *Type*: string
 +
 The cluster from which to create a pod definition for.
+
+--image::
+*Type*: string
++
+The Couchbase Server image to use for the pod
 
 --index::
 *Type*: int
