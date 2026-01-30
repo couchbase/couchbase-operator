@@ -932,16 +932,19 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 
 	// The readiness probe does a TCP check against Couchbase Server to determine
 	// whether NS server is running.  It may not be actually functional, but it's
-	// better than nothing, as people complain if there is no readiness.  Note that
-	// we try use the TLS port always, as that's the only common denominator -- the
-	// plaintext port can be deactivated by strict mode TLS.  We persist with 8091
-	// because it would require a rolling upgrade of all those server instances, so
-	// limiting the blast radius.
-	port := AdminServicePort
-
-	if cluster.IsMutualTLSEnabled() {
-		port = AdminServicePortTLS
-	}
+	// better than nothing, as people complain if there is no readiness.
+	//
+	// We use the TLS port (18091) for ALL clusters because:
+	// 1. Port 18091 is the "common denominator" - always available in CB 7.0+
+	// 2. Port 8091 can be disabled in strict TLS mode
+	// 3. CB Server uses port 18091 for AddNode verification (node-to-node),
+	//    so the pod should only be marked ready when 18091 is up
+	// 4. This prevents the race condition where readiness passes on 8091
+	//    but AddNode fails because 18091 isn't ready yet
+	//
+	// NOTE: This would've triggered a rolling upgrade of all server instances on older readiness probe ports, so we now have logic to ignore changes to the readiness probe port.
+	// Any new pod that comes up will use 18091 while the old pod will continue to use 8091.
+	port := AdminServicePortTLS
 
 	container.ReadinessProbe = createReadinessProbe(port, readinessConfig)
 

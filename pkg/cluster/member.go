@@ -477,37 +477,103 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 	return memberResults, nil
 }
 
-// AddNodeWithPodReadyCheck adds a node to the cluster but checks that the pod is ready before making the API call.
-func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url string, services couchbaseutil.ServiceList, target interface{}, retryPeriod time.Duration) error {
-	return retryutil.RetryUntilSuccess(retryPeriod, 1*time.Second, func() error {
-		pod, ok := c.k8s.Pods.Get(member.Name())
-		if !ok {
-			return fmt.Errorf("%w: pod not found", errors.ErrPodNotFound)
+// checkTargetPodsExist checks if target pod(s) still exist and are not terminating.
+// Returns an error if any target pod is missing or being deleted.
+func (c *Cluster) checkTargetPodsExist(target interface{}) error {
+	switch t := target.(type) {
+	case couchbaseutil.MemberSet:
+		for name := range t {
+			pod, exists := c.k8s.Pods.Get(name)
+			if !exists || pod.DeletionTimestamp != nil {
+				return fmt.Errorf("%w: target pod %s no longer exists or terminating", errors.ErrPodNotFound, name)
+			}
 		}
+	case couchbaseutil.Member:
+		pod, exists := c.k8s.Pods.Get(t.Name())
+		if !exists || pod.DeletionTimestamp != nil {
+			return fmt.Errorf("%w: target pod %s no longer exists or terminating", errors.ErrPodNotFound, t.Name())
+		}
+	}
+	return nil
+}
 
-		clusterInfo := couchbaseutil.ClusterInfo{}
+// attemptAddNode attempts to add a node to the cluster if the pod is ready.
+// Returns true if the node was successfully added or already exists, false if we should retry.
+func (c *Cluster) attemptAddNode(member couchbaseutil.Member, url string, services couchbaseutil.ServiceList, target interface{}) (bool, error) {
+	pod, ok := c.k8s.Pods.Get(member.Name())
+	if !ok || pod.DeletionTimestamp != nil {
+		return false, fmt.Errorf("%w: member pod %s not found or terminating, exiting to allow reconciler to recreate", errors.ErrPodNotFound, member.Name())
+	}
 
-		// Check if the node is already added to the cluster. This can
-		// happen if the node was already added to the cluster but API
-		// call failed.
-		if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, target); err != nil {
+	// Check if node already exists in cluster (idempotency check)
+	clusterInfo := couchbaseutil.ClusterInfo{}
+	if err := couchbaseutil.GetPoolsDefault(&clusterInfo).On(c.api, target); err != nil {
+		return false, nil
+	}
+
+	// Successfully got cluster info, check if node already added
+	for _, node := range clusterInfo.Nodes {
+		if string(node.HostName) == url {
+			log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
+			return true, nil
+		}
+	}
+
+	// Check main container readiness (not pod initialization).
+	// IsPodMainContainerReady checks if the Couchbase container is ready to accept requests.
+	if !k8sutil.IsPodMainContainerReady(pod) {
+		log.V(1).Info("Pod main container not ready, skipping AddNode attempt", "cluster", c.namespacedName(), "pod", member.Name())
+		return false, nil
+	}
+
+	// Pod is ready, attempt to add node
+	if err := couchbaseutil.AddNode(url, c.username, c.password, services).On(c.api, target); err != nil {
+		// AddNode failed, will retry (might be transient cluster issue)
+		log.V(1).Info("AddNode failed, will retry", "cluster", c.namespacedName(), "pod", member.Name())
+		return false, nil
+	}
+	// If pod not ready or AddNode failed, continue to retry
+	return true, nil
+}
+
+// AddNodeWithPodReadyCheck adds a node to the cluster but checks that the pod is ready before making the API call.
+// Uses a custom retry loop that checks for fatal conditions (pod deletion) on each iteration
+// instead of RetryUntilSuccess, which would retry all errors including fatal ones.
+func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url string, services couchbaseutil.ServiceList, target interface{}, retryPeriod time.Duration) error {
+	ctx, cancel := context.WithTimeout(c.ctx, retryPeriod)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	// Try immediately first, then on each tick
+	for {
+		// Check if target pod(s) still exist
+		// Target pods are existing cluster nodes that won't be recreated automatically.
+		// If user manually deletes them, fail immediately to unblock reconciler.
+		if err := c.checkTargetPodsExist(target); err != nil {
 			return err
 		}
 
-		// Check if node already exists in cluster
-		for _, node := range clusterInfo.Nodes {
-			if string(node.HostName) == url {
-				log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
-				return nil
-			}
+		// Check if member pod still exists and attempt to add node
+		// Even though the reconciler will recreate it, we must exit this loop immediately.
+		// The next reconcile cycle will detect the missing pod and recreate it.
+		success, err := c.attemptAddNode(member, url, services, target)
+		if err != nil {
+			return err
+		}
+		if success {
+			return nil
 		}
 
-		if !k8sutil.IsPodMainContainerReady(pod) {
-			return fmt.Errorf("%w: pod containers not ready", errors.ErrResourceRequired)
+		// Wait for next retry or timeout
+		select {
+		case <-ticker.C:
+			// Continue to next iteration
+		case <-ctx.Done():
+			return fmt.Errorf("failed to add node %s to cluster after %v: %w", member.Name(), retryPeriod, errors.ErrNodeNotAdded)
 		}
-
-		return couchbaseutil.AddNode(url, c.username, c.password, services).On(c.api, target)
-	})
+	}
 }
 
 // Destroys a Couchbase cluster member.

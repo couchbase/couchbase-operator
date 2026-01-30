@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing", "arbiter"}
@@ -348,6 +349,12 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		// from 2.4 -> 2.5+
 		requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
 		actualSpec.Containers[0].Ports = []v1.ContainerPort{}
+
+		// Ignore readiness probe port changes
+		// changed the default port from 8091 to 18091 (K8S-3828). New pods
+		// will get 18091, existing pods keep their current probe.
+		requestedSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
+		actualSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
 
 		// Don't force upgrades when we switch from migration mode to normal
 		// reconciliation.
