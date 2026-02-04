@@ -98,12 +98,12 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		}
 	}
 
-	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image, "serverGroup", serverGroup, "config", config)
-
 	serverGroup, err = scheduler.Create(config.Name, m.Name(), serverGroup)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image, "serverGroup", serverGroup, "config", config)
 
 	err = EstablishCNGPrerequisites(client, cluster)
 	if err != nil {

@@ -734,11 +734,6 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
-
-	if err := retryutil.RetryFor(4*time.Second, c.updateCRSpecAnnotation); err != nil {
-		log.Info("unable to update spec annotation", "cluster", c.namespacedName(), "error", err)
-	}
-
 	if err := retryutil.RetryFor(4*time.Second, c.updateCRStatus); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
@@ -824,7 +819,7 @@ func (c *Cluster) UpdateOnFailedValidationOperatorRestart(validationErr error, e
 
 // updateCRSpecAnnotation updates lastReconciledSpec annotation with the JSON representation of the current spec.
 // The annotation will only be updated if the spec has changed.
-func (c *Cluster) updateCRSpecAnnotation() error {
+func (c *Cluster) UpdateCRSpecAnnotation() error {
 	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
 
 	if err != nil {

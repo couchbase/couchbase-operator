@@ -4661,7 +4661,7 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	// Modification during upgrade, only allow rollback.
 	if updatedVersion != current.Status.CurrentVersion {
-		return util.NewUpdateError("spec.version", "body")
+		return fmt.Errorf("spec.image can only be rolled back to the original version %s during an upgrade", current.Status.CurrentVersion)
 	}
 
 	return nil
@@ -4685,6 +4685,10 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 
 	// If MixedMode condition exists and is true, cluster is not fully upgraded
 	if c.HasCondition(couchbasev2.ClusterConditionMixedMode) {
+		return false, nil
+	}
+
+	if c.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
 		return false, nil
 	}
 
