@@ -223,6 +223,7 @@ func registerTests() {
 		framework.NewTestDef(TestResilientDeltaRecovery).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestDeltaRecoveryWithVariousServices).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestInplaceUpgradeWithRollback).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestInPlaceUpgradeWithMultipleNodes).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestEditServiceConfig).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestCreateClusterDataServiceNotFirst).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestRemoveLastDataService).WithTags(TagSuiteP0),

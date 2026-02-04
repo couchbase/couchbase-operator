@@ -11,7 +11,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -1599,6 +1598,67 @@ func TestInplaceUpgradeWithRollback(t *testing.T) {
 		eventschema.Repeat{
 			Times:     2,
 			Validator: upgradeSequence,
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestInPlaceUpgradeWithMultipleNodes(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable().ServerGroups(1)
+
+	available := getAvailabilityZones(t, kubernetes)
+
+	// Static configuration.
+	clusterSize := 6
+	upgradablePercent := "33%"
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeStrategy:  couchbasev2.RollingUpgrade,
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
+			MaxUpgradablePercent: upgradablePercent,
+		},
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+
+	cluster.Spec.ServerGroups = []string{available[0]}
+	// Ensure the single server config uses all groups
+	cluster.Spec.Servers[0].ServerGroups = []string{available[0]}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// then the cluster to become healthy after upgrade has completed.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: 2,
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+			},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}

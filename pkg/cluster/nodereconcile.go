@@ -1402,6 +1402,10 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 	}
 
 	for _, node := range clusterInfoInitial.Nodes {
+		if node.HostName != candidate.GetHostName() {
+			continue
+		}
+
 		if !c.members.Contains(node.HostName.GetMemberName()) {
 			return fmt.Errorf("%w, %s", ErrNodeNotInCluster, node.HostName)
 		}
@@ -1534,7 +1538,7 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
 	if len(c.members) > 1 {
 		if canDeltaRecover {
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
@@ -1557,24 +1561,62 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 		return err
 	}
 
-	// Rebalance failed. Time to set recovery type as full.
-	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
-		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
+	return nil
+}
 
+func (r *ReconcileMachine) rebalanceAfterInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
+	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err == nil {
+		return nil
+	} else {
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
+	}
+
+	if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
+		if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
+			return err
+		}
+	}
+
+	for _, candidate := range candidates {
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
+	}
 
-		if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
-			if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
-				return err
-			}
-		}
+	if err := c.rebalance(c.members); err != nil {
+		return err
+	}
 
-		return c.rebalance(c.members)
+	for _, candidate := range candidates {
+		r.upgradedMembers.Add(candidate)
 	}
 
 	return nil
+}
+
+func (c *Cluster) multipleInPlaceUpgradesSupported(candidates couchbaseutil.MemberSet) (bool, error) {
+	if c.cluster.Spec.Upgrade == nil || (c.cluster.Spec.Upgrade != nil && c.cluster.Spec.Upgrade.UpgradeOrderType != couchbasev2.UpgradeOrderTypeServerGroups) {
+		return false, nil
+	}
+
+	if len(candidates) >= (len(c.callableMembers)-1)/2 {
+		log.Info("Unable to perform multiple in-place upgrades at once without losing quorum", "cluster", c.namespacedName())
+		return false, nil
+	}
+
+	buckets, err := c.gatherBuckets()
+	if err != nil {
+		return false, err
+	}
+
+	for _, bucket := range buckets {
+		if bucket.BucketReplicas <= len(candidates) {
+			log.Info("Unable to perform multiple in-place upgrades at once due to insufficient bucket replicas", "cluster", c.namespacedName(), "bucket", bucket.BucketName)
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // nolint:gocognit
@@ -1592,6 +1634,11 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 		metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 		return err
+	}
+
+	canDoMultipleInPlaceUpgrades, multipleInPlaceUpgradesErr := c.multipleInPlaceUpgradesSupported(candidates)
+	if multipleInPlaceUpgradesErr != nil {
+		return multipleInPlaceUpgradesErr
 	}
 
 	for _, candidate := range candidates {
@@ -1644,17 +1691,34 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
+		if err := r.recreateNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
 			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 			return err
 		}
 
-		r.upgradedMembers.Add(candidate)
-
 		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
+		if !canDoMultipleInPlaceUpgrades {
+			singleCandidate := couchbaseutil.NewMemberSet(candidate)
+			if err := r.rebalanceAfterInPlaceUpgrade(c, singleCandidate, targetVersion); err != nil {
+				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+				metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
+				return err
+			}
+		}
+	}
+
+	if canDoMultipleInPlaceUpgrades {
+		if err := r.rebalanceAfterInPlaceUpgrade(c, candidates, targetVersion); err != nil {
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
+
+			return err
+		}
 	}
 
 	return nil
