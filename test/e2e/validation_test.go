@@ -3432,6 +3432,22 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.merge.schedule`},
 		},
+		{
+			name: "TestValidateBackupAdditionalArgsDeleteLockfileMultipleArgs",
+			mutations: patchMap{"backup0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorBackupArgs": "--some-arg --force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile`},
+		},
+		{
+			name: "TestValidateBackupAdditionalArgsDeleteLockfile",
+			mutations: patchMap{"backup0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorBackupArgs": "--force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3534,6 +3550,22 @@ func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Replace("/spec/data/map/0/target", "bucket2.scope")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.data.map`},
+		},
+		{
+			name: "TestValidateRestoreAdditionalArgsDeleteLockfileMultipleArgs",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorRestoreArgs": "--some-arg --force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile`},
+		},
+		{
+			name: "TestValidateRestoreAdditionalArgsDeleteLockfile",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorRestoreArgs": "--force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile`},
 		},
 	}
 

@@ -2722,6 +2722,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		return nil
 	}
 
+	if err := annotations.Populate(&backup.Spec, backup.Annotations); err != nil {
+		return err
+	}
+
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
 	}
@@ -2762,6 +2766,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 				errs = append(errs, fmt.Errorf("spec.data.exclude invalid: %w", err))
 			}
 		}
+	}
+
+	if strings.Contains(backup.Spec.AdditionalOperatorBackupArgs, "--force-delete-lockfile") {
+		errs = append(errs, fmt.Errorf("spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile"))
 	}
 
 	errs = append(errs, checkConstraintsEnvVarsBackup(backup)...)
@@ -2950,12 +2958,17 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		return nil
 	}
 
+	if err := annotations.Populate(&restore.Spec, restore.Annotations); err != nil {
+		return err
+	}
+
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseBackupRestore) error{
 		checkContraintRestoreStart,
 		checkContraintRestoreEnd,
 		checkContraintRestoreRange,
 		checkContraintRestoreData,
 		checkConstraintBackupRestoreObjStoreSecret,
+		checkConstraintRestoreAdditionalArgs,
 	}
 
 	var errs []error
@@ -2975,6 +2988,14 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintRestoreAdditionalArgs(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if strings.Contains(restore.Spec.AdditionalOperatorRestoreArgs, "--force-delete-lockfile") {
+		return fmt.Errorf("spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile")
 	}
 
 	return nil
