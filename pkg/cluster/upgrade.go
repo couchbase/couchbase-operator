@@ -206,71 +206,9 @@ func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.
 	return candidates.ToList()
 }
 
-func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberList, error) {
-	allCandidates, err := c.needsUpgrade()
-	if err != nil {
-		return nil, err
-	}
-
-	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
-		return allCandidates.ToList(), nil
-	}
-
-	numOldPods := allCandidates.Size()
-
-	numToUpgrade := numOldPods
-
-	if c.cluster.Spec.Upgrade != nil {
-		// Check if this is a rollback (target version == baseline version)
-		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
-		if err != nil {
-			return nil, err
-		}
-		baselineVersion, err := c.state.Get(persistence.Version)
-		if err != nil {
-			return nil, err
-		}
-		isRollback := targetVersion == baselineVersion
-
-		// Only apply PreviousVersionPodCount for forward upgrades, not rollbacks
-		if !isRollback {
-			// Ensure we don't go negative - at minimum, we should upgrade 0 pods
-			numToUpgrade = max(numOldPods-c.cluster.Spec.Upgrade.PreviousVersionPodCount, 0)
-		}
-		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
-	}
-
-	finalCandidates := couchbaseutil.MemberList{}
-
-	if numToUpgrade == 0 {
-		return finalCandidates, nil
-	}
-
-	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates)
-	if err != nil {
-		return nil, err
-	}
-
-	// Trim the candidates to keep previousVersionPodCount.
-	for _, member := range orderedCandidates {
-		if len(finalCandidates) >= numToUpgrade {
-			break
-		}
-
-		finalCandidates = append(finalCandidates, member)
-	}
-
-	return finalCandidates, nil
-}
-
-// needsUpgrade does an ordered walk down the list of members, if a member is not
-// the correct version then return it as an upgrade canididate  It also returns the
-// counts of members in the various versions.
-//
-//nolint:gocognit
-func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
-	candidates := couchbaseutil.MemberSet{}
-
+// getRescheduleMoves determines and executes the appropriate reschedule strategy
+// based on server group configuration.
+func (c *Cluster) getRescheduleMoves() ([]scheduler.Move, error) {
 	var moves []scheduler.Move
 
 	if c.cluster.Spec.ServerGroupsEnabled() && !c.cluster.Spec.RescheduleDifferentServerGroup {
@@ -299,6 +237,136 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 		moves = m
 	}
 
+	return moves, nil
+}
+
+// normalizePodSpecsForComparison applies ignore rules to pod specs to avoid
+// unnecessary upgrades for fields that shouldn't trigger an upgrade.
+func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.PodSpec, actual *v1.Pod) error {
+	// Ignore this field so that we don't force upgrades because we changed it.
+	requestedSpec.TerminationGracePeriodSeconds = nil
+	actualSpec.TerminationGracePeriodSeconds = nil
+
+	// We ignore ports as they aren't configurable, this also prevents a
+	// forced upgrade cycle of the cluster when upgrading the Operator
+	// from 2.4 -> 2.5+
+	requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
+	actualSpec.Containers[0].Ports = []v1.ContainerPort{}
+
+	// Ignore readiness probe port changes
+	// changed the default port from 8091 to 18091 (K8S-3828). New pods
+	// will get 18091, existing pods keep their current probe.
+	requestedSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
+	actualSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
+
+	// Don't force upgrades when we switch from migration mode to normal
+	// reconciliation.
+	if !c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
+		ignoreMigratedHostnameAlias(actual, requestedSpec)
+	}
+
+	// Ignore metrics container readiness probes as that has changed but is obsolete in 2.9
+	requestedSpec.Containers = removeMetricsContainer(requestedSpec.Containers)
+	actualSpec.Containers = removeMetricsContainer(actualSpec.Containers)
+
+	// Ignore key shadow secret volume mount if it is not needed. But if it already exists there's no point in removing it so we do this before the comparison.
+	if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
+		return err
+	} else if !keyShadowSecretNeeded {
+		removeKeyShadowSecretVolumeMount(requestedSpec)
+		removeKeyShadowSecretVolumeMount(actualSpec)
+	}
+
+	return nil
+}
+
+// detectZoneChange checks if the pod's server group zone has changed.
+func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.PersistentVolumeClaimState) bool {
+	if pvcState == nil {
+		return false
+	}
+
+	actualZone := ""
+	requestedZone := ""
+	if actualSpec.NodeSelector != nil {
+		actualZone = actualSpec.NodeSelector[constants.ServerGroupLabel]
+	}
+	if requestedSpec.NodeSelector != nil {
+		requestedZone = requestedSpec.NodeSelector[constants.ServerGroupLabel]
+	}
+
+	return actualZone != "" && requestedZone != "" && actualZone != requestedZone
+}
+
+func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberList, bool, error) {
+	allCandidates, zoneChangeDetected, err := c.needsUpgrade()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
+		return allCandidates.ToList(), zoneChangeDetected, nil
+	}
+
+	numOldPods := allCandidates.Size()
+
+	numToUpgrade := numOldPods
+
+	if c.cluster.Spec.Upgrade != nil {
+		// Check if this is a rollback (target version == baseline version)
+		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+		if err != nil {
+			return nil, false, err
+		}
+		baselineVersion, err := c.state.Get(persistence.Version)
+		if err != nil {
+			return nil, false, err
+		}
+		isRollback := targetVersion == baselineVersion
+
+		// Only apply PreviousVersionPodCount for forward upgrades, not rollbacks
+		if !isRollback {
+			// Ensure we don't go negative - at minimum, we should upgrade 0 pods
+			numToUpgrade = max(numOldPods-c.cluster.Spec.Upgrade.PreviousVersionPodCount, 0)
+		}
+		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
+	}
+
+	finalCandidates := couchbaseutil.MemberList{}
+
+	if numToUpgrade == 0 {
+		return finalCandidates, false, nil
+	}
+
+	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Trim the candidates to keep previousVersionPodCount.
+	for _, member := range orderedCandidates {
+		if len(finalCandidates) >= numToUpgrade {
+			break
+		}
+
+		finalCandidates = append(finalCandidates, member)
+	}
+
+	return finalCandidates, zoneChangeDetected, nil
+}
+
+// needsUpgrade does an ordered walk down the list of members, if a member is not
+// the correct version then return it as an upgrade canididate  It also returns the
+// counts of members in the various versions.
+func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, bool, error) {
+	candidates := couchbaseutil.MemberSet{}
+	zoneChangeDetected := false
+
+	moves, err := c.getRescheduleMoves()
+	if err != nil {
+		return nil, false, err
+	}
+
 	for name, member := range c.members {
 		// Get what the member actually looks like.
 		actual, exists := c.k8s.Pods.Get(name)
@@ -314,12 +382,12 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		requested, err := c.regeneratePod(member, actual, serverClass, pvcState, moves)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 
 		// Check the specification at creation with the ones that are requested
@@ -331,47 +399,18 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
 			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-				return nil, errors.NewStackTracedError(err)
+				return nil, false, errors.NewStackTracedError(err)
 			}
 		}
 
 		requestedSpec := &v1.PodSpec{}
 		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
-			return nil, errors.NewStackTracedError(err)
+			return nil, false, errors.NewStackTracedError(err)
 		}
 
-		// Ignore this field so that we don't force upgrades because we changed it.
-		requestedSpec.TerminationGracePeriodSeconds = nil
-		actualSpec.TerminationGracePeriodSeconds = nil
-
-		// We ignore ports as they aren't configurable, this also prevents a
-		// forced upgrade cycle of the cluster when upgrading the Operator
-		// from 2.4 -> 2.5+
-		requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
-		actualSpec.Containers[0].Ports = []v1.ContainerPort{}
-
-		// Ignore readiness probe port changes
-		// changed the default port from 8091 to 18091 (K8S-3828). New pods
-		// will get 18091, existing pods keep their current probe.
-		requestedSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
-		actualSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
-
-		// Don't force upgrades when we switch from migration mode to normal
-		// reconciliation.
-		if !c.cluster.Spec.Networking.ImprovedHostNetwork && !c.cluster.Spec.Networking.InitPodsWithNodeHostname {
-			ignoreMigratedHostnameAlias(actual, requestedSpec)
-		}
-
-		// Ignore metrics container readiness probes as that has changed but is obsolete in 2.9
-		requestedSpec.Containers = removeMetricsContainer(requestedSpec.Containers)
-		actualSpec.Containers = removeMetricsContainer(actualSpec.Containers)
-
-		// Ignore key shadow secret volume mount if it is not needed. But if it already exists there's no point in removing it so we do this before the comparison.
-		if keyShadowSecretNeeded, err := c.needsKeyShadowSecret(); err != nil {
-			return nil, err
-		} else if !keyShadowSecretNeeded {
-			removeKeyShadowSecretVolumeMount(requestedSpec)
-			removeKeyShadowSecretVolumeMount(actualSpec)
+		// Apply normalization rules to both specs
+		if err := c.normalizePodSpecsForComparison(actualSpec, requestedSpec, actual); err != nil {
+			return nil, false, err
 		}
 
 		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
@@ -391,10 +430,15 @@ func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, error) {
 
 		log.V(1).Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
 
+		// Check if zone change is needed by comparing NodeSelector
+		if !zoneChangeDetected {
+			zoneChangeDetected = detectZoneChange(actualSpec, requestedSpec, pvcState)
+		}
+
 		candidates.Add(member)
 	}
 
-	return candidates, nil
+	return candidates, zoneChangeDetected, nil
 }
 
 func removeMetricsContainer(initial []v1.Container) []v1.Container {
@@ -526,7 +570,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
-	candidates, err := c.getUpgradeCandidates()
+	candidates, _, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}

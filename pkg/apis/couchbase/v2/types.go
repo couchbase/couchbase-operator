@@ -2917,9 +2917,10 @@ type ClusterSpec struct {
 	// zones and not biasing to the first availability zones.
 	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
 
-	// RescheduleDifferentServerGroup allows the Operator to attempt to  reschedule pods
-	// to a different server group a pod scheduling.
-	// +kubebuilder:default=true
+	// RescheduleDifferentServerGroup controls how the Operator handles pods that fail to schedule.
+	// When not set, the Operator performs full server group rebalancing for all pods, including unschedulable ones, and does not avoid groups that previously failed to schedule pods.
+	// When set to true, only pods from removed (unschedulable) server groups are rescheduled, and the Operator tracks failed groups and avoids them when possible.
+	// If all groups fail, a random group is chosen. Only affects pods without existing PVCs.
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 
 	// DEPRECATED - by spec.security.securityContext

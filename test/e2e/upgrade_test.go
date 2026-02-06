@@ -2851,3 +2851,40 @@ func TestChangeClusterSettingsDuringUpgradeStabilizationPeriod(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestInPlaceUpgradeServerGroupZoneAddedWithPV tests that the operator properly handles
+// server group zone addition during InPlaceUpgrade with PVCs by using SwapRebalance
+// instead of going into an infinite loop.
+func TestInPlaceUpgradeServerGroupZoneAddedWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size2
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 1 server group initially, PVCs, and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = serverGroups[:1]
+	cluster.ObjectMeta.Annotations = map[string]string{"cao.couchbase.com/rescheduleDifferentServerGroup": "false"}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the single server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Add a second zone (server group becomes available)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", serverGroups[:2]), time.Minute)
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+}

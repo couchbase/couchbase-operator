@@ -1046,7 +1046,10 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	prioritizedRemoveCandidates := couchbaseutil.NewMemberSet()
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
-		c.needsUpgrade,
+		func() (couchbaseutil.MemberSet, error) {
+			candidates, _, err := c.needsUpgrade()
+			return candidates, err
+		},
 		c.getBucketMigrationCandidates,
 		c.getNodeServiceMismatchCandidates,
 	}
@@ -1864,7 +1867,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	orderedCandidates, err := c.getUpgradeCandidates()
+	orderedCandidates, zoneChangeDetected, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}
@@ -1917,13 +1920,17 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 			}
 		}
 
-		if allCandidatesRecoverable {
+		switch {
+		case allCandidatesRecoverable && !zoneChangeDetected:
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
-
 			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
-		}
 
-		log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		case allCandidatesRecoverable && zoneChangeDetected:
+			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+
+		default:
+			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		}
 	}
 
 	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
