@@ -693,6 +693,10 @@ type CouchbaseBackupRestoreSpec struct {
 	// recover from broken backup/restore attempts.
 	// +kubebuilder:default="none"
 	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryMethod,omitempty"`
+
+	// ForceDeleteLockFile is used to force delete the lock file.
+	// This should be used with caution and will force delete the current lockfile if it exists.
+	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
 }
 
 type CouchbaseBackupStagingVolume struct {

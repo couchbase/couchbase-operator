@@ -1371,6 +1371,10 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		}
 	}
 
+	if restore.Spec.ForceDeleteLockfile {
+		args = append(args, "--force-delete-lockfile")
+	}
+
 	for flag, value := range enableFlags {
 		if *value {
 			args = append(args, flag)
