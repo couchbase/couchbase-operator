@@ -60,6 +60,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAutoFailoverMaxCount,
 		checkConstraintAutoFailoverEphemeral,
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
+		checkConstraintAutoFailoverOnDataDiskNonResponsiveness,
+		checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
 		checkConstraintAdminSecret,
@@ -686,6 +688,49 @@ func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(_ *types.Validator, c
 
 	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskIssuesTimePeriod.Seconds() > 3600.0 {
 		return fmt.Errorf("spec.cluster.autoFailoverOnDataDiskIssuesTimePeriod in body should be less than or equal to 1h")
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverOnDataDiskNonResponsiveness checks disk non-responsiveness settings are only used with 8.0.0+.
+func checkConstraintAutoFailoverOnDataDiskNonResponsiveness(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if before80, err := couchbaseutil.VersionBefore(tag, "8.0.0"); before80 && err == nil {
+		if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness {
+			return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is not supported in Couchbase Server versions lower than 8.0.0")
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod checks the auto failover disk non-responsiveness timeout is within range.
+func checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Only validate if the feature is enabled
+	if !cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness && cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+		return nil
+	}
+
+	if !cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness && cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod != nil {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod should not be set when annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is false")
+	}
+
+	// Should be set via annotation when feature is enabled.
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+		return errors.Required("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod", "body", nil)
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod.Seconds() < constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodMin {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be greater than or equal to 5s")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod.Seconds() > constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodMax {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be less than or equal to 3600s")
 	}
 
 	return nil

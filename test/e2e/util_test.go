@@ -303,6 +303,7 @@ func registerTests() {
 		framework.NewTestDef(TestPersistentVolumeKillAllPodsTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeaturePersistentVolumes, TagSuitePlatform),
 		framework.NewTestDef(TestServerGroupAutoFailover).WithTags(TagSuiteP0, TagFeatureServerGroups),
 		framework.NewTestDef(TestMultiNodeAutoFailover).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestAutoFailoverDiskNonResponsivenessAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestAnalyticsResizeCluster).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestNegLogCollectValidateArgs).WithTags(TagSuiteP0, TagFeatureSupportability),
 		framework.NewTestDef(TestLogCollect).WithTags(TagSuiteP0, TagFeatureSupportability),

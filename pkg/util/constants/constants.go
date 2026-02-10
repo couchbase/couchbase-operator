@@ -33,12 +33,15 @@ var (
 	DefaultDataPath  = "/opt/couchbase/var/lib/couchbase/data"
 	DefaultIndexPath = "/opt/couchbase/var/lib/couchbase/data"
 
-	AutoFailoverTimeoutMin                    uint64 = 5
-	AutoFailoverTimeoutMax                    uint64 = 3600
-	AutoFailoverMaxCountMin                   uint64 = 1
-	AutoFailoverMaxCountMax                   uint64 = 3
-	AutoFailoverOnDataDiskIssuesTimePeriodMin uint64 = 5
-	AutoFailoverOnDataDiskIssuesTimePeriodMax uint64 = 3600
+	AutoFailoverTimeoutMin                                   uint64  = 5
+	AutoFailoverTimeoutMax                                   uint64  = 3600
+	AutoFailoverMaxCountMin                                  uint64  = 1
+	AutoFailoverMaxCountMax                                  uint64  = 3
+	AutoFailoverOnDataDiskIssuesTimePeriodMin                uint64  = 5
+	AutoFailoverOnDataDiskIssuesTimePeriodMax                uint64  = 3600
+	AutoFailoverOnDataDiskNonResponsivenessTimePeriodMin     float64 = 5
+	AutoFailoverOnDataDiskNonResponsivenessTimePeriodDefault float64 = 120
+	AutoFailoverOnDataDiskNonResponsivenessTimePeriodMax     float64 = 3600
 
 	PodSpecAnnotation             = "pod.couchbase.com/spec"
 	PVCSpecAnnotation             = "pvc.couchbase.com/spec"

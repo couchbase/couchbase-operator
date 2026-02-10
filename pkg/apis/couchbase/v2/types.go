@@ -3857,6 +3857,21 @@ type ClusterConfig struct {
 	// +kubebuilder:default="120s"
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
 
+	// AutoFailoverOnDataDiskNonResponsiveness defines whether Couchbase server should failover a pod
+	// when the data disk has not completed an operation in the specified time period.
+	// This setting is only supported on Couchbase Server 8.0+.
+	// This field is configured via annotations only and is not exposed in the CRD.
+	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness
+	AutoFailoverOnDataDiskNonResponsiveness bool `json:"-" annotation:"autoFailoverOnDataDiskNonResponsiveness"`
+
+	// AutoFailoverOnDataDiskNonResponsivenessTimePeriod defines how long to wait before
+	// failing over a pod with an unresponsive disk.  This field must be in the range 5-3600s,
+	// defaulting to 120s. This setting is only supported on Couchbase Server 8.0+.
+	// This field is configured via annotations only and is not exposed in the CRD.
+	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod
+	// More info:  https://golang.org/pkg/time/#ParseDuration
+	AutoFailoverOnDataDiskNonResponsivenessTimePeriod *metav1.Duration `json:"-" annotation:"autoFailoverOnDataDiskNonResponsivenessTimePeriod"`
+
 	// AutoFailoverServerGroup whether to enable failing over a server group.
 	// This field is ignored in server versions 7.1+ as it has been removed from the Couchbase API
 	AutoFailoverServerGroup bool `json:"autoFailoverServerGroup,omitempty"`

@@ -467,6 +467,25 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	}
 
 	if c.SupportsVersionFeatures("8.0.0") {
+		// Disk non-responsiveness settings
+		specFailoverSettings.FailoverOnDataDiskNonResponsiveness.Enabled = clusterSettings.AutoFailoverOnDataDiskNonResponsiveness
+
+		if clusterSettings.AutoFailoverOnDataDiskNonResponsiveness && clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod != nil {
+			dataDiskNonResponsivenessFailoverTimePeriod := k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod)
+			specFailoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = &dataDiskNonResponsivenessFailoverTimePeriod
+		}
+
+		if clusterSettings.AutoFailoverOnDataDiskNonResponsiveness && clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+			// set to 120 using metav1 duration
+			defaultDataDiskNonResponsivenessTimePeriod := k8sutil.Seconds(&metav1.Duration{Duration: time.Duration(constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodDefault) * time.Second})
+			specFailoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = &defaultDataDiskNonResponsivenessTimePeriod
+		}
+
+		if !failoverSettings.FailoverOnDataDiskNonResponsiveness.Enabled {
+			failoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = nil
+		}
+
+		// Allow failover of ephemeral nodes with no replicas settings
 		if clusterSettings.AllowFailoverEphemeralNoReplicas != nil {
 			specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
 		} else {

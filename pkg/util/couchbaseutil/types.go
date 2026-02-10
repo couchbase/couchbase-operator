@@ -201,14 +201,20 @@ type FailoverOnDiskFailureSettings struct {
 	TimePeriod *int64 `url:"failoverOnDataDiskIssues[timePeriod],omitempty" json:"timePeriod"`
 }
 
+type FailoverOnDiskNonResponsivenessSettings struct {
+	Enabled    bool   `url:"failoverOnDataDiskNonResponsiveness[enabled]" json:"enabled"`
+	TimePeriod *int64 `url:"failoverOnDataDiskNonResponsiveness[timePeriod],omitempty" json:"timePeriod"`
+}
+
 type AutoFailoverSettings struct {
-	Enabled                          bool                          `url:"enabled" json:"enabled"`
-	Timeout                          int64                         `url:"timeout" json:"timeout"`
-	Count                            uint8                         `json:"count"`
-	FailoverOnDataDiskIssues         FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
-	FailoverServerGroup              *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
-	MaxCount                         uint64                        `url:"maxCount" json:"maxCount"`
-	AllowFailoverEphemeralNoReplicas *bool                         `url:"allowFailoverEphemeralNoReplicas,omitempty" json:"allowFailoverEphemeralNoReplicas,omitempty"`
+	Enabled                             bool                                    `url:"enabled" json:"enabled"`
+	Timeout                             int64                                   `url:"timeout" json:"timeout"`
+	Count                               uint8                                   `json:"count"`
+	FailoverOnDataDiskIssues            FailoverOnDiskFailureSettings           `url:"" json:"failoverOnDataDiskIssues"`
+	FailoverOnDataDiskNonResponsiveness FailoverOnDiskNonResponsivenessSettings `url:"" json:"failoverOnDataDiskNonResponsiveness"`
+	FailoverServerGroup                 *bool                                   `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
+	MaxCount                            uint64                                  `url:"maxCount" json:"maxCount"`
+	AllowFailoverEphemeralNoReplicas    *bool                                   `url:"allowFailoverEphemeralNoReplicas,omitempty" json:"allowFailoverEphemeralNoReplicas,omitempty"`
 }
 
 type AlternateAddressesExternalPorts struct {
