@@ -326,9 +326,27 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // ServerClassCouchbaseImage selects the image to use for a server class. The priority
 // order is:
 // * Operator Environment image if EnvImagePrecedence is set
+// * Server-specific image (server.Image) if set
 // * Cluster image.
 func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
+	// Check if server has a specific image override (used during mixed-mode upgrades with previousVersionPodCount)
+	if server.Image != "" {
+		return server.Image
+	}
 	return cs.CouchbaseImage()
+}
+
+// ConstructImageWithVersion takes the current cluster image and replaces its version tag
+// with the specified version. For example, given image "couchbase/server:8.0.0" and
+// version "7.6.8", it returns "couchbase/server:7.6.8".
+func (cs *ClusterSpec) ConstructImageWithVersion(version string) string {
+	image := cs.CouchbaseImage()
+	lastColon := strings.LastIndex(image, ":")
+	if lastColon == -1 {
+		return image + ":" + version
+	}
+
+	return image[:lastColon+1] + version
 }
 
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster

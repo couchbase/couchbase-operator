@@ -4830,6 +4830,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		errs = append(errs, err)
 	}
 
+	if err := checkChangeConstraintsPreviousVersionPodCount(prev, curr); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return false, errors.CompositeValidationError(errs...)
 	}
@@ -4849,6 +4853,51 @@ func checkChangeConstraintsSidecar(prev, curr *couchbasev2.CouchbaseCluster) err
 		if !reflect.DeepEqual(prev.Spec.Networking.CloudNativeGateway, curr.Spec.Networking.CloudNativeGateway) {
 			return fmt.Errorf("cloud native gateway spec cannot be changed in mixed mode or during upgrade")
 		}
+	}
+
+	return nil
+}
+
+// checkChangeConstraintsPreviousVersionPodCount validates changes to previousVersionPodCount
+// during mixed mode or upgrade. Increasing previousVersionPodCount is only allowed when the
+// cluster is scaling up, and the increase must not exceed the number of new nodes being added.
+// Without scaling, increasing previousVersionPodCount would be equivalent to a rollback request,
+// which is not allowed through this field.
+func checkChangeConstraintsPreviousVersionPodCount(prev, curr *couchbasev2.CouchbaseCluster) error {
+	// Only relevant during mixed mode or upgrading
+	if !curr.HasCondition(couchbasev2.ClusterConditionMixedMode) && !curr.HasCondition(couchbasev2.ClusterConditionUpgrading) {
+		return nil
+	}
+
+	// Get previous and current previousVersionPodCount values
+	prevPodCount := 0
+	if prev.Spec.Upgrade != nil {
+		prevPodCount = prev.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	currPodCount := 0
+	if curr.Spec.Upgrade != nil {
+		currPodCount = curr.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	// If previousVersionPodCount is not being increased, allow the change
+	if currPodCount <= prevPodCount {
+		return nil
+	}
+
+	// previousVersionPodCount is being increased - only allow if the cluster is scaling up
+	prevTotalSize := prev.Spec.TotalSize()
+	currTotalSize := curr.Spec.TotalSize()
+
+	newNodesBeingAdded := currTotalSize - prevTotalSize
+	if newNodesBeingAdded <= 0 {
+		return fmt.Errorf("spec.upgrade.previousVersionPodCount cannot be increased during mixed mode or upgrade without scaling up the cluster")
+	}
+
+	// The increase in previousVersionPodCount must not exceed the number of new nodes being added
+	podCountIncrease := currPodCount - prevPodCount
+	if podCountIncrease > newNodesBeingAdded {
+		return fmt.Errorf("spec.upgrade.previousVersionPodCount increase (%d) cannot exceed the number of new nodes being added (%d)", podCountIncrease, newNodesBeingAdded)
 	}
 
 	return nil

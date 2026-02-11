@@ -666,3 +666,83 @@ func (c *Cluster) getUpgradeBlockers() ([]string, error) {
 
 	return nil, nil
 }
+
+// applyPreviousVersionToNewPods modifies the additions slice in-place to set the old version
+// image on new pods that should be created with the previous version during a mixed-mode
+// scale-up. This is called from handleAddNode when previousVersionPodCount requires that
+// some new nodes come up on the old version.
+//
+// The logic:
+//  1. Check if we are in a forward upgrade with previousVersionPodCount > 0
+//  2. Count how many existing pods are on the old (baseline) version
+//  3. If previousVersionPodCount > existingOldPods, the difference tells us how many
+//     new pods should use the old version
+//  4. Set the Image field on the appropriate ServerConfig copies to the old version image
+func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerConfig) error {
+	if c.cluster.Spec.Upgrade == nil || c.cluster.Spec.Upgrade.PreviousVersionPodCount == 0 {
+		return nil
+	}
+
+	// Get the target version from spec.image
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return err
+	}
+
+	// Get the baseline (old) version from persistence
+	baselineVersion, err := c.state.Get(persistence.Version)
+	if err != nil {
+		return err
+	}
+
+	// If this is a rollback (target == baseline), don't apply old version logic
+	if targetVersion == baselineVersion {
+		return nil
+	}
+
+	// If the cluster isn't in mixed mode, there's nothing to do
+	if c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
+		return nil
+	}
+
+	// Count how many existing pods are running the old (baseline) version
+	existingOldPods := 0
+	for _, member := range c.members {
+		if member.Version() == baselineVersion {
+			existingOldPods++
+		}
+	}
+
+	// Determine how many new pods should use the old version
+	previousVersionPodCount := c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	newPodsOnOldVersion := previousVersionPodCount - existingOldPods
+	if newPodsOnOldVersion <= 0 {
+		return nil
+	}
+
+	// Cap at the number of new pods being added
+	// Since newPodsOnOldVersion is calculated as previousVersionPodCount - existingOldPods, existingOldPods may not be the the stable state number since this can happen during an update too.
+	// So if this happens during an upgrade we can expect existingOldPods to settle at previousVersionPodCount.
+	if newPodsOnOldVersion > len(additions) {
+		// return error as calculated new pods to be added on old version is greater than the number of new pods to be added
+		return errors.ErrNewPodsExceedAdditions
+	}
+
+	// Construct the old version image
+	oldImage := c.cluster.Spec.ConstructImageWithVersion(baselineVersion)
+
+	log.Info("Applying previous version image to new pods during scale-up",
+		"cluster", c.namespacedName(),
+		"oldImage", oldImage,
+		"newPodsOnOldVersion", newPodsOnOldVersion,
+		"totalNewPods", len(additions),
+		"previousVersionPodCount", previousVersionPodCount,
+		"existingOldPods", existingOldPods)
+
+	// Set the old version image on the first newPodsOnOldVersion additions
+	for i := range newPodsOnOldVersion {
+		additions[i].Image = oldImage
+	}
+
+	return nil
+}

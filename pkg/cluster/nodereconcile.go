@@ -1190,6 +1190,13 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		return nil
 	}
 
+	// During a forward upgrade with previousVersionPodCount, some new pods may need to be
+	// created with the old (baseline) version. This ensures that scaling up respects
+	// the user's intent to keep a certain number of pods on the previous version.
+	if err := c.applyPreviousVersionToNewPods(additions); err != nil {
+		log.Error(err, "Failed to apply previous version to new pods, all new pods will use the current spec image", "cluster", c.namespacedName())
+	}
+
 	r.log()
 
 	// Set the scaling status *before* we start adding any nodes.

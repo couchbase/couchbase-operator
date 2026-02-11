@@ -2567,6 +2567,96 @@ func TestUpgradePrevent3Versions(t *testing.T) {
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
 }
 
+// TestPreviousVersionPodCountScaleUp tests that during a mixed-mode upgrade with previousVersionPodCount,
+// scaling up creates new pods with the old version image when required to maintain the previousVersionPodCount.
+// This validates the fix for K8S-4522.
+func TestPreviousVersionPodCountScaleUp(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster at initial version (CouchbaseServerImageUpgrade)
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	// Set previousVersionPodCount to keep 1 pod at old version during upgrade
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: 1,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Step 1: Partial upgrade with previousVersionPodCount=1
+	// This should result in 2 pods at new version, 1 at old version
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we're in mixed mode
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	// Verify we have 2 versions: 1 at old, 2 at new
+	expectedImageCountMap := map[string]int{
+		f.CouchbaseServerImageUpgrade: 1, // Old version
+		f.CouchbaseServerImage:        2, // New version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+
+	// Step 2a: Verify DAC rejects increasing previousVersionPodCount without scaling
+	// This should be rejected by DAC since there's no scaling
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 2))
+
+	// Step 2b: Verify DAC rejects increasing previousVersionPodCount more than new nodes being added
+	// Try to add 1 node but increase previousVersionPodCount by 2 - should fail
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
+		Replace("/spec/servers/0/size", 4).
+		Replace("/spec/upgrade/previousVersionPodCount", 3))
+
+	// Step 2c: Scale up from 3 to 5 pods with previousVersionPodCount=2
+	// This validates that new pods are created with the old version when required
+	// Adding 2 new nodes and increasing previousVersionPodCount by 1 (from 1 to 2) is valid
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
+		Replace("/spec/upgrade/previousVersionPodCount", 2).
+		Replace("/spec/servers/0/size", 5),
+		time.Minute)
+
+	// Wait for cluster to scale up and reach healthy state
+	// No need to wait for Upgrading condition as this is a scale operation, not a new upgrade phase
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we have 2 versions: 2 at old, 3 at new
+	expectedImageCountMapScaled := map[string]int{
+		f.CouchbaseServerImageUpgrade: 2, // Old version
+		f.CouchbaseServerImage:        3, // New version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapScaled)
+
+	// Step 3: Complete upgrade by setting previousVersionPodCount to 0
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify upgrade is complete and mixed mode is cleared
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	// Verify all pods are at the new version
+	expectedImageCountMapFinal := map[string]int{
+		f.CouchbaseServerImage: 5, // All at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
+}
+
 // TestInPlaceUpgradeRecoverabilityOnServerGroupChanges tests that the operator will revert to SwapRebalance if a pod is not recoverable
 // due to a change in the cluster.spec.serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
 func TestInPlaceUpgradeGlobalServerGroupChangesWithPV(t *testing.T) {
