@@ -629,7 +629,8 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": OperatorResourceName,
+					"app.kubernetes.io/name":     OperatorResourceName,
+					"app.kubernetes.io/instance": "couchbase-operator",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
@@ -641,19 +642,32 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 						constants.AnnotationPrometheusScheme: "http",
 					},
 					Labels: map[string]string{
-						"app": OperatorResourceName,
+						"app.kubernetes.io/name":      OperatorResourceName,
+						"app.kubernetes.io/instance":  "couchbase-operator",
+						"app.kubernetes.io/component": "controller",
+						"app.kubernetes.io/part-of":   "couchbase",
 					},
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: OperatorResourceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: &nonRoot,
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
 					},
 					Containers: []corev1.Container{
 						{
 							Name:            OperatorResourceName,
 							Image:           o.image,
 							ImagePullPolicy: corev1.PullPolicy(o.imagePullPolicy),
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: func() *bool { b := false; return &b }(),
+								ReadOnlyRootFilesystem:   func() *bool { b := true; return &b }(),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
 							Command: []string{
 								operatorCommand,
 							},
@@ -695,6 +709,19 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 										Scheme: corev1.URISchemeHTTP,
 									},
 								},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/readyz",
+										Port:   intstr.FromString("http"),
+										Scheme: corev1.URISchemeHTTP,
+									},
+								},
+								InitialDelaySeconds: 30,
+								TimeoutSeconds:      5,
+								PeriodSeconds:       30,
+								FailureThreshold:    3,
 							},
 						},
 					},
@@ -739,10 +766,17 @@ func (o *generateOperatorOptions) getOperatorService() *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: OperatorResourceName,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":      OperatorResourceName,
+				"app.kubernetes.io/instance":  "couchbase-operator",
+				"app.kubernetes.io/component": "controller",
+				"app.kubernetes.io/part-of":   "couchbase",
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
-				"app": OperatorResourceName,
+				"app.kubernetes.io/name":     OperatorResourceName,
+				"app.kubernetes.io/instance": "couchbase-operator",
 			},
 			Ports: []corev1.ServicePort{
 				{
