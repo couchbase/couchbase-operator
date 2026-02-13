@@ -169,6 +169,15 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 		if err != nil {
 			return nil, err
 		}
+
+		// Increment and update the pod index to avoid reuse in future --autoIndex calls
+		persistenceStorage, err := persistence.New(k8sClient, cbc)
+		if err != nil {
+			return nil, err
+		}
+		if err := persistenceStorage.Upsert(persistence.PodIndex, strconv.Itoa(index+1)); err != nil {
+			return nil, err
+		}
 	}
 
 	resources := []runtime.Object{}
