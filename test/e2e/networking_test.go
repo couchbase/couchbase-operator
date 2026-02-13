@@ -619,8 +619,10 @@ func TestCreateInitNodeHostNameCluster(t *testing.T) {
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 
-	cluster.Spec.Networking.InitPodsWithNodeHostname = true
-	cluster.Spec.Networking.ImprovedHostNetwork = true
+	cluster.Annotations = map[string]string{
+		"cao.couchbase.com/networking.improvedHostNetwork":      "true",
+		"cao.couchbase.com/networking.initPodsWithNodeHostname": "true",
+	}
 
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 }
