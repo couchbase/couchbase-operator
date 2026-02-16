@@ -52,10 +52,34 @@ func CheckUpgradePath(currentVersion, newVersion string) error {
 			return err
 		}
 
+		// If there's an upper bound lower group, we want to include that in the error message to give users a better idea of what versions are valid.
+		lowerboundVersion, err := GetUpgradePathRecommendedLowerBound(currentVersion)
+		if err != nil {
+			return err
+		}
+
+		if lowerboundVersion != "" {
+			return fmt.Errorf("%w: cannot upgrade from %s to %s. The next version on the recommended upgrade path should be >= %s and < %s", errors.ErrInvalidVersion, currentVersion, newVersion, lowerboundVersion, upperboundVersion)
+		}
+
 		return fmt.Errorf("%w: cannot upgrade from %s to %s. Version must be less than %s", errors.ErrInvalidVersion, currentVersion, newVersion, upperboundVersion)
 	}
 
 	return nil
+}
+
+func GetUpgradePathRecommendedLowerBound(version string) (string, error) {
+	upgradeGroup, err := getUpgradeGroup(version)
+	if err != nil {
+		return "", err
+	}
+
+	upperBoundLowerGroup := upgradeGroup + 1
+	if upperBoundLowerGroup >= len(SupportedUpgradePath) {
+		return "", nil
+	}
+
+	return SupportedUpgradePath[upperBoundLowerGroup], nil
 }
 
 func GetUpgradeUpperbound(version string) (string, error) {

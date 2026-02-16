@@ -1,6 +1,10 @@
 package couchbaseutil
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestGetUpgradePath(t *testing.T) {
 	type versionGroup struct {
@@ -86,6 +90,32 @@ func TestInvalidUpgrades(t *testing.T) {
 			t.Error(err)
 		} else if valid {
 			t.Errorf("expected upgrade %s -> %s to be invalid", u.old, u.new)
+		}
+	}
+}
+
+func TestCheckUpgradePath(t *testing.T) {
+	type upgrade struct {
+		old, new, expectedMsg string
+	}
+
+	invalidUpgrades := []upgrade{
+		{"5.1.2", "7.1.0", "The next version on the recommended upgrade path should be >= 6.6.0 and < 7.2.0"},
+		{"5.1.2", "7.2.4", "The next version on the recommended upgrade path should be >= 6.6.0 and < 7.2.0"},
+		{"6.6.5", "7.2.4", "The next version on the recommended upgrade path should be >= 7.2.0 and < 7.2.4"},
+		{"6.6.5", "7.6.0", "The next version on the recommended upgrade path should be >= 7.2.0 and < 7.2.4"},
+		{"5.1.2", "8.0.0", "The next version on the recommended upgrade path should be >= 6.6.0 and < 7.2.0"},
+		{"6.6.5", "8.0.0", "The next version on the recommended upgrade path should be >= 7.2.0 and < 7.2.4"},
+		{"7.1.6", "8.0.0", "The next version on the recommended upgrade path should be >= 7.2.0 and < 7.2.4"},
+		{"7.6.0", "7.2.4", "Downgrades are not supported"},
+		{"8.0.0", "10.0.0", "Version must be less than 9.0.0"},
+		{"8.1.0", "10.1.5", "Version must be less than 9.1.0"},
+	}
+
+	for _, u := range invalidUpgrades {
+		err := CheckUpgradePath(u.old, u.new)
+		if !strings.Contains(err.Error(), fmt.Sprintf("cannot upgrade from %s to %s. %s", u.old, u.new, u.expectedMsg)) {
+			t.Errorf("expected upgrade %s -> %s to be invalid with message containing '%s' but got '%s'", u.old, u.new, u.expectedMsg, err.Error())
 		}
 	}
 }
