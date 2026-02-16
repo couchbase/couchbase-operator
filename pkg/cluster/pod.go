@@ -221,11 +221,28 @@ func (c *Cluster) checkPodRecoverability(m couchbaseutil.Member, checkReschedula
 		return false, err
 	}
 
-	if err := k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, checkReschedulability); err != nil {
+	restrictedGroups := c.getRestrictedServerGroupsForConfig(config)
+	if err := k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, checkReschedulability, restrictedGroups); err != nil {
 		return false, err
 	}
 
 	return true, nil
+}
+
+// getRestrictedServerGroupsForConfig returns the server groups that are restricted for a given server config.
+// If this method returns an empty list, then any server groups are allowed.
+// If this method returns a non-empty list, then only the server groups in the list are allowed, as determined by the cluster spec.
+func (c *Cluster) getRestrictedServerGroupsForConfig(config *couchbasev2.ServerConfig) []string {
+	restrictedGroups, _ := scheduler.GetServerGroupsForClass(c.cluster, config)
+
+	if len(restrictedGroups) == 0 && config.Pod != nil {
+		if group, ok := config.Pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			restrictedGroups = append(restrictedGroups, group)
+		}
+	}
+
+	return restrictedGroups
+	// return nil
 }
 
 // isPodRecoverable checks if a pod can be recovered after a failure.

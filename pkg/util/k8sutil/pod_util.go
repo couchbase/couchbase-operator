@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -55,6 +56,7 @@ const (
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
 	loggingSidecarMetadataMountName           = "podinfo"
 	loggingPort                               = 2020
+	loggingTLSVolumePrefix                    = "logging-tls-"
 	LoggingConfigurationFile                  = "fluent-bit.conf"
 	passphraseScriptName                      = "tls-passphrase-script"
 	passphraseScriptPath                      = "/opt/couchbase/var/lib/couchbase/scripts/"
@@ -96,12 +98,12 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 		}
 	}
 
-	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image, "serverGroup", serverGroup, "config", config)
-
 	serverGroup, err = scheduler.Create(config.Name, m.Name(), serverGroup)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("Creating pod", "cluster", cluster.NamespacedName(), "name", m.Name(), "image", image, "serverGroup", serverGroup, "config", config)
 
 	err = EstablishCNGPrerequisites(client, cluster)
 	if err != nil {
@@ -112,6 +114,14 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	pod, err := CreateCouchbasePodSpec(m, cluster, config, serverGroup, pvcState, image, readinessConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	// If servergroups aren't set, but a server group node selector is, the NullScheduler.Create() will return "",
+	// but it's going to be scheduled on a node with the node selector, so we should add that annotation to the PVC.
+	if serverGroup == "" {
+		if group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			serverGroup = group
+		}
 	}
 
 	// Create PVCs if required.
@@ -268,7 +278,7 @@ func NewPersistentVolumeClaimState() *PersistentVolumeClaimState {
 // A PVC is an update candidate if its requested spec
 // differs from currently deployed spec.
 func (p *PersistentVolumeClaimState) NeedsUpdate() bool {
-	return len(p.update) != 0 || len(p.create) != 0 || len(p.expanding) != 0 || len(p.resizeFailed) != 0
+	return len(p.update) != 0 || len(p.create) != 0 || len(p.resizeFailed) != 0
 }
 
 // IsUpdated indicates whether specific PVC spec has been updated.
@@ -922,28 +932,21 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 
 	// The readiness probe does a TCP check against Couchbase Server to determine
 	// whether NS server is running.  It may not be actually functional, but it's
-	// better than nothing, as people complain if there is no readiness.  Note that
-	// we try use the TLS port always, as that's the only common denominator -- the
-	// plaintext port can be deactivated by strict mode TLS.  We persist with 8091
-	// because it would require a rolling upgrade of all those server instances, so
-	// limiting the blast radius.
-	port := AdminServicePort
+	// better than nothing, as people complain if there is no readiness.
+	//
+	// We use the TLS port (18091) for ALL clusters because:
+	// 1. Port 18091 is the "common denominator" - always available in CB 7.0+
+	// 2. Port 8091 can be disabled in strict TLS mode
+	// 3. CB Server uses port 18091 for AddNode verification (node-to-node),
+	//    so the pod should only be marked ready when 18091 is up
+	// 4. This prevents the race condition where readiness passes on 8091
+	//    but AddNode fails because 18091 isn't ready yet
+	//
+	// NOTE: This would've triggered a rolling upgrade of all server instances on older readiness probe ports, so we now have logic to ignore changes to the readiness probe port.
+	// Any new pod that comes up will use 18091 while the old pod will continue to use 8091.
+	port := AdminServicePortTLS
 
-	if cluster.IsMutualTLSEnabled() {
-		port = AdminServicePortTLS
-	}
-
-	container.ReadinessProbe = &v1.Probe{
-		ProbeHandler: v1.ProbeHandler{
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromInt(port),
-			},
-		},
-		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
-		TimeoutSeconds:      5,
-		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
-		FailureThreshold:    1,
-	}
+	container.ReadinessProbe = createReadinessProbe(port, readinessConfig)
 
 	applyContainerStorage(&container, pvcState)
 
@@ -1069,6 +1072,23 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 	addOwnerRefToObject(pod, cluster.AsOwner())
 
 	return pod, nil
+}
+
+// createReadinessProbe creates a TCP socket readiness probe that connects to the pod's IP.
+// Since IPv6 can now be configured as the primary pod IP, the TCP socket probe will
+// connect to the appropriate IP family (IPv4 or IPv6) based on pod.status.podIP.
+func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Probe {
+	return &v1.Probe{
+		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
+		TimeoutSeconds:      5,
+		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
+		FailureThreshold:    1,
+		ProbeHandler: v1.ProbeHandler{
+			TCPSocket: &v1.TCPSocketAction{
+				Port: intstr.FromInt(port),
+			},
+		},
+	}
 }
 
 func applyContainerStorage(container *v1.Container, pvcState *PersistentVolumeClaimState) {
@@ -1604,6 +1624,38 @@ func applyPodLogging(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod) error {
 				Protocol:      v1.ProtocolTCP,
 			},
 		},
+	}
+
+	// Add TLS configuration if enabled - mount each secret under <mountPath>/<secretName>/
+	if sidecarConfig.TLS != nil {
+		loggingContainer.Ports = append(loggingContainer.Ports, v1.ContainerPort{
+			Name:          "https",
+			ContainerPort: tlsBasePort + loggingPort,
+			Protocol:      v1.ProtocolTCP,
+		})
+
+		// Add volume mounts to containers and volumes to pods for each TLS secret
+		for _, secretName := range sidecarConfig.TLS.SecretNames {
+			loggingContainer.VolumeMounts = append(loggingContainer.VolumeMounts, v1.VolumeMount{
+				Name:      loggingTLSVolumePrefix + secretName,
+				MountPath: filepath.Join(sidecarConfig.TLS.MountPath, secretName),
+				ReadOnly:  true,
+			})
+			pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+				Name: loggingTLSVolumePrefix + secretName,
+				VolumeSource: v1.VolumeSource{
+					Secret: &v1.SecretVolumeSource{
+						SecretName: secretName,
+					},
+				},
+			})
+		}
+
+		// Add environment variable for TLS certificate path (for rotation detection)
+		loggingContainer.Env = append(loggingContainer.Env, v1.EnvVar{
+			Name:  "COUCHBASE_LOGS_TLS_CERTS",
+			Value: sidecarConfig.TLS.MountPath,
+		})
 	}
 
 	if cluster.Spec.Security.SecurityContext != nil {
@@ -2283,7 +2335,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool) error {
+func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool, restrictedServerGroups []string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2302,9 +2354,11 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 	}
 
 	for _, mountMapping := range mountMappings {
-		if pvc, err := findMemberPVC(client, member.Name(), mountMapping.mountPath); err != nil {
+		pvc, err := findMemberPVC(client, member.Name(), mountMapping.mountPath)
+		if err != nil {
 			return err
-		} else if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
+		}
+		if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
 			pvcServerVersion, err := couchbaseutil.NewVersion(pvc.Annotations[constants.CouchbaseVersionAnnotationKey])
 			if err != nil {
 				return err
@@ -2313,6 +2367,12 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 			}
 		} else if checkForLPV && isLPV(pvc) {
 			return fmt.Errorf("%w: pvc is a LPV", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		}
+
+		// If the existing pod volumes already have an availability zone, we need to check that it's still available in the cluster spec.
+		// Otherwise, we can't recover this pod correctly and we should SwapRebalance/start full recovery instead.
+		if len(restrictedServerGroups) > 0 && pvc.Annotations[constants.ServerGroupLabel] != "" && !slices.Contains(restrictedServerGroups, pvc.Annotations[constants.ServerGroupLabel]) {
+			return fmt.Errorf("%w: pvc exists in server group %s. The server groups restricted by the cluster spec are %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), pvc.Annotations[constants.ServerGroupLabel], strings.Join(restrictedServerGroups, ", "))
 		}
 	}
 
@@ -2354,25 +2414,18 @@ func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeC
 		return nil
 	}
 
-	// retries until there is VolumeResizeSuccessful.
-	callback := func() error {
-		events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
-		if err != nil {
-			return err
-		}
+	events, err := GetEventsForResource(client.KubeClient, claim.Namespace, "PersistentVolumeClaim", claim.Name)
+	if err != nil {
+		return err
+	}
 
-		for _, event := range events {
-			// Only consider events which occur after the resize condition is presented
-			if expansionTimestamp.Before(&event.LastTimestamp) {
-				if event.Reason == "VolumeResizeSuccessful" || event.Reason == "FileSystemResizeSuccessful" {
-					return nil
-				}
+	for _, event := range events {
+		// Only consider events which occur after the resize condition is presented
+		if expansionTimestamp.Before(&event.LastTimestamp) {
+			if event.Reason == "VolumeResizeSuccessful" || event.Reason == "FileSystemResizeSuccessful" {
+				return nil
 			}
 		}
-		// Since, no VolumeResizeSuccessful has been raised for 10 mins,
-		// it could be assumed there is a VolumeResizeError...
-		// In actual, it could be any event but none of the above two.
-		return errors.ErrVolumeResizeError
 	}
 
 	timeout := 10
@@ -2380,7 +2433,11 @@ func checkVolumeResizeFailure(client *client.Client, claim *v1.PersistentVolumeC
 		timeout = *expansionTimeout
 	}
 
-	return retryutil.RetryFor(time.Duration(timeout)*time.Minute, callback)
+	if time.Now().After(expansionTimestamp.Add(time.Duration(timeout) * time.Minute)) {
+		return errors.ErrVolumeResizeError
+	}
+
+	return nil
 }
 
 // GetVolumeStorageSize returns requested storage size of a volume claim.

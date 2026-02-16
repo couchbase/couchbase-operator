@@ -520,3 +520,56 @@ func TestLoggingMemoryBufferLimits(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestLoggingTLSSecretsMounted verifies that TLS secrets are correctly mounted
+// in the FluentBit logging sidecar container at the configured paths.
+// This tests the mTLS certificate mounting feature for secure log shipping.
+func TestLoggingTLSSecretsMounted(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Define TLS configuration
+	tlsMountPath := "/fluent-bit/certs"
+	caSecretName := "fluent-bit-ca"
+	clientCertSecretName := "fluent-bit-client-cert"
+
+	// Create TLS secrets before creating the cluster
+	secretNames := e2eutil.CreateLoggingTLSSecrets(t, kubernetes, caSecretName, clientCertSecretName)
+
+	// Create cluster with logging TLS enabled
+	cluster := clusterOptions().
+		WithPersistentTopology(clusterSize).
+		WithCustomLogStreaming().
+		WithLoggingTLS(tlsMountPath, secretNames).
+		Generate(kubernetes)
+
+	// Set up a basic logging config that outputs logs with the expected format
+	config := map[string]string{
+		"fluent-bit.conf": "[SERVICE]\n" +
+			"    flush        	1\n" +
+			"    daemon       	Off\n" +
+			"    log_level    	info\n\n" +
+			"[INPUT]\n" +
+			"    Name tail\n" +
+			"    Path ${COUCHBASE_LOGS}/couchbase.log\n" +
+			"    Tag couchbase.log.couchbase\n\n" +
+			"[OUTPUT]\n" +
+			"    name  stdout\n" +
+			"    match couchbase.log.*\n",
+	}
+	e2eutil.SetLogStreamingConfig(t, kubernetes, cluster, config, false)
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Wait for logging sidecar to be ready
+	e2eutil.MustWaitForLoggingSidecarReady(t, kubernetes, cluster, 5*time.Minute)
+
+	// Verify TLS secrets are mounted at the expected paths
+	e2eutil.MustCheckLoggingTLSSecretsMounted(t, kubernetes, cluster, tlsMountPath, secretNames)
+
+	// Check that we only have the logging sidecar (no audit cleanup)
+	e2eutil.MustCheckLoggingSidecarsCount(t, kubernetes, cluster, 1)
+}

@@ -501,6 +501,31 @@ func getPeerServicePorts() ([]v1.ServicePort, error) {
 	return ports, nil
 }
 
+// applyIPFamilyConfig sets the IPFamilies and IPFamilyPolicy on a service based on
+// the cluster's addressFamily configuration. If the address family is not explicitly set,
+// we won't configure the service and let the cluster handle it.
+func applyIPFamilyConfig(service *v1.Service, cluster *couchbasev2.CouchbaseCluster) {
+	aFamily := cluster.Spec.Networking.AddressFamily
+	if aFamily == nil {
+		return
+	}
+
+	switch *aFamily {
+	case couchbasev2.IPv4, couchbasev2.IPv4Only:
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol}
+		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicySingleStack}[0]
+	case couchbasev2.IPv6, couchbasev2.IPv6Only:
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol}
+		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicySingleStack}[0]
+	case couchbasev2.IPv4Priority:
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
+		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
+	case couchbasev2.IPv6Priority:
+		service.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+		service.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
+	}
+}
+
 // generatePeerService returns an idealized peer service.  This is the main headless
 // service for a couchbase cluster that establishes DNS addressing for all pods.
 func generatePeerService(cluster *couchbasev2.CouchbaseCluster) (*v1.Service, error) {
@@ -524,6 +549,9 @@ func generatePeerService(cluster *couchbasev2.CouchbaseCluster) (*v1.Service, er
 	service.Spec.Selector = SelectorForClusterResource(cluster)
 	service.Spec.Ports = ports
 
+	// Apply IP family configuration based on cluster's addressFamily setting.
+	applyIPFamilyConfig(service, cluster)
+
 	return service, nil
 }
 
@@ -545,6 +573,9 @@ func generateDiscoveryService(cluster *couchbasev2.CouchbaseCluster) *v1.Service
 	service.Spec.PublishNotReadyAddresses = true
 	service.Spec.Selector = selectorForDataService(cluster)
 	service.Spec.Ports = srvServicePorts
+
+	// Apply IP family configuration based on cluster's addressFamily setting.
+	applyIPFamilyConfig(service, cluster)
 
 	return service
 }
@@ -647,6 +678,9 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 	if !cluster.Spec.IsAdminConsoleServiceTypePublic() || cluster.Spec.Platform != couchbasev2.PlatformTypeAWS {
 		service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	}
+
+	// Apply IP family configuration based on cluster's addressFamily setting.
+	applyIPFamilyConfig(service, cluster)
 
 	return service
 }
@@ -771,6 +805,9 @@ func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v
 
 	service.Spec.Selector = selectorForCloudNativeGatewayService(cluster)
 	service.Spec.Ports = svcPorts
+
+	// Apply IP family configuration based on cluster's addressFamily setting.
+	applyIPFamilyConfig(service, cluster)
 
 	return service
 }
@@ -1211,6 +1248,9 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 	if service.Spec.ExternalTrafficPolicy == "" {
 		service.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	}
+
+	// Apply IP family configuration based on cluster's addressFamily setting.
+	applyIPFamilyConfig(service, cluster)
 
 	return service, nil
 }

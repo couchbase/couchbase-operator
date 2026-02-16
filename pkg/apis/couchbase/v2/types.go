@@ -693,6 +693,10 @@ type CouchbaseBackupRestoreSpec struct {
 	// recover from broken backup/restore attempts.
 	// +kubebuilder:default="none"
 	DefaultRecoveryMethod DefaultRecoveryType `json:"defaultRecoveryMethod,omitempty"`
+
+	// ForceDeleteLockFile is used to force delete the lock file.
+	// This should be used with caution and will force delete the current lockfile if it exists.
+	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
 }
 
 type CouchbaseBackupStagingVolume struct {
@@ -2906,9 +2910,10 @@ type ClusterSpec struct {
 	// zones and not biasing to the first availability zones.
 	ShuffleServerGroups bool `json:"-" annotation:"shuffleServerGroups"`
 
-	// RescheduleDifferentServerGroup allows the Operator to attempt to  reschedule pods
-	// to a different server group a pod scheduling.
-	// +kubebuilder:default=true
+	// RescheduleDifferentServerGroup controls how the Operator handles pods that fail to schedule.
+	// When not set, the Operator performs full server group rebalancing for all pods, including unschedulable ones, and does not avoid groups that previously failed to schedule pods.
+	// When set to true, only pods from removed (unschedulable) server groups are rescheduled, and the Operator tracks failed groups and avoids them when possible.
+	// If all groups fail, a random group is chosen. Only affects pods without existing PVCs.
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 
 	// DEPRECATED - by spec.security.securityContext
@@ -3658,11 +3663,11 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// ImprovedHostNetwork is used to set the alternate address of the pod to the node name
 	// +kubebulder:default=false
-	ImprovedHostNetwork bool `json:"improvedHostNetwork,omitempty"`
+	ImprovedHostNetwork bool `json:"improvedHostNetwork,omitempty" annotation:"improvedHostNetwork"`
 
 	// InitPodsWithNodeHostname is used to set the hostname of the pod to the node name
 	// +kubebuilder:default=false
-	InitPodsWithNodeHostname bool `json:"initPodsWithNodeHostname,omitempty"`
+	InitPodsWithNodeHostname bool `json:"initPodsWithNodeHostname,omitempty" annotation:"initPodsWithNodeHostname"`
 }
 
 type CouchbaseClusterLoggingSpec struct {
@@ -3844,6 +3849,21 @@ type ClusterConfig struct {
 	// to 120s.  More info:  https://golang.org/pkg/time/#ParseDuration
 	// +kubebuilder:default="120s"
 	AutoFailoverOnDataDiskIssuesTimePeriod *metav1.Duration `json:"autoFailoverOnDataDiskIssuesTimePeriod,omitempty"`
+
+	// AutoFailoverOnDataDiskNonResponsiveness defines whether Couchbase server should failover a pod
+	// when the data disk has not completed an operation in the specified time period.
+	// This setting is only supported on Couchbase Server 8.0+.
+	// This field is configured via annotations only and is not exposed in the CRD.
+	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness
+	AutoFailoverOnDataDiskNonResponsiveness bool `json:"-" annotation:"autoFailoverOnDataDiskNonResponsiveness"`
+
+	// AutoFailoverOnDataDiskNonResponsivenessTimePeriod defines how long to wait before
+	// failing over a pod with an unresponsive disk.  This field must be in the range 5-3600s,
+	// defaulting to 120s. This setting is only supported on Couchbase Server 8.0+.
+	// This field is configured via annotations only and is not exposed in the CRD.
+	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod
+	// More info:  https://golang.org/pkg/time/#ParseDuration
+	AutoFailoverOnDataDiskNonResponsivenessTimePeriod *metav1.Duration `json:"-" annotation:"autoFailoverOnDataDiskNonResponsivenessTimePeriod"`
 
 	// AutoFailoverServerGroup whether to enable failing over a server group.
 	// This field is ignored in server versions 7.1+ as it has been removed from the Couchbase API
@@ -4785,7 +4805,7 @@ type ServerConfig struct {
 	// At least one class must contain the data service.  The field may contain
 	// any of "data", "index", "query", "search", "eventing" or "analytics".
 	// Each service may only be specified once. An empty list can also be specified
-	// for a serviceless class ("[]") if Couchbase version is 7.6.0 or greater.
+	// for an Arbiter class ("[]") if Couchbase version is 7.6.0 or greater.
 	// +listType=set
 	Services []Service `json:"services"`
 

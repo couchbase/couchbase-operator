@@ -435,10 +435,10 @@ func (o *ClusterOptions) WithSplitEphemeralTopology(size int) *ClusterOptions {
 	return o
 }
 
-// WithEphemeralAndServicelessTopology just adds a serviceless class to the
+// WithEphemeralAndArbiterTopology just adds a arbiter class to the
 // Ephemeral topology.
-func (o *ClusterOptions) WithEphemeralAndServicelessTopology(size int) *ClusterOptions {
-	topology := e2espec.EphemeralAndServicelessTopology.DeepCopy()
+func (o *ClusterOptions) WithEphemeralAndArbiterTopology(size int) *ClusterOptions {
+	topology := e2espec.EphemeralAndArbiterTopology.DeepCopy()
 	topology[0].Size = size
 	topology[1].Size = size
 
@@ -473,6 +473,25 @@ func (o *ClusterOptions) WithCustomLogStreaming() *ClusterOptions {
 
 	if imageName := strings.TrimSpace(o.Options.LoggingImage); imageName != "" {
 		o.LogStreaming.Sidecar.Image = imageName
+	}
+
+	return o
+}
+
+// WithLoggingTLS configures TLS for the logging sidecar with the specified mount path and secrets.
+func (o *ClusterOptions) WithLoggingTLS(mountPath string, secretNames []string) *ClusterOptions {
+	if o.LogStreaming == nil {
+		// Initialize logging if not already set
+		o.WithCustomLogStreaming()
+	}
+
+	if o.LogStreaming.Sidecar == nil {
+		o.LogStreaming.Sidecar = &couchbasev2.LogShipperSidecarSpec{}
+	}
+
+	o.LogStreaming.Sidecar.TLS = &couchbasev2.LogShipperSidecarTLSSpec{
+		MountPath:   mountPath,
+		SecretNames: secretNames,
 	}
 
 	return o

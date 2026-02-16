@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
@@ -526,6 +527,71 @@ func TestPasswordCompliesWithCouchbasePasswordPolicy(t *testing.T) {
 		if result != testcase.expected {
 			t.Errorf("test %v failed, expected %v, got %v", testcase.name, testcase.expected, result)
 		}
+	}
+}
+
+func TestCreateReadinessProbe(t *testing.T) {
+	testCases := []struct {
+		name string
+		port int
+	}{
+		{"default_port", 8091},
+		{"TLS_port", 18091},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			readinessConfig := PodReadinessConfig{
+				PodReadinessDelay:  10 * time.Second,
+				PodReadinessPeriod: 20 * time.Second,
+			}
+
+			probe := createReadinessProbe(tc.port, readinessConfig)
+			assertReadinessProbe(t, probe, tc.port)
+		})
+	}
+}
+
+func assertReadinessProbe(t *testing.T, probe *v1.Probe, port int) {
+	t.Helper()
+
+	if probe == nil {
+		t.Fatal("expected probe to be non-nil")
+	}
+
+	if probe.Exec != nil {
+		t.Fatal("expected no exec probe")
+	}
+
+	if probe.TCPSocket == nil {
+		t.Fatal("expected TCP socket probe, got nil")
+	}
+
+	if probe.TCPSocket.Host != "" {
+		t.Fatalf("expected TCP host to be empty, got %q", probe.TCPSocket.Host)
+	}
+
+	if probe.TCPSocket.Port.IntValue() != port {
+		t.Fatalf("expected TCP port %d, got %d", port, probe.TCPSocket.Port.IntValue())
+	}
+
+	assertCommonProbeSettings(t, probe)
+}
+
+func assertCommonProbeSettings(t *testing.T, probe *v1.Probe) {
+	t.Helper()
+
+	if probe.InitialDelaySeconds != 10 {
+		t.Fatalf("expected InitialDelaySeconds 10, got %d", probe.InitialDelaySeconds)
+	}
+	if probe.PeriodSeconds != 20 {
+		t.Fatalf("expected PeriodSeconds 20, got %d", probe.PeriodSeconds)
+	}
+	if probe.TimeoutSeconds != 5 {
+		t.Fatalf("expected TimeoutSeconds 5, got %d", probe.TimeoutSeconds)
+	}
+	if probe.FailureThreshold != 1 {
+		t.Fatalf("expected FailureThreshold 1, got %d", probe.FailureThreshold)
 	}
 }
 

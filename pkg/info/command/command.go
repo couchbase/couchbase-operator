@@ -71,6 +71,12 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 
                         # Collect only required resources, filtering potentially sensitive information
                         cao collect-logs --log-level 0
+
+                        # Collect cbbackupmgr logs from all backups
+                        cao collect-logs --backup-logs
+
+                        # Collect cbbackupmgr logs from a specific backup
+                        cao collect-logs --backup-logs --backup-logs-name my-backup
                 `),
 		Run: func(cmd *cobra.Command, args []string) {
 			collect(c)

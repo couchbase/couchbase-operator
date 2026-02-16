@@ -382,7 +382,7 @@ func CreateSampleBucket(bucketName string) *Request {
 
 // CreateBucket creates a new bucket.
 func CreateBucket(bucket *Bucket) *Request {
-	params := bucket.FormEncode(false, false, false)
+	params := bucket.FormEncode(false, false)
 
 	return NewRequest((*Client).Post, "/pools/default/buckets", params, nil)
 }
@@ -394,21 +394,15 @@ func DeleteBucket(name string) *Request {
 
 // UpdateBucket updates an existing bucket.
 func UpdateBucket(bucket *Bucket) *Request {
-	params := bucket.FormEncode(true, false, false)
+	params := bucket.FormEncode(true, false)
 
 	return NewRequest((*Client).Post, "/pools/default/buckets/"+bucket.BucketName, params, nil)
 }
 
-// Updates only the storage backend of a bucket.
-func UpdateBucketStorageBackend(bucket *Bucket) *Request {
-	params := bucket.FormEncode(true, true, false)
-
-	return NewRequest((*Client).Post, "/pools/default/buckets/"+bucket.BucketName, params, nil)
-}
-
-// Updates only the eviction policy of a bucket.
-func UpdateBucketEvictionPolicy(bucket *Bucket) *Request {
-	params := bucket.FormEncode(true, false, true)
+// UpdateBucketDuringMigration updates a bucket during storage backend migration.
+// Only sends fields that the server allows during migration: storageBackend, evictionPolicy, and ramQuota.
+func UpdateBucketDuringMigration(bucket *Bucket) *Request {
+	params := bucket.FormEncode(true, true)
 
 	return NewRequest((*Client).Post, "/pools/default/buckets/"+bucket.BucketName, params, nil)
 }

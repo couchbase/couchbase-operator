@@ -192,6 +192,14 @@ func (c *Cluster) reconcileMigrationCluster() error {
 		return nil
 	}
 
+	postTopologyReconcilers := reconcileFuncList{
+		(*Cluster).reconcileStatusExistingBucket,
+	}
+
+	if err := postTopologyReconcilers.run(c); err != nil {
+		return err
+	}
+
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
@@ -828,6 +836,29 @@ func (r *MigrationReconcileMachine) handleMarkReady(c *Cluster) error {
 		return err
 	} else if candidates.Empty() {
 		c.cluster.Status.SetReadyCondition()
+	}
+
+	return nil
+}
+
+// reconcileStatusExistingBucket adds the existing cluster buckets to the bucket status list on the cluster.
+// When leaving migration mode, the bucket status is used to compare against bucket CRD's for change constraints.
+// During migration, if buckets are managed, the bucket status will contain all buckets existing on the cluster.
+// Post migration, the bucket status will only contain requested buckets.
+func (c *Cluster) reconcileStatusExistingBucket() error {
+	if !c.cluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	actualBuckets := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&actualBuckets).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.cluster.Status.Buckets = []couchbasev2.BucketStatus{}
+
+	for _, bucket := range actualBuckets {
+		c.cluster.Status.Buckets = append(c.cluster.Status.Buckets, bucketToClusterStatus(bucket))
 	}
 
 	return nil

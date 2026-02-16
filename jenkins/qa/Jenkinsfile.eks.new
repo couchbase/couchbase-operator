@@ -109,7 +109,7 @@ pipeline {
           sh 'aws configure set default.region us-east-2'
           sh 'aws configure set default.output json'
           dir(tfdir) {
-            sh "${env.WORKSPACE}/bin/terraform init -no-color -input=false"
+            sh "${env.WORKSPACE}/bin/terraform init -no-color -input=false -upgrade"
             sh "${env.WORKSPACE}/bin/terraform apply -var kubernetes-version=${params.kubernetes_version} -var name=${env.NAME} -auto-approve -no-color"
             sh "aws eks update-kubeconfig --name ${env.NAME} --kubeconfig ${env.WORKSPACE}/config1"
           }

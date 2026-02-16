@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -1345,7 +1346,7 @@ func TestMovePod(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestServicelessClass(t *testing.T) {
+func TestArbiterClass(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1357,7 +1358,7 @@ func TestServicelessClass(t *testing.T) {
 	clusterSize := 1
 
 	// Create the cluster.
-	cluster := clusterOptions().WithEphemeralAndServicelessTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralAndArbiterTopology(clusterSize).MustCreate(t, kubernetes)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check the events match what we expect:
@@ -1426,4 +1427,53 @@ func TestSecuritySettings(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestAutoFailoverDiskNonResponsivenessAnnotations tests that auto-failover disk
+// non-responsiveness settings can be configured via annotations (Couchbase Server 8.0+).
+func TestAutoFailoverDiskNonResponsivenessAnnotations(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+	timePeriod := 300
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	// Set annotations for auto-failover disk non-responsiveness
+	cluster.Annotations = make(map[string]string)
+	cluster.Annotations["cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness"] = "true"
+	cluster.Annotations["cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod"] = "300s"
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Verify the settings are applied on the Couchbase cluster
+	client, err := e2eutil.CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to create admin console client: %w", err))
+	}
+
+	// Get the auto-failover settings from Couchbase
+	settings := &couchbaseutil.AutoFailoverSettings{}
+	if err := couchbaseutil.GetAutoFailoverSettings(settings).On(client.Client(), client.Host()); err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to get auto-failover settings: %w", err))
+	}
+
+	// Verify the auto-failover disk non-responsiveness settings
+	if !settings.FailoverOnDataDiskNonResponsiveness.Enabled {
+		e2eutil.Die(t, fmt.Errorf("expected auto-failover on data disk non-responsiveness to be enabled"))
+	}
+
+	if settings.FailoverOnDataDiskNonResponsiveness.TimePeriod == nil {
+		e2eutil.Die(t, fmt.Errorf("expected auto-failover on data disk non-responsiveness time period to be set"))
+	}
+
+	if *settings.FailoverOnDataDiskNonResponsiveness.TimePeriod != int64(timePeriod) {
+		e2eutil.Die(t, fmt.Errorf("expected auto-failover on data disk non-responsiveness time period to be %d, got %d",
+			timePeriod, *settings.FailoverOnDataDiskNonResponsiveness.TimePeriod))
+	}
 }

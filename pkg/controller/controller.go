@@ -8,6 +8,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/validationrunner"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -242,11 +243,16 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		c.GetCouchbaseCluster().Status.SetErrorCondition(strings.Join(validationErrors, "; "))
 	} else {
 		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterConditionError)
+		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterUnreconcilable)
 	}
 
 	if validationFailed {
 		c.RunReconcile(r.operatorStartTime)
 	} else {
+		// If validation hasn't failed, we'll update the CR spec, regardless of whether reconciliation succeeds.
+		if err := retryutil.RetryFor(4*time.Second, c.UpdateCRSpecAnnotation); err != nil {
+			log.Error(err, "Unable to update lastReconciledSpec annotation", "cluster", c.GetCouchbaseCluster().NamespacedName())
+		}
 		c.Update(couchbase, r.operatorStartTime)
 	}
 

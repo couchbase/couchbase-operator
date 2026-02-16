@@ -1628,11 +1628,11 @@ func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Clust
 			return err
 		}
 
-		if !reflect.DeepEqual(current.ReaderThreads, couchbaseutil.ToDataThreadSetting(readerThreads)) {
+		if !reflect.DeepEqual(current.ReaderThreads, couchbaseutil.ToDataThreadSetting(readerThreads, true)) {
 			return fmt.Errorf("expected %s readers, got %s", readerThreads, current.ReaderThreads)
 		}
 
-		if !reflect.DeepEqual(current.WriterThreads, couchbaseutil.ToDataThreadSetting(writerThreads)) {
+		if !reflect.DeepEqual(current.WriterThreads, couchbaseutil.ToDataThreadSetting(writerThreads, true)) {
 			return fmt.Errorf("expected %s writers, got %s", writerThreads, current.WriterThreads)
 		}
 

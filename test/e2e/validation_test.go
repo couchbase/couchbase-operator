@@ -773,6 +773,29 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"},
 		},
 		{
+			name:             "TestValidateUpgradeProcessDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "SwapRebalance")},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
+			name:             "TestValidateUpgradeStrategyDeprecated",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeStrategy", "RollingUpgrade")},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
+			name: "TestValidateMultipleDeprecatedUpgradeFields",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.DeltaRecovery}).
+				Replace("/spec/upgradeStrategy", "RollingUpgrade").
+				Replace("/spec/upgradeProcess", "DeltaRecovery")},
+			shouldFail: false,
+			expectedWarnings: []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead",
+				"spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead",
+				"spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead"},
+		},
+		{
 			name: "TestValidateInPlaceUpgradeWithOneDataNodeMultiNodeCluster",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/upgradeProcess", "InPlaceUpgrade").
 				Replace("/spec/servers", []couchbasev2.ServerConfig{
@@ -895,20 +918,20 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"IPv6Only should be used in place of IPv6 for spec.networking.addressFamily. IPv6 is deprecated and will be removed in a future release"},
 		},
 		{
-			name: "TestValidateLoggingTLSCRDFieldsNotYetImplemented",
+			name: "TestValidateLoggingTLSConfigurationValid",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
-								MountPath:   "some-value",
-								SecretNames: []string{"some-value", "some-other-value"},
+								MountPath:   "/fluent-bit/certs/",
+								SecretNames: []string{"fluent-bit-ca", "fluent-bit-client-cert"},
 							},
 						},
 					},
 				})},
 			shouldFail:       false,
-			expectedWarnings: []string{"CouchbaseCluster spec.logging.server.sidecar.tls is not implemented in this operator version."},
+			expectedWarnings: []string{},
 		},
 	}
 
@@ -1122,7 +1145,7 @@ func TestNegValidationCreateCouchbaseClusterServers(t *testing.T) {
 			expectedErrors: []string{`spec.servers(\[2\])?.serverGroups`},
 		},
 		{
-			name:           "TestNoServicelessClassBelow76",
+			name:           "TestNoArbiterClassBelow76",
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/servers/3/services", []string{})},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.servers(\[3\])?.services requires atleast one service`},
@@ -1423,6 +1446,18 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "TestValidateLoggingFailsForDuplicateConfigurationSecret",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Add("/spec/logging/server", &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled:           true,
+						ConfigurationName: "cluster-2-fluent-bit-config",
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.logging.server.configurationName is already in use for cluster cluster-2`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -1712,7 +1747,48 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 					},
 				})},
 			shouldFail:     true,
-			expectedErrors: []string{`spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later`},
+			expectedErrors: []string{`spec.cluster.data.diskUsageLimit can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpUserTimeoutUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPUserTimeout: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpUserTimeout can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveProbesUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveProbes: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveProbes can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveIntervalUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveInterval: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveInterval can only be set for Couchbase Server 8.0.0+`},
+		},
+		{
+			name: "TestValidateTcpKeepAliveIntervalUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/image", "couchbase/server:8.0.0").
+				Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+					TCPKeepAliveInterval: util.IntPtr(10),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateTcpKeepAliveIdleUnsupportedVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+				TCPKeepAliveIdle: util.IntPtr(10),
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.cluster.data.tcpKeepAliveIdle can only be set for Couchbase Server 8.0.0+`},
 		},
 		{
 			name: "TestValidateDataThreadSettingsFixedValueInvalid",
@@ -2866,6 +2942,15 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.warmupBehavior"},
 		},
+		{
+			name: "TestValidateBucketInvalidDurabilityImpossibleFallback",
+			mutations: patchMap{
+				"bucket7": jsonpatch.NewPatchSet().
+					Replace("/spec/durabilityImpossibleFallback", "fallbackToActiveAck"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3347,6 +3432,22 @@ func TestNegValidationCreateCouchbaseBackup(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.merge.schedule`},
 		},
+		{
+			name: "TestValidateBackupAdditionalArgsDeleteLockfileMultipleArgs",
+			mutations: patchMap{"backup0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorBackupArgs": "--some-arg --force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile`},
+		},
+		{
+			name: "TestValidateBackupAdditionalArgsDeleteLockfile",
+			mutations: patchMap{"backup0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorBackupArgs": "--force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile`},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -3449,6 +3550,22 @@ func TestNegValidationCreateCouchbaseBackupRestore(t *testing.T) {
 			mutations:      patchMap{"restore1": jsonpatch.NewPatchSet().Replace("/spec/data/map/0/target", "bucket2.scope")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.data.map`},
+		},
+		{
+			name: "TestValidateRestoreAdditionalArgsDeleteLockfileMultipleArgs",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorRestoreArgs": "--some-arg --force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile`},
+		},
+		{
+			name: "TestValidateRestoreAdditionalArgsDeleteLockfile",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+				"cao.couchbase.com/additionalOperatorRestoreArgs": "--force-delete-lockfile",
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile`},
 		},
 	}
 
@@ -3927,12 +4044,6 @@ func TestNegValidationConstraintsApply(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 		{
-			name:           "TestValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
-		},
-		{
 			name: "TestValidateVolumeClaimTemplatesShrinkRejected",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/enableOnlineVolumeExpansion", true).
@@ -4027,6 +4138,14 @@ func TestRBACValidationCreate(t *testing.T) {
 			name:       "TestValidateLDAPDomain",
 			mutations:  patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "external")},
 			shouldFail: false,
+		},
+		{
+			name: "TestValidateLDAPDomain",
+			mutations: patchMap{"user2": jsonpatch.NewPatchSet().Replace("/spec/authDomain", "external").Add("/spec/locked", true).Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+				ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+			})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password not allowed for LDAP user `user2`", "spec.locked not allowed for LDAP user `user2`"},
 		},
 		{
 			name:        "TestValidateClusterRole",
@@ -4174,6 +4293,41 @@ func TestRBACRoleValidation76(t *testing.T) {
 			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:7.6.4").Replace("/status/currentVersion", "7.6.4"), "admin-group": jsonpatch.NewPatchSet().Replace("/spec/roles/0", couchbasev2.Role{Name: "user_admin_external"})},
 			shouldFail:     true,
 			expectedErrors: []string{`role user_admin_external in group admin-group requires Couchbase Server 8.0\+`},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
+}
+
+func TestRBACUserVersionConstraints(t *testing.T) {
+	testDefs := []testDef{
+		{
+			// user1 is created before the cluster, but we should still fail on cluster validation.
+			name: "TestUserVersionConstraintsValidatedOnCluster",
+			mutations: patchMap{"user1": jsonpatch.NewPatchSet().Replace("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+				ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+			}).Add("/spec/locked", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password is only supported for Couchbase Server versions 8.0.0+", "spec.locked is only supported for Couchbase Server versions 8.0.0+"},
+		},
+		{
+			// user3 is created after the cluster, so it should pass validation on an 8.0.0 cluster
+			name: "TestUserVersionConstraintsValidatedAfterCluster",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0").Replace("/spec/image", "couchbase/server:8.0.0"),
+				"user3": jsonpatch.NewPatchSet().Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+					ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+				}).Add("/spec/locked", true)},
+			shouldFail: false,
+		},
+		{
+			// user3 should fail when it has a password and locked spec and is selected by a non 8.0.0 cluster selector.
+			name: "TestUserVersionConstraintsSelectedByNon80ClusterSelector",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/spec/security/rbac/selector", &metav1.LabelSelector{MatchLabels: map[string]string{"cluster": "some-cluster-label"}}),
+				"user3": jsonpatch.NewPatchSet().Add("/spec/password", couchbasev2.CouchbaseUserPasswordSpec{
+					ExpiresAfter: &metav1.Duration{Duration: 1 * time.Hour},
+				}).Add("/spec/locked", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.password is only supported for Couchbase Server versions 8.0.0\\+ for user `user3`", "spec.locked is only supported for Couchbase Server versions 8.0.0\\+ for user `user3`"},
 		},
 	}
 
@@ -4404,7 +4558,8 @@ func TestBucketMigrationPost76Validation(t *testing.T) {
 					"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "true",
 				}),
 				"bucket2": jsonpatch.NewPatchSet().
-					Replace("/spec/storageBackend", "couchstore"),
+					Replace("/spec/storageBackend", "couchstore").
+					Remove("/spec/historyRetention"),
 			},
 			shouldFail: false,
 		},
@@ -4629,13 +4784,18 @@ func TestAnnotationWarnings(t *testing.T) {
 	testDefs := []testDef{
 		{
 			name: "TestHistoryRetentionSecondsOverwrite",
-			mutations: patchMap{"bucket0": jsonpatch.NewPatchSet().
-				Add("/spec/historyRetention", couchbasev2.HistoryRetentionSettings{
-					Seconds: 1000,
-				}).
-				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/historyRetention.seconds": "4",
-				})},
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().
+					Replace("/spec/cluster/dataServiceMemoryQuota", "2048Mi"),
+				"bucket7": jsonpatch.NewPatchSet().
+					Add("/spec/storageBackend", "magma").
+					Replace("/spec/memoryQuota", "1024Mi").
+					Add("/spec/historyRetention", couchbasev2.HistoryRetentionSettings{
+						Seconds: 1000,
+					}).
+					Add("/metadata/annotations", map[string]string{
+						"cao.couchbase.com/historyRetention.seconds": "4",
+					})},
 			shouldFail:       false,
 			expectedWarnings: []string{"Overwriting existing value for annotation"},
 		},
@@ -4839,6 +4999,27 @@ func TestValidationClusterMigrationApply(t *testing.T) {
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-migration.yaml"})
+}
+
+// TestBucketValidationClusterLeavingMigrationApply tests the bucket change constraints are ran when leaving migration mode.
+// The DAC will compare bucket CRD's with buckets from the cluster status to check those CRD's are valid.
+func TestBucketValidationClusterLeavingMigrationApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			// If the buckets are valid (They are in validation-leaving-migration.yaml to start with) and the migration spec is removed, we should be allowed to leave migration.
+			name: "TestLeavingMigrationAllowedWhenBucketsValid",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Remove("/spec/migration")},
+			shouldFail: true,
+			expectedErrors: []string{
+				"spec.numVBuckets is immutable for bucket bucket1 and cluster", // bucket1 in status has 1024 vBuckets, but spec has 128
+				"spec.numVBuckets is immutable for bucket bucket2 and cluster", // bucket2 in status has 1024 vBuckets, but spec has 128 (tests the validation works with different spec.Name/metadata.Name values)
+				"spec.conflictResolution in body cannot be updated",            // bucket3 in status has seqno conflict resolution, but spec has lww
+			},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-leaving-migration.yaml"})
 }
 
 func TestMidUpgradeImageValidations(t *testing.T) {
@@ -5923,6 +6104,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			name: "TestValidateMagmaToCouchstoreWithExplicitNumVBuckets",
 			mutations: patchMap{
 				"bucket1": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
 					Replace("/spec/storageBackend", "couchstore").
 					Add("/spec/numVBuckets", 1024),
 			},
@@ -5948,9 +6130,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 					Add(`/spec/buckets/enableBucketMigrationRoutines`, true),
 				"bucket1": jsonpatch.NewPatchSet().
 					Add("/spec/numVBuckets", 1024).
-					Add(`/spec/historyRetention`, &couchbasev2.HistoryRetentionSettings{
-						CollectionDefault: boolPtr(false),
-					}).
+					Remove(`/spec/historyRetention`).
 					Replace("/spec/storageBackend", "couchstore").
 					Replace("/spec/memoryQuota", "500Mi"),
 			},
@@ -5991,9 +6171,20 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 		{
 			name: "TestMigrateMagmaToCouchstoreValid",
 			mutations: patchMap{
-				"bucket1": jsonpatch.NewPatchSet().Replace("/spec/storageBackend", "couchstore"),
+				"bucket1": jsonpatch.NewPatchSet().
+					Remove("/spec/historyRetention").
+					Replace("/spec/storageBackend", "couchstore"),
 			},
 			shouldFail: false,
+		},
+		{
+			name: "TestMigrateMagmaToCouchstoreValidInvalidHistoryRetention",
+			mutations: patchMap{
+				"bucket1": jsonpatch.NewPatchSet().
+					Replace("/spec/storageBackend", "couchstore"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`historyRetentionSettings can only be used with magma storage backend`},
 		},
 		{
 			name: "TestUpgradeClusterTo80AllowedDueToImplicit",
@@ -6153,7 +6344,96 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`spec.numVBuckets is immutable`},
 		},
+		{
+			name: "TestNegValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
+			mutations: patchMap{
+				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/buckets/enableBucketMigrationRoutines", false),
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0"),
+				"bucket8": jsonpatch.NewPatchSet().
+					Replace("/metadata/labels", map[string]string{
+						"cluster": "cluster0",
+					}).
+					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
+					Replace("/spec/onlineEvictionPolicyChange", true)},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-storagebackend.yaml"})
+}
+
+func TestValidateUpgradeField(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateUpgradeOrderServerGroupInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerGroups",
+						UpgradeOrder:     []string{"group1", "group2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains servergroup group1 not found in the cluster spec", "upgrade order contains servergroup group2 not found in the cluster spec"},
+		},
+		{
+			name: "TestValidateUpgradeOrderServerClassesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerClasses",
+						UpgradeOrder:     []string{"class1", "class2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains serverclass class1 not found in spec.servers", "upgrade order contains serverclass class2 not found in spec.servers"},
+		},
+		{
+			name: "TestValidateUpgradeOrderServicesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "Services",
+						UpgradeOrder:     []string{"service1", "service2"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains service service1 not found in spec.servers", "upgrade order contains service service2 not found in spec.servers"},
+		},
+		{
+			name: "TestValidateUpgradeOrderDuplicatesInvalid",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/upgrade", &couchbasev2.UpgradeSpec{
+						UpgradeOrderType: "ServerGroups",
+						UpgradeOrder:     []string{"group1", "group1"},
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"upgrade order contains duplicate entry: group1"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
+}
+
+func TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name: "TestValidateBucketCRDFieldsForNonDefaultUnsupportedFields",
+			mutations: patchMap{
+				"bucket7": jsonpatch.NewPatchSet().Replace("/spec/accessScannerEnabled", false).Replace("/spec/memoryLowWatermark", 50).Replace("/spec/memoryHighWatermark", 90).Replace("/spec/warmupBehavior", "none"),
+			},
+			shouldFail: false,
+			expectedWarnings: []string{
+				"CouchbaseBucket spec.accessScannerEnabled has been configured for cluster",
+				"CouchbaseBucket spec.memoryLowWatermark has been configured for cluster",
+				"CouchbaseBucket spec.memoryHighWatermark has been configured for cluster",
+				"CouchbaseBucket spec.warmupBehavior has been configured for cluster",
+			},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation.yaml"})
 }

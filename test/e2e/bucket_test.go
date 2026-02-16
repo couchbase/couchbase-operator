@@ -471,9 +471,11 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	framework.Requires(t, kubernetes).CouchbaseBucket()
 
 	// Create the cluster.
-	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	bucket := e2eutil.MustGetCouchstoreBucket(f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1431)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	// Once ready, alter a few parameters and ensure they are reverted by the operator.
@@ -483,6 +485,9 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketReplicas", 1), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/IoPriority", couchbaseutil.IoPriorityTypeLow), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/IoPriority", couchbaseutil.IoPriorityTypeHigh), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/BucketMemoryQuota", int64(1024)), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Replace("/BucketStorageBackend", couchbaseutil.CouchbaseStorageBackendMagma), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/BucketStorageBackend", couchbaseutil.CouchbaseStorageBackendCouchstore), 3*time.Minute)
 	time.Sleep(10 * time.Second) // Wait for event to become visible
 
 	// Check the events match what we expect:
@@ -492,7 +497,7 @@ func TestRevertExternalBucketUpdates(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
+		eventschema.Repeat{Times: 4, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

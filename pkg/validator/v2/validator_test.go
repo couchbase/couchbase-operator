@@ -226,7 +226,7 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "should reject usage of logging sidecar TLS in 2.9.0",
+			name: "should allow valid TLS configuration with secrets",
 			clusterSpec: &couchbasev2.CouchbaseCluster{
 				Spec: couchbasev2.ClusterSpec{
 					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
@@ -241,7 +241,43 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+",
+			expectedErr: "",
+		},
+		{
+			name: "should reject TLS configuration without secret names",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "/fluent-bit/certs/",
+									SecretNames: []string{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "spec.logging.server.sidecar.tls.secretNames must contain at least one secret when TLS is configured",
+		},
+		{
+			name: "should reject TLS configuration with empty mount path",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "",
+									SecretNames: []string{"fluent-bit-ca"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "spec.logging.server.sidecar.tls.mountPath cannot be empty when TLS is configured",
 		},
 		{
 			name: "should allow if logging sidecar TLS is nil",
@@ -471,6 +507,152 @@ func TestIsFullyUpgraded(t *testing.T) {
 
 			if result != tc.expectedResult {
 				t.Errorf("expected %v, got %v", tc.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestCheckConstraintAutoFailoverOnDataDiskNonResponsiveness(t *testing.T) {
+	testcases := []struct {
+		name        string
+		image       string
+		enabled     bool
+		expectedErr string
+	}{
+		{
+			name:        "should allow disk non-responsiveness on 8.0.0+",
+			image:       "couchbase/server:8.0.0",
+			enabled:     true,
+			expectedErr: "",
+		},
+		{
+			name:        "should allow disk non-responsiveness disabled on any version",
+			image:       "couchbase/server:7.6.0",
+			enabled:     false,
+			expectedErr: "",
+		},
+		{
+			name:        "should reject disk non-responsiveness on 7.6.0",
+			image:       "couchbase/server:7.6.0",
+			enabled:     true,
+			expectedErr: "annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is not supported in Couchbase Server versions lower than 8.0.0",
+		},
+		{
+			name:        "should reject disk non-responsiveness on 7.2.0",
+			image:       "couchbase/server:7.2.0",
+			enabled:     true,
+			expectedErr: "annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is not supported in Couchbase Server versions lower than 8.0.0",
+		},
+		{
+			name:        "should allow on 8.0.1+",
+			image:       "couchbase/server:8.0.1",
+			enabled:     true,
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Image: testcase.image,
+					ClusterSettings: couchbasev2.ClusterConfig{
+						AutoFailoverOnDataDiskNonResponsiveness: testcase.enabled,
+					},
+				},
+			}
+
+			err := checkConstraintAutoFailoverOnDataDiskNonResponsiveness(nil, cluster)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error but got: %s", err.Error())
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error containing '%s' but got none", testcase.expectedErr)
+				} else if !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Errorf("expected error containing '%s' but got '%s'", testcase.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestCheckConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod(t *testing.T) {
+	testcases := []struct {
+		name        string
+		enabled     bool
+		timePeriod  *metav1.Duration
+		expectedErr string
+	}{
+		{
+			name:        "should allow 5 seconds (minimum)",
+			enabled:     true,
+			timePeriod:  &metav1.Duration{Duration: 5 * 1e9},
+			expectedErr: "",
+		},
+		{
+			name:        "should allow 120 seconds",
+			enabled:     true,
+			timePeriod:  &metav1.Duration{Duration: 120 * 1e9},
+			expectedErr: "",
+		},
+		{
+			name:        "should allow 3600 seconds (maximum)",
+			enabled:     true,
+			timePeriod:  &metav1.Duration{Duration: 3600 * 1e9},
+			expectedErr: "",
+		},
+		{
+			name:        "should reject 4 seconds (below minimum)",
+			enabled:     true,
+			timePeriod:  &metav1.Duration{Duration: 4 * 1e9},
+			expectedErr: "annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be greater than or equal to 5s",
+		},
+		{
+			name:        "should reject 3601 seconds (above maximum)",
+			enabled:     true,
+			timePeriod:  &metav1.Duration{Duration: 3601 * 1e9},
+			expectedErr: "annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be less than or equal to 3600s",
+		},
+		{
+			name:        "should reject nil when enabled",
+			enabled:     true,
+			timePeriod:  nil,
+			expectedErr: "annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body is required",
+		},
+		{
+			name:        "should skip validation when feature is disabled",
+			enabled:     false,
+			timePeriod:  nil,
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					ClusterSettings: couchbasev2.ClusterConfig{
+						AutoFailoverOnDataDiskNonResponsiveness:           testcase.enabled,
+						AutoFailoverOnDataDiskNonResponsivenessTimePeriod: testcase.timePeriod,
+					},
+				},
+			}
+
+			err := checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod(nil, cluster)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error but got: %s", err.Error())
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error containing '%s' but got none", testcase.expectedErr)
+				} else if !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Errorf("expected error containing '%s' but got '%s'", testcase.expectedErr, err.Error())
+				}
 			}
 		})
 	}

@@ -177,9 +177,9 @@ var (
 		},
 	}
 
-	// EphemeralAndServicelessTopology is a simple ephemeral cluster with,
-	// an additional serviceless class.
-	EphemeralAndServicelessTopology = ClusterTopology{
+	// EphemeralAndArbiterTopology is a simple ephemeral cluster with,
+	// an additional arbiter class.
+	EphemeralAndArbiterTopology = ClusterTopology{
 		{
 			Name: "default",
 			Services: []couchbasev2.Service{
@@ -189,7 +189,7 @@ var (
 			},
 		},
 		{
-			Name:     "serviceless",
+			Name:     "arbiter",
 			Services: []couchbasev2.Service{},
 		},
 	}

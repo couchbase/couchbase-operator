@@ -254,7 +254,12 @@ func (m *memberImpl) UseTLS() bool {
 }
 
 // MemberSet is a mapping from member/pod name to the member.
+// Note: MemberSet is a map and iteration order is not guaranteed.
 type MemberSet map[string]Member
+
+// MemberList is a list of members.
+// Note: MemberList is a slice and iteration order is guaranteed.
+type MemberList []Member
 
 // NewMemberSet creates a new member set from the list of members.
 func NewMemberSet(ms ...Member) MemberSet {
@@ -265,6 +270,31 @@ func NewMemberSet(ms ...Member) MemberSet {
 	}
 
 	return res
+}
+
+func (ms MemberList) ToSet() MemberSet {
+	set := MemberSet{}
+	for _, m := range ms {
+		set[m.Name()] = m
+	}
+	return set
+}
+
+func (ms MemberList) Contains(name string) bool {
+	for _, m := range ms {
+		if m.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (ms MemberSet) ToList() MemberList {
+	list := MemberList{}
+	for _, m := range ms {
+		list = append(list, m)
+	}
+	return list
 }
 
 // Contains returns whether a named member is part of the set.

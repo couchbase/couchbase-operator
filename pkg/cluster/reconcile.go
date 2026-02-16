@@ -207,7 +207,10 @@ func (c *Cluster) reconcile() error {
 	// If the cluster is upgrading, then don't interfere with anything else
 	// as the data returned from Couchbase will vary depending on the version
 	// leading to some very strange and possibly dangerous behaviour.
-	if upgrading, err := c.isUpgrading(); err == nil && upgrading {
+	// If we're actively upgrading but we are also waiting for the stabalization period, we can run the postTopology reconcilers.
+	// Settings should only be set if allowed by the lowest member version (c.SupportsVersionFeatures())
+	upgrading, err := c.isUpgrading()
+	if (err == nil && upgrading) && !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
 		return nil
 	}
 
@@ -232,8 +235,8 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileAdminService,
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileUnmanagedBucketsBackends,
-		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcilePasswordPolicy,
+		(*Cluster).reconcileRBAC,
 		(*Cluster).reconcileBackup,
 		(*Cluster).reconcileBackupRestore,
 		(*Cluster).reconcileAutoscalers,
@@ -464,6 +467,25 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	}
 
 	if c.SupportsVersionFeatures("8.0.0") {
+		// Disk non-responsiveness settings
+		specFailoverSettings.FailoverOnDataDiskNonResponsiveness.Enabled = clusterSettings.AutoFailoverOnDataDiskNonResponsiveness
+
+		if clusterSettings.AutoFailoverOnDataDiskNonResponsiveness && clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod != nil {
+			dataDiskNonResponsivenessFailoverTimePeriod := k8sutil.Seconds(clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod)
+			specFailoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = &dataDiskNonResponsivenessFailoverTimePeriod
+		}
+
+		if clusterSettings.AutoFailoverOnDataDiskNonResponsiveness && clusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+			// set to 120 using metav1 duration
+			defaultDataDiskNonResponsivenessTimePeriod := k8sutil.Seconds(&metav1.Duration{Duration: time.Duration(constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodDefault) * time.Second})
+			specFailoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = &defaultDataDiskNonResponsivenessTimePeriod
+		}
+
+		if !failoverSettings.FailoverOnDataDiskNonResponsiveness.Enabled {
+			failoverSettings.FailoverOnDataDiskNonResponsiveness.TimePeriod = nil
+		}
+
+		// Allow failover of ephemeral nodes with no replicas settings
 		if clusterSettings.AllowFailoverEphemeralNoReplicas != nil {
 			specFailoverSettings.AllowFailoverEphemeralNoReplicas = clusterSettings.AllowFailoverEphemeralNoReplicas
 		} else {
@@ -635,8 +657,9 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		return err
 	}
 
+	after80 := c.SupportsVersionFeatures("8.0.0")
 	defaultThreadSetting := "default"
-	if c.SupportsVersionFeatures("8.0.0") {
+	if after80 {
 		defaultThreadSetting = "balanced"
 	}
 
@@ -667,13 +690,13 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		requested.NumAuxIOThreads = defaultIfExists(current.NumAuxIOThreads, &ioDefault)
 	} else {
 		// If anything is not set in the spec, we will set it to the default value.
-		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.ReaderThreads); setting != nil {
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.ReaderThreads, after80); setting != nil {
 			requested.ReaderThreads = setting
 		} else {
 			requested.ReaderThreads = &readWriteDefault
 		}
 
-		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.WriterThreads); setting != nil {
+		if setting := couchbaseutil.ToDataThreadSetting(c.cluster.Spec.ClusterSettings.Data.WriterThreads, after80); setting != nil {
 			requested.WriterThreads = setting
 		} else {
 			requested.WriterThreads = &readWriteDefault
@@ -697,7 +720,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 			}
 		}
 
-		if c.SupportsVersionFeatures("8.0.0") {
+		if after80 {
 			requested.TCPKeepAliveInterval = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveInterval
 			requested.TCPKeepAliveIdle = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveIdle
 			requested.TCPKeepAliveProbes = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveProbes
@@ -1362,7 +1385,7 @@ func (c *Cluster) reconcileRBAC() error {
 	// such as users, groups, collections, and scopes, are fully managed.
 	if c.cluster.Spec.Security.RBAC.Managed {
 		if err := c.reconcileRBACResources(); err != nil {
-			return err
+			log.Error(err, "RBAC reconciliation failed", "cluster", c.namespacedName())
 		}
 	} else if c.cluster.Spec.Networking.CloudNativeGateway != nil {
 		// need to create the admin user
@@ -1458,36 +1481,34 @@ func (c *Cluster) reconcileStatus() error {
 }
 
 func (c *Cluster) reconcilePasswordPolicy() error {
-	if c.cluster.Spec.Security.PasswordPolicy == nil {
-		return nil
-	}
-
 	current := couchbaseutil.PasswordPolicySettings{}
 	if err := couchbaseutil.GetPasswordPolicySettings(&current).On(c.api, c.readyMembers()); err != nil {
 		return err
 	}
 
-	requested := current
+	requested := defaultPasswordPolicySettings()
 
-	policy := c.cluster.Spec.Security.PasswordPolicy
-	if policy.MinLength != nil {
-		requested.MinLength = policy.MinLength
-	}
+	// If password policy is set in the spec, override defaults with spec values
+	if policy := c.cluster.Spec.Security.PasswordPolicy; policy != nil {
+		if policy.MinLength != nil {
+			requested.MinLength = policy.MinLength
+		}
 
-	if policy.EnforceUppercase != nil {
-		requested.EnforceUppercase = policy.EnforceUppercase
-	}
+		if policy.EnforceUppercase != nil {
+			requested.EnforceUppercase = policy.EnforceUppercase
+		}
 
-	if policy.EnforceLowercase != nil {
-		requested.EnforceLowercase = policy.EnforceLowercase
-	}
+		if policy.EnforceLowercase != nil {
+			requested.EnforceLowercase = policy.EnforceLowercase
+		}
 
-	if policy.EnforceDigits != nil {
-		requested.EnforceDigits = policy.EnforceDigits
-	}
+		if policy.EnforceDigits != nil {
+			requested.EnforceDigits = policy.EnforceDigits
+		}
 
-	if policy.EnforceSpecialChars != nil {
-		requested.EnforceSpecialChars = policy.EnforceSpecialChars
+		if policy.EnforceSpecialChars != nil {
+			requested.EnforceSpecialChars = policy.EnforceSpecialChars
+		}
 	}
 
 	if reflect.DeepEqual(current, requested) {
@@ -1500,5 +1521,20 @@ func (c *Cluster) reconcilePasswordPolicy() error {
 
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("password policy", c.cluster))
 
+	// Only reconcile temporary passwords if a policy was explicitly set, the function handles the nil case.
 	return c.reconcileTemporaryPasswords(true)
+}
+
+// defaultPasswordPolicySettings returns the Couchbase Server default password policy settings.
+func defaultPasswordPolicySettings() couchbaseutil.PasswordPolicySettings {
+	defaultMinLength := 6
+	defaultFalse := false
+
+	return couchbaseutil.PasswordPolicySettings{
+		MinLength:           &defaultMinLength,
+		EnforceUppercase:    &defaultFalse,
+		EnforceLowercase:    &defaultFalse,
+		EnforceDigits:       &defaultFalse,
+		EnforceSpecialChars: &defaultFalse,
+	}
 }

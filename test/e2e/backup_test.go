@@ -3669,3 +3669,112 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("expected '--default-recovery' and 'purge' in restore container args"))
 	}
 }
+
+// TestBackupLogsCollection tests that backup logs are collected when using --backup-logs flag.
+func TestBackupLogsCollection(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a simple cluster for backup
+	cluster := clusterOptions().WithEphemeralTopology(constants.Size1).MustCreate(t, kubernetes)
+
+	// Create a simple full backup
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// Wait for the first backup job to actually complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
+
+	// Run cao collect-logs with --backup-logs flag and --backup-logs-keep-job to persist containers for debugging
+	commonArgs := e2eutil.ArgumentList{}
+	commonArgs.AddClusterDefaults(kubernetes)
+	commonArgs.AddEnvironmentDefaults(f.OpImage)
+	commonArgs.Add("--backup-logs", "")
+	commonArgs.Add("--backup-logs-keep-job", "")
+
+	archive, cleanCbopinfo := cbopinfo(t, commonArgs)
+	defer cleanCbopinfo()
+
+	// Verify backup logs are included in the archive
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, f.OpImage, false, true, true, 0, true, "", cluster.Name)
+	mustVerifyArchiveContents(t, archive, files)
+}
+
+// TestBackupLogsCollectionWithName tests that --backup-logs-name flag collects logs from only the specified backup.
+func TestBackupLogsCollectionWithName(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a simple cluster for backup
+	cluster := clusterOptions().WithEphemeralTopology(constants.Size1).MustCreate(t, kubernetes)
+
+	// Create first backup and wait for it to complete before creating the second
+	backup1 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup1, e2eutil.BackupCompletedEvent(cluster, backup1.Name), 10*time.Minute)
+
+	// Now create second backup and wait for it to complete
+	backup2 := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup2, e2eutil.BackupCompletedEvent(cluster, backup2.Name), 10*time.Minute)
+
+	// Run cao collect-logs with --backup-logs and --backup-logs-name specifying only backup1
+	commonArgs := e2eutil.ArgumentList{}
+	commonArgs.AddClusterDefaults(kubernetes)
+	commonArgs.AddEnvironmentDefaults(f.OpImage)
+	commonArgs.Add("--backup-logs", "")
+	commonArgs.Add("--backup-logs-name", backup1.Name)
+	commonArgs.Add("--backup-logs-keep-job", "")
+
+	archive, cleanCbopinfo := cbopinfo(t, commonArgs)
+	defer cleanCbopinfo()
+
+	// Verify only backup1's logs are included in the archive, but both backup YAMLs are present
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, f.OpImage, false, true, true, 0, true, backup1.Name, cluster.Name)
+
+	// Check that both backup YAML files are present (always collected)
+	backup1YamlFound := false
+	backup2YamlFound := false
+	for _, file := range files {
+		if strings.Contains(file, fmt.Sprintf("couchbasebackup/%s/%s.yaml", backup1.Name, backup1.Name)) {
+			backup1YamlFound = true
+		}
+		if strings.Contains(file, fmt.Sprintf("couchbasebackup/%s/%s.yaml", backup2.Name, backup2.Name)) {
+			backup2YamlFound = true
+		}
+	}
+	if !backup1YamlFound {
+		e2eutil.Die(t, fmt.Errorf("expected backup1 YAML file to be present in archive"))
+	}
+	if !backup2YamlFound {
+		e2eutil.Die(t, fmt.Errorf("expected backup2 YAML file to be present in archive"))
+	}
+
+	// Check that only backup1's logs.zip is present
+	backup1LogsFound := false
+	backup2LogsFound := false
+	for _, file := range files {
+		if strings.Contains(file, fmt.Sprintf("couchbasebackup/%s/logs.zip", backup1.Name)) {
+			backup1LogsFound = true
+		}
+		if strings.Contains(file, fmt.Sprintf("couchbasebackup/%s/logs.zip", backup2.Name)) {
+			backup2LogsFound = true
+		}
+	}
+	if !backup1LogsFound {
+		e2eutil.Die(t, fmt.Errorf("expected backup1 logs.zip to be present in archive"))
+	}
+	if backup2LogsFound {
+		e2eutil.Die(t, fmt.Errorf("expected backup2 logs.zip to NOT be present in archive"))
+	}
+
+	mustVerifyArchiveContents(t, archive, files)
+}

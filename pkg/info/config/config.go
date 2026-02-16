@@ -54,6 +54,12 @@ type Configuration struct {
 	UploadProxy string
 	// Ticket specifies a Couchbase Support ticket number for log uploads
 	Ticket string
+	// BackupLogs determines whether to collect cbbackupmgr logs
+	BackupLogs bool
+	// BackupLogsName specifies which backup to collect logs from (empty means all)
+	BackupLogsName string
+	// BackupLogsKeepJob determines whether to keep the backup logs collection job after completion for debugging
+	BackupLogsKeepJob bool
 }
 
 const (
@@ -77,6 +83,9 @@ const (
 	uploadProxyFlag         = "upload-proxy"
 	ticketFlag              = "ticket"
 	eventCollectorPortFlag  = "event-collector-port"
+	backupLogsFlag          = "backup-logs"
+	backupLogsNameFlag      = "backup-logs-name"
+	backupLogsKeepJobFlag   = "backup-logs-keep-job"
 )
 
 type AppendStringVar struct {
@@ -119,4 +128,7 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.UploadProxy, uploadProxyFlag, "", "Specifies a proxy for log uploading")
 	flags.StringVar(&c.Ticket, ticketFlag, "", "Specifies the Couchbase Support ticket-number. The value must be a string with a maximum length of 7 characters, containing only digits in the range of 0-9.")
 	flags.StringVar(&c.EventCollectorPort, eventCollectorPortFlag, "8080", "Event collector API port")
+	flags.BoolVar(&c.BackupLogs, backupLogsFlag, false, "Collect cbbackupmgr logs from backup PVCs")
+	flags.StringVar(&c.BackupLogsName, backupLogsNameFlag, "", "Specify which backup to collect logs from (default: all backups)")
+	flags.BoolVar(&c.BackupLogsKeepJob, backupLogsKeepJobFlag, false, "Keep backup logs collection job after completion for debugging")
 }

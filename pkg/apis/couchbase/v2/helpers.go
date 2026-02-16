@@ -193,6 +193,10 @@ func (sc *ServerConfig) AutoscalerName(cluster string) string {
 	return name + "." + cluster
 }
 
+func (sc *ServerConfig) HasService(service Service) bool {
+	return slices.Contains(sc.Services, service) || (service == "arbiter" && len(sc.Services) == 0)
+}
+
 func (cs *ClusterSpec) Cleanup() {
 }
 
@@ -322,9 +326,27 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // ServerClassCouchbaseImage selects the image to use for a server class. The priority
 // order is:
 // * Operator Environment image if EnvImagePrecedence is set
+// * Server-specific image (server.Image) if set
 // * Cluster image.
 func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
+	// Check if server has a specific image override (used during mixed-mode upgrades with previousVersionPodCount)
+	if server.Image != "" {
+		return server.Image
+	}
 	return cs.CouchbaseImage()
+}
+
+// ConstructImageWithVersion takes the current cluster image and replaces its version tag
+// with the specified version. For example, given image "couchbase/server:8.0.0" and
+// version "7.6.8", it returns "couchbase/server:7.6.8".
+func (cs *ClusterSpec) ConstructImageWithVersion(version string) string {
+	image := cs.CouchbaseImage()
+	lastColon := strings.LastIndex(image, ":")
+	if lastColon == -1 {
+		return image + ":" + version
+	}
+
+	return image[:lastColon+1] + version
 }
 
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
@@ -822,11 +844,6 @@ func (cs *ClusterStatus) SetWaitingBetweenUpgrades() {
 	cs.setClusterCondition(c)
 }
 
-func (cs *ClusterStatus) SetNotWaitingBetweenUpgrades() {
-	c := newClusterCondition(ClusterConditionWaitingBetweenUpgrades, v1.ConditionFalse, "Waiting", "Waiting before starting next upgrade")
-	cs.setClusterCondition(c)
-}
-
 func (cs *ClusterStatus) SetWaitingBetweenMigrations() {
 	c := newClusterCondition(ClusterConditionWaitingBetweenMigrations, v1.ConditionTrue, "Waiting", "Waiting before starting next migration")
 	cs.setClusterCondition(c)
@@ -843,7 +860,7 @@ func (cs *ClusterStatus) SetMigratingCondition() {
 }
 
 func (cs *ClusterStatus) SetExpandingVolumeCondition() {
-	c := newClusterCondition(ClusterConditionExpandingVolume, v1.ConditionTrue, "ExpandingVolume", "Expanding volume")
+	c := newClusterCondition(ClusterConditionExpandingVolume, v1.ConditionTrue, "ExpandingVolume", "Volumes are being expanded")
 	cs.setClusterCondition(c)
 }
 
@@ -1278,6 +1295,9 @@ type AbstractBucket interface {
 
 	// HasCrossClusterVersioningEnabled returns true if the bucket has cross cluster versioning enabled.
 	HasCrossClusterVersioningEnabled() bool
+
+	// GetResourceName returns the resource name (metadata.name) of the bucket.
+	GetResourceName() string
 }
 
 func (b *CouchbaseBucket) GetCouchbaseName() string {
@@ -1288,6 +1308,10 @@ func (b *CouchbaseBucket) GetCouchbaseName() string {
 	}
 
 	return name
+}
+
+func (b *CouchbaseBucket) GetResourceName() string {
+	return b.Name
 }
 
 func (b *CouchbaseBucket) GetLabels() map[string]string {
@@ -1412,6 +1436,10 @@ func (b *CouchbaseEphemeralBucket) GetCouchbaseName() string {
 	return name
 }
 
+func (b *CouchbaseEphemeralBucket) GetResourceName() string {
+	return b.Name
+}
+
 func (b *CouchbaseEphemeralBucket) GetLabels() map[string]string {
 	return b.Labels
 }
@@ -1465,6 +1493,10 @@ func (b *CouchbaseMemcachedBucket) GetCouchbaseName() string {
 	}
 
 	return name
+}
+
+func (b *CouchbaseMemcachedBucket) GetResourceName() string {
+	return b.Name
 }
 
 func (b *CouchbaseMemcachedBucket) GetLabels() map[string]string {
@@ -1656,14 +1688,34 @@ func ServerServiceListToSpecServiceList(services []string) (ServiceList, error) 
 
 	return list, nil
 }
-func (c *CouchbaseCluster) IsReadyToUpgrade() bool {
-	cond := c.Status.GetCondition(ClusterConditionWaitingBetweenUpgrades)
 
-	if cond == nil {
-		return true
+func (c *CouchbaseCluster) UpgradeWaitingForStabilizationPeriod() bool {
+	upgradeSpec := c.Spec.Upgrade
+	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
+		return false
 	}
 
-	return cond.Status != v1.ConditionTrue
+	waitingCond := c.Status.GetCondition(ClusterConditionWaitingBetweenUpgrades)
+	if waitingCond == nil || waitingCond.Status == v1.ConditionFalse {
+		return false
+	}
+
+	waitingLastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
+	if err != nil {
+		// This can happen if someone has messed with the status fields.
+		// We'll just assume that we don't need to wait.
+		log.Info("[WARN]]: failed to parse last update time for node upgrade condition", "error", err)
+		return false
+	}
+
+	stabalizationEndTime := waitingLastTransitionTime.Add(upgradeSpec.StabilizationPeriod.Duration)
+
+	if time.Now().After(stabalizationEndTime) {
+		return false
+	}
+
+	log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.NamespacedName(), "stabilizationEndTime", stabalizationEndTime)
+	return true
 }
 
 func (c *CouchbaseCluster) IsReadyToAttemptMigration() bool {

@@ -32,7 +32,7 @@ func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, er
 	case *couchbasev2.CouchbaseCluster:
 		return validationv2.CheckConstraints(v, t)
 	case *couchbasev2.CouchbaseBucket:
-		return []string{}, validationv2.CheckConstraintsBucket(v, t, nil)
+		return validationv2.CheckConstraintsBucket(v, t, nil)
 	case *couchbasev2.CouchbaseEphemeralBucket:
 		return []string{}, validationv2.CheckConstraintsEphemeralBucket(v, t, nil)
 	case *couchbasev2.CouchbaseMemcachedBucket:
@@ -103,6 +103,10 @@ func CheckImmutableFields(current, updated runtime.Object) error {
 	case *couchbasev2.CouchbaseEncryptionKey:
 		if t2, ok := updated.(*couchbasev2.CouchbaseEncryptionKey); ok {
 			return validationv2.CheckImmutableFieldsEncryptionKey(t, t2)
+		}
+	case *couchbasev2.CouchbaseUser:
+		if t2, ok := updated.(*couchbasev2.CouchbaseUser); ok {
+			return validationv2.CheckImmutableFieldsUser(t, t2)
 		}
 	}
 

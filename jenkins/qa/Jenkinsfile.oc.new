@@ -63,7 +63,6 @@ pipeline {
     S3_SECRET_ID = credentials('cbqe-s3-secret-id')
     AWS_ACCESS_KEY_ID = credentials('couchbaseqe-aws-access-id')
     AWS_SECRET_ACCESS_KEY = credentials('couchbaseqe-aws-access-secret')
-    REDHAT_PULL_SECRET = credentials('rhcc-pull-secret')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
   }
@@ -90,7 +89,26 @@ pipeline {
 
     stage('Provision OC') {
       steps {
-        sh "sed 's/PULL_SECRET/${env.REDHAT_PULL_SECRET}/g;s/CLUSTER_NAME/${env.NAME}/g' ${env.WORKSPACE}/test/e2e/resources/provisioners/oc/install-config.yaml > install-config.yaml"
+        // Read and compact the pull secret, then generate install-config.yaml
+        withCredentials([file(credentialsId: 'rhcc-pull-secret-file', variable: 'PULL_SECRET_FILE')]) {
+          sh '''
+            python3 << 'PYEOF'
+import json
+import os
+
+with open(os.environ['WORKSPACE'] + '/test/e2e/resources/provisioners/oc/install-config.yaml', 'r') as f:
+    template = f.read()
+
+# Read and compact the pull secret JSON from the credential file
+with open(os.environ['PULL_SECRET_FILE'], 'r') as f:
+    pull_secret = json.dumps(json.load(f), separators=(',', ':'))
+
+config = template.replace('PULL_SECRET', pull_secret).replace('CLUSTER_NAME', os.environ['NAME'])
+with open('install-config.yaml', 'w') as f:
+    f.write(config)
+PYEOF
+          '''
+        }
         sh './openshift-install create cluster'
         sh "cp auth/kubeconfig ${env.WORKSPACE}/config1"
       }

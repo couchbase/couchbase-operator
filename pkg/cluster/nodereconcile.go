@@ -17,7 +17,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -354,6 +353,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleNodeServices,
 		(*ReconcileMachine).handleAutoscaleServerConfigs,
 		(*ReconcileMachine).handleRebalance,
+		(*ReconcileMachine).handleUpgradeStabilizationPeriod,
 		(*ReconcileMachine).handleDeadMembers,
 		(*ReconcileMachine).handleNotifyFinished,
 	}
@@ -1046,7 +1046,10 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 	prioritizedRemoveCandidates := couchbaseutil.NewMemberSet()
 
 	getCandidatesFuncs := []func() (couchbaseutil.MemberSet, error){
-		c.needsUpgrade,
+		func() (couchbaseutil.MemberSet, error) {
+			candidates, _, err := c.needsUpgrade()
+			return candidates, err
+		},
 		c.getBucketMigrationCandidates,
 		c.getNodeServiceMismatchCandidates,
 	}
@@ -1155,7 +1158,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	var scheduledScaling couchbasev2.ScalingMessageList
 
-	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return err
 	}
@@ -1171,8 +1174,8 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 			continue
 		}
 
-		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
-			log.Info("[WARN] Serviceless nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !arbiterNodesSupported {
+			log.Info("[WARN] Arbiter nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
 			continue
 		}
 
@@ -1185,6 +1188,13 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	if len(additions) == 0 {
 		return nil
+	}
+
+	// During a forward upgrade with previousVersionPodCount, some new pods may need to be
+	// created with the old (baseline) version. This ensures that scaling up respects
+	// the user's intent to keep a certain number of pods on the previous version.
+	if err := c.applyPreviousVersionToNewPods(additions); err != nil {
+		log.Error(err, "Failed to apply previous version to new pods, all new pods will use the current spec image", "cluster", c.namespacedName())
 	}
 
 	r.log()
@@ -1233,7 +1243,6 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 // handleVolumeExpansion attempts to perform online expansion of Persistent Volumes.
 func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	if !c.cluster.Spec.EnableOnlineVolumeExpansion {
-		// currently only volumes are allowed for online upgrade
 		return nil
 	}
 
@@ -1247,7 +1256,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			continue
 		}
 
-		// Get state of persistent volumes
+		// Get state of persistent volumes for the member
 		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
 		if err != nil {
 			return err
@@ -1261,23 +1270,14 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			// normal rolling upgrade since the Pod must be recreated.
 			case pvcState.IsResizeFailed(pvc.Name):
 				err := pvcState.GetReasonForResizeFailed(pvc.Name)
-				log.Info("Unable to expand volume in place, falling back to rolling upgrade", "cluster", c.namespacedName(), "volume", pvc.Name, "error", err)
+				log.Info("Volume expansion failed, falling back to rolling upgrade", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "error", err)
 				c.raiseEvent(k8sutil.ExpandVolumeFallbackEvent(pvc.Name, c.cluster, err.Error()))
+				c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 
-				// Remove volume expansion flag.
-				if c.checkVolumeExpansionState() {
-					return nil
-				}
-
-				return c.setVolumeExpansionState(false)
-
+				return nil
 			// Check if a volume expansion is already in progress and end reconciliation loop if so.
 			case pvcState.IsExpanding(pvc.Name):
-				// NOTE: might consider a timeout here, but since we've already sent the request
-				// to the storageclass there isn't really a good action to take while volumes
-				// are in an unstable state.
-				log.Info("Pod volume expansion is in progress", "cluster", c.namespacedName(), "volume", pvc.Name)
-				r.abort("persisitent volumes expanding")
+				log.Info("Volume expansion is in progress", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name)
 
 				return nil
 			// Check if volume spec has been updated and apply changes.
@@ -1286,83 +1286,78 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				if err != nil {
 					return err
 				}
+
 				// Flag that a volume expansion is occurring.
-				if err := c.setVolumeExpansionState(true); err != nil {
-					return err
-				}
+				c.cluster.Status.SetExpandingVolumeCondition()
 
 				// Log and raise event that expansion started.
 				currentSize := k8sutil.GetVolumeStorageSize(pvc)
 				requestedSize := k8sutil.GetVolumeStorageSize(requestedClaim)
 				c.raiseEvent(k8sutil.ExpandVolumeStartedEvent(pvc.Name, currentSize, requestedSize, c.cluster))
-				log.Info("Volume expanding", "cluster", c.namespacedName(), "name", pvc.Name, "current", currentSize, "requested", requestedSize)
+				log.Info("Volume expansion started", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "current", currentSize, "requested", requestedSize)
 
 				metrics.VolumeExpansionMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, pvc.Name})...).Inc()
 
-				// Done for now. Not going to upgrade all volumes at once.
-				r.abort("persistent volumes expanding")
-
 				return nil
 			}
-			// volume expansion state is not set
-			if !c.checkVolumeExpansionState() {
-				continue
-			}
-
-			// At this point the volume matches our desired state.
-			// If this is a result of a volume expansion then
-			// send an event, otherwise carry on.
-			if err := c.setVolumeExpansionState(false); err != nil {
-				return err
-			}
-
-			c.raiseEvent(k8sutil.ExpandVolumeSucceededEvent(pvc.Name, c.cluster))
 		}
 	}
+
+	// We can't raise expansion completed events for each PVC as there's no reliable way to determine when a specific volume has "completed" it's expansion.
+	// Instead, if we get to this point in the method, we can assume there are no more PVC's that are expanding/failed expanding/updated, so we'll raise a single event
+	// if the condition still exists.
+	if c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
+		log.Info("Volume expansion completed", "cluster", c.namespacedName())
+		c.raiseEvent(k8sutil.ExpandVolumeSucceededEvent(c.cluster))
+	}
+
+	// Clear the condition regardless of whether we raised an event or not for safety.
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 
 	return nil
 }
 
-func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberSet, error) {
-	return c.selectUpgradeCandidates(candidates, "")
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList) (couchbaseutil.MemberSet, error) {
+	return c.selectOrderedUpgradeCandidates(candidates, "")
 }
 
-// selectUpgradeCandidates applies an upgrade heuristic to the set of all upgradable pods
-// and filters this down into a set of pods that will be upgraded this turn.
+// selectUpgradeCandidates returns the candidates that can be upgraded this turn, determined by the upgrade strategy and
+// the maximum number of candidates that can be upgraded at once.
 func (c *Cluster) selectUpgradeCandidates(candidates couchbaseutil.MemberSet, orchestrator string) (couchbaseutil.MemberSet, error) {
-	// Rolling upgrade defaults to a single node at a time, however this can
-	// be increased to an absolute number or a relative size of the cluster.
-	if c.cluster.GetUpgradeStrategy() == couchbasev2.RollingUpgrade {
-		// Remove orchestrator from list if rolling upgrade
-		if len(candidates) != 1 && orchestrator != "" {
-			candidates, _ = separateCandidatesAndOrchestrator(candidates, orchestrator)
-		}
+	return c.selectOrderedUpgradeCandidates(candidates.ToList(), orchestrator)
+}
 
-		upgradeLimit, err := c.cluster.GetMaxUpgradable()
-		if err != nil {
-			return nil, err
-		}
-
-		// Cap the number of upgrades at the number of candidates.
-		maxUpgradable := len(candidates)
-		if upgradeLimit < maxUpgradable {
-			maxUpgradable = upgradeLimit
-		}
-
-		constrained := couchbaseutil.MemberSet{}
-
-		for _, name := range candidates.Names()[:maxUpgradable] {
-			constrained.Add(candidates[name])
-		}
-
-		candidates = constrained
+func (c *Cluster) selectOrderedUpgradeCandidates(candidates couchbaseutil.MemberList, orchestrator string) (couchbaseutil.MemberSet, error) {
+	if c.cluster.GetUpgradeStrategy() != couchbasev2.RollingUpgrade {
+		return candidates.ToSet(), nil
 	}
 
-	return candidates, nil
+	// Remove orchestrator from list if rolling upgrade and orchestrator is specified.
+	if len(candidates) != 1 && orchestrator != "" {
+		candidates, _ = separateOrderedCandidatesAndOrchestrator(candidates, orchestrator)
+	}
+
+	maxUpgradable, err := c.cluster.GetMaxUpgradable()
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the max upgradable constraint
+	// The ordering of the candidates does not matter as the upgrade process will be done in parallel.
+	constrained := couchbaseutil.MemberSet{}
+	for _, candidate := range candidates {
+		if constrained.Size() >= maxUpgradable {
+			break
+		}
+
+		constrained.Add(candidate)
+	}
+
+	return constrained, nil
 }
 
-func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orchestratorName string) (couchbaseutil.MemberSet, couchbaseutil.Member) {
-	var candidatesNoOrchestrator = couchbaseutil.MemberSet{}
+func separateOrderedCandidatesAndOrchestrator(candidates couchbaseutil.MemberList, orchestratorName string) (couchbaseutil.MemberList, couchbaseutil.Member) {
+	var candidatesNoOrchestrator = couchbaseutil.MemberList{}
 
 	var orchestrator couchbaseutil.Member
 
@@ -1378,10 +1373,15 @@ func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orche
 			continue
 		}
 
-		candidatesNoOrchestrator.Add(candidate)
+		candidatesNoOrchestrator = append(candidatesNoOrchestrator, candidate)
 	}
 
 	return candidatesNoOrchestrator, orchestrator
+}
+
+func separateCandidatesAndOrchestrator(candidates couchbaseutil.MemberSet, orchestratorName string) (couchbaseutil.MemberSet, couchbaseutil.Member) {
+	candidatesNoOrchestrator, orchestrator := separateOrderedCandidatesAndOrchestrator(candidates.ToList(), orchestratorName)
+	return candidatesNoOrchestrator.ToSet(), orchestrator
 }
 
 func (r *ReconcileMachine) startGracefulFailover(candidate couchbaseutil.Member, c *Cluster) error {
@@ -1412,6 +1412,10 @@ func (r *ReconcileMachine) gracefullyFailoverNode(candidate couchbaseutil.Member
 	}
 
 	for _, node := range clusterInfoInitial.Nodes {
+		if node.HostName != candidate.GetHostName() {
+			continue
+		}
+
 		if !c.members.Contains(node.HostName.GetMemberName()) {
 			return fmt.Errorf("%w, %s", ErrNodeNotInCluster, node.HostName)
 		}
@@ -1544,7 +1548,7 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
 	if len(c.members) > 1 {
 		if canDeltaRecover {
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
@@ -1567,24 +1571,62 @@ func (r *ReconcileMachine) recreateAndRebalanceNode(c *Cluster, candidate couchb
 		return err
 	}
 
-	// Rebalance failed. Time to set recovery type as full.
-	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err != nil {
-		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
+	return nil
+}
 
+func (r *ReconcileMachine) rebalanceAfterInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
+	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err == nil {
+		return nil
+	} else {
+		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
+	}
+
+	if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
+		if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
+			return err
+		}
+	}
+
+	for _, candidate := range candidates {
 		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
+	}
 
-		if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
-			if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
-				return err
-			}
-		}
+	if err := c.rebalance(c.members); err != nil {
+		return err
+	}
 
-		return c.rebalance(c.members)
+	for _, candidate := range candidates {
+		r.upgradedMembers.Add(candidate)
 	}
 
 	return nil
+}
+
+func (c *Cluster) multipleInPlaceUpgradesSupported(candidates couchbaseutil.MemberSet) (bool, error) {
+	if c.cluster.Spec.Upgrade == nil || (c.cluster.Spec.Upgrade != nil && c.cluster.Spec.Upgrade.UpgradeOrderType != couchbasev2.UpgradeOrderTypeServerGroups) {
+		return false, nil
+	}
+
+	if len(candidates) >= len(c.callableMembers)/2 {
+		log.Info("Unable to perform multiple in-place upgrades at once without losing quorum", "cluster", c.namespacedName())
+		return false, nil
+	}
+
+	buckets, err := c.gatherBuckets()
+	if err != nil {
+		return false, err
+	}
+
+	for _, bucket := range buckets {
+		if bucket.BucketReplicas <= len(candidates) {
+			log.Info("Unable to perform multiple in-place upgrades at once due to insufficient bucket replicas", "cluster", c.namespacedName(), "bucket", bucket.BucketName)
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
 
 // nolint:gocognit
@@ -1602,6 +1644,11 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 		metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 		return err
+	}
+
+	canDoMultipleInPlaceUpgrades, multipleInPlaceUpgradesErr := c.multipleInPlaceUpgradesSupported(candidates)
+	if multipleInPlaceUpgradesErr != nil {
+		return multipleInPlaceUpgradesErr
 	}
 
 	for _, candidate := range candidates {
@@ -1654,17 +1701,34 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if err := r.recreateAndRebalanceNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
+		if err := r.recreateNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
 			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
 			return err
 		}
 
-		r.upgradedMembers.Add(candidate)
-
 		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
+		if !canDoMultipleInPlaceUpgrades {
+			singleCandidate := couchbaseutil.NewMemberSet(candidate)
+			if err := r.rebalanceAfterInPlaceUpgrade(c, singleCandidate, targetVersion); err != nil {
+				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+				metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
+				return err
+			}
+		}
+	}
+
+	if canDoMultipleInPlaceUpgrades {
+		if err := r.rebalanceAfterInPlaceUpgrade(c, candidates, targetVersion); err != nil {
+			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
+			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
+
+			return err
+		}
 	}
 
 	return nil
@@ -1777,21 +1841,20 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	r.checkUpgradeStabilizationPeriod()
-
-	if !r.c.cluster.IsReadyToUpgrade() {
+	if c.cluster.UpgradeWaitingForStabilizationPeriod() || c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
-		log.Info("Cluster not ready to start upgrade, waiting for stabilization period to end", "cluster", c.namespacedName())
 		return nil
 	}
 
-	servicelessNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}
 
 	// Abort if we need to create nodes, as we can't continue the upgrade until we have the right number of nodes.
-	if CheckNodesToCreate(c.cluster, r.clusteredMembers, servicelessNodesSupported) {
+	if CheckNodesToCreate(c.cluster, r.clusteredMembers, arbiterNodesSupported) {
 		return nil
 	}
 
@@ -1811,40 +1874,27 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	// Nothing to do, move along.
-	candidates, err := c.getUpgradeCandidates()
+	orderedCandidates, zoneChangeDetected, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}
 
-	if candidates.Empty() {
+	// Nothing to do, move along.
+	if len(orderedCandidates) == 0 {
 		return nil
 	}
 
 	r.log()
 
-	podRecoverable := true
-
-	for _, candidate := range candidates {
-		log.Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", candidate.Name())
-		if !c.isPodRecoverable(candidate) {
-			podRecoverable = false
-			break
-		}
-	}
-
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
-	constrained, err := c.selectUpgradeCandidatesIgnoringOrchestrator(candidates)
-
+	constrainedCandidates, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates)
 	if err != nil {
 		return err
 	}
 
-	candidates = constrained
-
 	// Calculate the number of nodes already in the target state before we
 	// potentially mutate the candidates.
-	upgraded := len(c.members) - len(candidates)
+	upgraded := len(c.members) - len(constrainedCandidates)
 
 	// Do any events/conditions that make the upgrade observable.
 	status := &couchbasev2.UpgradeStatus{
@@ -1868,105 +1918,60 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
-	// Handle the stabilization period after the upgrade has completed even if some nodes fail upgrade.
-	defer r.handleApplyingUpgradeStabilizationPeriod()
-
-	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && podRecoverable {
-		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
-
-		err = r.handleInPlaceUpgrade(c, candidates, targetVersion)
-		if err != nil {
-			return err
-		}
-	} else {
-		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !podRecoverable {
-			log.Info("Pod is not recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
+		allCandidatesRecoverable := true
+		for _, candidate := range constrainedCandidates {
+			if !c.isPodRecoverable(candidate) {
+				allCandidatesRecoverable = false
+				break
+			}
 		}
 
-		log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
+		switch {
+		case allCandidatesRecoverable && !zoneChangeDetected:
+			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
+			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
 
-		err = r.swapRebalanceMembers(c, candidates)
-		if err != nil {
-			return err
+		case allCandidatesRecoverable && zoneChangeDetected:
+			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+
+		default:
+			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
+	}
+
+	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
+	return r.swapRebalanceMembers(c, constrainedCandidates)
+}
+
+// handleApplyingUpgradeStabilizationPeriod adds the waiting between upgrades condition to the cluster
+// if a stabilization period is configured in the spec and at least one member has been upgraded this
+// reconcile loop.
+func (r *ReconcileMachine) handleUpgradeStabilizationPeriod(c *Cluster) error {
+	upgradeSpec := r.c.cluster.Spec.Upgrade
+	if upgradeSpec == nil {
+		return nil
+	}
+
+	if upgradeSpec.StabilizationPeriod == nil {
+		return nil
+	}
+
+	if len(r.upgradedMembers) == 0 {
+		return nil
+	}
+
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
+		r.c.cluster.Status.SetWaitingBetweenUpgrades()
 	}
 
 	return nil
 }
 
-func (r *ReconcileMachine) handleApplyingUpgradeStabilizationPeriod() {
-	upgradeSpec := r.c.cluster.Spec.Upgrade
-	if upgradeSpec == nil {
-		return
-	}
-
-	if upgradeSpec.StabilizationPeriod == nil {
-		return
-	}
-
-	if len(r.upgradedMembers) == 0 {
-		return
-	}
-
-	r.c.cluster.Status.SetWaitingBetweenUpgrades()
-}
-
-func (r *ReconcileMachine) checkUpgradeStabilizationPeriod() {
-	upgradeSpec := r.c.cluster.Spec.Upgrade
-	if upgradeSpec == nil || upgradeSpec.StabilizationPeriod == nil {
-		isWaiting := r.c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
-		if isWaiting {
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-		}
-
-		return
-	}
-
-	waitingCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
-
-	// If we are waiting then check if the stabilization period has passed.
-	if waitingCond != nil && waitingCond.Status == v1.ConditionTrue {
-		balancedCond := r.c.cluster.Status.GetCondition(couchbasev2.ClusterConditionBalanced)
-		if balancedCond == nil || balancedCond.Status == v1.ConditionFalse {
-			return
-		}
-
-		balancedLastTransitionTime, err := time.Parse(time.RFC3339, balancedCond.LastTransitionTime)
-		if err != nil {
-			// This can happen if someone has messed with the status fields.
-			// We'll just assume that we don't need to wait.
-			log.Info("[WARN]]: failed to parse last update time for node balanced condition", "error", err)
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-
-			return
-		}
-
-		waitingLastTransitionTime, err := time.Parse(time.RFC3339, waitingCond.LastTransitionTime)
-		if err != nil {
-			// This can happen if someone has messed with the status fields.
-			// We'll just assume that we don't need to wait.
-			log.Info("[WARN]]: failed to parse last update time for node upgrade condition", "error", err)
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-
-			return
-		}
-
-		if waitingLastTransitionTime.After(balancedLastTransitionTime) {
-			return
-		}
-
-		stabilizationDuration := upgradeSpec.StabilizationPeriod.Duration
-
-		if time.Now().After(balancedLastTransitionTime.Add(stabilizationDuration)) {
-			r.c.cluster.Status.SetNotWaitingBetweenUpgrades()
-		}
-	}
-}
-
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
-func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, servicelessNodesSupported bool) bool {
+func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, arbiterNodesSupported bool) bool {
 	for _, serverSpec := range cluster.Spec.Servers {
-		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !servicelessNodesSupported {
+		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !arbiterNodesSupported {
 			continue
 		}
 
@@ -2057,8 +2062,6 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 		if len(r.couchbase.ServerRebalanceReasons) > 0 {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
-
-		c.cluster.Status.SetRebalancingCondition()
 
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
 			return err
@@ -2199,6 +2202,17 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 		return nil, nil
 	}
 
+	bucketSpecs, err := c.gatherBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	bucketMap := make(map[string]couchbaseutil.Bucket, len(bucketSpecs))
+
+	for _, bucketSpec := range bucketSpecs {
+		bucketMap[bucketSpec.BucketName] = bucketSpec
+	}
+
 	clusterBuckets := couchbaseutil.BucketStatusList{}
 	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
 		return nil, err
@@ -2209,7 +2223,7 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 	for _, bucket := range clusterBuckets {
 		for _, node := range bucket.Nodes {
 			// node.StorageBackend/EvictionPolicy is empty if it matches the bucket storageMode/evictionPolicy
-			if node.StorageBackend != "" || node.EvictionPolicy != "" {
+			if (node.StorageBackend != "" || node.EvictionPolicy != "") && bucket.StorageBackend == bucketMap[bucket.BucketName].BucketStorageBackend && bucket.EvictionPolicy == bucketMap[bucket.BucketName].EvictionPolicy {
 				candidates.Add(c.members[node.HostName.GetMemberName()])
 			}
 		}

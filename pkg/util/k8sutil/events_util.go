@@ -232,11 +232,11 @@ func ExpandVolumeStartedEvent(volumeName string, fromSize string, toSize string,
 	return event
 }
 
-func ExpandVolumeSucceededEvent(volumeName string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+func ExpandVolumeSucceededEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonExpandVolumeSucceeded
-	event.Message = fmt.Sprintf("Successfully expanded volume %s", volumeName)
+	event.Message = "Successfully expanded volumes"
 
 	return event
 }

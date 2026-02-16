@@ -51,21 +51,16 @@ func clusterExists(clusters *couchbasev2.CouchbaseClusterList, name string) bool
 	return false
 }
 
-// main is the entry point of this application.
-func collect(c config.Configuration) {
-	// Parse our configuration.
-	context := &context.Context{Config: c}
-
+// validateEnvironment initializes the Kubernetes context and validates connectivity.
+// Returns the list of CouchbaseClusters found in the namespace.
+func validateEnvironment(context *context.Context) *couchbasev2.CouchbaseClusterList {
 	// Allocate and initialize all Kubernetes specific context.
 	if err := k8s.InitContext(context); err != nil {
 		fmt.Println("unable to initialize context:", err)
 		os.Exit(1)
 	}
 
-	// Before we do anything further ensure we've been correctly configured.
-	// Check basic connectivity via the discovery API.  This is plain text.
-	// Use the simplest possible call here, the discovery API has a tendency
-	// to crap out if some aggregated controller is not working.
+	// Check basic connectivity via the discovery API.
 	if _, err := context.KubeClient.Discovery().ServerVersion(); err != nil {
 		fmt.Println("unable to connect to kubernetes cluster:", err)
 		os.Exit(1)
@@ -77,31 +72,18 @@ func collect(c config.Configuration) {
 			fmt.Println("namespace", context.Namespace(), "does not exist")
 			os.Exit(1)
 		}
-
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// Check we have at least access to the couchbase clusters.  This will test
-	// TLS and RBAC settings are correct.
+	// Check we have access to couchbase clusters (tests TLS and RBAC).
 	clusters, err := k8s.GetCouchbaseClusters(context)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// This is set to true if there is anything worth collecting.
-	anythingToCollect := false
-
-	// Check there is something to collect, warn if not but continue so we get
-	// debug information about the operator itself.
-	if len(clusters.Items) == 0 {
-		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Namespace())
-	} else {
-		anythingToCollect = true
-	}
-
-	// Finally check to see if any requested CouchbaseClusters exist.
+	// Validate that requested clusters exist.
 	for _, name := range context.Config.Clusters.Values {
 		if !clusterExists(clusters, name) {
 			fmt.Println("requested cluster", name, "not found in namespace", context.Namespace())
@@ -109,7 +91,21 @@ func collect(c config.Configuration) {
 		}
 	}
 
-	// Check that there is an operator deployment running.
+	return clusters
+}
+
+// hasCollectableResources checks if there are any resources worth collecting.
+func hasCollectableResources(context *context.Context, clusters *couchbasev2.CouchbaseClusterList) bool {
+	anythingToCollect := false
+
+	// Check for CouchbaseClusters.
+	if len(clusters.Items) == 0 {
+		fmt.Println("no CouchbaseCluster resources discovered in name space", context.Namespace())
+	} else {
+		anythingToCollect = true
+	}
+
+	// Check for operator deployment.
 	hasOperator, err := k8s.HasOperatorDeployment(context)
 	if err != nil {
 		fmt.Println(err)
@@ -122,8 +118,24 @@ func collect(c config.Configuration) {
 		anythingToCollect = true
 	}
 
-	// Bomb out if there is nothing of interest to collect from.
-	if !anythingToCollect {
+	// Check if backup logs are requested.
+	if context.Config.BackupLogs {
+		anythingToCollect = true
+	}
+
+	return anythingToCollect
+}
+
+// main is the entry point of this application.
+func collect(c config.Configuration) {
+	// Parse our configuration.
+	context := &context.Context{Config: c}
+
+	// Initialize and validate the environment.
+	clusters := validateEnvironment(context)
+
+	// Ensure there is something worth collecting.
+	if !hasCollectableResources(context, clusters) {
 		fmt.Println("nothing to collect in name space", context.Namespace())
 		os.Exit(1)
 	}
@@ -148,15 +160,39 @@ func collect(c config.Configuration) {
 		os.Exit(1)
 	}
 
+	// Collect backup logs if requested (after backend initialization to include in tar.gz)
+	// Automatically enable backup logs if a specific backup name is specified
+	collectBackupLogs := context.Config.BackupLogs
+	if context.Config.BackupLogsName != "" && !context.Config.BackupLogs {
+		fmt.Printf("Note: --backup-logs-name specified, automatically enabling --backup-logs\n")
+		collectBackupLogs = true
+	}
+
+	if collectBackupLogs {
+		if err := collector.CollectBackupLogs(context, backend); err != nil {
+			fmt.Println("backup log collection failed:", err)
+		}
+	}
+
 	defer func() {
 		backend.Close()
 		// If log upload is specified, attempt to upload the collected logs
 		if context.Config.Upload {
 			verifyUploadInputs(context)
 
-			address := context.Config.UploadHost + "/" + context.Config.Customer + "/" + context.Config.Ticket + "/"
 			proxy := context.Config.UploadProxy
 			payload := util.ArchiveName() + ".tar.gz"
+
+			// Build the upload URL path, including the filename
+			// If ticket is provided: [host]/[customer]/[ticket]/[filename]
+			// If ticket is empty: [host]/[customer]/[filename]
+			var address string
+			if context.Config.Ticket != "" {
+				address = context.Config.UploadHost + "/" + context.Config.Customer + "/" + context.Config.Ticket + "/" + payload
+			} else {
+				address = context.Config.UploadHost + "/" + context.Config.Customer + "/" + payload
+			}
+
 			err := upload(address, payload, proxy)
 
 			if err != nil {

@@ -116,6 +116,9 @@ type generateOperatorOptions struct {
 
 	// separateMetricClusternameAndNamespace allows you to separate cluster name and namespace from certain metrics.
 	separateMetricClusternameAndNamespace bool
+
+	// useHighCardinalityMetrics allows you to add high cardinality labels for http request metrics.
+	useHighCardinalityMetrics bool
 }
 
 // newGenerateOperatorOptions returns a set of options with defaults applied.
@@ -153,6 +156,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().BoolVar(&o.debug, debug, false, "Runs debug configuration. Not intended for external use")
 	cmd.Flags().Var(&o.optionalMetricLabels, "optional-metric-labels", "Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.")
 	cmd.Flags().BoolVar(&o.separateMetricClusternameAndNamespace, "separate-cluster-namespace-and-name", true, "Separates cluster name and namespace from certain metrics.")
+	cmd.Flags().BoolVar(&o.useHighCardinalityMetrics, "use-high-cardinality-metrics", false, "Adds high cardinality labels for http request metrics.")
 	_ = cmd.Flags().MarkHidden(debug)
 }
 
@@ -383,6 +387,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by my "favourite" synchronization feature
+				"update", // used for adding the unreconcilable annotation
 			},
 		},
 		{
@@ -696,6 +701,13 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 				},
 			},
 		},
+	}
+
+	if o.useHighCardinalityMetrics {
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+			Name:  "use-high-cardinality-metrics",
+			Value: strconv.FormatBool(o.useHighCardinalityMetrics),
+		})
 	}
 
 	if o.withResources {

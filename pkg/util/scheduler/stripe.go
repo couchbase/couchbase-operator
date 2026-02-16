@@ -49,7 +49,7 @@ type stripeSchedulerImpl struct {
 
 // getServerGroupsForClass gets the list of server groups to schedule pods across
 // given a specific server class name.
-func getServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couchbasev2.ServerConfig) ([]string, error) {
+func GetServerGroupsForClass(cluster *couchbasev2.CouchbaseCluster, class *couchbasev2.ServerConfig) ([]string, error) {
 	// Determine the server groups to use, defaulting to the global configuration
 	// if server configuration specific settings do not exist.
 	serverGroups := class.ServerGroups
@@ -71,7 +71,7 @@ func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.Couchba
 	for i := range cluster.Spec.Servers {
 		class := cluster.Spec.Servers[i]
 
-		groups, err := getServerGroupsForClass(cluster, &class)
+		groups, err := GetServerGroupsForClass(cluster, &class)
 		if err != nil {
 			return err
 		}

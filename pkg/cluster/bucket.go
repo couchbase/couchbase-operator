@@ -455,7 +455,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	return allBuckets, nil
 }
 
-func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
+func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.CouchbaseBucket) (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
 	updateBuckets := make(map[couchbaseutil.Bucket]couchbaseutil.Bucket)
 
 	requested, err := c.gatherBuckets()
@@ -471,12 +471,21 @@ func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.B
 	for _, r := range requested {
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
+				val, ok := couchbaseBucketMap[r.BucketName]
+				if ok && string(val.Spec.StorageBackend) == string(r.BucketStorageBackend) {
+					r.BucketStorageBackend = a.BucketStorageBackend
+				}
+
+				if ok && string(val.Spec.EvictionPolicy) == r.EvictionPolicy {
+					r.EvictionPolicy = a.EvictionPolicy
+				}
+
 				if !reflect.DeepEqual(r, a) {
 					updateBuckets[a] = r
 				}
-
-				break
 			}
+
+			break
 		}
 	}
 
@@ -511,15 +520,15 @@ func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
 // of buckets to create, update or remove and the requested set for status updates.
 //
 //nolint:gocognit,gocyclo
-func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
-	requested, err := c.gatherBuckets()
+func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, []couchbaseutil.Bucket, error) {
+	unfilteredRequested, err := c.gatherBuckets()
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	unfilteredActual := couchbaseutil.BucketList{}
 	if err := couchbaseutil.ListBuckets(&unfilteredActual).On(c.api, c.readyMembers()); err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// Filter out unreconcilable buckets.
@@ -533,15 +542,29 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 	isOver71, err := c.IsAtLeastVersion("7.1.0")
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
+	}
+
+	targetVersion80, err := c.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+
+	requested := []couchbaseutil.Bucket{}
+	for _, bucket := range unfilteredRequested {
+		if bucket.BucketType == constants.BucketTypeMemcached && targetVersion80 {
+			log.Info("Memcached buckets are not supported on Couchbase Server versions 8.0.0+ and will be ignored.", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName)
+			continue
+		}
+
+		requested = append(requested, bucket)
 	}
 
 	atLeast80 := c.SupportsVersionFeatures("8.0.0")
 
 	create := []couchbaseutil.Bucket{}
 	update := []couchbaseutil.Bucket{}
-	updateStorageBackend := []couchbaseutil.Bucket{}
-	updateEvictionPolicy := []couchbaseutil.Bucket{}
+	updateDuringMigration := []couchbaseutil.Bucket{}
 	remove := []couchbaseutil.Bucket{}
 
 	// Do an exhaustive search of requested buckets in the actual list, creating and
@@ -561,12 +584,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				}
 
 				doCrossClusterVersioningChecks(&r, &a, c.cluster)
-
-				// Ignore memcached buckets if the server version is 8.0.0 or higher.
-				if r.BucketType == constants.BucketTypeMemcached && atLeast80 {
-					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
-					continue
-				}
 
 				// We should never set the numVBuckets field for buckets pre 8.0.0.
 				// This shouldn't get through the dac but we're adding some extra protection.
@@ -595,12 +612,11 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 					setBucketFieldsForEncoding(&r, isOver71)
 
-					switch {
-					case c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) && a.BucketStorageBackend != r.BucketStorageBackend:
-						updateStorageBackend = append(updateStorageBackend, r)
-					case c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) && a.EvictionPolicy != r.EvictionPolicy && a.NoRestart != nil && *a.NoRestart:
-						updateEvictionPolicy = append(updateEvictionPolicy, r)
-					case !c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration):
+					// During migration, use specialized API that only sends allowed fields.
+					// Otherwise, use normal full update.
+					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) || r.BucketStorageBackend != a.BucketStorageBackend {
+						updateDuringMigration = append(updateDuringMigration, r)
+					} else {
 						update = append(update, r)
 					}
 					c.logUpdate(a, r)
@@ -614,11 +630,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		if !found {
 			if !atLeast80 {
-				if r.BucketType == constants.BucketTypeMemcached {
-					log.Info("Memcached buckets are not supported on this version of Couchbase Server", "cluster", c.namespacedName(), "bucket-name", r.BucketName)
-					continue
-				}
-
 				// Dac should prevent this from getting through but we're adding some extra protection.
 				r.NumVBuckets = nil
 			}
@@ -634,7 +645,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	for _, a := range actual {
 		found := false
 
-		for _, r := range requested {
+		for _, r := range unfilteredRequested {
 			if a.BucketName == r.BucketName {
 				if found = c.isUnreconilableBucket(a); found {
 					continue
@@ -653,7 +664,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		}
 	}
 
-	return create, update, updateStorageBackend, updateEvictionPolicy, remove, requested, nil
+	return create, update, updateDuringMigration, remove, requested, nil
 }
 
 func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
@@ -709,7 +720,7 @@ func (c *Cluster) reconcileBuckets() error {
 		return nil
 	}
 
-	create, update, updateStorageBackend, updateEvictionPolicy, remove, requested, err := c.inspectBuckets()
+	create, update, updateDuringMigration, remove, requested, err := c.inspectBuckets()
 	if err != nil {
 		return err
 	}
@@ -755,23 +766,13 @@ func (c *Cluster) reconcileBuckets() error {
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
 	}
 
-	for i := range updateStorageBackend {
-		bucket := &updateStorageBackend[i]
-		if err := couchbaseutil.UpdateBucketStorageBackend(bucket).On(c.api, c.readyMembers()); err != nil {
+	for i := range updateDuringMigration {
+		bucket := &updateDuringMigration[i]
+		if err := couchbaseutil.UpdateBucketDuringMigration(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
 
-		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
-		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
-	}
-
-	for i := range updateEvictionPolicy {
-		bucket := &updateEvictionPolicy[i]
-		if err := couchbaseutil.UpdateBucketEvictionPolicy(bucket).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		log.Info("Bucket updated", "cluster", c.namespacedName(), "name", bucket.BucketName)
+		log.Info("Bucket updated during migration", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
 	}
 
@@ -783,20 +784,7 @@ func (c *Cluster) reconcileBuckets() error {
 	for i, bucket := range requested {
 		names[i] = bucket.BucketName
 
-		statuses[bucket.BucketName] = couchbasev2.BucketStatus{
-			BucketName:           bucket.BucketName,
-			BucketType:           bucket.BucketType,
-			BucketStorageBackend: string(bucket.BucketStorageBackend),
-			NumVBuckets:          bucket.NumVBuckets,
-			BucketMemoryQuota:    bucket.BucketMemoryQuota,
-			BucketReplicas:       bucket.BucketReplicas,
-			IoPriority:           string(bucket.IoPriority),
-			EvictionPolicy:       bucket.EvictionPolicy,
-			ConflictResolution:   bucket.ConflictResolution,
-			EnableFlush:          bucket.EnableFlush,
-			EnableIndexReplica:   bucket.EnableIndexReplica,
-			CompressionMode:      string(bucket.CompressionMode),
-		}
+		statuses[bucket.BucketName] = bucketToClusterStatus(bucket)
 	}
 
 	sort.Strings(names)
@@ -808,6 +796,23 @@ func (c *Cluster) reconcileBuckets() error {
 	}
 
 	return nil
+}
+
+func bucketToClusterStatus(b couchbaseutil.Bucket) couchbasev2.BucketStatus {
+	return couchbasev2.BucketStatus{
+		BucketName:           b.BucketName,
+		BucketType:           b.BucketType,
+		BucketStorageBackend: string(b.BucketStorageBackend),
+		NumVBuckets:          b.NumVBuckets,
+		BucketMemoryQuota:    b.BucketMemoryQuota,
+		BucketReplicas:       b.BucketReplicas,
+		IoPriority:           string(b.IoPriority),
+		EvictionPolicy:       b.EvictionPolicy,
+		ConflictResolution:   b.ConflictResolution,
+		EnableFlush:          b.EnableFlush,
+		EnableIndexReplica:   b.EnableIndexReplica,
+		CompressionMode:      string(b.CompressionMode),
+	}
 }
 
 func (c *Cluster) reconcileUnmanagedBucketsBackends() error {

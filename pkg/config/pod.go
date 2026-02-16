@@ -26,6 +26,7 @@ type podOptions struct {
 	serverClass string
 	index       int
 	autoIndex   bool
+	image       string
 }
 
 func newPodOptions() *podOptions {
@@ -37,6 +38,10 @@ func (o *podOptions) registerPodGenerateFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.serverClass, "server-class", "", "The server class from which to create a pod definition for.")
 	cmd.Flags().IntVar(&o.index, "index", 0, "The index of the pod to create")
 	cmd.Flags().BoolVar(&o.autoIndex, "auto-index", false, "Use the persistence secret's to generate a new pod with a new index")
+	cmd.Flags().StringVar(&o.image, "image", "", "The Couchbase Server image to use for the pod")
+
+	_ = cmd.MarkFlagRequired("couchbase-cluster")
+	_ = cmd.MarkFlagRequired("server-class")
 }
 
 func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
@@ -45,20 +50,17 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 	cmd := &cobra.Command{
 		Use:          "pod",
 		Short:        "Generates YAML for a pod of a specific cluster.",
-		SilenceUsage: true,
-		Hidden:       true,
+		SilenceUsage: false,
+		Hidden:       false,
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to generate a pod definition for a since removed pod, or a new pod when
 							support needs to do so.`),
 		Example: normalize(fmt.Sprintf(`
-                        # Create pod.
-                        %[1]s generate pod
-
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s generate pod --cluster-name cb-example --server-class all_services --index 3
+			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s generate pod --cluster-name cb-example --server-class all_services --auto-index
+			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
@@ -79,20 +81,19 @@ func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *
 	cmd := &cobra.Command{
 		Use:          "pod",
 		Short:        "Creates a pod of a specific cluster.",
-		SilenceUsage: true,
-		Hidden:       true,
+		SilenceUsage: false,
+		Hidden:       false,
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to create a pod for a since removed pod, or a new pod when
-							support needs to do so.`),
-		Example: normalize(fmt.Sprintf(`
-                        # Create pod.
-                        %[1]s create pod
+							support needs to do so.
 
+Note: The Couchbase Operator watches CouchbaseCluster resources and may immediately delete pods it considers unclustered.  Pause or stop the Operator before using this command.`),
+		Example: normalize(fmt.Sprintf(`
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s create pod --cluster-name cb-example --server-class all_services --index 3
+			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s create pod --cluster-name cb-example --server-class all_services --auto-index
+			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --auto-index
 		`, command)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
@@ -194,6 +195,10 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 	serverGroup, image, err := getServerGroupAndImageFromScheduler(k8sClient, cbc, m, pvcState, serverClass)
 	if err != nil {
 		return nil, err
+	}
+
+	if o.image != "" {
+		image = o.image
 	}
 
 	//TODO:  Pull this from the Couchbase Operator Deployment?

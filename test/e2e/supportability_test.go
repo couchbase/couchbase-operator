@@ -413,7 +413,7 @@ func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoList
 }
 
 // mustGetFileList lists all resources that should be collected by cbopinfo.
-func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, logLevel int, clusters ...string) []string {
+func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, logLevel int, backupLogs bool, backupLogsName string, clusters ...string) []string {
 	// The base file path will have a top level directory named the same as the archive.
 	base := strings.TrimSuffix(filepath.Base(archive), ".tar.gz")
 
@@ -633,6 +633,23 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasecluster/%s/%s.yaml", base, namespace, cluster.Name, cluster.Name))
 	}
 
+	// CouchbaseBackup YAML manifests are always collected as part of regular resources.
+	couchbaseBackups, err := k8s.CRClient.CouchbaseV2().CouchbaseBackups(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, backup := range couchbaseBackups.Items {
+		files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasebackup/%s/%s.yaml", base, namespace, backup.Name, backup.Name))
+		// logs.zip files are only collected when backup logs are enabled.
+		if backupLogs {
+			// If backupLogsName is specified, only include logs.zip for that specific backup
+			if backupLogsName == "" || backup.Name == backupLogsName {
+				files = append(files, fmt.Sprintf("%s/namespace/%s/couchbasebackup/%s/logs.zip", base, namespace, backup.Name))
+			}
+		}
+	}
+
 	// Gather namespace and cluster scoped resources.
 	selector, err := getLabelSelector(all, clusters)
 	if err != nil {
@@ -693,6 +710,25 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 
 	for _, configMap := range configMaps.Items {
 		files = append(files, fmt.Sprintf("%s/namespace/%s/configmap/%s/%s.yaml", base, namespace, configMap.Name, configMap.Name))
+	}
+
+	// Jobs and CronJobs are always collected as cluster-scoped resources.
+	jobs, err := k8s.KubeClient.BatchV1().Jobs(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, job := range jobs.Items {
+		files = append(files, fmt.Sprintf("%s/namespace/%s/job/%s/%s.yaml", base, namespace, job.Name, job.Name))
+	}
+
+	cronjobs, err := k8s.KubeClient.BatchV1().CronJobs(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for _, cronjob := range cronjobs.Items {
+		files = append(files, fmt.Sprintf("%s/namespace/%s/cronjob/%s/%s.yaml", base, namespace, cronjob.Name, cronjob.Name))
 	}
 
 	return files
@@ -1009,7 +1045,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1024,7 +1060,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 1, cluster1.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 1, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1039,7 +1075,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name, cluster3.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name, cluster3.Name)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1050,7 +1086,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1065,8 +1101,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster2.Name)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster2.Name)
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1082,8 +1118,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name, cluster3.Name)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name, cluster3.Name)
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1097,8 +1133,8 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0)
-		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0)...)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "")
+		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1114,7 +1150,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, cluster1.Name)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
 		mustVerifyServerLogs(t, kubernetes, archive, false, cluster1.Name)
 	})
@@ -1129,7 +1165,7 @@ func TestLogCollect(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1290,7 +1326,7 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	archive, cleanCbopinfo := cbopinfo(t, args)
 	defer cleanCbopinfo()
 
-	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, operatorImage, true, true, true, 0)
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, operatorImage, true, true, true, 0, false, "")
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, kubernetes, archive, false)
 }
@@ -1364,7 +1400,7 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, invalidImgName, false, true, true, 0)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, invalidImgName, false, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
 	})
 
@@ -1381,7 +1417,7 @@ func TestLogCollectInvalid(t *testing.T) {
 		archive, cleanCbopinfo := cbopinfo(t, args)
 		defer cleanCbopinfo()
 
-		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, false, true, 0)
+		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, false, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
@@ -1414,7 +1450,7 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	defer cleanCbopinfo()
 
 	// Verify file list
-	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0)
+	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0, false, "")
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, kubernetes, archive, false)
 }

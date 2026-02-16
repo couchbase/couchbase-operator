@@ -69,6 +69,25 @@ Group to impersonate for the operation, this flag can be repeated to specify mul
 +
 UID to impersonate for the operation.
 
+--backup-logs::
+*Type*: bool
++
+*Default*: false
++
+Collect cbbackupmgr logs from backup PVCs
+
+--backup-logs-keep-job::
+*Type*: bool
++
+*Default*: false
++
+Keep backup logs collection job after completion for debugging
+
+--backup-logs-name::
+*Type*: string
++
+Specify which backup to collect logs from (default: all backups)
+
 --cache-dir::
 *Type*: string
 +

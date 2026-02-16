@@ -198,16 +198,6 @@ func NewEncryptionKeyUpdatedEvent(cl *couchbasev2.CouchbaseCluster, keyName stri
 	return k8sutil.EncryptionKeyUpdatedEvent(cl, keyName)
 }
 
-// VolumeExpansionSuccessSequence combines the successful series of events associated with expanding persistent volumes.
-func VolumeExpansionSuccessSequence() eventschema.Validatable {
-	return eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
-		},
-	}
-}
-
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {

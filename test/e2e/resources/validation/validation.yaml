@@ -333,6 +333,14 @@ metadata:
 data:
   password: YmxhaCBibGFoIGJsYWgK
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    app: couchbase
+    couchbase_cluster: cluster-2
+  name: cluster-2-fluent-bit-config
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseCluster
 metadata:
@@ -651,3 +659,16 @@ apiVersion: couchbase.com/v2
 kind: CouchbaseBucket
 metadata:
   name: bucket7
+spec:
+  memoryQuota: 100Mi
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: user3
+  labels:
+    cluster: some-cluster-label
+spec:
+  fullName: Administrator
+  authDomain: local
+  authSecret: test-example-auth

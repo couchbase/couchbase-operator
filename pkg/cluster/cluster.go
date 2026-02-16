@@ -622,9 +622,16 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			return
 		}
 
-		if !running {
+		switch {
+		case !running:
+			// If we have the condition but it's not running, we should have already cleared it. This is just a safety check.
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
-		} else {
+		case !enabled:
+			// If the MirWatchdog is running but not enabled, it's possible that the spec has been updated to disable it before the mirWatchdogContext is reconciled.
+			// We can handle stopping it here if this occurs.
+			c.StopMirWatchdog()
+		default:
+			// We have the condition and the MirWatchdog is running and enabled, but we don't want to skip reconciliation so we should log the reason and continue.
 			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
 		}
 	}
@@ -727,11 +734,6 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
-
-	if err := retryutil.RetryFor(4*time.Second, c.updateCRSpecAnnotation); err != nil {
-		log.Info("unable to update spec annotation", "cluster", c.namespacedName(), "error", err)
-	}
-
 	if err := retryutil.RetryFor(4*time.Second, c.updateCRStatus); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
@@ -817,7 +819,7 @@ func (c *Cluster) UpdateOnFailedValidationOperatorRestart(validationErr error, e
 
 // updateCRSpecAnnotation updates lastReconciledSpec annotation with the JSON representation of the current spec.
 // The annotation will only be updated if the spec has changed.
-func (c *Cluster) updateCRSpecAnnotation() error {
+func (c *Cluster) UpdateCRSpecAnnotation() error {
 	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
 
 	if err != nil {
@@ -1222,25 +1224,6 @@ func (c *Cluster) setPodIndex(index int) error {
 	return c.state.Update(persistence.PodIndex, strconv.Itoa(index))
 }
 
-// setVolumeExpansionState sets volume expansion state
-// if enable flag is 'true' otherwise state is deleted.
-func (c *Cluster) setVolumeExpansionState(enable bool) (err error) {
-	if enable {
-		c.cluster.Status.SetExpandingVolumeCondition()
-	} else {
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
-	}
-
-	return err
-}
-
-// checkVolumeExpansionState simplifies inquiries as to
-// whether or not the volume expansion state is set.
-func (c *Cluster) checkVolumeExpansionState() bool {
-	cond := c.cluster.Status.GetCondition(couchbasev2.ClusterConditionExpandingVolume)
-	return cond != nil
-}
-
 func (c *Cluster) logStatus(status *MemberState) {
 	status.LogStatus(c.namespacedName())
 	c.scheduler.LogStatus(c.namespacedName())
@@ -1332,9 +1315,7 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 
 	// Stop the watchdog if it's disabled and running.
 	if !enabled && running {
-		log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
-		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
-		c.mirWatchdog.Stop()
+		c.StopMirWatchdog()
 		return
 	}
 
@@ -1350,6 +1331,12 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 		c.mirWatchdog = StartMirWatchdog(c, desiredInterval)
 		return
 	}
+}
+
+func (c *Cluster) StopMirWatchdog() {
+	log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
+	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+	c.mirWatchdog.Stop()
 }
 
 func (c *Cluster) InitCounterMetrics() {

@@ -682,6 +682,7 @@ func WaitClusterStatusHealthyWithoutError(k8s *types.Cluster, cluster *couchbase
 		resourceConditionExists(string(couchbasev2.ClusterConditionAvailable), string(v1.ConditionTrue)),
 		resourceConditionExists(string(couchbasev2.ClusterConditionBalanced), string(v1.ConditionTrue)),
 		resourceConditionNotExists(string(couchbasev2.ClusterConditionUpgrading)),
+		resourceConditionNotExists(string(couchbasev2.ClusterConditionWaitingBetweenUpgrades)),
 	)
 
 	strictConstraints := ResourceConstraints(k8s, cluster,

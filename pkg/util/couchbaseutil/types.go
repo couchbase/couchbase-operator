@@ -201,14 +201,20 @@ type FailoverOnDiskFailureSettings struct {
 	TimePeriod *int64 `url:"failoverOnDataDiskIssues[timePeriod],omitempty" json:"timePeriod"`
 }
 
+type FailoverOnDiskNonResponsivenessSettings struct {
+	Enabled    bool   `url:"failoverOnDataDiskNonResponsiveness[enabled]" json:"enabled"`
+	TimePeriod *int64 `url:"failoverOnDataDiskNonResponsiveness[timePeriod],omitempty" json:"timePeriod"`
+}
+
 type AutoFailoverSettings struct {
-	Enabled                          bool                          `url:"enabled" json:"enabled"`
-	Timeout                          int64                         `url:"timeout" json:"timeout"`
-	Count                            uint8                         `json:"count"`
-	FailoverOnDataDiskIssues         FailoverOnDiskFailureSettings `url:"" json:"failoverOnDataDiskIssues"`
-	FailoverServerGroup              *bool                         `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
-	MaxCount                         uint64                        `url:"maxCount" json:"maxCount"`
-	AllowFailoverEphemeralNoReplicas *bool                         `url:"allowFailoverEphemeralNoReplicas,omitempty" json:"allowFailoverEphemeralNoReplicas,omitempty"`
+	Enabled                             bool                                    `url:"enabled" json:"enabled"`
+	Timeout                             int64                                   `url:"timeout" json:"timeout"`
+	Count                               uint8                                   `json:"count"`
+	FailoverOnDataDiskIssues            FailoverOnDiskFailureSettings           `url:"" json:"failoverOnDataDiskIssues"`
+	FailoverOnDataDiskNonResponsiveness FailoverOnDiskNonResponsivenessSettings `url:"" json:"failoverOnDataDiskNonResponsiveness"`
+	FailoverServerGroup                 *bool                                   `url:"failoverServerGroup,omitempty" json:"failoverServerGroup"`
+	MaxCount                            uint64                                  `url:"maxCount" json:"maxCount"`
+	AllowFailoverEphemeralNoReplicas    *bool                                   `url:"allowFailoverEphemeralNoReplicas,omitempty" json:"allowFailoverEphemeralNoReplicas,omitempty"`
 }
 
 type AlternateAddressesExternalPorts struct {
@@ -961,20 +967,27 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 }
 
 //nolint:gocognit,gocyclo
-func (b *Bucket) FormEncode(update bool, storageBackendOnly bool, evictionPolicyOnly bool) []byte {
+func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 	data := url.Values{}
-	// Adds storageBackend for CB Server 7.0.0 onwards.
-	if evictionPolicyOnly && b.EvictionPolicy != "" {
-		data.Set("evictionPolicy", b.EvictionPolicy)
+
+	// During migration, only send fields that the server allows to be modified.
+	// Couchbase Server allows: storageBackend, evictionPolicy (with noRestart=true), and ramQuota.
+	if duringMigration {
+		if b.BucketStorageBackend != "" {
+			data.Set("storageBackend", string(b.BucketStorageBackend))
+		}
+		// EvictionPolicy changes during migration require noRestart=true
+		if b.EvictionPolicy != "" && b.NoRestart != nil && *b.NoRestart {
+			data.Set("evictionPolicy", b.EvictionPolicy)
+			data.Set("noRestart", BoolAsStr(*b.NoRestart))
+		}
+		data.Set("ramQuotaMB", strconv.Itoa(int(b.BucketMemoryQuota)))
 		return []byte(data.Encode())
 	}
 
+	// Normal operation: encode all fields
 	if b.BucketStorageBackend != "" {
 		data.Set("storageBackend", string(b.BucketStorageBackend))
-	}
-
-	if storageBackendOnly {
-		return []byte(data.Encode())
 	}
 
 	data.Set("name", b.BucketName)
@@ -2075,7 +2088,7 @@ func (t *DataThreadSetting) ToIntOrString() *intstr.IntOrString {
 	return nil
 }
 
-func ToDataThreadSetting(intOrStr *intstr.IntOrString) *DataThreadSetting {
+func ToDataThreadSetting(intOrStr *intstr.IntOrString, after80 bool) *DataThreadSetting {
 	if intOrStr == nil {
 		return nil
 	}
@@ -2089,6 +2102,12 @@ func ToDataThreadSetting(intOrStr *intstr.IntOrString) *DataThreadSetting {
 	}
 
 	val := intOrStr.String()
+
+	// There's a bug in server that requires us to use "default" instead of "balanced" until the entire
+	// cluster is upgraded to 8.0.0, or memcached will crash on a loop.
+	if val == "balanced" && !after80 {
+		val = "default"
+	}
 
 	return &DataThreadSetting{
 		Setting: &val,

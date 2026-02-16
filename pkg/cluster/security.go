@@ -31,6 +31,11 @@ func (c *Cluster) reconcileAdminPassword() error {
 		return nil
 	}
 
+	if !k8sutil.PasswordCompliesWithCouchbasePasswordPolicy(c.cluster.Spec.Security.PasswordPolicy, password) {
+		log.Info("Unable to rotate admin password as it does not comply with the current password policy", "cluster", c.namespacedName())
+		return nil
+	}
+
 	log.Info("Rotating admin password", "cluster", c.namespacedName())
 
 	if err := couchbaseutil.ChangePassword(password).On(c.api, c.readyMembers()); err != nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
-
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -307,17 +306,16 @@ func TestUpgradeStabilizationPeriod(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
-
 	// Check that the cluster goes into the waiting state the right number of times
-	for i := 0; i < clusterSize-1; i++ {
-		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 10*time.Minute)
+	for i := 0; i < clusterSize; i++ {
+		e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
-		// Validate that it stays in the waiting state for the right amount of time (minus 10 seconds so not too flakey)
-		e2eutil.AssertClusterConditionFor(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, time.Duration(stabilizationPeriodS-10)*time.Second)
-
-		if i < clusterSize-2 {
-			e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionFalse, cluster, 10*time.Minute)
+		if i < clusterSize-1 {
+			e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+			e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 10*time.Minute)
+			// Validate that it stays in the waiting state for the right amount of time (minus 10 seconds so not too flakey)
+			e2eutil.AssertClusterConditionFor(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, time.Duration(stabilizationPeriodS-10)*time.Second)
+			e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 10*time.Minute, couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 		}
 	}
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
@@ -1607,6 +1605,67 @@ func TestInplaceUpgradeWithRollback(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestInPlaceUpgradeWithMultipleNodes(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable().ServerGroups(1)
+
+	available := getAvailabilityZones(t, kubernetes)
+
+	// Static configuration.
+	clusterSize := 6
+	maxUpgradeable := 2
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeStrategy:  couchbasev2.RollingUpgrade,
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
+			MaxUpgradable: maxUpgradeable,
+		},
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+
+	cluster.Spec.ServerGroups = []string{available[0]}
+	// Ensure the single server config uses all groups
+	cluster.Spec.Servers[0].ServerGroups = []string{available[0]}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
+	// then the cluster to become healthy after upgrade has completed.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: 3,
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
+			},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade tests that when a pod is deleted during
 // an upgrade, the replacement pod is not implicitly upgraded.
 func TestUpgradeStatefulPodDeletionDoesNotImplicitlyUpgrade(t *testing.T) {
@@ -1852,6 +1911,69 @@ func TestServicesUpgradeOrder(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size2
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	cluster := clusterOptionsUpgrade().WithEphemeralAndArbiterTopology(classSize).Generate(kubernetes)
+	// servers [0] -> Data + Index + Query
+	// servers [1] -> Arbiter
+
+	// Set the upgrade order to upgrade the arbiter first, followed by anything else.
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServices,
+		UpgradeOrder: []string{
+			"arbiter",
+		},
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Start the upgrade
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	expectedIndexUpgradeOrder := []int{2, 3, 0, 1}
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(classSize * 2),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	for _, podIndex := range expectedIndexUpgradeOrder {
+		upgradeSequence := eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, podIndex)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+		expectedEvents = append(expectedEvents, upgradeSequence)
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 func TestServicesUpgradeOrderSharedServices(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -1982,6 +2104,101 @@ func TestServerGroupUpgradeOrder(t *testing.T) {
 	// Verify the all server groups are upgraded
 	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[0], f.CouchbaseServerImage, upgradeVersion)
 	e2eutil.MustCheckServerGroupPodsForVersion(t, kubernetes, cluster, availableServerGroups[1], f.CouchbaseServerImage, upgradeVersion)
+}
+
+// TestServerGroupUpgradeOrderWithArbiterNodes tests that arbiter nodes are upgraded last when upgrading by server groups
+// and maxUpgradable is less than the size of the server group.
+func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2)
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	availableServerGroups := getAvailabilityZones(t, kubernetes)
+	classSize := 2
+
+	// Create a cluster with server groups enabled
+	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+
+	// Add an arbiter serverclass to the cluster at the start of the cluster servers list.
+	cluster.Spec.Servers = append([]couchbasev2.ServerConfig{{
+		Name:         "no_services",
+		Size:         classSize,
+		Services:     []couchbasev2.Service{},
+		VolumeMounts: cluster.Spec.Servers[0].VolumeMounts.DeepCopy(),
+	}}, cluster.Spec.Servers...)
+
+	// Enable server groups
+	cluster.Spec.ServerGroups = availableServerGroups[:2]
+
+	// Set the upgrade order to upgrade by server groups
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
+		UpgradeOrder: []string{
+			availableServerGroups[1],
+			availableServerGroups[0],
+		},
+	}
+
+	// Create the cluster
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade of the first server group to finish
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 20*time.Minute)
+
+	// Verify the cluster version is the upgrade version
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade starts
+	// * Each node is upgraded in the expected order (with arbiter nodes upgraded last for each server group)
+	// * Upgrade completes
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(classSize * 3),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+	}
+
+	// The arbiter nodes should have index 1 (serverGroup[0]) and 2 (serverGroup[1]). Index 0 is the initial node which cannot be an arbiter node.
+	// We expect arbiter nodes to be upgraded last for each server group.
+	normalUpgradeSequence := eventschema.Sequence{
+		Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		},
+	}
+
+	arbiterUpgradeSequence := func(i int) eventschema.Sequence {
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, i)},
+				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			},
+		}
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
+	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(2))
+	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
+	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(1))
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
 func TestNodeUpgradeOrder(t *testing.T) {
@@ -2348,4 +2565,416 @@ func TestUpgradePrevent3Versions(t *testing.T) {
 		f.CouchbaseServerImage: clusterSize, // All at new version
 	}
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
+}
+
+// TestPreviousVersionPodCountScaleUp tests that during a mixed-mode upgrade with previousVersionPodCount,
+// scaling up creates new pods with the old version image when required to maintain the previousVersionPodCount.
+// This validates the fix for K8S-4522.
+func TestPreviousVersionPodCountScaleUp(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create the cluster at initial version (CouchbaseServerImageUpgrade)
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	// Set previousVersionPodCount to keep 1 pod at old version during upgrade
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: 1,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Step 1: Partial upgrade with previousVersionPodCount=1
+	// This should result in 2 pods at new version, 1 at old version
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we're in mixed mode
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	// Verify we have 2 versions: 1 at old, 2 at new
+	expectedImageCountMap := map[string]int{
+		f.CouchbaseServerImageUpgrade: 1, // Old version
+		f.CouchbaseServerImage:        2, // New version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+
+	// Step 2a: Verify DAC rejects increasing previousVersionPodCount without scaling
+	// This should be rejected by DAC since there's no scaling
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 2))
+
+	// Step 2b: Verify DAC rejects increasing previousVersionPodCount more than new nodes being added
+	// Try to add 1 node but increase previousVersionPodCount by 2 - should fail
+	e2eutil.MustNotPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
+		Replace("/spec/servers/0/size", 4).
+		Replace("/spec/upgrade/previousVersionPodCount", 3))
+
+	// Step 2c: Scale up from 3 to 5 pods with previousVersionPodCount=2
+	// This validates that new pods are created with the old version when required
+	// Adding 2 new nodes and increasing previousVersionPodCount by 1 (from 1 to 2) is valid
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
+		Replace("/spec/upgrade/previousVersionPodCount", 2).
+		Replace("/spec/servers/0/size", 5),
+		time.Minute)
+
+	// Wait for cluster to scale up and reach healthy state
+	// No need to wait for Upgrading condition as this is a scale operation, not a new upgrade phase
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify we have 2 versions: 2 at old, 3 at new
+	expectedImageCountMapScaled := map[string]int{
+		f.CouchbaseServerImageUpgrade: 2, // Old version
+		f.CouchbaseServerImage:        3, // New version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapScaled)
+
+	// Step 3: Complete upgrade by setting previousVersionPodCount to 0
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0), time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify upgrade is complete and mixed mode is cleared
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	// Verify all pods are at the new version
+	expectedImageCountMapFinal := map[string]int{
+		f.CouchbaseServerImage: 5, // All at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
+}
+
+// TestInPlaceUpgradeRecoverabilityOnServerGroupChanges tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeGlobalServerGroupChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 2 server groups and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = serverGroups[:2]
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the two available server groups
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Remove the second zone from the cluster.spec.serverGroups list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", serverGroups[:1]), time.Minute)
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for each of the pods in the now removed server group
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize / 2, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeClassServerGroupChangesWithPV tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.servers[i].serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeClassServerGroupChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 2 server groups and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].ServerGroups = serverGroups[:2]
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the two available server groups
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Remove the second zone from the cluster.spec.serverGroups list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/serverGroups", serverGroups[:1]), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for each of the pods in the now removed server group
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize / 2, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeNodeSelectorZoneChangesWithPV tests that the operator will revert to SwapRebalance if a pod is not recoverable
+// due to a change in the cluster.spec.servers[i].pod.spec.nodeSelector as PVC's cannot be recovered if the pod is going to be moved to a different node.
+func TestInPlaceUpgradeNodeSelectorZoneChangesWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with one server group in the nodeselector
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{
+				constants.FailureDomainZoneLabel: serverGroups[0],
+			},
+		},
+	}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the only available server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Replace the node selector zone with the second zone in the list
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/pod/spec/nodeSelector", map[string]string{
+		constants.FailureDomainZoneLabel: serverGroups[1],
+	}), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[1:2])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence (not InPlaceUpgrade like the spec says)
+	// * - This should happen for all pods given we've moved from serverGroups[0] to serverGroups[1]
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV tests the Operator will upgrade pods in place if the explicit node selector is removed
+// but PVC's already exist for the pod, meaning the pods can be recreated in place as the existing zone's are still valid.
+func TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV(t *testing.T) {
+	f := framework.Global
+
+	// TODO Check that no pod changes happen, given that the "old" server groups are still valid
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size4
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with one server group in the nodeselector
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{
+		Spec: v1.PodSpec{
+			NodeSelector: map[string]string{
+				constants.FailureDomainZoneLabel: serverGroups[0],
+			},
+		},
+	}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the only available server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Remove the zone node selector from the server class
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/servers/0/pod"), time.Minute)
+
+	time.Sleep(10 * time.Second) // Wait for a reconcile loop to happen
+
+	// There should not be any changes in the RZA map as pods should be re-created in place as the existing zone's are still valid
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// We can't check for the rza map as the pods will not have zone selectors as none exist in the spec,
+	// but the events should show InPlaceUpgrade happening for each pod instead of SwapRebalance,
+	// meaning they must have been re-created in place to allow for the PVC's to be recovered.
+
+	// Verify the expected events
+	// * Cluster created
+	// * Upgrade started
+	// * Given the pod spec has changed (removed explicit nodeselector), every node should be upgraded via InPlaceUpgrade
+	// - This does not consist of a new member being added but an existing member recreated and rebalanced into the cluster
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestChangeClusterSettingsDuringUpgradeStabilizationPeriod(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	clusterSize := constants.Size2
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	stabilizationPeriodS := int64(60)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	var cluster *couchbasev2.CouchbaseCluster
+	cluster = clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		StabilizationPeriod: e2espec.NewDurationS(stabilizationPeriodS),
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// When the cluster is ready, start the upgrade.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Patch the cluster while it's waiting for the stabilization period to end.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionWaitingBetweenUpgrades, v1.ConditionTrue, cluster, 10*time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoFailoverTimeout", e2espec.NewDurationS(33)), time.Minute)
+	e2eutil.MustPatchAutoFailoverInfo(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/Timeout", int64(33)), time.Minute)
+
+	// Wait for the upgrade to finish and check the versions are correct.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Upgrade started
+	// * SwapRebalance sequence
+	// * Cluster settings edited
+	// * SwapRebalance sequence
+	// * Upgrade finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: 1, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		eventschema.Repeat{Times: clusterSize - 1, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeServerGroupZoneAddedWithPV tests that the operator properly handles
+// server group zone addition during InPlaceUpgrade with PVCs by using SwapRebalance
+// instead of going into an infinite loop.
+func TestInPlaceUpgradeServerGroupZoneAddedWithPV(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ServerGroups(2).InplaceUpgradeable()
+
+	clusterSize := constants.Size2
+
+	serverGroups := getAvailabilityZones(t, kubernetes)
+
+	// Create the cluster with 1 server group initially, PVCs, and InPlaceUpgrade enabled
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ServerGroups = serverGroups[:1]
+	cluster.ObjectMeta.Annotations = map[string]string{"cao.couchbase.com/rescheduleDifferentServerGroup": "false"}
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is correctly scheduled across the single server group
+	expectedRzaMap := getExpectedRzaResultMap(clusterSize, serverGroups[:1])
+	expectedRzaMap.mustValidateRzaMap(t, kubernetes, cluster)
+
+	// Add a second zone (server group becomes available)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/serverGroups", serverGroups[:2]), time.Minute)
+
+	// Wait for the RZA map to reflect the new server group configuration
+	expectedRzaMap = getExpectedRzaResultMap(clusterSize, serverGroups[:2])
+	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 }

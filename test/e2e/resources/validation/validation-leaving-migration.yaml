@@ -1,0 +1,131 @@
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  replicas: 1
+  evictionPolicy: fullEviction
+  memoryQuota: 2Gi
+  numVBuckets: 128 # Bucket already exists as 1024, so this is invalid
+  storageBackend: magma
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket2-resource
+spec:
+  name: bucket2
+  replicas: 1
+  evictionPolicy: fullEviction
+  memoryQuota: 2Gi
+  numVBuckets: 128 # Bucket already exists as 1024, so this is invalid
+  storageBackend: magma
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseEphemeralBucket
+metadata:
+  name: bucket3
+spec:
+  replicas: 1
+  memoryQuota: 1Gi
+  conflictResolution: lww # Bucket already exists as seqno, so this is invalid
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster
+spec:
+  image: couchbase/server:8.0.0
+  cluster:
+    dataServiceMemoryQuota: 6Gi
+    indexServiceMemoryQuota: 4Gi
+  mirWatchdog:
+    enabled: false
+    interval: 10s
+    skipReconciliation: false
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: false
+  buckets:
+    managed: true
+  upgradeProcess: InPlaceUpgrade
+  migration:
+    unmanagedClusterHost: cb-example.default.svc.cluster.local
+  servers:
+    - size: 3
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+        - search
+        - eventing
+        - analytics
+status:
+  size: 3
+  allocations:
+  - allocatedMemory: 11776Mi
+    analyticsServiceAllocation: 1Gi
+    dataServiceAllocation: 6Gi
+    eventingServiceAllocation: 256Mi
+    indexServiceAllocation: 4Gi
+    name: all_services
+    searchServiceAllocation: 256Mi
+  buckets:
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: fullEviction
+    ioPriority: low
+    memoryQuota: 2048
+    name: bucket1
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    storageBackend: magma
+    type: couchbase
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: fullEviction
+    ioPriority: low
+    memoryQuota: 2048
+    name: bucket2
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    storageBackend: magma
+    type: couchbase
+  - compressionMode: passive
+    conflictResolution: seqno
+    enableFlush: false
+    enableIndexReplica: false
+    evictionPolicy: noEviction
+    ioPriority: low
+    memoryQuota: 1024
+    name: bucket3
+    numVBuckets: 1024
+    password: ""
+    replicas: 1
+    type: ephemeral
+  conditions:
+  - lastTransitionTime: "2026-01-14T13:14:55Z"
+    lastUpdateTime: "2026-01-14T13:14:55Z"
+    message: Data is equally distributed across all nodes in the cluster
+    reason: Balanced
+    status: "True"
+    type: Balanced
+  - lastTransitionTime: "2026-01-14T13:14:55Z"
+    lastUpdateTime: "2026-01-14T13:14:55Z"
+    reason: Available
+    status: "True"
+    type: Available
+  currentVersion: 8.0.0
+  members:
+    ready:
+    - cb-example-target-0000
+    - cb-example-target-0001
+    - cb-example-target-0002

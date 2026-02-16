@@ -146,6 +146,10 @@ var (
 	ErrUnsupportedEncryptionKeyType = errors.New("unsupported encryption key type")
 
 	ErrEncryptionKeyNotFound = errors.New("encryption key not found")
+
+	// ErrNewPodsExceedAdditions is raised when the calculated number of pods to be added
+	// on old version is greater than the number of new pods to be added.
+	ErrNewPodsExceedAdditions = errors.New("pods to be added on old version is greater than the number of new pods to be added")
 )
 
 // CLI errors.

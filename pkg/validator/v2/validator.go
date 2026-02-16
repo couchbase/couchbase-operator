@@ -60,17 +60,20 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintAutoFailoverMaxCount,
 		checkConstraintAutoFailoverEphemeral,
 		checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod,
+		checkConstraintAutoFailoverOnDataDiskNonResponsiveness,
+		checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod,
 		checkConstraintIndexerMemorySnapshotInterval,
 		checkConstraintIndexerStableSnapshotInterval,
 		checkConstraintAdminSecret,
 		checkConstraintLoggingPermissible,
+		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
 		checkConstraintXDCRReplicationBuckets,
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
-		checkoutConstraintNoServicelessClassBelow76,
+		checkoutConstraintNoArbiterClassBelow76,
 		checkConstraintMoreThanTwoDataNodesMultiNodeClusterInPlaceUpgrade,
 		checkConstraintClusterSupportable,
 		checkConstraintServiceEnabledForVolumeMount,
@@ -104,15 +107,17 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
-		checkConstraintsResourceManagement,
+		checkConstraintsDataSettings,
 		checkConstraintsIndexerSettings,
 		checkConstraintEncryptionKeys,
+		checkConstraintsPasswordPolicy,
+		checkConstraintsUpgrade,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
 		checkConstraintTwoDataNodesForDeltaRecovery,
-		checkConstraintDeltaRecoveryDeprecated,
-		checkConstraintServicelessOverAdminService,
+		checkConstraintUpgradeFieldsDeprecated,
+		checkConstraintArbiterOverAdminService,
 		checkMigrationConstraints,
 		checkConstraintMemcachedBucketDeprecated,
 		checkServerClassImageDeprecated,
@@ -169,6 +174,33 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 	}
 
 	return warnings, nil
+}
+
+func checkConstraintsUpgrade(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Upgrade == nil {
+		return nil
+	}
+
+	var errs []error
+
+	errs = append(errs, checkUpgradeOrderEntriesExist(cluster.Spec.Upgrade.UpgradeOrderType, cluster)...)
+
+	uniqueMap := make(map[string]bool)
+
+	for _, entry := range cluster.Spec.Upgrade.UpgradeOrder {
+		if _, exists := uniqueMap[entry]; !exists {
+			uniqueMap[entry] = true
+			continue
+		}
+
+		errs = append(errs, fmt.Errorf("upgrade order contains duplicate entry: %s", entry))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
 }
 
 func checkConstraintClusterName(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -661,6 +693,49 @@ func checkConstraintAutoFailoverOnDataDiskIssuesTimePeriod(_ *types.Validator, c
 	return nil
 }
 
+// checkConstraintAutoFailoverOnDataDiskNonResponsiveness checks disk non-responsiveness settings are only used with 8.0.0+.
+func checkConstraintAutoFailoverOnDataDiskNonResponsiveness(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	tag, err := k8sutil.CouchbaseVersion(cluster.Spec.Image)
+	if err != nil {
+		return err
+	}
+
+	if before80, err := couchbaseutil.VersionBefore(tag, "8.0.0"); before80 && err == nil {
+		if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness {
+			return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is not supported in Couchbase Server versions lower than 8.0.0")
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod checks the auto failover disk non-responsiveness timeout is within range.
+func checkConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Only validate if the feature is enabled
+	if !cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness && cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+		return nil
+	}
+
+	if !cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsiveness && cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod != nil {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod should not be set when annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness is false")
+	}
+
+	// Should be set via annotation when feature is enabled.
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod == nil {
+		return errors.Required("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod", "body", nil)
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod.Seconds() < constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodMin {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be greater than or equal to 5s")
+	}
+
+	if cluster.Spec.ClusterSettings.AutoFailoverOnDataDiskNonResponsivenessTimePeriod.Seconds() > constants.AutoFailoverOnDataDiskNonResponsivenessTimePeriodMax {
+		return fmt.Errorf("annotation cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod in body should be less than or equal to 3600s")
+	}
+
+	return nil
+}
+
 // checkConstraintIndexerMemorySnapshotInterval checks the indexer snapshot interval is within range.
 func checkConstraintIndexerMemorySnapshotInterval(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.ClusterSettings.Indexer == nil {
@@ -728,8 +803,11 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 	return nil
 }
 
-// checkConstraintLoggingSidecarTLS checks that if enabled, the logging sidecar TLS configs passed.
-func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// checkConstraintLoggingSidecarTLS validates the logging sidecar TLS configuration.
+// It ensures that when TLS is configured:
+// - At least one secret name is provided.
+// - The mount path is valid.
+func checkConstraintLoggingSidecarTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	fbs := cluster.Spec.Logging.Server
 	if fbs == nil {
 		return nil
@@ -739,20 +817,62 @@ func checkConstraintLoggingSidecarTLS(_ *types.Validator, cluster *couchbasev2.C
 		return nil
 	}
 
-	// In operator 2.9.0 the `spec.logging.server.sidecar.tls` field is not
-	// implemented. Reject usage via the admission controller so users cannot
-	// rely on it until mounting/rotation is implemented in 2.9.1.
-	return fmt.Errorf("spec.logging.server.sidecar.tls is not implemented in this operator version; available in 2.9.1+")
+	tlsConfig := fbs.Sidecar.TLS
+
+	// Ensure at least one secret name is provided when TLS is configured
+	if len(tlsConfig.SecretNames) == 0 {
+		return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames must contain at least one secret when TLS is configured")
+	}
+
+	// Validate mount path is not empty
+	if tlsConfig.MountPath == "" {
+		return fmt.Errorf("spec.logging.server.sidecar.tls.mountPath cannot be empty when TLS is configured")
+	}
+
+	// Validate that secrets exist if secret validation is enabled
+	if v != nil && v.Options.ValidateSecrets {
+		for _, secretName := range tlsConfig.SecretNames {
+			if secretName == "" {
+				return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames cannot contain empty values")
+			}
+
+			_, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+			if err != nil {
+				return fmt.Errorf("failed to get secret %q for logging sidecar TLS: %w", secretName, err)
+			}
+
+			if !found {
+				return fmt.Errorf("spec.logging.server.sidecar.tls.secretNames references secret %q which does not exist", secretName)
+			}
+		}
+	}
+
+	return nil
 }
 
-// checkConstraintLoggingPermissible checks persistent volumes are being used.
-func checkConstraintLoggingPermissible(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// checkConstraintLoggingPermissible checks that server logging is properly configured:
+// - persistent volumes are configured via volumeMounts.
+// - the configuration secret is not already in use by another cluster (if ValidateSecrets is enabled).
+func checkConstraintLoggingPermissible(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.IsServerLoggingEnabled() {
 		return nil
 	}
 
 	if !cluster.IsSupportable() {
 		return fmt.Errorf("server logging requires 'spec.servers.volumeMounts' to be configured")
+	}
+
+	if !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, cluster.Spec.Logging.Server.ConfigurationName)
+	if err != nil || !found {
+		return err
+	}
+
+	if val, ok := secret.Labels[constants.LabelCluster]; ok && val != cluster.Name {
+		return fmt.Errorf("spec.logging.server.configurationName is already in use for cluster %s", val)
 	}
 
 	return nil
@@ -1164,7 +1284,7 @@ func checkConstraintServerClassContainsDataService(_ *types.Validator, cluster *
 	return errors.Required("at least one \"data\" service", "spec.servers.services", nil)
 }
 
-func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkoutConstraintNoArbiterClassBelow76(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	clusterVersionImage, err := cluster.Spec.LowestInUseCouchbaseVersionImage()
 	if err != nil {
 		return err
@@ -1190,9 +1310,23 @@ func checkoutConstraintNoServicelessClassBelow76(_ *types.Validator, cluster *co
 	return nil
 }
 
-func checkConstraintDeltaRecoveryDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+func checkConstraintUpgradeFieldsDeprecated(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	var warnings []string
+
 	if cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
-		return []string{"DeltaRecovery is deprecated, please use InPlaceUpgrade instead"}, nil
+		warnings = append(warnings, "DeltaRecovery is deprecated, please use InPlaceUpgrade instead")
+	}
+
+	if cluster.Spec.UpgradeProcess != nil {
+		warnings = append(warnings, "spec.upgradeProcess is deprecated, please use spec.upgrade.upgradeStrategy instead")
+	}
+
+	if cluster.Spec.UpgradeStrategy != nil {
+		warnings = append(warnings, "spec.upgradeStrategy is deprecated, please use spec.upgrade.upgradeStrategy instead")
+	}
+
+	if len(warnings) > 0 {
+		return warnings, nil
 	}
 
 	return nil, nil
@@ -1925,10 +2059,9 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 	return nil
 }
 
-func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, storageBackend couchbasev2.CouchbaseStorageBackend) error {
 	if bucket.Spec.HistoryRetentionSettings != nil {
-		backend, _ := bucket.GetStorageBackend(cluster)
-		if backend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		if storageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
 			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
 		}
 
@@ -1983,17 +2116,17 @@ func checkBucketAnnotations(bucket *couchbasev2.CouchbaseBucket) []error {
 }
 
 //nolint:gocognit,gocyclo
-func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
 
 	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
+		return nil, nil
 	}
 	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
@@ -2021,10 +2154,6 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketHistoryRetentionSettings(bucket, cluster); err != nil {
-		errs = append(errs, err)
-	}
-
 	if err := checkConstraintAutoCompactionBucket(bucket.Spec.AutoCompaction); err != nil {
 		errs = append(errs, err)
 	}
@@ -2049,11 +2178,26 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+	if err := checkBucketUnsupportedFields(v, bucket, cluster); err != nil {
+		errs = append(errs, err)
 	}
 
-	return nil
+	var warnings []string
+
+	w, err := checkBucketCRDFieldsForNonDefaultUnsupportedFields(v, bucket, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(w) > 0 {
+		warnings = append(warnings, w...)
+	}
+
+	if errs != nil {
+		return warnings, errors.CompositeValidationError(errs...)
+	}
+
+	return warnings, nil
 }
 
 func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) error {
@@ -2256,30 +2400,43 @@ func checkEphemeralBucketCrossClusterVersioning(v *types.Validator, bucket *couc
 }
 
 func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	var clusters = new(couchbasev2.CouchbaseClusterList)
-
+	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
-		clusters.Items = []couchbasev2.CouchbaseCluster{*cluster}
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
 	} else {
-		allClusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
 		if err != nil {
 			return err
 		}
 
-		clusters = allClusters
+		clusters = append(clusters, bClusters...)
 	}
 
-	for _, cluster := range clusters.Items {
-		if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MinReplicasCount <= bucket.Spec.Replicas {
-			continue
+	for _, cluster := range clusters {
+		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
+			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
+				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
 		}
+	}
 
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+	return nil
+}
+
+func checkEphemeralBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getEphemeralBucketsRelatedClusters(v, bucket)
 		if err != nil {
 			return err
 		}
 
-		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucket.Labels)) {
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, cluster := range clusters {
+		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
 			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
 				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
 		}
@@ -2322,6 +2479,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.EphemeralBucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkEphemeralBucketReplicasCount(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2415,15 +2576,15 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 		if authSecretName == "" {
 			emsg := fmt.Sprintf("spec.authSecret for `%s` domain", domain)
 			errs = append(errs, errors.Required(emsg, user.Name, nil))
-		} else if v.Options.ValidateSecrets {
-			if err := checkConstraintUserCompliesWithPasswordPolicies(v, user); err != nil {
-				errs = append(errs, err)
-			}
 		}
 	case couchbasev2.LDAPAuthDomain:
 		// authSecret not accepted for LDAP user
 		if authSecretName := user.Spec.AuthSecret; authSecretName != "" {
 			errs = append(errs, fmt.Errorf("spec.authSecret %s not allowed for LDAP user `%s`", authSecretName, user.Name))
+		}
+
+		if user.Spec.Password != nil {
+			errs = append(errs, fmt.Errorf("spec.password not allowed for LDAP user `%s`", user.Name))
 		}
 
 		if user.Spec.Locked != nil && *user.Spec.Locked {
@@ -2432,6 +2593,8 @@ func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.Couchba
 	default:
 		return nil, fmt.Errorf("unknown auth domain: %s", user.Spec.AuthDomain)
 	}
+
+	errs = append(errs, checkClusterUserConstraints(v, user, nil)...)
 
 	if errs != nil {
 		return nil, errors.CompositeValidationError(errs...)
@@ -2463,58 +2626,15 @@ func checkPasswordAuthSecret(v *types.Validator, user *couchbasev2.CouchbaseUser
 	return string(pw), nil
 }
 
-// checkConstraintUserCompliesWithPasswordPolicies checks that the user's authSecret password complies with the password policy of every cluster that the user is/will be a member of.
-func checkConstraintUserCompliesWithPasswordPolicies(v *types.Validator, user *couchbasev2.CouchbaseUser) error {
-	if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
-		return nil
-	}
-
-	allClusters, err := v.Abstraction.GetCouchbaseClusters(user.Namespace)
-	if err != nil {
-		return err
-	}
-
-	// We need to check against every cluster that the user is/will be a member of to ensure the password complies with their password policy.
-	for _, cluster := range allClusters.Items {
-		if err := checkUserPasswordForCluster(v, &cluster, user); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // checkUserPasswordForCluster checks that a given password is valid for a CouchbaseCluster to create a new CouchbaseUser.
 // This will return nil if the user is not managed by the cluster and therefore not subject to the password policy, or if the user's authSecret password complies with the cluster's password policy.
 func checkUserPasswordForCluster(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) error {
-	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
+	if cluster.Spec.Security.PasswordPolicy == nil {
 		return nil
-	}
-
-	name := user.Name
-	if user.Spec.Name != "" {
-		name = user.Spec.Name
 	}
 
 	// We can ignore users that already exist on a cluster as subsequent changes to the password secret are irrelevant.
-	if slices.Contains(cluster.Status.Users, name) {
-		return nil
-	}
-
-	// User's aren't created by the operator unless they are a member of a CouchbaseGroup and have roles bound to them. However, climbing this tree
-	// during validation may lead to confusing DAC rejections where changing a role is not allowed because of a user password issue, so
-	// instead we just use the rbac selector against the user.
-	selector := labels.Everything()
-	if cluster.Spec.Security.RBAC.Selector != nil {
-		s, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
-		if err != nil {
-			return err
-		}
-
-		selector = s
-	}
-
-	if !selector.Matches(labels.Set(user.Labels)) {
+	if slices.Contains(cluster.Status.Users, user.GetUserID()) {
 		return nil
 	}
 
@@ -2647,6 +2767,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		return nil
 	}
 
+	if err := annotations.Populate(&backup.Spec, backup.Annotations); err != nil {
+		return err
+	}
+
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
 	}
@@ -2689,11 +2813,40 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 		}
 	}
 
+	if strings.Contains(backup.Spec.AdditionalOperatorBackupArgs, "--force-delete-lockfile") {
+		errs = append(errs, fmt.Errorf("spec.additionalOperatorBackupArgs cannot contain --force-delete-lockfile"))
+	}
+
+	errs = append(errs, checkConstraintsEnvVarsBackup(backup)...)
+
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
+}
+
+func checkConstraintsEnvVarsBackup(backup *couchbasev2.CouchbaseBackup) []error {
+	var errs []error
+
+	for _, env := range backup.Spec.Env {
+		if env.Value != "" && env.ValueFrom != nil {
+			errs = append(errs, fmt.Errorf("spec.env[%s] cannot have both value and valueFrom set", env.Name))
+		}
+
+		if env.ValueFrom != nil && env.ValueFrom.ConfigMapKeyRef != nil {
+			match, err := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*`, env.ValueFrom.ConfigMapKeyRef.Name)
+			if err != nil {
+				errs = append(errs, err)
+			}
+
+			if !match {
+				errs = append(errs, fmt.Errorf("spec.env[%s].valueFrom.configMapKeyRef.name %s is not a valid config map name", env.Name, env.ValueFrom.ConfigMapKeyRef.Name))
+			}
+		}
+	}
+
+	return errs
 }
 
 // checks that if the secret for the object store exists,
@@ -2850,12 +3003,17 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		return nil
 	}
 
+	if err := annotations.Populate(&restore.Spec, restore.Annotations); err != nil {
+		return err
+	}
+
 	checks := []func(*types.Validator, *couchbasev2.CouchbaseBackupRestore) error{
 		checkContraintRestoreStart,
 		checkContraintRestoreEnd,
 		checkContraintRestoreRange,
 		checkContraintRestoreData,
 		checkConstraintBackupRestoreObjStoreSecret,
+		checkConstraintRestoreAdditionalArgs,
 	}
 
 	var errs []error
@@ -2875,6 +3033,14 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintRestoreAdditionalArgs(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if strings.Contains(restore.Spec.AdditionalOperatorRestoreArgs, "--force-delete-lockfile") {
+		return fmt.Errorf("spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile")
 	}
 
 	return nil
@@ -3294,6 +3460,30 @@ func validateTLSXDCR(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) 
 	}
 
 	return
+}
+
+func getClusterBucketsByType(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) (map[string]*couchbasev2.CouchbaseBucket, map[string]*couchbasev2.CouchbaseEphemeralBucket, error) {
+	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	couchbaseBucketsMap := make(map[string]*couchbasev2.CouchbaseBucket)
+	for i := range couchbaseBuckets.Items {
+		couchbaseBucketsMap[couchbaseBuckets.Items[i].GetCouchbaseName()] = &couchbaseBuckets.Items[i]
+	}
+
+	ephemeralBuckets, err := v.Abstraction.GetCouchbaseEphemeralBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ephemeralBucketsMap := make(map[string]*couchbasev2.CouchbaseEphemeralBucket)
+	for i := range ephemeralBuckets.Items {
+		ephemeralBucketsMap[ephemeralBuckets.Items[i].GetCouchbaseName()] = &ephemeralBuckets.Items[i]
+	}
+
+	return couchbaseBucketsMap, ephemeralBucketsMap, nil
 }
 
 // getClusterBuckets returns all abstract buckets for a cluster as per its scoping rules.
@@ -4537,7 +4727,7 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 
 	// Modification during upgrade, only allow rollback.
 	if updatedVersion != current.Status.CurrentVersion {
-		return util.NewUpdateError("spec.version", "body")
+		return fmt.Errorf("spec.image can only be rolled back to the original version %s during an upgrade", current.Status.CurrentVersion)
 	}
 
 	return nil
@@ -4561,6 +4751,10 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 
 	// If MixedMode condition exists and is true, cluster is not fully upgraded
 	if c.HasCondition(couchbasev2.ClusterConditionMixedMode) {
+		return false, nil
+	}
+
+	if c.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
 		return false, nil
 	}
 
@@ -4681,6 +4875,10 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		errs = append(errs, err)
 	}
 
+	if err := checkChangeConstraintsPreviousVersionPodCount(prev, curr); err != nil {
+		errs = append(errs, err)
+	}
+
 	if errs != nil {
 		return false, errors.CompositeValidationError(errs...)
 	}
@@ -4700,6 +4898,51 @@ func checkChangeConstraintsSidecar(prev, curr *couchbasev2.CouchbaseCluster) err
 		if !reflect.DeepEqual(prev.Spec.Networking.CloudNativeGateway, curr.Spec.Networking.CloudNativeGateway) {
 			return fmt.Errorf("cloud native gateway spec cannot be changed in mixed mode or during upgrade")
 		}
+	}
+
+	return nil
+}
+
+// checkChangeConstraintsPreviousVersionPodCount validates changes to previousVersionPodCount
+// during mixed mode or upgrade. Increasing previousVersionPodCount is only allowed when the
+// cluster is scaling up, and the increase must not exceed the number of new nodes being added.
+// Without scaling, increasing previousVersionPodCount would be equivalent to a rollback request,
+// which is not allowed through this field.
+func checkChangeConstraintsPreviousVersionPodCount(prev, curr *couchbasev2.CouchbaseCluster) error {
+	// Only relevant during mixed mode or upgrading
+	if !curr.HasCondition(couchbasev2.ClusterConditionMixedMode) && !curr.HasCondition(couchbasev2.ClusterConditionUpgrading) {
+		return nil
+	}
+
+	// Get previous and current previousVersionPodCount values
+	prevPodCount := 0
+	if prev.Spec.Upgrade != nil {
+		prevPodCount = prev.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	currPodCount := 0
+	if curr.Spec.Upgrade != nil {
+		currPodCount = curr.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	// If previousVersionPodCount is not being increased, allow the change
+	if currPodCount <= prevPodCount {
+		return nil
+	}
+
+	// previousVersionPodCount is being increased - only allow if the cluster is scaling up
+	prevTotalSize := prev.Spec.TotalSize()
+	currTotalSize := curr.Spec.TotalSize()
+
+	newNodesBeingAdded := currTotalSize - prevTotalSize
+	if newNodesBeingAdded <= 0 {
+		return fmt.Errorf("spec.upgrade.previousVersionPodCount cannot be increased during mixed mode or upgrade without scaling up the cluster")
+	}
+
+	// The increase in previousVersionPodCount must not exceed the number of new nodes being added
+	podCountIncrease := currPodCount - prevPodCount
+	if podCountIncrease > newNodesBeingAdded {
+		return fmt.Errorf("spec.upgrade.previousVersionPodCount increase (%d) cannot exceed the number of new nodes being added (%d)", podCountIncrease, newNodesBeingAdded)
 	}
 
 	return nil
@@ -4791,6 +5034,10 @@ func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *
 func checkClusterUpgradePrerequisites(v *types.Validator, prev, curr *couchbasev2.CouchbaseCluster) error {
 	if !curr.Spec.Buckets.Managed {
 		return nil
+	}
+
+	if (curr.HasCondition(couchbasev2.ClusterConditionBucketMigration) || prev.HasCondition(couchbasev2.ClusterConditionBucketMigration)) && prev.Spec.Image != curr.Spec.Image {
+		return fmt.Errorf("cannot upgrade cluster while bucket migration is in progress")
 	}
 
 	startVersion, err := k8sutil.CouchbaseVersion(prev.Spec.CouchbaseImage())
@@ -5166,6 +5413,28 @@ func CheckImmutableFieldsAutoscaler(prev, curr *couchbasev2.CouchbaseAutoscaler)
 	return nil
 }
 
+// CheckImmutableFieldsUser checks for field changes that are invalid for CouchbaseUser.
+// The authDomain field is immutable because changing it would require deleting the existing
+// user and creating a new one with a different authentication domain.
+func CheckImmutableFieldsUser(prev, curr *couchbasev2.CouchbaseUser) error {
+	var errs []error
+
+	if checkAnnotationSkipValidation(curr.Annotations) {
+		return nil
+	}
+
+	// authDomain cannot be changed as external and local users are separate entities
+	if prev.Spec.AuthDomain != curr.Spec.AuthDomain {
+		errs = append(errs, util.NewUpdateError("spec.authDomain", "body"))
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
 // checkClusterConstraintMagmaStorageBackend checks if any buckets selected by the cluster have a magma storage backend
 // and if so, checks if the cluster is able to support it.
 func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
@@ -5180,6 +5449,10 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 	}
 
 	for _, cbBucket := range couchbaseBuckets.Items {
+		if err := annotations.Populate(&cbBucket.Spec, cbBucket.Annotations); err != nil {
+			return err
+		}
+
 		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster); err != nil {
 			return err
 		}
@@ -5301,18 +5574,66 @@ func checkChangeConstraintsMigration(v *types.Validator, current, updated *couch
 			return err
 		}
 
-		buckets, err := v.Abstraction.GetBuckets(updated.Namespace, updated.Spec.Buckets.Selector)
-		if err != nil {
-			return err
-		}
-
-		if len(buckets) == 0 && updated.Spec.Buckets.Managed {
-			return fmt.Errorf("cannot remove migration spec: create bucket CRDs or disable bucket management")
-		}
-
 		if len(users.Items) == 0 && updated.Spec.Security.RBAC.Managed {
 			return fmt.Errorf("cannot remove migration spec: create user CRDs or disable user management")
 		}
+
+		if err := checkChangeConstraintsBucketLeavingMigrationMode(v, current, updated); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkChangeConstraintsBucketLeavingMigrationMode validates all CRD resources are valid
+// for buckets that already exist in the cluster after a cluster migration has completed.
+// This method should only be called when leaving migration mode.
+func checkChangeConstraintsBucketLeavingMigrationMode(v *types.Validator, current *couchbasev2.CouchbaseCluster, updated *couchbasev2.CouchbaseCluster) error {
+	if !current.Spec.Buckets.Managed {
+		return nil
+	}
+
+	requestedCBuckets, requestedEBuckets, err := getClusterBucketsByType(v, updated)
+	if err != nil {
+		return err
+	}
+
+	if len(requestedCBuckets) == 0 && len(requestedEBuckets) == 0 {
+		return fmt.Errorf("cannot remove migration spec: create bucket CRDs or disable bucket management")
+	}
+
+	errs := []error{}
+	actualBuckets := current.Status.Buckets
+	for _, statusBucket := range actualBuckets {
+		switch statusBucket.BucketType {
+		case couchbasev2.BucketTypeCouchbase:
+			if requested, ok := requestedCBuckets[statusBucket.BucketName]; ok {
+				actualAsCRD := util.BucketStatusToCouchbaseBucket(statusBucket)
+				if err := CheckImmutableFieldsBucket(actualAsCRD, requested); err != nil {
+					errs = append(errs, err)
+				}
+
+				if _, err = CheckChangeConstraintsBucket(v, actualAsCRD, requested, updated); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		case couchbasev2.BucketTypeEphemeral:
+			if requested, ok := requestedEBuckets[statusBucket.BucketName]; ok {
+				actualAsCRD := util.BucketStatusToEphemeralBucket(statusBucket)
+				if err := CheckImmutableFieldsEphemeralBucket(actualAsCRD, requested); err != nil {
+					errs = append(errs, err)
+				}
+
+				if err := CheckChangeConstraintsEphemeralBucket(v, actualAsCRD, requested, updated); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
@@ -5356,10 +5677,8 @@ func checkClusterRBACConstraints(v *types.Validator, cluster *couchbasev2.Couchb
 		return err
 	}
 
-	if v.Options.ValidateSecrets {
-		if err := checkClusterUserPasswordConstraints(v, cluster); err != nil {
-			return err
-		}
+	if err := checkClusterUserRbacConstraints(v, cluster, nil); err != nil {
+		return err
 	}
 
 	return nil
@@ -5374,33 +5693,6 @@ func checkCouchbaseGroupRBACConstraints(v *types.Validator, group *couchbasev2.C
 
 	for _, c := range allClusters.Items {
 		return checkClusterGroupRBACConstraints(v, &c, group)
-	}
-
-	return nil
-}
-
-// checkClusterUserPasswordConstraints checks that any internal auth domain users who will be managed by the cluster but do not exist yet have an initial password that complies with the cluster's password policy.
-// This check excludes users that are already managed by the cluster (in the status.users slice), as changes to the authSecret password are irrelevant once a user has already been created.
-// We already validate this when a CouchbaseUser is created, but this will help protect against race conditions.
-func checkClusterUserPasswordConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if !cluster.Spec.Security.RBAC.Managed || cluster.Spec.Security.PasswordPolicy == nil {
-		return nil
-	}
-
-	users, err := v.Abstraction.GetCouchbaseUsers(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
-	if err != nil {
-		return err
-	}
-
-	for _, user := range users.Items {
-		// Only check internal auth domain users
-		if user.Spec.AuthDomain != couchbasev2.InternalAuthDomain {
-			continue
-		}
-
-		if err := checkUserPasswordForCluster(v, cluster, &user); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -5467,13 +5759,13 @@ func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.
 	return nil
 }
 
-// checkConstraintServicelessOverAdminService returns a warning if the AdminService is used, recommending
-// using a serviceless server class instead.
-func checkConstraintServicelessOverAdminService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+// checkConstraintArbiterOverAdminService returns a warning if the AdminService is used, recommending
+// using an arbiter server class instead.
+func checkConstraintArbiterOverAdminService(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	for _, server := range cluster.Spec.Servers {
 		for _, service := range server.Services {
 			if service == couchbasev2.AdminService {
-				return []string{fmt.Sprintf("Server class %s uses the admin service - it is recommended to use a serviceless server class ('[]') instead", server.Name)}, nil
+				return []string{fmt.Sprintf("Server class %s uses the admin service - it is recommended to use an arbiter server class ('[]') instead", server.Name)}, nil
 			}
 		}
 	}
@@ -5582,19 +5874,63 @@ func checkConstraintsIndexerSettings(v *types.Validator, cluster *couchbasev2.Co
 	return nil
 }
 
-func checkConstraintsResourceManagement(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	if cluster.Spec.ClusterSettings.Data == nil {
+func checkConstraintsDataSettings(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	dataSettings := cluster.Spec.ClusterSettings.Data
+	if dataSettings == nil {
 		return nil
 	}
 
-	if cluster.Spec.ClusterSettings.Data.DiskUsageLimit != nil {
-		atleast80, err := cluster.IsAtLeastVersion("8.0.0")
-		if err != nil {
-			return err
+	atLeast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if atLeast80 {
+		return nil
+	}
+
+	if dataSettings.DiskUsageLimit != nil {
+		return fmt.Errorf("spec.cluster.data.diskUsageLimit can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPUserTimeout != nil {
+		return fmt.Errorf("spec.cluster.data.tcpUserTimeout can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveProbes != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveProbes can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveInterval != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveInterval can only be set for Couchbase Server 8.0.0+")
+	}
+
+	if dataSettings.TCPKeepAliveIdle != nil {
+		return fmt.Errorf("spec.cluster.data.tcpKeepAliveIdle can only be set for Couchbase Server 8.0.0+")
+	}
+
+	return nil
+}
+
+// checkConstraintsPasswordPolicy validates passwordPolicy fields that are only supported on 8.0.0+.
+func checkConstraintsPasswordPolicy(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.Security.PasswordPolicy == nil {
+		return nil
+	}
+
+	atleast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if !atleast80 {
+		pp := cluster.Spec.Security.PasswordPolicy
+		if pp.RequirePasswordResetOnPolicyChange != nil {
+			return fmt.Errorf("spec.security.passwordPolicy.requirePasswordResetOnPolicyChange requires Couchbase Server version 8.0.0 or later")
 		}
 
-		if !atleast80 {
-			return fmt.Errorf("spec.cluster.data.diskUsageLimit requires Couchbase Server version 8.0.0 or later")
+		if len(pp.PasswordResetOnPolicyChangeExemptUsers) > 0 {
+			return fmt.Errorf("spec.security.passwordPolicy.passwordResetOnPolicyChangeExemptUsers requires Couchbase Server version 8.0.0 or later")
 		}
 	}
 
@@ -5685,6 +6021,11 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 		return err
 	} else if !encryptionAtRestSupported {
 		return fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
+	}
+
+	// Encryption at rest cannot be enabled in mixed mode as it requires all nodes to be running Couchbase Server 8.0.0+
+	if cluster.HasCondition(couchbasev2.ClusterConditionMixedMode) {
+		return fmt.Errorf("encryption at rest cannot be enabled while cluster is in mixed mode")
 	}
 
 	encryptionAtRest := cluster.Spec.Security.EncryptionAtRest
@@ -6069,6 +6410,67 @@ func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.Couchbase
 	return relatedClusters, nil
 }
 
+func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(bucket.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.Buckets.Managed {
+			continue
+		}
+
+		if cluster.Spec.Buckets.Selector == nil {
+			relatedClusters = append(relatedClusters, &cluster)
+			continue
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		if err != nil {
+			return nil, err
+		}
+
+		if selector.Matches(labels.Set(bucket.Labels)) {
+			relatedClusters = append(relatedClusters, &cluster)
+		}
+	}
+
+	return relatedClusters, nil
+}
+
+func getUserRelatedClusters(v *types.Validator, user *couchbasev2.CouchbaseUser) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(user.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.Security.RBAC.Managed {
+			continue
+		}
+
+		selector := labels.Everything()
+		if cluster.Spec.Security.RBAC.Selector != nil {
+			selector, err = metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if !selector.Matches(labels.Set(user.Labels)) {
+			continue
+		}
+
+		relatedClusters = append(relatedClusters, &cluster)
+	}
+
+	return relatedClusters, nil
+}
+
+//nolint:gocognit
 func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
@@ -6090,6 +6492,12 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		}
 	}
 
+	if len(clusters) == 0 && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		if err := checkBucketHistoryRetentionSettings(bucket, couchbasev2.CouchbaseStorageBackendCouchstore); err != nil {
+			return err
+		}
+	}
+
 	for _, c := range clusters {
 		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
 			return err
@@ -6102,6 +6510,11 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		// The operator will use GetStorageBackend, which in some cases will return a different value for compatibility. Therefore we'll run these checks
 		// if it's set specifically on the bucket as well so we can validate values that the operator would override.
 		storageBackend, _ := bucket.GetStorageBackend(c)
+
+		if err := checkBucketHistoryRetentionSettings(bucket, storageBackend); err != nil {
+			return err
+		}
+
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma || bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
 			if err := checkMagmaBucketRequiredSettings(bucket); err != nil {
 				return err
@@ -6126,6 +6539,256 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 				return fmt.Errorf("spec.onlineEvictionPolicyChange can only be set for Couchbase Server 8.0.0+")
 			}
 		}
+	}
+
+	return nil
+}
+
+func checkUpgradeOrderEntriesExist(t couchbasev2.UpgradeOrderType, cluster *couchbasev2.CouchbaseCluster) []error {
+	var errs []error
+
+	servers := cluster.Spec.Servers
+
+	switch t {
+	case couchbasev2.UpgradeOrderTypeServices:
+		servicesMap := make(map[string]bool)
+
+		for _, server := range servers {
+			if len(server.Services) == 0 {
+				servicesMap["arbiter"] = true
+			}
+
+			for _, item := range server.Services {
+				servicesMap[item.String()] = true
+			}
+		}
+
+		for _, uOService := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !servicesMap[uOService] {
+				errs = append(errs, fmt.Errorf("upgrade order contains service %s not found in spec.servers", uOService))
+			}
+		}
+	case couchbasev2.UpgradeOrderTypeServerClasses:
+		var serverNames []string
+
+		for _, server := range servers {
+			serverNames = append(serverNames, server.Name)
+		}
+
+		for _, uOServer := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !slices.Contains(serverNames, uOServer) {
+				errs = append(errs, fmt.Errorf("upgrade order contains serverclass %s not found in spec.servers", uOServer))
+			}
+		}
+	case couchbasev2.UpgradeOrderTypeServerGroups:
+		for _, uOServerGroup := range cluster.Spec.Upgrade.UpgradeOrder {
+			if !slices.Contains(cluster.Spec.ServerGroups, uOServerGroup) {
+				errs = append(errs, fmt.Errorf("upgrade order contains servergroup %s not found in the cluster spec", uOServerGroup))
+			}
+		}
+	case couchbasev2.UpgradeOrderTypeNodes:
+	// We don't generate node names from the spec as they are ephemeral, so we'll skip validation here for now.
+	default:
+		errs = append(errs, fmt.Errorf("unknown upgrade order type %v", t))
+	}
+
+	return errs
+}
+
+// There are several 8.0 only fields that were added with kubebuilder:default annotations. We can't remove these from the CRD's without breaking backwards compatibility,
+// and we can't warn if they are the defaults or we'll barrage users with warnings.
+// The compromise is to warn if the fields have been changed from the default.
+// checkBucketCRDFieldsForNonDefaultUnsupportedFields handles the bucket fields.
+func checkBucketCRDFieldsForNonDefaultUnsupportedFields(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return nil, err
+		}
+		clusters = append(clusters, bClusters...)
+	}
+
+	warnings := []string{}
+	for _, c := range clusters {
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return nil, err
+		}
+
+		if atLeast80 {
+			continue
+		}
+
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return nil, err
+		}
+
+		fields := []string{}
+
+		if bucket.Spec.AccessScannerEnabled != nil && !*bucket.Spec.AccessScannerEnabled {
+			fields = append(fields, "spec.accessScannerEnabled")
+		}
+
+		if bucket.Spec.MemoryLowWatermark != nil && *bucket.Spec.MemoryLowWatermark != 75 {
+			fields = append(fields, "spec.memoryLowWatermark")
+		}
+
+		if bucket.Spec.MemoryHighWatermark != nil && *bucket.Spec.MemoryHighWatermark != 85 {
+			fields = append(fields, "spec.memoryHighWatermark")
+		}
+
+		if warmupBehavior := bucket.Spec.WarmupBehavior; warmupBehavior != couchbasev2.CouchbaseBucketWarmupBehaviorBackground {
+			fields = append(fields, "spec.warmupBehavior")
+		}
+
+		for _, field := range fields {
+			warnings = append(warnings, fmt.Sprintf("CouchbaseBucket %s has been configured for cluster %s. This will be ignored for Couchbase Server versions below 8.0.0.", field, c.NamespacedName()))
+		}
+	}
+
+	return warnings, nil
+}
+
+func checkBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return err
+		}
+
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return err
+		}
+
+		atLeast80, err := c.IsAtLeastVersion("8.0.0")
+		if err != nil {
+			return err
+		}
+
+		if atLeast80 {
+			continue
+		}
+
+		if bucket.Spec.DurabilityImpossibleFallback != "" {
+			return fmt.Errorf("spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+")
+		}
+	}
+
+	return nil
+}
+
+func checkClusterUserRbacConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, user *couchbasev2.CouchbaseUser) error {
+	if !cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	users := []*couchbasev2.CouchbaseUser{}
+	if user != nil {
+		users = append(users, user)
+	} else {
+		allUsers, err := v.Abstraction.GetCouchbaseUsers(cluster.Namespace, cluster.Spec.Security.RBAC.Selector)
+		if err != nil {
+			return err
+		}
+
+		for _, user := range allUsers.Items {
+			selector := labels.Everything()
+			if cluster.Spec.Security.RBAC.Selector != nil {
+				s, err := metav1.LabelSelectorAsSelector(cluster.Spec.Security.RBAC.Selector)
+				if err != nil {
+					return err
+				}
+				selector = s
+			}
+
+			// Current user pw and version validation currently only applies to internal users.
+			if selector.Matches(labels.Set(user.Labels)) && user.Spec.AuthDomain == couchbasev2.InternalAuthDomain {
+				users = append(users, &user)
+			}
+		}
+	}
+
+	for _, user := range users {
+		if errs := checkClusterUserConstraints(v, user, cluster); errs != nil {
+			return errors.CompositeValidationError(errs...)
+		}
+	}
+
+	return nil
+}
+
+// checkClusterUserConstraints validates user constraints that are cluster specific, e.g. versions.
+// A user must be provided and if a cluster is provided, we will validate against that cluster. If not, we will fetch all clusters that have an rbac selector
+// that matches the user. The Operator uses a tree of groups/users/rolebindings to determine which clusters are relevant to a given user,
+// but for validation this becomes quite a heavy check, so until we can correctly cache the tree, we'll just do a more lightweight check.
+func checkClusterUserConstraints(v *types.Validator, user *couchbasev2.CouchbaseUser, cluster *couchbasev2.CouchbaseCluster) []error {
+	var errs []error
+	if user == nil {
+		return errs
+	}
+
+	var clusters []*couchbasev2.CouchbaseCluster
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		allClusters, err := getUserRelatedClusters(v, user)
+		if err != nil {
+			return []error{err}
+		}
+
+		clusters = allClusters
+	}
+
+	for _, cluster := range clusters {
+		if !cluster.Spec.Security.RBAC.Managed {
+			continue
+		}
+
+		if v.Options.ValidateSecrets {
+			if err := checkUserPasswordForCluster(v, cluster, user); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if err := checkUserClusterVersionConstraints(user, cluster); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func checkUserClusterVersionConstraints(user *couchbasev2.CouchbaseUser, cluster *couchbasev2.CouchbaseCluster) error {
+	atLeast80, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	if atLeast80 {
+		return nil
+	}
+
+	errs := []error{}
+	if user.Spec.Password != nil {
+		errs = append(errs, fmt.Errorf("spec.password is only supported for Couchbase Server versions 8.0.0+ for user `%s`", user.Name))
+	}
+
+	if user.Spec.Locked != nil && *user.Spec.Locked {
+		errs = append(errs, fmt.Errorf("spec.locked is only supported for Couchbase Server versions 8.0.0+ for user `%s`", user.Name))
+	}
+
+	if len(errs) > 0 {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
