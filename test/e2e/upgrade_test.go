@@ -1618,7 +1618,7 @@ func TestInPlaceUpgradeWithMultipleNodes(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := 6
-	upgradablePercent := "33%"
+	maxUpgradeable := 2
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
@@ -1627,7 +1627,7 @@ func TestInPlaceUpgradeWithMultipleNodes(t *testing.T) {
 		UpgradeStrategy:  couchbasev2.RollingUpgrade,
 		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerGroups,
 		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
-			MaxUpgradablePercent: upgradablePercent,
+			MaxUpgradable: maxUpgradeable,
 		},
 		UpgradeProcess: couchbasev2.InPlaceUpgrade,
 	}
@@ -1654,7 +1654,7 @@ func TestInPlaceUpgradeWithMultipleNodes(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: 2,
+		eventschema.Repeat{Times: 3,
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},

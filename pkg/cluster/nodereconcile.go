@@ -1609,7 +1609,7 @@ func (c *Cluster) multipleInPlaceUpgradesSupported(candidates couchbaseutil.Memb
 		return false, nil
 	}
 
-	if len(candidates) >= (len(c.callableMembers)-1)/2 {
+	if len(candidates) >= len(c.callableMembers)/2 {
 		log.Info("Unable to perform multiple in-place upgrades at once without losing quorum", "cluster", c.namespacedName())
 		return false, nil
 	}
