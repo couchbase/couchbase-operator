@@ -145,6 +145,25 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	return supports
 }
 
+func (c *Cluster) GetRunningImageForVersion(version string) string {
+	runningPods, _ := c.getClusterPodsByPhase()
+
+	for _, pod := range runningPods {
+		if v, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok || v != version {
+			continue
+		}
+
+		containers := pod.Spec.Containers
+		for _, con := range containers {
+			if con.Name == constants.CouchbaseContainerName {
+				return con.Image
+			}
+		}
+	}
+
+	return ""
+}
+
 func (c *Cluster) GetLowestMemberVersion() string {
 	versions := c.GetRunningVersions()
 

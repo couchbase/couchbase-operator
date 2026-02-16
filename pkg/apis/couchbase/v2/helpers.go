@@ -336,19 +336,6 @@ func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 	return cs.CouchbaseImage()
 }
 
-// ConstructImageWithVersion takes the current cluster image and replaces its version tag
-// with the specified version. For example, given image "couchbase/server:8.0.0" and
-// version "7.6.8", it returns "couchbase/server:7.6.8".
-func (cs *ClusterSpec) ConstructImageWithVersion(version string) string {
-	image := cs.CouchbaseImage()
-	lastColon := strings.LastIndex(image, ":")
-	if lastColon == -1 {
-		return image + ":" + version
-	}
-
-	return image[:lastColon+1] + version
-}
-
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
 // that is in use. Operator Environment image takes the highest priority.
 func (cs *ClusterSpec) LowestInUseCouchbaseVersionImage() (string, error) {

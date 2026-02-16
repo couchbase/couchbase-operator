@@ -728,8 +728,12 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return errors.ErrNewPodsExceedAdditions
 	}
 
-	// Construct the old version image
-	oldImage := c.cluster.Spec.ConstructImageWithVersion(baselineVersion)
+	// Construct the old version image - What if the image to produce this version is a hash? We
+	oldImage := c.GetRunningImageForVersion(baselineVersion)
+
+	if oldImage == "" {
+		return errors.ErrOldImageNotFound
+	}
 
 	log.Info("Applying previous version image to new pods during scale-up",
 		"cluster", c.namespacedName(),
