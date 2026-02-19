@@ -388,47 +388,29 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	supportedFeatures := make(map[SupportedFeature]bool)
 
-	durablitySupported, err := c.IsAtLeastVersion("6.6.0")
-	if err != nil {
-		return nil, err
-	}
+	durablitySupported := c.SupportsVersionFeatures("6.6.0")
 
 	supportedFeatures[SupportedDurability] = durablitySupported
 
 	// // storageBackend is only allowed above CB version 7.0.0.
-	storageBackendSupported, err := c.IsAtLeastVersion("7.0.0")
-	if err != nil {
-		return nil, err
-	}
+	storageBackendSupported := c.SupportsVersionFeatures("7.0.0")
 
 	supportedFeatures[SupportedBackendCouchstore] = storageBackendSupported
 	// // magma storageBackend is only allowed above CB version 7.1.0.
-	magmaStorageBackendSupported, err := c.IsAtLeastVersion("7.1.0")
-	if err != nil {
-		return nil, err
-	}
+	magmaStorageBackendSupported := c.SupportsVersionFeatures("7.1.0")
 
 	supportedFeatures[SupportedBackendMagma] = magmaStorageBackendSupported
 
-	atleast720, err := c.IsAtLeastVersion("7.2.0")
-	if err != nil {
-		return nil, err
-	}
+	atleast720 := c.SupportsVersionFeatures("7.2.0")
 
 	supportedFeatures[SupportedHistoryRetention] = atleast720
 	supportedFeatures[SupportedBlockSize] = atleast720
 
-	rankSupported, err := c.IsAtLeastVersion("7.6.0")
-	if err != nil {
-		return nil, err
-	}
+	rankSupported := c.SupportsVersionFeatures("7.6.0")
 
 	supportedFeatures[SupportedRank] = rankSupported
 
-	atleast76, err := c.IsAtLeastVersion("7.6.0")
-	if err != nil {
-		return nil, err
-	}
+	atleast76 := c.SupportsVersionFeatures("7.6.0")
 
 	atleast80 := c.SupportsVersionFeatures("8.0.0")
 	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
@@ -607,6 +589,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 				} else if !reflect.DeepEqual(r, a) {
 					if r.BucketStorageBackend != a.BucketStorageBackend && !isStorageBackendExplicitlySet(c, &r) {
 						log.Info("Skipping bucket storage backend change as the backend was not set explicitly.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-backend", a.BucketStorageBackend, "requested-backend", r.BucketStorageBackend)
+						found = true
 						continue
 					}
 
