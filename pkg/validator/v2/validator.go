@@ -4022,6 +4022,15 @@ func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope
 		return nil
 	}
 
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(scope.Namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(scope.Namespace); err != nil {
+		return err
+	}
+
 	if err := checkScopeCollectionsUnique(v, scope.Namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
 		errs = append(errs, err)
 	}
@@ -4042,6 +4051,15 @@ func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.Couc
 
 	if checkAnnotationSkipValidation(scopeGroup.Annotations) {
 		return nil
+	}
+
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(scopeGroup.Namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(scopeGroup.Namespace); err != nil {
+		return err
 	}
 
 	if err := checkScopeCollectionsUnique(v, scopeGroup.Namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
@@ -4294,6 +4312,15 @@ func validateKMIPKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey
 // we check every scope in the namespace in case a scope references the collection, before validating
 // each of those scopes individually.
 func checkAllScopeCollectionsUnique(v *types.Validator, namespace string) error {
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(namespace); err != nil {
+		return err
+	}
+
 	scopes, err := v.Abstraction.GetCouchbaseScopes(namespace, nil)
 	if err != nil {
 		return err
@@ -4342,17 +4369,17 @@ func checkScopeCollectionsUnique(v *types.Validator, namespace, kind, resourceNa
 
 	names := nameFirstDefinitionMap{}
 
-	if err := checkScopeCollectionsUniqueExplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+	if err := checkScopeCollectionsUniqueExplicit(v, namespace, kind, resourceName, selector.Resources, names); err != nil {
 		return err
 	}
 
-	return checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector, names)
+	return checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector.Selector, names)
 }
 
 // checkScopeCollectionsUniqueExplicit checks collections included in a scope by reference have
 // unique names.
-func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
-	for _, resource := range selector.Resources {
+func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, resources []couchbasev2.CollectionLocalObjectReference, names nameFirstDefinitionMap) error {
+	for _, resource := range resources {
 		switch resource.Kind {
 		case couchbasev2.CollectionCRDResourceKind:
 			collection, found, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.StrName())
@@ -4400,12 +4427,12 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 
 // checkScopeCollectionsUniqueImplicit checks collections included in a scope by label selector have
 // unique names.
-func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
-	if selector.Selector == nil {
+func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *metav1.LabelSelector, names nameFirstDefinitionMap) error {
+	if selector == nil {
 		return nil
 	}
 
-	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, selector.Selector)
+	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, selector)
 	if err != nil {
 		return err
 	}
@@ -4421,7 +4448,7 @@ func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, re
 		}
 	}
 
-	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, selector.Selector)
+	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, selector)
 	if err != nil {
 		return err
 	}
