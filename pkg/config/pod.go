@@ -192,7 +192,8 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 
 	resources := []runtime.Object{}
 	memberName := couchbaseutil.CreateMemberName(cbc.Name, index)
-	m := couchbaseutil.NewMember(namespace, cbc.Name, memberName, cbc.Spec.Image, o.serverClass, cbc.IsTLSEnabled())
+	// Member image set to spec image for new pod creation
+	m := couchbaseutil.NewMember(namespace, cbc.Name, memberName, cbc.Spec.Image, o.serverClass, cbc.IsTLSEnabled(), cbc.Spec.Image)
 	pvcState := &k8sutil.PersistentVolumeClaimState{}
 
 	if serverClass.GetVolumeMounts() != nil {

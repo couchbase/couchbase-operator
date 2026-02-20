@@ -2577,6 +2577,90 @@ func TestUpgradePrevent3Versions(t *testing.T) {
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
 }
 
+// TestPreviousVersionPodCountSpecOnlyUpdate tests that during a mixed-mode upgrade (PVPC > 0),
+// pods preserved at the old version still receive spec-only changes (e.g. env var additions)
+// without their version being bumped.
+func TestPreviousVersionPodCountSpecOnlyUpdate(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	const (
+		classSize  = 2 // pods per server class
+		numOldPods = 2 // PVPC: keep 2 pods at old version across the cluster
+	)
+	totalPods := classSize * 2 // 4 total (default class + query class)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Two-class ephemeral cluster: "default" (data+index) and "query".
+	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: numOldPods,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Step 1: Start healthy at old version.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Step 2: Trigger partial upgrade — PVPC=2 means only 2 of the 4 pods version-upgrade.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Cluster is now in mixed mode: 2 pods at old version, 2 at new version.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	expectedImageCountMixed := map[string]int{
+		f.CouchbaseServerImageUpgrade: numOldPods,             // 2 pods at old version
+		f.CouchbaseServerImage:        totalPods - numOldPods, // 2 pods at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMixed)
+
+	// Step 3: Apply a spec-only change (env var) to both server classes.
+	// Old-version pods become IS candidates (both version+spec change needed) but must only
+	// receive the spec change — not a version bump — because PVPC still blocks version upgrades.
+	specChangeEnv := []v1.EnvVar{
+		{Name: "PVPC_SPEC_TEST", Value: "spec_only_change"},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().
+			Add("/spec/servers/0/env", specChangeEnv).
+			Add("/spec/servers/1/env", specChangeEnv),
+		time.Minute)
+
+	// The cluster should re-enter the Upgrading condition as the spec change is applied.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Step 4: Assertions.
+
+	// 4a: All pods have the env var — spec change was applied to both old- and new-version pods.
+	e2eutil.MustCheckAllPodsHaveEnvVar(t, kubernetes, cluster, "PVPC_SPEC_TEST", "spec_only_change")
+
+	// 4b: Cluster is still mixed mode (PVPC still in effect) and healthy.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+
+	// 4c: Image distribution must not have changed — spec change must not cause a version upgrade.
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMixed)
+
+	// Step 5: Complete the upgrade by releasing the PVPC constraint.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Replace("/spec/upgrade/previousVersionPodCount", 0),
+		time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 1*time.Minute, couchbasev2.ClusterConditionMixedMode)
+
+	expectedImageCountFinal := map[string]int{
+		f.CouchbaseServerImage: totalPods,
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountFinal)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+}
+
 // TestPreviousVersionPodCountScaleUp tests that during a mixed-mode upgrade with previousVersionPodCount,
 // scaling up creates new pods with the old version image when required to maintain the previousVersionPodCount.
 // This validates the fix for K8S-4522.

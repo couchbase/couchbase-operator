@@ -1574,7 +1574,7 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, canDeltaRecover bool) error {
 	if len(c.members) > 1 {
 		if canDeltaRecover {
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
@@ -1689,9 +1689,8 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 			continue
 		}
 
-		// Update candidate version
-		candidate.SetVersion(targetVersion)
-
+		// Member already has correct version and image from getUpgradeCandidates()
+		// Update PVC annotations to match
 		if c.k8s.PersistentVolumeClaims != nil {
 			// Update volumes
 			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
@@ -1701,8 +1700,9 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				return err
 			} else if pvcState != nil {
 				for _, volume := range pvcState.List() {
-					volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
-					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
+					// Use candidate's version/image (set by getUpgradeCandidates)
+					volume.Annotations[constants.PVCImageAnnotation] = candidate.GetImage()
+					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
 					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, metav1.UpdateOptions{})
 
 					if err != nil {
@@ -1727,7 +1727,7 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if err := r.recreateNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
+		if err := r.recreateNode(c, candidate, canInPlaceUpgrade); err != nil {
 			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
@@ -1906,7 +1906,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates()
+	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates(true)
 	if err != nil {
 		return err
 	}
@@ -2384,7 +2384,11 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		toCreate = append(toCreate, *class)
+		// Member already has correct image from getUpgradeCandidates()
+		// Create a copy and use candidate's image (spec class has latest image)
+		configToUse := *class
+		configToUse.Image = candidate.GetImage()
+		toCreate = append(toCreate, configToUse)
 		candidatesSlice = append(candidatesSlice, candidate)
 	}
 

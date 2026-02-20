@@ -109,10 +109,11 @@ func (c *Cluster) newMember(id int, serverSpecName, image string) (couchbaseutil
 			version,
 			serverSpecName,
 			c.cluster.IsTLSEnabled(),
-			k8sutil.GetDNSName(c.cluster, name)), nil
+			k8sutil.GetDNSName(c.cluster, name),
+			image), nil
 	}
 
-	return couchbaseutil.NewMember(c.cluster.Namespace, c.cluster.Name, name, version, serverSpecName, c.cluster.IsTLSEnabled()), nil
+	return couchbaseutil.NewMember(c.cluster.Namespace, c.cluster.Name, name, version, serverSpecName, c.cluster.IsTLSEnabled(), image), nil
 }
 
 func (c *Cluster) pvcMembers() couchbaseutil.MemberSet {
@@ -150,10 +151,13 @@ func podsToMemberSet(pods []*v1.Pod) couchbaseutil.MemberSet {
 			hostname = val
 		}
 
-		m := couchbaseutil.NewMember(pod.Namespace, cluster, pod.Name, version, config, secure)
+		// Extract the image from the running container spec.
+		image := extractCouchbaseImage(pod)
+
+		m := couchbaseutil.NewMember(pod.Namespace, cluster, pod.Name, version, config, secure, image)
 
 		if hostname != "" && hostname != m.GetDNSName() {
-			m = couchbaseutil.NewExtConnectedMember(pod.Namespace, cluster, pod.Name, version, config, secure, hostname)
+			m = couchbaseutil.NewExtConnectedMember(pod.Namespace, cluster, pod.Name, version, config, secure, hostname, image)
 		}
 
 		members.Add(m)
@@ -236,7 +240,8 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 
 	usedPodIndex := 0
 	for index, serverSpec := range serverSpecs {
-		newMember, err := c.newMember(availableIndexes[usedPodIndex], serverSpec.Name, c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec))
+		serverImage := c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec)
+		newMember, err := c.newMember(availableIndexes[usedPodIndex], serverSpec.Name, serverImage)
 		if err != nil {
 			return nil, err // since we've not managed to create anything lets just error out
 		}

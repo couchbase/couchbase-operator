@@ -22,14 +22,176 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
-	"github.com/couchbase/couchbase-operator/pkg/util/diff"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// ChangeSet holds the three types of upgrade candidates.
+type ChangeSet struct {
+	VersionOnly  couchbaseutil.MemberSet         // VOS: needs version upgrade only
+	SpecOnly     couchbaseutil.MemberSet         // SOS: needs spec changes only
+	Both         couchbaseutil.MemberSet         // IS: needs both version and spec changes
+	ChangedZones map[string]couchbaseutil.Member // Members that have zone changes
+}
+
 var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing", "arbiter"}
+
+// detectChangeSets analyzes all pods and categorizes them into three sets.
+// - VersionOnly (VOS): Pods that only need version upgrade (no other spec changes).
+// - SpecOnly (SOS): Pods that only need spec changes (version already matches).
+// - Both (IS): Pods that need both version upgrade AND spec changes.
+func (c *Cluster) detectChangeSets() (*ChangeSet, error) {
+	result := &ChangeSet{
+		VersionOnly:  couchbaseutil.MemberSet{},
+		SpecOnly:     couchbaseutil.MemberSet{},
+		Both:         couchbaseutil.MemberSet{},
+		ChangedZones: make(map[string]couchbaseutil.Member),
+	}
+
+	moves, err := c.getRescheduleMoves()
+	if err != nil {
+		return nil, err
+	}
+
+	for name, member := range c.members {
+		changeInfo, err := c.analyzePodChange(name, member, moves)
+		if err != nil {
+			return nil, err
+		}
+		if changeInfo == nil {
+			continue
+		}
+
+		c.categorizePodChange(result, name, member, changeInfo)
+	}
+
+	return result, nil
+}
+
+// podChangeInfo holds the analysis results for a single pod's changes.
+type podChangeInfo struct {
+	needsVersionChange bool
+	needsSpecChange    bool
+	currentImage       string
+	specImage          string
+	actualSpec         *v1.PodSpec
+	preservedSpec      *v1.PodSpec
+	pvcState           *k8sutil.PersistentVolumeClaimState
+}
+
+// analyzePodChange analyzes a single pod to determine if it needs version or spec changes.
+func (c *Cluster) analyzePodChange(name string, member couchbaseutil.Member, moves []scheduler.Move) (*podChangeInfo, error) {
+	actual, exists := c.k8s.Pods.Get(name)
+	if !exists {
+		return nil, nil
+	}
+
+	serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
+	if serverClass == nil {
+		return nil, nil
+	}
+
+	pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
+	if err != nil {
+		return nil, err
+	}
+
+	currentImage := extractCouchbaseImage(actual)
+	specImage := c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
+
+	needsVersionChange := currentImage != specImage
+
+	needsSpecChange, actualSpec, preservedSpec, err := c.checkSpecChange(member, actual, serverClass, pvcState, moves)
+	if err != nil {
+		return nil, err
+	}
+
+	return &podChangeInfo{
+		needsVersionChange: needsVersionChange,
+		needsSpecChange:    needsSpecChange,
+		currentImage:       currentImage,
+		specImage:          specImage,
+		actualSpec:         actualSpec,
+		preservedSpec:      preservedSpec,
+		pvcState:           pvcState,
+	}, nil
+}
+
+// checkSpecChange determines if a pod needs specification changes.
+func (c *Cluster) checkSpecChange(member couchbaseutil.Member, actual *v1.Pod, serverClass *couchbasev2.ServerConfig, pvcState *k8sutil.PersistentVolumeClaimState, moves []scheduler.Move) (bool, *v1.PodSpec, *v1.PodSpec, error) {
+	currentImage := extractCouchbaseImage(actual)
+	preservedConfig := serverClass.DeepCopy()
+	preservedConfig.Image = currentImage
+
+	preservedPod, err := c.regeneratePod(member, actual, preservedConfig, pvcState, moves)
+	if err != nil {
+		return false, nil, nil, err
+	}
+
+	actualSpec := &v1.PodSpec{}
+	if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
+		if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
+			return false, nil, nil, errors.NewStackTracedError(err)
+		}
+	}
+
+	preservedSpec := &v1.PodSpec{}
+	if err := json.Unmarshal([]byte(preservedPod.Annotations[constants.PodSpecAnnotation]), preservedSpec); err != nil {
+		return false, nil, nil, errors.NewStackTracedError(err)
+	}
+
+	if err := c.normalizePodSpecsForComparison(actualSpec, preservedSpec, actual); err != nil {
+		return false, nil, nil, err
+	}
+
+	podsEqual, _ := c.resourcesEqual(actualSpec, preservedSpec)
+	pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
+
+	needsSpecChange := !podsEqual || !pvcsEqual
+
+	return needsSpecChange, actualSpec, preservedSpec, nil
+}
+
+// categorizePodChange adds a pod to the appropriate change set based on its change type.
+func (c *Cluster) categorizePodChange(result *ChangeSet, name string, member couchbaseutil.Member, info *podChangeInfo) {
+	switch {
+	case info.needsVersionChange && info.needsSpecChange:
+		result.Both.Add(member)
+		log.V(1).Info("Pod needs both version and spec changes",
+			"cluster", c.namespacedName(),
+			"pod", name,
+			"currentImage", info.currentImage,
+			"specImage", info.specImage)
+	case info.needsVersionChange:
+		result.VersionOnly.Add(member)
+		log.V(1).Info("Pod needs version change only",
+			"cluster", c.namespacedName(),
+			"pod", name,
+			"currentImage", info.currentImage,
+			"specImage", info.specImage)
+	case info.needsSpecChange:
+		result.SpecOnly.Add(member)
+		log.V(1).Info("Pod needs spec change only",
+			"cluster", c.namespacedName(),
+			"pod", name)
+	}
+
+	if info.needsSpecChange && detectZoneChange(info.actualSpec, info.preservedSpec, info.pvcState) {
+		result.ChangedZones[name] = member
+	}
+}
+
+// extractCouchbaseImage extracts the Couchbase Server image from a pod.
+func extractCouchbaseImage(pod *v1.Pod) string {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == constants.CouchbaseContainerName {
+			return container.Image
+		}
+	}
+	return ""
+}
 
 func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 	candidates := couchbaseutil.MemberSet{}
@@ -308,147 +470,123 @@ func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.P
 	return actualZone != "" && requestedZone != "" && actualZone != requestedZone
 }
 
-func (c *Cluster) getUpgradeCandidates() (couchbaseutil.MemberList, map[string]couchbaseutil.Member, error) {
-	allCandidates, zoneChangeDetected, err := c.needsUpgrade()
+func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.MemberList, map[string]couchbaseutil.Member, error) {
+	// Detect the three sets: VOS, SOS, IS
+	changes, err := c.detectChangeSets()
 	if err != nil {
 		return nil, nil, err
 	}
 
+	// Handle immediate upgrade strategy - upgrade everything
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
-		return allCandidates.ToList(), zoneChangeDetected, nil
+		allCandidates := couchbaseutil.MemberSet{}
+		allCandidates.Merge(changes.VersionOnly)
+		allCandidates.Merge(changes.SpecOnly)
+		allCandidates.Merge(changes.Both)
+		return allCandidates.ToList(), changes.ChangedZones, nil
 	}
 
-	numOldPods := allCandidates.Size()
-
-	numToUpgrade := numOldPods
+	// Get baseline version for determining old vs new
+	baselineVersion := ""
+	targetImage := c.cluster.Spec.CouchbaseImage()
+	targetVersion := ""
 
 	if c.cluster.Spec.Upgrade != nil {
-		// Check if this is a rollback (target version == baseline version)
-		targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+		baselineVersion, err = c.state.Get(persistence.Version)
 		if err != nil {
 			return nil, nil, err
 		}
-		baselineVersion, err := c.state.Get(persistence.Version)
+		targetVersion, err = k8sutil.CouchbaseVersion(targetImage)
 		if err != nil {
 			return nil, nil, err
 		}
-		isRollback := targetVersion == baselineVersion
+	}
 
-		// Only apply PreviousVersionPodCount for forward upgrades, not rollbacks
-		if !isRollback {
-			// Ensure we don't go negative - at minimum, we should upgrade 0 pods
-			numToUpgrade = max(numOldPods-c.cluster.Spec.Upgrade.PreviousVersionPodCount, 0)
+	isRollback := targetVersion == baselineVersion
+
+	pvpc := 0
+	if c.cluster.Spec.Upgrade != nil && !isRollback {
+		pvpc = c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	}
+
+	// Accumulate all pods that need processing this cycle.
+	// SOS pods already have the correct version and only need spec changes.
+	// IS pods always need spec changes regardless of whether their version is
+	// also bumped this cycle; pre-populate them at their current image.
+	candidates := couchbaseutil.MemberSet{}
+	candidates.Merge(changes.SpecOnly)
+	candidates.Merge(changes.Both)
+
+	lenVOS := changes.VersionOnly.Size()
+	lenIS := changes.Both.Size()
+	lenSpecOnly := changes.SpecOnly.Size()
+	totalVersionCandidates := lenVOS + lenIS
+
+	if totalVersionCandidates > 0 {
+		// Determine how many pods are cleared to move to the new version this cycle.
+		// pvpc keeps up to N pods at the previous version globally; the upgrade-order
+		// filter further constrains the batch size.
+		numToUpgradeVersion := max(totalVersionCandidates-pvpc, 0)
+		specImage := c.cluster.Spec.CouchbaseImage()
+
+		allVersionCandidates := couchbaseutil.MemberSet{}
+		allVersionCandidates.Merge(changes.VersionOnly)
+		allVersionCandidates.Merge(changes.Both)
+
+		orderedVersionCandidates, err := c.filterCandidatesByUpgradeOrder(allVersionCandidates)
+		if err != nil {
+			return nil, nil, err
 		}
-		// For rollbacks, numToUpgrade remains numOldPods (upgrade all candidates)
+
+		// Mark the first numToUpgradeVersion pods for a version bump.
+		// VOS pods are added to candidates here; IS pods are already present with
+		// the old image and get updated in-place.
+		for i, candidate := range orderedVersionCandidates {
+			if i >= numToUpgradeVersion {
+				break
+			}
+			candidate.SetImage(specImage)
+			candidate.SetVersion(targetVersion)
+			candidates.Add(candidate)
+		}
 	}
 
-	finalCandidates := couchbaseutil.MemberList{}
-
-	if numToUpgrade == 0 {
-		return finalCandidates, nil, nil
-	}
-
-	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(allCandidates)
+	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(candidates)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Trim the candidates to keep previousVersionPodCount.
-	for _, member := range orderedCandidates {
-		if len(finalCandidates) >= numToUpgrade {
-			break
-		}
-
-		finalCandidates = append(finalCandidates, member)
+	if logCandidates && (lenVOS > 0 || lenIS > 0 || lenSpecOnly > 0) {
+		log.Info("Upgrade candidates calculated",
+			"cluster", c.namespacedName(),
+			"totalCandidates", len(orderedCandidates),
+			"versionOnly", lenVOS,
+			"specOnly", lenSpecOnly,
+			"both", lenIS)
 	}
 
-	return finalCandidates, zoneChangeDetected, nil
+	return orderedCandidates, changes.ChangedZones, nil
 }
 
-// needsUpgrade does an ordered walk down the list of members, if a member is not
-// the correct version then return it as an upgrade canididate  It also returns the
-// counts of members in the various versions.
+// needsUpgrade returns ALL pods that differ from spec (version OR spec changes).
+// This maintains backwards compatibility for scale-down operations which need
+// to know all pods that are "different" regardless of change type.
+//
+// For upgrade logic, use getUpgradeCandidates() which uses detectChangeSets()
+// and handles previousVersionPodCount correctly.
 func (c *Cluster) needsUpgrade() (couchbaseutil.MemberSet, map[string]couchbaseutil.Member, error) {
-	candidates := couchbaseutil.MemberSet{}
-	changedZones := make(map[string]couchbaseutil.Member)
-
-	moves, err := c.getRescheduleMoves()
+	changes, err := c.detectChangeSets()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for name, member := range c.members {
-		// Get what the member actually looks like.
-		actual, exists := c.k8s.Pods.Get(name)
-		if !exists {
-			continue
-		}
+	// Merge all three sets
+	allCandidates := couchbaseutil.MemberSet{}
+	allCandidates.Merge(changes.VersionOnly)
+	allCandidates.Merge(changes.SpecOnly)
+	allCandidates.Merge(changes.Both)
 
-		// Get what the member should look like.
-		serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
-		if serverClass == nil {
-			continue
-		}
-
-		pvcState, err := k8sutil.GetPodVolumes(c.k8s, member, c.cluster, *serverClass)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		requested, err := c.regeneratePod(member, actual, serverClass, pvcState, moves)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Check the specification at creation with the ones that are requested
-		// currently.  If they differ then something has changed and we need to
-		// "upgrade".  Otherwise accumulate the number of pods at the correct
-		// target configuration.  Do this with reflection as the spec may contain
-		// maps (e.g. NodeSelector)
-		actualSpec := &v1.PodSpec{}
-
-		if annotation, ok := actual.Annotations[constants.PodSpecAnnotation]; ok {
-			if err := json.Unmarshal([]byte(annotation), actualSpec); err != nil {
-				return nil, nil, errors.NewStackTracedError(err)
-			}
-		}
-
-		requestedSpec := &v1.PodSpec{}
-		if err := json.Unmarshal([]byte(requested.Annotations[constants.PodSpecAnnotation]), requestedSpec); err != nil {
-			return nil, nil, errors.NewStackTracedError(err)
-		}
-
-		// Apply normalization rules to both specs
-		if err := c.normalizePodSpecsForComparison(actualSpec, requestedSpec, actual); err != nil {
-			return nil, nil, err
-		}
-
-		podsEqual, _ := c.resourcesEqual(actualSpec, requestedSpec)
-
-		pvcsEqual := pvcState == nil || !pvcState.NeedsUpdate()
-
-		// Nothing to do, carry on...
-		if podsEqual && pvcsEqual {
-			continue
-		}
-
-		prettyDiff := diff.PrettyDiff(actualSpec, requestedSpec)
-
-		if !pvcsEqual {
-			prettyDiff += pvcState.Diff()
-		}
-
-		log.V(1).Info("Pod upgrade candidate", "cluster", c.namespacedName(), "name", name, "diff", prettyDiff)
-
-		// Check if zone change is needed by comparing NodeSelector
-		if detectZoneChange(actualSpec, requestedSpec, pvcState) {
-			changedZones[name] = member
-		}
-
-		candidates.Add(member)
-	}
-
-	return candidates, changedZones, nil
+	return allCandidates, changes.ChangedZones, nil
 }
 
 func removeMetricsContainer(initial []v1.Container) []v1.Container {
@@ -580,7 +718,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
-	candidates, _, err := c.getUpgradeCandidates()
+	candidates, _, err := c.getUpgradeCandidates(false)
 	if err != nil {
 		return err
 	}

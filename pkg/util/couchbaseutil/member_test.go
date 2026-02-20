@@ -32,7 +32,7 @@ func addMembersWithConfig(ms MemberSet, configName string, numMembers int) Membe
 	rv := NewMemberSet()
 
 	for i := 0; i < numMembers; i++ {
-		m := NewMember("test-namespace", "test-cluster", fmt.Sprintf("member-%v", len(ms)), "7.3.2", configName, false)
+		m := NewMember("test-namespace", "test-cluster", fmt.Sprintf("member-%v", len(ms)), "7.3.2", configName, false, "")
 		ms.Add(m)
 		rv.Add(m)
 	}

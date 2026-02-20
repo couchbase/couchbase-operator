@@ -92,6 +92,8 @@ type Member interface { //nolint: interfacebloat
 	GetHostURLPlaintext() string
 	GetHostName() HostName
 	GetOTPNode() OTPNode
+	SetImage(string)
+	GetImage() string
 }
 
 // memberImpl is the core internal representation of a Couchbase server node.
@@ -117,11 +119,17 @@ type memberImpl struct {
 
 	// dnsHostName is the DNS name of the member if the default isn't used.
 	dnsHostName string
+
+	// image is the Couchbase Server container image this member uses/should use.
+	// For running pods, this is the actual current image.
+	// For PVC-backed members, this comes from PVC annotations.
+	// During upgrades, this gets set to the target upgrade image.
+	image string
 }
 
 // NewMember returns a new member that is created or managed by the operator
 // as we are in possession of all the metadata that entails.
-func NewMember(namespace, cluster, name, version, config string, useTLS bool) Member {
+func NewMember(namespace, cluster, name, version, config string, useTLS bool, image string) Member {
 	return &memberImpl{
 		namespace: namespace,
 		cluster:   cluster,
@@ -129,6 +137,7 @@ func NewMember(namespace, cluster, name, version, config string, useTLS bool) Me
 		version:   version,
 		config:    config,
 		useTLS:    useTLS,
+		image:     image,
 	}
 }
 
@@ -145,7 +154,7 @@ func NewPartialMember(namespace, cluster, name string) Member {
 
 // NewMember returns a new member that is created or managed by the operator
 // as we are in possession of all the metadata that entails.
-func NewExtConnectedMember(namespace, cluster, name, version, config string, useTLS bool, hostname string) Member {
+func NewExtConnectedMember(namespace, cluster, name, version, config string, useTLS bool, hostname string, image string) Member {
 	return &memberImpl{
 		namespace:   namespace,
 		cluster:     cluster,
@@ -154,6 +163,7 @@ func NewExtConnectedMember(namespace, cluster, name, version, config string, use
 		config:      config,
 		useTLS:      useTLS,
 		dnsHostName: hostname,
+		image:       image,
 	}
 }
 
@@ -168,6 +178,16 @@ func (m *memberImpl) SetVersion(version string) {
 // SetDNSName is used to set the member's DNS name.
 func (m *memberImpl) SetDNSName(hostname string) {
 	m.dnsHostName = hostname
+}
+
+// SetImage sets the Couchbase Server image for this member.
+func (m *memberImpl) SetImage(image string) {
+	m.image = image
+}
+
+// GetImage returns the Couchbase Server image for this member.
+func (m *memberImpl) GetImage() string {
+	return m.image
 }
 
 // GetDNSName returns the member's DNS name.  The host name is generated for an endpoint
@@ -592,6 +612,14 @@ func (m *externamMemberImpl) SetVersion(string) {
 
 func (m *externamMemberImpl) SetDNSName(string) {
 	return
+}
+
+func (m *externamMemberImpl) SetImage(string) {
+	return
+}
+
+func (m *externamMemberImpl) GetImage() string {
+	return ""
 }
 
 func (m *externamMemberImpl) Version() string {

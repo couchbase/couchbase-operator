@@ -98,7 +98,12 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	// set then we use the scheduler to balance the load across AZs.
 	serverGroup := ""
 
-	image := cluster.Spec.ServerClassCouchbaseImage(&config)
+	// Use member's image (set from pod/PVC or by upgrade logic)
+	image := m.GetImage()
+	if image == "" {
+		// Fallback to spec image if member doesn't have image set (shouldn't happen)
+		image = cluster.Spec.ServerClassCouchbaseImage(&config)
+	}
 
 	if pvcState != nil {
 		serverGroup = pvcState.AvailabilityZone
@@ -1051,7 +1056,7 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 	}
 
 	// Set the Couchbase version metadata.
-	if err := SetCouchbaseVersion(pod, image); err != nil {
+	if err := SetCouchbaseVersionAndImage(pod, image); err != nil {
 		return nil, err
 	}
 
@@ -2335,7 +2340,13 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 			continue
 		}
 
-		ms.Add(couchbaseutil.NewMember(namespace, cluster, name, version, config, secure))
+		// Extract the image from PVC annotation
+		image := ""
+		if val, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {
+			image = val
+		}
+
+		ms.Add(couchbaseutil.NewMember(namespace, cluster, name, version, config, secure, image))
 	}
 
 	return ms

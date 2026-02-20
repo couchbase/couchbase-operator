@@ -320,7 +320,10 @@ func (c *Cluster) reconcilePods() error {
 			}
 		}
 
-		image := c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
+		image := extractCouchbaseImage(actual)
+		if image == "" {
+			image = c.cluster.Spec.ServerClassCouchbaseImage(serverClass)
+		}
 
 		if pvcState != nil && pvcState.Image != "" {
 			image = pvcState.Image

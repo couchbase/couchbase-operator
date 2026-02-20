@@ -358,7 +358,7 @@ func TestRemoveForeignNode(t *testing.T) {
 
 	// Runtime configuration.
 	foreignNodeName := cluster.Name + "-hrisovalantis" // (this is Greek ;p)
-	member := couchbaseutil.NewMember(kubernetes.Namespace, cluster.Name, foreignNodeName, "", cluster.Spec.Servers[0].Name, false)
+	member := couchbaseutil.NewMember(kubernetes.Namespace, cluster.Name, foreignNodeName, "", cluster.Spec.Servers[0].Name, false, "")
 
 	// When ready create and add a new node, expect the operator to remove it
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
