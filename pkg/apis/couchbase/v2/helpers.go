@@ -924,6 +924,16 @@ func (cs *ClusterStatus) GetBucketStorageBackendFromStatus(bucketName string) Co
 	return ""
 }
 
+func (cs *ClusterStatus) GetBucketEvictionPolicyFromStatus(bucketName string) string {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return bucket.EvictionPolicy
+		}
+	}
+
+	return ""
+}
+
 func newClusterCondition(t ClusterConditionType, status v1.ConditionStatus, reason, message string) *ClusterCondition {
 	now := time.Now().Format(time.RFC3339)
 

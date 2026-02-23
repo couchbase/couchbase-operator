@@ -5174,13 +5174,13 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		// currBackend is the desired backend
 		currBackend, _ := curr.GetStorageBackend(c)
 
-		// prevBackend is the one currently in use. If it isn't explicitly set, we'll check the cluster status.
-		prevBackend, explicit := prev.GetStorageBackend(c)
-		if !explicit {
-			if statusBackend := c.Status.GetBucketStorageBackendFromStatus(prev.GetCouchbaseName()); statusBackend != "" {
-				prevBackend = statusBackend
-			}
-		}
+		// prevBackend is the previously applied backend.
+		// At admission time this is the old CRD's Spec.StorageBackend as stored in etcd.
+		// At runtime (via validateBucketsChangeConstraints), GetBucketsToUpdate has already
+		// reset a.BucketStorageBackend to the status value for any server-side drift, so
+		// prev.Spec.StorageBackend reflects the last-reconciled desired state rather than
+		// a live server value — migration validators won't fire for drift reversions.
+		prevBackend, _ := prev.GetStorageBackend(c)
 
 		if prevBackend != currBackend || prev.IsSampleBucket() && !curr.IsSampleBucket() {
 			if err := checkClusterValidForBucketMigration(v, curr, c); err != nil {

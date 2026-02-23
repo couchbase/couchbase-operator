@@ -1050,7 +1050,10 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 			candidates, _, err := c.needsUpgrade()
 			return candidates, err
 		},
-		c.getBucketMigrationCandidates,
+		func() (couchbaseutil.MemberSet, error) {
+			candidates, _, err := c.getBucketMigrationCandidates()
+			return candidates, err
+		},
 		c.getNodeServiceMismatchCandidates,
 	}
 
@@ -2204,20 +2207,23 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 	return false
 }
 
-func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error) {
+// getBucketMigrationCandidates returns nodes that have in-progress backend or
+// eviction-policy migrations, and whether any of those nodes actually require a
+// swap-rebalance to converge to spec.
+func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, swapsNeeded bool, err error) {
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
-	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-		return nil, nil
+	// Node-level migration fields are only reported by CB server >= 7.6.
+	if !atleast76 {
+		return nil, false, nil
 	}
 
 	bucketSpecs, err := c.gatherBuckets()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	bucketMap := make(map[string]couchbaseutil.Bucket, len(bucketSpecs))
@@ -2228,21 +2234,34 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 
 	clusterBuckets := couchbaseutil.BucketStatusList{}
 	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	var candidates = couchbaseutil.MemberSet{}
+	candidates = couchbaseutil.MemberSet{}
 
 	for _, bucket := range clusterBuckets {
+		spec := bucketMap[bucket.BucketName]
+
 		for _, node := range bucket.Nodes {
-			// node.StorageBackend/EvictionPolicy is empty if it matches the bucket storageMode/evictionPolicy
-			if (node.StorageBackend != "" || node.EvictionPolicy != "") && bucket.StorageBackend == bucketMap[bucket.BucketName].BucketStorageBackend && bucket.EvictionPolicy == bucketMap[bucket.BucketName].EvictionPolicy {
-				candidates.Add(c.members[node.HostName.GetMemberName()])
+			// A non-empty value means that node's vBuckets still carry the old
+			// backend/eviction-policy and a migration is in progress.
+			if node.StorageBackend == "" && node.EvictionPolicy == "" {
+				continue
+			}
+
+			candidates.Add(c.members[node.HostName.GetMemberName()])
+
+			// If the node's current vBucket format differs from spec, a
+			// swap-rebalance is required to move the data.  If it already matches
+			// spec the server just needs a corrective REST push — no pod ejection.
+			if (node.StorageBackend != "" && node.StorageBackend != string(spec.BucketStorageBackend)) ||
+				(node.EvictionPolicy != "" && node.EvictionPolicy != spec.EvictionPolicy) {
+				swapsNeeded = true
 			}
 		}
 	}
 
-	return candidates, nil
+	return candidates, swapsNeeded, nil
 }
 
 func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
@@ -2268,12 +2287,12 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
-	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+	// Node-level migration state is only reported by CB server >= 7.6.
+	if !atleast76 {
 		return nil
 	}
 
-	candidates, err := c.getBucketMigrationCandidates()
+	candidates, swapsNeeded, err := c.getBucketMigrationCandidates()
 	if err != nil {
 		return err
 	}
@@ -2285,7 +2304,19 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
+	// Always set the condition so reconcileBuckets uses the migration-safe API
+	// to push corrective bucket updates — regardless of whether swap routines
+	// are enabled.
 	r.c.cluster.Status.SetBucketMigrationCondition()
+
+	// Swap-rebalances are skipped when either:
+	// * Migration routines are disabled (operator not permitted to eject pods), or
+	// * Every overridden node already carries the vBucket format spec desires
+	//   (the bucket setting drifted then was reverted before any data movement —
+	//   reconcileBuckets will push the corrective REST update this tick).
+	if !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines || !swapsNeeded {
+		return nil
+	}
 
 	migrationCandidates := couchbaseutil.MemberSet{}
 

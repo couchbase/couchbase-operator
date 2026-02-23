@@ -96,6 +96,16 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 
 		applyBucketStorageBackend(&b, bucket, storageBackendSupported, magmaStorageBackendSupported, cluster)
 
+		// If eviction policy is not explicitly set in the CRD, fill in the server default so that
+		// status always stores a resolved value (never ""), mirroring how storage backend behaves.
+		if b.EvictionPolicy == "" {
+			if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma {
+				b.EvictionPolicy = string(couchbasev2.CouchbaseBucketEvictionPolicyFullEviction)
+			} else {
+				b.EvictionPolicy = string(couchbasev2.CouchbaseBucketEvictionPolicyValueOnly)
+			}
+		}
+
 		// Defaults to true, when bucket is magma.
 		// Hence, setting it to true to avoid false reconciliation updates.
 		if b.BucketStorageBackend == couchbaseutil.CouchbaseStorageBackendMagma && supportedHistoryRetention {
@@ -184,8 +194,6 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			if bucket.Spec.OnlineEvictionPolicyChange {
 				noRestart := true
 				b.NoRestart = &noRestart
-			} else if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-				b.EvictionPolicy = string(bucket.Spec.EvictionPolicy)
 			}
 
 			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
@@ -272,6 +280,12 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			ConflictResolution: string(bucket.Spec.ConflictResolution),
 			EnableFlush:        bucket.Spec.EnableFlush,
 			CompressionMode:    couchbaseutil.CompressionMode(bucket.Spec.CompressionMode),
+		}
+
+		// If eviction policy is not explicitly set in the CRD, fill in the server default so that
+		// status always stores a resolved value (never ""), mirroring how storage backend behaves.
+		if b.EvictionPolicy == "" {
+			b.EvictionPolicy = string(couchbasev2.CouchbaseEphemeralBucketEvictionPolicyNoEviction)
 		}
 
 		if durablitySupported {
@@ -453,13 +467,24 @@ func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.
 	for _, r := range requested {
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				val, ok := couchbaseBucketMap[r.BucketName]
-				if ok && string(val.Spec.StorageBackend) == string(r.BucketStorageBackend) {
-					r.BucketStorageBackend = a.BucketStorageBackend
+				// If the server-reported eviction policy differs from the last-reconciled value
+				// in cluster status, the server was externally patched (drift). Reset
+				// a.EvictionPolicy to the status value so the validation runner never sees a
+				// spurious diff.
+				if statusEviction := c.cluster.Status.GetBucketEvictionPolicyFromStatus(a.BucketName); statusEviction != "" &&
+					statusEviction != a.EvictionPolicy {
+					a.EvictionPolicy = statusEviction
 				}
 
-				if ok && string(val.Spec.EvictionPolicy) == r.EvictionPolicy {
-					r.EvictionPolicy = a.EvictionPolicy
+				// If the server-reported backend differs from the last-reconciled value
+				// in cluster status, the server was externally patched (drift). Reset
+				// a.BucketStorageBackend to the status value so that
+				// ConvertAbstractBucketToAPIBucket sets Spec.StorageBackend to the
+				// last-reconciled backend. CheckChangeConstraintsBucket then sees
+				// prevBackend == currBackend and migration validators don't fire.
+				if statusBackend := c.cluster.Status.GetBucketStorageBackendFromStatus(a.BucketName); statusBackend != "" &&
+					couchbaseutil.CouchbaseStorageBackend(statusBackend) != a.BucketStorageBackend {
+					a.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(statusBackend)
 				}
 
 				if !reflect.DeepEqual(r, a) {
@@ -582,22 +607,33 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 					a.NoRestart = r.NoRestart
 				}
 
+				// If eviction policy is not explicitly set in the CRD, the operator enforces its
+				// resolved default (valueOnly for couchstore, fullEviction for magma). Log when
+				// the server currently differs so the change is visible in operator logs.
+				if !isEvictionPolicyExplicitlySet(c, &r) {
+					if r.EvictionPolicy != a.EvictionPolicy {
+						log.Info("Bucket eviction policy not explicitly set in CRD, defaulting to requested value.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "requested-eviction-policy", r.EvictionPolicy)
+					}
+				}
+
+				// If storage backend is not explicitly set in the CRD, the operator enforces its
+				// resolved default. Log when the server currently differs.
+				if !isStorageBackendExplicitlySet(c, &r) {
+					if r.BucketStorageBackend != a.BucketStorageBackend {
+						log.Info("Bucket storage backend not explicitly set in CRD, defaulting to requested value.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "requested-backend", r.BucketStorageBackend)
+					}
+				}
+
 				if a.BucketType != r.BucketType {
 					log.Info("Bucket type cannot be changed so recreating with requested type", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-type", a.BucketType, "requested-type", r.BucketType)
 					remove = append(remove, a)
 					create = append(create, r)
 				} else if !reflect.DeepEqual(r, a) {
-					if r.BucketStorageBackend != a.BucketStorageBackend && !isStorageBackendExplicitlySet(c, &r) {
-						log.Info("Skipping bucket storage backend change as the backend was not set explicitly.", "cluster", c.namespacedName(), "bucket-name", r.BucketName, "current-backend", a.BucketStorageBackend, "requested-backend", r.BucketStorageBackend)
-						found = true
-						continue
-					}
-
 					setBucketFieldsForEncoding(&r, isOver71)
 
 					// During migration, use specialized API that only sends allowed fields.
 					// Otherwise, use normal full update.
-					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) || r.BucketStorageBackend != a.BucketStorageBackend {
+					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
 						updateDuringMigration = append(updateDuringMigration, r)
 					} else {
 						update = append(update, r)
@@ -656,6 +692,25 @@ func isStorageBackendExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
 		if bucket.GetCouchbaseName() == r.BucketName {
 			_, explicit := bucket.GetStorageBackend(c.cluster)
 			return explicit
+		}
+	}
+
+	return true
+}
+
+func isEvictionPolicyExplicitlySet(c *Cluster, r *couchbaseutil.Bucket) bool {
+	switch r.BucketType {
+	case constants.BucketTypeCouchbase:
+		for _, bucket := range c.k8s.CouchbaseBuckets.List() {
+			if bucket.GetCouchbaseName() == r.BucketName {
+				return bucket.Spec.EvictionPolicy != ""
+			}
+		}
+	case constants.BucketTypeEphemeral:
+		for _, bucket := range c.k8s.CouchbaseEphemeralBuckets.List() {
+			if bucket.GetCouchbaseName() == r.BucketName {
+				return bucket.Spec.EvictionPolicy != ""
+			}
 		}
 	}
 
