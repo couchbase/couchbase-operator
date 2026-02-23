@@ -244,7 +244,7 @@ The address and port of the Kubernetes API server
 --server-image::
 *Type*: string
 +
-*Default*: couchbase/server:7.1.3
+*Default*: couchbase/server:8.0.0
 +
 Couchbase server image
 
