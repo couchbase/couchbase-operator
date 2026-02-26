@@ -1317,8 +1317,21 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	return nil
 }
 
-func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList) (couchbaseutil.MemberSet, error) {
-	return c.selectOrderedUpgradeCandidates(candidates, "")
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList, zoneChanges map[string]couchbaseutil.Member) (couchbaseutil.MemberSet, bool, error) {
+	zoneChange := false
+
+	candidateList, err := c.selectOrderedUpgradeCandidates(candidates, "")
+	if err != nil {
+		return nil, false, err
+	}
+
+	for _, candidate := range candidateList {
+		if _, ok := zoneChanges[candidate.Name()]; ok {
+			zoneChange = true
+		}
+	}
+
+	return candidateList, zoneChange, nil
 }
 
 // selectUpgradeCandidates returns the candidates that can be upgraded this turn, determined by the upgrade strategy and
@@ -1874,7 +1887,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	orderedCandidates, zoneChangeDetected, err := c.getUpgradeCandidates()
+	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates()
 	if err != nil {
 		return err
 	}
@@ -1887,7 +1900,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	r.log()
 
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
-	constrainedCandidates, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates)
+	constrainedCandidates, zoneChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges)
 	if err != nil {
 		return err
 	}
