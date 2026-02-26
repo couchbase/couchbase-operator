@@ -1,4 +1,4 @@
-FROM docker.io/redhat/ubi8-minimal
+FROM docker.io/redhat/ubi8-micro
 LABEL maintainer="docker@couchbase.com"
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
 
