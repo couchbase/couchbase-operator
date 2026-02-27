@@ -197,6 +197,21 @@ func (sc *ServerConfig) HasService(service Service) bool {
 	return slices.Contains(sc.Services, service) || (service == "arbiter" && len(sc.Services) == 0)
 }
 
+func (sc *ServerConfig) HasServiceWithout(required, forbidden Service) bool {
+	hasSvc := false
+
+	for _, service := range sc.Services {
+		switch service {
+		case required:
+			hasSvc = true
+		case forbidden:
+			return false
+		}
+	}
+
+	return hasSvc
+}
+
 func (cs *ClusterSpec) Cleanup() {
 }
 
@@ -1946,4 +1961,14 @@ func (c *CouchbaseCluster) RunningVersion(tag string) (bool, error) {
 	}
 
 	return c.IsAtLeastVersion(tag)
+}
+
+func (c *CouchbaseCluster) ShouldRevertCandidateToSwapRebalance(candidate couchbaseutil.Member) bool {
+	if c.Spec.Upgrade == nil || c.Spec.Upgrade.SwapRebalanceIndexServiceUpgrades == nil || !*c.Spec.Upgrade.SwapRebalanceIndexServiceUpgrades {
+		return false
+	}
+
+	candidateConfig := c.Spec.GetServerConfigByName(candidate.Config())
+
+	return candidateConfig != nil && candidateConfig.HasServiceWithout(IndexService, DataService)
 }

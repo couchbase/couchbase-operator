@@ -2978,3 +2978,167 @@ func TestInPlaceUpgradeServerGroupZoneAddedWithPV(t *testing.T) {
 	MustWaitForRzaMap(t, kubernetes, cluster, expectedRzaMap, 10*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 }
+
+// TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride tests that index nodes are upgraded with SwapRebalance when the override is set,
+// even if InPlaceUpgrade is specified as the upgrade process. It also checks that index nodes that persist on pods that are also running the data
+// service will continue to be upgraded via InPlaceUpgrade.
+func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	serverClassSize := constants.Size2
+
+	// Initialise the cluster. This should have 3 service classes: data + index, query and index only,
+	// and the index swap rebalance override enabled.
+	// The names of the services are in order: default (idx + data), index-only, data-only
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(serverClassSize).Generate(kubernetes)
+
+	idxOnly := cluster.Spec.Servers[0].DeepCopy()
+	idxOnly.Name = "index-only"
+	idxOnly.Services = idxOnly.Services[1:] // Only index service
+	cluster.Spec.Servers = append(cluster.Spec.Servers, *idxOnly)
+	dataOnly := cluster.Spec.Servers[0].DeepCopy()
+	dataOnly.Name = "data-only"
+	dataOnly.Services = dataOnly.Services[:1] // Only data service
+	cluster.Spec.Servers = append(cluster.Spec.Servers, *dataOnly)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess:   couchbasev2.InPlaceUpgrade,
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeServerClasses,
+		UpgradeOrder:     []string{"default", "index-only", "data-only"},
+	}
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	cluster.Annotations["cao.couchbase.com/upgrade.swapRebalanceIndexServiceUpgrades"] = "true"
+
+	// Initialise the cluster, start the upgrade and wait for it to finish.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the upgrade completed successfully.
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect. The specified upgrade order means we should see
+	// 2 InPlaceUpgrades for the default (idx + data) service, then 2 SwapRebalances for the index-only service,
+	// then 2 InPlaceUpgrades for the data only service.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(len(cluster.Spec.Servers) * serverClassSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: serverClassSize, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}}, // default (data + index)
+		eventschema.Repeat{Times: serverClassSize, Validator: e2eutil.SwapRebalanceSequence}, // index-only service
+		eventschema.Repeat{Times: serverClassSize, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}}, // data-only
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate tests that all upgrade candidates in a reconciliation loop are upgraded with SwapRebalance
+// when the override is set if any of those candidates contain the index service, even if InPlaceUpgrade is specified as the upgrade process.
+// It also checks that index nodes that persist on pods that are also running the data service will continue to be upgraded via InPlaceUpgrade.
+func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	serverClassSize := constants.Size2
+
+	// Initialise the cluster. This should have 3 service classes: data + index, query and index only,
+	// and the index swap rebalance override enabled.
+	// The names of the services are in order: default (idx + data), index-only, data-only
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(serverClassSize).Generate(kubernetes)
+
+	idxOnly := cluster.Spec.Servers[0].DeepCopy()
+	idxOnly.Name = "index-only"
+	idxOnly.Services = idxOnly.Services[1:] // Only index service
+	cluster.Spec.Servers = append(cluster.Spec.Servers, *idxOnly)
+	dataOnly := cluster.Spec.Servers[0].DeepCopy()
+	dataOnly.Name = "data-only"
+	dataOnly.Services = dataOnly.Services[:1] // Only data service
+	cluster.Spec.Servers = append(cluster.Spec.Servers, *dataOnly)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess:   couchbasev2.InPlaceUpgrade,
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
+		RollingUpgrade: &couchbasev2.RollingUpgradeConstraints{
+			MaxUpgradable: 2,
+		},
+	}
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+
+	cluster.Annotations["cao.couchbase.com/upgrade.swapRebalanceIndexServiceUpgrades"] = "true"
+
+	// Initialise the cluster, start the upgrade and wait for it to finish.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Nodes will be created in order of the server classes. Therefore:
+	// 0000 and 0001 = default (idx + data)
+	// 0002 and 0003 = index-only
+	// 0004 and 0005 = data-only
+	// Given maxUpgradable is 2, we want to configure the upgrade order
+	// so two candidate groups will contain one node that has the index service only,
+	// and therefore will trigger both members in that group to be upgraded via swap rebalance.
+	// The final 2 candidates should be upgraded via InPlaceUpgrade.
+	upgradeOrderIndexes := []int{3, 0, 2, 4, 1, 5}
+	upgradeOrder := make([]string, len(upgradeOrderIndexes))
+	for i, index := range upgradeOrderIndexes {
+		upgradeOrder[i] = couchbaseutil.CreateMemberName(cluster.Name, index)
+	}
+
+	cluster.Spec.Upgrade.UpgradeOrder = upgradeOrder
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/upgrade/upgradeOrder", upgradeOrder), time.Minute)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the upgrade completed successfully.
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	// - Cluster Created
+	// - Upgrade Started. MaxUpgradable set to 2, so we should see 3 upgrade sequences in total
+	// - Candidates 3 (index-only) and 0 (default) = swap rebalance due to index-only presence
+	// - Candidates 2 (index-only) and 4 (data-only) = swap rebalance due to index-only presence
+	// - Candidates 1 and 5 = InPlaceUpgrade as no index-only candidates. These cannot be
+	// upgraded together as the upgrade order is not by server group, so we expect two separate sequences here, one for each candidate.
+	// - Upgrade Finished
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(len(cluster.Spec.Servers) * serverClassSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: 2, Validator: e2eutil.MultiNodeSwapRebalanceSequence(2)},
+		eventschema.Repeat{Times: 2, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

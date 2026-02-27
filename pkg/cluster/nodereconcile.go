@@ -1801,6 +1801,12 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 			canDoInPlaceReschedule = false
 			break
 		}
+
+		// If any of the candidates are index nodes and the cluster is configured to revert index node moves to swap rebalance, then we can't do in-place rescheduling.
+		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) {
+			canDoInPlaceReschedule = false
+			break
+		}
 	}
 
 	if c.cluster.GetUpgradeProcess() == couchbasev2.DeltaRecovery {
@@ -1936,21 +1942,26 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
 		allCandidatesRecoverable := true
+		swapRebalanceIndexNodes := false
 		for _, candidate := range constrainedCandidates {
 			if !c.isPodRecoverable(candidate) {
 				allCandidatesRecoverable = false
 				break
 			}
+
+			if swapRebalanceIndexNodes = c.cluster.ShouldRevertCandidateToSwapRebalance(candidate); swapRebalanceIndexNodes {
+				break
+			}
 		}
 
 		switch {
-		case allCandidatesRecoverable && !zoneChangeDetected:
+		case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes:
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
-
 		case allCandidatesRecoverable && zoneChangeDetected:
 			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-
+		case allCandidatesRecoverable && swapRebalanceIndexNodes:
+			log.Info("An upgrade candidate has the index service and SwapRebalanceIndexServiceUpgrade enabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		default:
 			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}

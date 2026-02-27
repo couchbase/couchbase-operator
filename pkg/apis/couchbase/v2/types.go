@@ -2781,6 +2781,11 @@ type UpgradeSpec struct {
 	// If `spec.upgrade.upgradeOrderType` is set to "ServerClasses" then the sequence will be a list of server class names.
 	// If `spec.upgrade.upgradeOrderType` is set to "Services" then the sequence will be a list of service names.
 	UpgradeOrder []string `json:"upgradeOrder,omitempty"`
+
+	// SwapRebalanceIndexServiceUpgrades controls whether upgrades to pods that are running the Index service should
+	// always be swap rebalanced, regardless of the specified upgrade process. This is only used when a node does not also
+	// have the data service.
+	SwapRebalanceIndexServiceUpgrades *bool `json:"-" annotation:"swapRebalanceIndexServiceUpgrades"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
@@ -2824,7 +2829,7 @@ type ClusterSpec struct {
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
 
 	// Upgrade defines the upgrade configuration for a Couchbase cluster.
-	Upgrade *UpgradeSpec `json:"upgrade,omitempty"`
+	Upgrade *UpgradeSpec `json:"upgrade,omitempty" annotation:"upgrade"`
 
 	// DEPRECATED - By spec.upgrade.upgradeProcess.
 	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
