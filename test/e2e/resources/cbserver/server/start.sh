@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# Copyright 2018-Present Couchbase, Inc.
+#
+# Use of this software is governed by the Business Source License included in
+# the file licenses/BSL-Couchbase.txt.  As of the Change Date specified in that
+# file, in accordance with the Business Source License, use of this software
+# will be governed by the Apache License, Version 2.0, included in the file
+# licenses/APL2.txt.
+
 ######## usage
 # 	start with ipv6 mode and assign cb1.ipv6.couchbase.com in DNS(172.17.0.2)
 # 	./start.sh true cb1 172.17.0.2
