@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+# Copyright 2018-Present Couchbase, Inc.
+#
+# Use of this software is governed by the Business Source License included in
+# the file licenses/BSL-Couchbase.txt.  As of the Change Date specified in that
+# file, in accordance with the Business Source License, use of this software
+# will be governed by the Apache License, Version 2.0, included in the file
+# licenses/APL2.txt.
+
 BUILD_DIR=${WORKSPACE_DIR}/build
 CBOPCFG=${WORKSPACE_DIR}/build/bin/cbopcfg
 OPERATOR_VERSION=$(grep -o '[0-9]\.[0-9]\.[0-9]' ${WORKSPACE_DIR}/pkg/version/version.go)
