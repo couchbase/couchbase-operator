@@ -155,6 +155,44 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	return supports
 }
 
+func (c *Cluster) GetRunningImageForVersion(version string) string {
+	// First check running pods
+	runningPods, _ := c.getClusterPodsByPhase()
+
+	for _, pod := range runningPods {
+		if v, ok := pod.Annotations[constants.CouchbaseVersionAnnotationKey]; !ok || v != version {
+			continue
+		}
+
+		containers := pod.Spec.Containers
+		for _, con := range containers {
+			if con.Name == constants.CouchbaseContainerName {
+				return con.Image
+			}
+		}
+	}
+
+	// Fallback: check c.members (includes PVC-backed members) to handle deleted pods
+	// This allows version preservation even when all pods of a version are deleted
+	// but haven't been rebalanced out yet (PVCs still exist with version metadata)
+	for _, member := range c.members {
+		if member.Version() != version {
+			continue
+		}
+
+		// Try to get image from PVC annotations
+		for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+			if name, ok := pvc.Labels[constants.LabelNode]; ok && name == member.Name() {
+				if image, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {
+					return image
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
 func (c *Cluster) GetLowestMemberVersion() string {
 	versions := c.GetRunningVersions()
 

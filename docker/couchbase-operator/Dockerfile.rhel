@@ -6,15 +6,9 @@
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
 
-FROM docker.io/redhat/ubi8-minimal
+FROM docker.io/redhat/ubi8-micro
 LABEL maintainer="docker@couchbase.com"
 ARG WORKDIR=/tmp/src/github.com/couchbase/couchbase-operator
-
-# ubi-minimal updates frequently and has very few packages installed,
-# so no need for a "security-only" update.
-RUN microdnf update \
- && microdnf -y install shadow-utils \
- && microdnf clean all
 
 # Add licenses and help file
 COPY License.txt /licenses/License.txt
@@ -28,7 +22,6 @@ ARG OPERATOR_BUILD
 # Install Couchbase Operator
 COPY openshift-linux-${TARGETARCH}/couchbase-operator /usr/local/bin/
 
-RUN useradd -u 8453 -m -s /bin/false couchbase
 USER 8453
 
 LABEL name="couchbase/operator" \

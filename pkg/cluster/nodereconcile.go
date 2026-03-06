@@ -1060,7 +1060,10 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 			candidates, _, err := c.needsUpgrade()
 			return candidates, err
 		},
-		c.getBucketMigrationCandidates,
+		func() (couchbaseutil.MemberSet, error) {
+			candidates, _, err := c.getBucketMigrationCandidates()
+			return candidates, err
+		},
 		c.getNodeServiceMismatchCandidates,
 	}
 
@@ -1327,8 +1330,21 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	return nil
 }
 
-func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList) (couchbaseutil.MemberSet, error) {
-	return c.selectOrderedUpgradeCandidates(candidates, "")
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList, zoneChanges map[string]couchbaseutil.Member) (couchbaseutil.MemberSet, bool, error) {
+	zoneChange := false
+
+	candidateList, err := c.selectOrderedUpgradeCandidates(candidates, "")
+	if err != nil {
+		return nil, false, err
+	}
+
+	for _, candidate := range candidateList {
+		if _, ok := zoneChanges[candidate.Name()]; ok {
+			zoneChange = true
+		}
+	}
+
+	return candidateList, zoneChange, nil
 }
 
 // selectUpgradeCandidates returns the candidates that can be upgraded this turn, determined by the upgrade strategy and
@@ -1558,7 +1574,7 @@ func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVe
 	return retryutil.RetryFor(1*time.Minute, callback)
 }
 
-func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, targetVersion string, canDeltaRecover bool) error {
+func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, canDeltaRecover bool) error {
 	if len(c.members) > 1 {
 		if canDeltaRecover {
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
@@ -1673,9 +1689,8 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 			continue
 		}
 
-		// Update candidate version
-		candidate.SetVersion(targetVersion)
-
+		// Member already has correct version and image from getUpgradeCandidates()
+		// Update PVC annotations to match
 		if c.k8s.PersistentVolumeClaims != nil {
 			// Update volumes
 			pvcState, err := k8sutil.GetPodVolumes(c.k8s, candidate, c.cluster, *serverClass)
@@ -1685,8 +1700,9 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				return err
 			} else if pvcState != nil {
 				for _, volume := range pvcState.List() {
-					volume.Annotations[constants.PVCImageAnnotation] = c.cluster.Spec.Image
-					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = targetVersion
+					// Use candidate's version/image (set by getUpgradeCandidates)
+					volume.Annotations[constants.PVCImageAnnotation] = candidate.GetImage()
+					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
 					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, metav1.UpdateOptions{})
 
 					if err != nil {
@@ -1711,7 +1727,7 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 
 		canInPlaceUpgrade = canInPlaceUpgrade && c.cluster.Spec.ConfigHasStatefulService(candidate.Config())
 
-		if err := r.recreateNode(c, candidate, targetVersion, canInPlaceUpgrade); err != nil {
+		if err := r.recreateNode(c, candidate, canInPlaceUpgrade); err != nil {
 			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 
@@ -1792,6 +1808,12 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		targetVersion = candidate.Version()
 
 		if c.isPodReschedulable(candidate) == false {
+			canDoInPlaceReschedule = false
+			break
+		}
+
+		// If any of the candidates are index nodes and the cluster is configured to revert index node moves to swap rebalance, then we can't do in-place rescheduling.
+		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) {
 			canDoInPlaceReschedule = false
 			break
 		}
@@ -1884,7 +1906,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	orderedCandidates, zoneChangeDetected, err := c.getUpgradeCandidates()
+	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates(true)
 	if err != nil {
 		return err
 	}
@@ -1897,7 +1919,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	r.log()
 
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
-	constrainedCandidates, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates)
+	constrainedCandidates, zoneChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges)
 	if err != nil {
 		return err
 	}
@@ -1930,21 +1952,26 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
 		allCandidatesRecoverable := true
+		swapRebalanceIndexNodes := false
 		for _, candidate := range constrainedCandidates {
 			if !c.isPodRecoverable(candidate) {
 				allCandidatesRecoverable = false
 				break
 			}
+
+			if swapRebalanceIndexNodes = c.cluster.ShouldRevertCandidateToSwapRebalance(candidate); swapRebalanceIndexNodes {
+				break
+			}
 		}
 
 		switch {
-		case allCandidatesRecoverable && !zoneChangeDetected:
+		case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes:
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
-
 		case allCandidatesRecoverable && zoneChangeDetected:
 			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-
+		case allCandidatesRecoverable && swapRebalanceIndexNodes:
+			log.Info("An upgrade candidate has the index service and SwapRebalanceIndexServiceUpgrade enabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		default:
 			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
@@ -2201,20 +2228,23 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 	return false
 }
 
-func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error) {
+// getBucketMigrationCandidates returns nodes that have in-progress backend or
+// eviction-policy migrations, and whether any of those nodes actually require a
+// swap-rebalance to converge to spec.
+func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, swapsNeeded bool, err error) {
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
-	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
-		return nil, nil
+	// Node-level migration fields are only reported by CB server >= 7.6.
+	if !atleast76 {
+		return nil, false, nil
 	}
 
 	bucketSpecs, err := c.gatherBuckets()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	bucketMap := make(map[string]couchbaseutil.Bucket, len(bucketSpecs))
@@ -2225,21 +2255,34 @@ func (c *Cluster) getBucketMigrationCandidates() (couchbaseutil.MemberSet, error
 
 	clusterBuckets := couchbaseutil.BucketStatusList{}
 	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	var candidates = couchbaseutil.MemberSet{}
+	candidates = couchbaseutil.MemberSet{}
 
 	for _, bucket := range clusterBuckets {
+		spec := bucketMap[bucket.BucketName]
+
 		for _, node := range bucket.Nodes {
-			// node.StorageBackend/EvictionPolicy is empty if it matches the bucket storageMode/evictionPolicy
-			if (node.StorageBackend != "" || node.EvictionPolicy != "") && bucket.StorageBackend == bucketMap[bucket.BucketName].BucketStorageBackend && bucket.EvictionPolicy == bucketMap[bucket.BucketName].EvictionPolicy {
-				candidates.Add(c.members[node.HostName.GetMemberName()])
+			// A non-empty value means that node's vBuckets still carry the old
+			// backend/eviction-policy and a migration is in progress.
+			if node.StorageBackend == "" && node.EvictionPolicy == "" {
+				continue
+			}
+
+			candidates.Add(c.members[node.HostName.GetMemberName()])
+
+			// If the node's current vBucket format differs from spec, a
+			// swap-rebalance is required to move the data.  If it already matches
+			// spec the server just needs a corrective REST push — no pod ejection.
+			if (node.StorageBackend != "" && node.StorageBackend != string(spec.BucketStorageBackend)) ||
+				(node.EvictionPolicy != "" && node.EvictionPolicy != spec.EvictionPolicy) {
+				swapsNeeded = true
 			}
 		}
 	}
 
-	return candidates, nil
+	return candidates, swapsNeeded, nil
 }
 
 func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
@@ -2265,12 +2308,12 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	// We can only migrate the nodes if CB server is >= 7.6 and bucket migration routines are enabled
-	if !atleast76 || !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+	// Node-level migration state is only reported by CB server >= 7.6.
+	if !atleast76 {
 		return nil
 	}
 
-	candidates, err := c.getBucketMigrationCandidates()
+	candidates, swapsNeeded, err := c.getBucketMigrationCandidates()
 	if err != nil {
 		return err
 	}
@@ -2282,7 +2325,19 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
+	// Always set the condition so reconcileBuckets uses the migration-safe API
+	// to push corrective bucket updates — regardless of whether swap routines
+	// are enabled.
 	r.c.cluster.Status.SetBucketMigrationCondition()
+
+	// Swap-rebalances are skipped when either:
+	// * Migration routines are disabled (operator not permitted to eject pods), or
+	// * Every overridden node already carries the vBucket format spec desires
+	//   (the bucket setting drifted then was reverted before any data movement —
+	//   reconcileBuckets will push the corrective REST update this tick).
+	if !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines || !swapsNeeded {
+		return nil
+	}
 
 	migrationCandidates := couchbaseutil.MemberSet{}
 
@@ -2329,7 +2384,11 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			return fmt.Errorf("swap rebalance unable to determine server class %s for member %s: %w", candidate.Name(), candidate.Config(), errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		toCreate = append(toCreate, *class)
+		// Member already has correct image from getUpgradeCandidates()
+		// Create a copy and use candidate's image (spec class has latest image)
+		configToUse := *class
+		configToUse.Image = candidate.GetImage()
+		toCreate = append(toCreate, configToUse)
 		candidatesSlice = append(candidatesSlice, candidate)
 	}
 

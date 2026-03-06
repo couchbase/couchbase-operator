@@ -613,7 +613,7 @@ How many pods to collect logs from at the same time
 --server-image::
 *Type*: string
 +
-*Default*: couchbase/server:7.1.3
+*Default*: couchbase/server:8.0.0
 +
 Couchbase server image
 

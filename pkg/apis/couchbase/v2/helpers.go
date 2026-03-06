@@ -207,6 +207,21 @@ func (sc *ServerConfig) HasService(service Service) bool {
 	return slices.Contains(sc.Services, service) || (service == "arbiter" && len(sc.Services) == 0)
 }
 
+func (sc *ServerConfig) HasServiceWithout(required, forbidden Service) bool {
+	hasSvc := false
+
+	for _, service := range sc.Services {
+		switch service {
+		case required:
+			hasSvc = true
+		case forbidden:
+			return false
+		}
+	}
+
+	return hasSvc
+}
+
 func (cs *ClusterSpec) Cleanup() {
 }
 
@@ -344,19 +359,6 @@ func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 		return server.Image
 	}
 	return cs.CouchbaseImage()
-}
-
-// ConstructImageWithVersion takes the current cluster image and replaces its version tag
-// with the specified version. For example, given image "couchbase/server:8.0.0" and
-// version "7.6.8", it returns "couchbase/server:7.6.8".
-func (cs *ClusterSpec) ConstructImageWithVersion(version string) string {
-	image := cs.CouchbaseImage()
-	lastColon := strings.LastIndex(image, ":")
-	if lastColon == -1 {
-		return image + ":" + version
-	}
-
-	return image[:lastColon+1] + version
 }
 
 // LowestInUseCouchbaseVersionImage will get the lowest version couchbase image in the cluster
@@ -941,6 +943,16 @@ func (cs *ClusterStatus) GetBucketStorageBackendFromStatus(bucketName string) Co
 	for _, bucket := range cs.Buckets {
 		if bucket.BucketName == bucketName {
 			return CouchbaseStorageBackend(bucket.BucketStorageBackend)
+		}
+	}
+
+	return ""
+}
+
+func (cs *ClusterStatus) GetBucketEvictionPolicyFromStatus(bucketName string) string {
+	for _, bucket := range cs.Buckets {
+		if bucket.BucketName == bucketName {
+			return bucket.EvictionPolicy
 		}
 	}
 
@@ -1959,4 +1971,14 @@ func (c *CouchbaseCluster) RunningVersion(tag string) (bool, error) {
 	}
 
 	return c.IsAtLeastVersion(tag)
+}
+
+func (c *CouchbaseCluster) ShouldRevertCandidateToSwapRebalance(candidate couchbaseutil.Member) bool {
+	if c.Spec.Upgrade == nil || c.Spec.Upgrade.SwapRebalanceIndexServiceUpgrades == nil || !*c.Spec.Upgrade.SwapRebalanceIndexServiceUpgrades {
+		return false
+	}
+
+	candidateConfig := c.Spec.GetServerConfigByName(candidate.Config())
+
+	return candidateConfig != nil && candidateConfig.HasServiceWithout(IndexService, DataService)
 }

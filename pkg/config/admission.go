@@ -556,25 +556,39 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app": AdmissionResourceName,
+					"app.kubernetes.io/name":     AdmissionResourceName,
+					"app.kubernetes.io/instance": "couchbase-admission",
 				},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"app": AdmissionResourceName,
+						"app.kubernetes.io/name":      AdmissionResourceName,
+						"app.kubernetes.io/instance":  "couchbase-admission",
+						"app.kubernetes.io/component": "admission-webhook",
+						"app.kubernetes.io/part-of":   "couchbase",
 					},
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: AdmissionResourceName,
 					SecurityContext: &corev1.PodSecurityContext{
 						RunAsNonRoot: &nonRoot,
+						SeccompProfile: &corev1.SeccompProfile{
+							Type: corev1.SeccompProfileTypeRuntimeDefault,
+						},
 					},
 					Containers: []corev1.Container{
 						{
 							Name:            AdmissionResourceName,
 							Image:           o.image,
 							ImagePullPolicy: corev1.PullPolicy(o.imagePullPolicy),
+							SecurityContext: &corev1.SecurityContext{
+								AllowPrivilegeEscalation: func() *bool { b := false; return &b }(),
+								ReadOnlyRootFilesystem:   func() *bool { b := true; return &b }(),
+								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
+								},
+							},
 							Command: []string{
 								"couchbase-admission-controller",
 							},
@@ -599,6 +613,19 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 										Scheme: corev1.URISchemeHTTPS,
 									},
 								},
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									HTTPGet: &corev1.HTTPGetAction{
+										Path:   "/readyz",
+										Port:   intstr.FromString("https"),
+										Scheme: corev1.URISchemeHTTPS,
+									},
+								},
+								InitialDelaySeconds: 30,
+								TimeoutSeconds:      5,
+								PeriodSeconds:       30,
+								FailureThreshold:    3,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -653,10 +680,17 @@ func (o *generateAdmissionOptions) getAdmissionService() *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: AdmissionResourceName,
+			Labels: map[string]string{
+				"app.kubernetes.io/name":      AdmissionResourceName,
+				"app.kubernetes.io/instance":  "couchbase-admission",
+				"app.kubernetes.io/component": "admission-webhook",
+				"app.kubernetes.io/part-of":   "couchbase",
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
-				"app": AdmissionResourceName,
+				"app.kubernetes.io/name":     AdmissionResourceName,
+				"app.kubernetes.io/instance": "couchbase-admission",
 			},
 			Ports: []corev1.ServicePort{
 				{

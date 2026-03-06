@@ -166,7 +166,15 @@ func newZapLogLevelVar(value string) zapLogLevelVar {
 func (v *zapLogLevelVar) Set(s string) error {
 	switch s {
 	case "info", "0", "debug", "1", "2":
-		v.value = s
+		// Translate numeric "0" to "info" for controller-runtime zap compatibility.
+		// Controller-runtime's zap accepts "info", "debug", "error" as named levels,
+		// or integer values > 0 for custom debug verbosity levels.
+		// Since zap's InfoLevel = 0, we accept "0" as input but translate to "info".
+		if s == "0" {
+			v.value = "info"
+		} else {
+			v.value = s
+		}
 	default:
 		return fmt.Errorf("log level must be one of [info, 0, debug, 1, 2]")
 	}

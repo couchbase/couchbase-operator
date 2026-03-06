@@ -58,7 +58,7 @@ func CouchbaseVersion(image string) (string, error) {
 	return couchbaseutil.CouchbaseImageVersion(image)
 }
 
-func SetCouchbaseVersion(pod *v1.Pod, image string) error {
+func SetCouchbaseVersionAndImage(pod *v1.Pod, image string) error {
 	version, err := CouchbaseVersion(image)
 	if err != nil {
 		return err

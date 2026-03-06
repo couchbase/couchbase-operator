@@ -46,7 +46,7 @@ func TestPathsToPersist(t *testing.T) {
 		IndexClaim:   claimName,
 	}
 
-	member := couchbaseutil.NewMember("namespace", "cluster", "name", "version", "class", false)
+	member := couchbaseutil.NewMember("namespace", "cluster", "name", "version", "class", false, "")
 
 	paths, err := getPathsToPersist(member, mounts)
 	if err != nil {

@@ -211,6 +211,8 @@ func registerTests() {
 		framework.NewTestDef(TestInPlaceUpgradeNodeSelectorZoneChangesWithPV).WithTags(TagSuiteSanity, TagFeatureUpgrade, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV).WithTags(TagSuiteSanity, TagFeatureUpgrade, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestInPlaceUpgradeServerGroupZoneAddedWithPV).WithTags(TagSuiteSanity, TagFeatureUpgrade, TagFeaturePersistentVolumes),
+		framework.NewTestDef(TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride).WithTags(TagSuiteSanity, TagFeatureUpgrade),
+		framework.NewTestDef(TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate).WithTags(TagSuiteSanity, TagFeatureUpgrade),
 
 		// High priority tests.
 		framework.NewTestDef(TestBucketHistoryRetentionWithAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
@@ -349,6 +351,7 @@ func registerTests() {
 		framework.NewTestDef(TestNodeUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestNodeUpgradeDefaultOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestUpgradePrevent3Versions).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestPreviousVersionPodCountSpecOnlyUpdate).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestPreviousVersionPodCountScaleUp).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),

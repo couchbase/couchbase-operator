@@ -121,7 +121,7 @@ func (c *Configuration) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&c.OperatorImage, operatorImageFlag, "couchbase/operator:"+version.Version, "Operator image name")
 	flags.StringVar(&c.OperatorRestPort, operatorRestPortFlag, "8080", "Operator rest port")
 	flags.StringVar(&c.OperatorMetricsPort, operatorMetricsPortFlag, "8383", "Operator metrics port")
-	flags.StringVar(&c.ServerImage, serverImageFlag, "couchbase/server:7.1.3", "Couchbase server image")
+	flags.StringVar(&c.ServerImage, serverImageFlag, "couchbase/server:8.0.0", "Couchbase server image")
 	flags.StringVar(&c.CollectInfoCollect, collectInfoCollectFlag, "", "Collect couchbase server logs non-interactively, requires the -"+collectInfoFlag+" flag to be set")
 	flags.IntVar(&c.Parallel, parallelFlag, 5, "How many pods to collect logs from at the same time")
 	flags.StringVar(&c.Directory, directoryFlag, "", "Collect logs in a specific directory")

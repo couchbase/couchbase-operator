@@ -386,3 +386,29 @@ func checkPodImageCountMap(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseC
 
 	return nil
 }
+
+// MustCheckAllPodsHaveEnvVar asserts that every Couchbase pod in the cluster has
+// a container env var with the given name and value.
+func MustCheckAllPodsHaveEnvVar(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, name, value string) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	pods, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+	if err != nil {
+		Die(t, err)
+	}
+
+	for _, pod := range pods.Items {
+		found := false
+		for _, env := range pod.Spec.Containers[0].Env {
+			if env.Name == name && env.Value == value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			Die(t, fmt.Errorf("pod %s missing env var %s=%s", pod.Name, name, value))
+		}
+	}
+}

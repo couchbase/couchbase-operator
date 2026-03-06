@@ -565,7 +565,7 @@ func MustEjectMember(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Co
 func MemberFromSpecProps(couchbase *couchbasev2.CouchbaseCluster, serverConfig string, memberIndex int) couchbaseutil.Member {
 	name := couchbaseutil.CreateMemberName(couchbase.Name, memberIndex)
 
-	return couchbaseutil.NewMember(couchbase.Namespace, couchbase.Name, name, "", serverConfig, false)
+	return couchbaseutil.NewMember(couchbase.Namespace, couchbase.Name, name, "", serverConfig, false, "")
 }
 
 func FailoverNodes(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, indexes []int, allowUnsafe bool, timeout time.Duration) error {

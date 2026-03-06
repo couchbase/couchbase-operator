@@ -4032,6 +4032,15 @@ func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope
 		return nil
 	}
 
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(scope.Namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(scope.Namespace); err != nil {
+		return err
+	}
+
 	if err := checkScopeCollectionsUnique(v, scope.Namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
 		errs = append(errs, err)
 	}
@@ -4052,6 +4061,15 @@ func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.Couc
 
 	if checkAnnotationSkipValidation(scopeGroup.Annotations) {
 		return nil
+	}
+
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(scopeGroup.Namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(scopeGroup.Namespace); err != nil {
+		return err
 	}
 
 	if err := checkScopeCollectionsUnique(v, scopeGroup.Namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
@@ -4304,6 +4322,15 @@ func validateKMIPKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey
 // we check every scope in the namespace in case a scope references the collection, before validating
 // each of those scopes individually.
 func checkAllScopeCollectionsUnique(v *types.Validator, namespace string) error {
+	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
+	if err := v.Abstraction.InitCollectionCache(namespace); err != nil {
+		return err
+	}
+
+	if err := v.Abstraction.InitCollectionGroupCache(namespace); err != nil {
+		return err
+	}
+
 	scopes, err := v.Abstraction.GetCouchbaseScopes(namespace, nil)
 	if err != nil {
 		return err
@@ -4352,17 +4379,17 @@ func checkScopeCollectionsUnique(v *types.Validator, namespace, kind, resourceNa
 
 	names := nameFirstDefinitionMap{}
 
-	if err := checkScopeCollectionsUniqueExplicit(v, namespace, kind, resourceName, selector, names); err != nil {
+	if err := checkScopeCollectionsUniqueExplicit(v, namespace, kind, resourceName, selector.Resources, names); err != nil {
 		return err
 	}
 
-	return checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector, names)
+	return checkScopeCollectionsUniqueImplicit(v, namespace, kind, resourceName, selector.Selector, names)
 }
 
 // checkScopeCollectionsUniqueExplicit checks collections included in a scope by reference have
 // unique names.
-func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
-	for _, resource := range selector.Resources {
+func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, resourceName string, resources []couchbasev2.CollectionLocalObjectReference, names nameFirstDefinitionMap) error {
+	for _, resource := range resources {
 		switch resource.Kind {
 		case couchbasev2.CollectionCRDResourceKind:
 			collection, found, err := v.Abstraction.GetCouchbaseCollection(namespace, resource.StrName())
@@ -4410,12 +4437,12 @@ func checkScopeCollectionsUniqueExplicit(v *types.Validator, namespace, kind, re
 
 // checkScopeCollectionsUniqueImplicit checks collections included in a scope by label selector have
 // unique names.
-func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *couchbasev2.CollectionSelector, names nameFirstDefinitionMap) error {
-	if selector.Selector == nil {
+func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, resourceName string, selector *metav1.LabelSelector, names nameFirstDefinitionMap) error {
+	if selector == nil {
 		return nil
 	}
 
-	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, selector.Selector)
+	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, selector)
 	if err != nil {
 		return err
 	}
@@ -4431,7 +4458,7 @@ func checkScopeCollectionsUniqueImplicit(v *types.Validator, namespace, kind, re
 		}
 	}
 
-	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, selector.Selector)
+	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, selector)
 	if err != nil {
 		return err
 	}
@@ -4881,10 +4908,6 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 		errs = append(errs, err)
 	}
 
-	if err := checkChangeConstraintsSidecar(prev, curr); err != nil {
-		errs = append(errs, err)
-	}
-
 	if err := checkChangeConstraintsPreviousVersionPodCount(prev, curr); err != nil {
 		errs = append(errs, err)
 	}
@@ -4894,23 +4917,6 @@ func CheckChangeConstraintsCluster(v *types.Validator, prev, curr *couchbasev2.C
 	}
 
 	return false, nil
-}
-
-func checkChangeConstraintsSidecar(prev, curr *couchbasev2.CouchbaseCluster) error {
-	upgradeCondition := curr.HasCondition(couchbasev2.ClusterConditionUpgrading)
-	mixedModeCondition := curr.HasCondition(couchbasev2.ClusterConditionMixedMode)
-
-	if upgradeCondition || mixedModeCondition {
-		if !reflect.DeepEqual(prev.Spec.Logging, curr.Spec.Logging) {
-			return fmt.Errorf("server logging is immutable in mixed mode or during upgrade")
-		}
-
-		if !reflect.DeepEqual(prev.Spec.Networking.CloudNativeGateway, curr.Spec.Networking.CloudNativeGateway) {
-			return fmt.Errorf("cloud native gateway spec cannot be changed in mixed mode or during upgrade")
-		}
-	}
-
-	return nil
 }
 
 // checkChangeConstraintsPreviousVersionPodCount validates changes to previousVersionPodCount
@@ -5178,13 +5184,13 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 		// currBackend is the desired backend
 		currBackend, _ := curr.GetStorageBackend(c)
 
-		// prevBackend is the one currently in use. If it isn't explicitly set, we'll check the cluster status.
-		prevBackend, explicit := prev.GetStorageBackend(c)
-		if !explicit {
-			if statusBackend := c.Status.GetBucketStorageBackendFromStatus(prev.GetCouchbaseName()); statusBackend != "" {
-				prevBackend = statusBackend
-			}
-		}
+		// prevBackend is the previously applied backend.
+		// At admission time this is the old CRD's Spec.StorageBackend as stored in etcd.
+		// At runtime (via validateBucketsChangeConstraints), GetBucketsToUpdate has already
+		// reset a.BucketStorageBackend to the status value for any server-side drift, so
+		// prev.Spec.StorageBackend reflects the last-reconciled desired state rather than
+		// a live server value — migration validators won't fire for drift reversions.
+		prevBackend, _ := prev.GetStorageBackend(c)
 
 		if prevBackend != currBackend || prev.IsSampleBucket() && !curr.IsSampleBucket() {
 			if err := checkClusterValidForBucketMigration(v, curr, c); err != nil {

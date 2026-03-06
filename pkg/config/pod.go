@@ -179,11 +179,21 @@ func (o *podOptions) generate(flags *genericclioptions.ConfigFlags) ([]runtime.O
 		if err != nil {
 			return nil, err
 		}
+
+		// Increment and update the pod index to avoid reuse in future --autoIndex calls
+		persistenceStorage, err := persistence.New(k8sClient, cbc)
+		if err != nil {
+			return nil, err
+		}
+		if err := persistenceStorage.Upsert(persistence.PodIndex, strconv.Itoa(index+1)); err != nil {
+			return nil, err
+		}
 	}
 
 	resources := []runtime.Object{}
 	memberName := couchbaseutil.CreateMemberName(cbc.Name, index)
-	m := couchbaseutil.NewMember(namespace, cbc.Name, memberName, cbc.Spec.Image, o.serverClass, cbc.IsTLSEnabled())
+	// Member image set to spec image for new pod creation
+	m := couchbaseutil.NewMember(namespace, cbc.Name, memberName, cbc.Spec.Image, o.serverClass, cbc.IsTLSEnabled(), cbc.Spec.Image)
 	pvcState := &k8sutil.PersistentVolumeClaimState{}
 
 	if serverClass.GetVolumeMounts() != nil {

@@ -1434,6 +1434,7 @@ type CouchbaseBucketSpec struct {
 	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
 	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
 	// This field is only supported for Couchbase Server 8.0.0+.
+	// DEVELOPER PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	// +kubebuilder:validation:Optional
 	OnlineEvictionPolicyChange bool `json:"onlineEvictionPolicyChange,omitempty"`
 
@@ -1774,14 +1775,6 @@ type CouchbaseEphemeralBucketSpec struct {
 	// DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
 	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
-
-	// OnlineEvictionPolicyChange controls whether eviction policy changes can be made online
-	// without requiring a bucket restart. If set the eviction policy change will only take effect
-	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
-	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
-	// This field is only supported for Couchbase Server 8.0.0+.
-	// +kubebuilder:validation:Optional
-	OnlineEvictionPolicyChange bool `json:"onlineEvictionPolicyChange,omitempty"`
 }
 
 type CouchbaseBucketWarmupBehavior string
@@ -2798,6 +2791,11 @@ type UpgradeSpec struct {
 	// If `spec.upgrade.upgradeOrderType` is set to "ServerClasses" then the sequence will be a list of server class names.
 	// If `spec.upgrade.upgradeOrderType` is set to "Services" then the sequence will be a list of service names.
 	UpgradeOrder []string `json:"upgradeOrder,omitempty"`
+
+	// SwapRebalanceIndexServiceUpgrades controls whether upgrades to pods that are running the Index service should
+	// always be swap rebalanced, regardless of the specified upgrade process. This is only used when a node does not also
+	// have the data service.
+	SwapRebalanceIndexServiceUpgrades *bool `json:"-" annotation:"swapRebalanceIndexServiceUpgrades"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
@@ -2841,7 +2839,7 @@ type ClusterSpec struct {
 	RecoveryPolicy *RecoveryPolicy `json:"recoveryPolicy,omitempty"`
 
 	// Upgrade defines the upgrade configuration for a Couchbase cluster.
-	Upgrade *UpgradeSpec `json:"upgrade,omitempty"`
+	Upgrade *UpgradeSpec `json:"upgrade,omitempty" annotation:"upgrade"`
 
 	// DEPRECATED - By spec.upgrade.upgradeProcess.
 	// UpgradeProcess defines the process that will be used when performing a couchbase cluster upgrade.
