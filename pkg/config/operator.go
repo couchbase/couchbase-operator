@@ -72,6 +72,15 @@ const (
 	debug = "debug"
 	// dlv requires a specific port be specified otherwise a random one is used.
 	debugPort = "30123"
+
+	// operatorMetricsTLSMountPath is the directory inside the operator pod where
+	// the TLS secret is mounted.  The operator binary reads tls.crt and tls.key
+	// from this directory when --secure-metrics-cert-file/key-file are set.
+	operatorMetricsTLSMountPath = "/var/run/secrets/couchbase.com/couchbase-operator-metrics"
+
+	// operatorMetricsTLSVolumeName is the pod-internal Volume name for the
+	// metrics TLS secret mount.  It is independent of the user's secret name.
+	operatorMetricsTLSVolumeName = "metrics-tls"
 )
 
 // generateOperatorOptions defines the options for creating the operator.
@@ -129,6 +138,11 @@ type generateOperatorOptions struct {
 
 	// useHighCardinalityMetrics allows you to add high cardinality labels for http request metrics.
 	useHighCardinalityMetrics bool
+
+	// metricsTLSSecret is the name of an existing K8s Secret (tls.crt + tls.key)
+	// to mount into the operator pod for serving metrics over HTTPS.
+	// When empty (default) metrics are served over plain HTTP.
+	metricsTLSSecret string
 }
 
 // newGenerateOperatorOptions returns a set of options with defaults applied.
@@ -167,6 +181,7 @@ func (o *generateOperatorOptions) registerOperatorGenerateFlags(cmd *cobra.Comma
 	cmd.Flags().Var(&o.optionalMetricLabels, "optional-metric-labels", "Whether to add cluster uuid or cluster uuid and cluster name to prometheus metrics as labels. Allowed 'uuid-only' or 'uuid-and-name'.")
 	cmd.Flags().BoolVar(&o.separateMetricClusternameAndNamespace, "separate-cluster-namespace-and-name", true, "Separates cluster name and namespace from certain metrics.")
 	cmd.Flags().BoolVar(&o.useHighCardinalityMetrics, "use-high-cardinality-metrics", false, "Adds high cardinality labels for http request metrics.")
+	cmd.Flags().StringVar(&o.metricsTLSSecret, "metrics-tls-secret", "", "Name of an existing Kubernetes Secret containing 'tls.crt' and 'tls.key'. When set, the metrics server listens over HTTPS on the same port instead of plain HTTP.")
 	_ = cmd.Flags().MarkHidden(debug)
 }
 
@@ -807,6 +822,46 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 			Name:  "use-high-cardinality-metrics",
 			Value: strconv.FormatBool(o.useHighCardinalityMetrics),
 		})
+	}
+
+	if o.metricsTLSSecret != "" {
+		// Flip the Prometheus scrape annotation from http to https so scrapers
+		// know to use TLS when contacting this pod.
+		deployment.Spec.Template.ObjectMeta.Annotations[constants.AnnotationPrometheusScheme] = "https"
+
+		// Tell the operator binary where to find the cert files on disk.
+		// main.go reads these flags and sets SecureServing on the metrics server.
+		deployment.Spec.Template.Spec.Containers[0].Args = append(
+			deployment.Spec.Template.Spec.Containers[0].Args,
+			"--secure-metrics-cert-file="+operatorMetricsTLSMountPath+"/tls.crt",
+			"--secure-metrics-key-file="+operatorMetricsTLSMountPath+"/tls.key",
+		)
+
+		// Mount the user-provided Secret at a fixed path inside the container.
+		// Kubernetes projects Secret.Data keys (tls.crt, tls.key) as files.
+		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			deployment.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      operatorMetricsTLSVolumeName,
+				MountPath: operatorMetricsTLSMountPath,
+				ReadOnly:  true,
+			},
+		)
+
+		// Declare the Volume backed by the user's pre-existing Secret.
+		// The volume name is a fixed pod-internal label; the SecretName is
+		// what the user passed via --metrics-tls-secret.
+		deployment.Spec.Template.Spec.Volumes = append(
+			deployment.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: operatorMetricsTLSVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: o.metricsTLSSecret,
+					},
+				},
+			},
+		)
 	}
 
 	if o.withResources {

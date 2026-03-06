@@ -455,6 +455,11 @@ Memory limit for constraining
 +
 Memory requested for scheduling
 
+--metrics-tls-secret::
+*Type*: string
++
+Name of an existing Kubernetes Secret containing 'tls.crt' and 'tls.key'. When set, the metrics server listens over HTTPS on the same port instead of plain HTTP.
+
 --optional-metric-labels::
 *Type*: string
 +
@@ -1566,6 +1571,11 @@ Memory limit for constraining
 *Default*: 200Mi
 +
 Memory requested for scheduling
+
+--metrics-tls-secret::
+*Type*: string
++
+Name of an existing Kubernetes Secret containing 'tls.crt' and 'tls.key'. When set, the metrics server listens over HTTPS on the same port instead of plain HTTP.
 
 --optional-metric-labels::
 *Type*: string

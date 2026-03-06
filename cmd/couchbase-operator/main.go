@@ -17,6 +17,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/apis"
@@ -55,6 +56,11 @@ var (
 
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
+
+	// secureMetricsCertFile and secureMetricsKeyFile are set via flags to opt into TLS.
+	// When both are non-empty the metrics server listens on HTTPS instead of HTTP.
+	secureMetricsCertFile string
+	secureMetricsKeyFile  string
 )
 
 var log = logf.Log.WithName("main")
@@ -75,6 +81,8 @@ func main() {
 	pflag.StringVar(&podReadinessPeriod, "pod-readiness-period", "20s", "Sets the period between readiness probes")
 	pflag.IntVar(&podRecoveryMaxRetries, "pod-recovery-max-retries", 0, "Maximum number of pod recovery retries before falling back to swap rebalance. 0 means infinite retries (default behavior)")
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
+	pflag.StringVar(&secureMetricsCertFile, "secure-metrics-cert-file", "", "Path to the TLS certificate file for the metrics server. When set alongside --secure-metrics-key-file, metrics are served over HTTPS on the same port instead of HTTP.")
+	pflag.StringVar(&secureMetricsKeyFile, "secure-metrics-key-file", "", "Path to the TLS private key file for the metrics server.")
 	pflag.Parse()
 
 	// Route all library logging to the ZAP JSON logger.
@@ -108,15 +116,26 @@ func main() {
 
 	log.V(1).Info("Initializing resource manager.")
 
+	// Build the metrics server options.  By default this is plain HTTP.  When
+	// both cert and key flags are provided we enable TLS.
+	metricsOpts := server.Options{
+		BindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
+	}
+
+	if secureMetricsCertFile != "" && secureMetricsKeyFile != "" {
+		metricsOpts.SecureServing = true
+		metricsOpts.CertDir = filepath.Dir(secureMetricsCertFile)
+		metricsOpts.CertName = filepath.Base(secureMetricsCertFile)
+		metricsOpts.KeyName = filepath.Base(secureMetricsKeyFile)
+	}
+
 	mgr, err := manager.New(cfg, manager.Options{
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
 				namespace: {LabelSelector: labels.Everything(), FieldSelector: fields.Everything()},
 			},
 		},
-		Metrics: server.Options{
-			BindAddress: fmt.Sprintf("%s:%d", metricsHost, metricsPort),
-		},
+		Metrics:                 metricsOpts,
 		LeaderElection:          true,
 		LeaderElectionNamespace: namespace,
 		LeaderElectionID:        "couchbase-operator",
