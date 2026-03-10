@@ -1330,21 +1330,29 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	return nil
 }
 
-func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(candidates couchbaseutil.MemberList, zoneChanges map[string]couchbaseutil.Member) (couchbaseutil.MemberSet, bool, error) {
+func (c *Cluster) selectUpgradeCandidatesIgnoringOrchestrator(
+	candidates couchbaseutil.MemberList,
+	zoneChanges map[string]couchbaseutil.Member,
+	pvcChanges map[string]couchbaseutil.Member,
+) (couchbaseutil.MemberSet, bool, bool, error) {
 	zoneChange := false
+	pvcChange := false
 
 	candidateList, err := c.selectOrderedUpgradeCandidates(candidates, "")
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 
 	for _, candidate := range candidateList {
 		if _, ok := zoneChanges[candidate.Name()]; ok {
 			zoneChange = true
 		}
+		if _, ok := pvcChanges[candidate.Name()]; ok {
+			pvcChange = true
+		}
 	}
 
-	return candidateList, zoneChange, nil
+	return candidateList, zoneChange, pvcChange, nil
 }
 
 // selectUpgradeCandidates returns the candidates that can be upgraded this turn, determined by the upgrade strategy and
@@ -1867,6 +1875,7 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
 }
 
+// nolint:gocognit,gocyclo
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
@@ -1906,7 +1915,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
-	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates(true)
+	orderedCandidates, zoneChanges, pvcChanges, err := c.getUpgradeCandidates(true)
 	if err != nil {
 		return err
 	}
@@ -1919,7 +1928,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	r.log()
 
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
-	constrainedCandidates, zoneChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges)
+	constrainedCandidates, zoneChangeDetected, pvcChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges, pvcChanges)
 	if err != nil {
 		return err
 	}
@@ -1958,20 +1967,21 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 				allCandidatesRecoverable = false
 				break
 			}
-
 			if swapRebalanceIndexNodes = c.cluster.ShouldRevertCandidateToSwapRebalance(candidate); swapRebalanceIndexNodes {
 				break
 			}
 		}
 
 		switch {
-		case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes:
+		case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected:
 			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
 		case allCandidatesRecoverable && zoneChangeDetected:
 			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		case allCandidatesRecoverable && swapRebalanceIndexNodes:
 			log.Info("An upgrade candidate has the index service and SwapRebalanceIndexServiceUpgrade enabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		case allCandidatesRecoverable && pvcChangeDetected:
+			log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		default:
 			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}

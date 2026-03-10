@@ -3236,3 +3236,46 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestInPlaceUpgradePVCResourceChangeWithOnlineExpansionDisabled ensures that InPlaceUpgrade is NOT triggered on PVC resource changes when online expansion is disabled. It expects SwapRebalance to be used instead.
+func TestInPlaceUpgradePVCResourceChangeWithOnlineExpansionDisabled(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable()
+
+	clusterSize := 3
+
+	// Create a persistent cluster with InPlaceUpgrade and explicitly disable online volume expansion
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster.Spec.EnableOnlineVolumeExpansion = false
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Wait for cluster to be healthy
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Patch the PVC resource (increase storage size)
+	newSize := v1.ResourceList{v1.ResourceStorage: *e2espec.NewResourceQuantityMi(4096)}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", newSize), time.Minute)
+
+	// Wait for the cluster to process the change
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Validate that the upgrade process used was SwapRebalance, not InPlaceUpgrade
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
