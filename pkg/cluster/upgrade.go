@@ -35,6 +35,7 @@ type ChangeSet struct {
 	SpecOnly     couchbaseutil.MemberSet         // SOS: needs spec changes only
 	Both         couchbaseutil.MemberSet         // IS: needs both version and spec changes
 	ChangedZones map[string]couchbaseutil.Member // Members that have zone changes
+	ChangedPVCs  map[string]couchbaseutil.Member // Members that have PVC changes
 }
 
 var DefaultServicesOrder = []string{"data", "query", "index", "search", "analytics", "eventing", "arbiter"}
@@ -49,6 +50,7 @@ func (c *Cluster) detectChangeSets() (*ChangeSet, error) {
 		SpecOnly:     couchbaseutil.MemberSet{},
 		Both:         couchbaseutil.MemberSet{},
 		ChangedZones: make(map[string]couchbaseutil.Member),
+		ChangedPVCs:  make(map[string]couchbaseutil.Member),
 	}
 
 	moves, err := c.getRescheduleMoves()
@@ -185,6 +187,9 @@ func (c *Cluster) categorizePodChange(result *ChangeSet, name string, member cou
 
 	if info.needsSpecChange && detectZoneChange(info.actualSpec, info.preservedSpec, info.pvcState) {
 		result.ChangedZones[name] = member
+	}
+	if info.needsSpecChange && info.pvcState != nil && info.pvcState.NeedsUpdate() {
+		result.ChangedPVCs[name] = member
 	}
 }
 
@@ -501,11 +506,12 @@ func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.P
 	return actualZone != "" && requestedZone != "" && actualZone != requestedZone
 }
 
-func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.MemberList, map[string]couchbaseutil.Member, error) {
+// nolint:gocognit,gocyclo
+func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.MemberList, map[string]couchbaseutil.Member, map[string]couchbaseutil.Member, error) {
 	// Detect the three sets: VOS, SOS, IS
 	changes, err := c.detectChangeSets()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Handle immediate upgrade strategy - upgrade everything
@@ -513,7 +519,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		specImage := c.cluster.Spec.CouchbaseImage()
 		targetVersion, err := k8sutil.CouchbaseVersion(specImage)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		allCandidates := couchbaseutil.MemberSet{}
@@ -531,7 +537,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 			allCandidates.Add(cloned)
 		}
 
-		return allCandidates.ToList(), changes.ChangedZones, nil
+		return allCandidates.ToList(), changes.ChangedZones, changes.ChangedPVCs, nil
 	}
 
 	// Get baseline version for determining old vs new
@@ -542,11 +548,11 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 	if c.cluster.Spec.Upgrade != nil {
 		baselineVersion, err = c.state.Get(persistence.Version)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		targetVersion, err = k8sutil.CouchbaseVersion(targetImage)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 
@@ -583,7 +589,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 		orderedVersionCandidates, err := c.filterCandidatesByUpgradeOrder(allVersionCandidates)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		// Mark the first numToUpgradeVersion pods for a version bump.
@@ -606,9 +612,10 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	orderedCandidates, err := c.filterCandidatesByUpgradeOrder(candidates)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
+	// Return all candidates, all detected zone changes, and all detected PVC changes
 	if logCandidates && (lenVOS > 0 || lenIS > 0 || lenSpecOnly > 0) {
 		log.Info("Upgrade candidates calculated",
 			"cluster", c.namespacedName(),
@@ -618,7 +625,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 			"both", lenIS)
 	}
 
-	return orderedCandidates, changes.ChangedZones, nil
+	return orderedCandidates, changes.ChangedZones, changes.ChangedPVCs, nil
 }
 
 // needsUpgrade returns ALL pods that differ from spec (version OR spec changes).
@@ -771,7 +778,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
-	candidates, _, err := c.getUpgradeCandidates(false)
+	candidates, _, _, err := c.getUpgradeCandidates(false)
 	if err != nil {
 		return err
 	}
