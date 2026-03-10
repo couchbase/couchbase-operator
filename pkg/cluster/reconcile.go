@@ -904,8 +904,15 @@ func (c *Cluster) configureBasicQuerySettings(apiSettings *couchbasev2.Couchbase
 	requested.CompletedLimit = apiSettings.CompletedLimit
 	requested.LogLevel = couchbaseutil.QueryLogLevel(apiSettings.LogLevel)
 	requested.MaxParallelism = apiSettings.MaxParallelism
-	requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
-	requested.MemoryQuota = int32(k8sutil.Megabytes(apiSettings.MemoryQuota))
+
+	if apiSettings.TxTimeout != nil {
+		requested.TxTimeout = couchbaseutil.CouchbaseQueryDurationString(apiSettings.TxTimeout.Duration)
+	}
+
+	if apiSettings.MemoryQuota != nil {
+		requested.MemoryQuota = int32(k8sutil.Megabytes(apiSettings.MemoryQuota))
+	}
+
 	requested.CBOEnabled = apiSettings.CBOEnabled
 	requested.CleanupClientAttemptsEnabled = apiSettings.CleanupClientAttemptsEnabled
 	requested.CleanupLostAttemptsEnabled = apiSettings.CleanupLostAttemptsEnabled
