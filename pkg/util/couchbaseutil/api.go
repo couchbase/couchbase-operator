@@ -1164,3 +1164,8 @@ func SetPasswordPolicySettings(settings *PasswordPolicySettings) *Request {
 
 	return NewRequest((*Client).Post, "/settings/passwordPolicy", data, nil)
 }
+
+// RotateEncryptionKey triggers rotation of an encryption-at-rest key.
+func RotateEncryptionKey(keyID int) *Request {
+	return NewRequest((*Client).Post, fmt.Sprintf("/controller/rotateEncryptionKey/%d", keyID), nil, nil)
+}

@@ -143,6 +143,9 @@ const (
 	AnnotationSkipClusterNameLengthValidation = "dac.couchbase.com/skipClusterNameLengthValidation"
 	AnnotationForceDeleteLockfile             = "cao.couchbase.com/forceDeleteLockfile"
 
+	// AnnotationRotateEncryptionKey triggers on-demand rotation of an encryption-at-rest key.
+	AnnotationRotateEncryptionKey = "cao.couchbase.com/rotateEncryptionKey"
+
 	AnnotationLastReconciledSpec = "operator.couchbase.com/lastReconciledSpec"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone

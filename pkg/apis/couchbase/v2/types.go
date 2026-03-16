@@ -3035,6 +3035,12 @@ type ClusterSpec struct {
 	// By default this is disabled.
 	// DEVELOPER_PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	MirWatchdog *MirWatchdog `json:"mirWatchdog,omitempty"`
+
+	// RotateEncryptionKey triggers on-demand rotation of an encryption-at-rest key.
+	// This is a one-time trigger, set via annotation on the CouchbaseCluster resource.
+	// The operator will process the request and remove the annotation after execution.
+	// +optional
+	RotateEncryptionKey string `json:"-" annotation:"rotateEncryptionKey"`
 }
 
 type MirWatchdog struct {

@@ -14,6 +14,7 @@ import (
 	"context"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,11 @@ func (c *Cluster) reconcileEncryptionAtRest() error {
 		return nil
 	}
 
+	// Handle rotate encryption key annotation trigger
+	if err := c.reconcileRotateEncryptionKey(); err != nil {
+		return err
+	}
+
 	encryptionKeys := &couchbaseutil.EncryptionKeyList{}
 	if err := couchbaseutil.ListEncryptionKeys(encryptionKeys).On(c.api, c.readyMembers()); err != nil {
 		return err
@@ -47,6 +53,84 @@ func (c *Cluster) reconcileEncryptionAtRest() error {
 	}
 
 	if err := c.reconcileLogEncryptionAtRestSettings(*encryptionKeys); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcileRotateEncryptionKey handles the annotation driven rotation of encryption keys.
+func (c *Cluster) reconcileRotateEncryptionKey() error {
+	if c.cluster.Annotations == nil {
+		return nil
+	}
+
+	ann := c.cluster.GetAnnotations()
+
+	keyList, found := ann[constants.AnnotationRotateEncryptionKey]
+	if !found || strings.TrimSpace(keyList) == "" {
+		return nil
+	}
+
+	keys := strings.Split(keyList, ",")
+	var failedKeys []string
+
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+
+		keyID, err := strconv.Atoi(key)
+		if err != nil {
+			log.Error(err, "Invalid encryption key ID",
+				"cluster", c.namespacedName(),
+				"keyID", key)
+			failedKeys = append(failedKeys, key)
+			continue
+		}
+
+		req := couchbaseutil.RotateEncryptionKey(keyID)
+		err = req.On(c.api, c.readyMembers())
+		if err != nil {
+			failedKeys = append(failedKeys, key)
+
+			log.Error(err, "Failed to rotate encryption key",
+				"cluster", c.namespacedName(),
+				"keyID", key)
+
+			continue
+		}
+
+		log.Info("Rotated encryption key",
+			"cluster", c.namespacedName(),
+			"keyID", key)
+	}
+
+	// Update annotation based on result
+	if len(failedKeys) == 0 {
+		delete(c.cluster.Annotations, constants.AnnotationRotateEncryptionKey)
+
+		log.Info("Removed rotate encryption key annotation after successful operation",
+			"cluster", c.namespacedName())
+	} else {
+		// retry only failed keys
+		c.cluster.Annotations[constants.AnnotationRotateEncryptionKey] =
+			strings.Join(failedKeys, ",")
+
+		log.Info("Some encryption key rotations failed, will retry",
+			"cluster", c.namespacedName(),
+			"failedKeys", failedKeys)
+	}
+
+	_, err := c.k8s.CouchbaseClient.
+		CouchbaseV2().
+		CouchbaseClusters(c.cluster.Namespace).
+		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
+
+	if err != nil {
+		log.Error(err, "Failed to update rotate encryption key annotation",
+			"cluster", c.namespacedName())
 		return err
 	}
 
