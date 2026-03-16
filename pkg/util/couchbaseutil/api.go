@@ -1169,3 +1169,8 @@ func SetPasswordPolicySettings(settings *PasswordPolicySettings) *Request {
 func RotateEncryptionKey(keyID int) *Request {
 	return NewRequest((*Client).Post, fmt.Sprintf("/controller/rotateEncryptionKey/%d", keyID), nil, nil)
 }
+
+// DropDEKBucket triggers dropping DEKs and re-encrypting data for a bucket.
+func DropDEKBucket(bucketName string) *Request {
+	return NewRequest((*Client).Post, fmt.Sprintf("/controller/dropEncryptionAtRestDeks/bucket/%s", url.PathEscape(bucketName)), nil, nil)
+}

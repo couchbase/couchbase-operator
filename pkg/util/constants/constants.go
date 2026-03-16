@@ -146,6 +146,9 @@ const (
 	// AnnotationRotateEncryptionKey triggers on-demand rotation of an encryption-at-rest key.
 	AnnotationRotateEncryptionKey = "cao.couchbase.com/rotateEncryptionKey"
 
+	// AnnotationDropDEKBucket triggers dropping DEKs and re-encrypting data for a bucket.
+	AnnotationDropDEKBucket = "cao.couchbase.com/dropDEKBucket"
+
 	AnnotationLastReconciledSpec = "operator.couchbase.com/lastReconciledSpec"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone

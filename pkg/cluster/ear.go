@@ -39,6 +39,11 @@ func (c *Cluster) reconcileEncryptionAtRest() error {
 		return err
 	}
 
+	// Handle drop DEK bucket annotation trigger
+	if err := c.reconcileDropDEKBucket(); err != nil {
+		return err
+	}
+
 	encryptionKeys := &couchbaseutil.EncryptionKeyList{}
 	if err := couchbaseutil.ListEncryptionKeys(encryptionKeys).On(c.api, c.readyMembers()); err != nil {
 		return err
@@ -130,6 +135,73 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 
 	if err != nil {
 		log.Error(err, "Failed to update rotate encryption key annotation",
+			"cluster", c.namespacedName())
+		return err
+	}
+
+	return nil
+}
+
+// reconcileDropDEKBucket handles the annotation driven drop DEK and re-encrypt for buckets.
+func (c *Cluster) reconcileDropDEKBucket() error {
+	if c.cluster.Annotations == nil {
+		return nil
+	}
+
+	ann := c.cluster.GetAnnotations()
+
+	bucketList, found := ann[constants.AnnotationDropDEKBucket]
+	if !found || strings.TrimSpace(bucketList) == "" {
+		return nil
+	}
+
+	buckets := strings.Split(bucketList, ",")
+	var failedBuckets []string
+
+	for _, bucket := range buckets {
+		bucket = strings.TrimSpace(bucket)
+		if bucket == "" {
+			continue
+		}
+
+		req := couchbaseutil.DropDEKBucket(bucket)
+		err := req.On(c.api, c.readyMembers())
+		if err != nil {
+			failedBuckets = append(failedBuckets, bucket)
+
+			log.Error(err, "Failed to drop DEK for bucket",
+				"cluster", c.namespacedName(),
+				"bucket", bucket)
+
+			continue
+		}
+
+		log.Info("Dropped DEK and re-encrypted bucket",
+			"cluster", c.namespacedName(),
+			"bucket", bucket)
+	}
+
+	if len(failedBuckets) == 0 {
+		delete(c.cluster.Annotations, constants.AnnotationDropDEKBucket)
+
+		log.Info("Removed drop DEK annotation after successful operation",
+			"cluster", c.namespacedName())
+	} else {
+		c.cluster.Annotations[constants.AnnotationDropDEKBucket] =
+			strings.Join(failedBuckets, ",")
+
+		log.Info("Some buckets failed DEK drop, will retry",
+			"cluster", c.namespacedName(),
+			"failedBuckets", failedBuckets)
+	}
+
+	_, err := c.k8s.CouchbaseClient.
+		CouchbaseV2().
+		CouchbaseClusters(c.cluster.Namespace).
+		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
+
+	if err != nil {
+		log.Error(err, "Failed to update drop DEK annotation",
 			"cluster", c.namespacedName())
 		return err
 	}

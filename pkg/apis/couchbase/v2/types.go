@@ -3041,6 +3041,12 @@ type ClusterSpec struct {
 	// The operator will process the request and remove the annotation after execution.
 	// +optional
 	RotateEncryptionKey string `json:"-" annotation:"rotateEncryptionKey"`
+
+	// DropDEKBucket triggers dropping DEKs and re-encrypting data for a specific bucket.
+	// This is a one-time trigger, set via annotation on the CouchbaseCluster resource.
+	// The operator will process the request and remove the annotation after execution.
+	// +optional
+	DropDEKBucket string `json:"-" annotation:"dropDEKBucket"`
 }
 
 type MirWatchdog struct {
