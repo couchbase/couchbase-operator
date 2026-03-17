@@ -59,10 +59,9 @@ pipeline {
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
-    S3_ACCESS_KEY = credentials('cbqe-s3-access-key')
-    S3_SECRET_ID = credentials('cbqe-s3-secret-id')
-    AWS_ACCESS_KEY_ID = credentials('couchbaseqe-aws-access-id')
-    AWS_SECRET_ACCESS_KEY = credentials('couchbaseqe-aws-access-secret')
+    S3_ACCESS_KEY = credentials('CAO_AWS')
+    S3_SECRET_ID = credentials('CAO_AWS')
+    AWS_CREDS = credentials('CAO_AWS')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
   }
