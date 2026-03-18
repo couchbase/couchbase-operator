@@ -1867,3 +1867,103 @@ func MustWaitUntilUserHasDirectRole(t *testing.T, k8s *types.Cluster, couchbase 
 		Die(t, err)
 	}
 }
+
+// GetLatestKeyVersionCreationTime returns the creation timestamp of the latest active version of the specified encryption key.
+func GetLatestKeyVersionCreationTime(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyName string) (string, error) {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		return "", err
+	}
+
+	var result []map[string]interface{}
+	req := couchbaseutil.NewRequest((*couchbaseutil.Client).Get, "/settings/encryptionKeys", nil, &result)
+	if err := req.On(client.client, client.host); err != nil {
+		return "", err
+	}
+
+	for _, key := range result {
+		name, ok := key["name"].(string)
+		if !ok || name != keyName {
+			continue
+		}
+
+		data, ok := key["data"].(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("data field missing for key %s", keyName)
+		}
+
+		keyVersions, ok := data["keys"].([]interface{})
+		if !ok || len(keyVersions) == 0 {
+			return "", fmt.Errorf("no key versions found for key %s", keyName)
+		}
+
+		for _, kv := range keyVersions {
+			keyMap := kv.(map[string]interface{})
+
+			active, ok := keyMap["active"].(bool)
+			if !ok {
+				continue
+			}
+
+			if active {
+				ts, ok := keyMap["creationDateTime"].(string)
+				if !ok {
+					return "", fmt.Errorf("creationDateTime missing for key %s", keyName)
+				}
+
+				return ts, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("encryption key %s not found", keyName)
+}
+
+// MustGetLatestKeyVersionCreationTime returns the creation timestamp of the latest active version of the specified encryption key or fails the test.
+func MustGetLatestKeyVersionCreationTime(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyName string) string {
+	t.Helper()
+
+	ts, err := GetLatestKeyVersionCreationTime(kubernetes, cluster, keyName)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return ts
+}
+
+// MustWaitForKeyRotation waits until the latest key versions for the given keys have rotated.
+// Fails the test if rotation doesn't happen within the timeout.
+func MustWaitForKeyRotation(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keys ...string) {
+	t.Helper()
+
+	// Capture initial key version timestamps
+	keyVersionsBefore := make(map[string]string)
+	for _, key := range keys {
+		keyVersionsBefore[key] = MustGetLatestKeyVersionCreationTime(t, kubernetes, cluster, key)
+	}
+
+	// Retry until keys rotate or timeout
+	err := retryutil.RetryFor(2*time.Minute, func() error {
+		for _, key := range keys {
+			before, err := time.Parse(time.RFC3339, keyVersionsBefore[key])
+			if err != nil {
+				return err
+			}
+
+			afterStr := MustGetLatestKeyVersionCreationTime(t, kubernetes, cluster, key)
+			after, err := time.Parse(time.RFC3339, afterStr)
+			if err != nil {
+				return err
+			}
+
+			if !after.After(before) {
+				return fmt.Errorf("key %s did not rotate", key)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}

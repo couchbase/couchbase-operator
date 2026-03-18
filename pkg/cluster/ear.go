@@ -44,6 +44,11 @@ func (c *Cluster) reconcileEncryptionAtRest() error {
 		return err
 	}
 
+	// Handle drop DEK system annotation trigger
+	if err := c.reconcileDropDEKSystem(); err != nil {
+		return err
+	}
+
 	encryptionKeys := &couchbaseutil.EncryptionKeyList{}
 	if err := couchbaseutil.ListEncryptionKeys(encryptionKeys).On(c.api, c.readyMembers()); err != nil {
 		return err
@@ -70,9 +75,7 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 		return nil
 	}
 
-	ann := c.cluster.GetAnnotations()
-
-	keyList, found := ann[constants.AnnotationRotateEncryptionKey]
+	keyList, found := c.cluster.Annotations[constants.AnnotationRotateEncryptionKey]
 	if !found || strings.TrimSpace(keyList) == "" {
 		return nil
 	}
@@ -148,9 +151,7 @@ func (c *Cluster) reconcileDropDEKBucket() error {
 		return nil
 	}
 
-	ann := c.cluster.GetAnnotations()
-
-	bucketList, found := ann[constants.AnnotationDropDEKBucket]
+	bucketList, found := c.cluster.Annotations[constants.AnnotationDropDEKBucket]
 	if !found || strings.TrimSpace(bucketList) == "" {
 		return nil
 	}
@@ -202,6 +203,71 @@ func (c *Cluster) reconcileDropDEKBucket() error {
 
 	if err != nil {
 		log.Error(err, "Failed to update drop DEK annotation",
+			"cluster", c.namespacedName())
+		return err
+	}
+
+	return nil
+}
+
+// reconcileDropDEKSystem handles the annotation-driven drop DEK and re-encrypt for system data.
+func (c *Cluster) reconcileDropDEKSystem() error {
+	if c.cluster.Annotations == nil {
+		return nil
+	}
+
+	typeList, found := c.cluster.Annotations[constants.AnnotationDropDEKSystem]
+	if !found || strings.TrimSpace(typeList) == "" {
+		return nil
+	}
+
+	types := strings.Split(typeList, ",")
+	var failedTypes []string
+
+	for _, t := range types {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+
+		req := couchbaseutil.DropDEKSystem(t)
+		err := req.On(c.api, c.readyMembers())
+		if err != nil {
+			failedTypes = append(failedTypes, t)
+
+			log.Error(err, "Failed to drop DEK for system data",
+				"cluster", c.namespacedName(),
+				"type", t)
+
+			continue
+		}
+
+		log.Info("Dropped DEK and re-encrypted system data",
+			"cluster", c.namespacedName(),
+			"type", t)
+	}
+
+	// Update annotation based on results
+	if len(failedTypes) == 0 {
+		delete(c.cluster.Annotations, constants.AnnotationDropDEKSystem)
+
+		log.Info("Removed drop DEK system annotation after successful operation",
+			"cluster", c.namespacedName())
+	} else {
+		c.cluster.Annotations[constants.AnnotationDropDEKSystem] = strings.Join(failedTypes, ",")
+
+		log.Info("Some system data types failed DEK drop, will retry",
+			"cluster", c.namespacedName(),
+			"failedTypes", failedTypes)
+	}
+
+	_, err := c.k8s.CouchbaseClient.
+		CouchbaseV2().
+		CouchbaseClusters(c.cluster.Namespace).
+		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
+
+	if err != nil {
+		log.Error(err, "Failed to update drop DEK system annotation",
 			"cluster", c.namespacedName())
 		return err
 	}

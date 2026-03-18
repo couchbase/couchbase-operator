@@ -1174,3 +1174,9 @@ func RotateEncryptionKey(keyID int) *Request {
 func DropDEKBucket(bucketName string) *Request {
 	return NewRequest((*Client).Post, fmt.Sprintf("/controller/dropEncryptionAtRestDeks/bucket/%s", url.PathEscape(bucketName)), nil, nil)
 }
+
+// DropDEKSystem triggers dropping DEKs and re-encrypting system data
+// such as audit, configuration, or logs.
+func DropDEKSystem(dataType string) *Request {
+	return NewRequest((*Client).Post, fmt.Sprintf("/controller/dropEncryptionAtRestDeks/%s", url.PathEscape(dataType)), nil, nil)
+}

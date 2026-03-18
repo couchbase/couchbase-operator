@@ -149,6 +149,10 @@ const (
 	// AnnotationDropDEKBucket triggers dropping DEKs and re-encrypting data for a bucket.
 	AnnotationDropDEKBucket = "cao.couchbase.com/dropDEKBucket"
 
+	// AnnotationDropDEKSystem triggers dropping DEKs and re-encrypting system data
+	// such as audit, configuration, or logs.
+	AnnotationDropDEKSystem = "cao.couchbase.com/dropDEKSystem"
+
 	AnnotationLastReconciledSpec = "operator.couchbase.com/lastReconciledSpec"
 
 	ServerGroupLabel    = corev1.LabelTopologyZone
