@@ -355,8 +355,10 @@ func (cs *ClusterSpec) CouchbaseImage() string {
 // * Cluster image.
 func (cs *ClusterSpec) ServerClassCouchbaseImage(server *ServerConfig) string {
 	// Check if server has a specific image override (used during mixed-mode upgrades with previousVersionPodCount)
-	if server.Image != "" {
-		return server.Image
+	if server != nil {
+		if server.Image != "" {
+			return server.Image
+		}
 	}
 	return cs.CouchbaseImage()
 }
