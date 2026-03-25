@@ -493,7 +493,9 @@ func (c *Cluster) getNodeServiceMismatchCandidates() (couchbaseutil.MemberSet, e
 		expectedServices := serverConfig.Services
 		expectedServicesString := make([]string, 0, len(expectedServices))
 		for _, service := range expectedServices {
-			expectedServicesString = append(expectedServicesString, service.String())
+			if service.String() != "admin" {
+				expectedServicesString = append(expectedServicesString, service.String())
+			}
 		}
 
 		for i := 0; i < len(candidateServices); i++ {
