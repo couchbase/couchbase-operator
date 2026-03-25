@@ -1908,6 +1908,9 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return nil
 	}
 
+	// Log current member state before getUpgradeCandidates mutates member versions/images with target values (SetVersion/SetImage).
+	r.log()
+
 	orderedCandidates, zoneChanges, err := c.getUpgradeCandidates(true)
 	if err != nil {
 		return err
@@ -1917,8 +1920,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	if len(orderedCandidates) == 0 {
 		return nil
 	}
-
-	r.log()
 
 	// We filter out the orchestrator when appropriate earlier so we don't need to do it here
 	constrainedCandidates, zoneChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges)
