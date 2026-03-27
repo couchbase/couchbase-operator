@@ -1413,6 +1413,24 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 		return nil
 	}
 
+	// When using swap rebalance, skip volume expansion for nodes that will be replaced.
+	// Pods whose only spec change is a PVC update are excluded from the skip set so that online volume expansion handles them instead of swap rebalance unnecessarily replacing the pod.
+	upgradeCandidatesSet := couchbaseutil.MemberSet{}
+	if c.cluster.GetUpgradeProcess() == couchbasev2.SwapRebalance {
+		changes, err := c.detectChangeSets()
+		if err != nil {
+			log.Error(err, "Failed to check upgrade candidates, proceeding with volume expansion", "cluster", c.namespacedName())
+		} else {
+			upgradeCandidatesSet.Merge(changes.VersionOnly)
+			upgradeCandidatesSet.Merge(changes.Both)
+			for name, member := range changes.SpecOnly {
+				if _, hasPVCChange := changes.ChangedPVCs[name]; !hasPVCChange {
+					upgradeCandidatesSet[name] = member
+				}
+			}
+		}
+	}
+
 	// Online upgrade of Persistent volumes for each member
 	for _, name := range c.members.Names() {
 		member := c.members[name]
@@ -1420,6 +1438,12 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 		// Get member config
 		serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
 		if serverClass == nil {
+			continue
+		}
+
+		// Skip volume expansion if this member needs upgrading and we're using swap rebalance
+		if !upgradeCandidatesSet.Empty() && upgradeCandidatesSet.Contains(member.Name()) {
+			log.V(2).Info("Skipping volume expansion for node that will be upgraded via Swap Rebalance", "cluster", c.namespacedName(), "node", member.Name())
 			continue
 		}
 

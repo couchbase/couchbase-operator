@@ -3251,3 +3251,137 @@ func TestInPlaceUpgradePVCResourceChangeWithOnlineExpansionDisabled(t *testing.T
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestSwapRebalanceOnlineVolumeExpansionPVCOnly tests that when using swap rebalance with online volume expansion enabled, a PVC only size change triggers online expansion rather than an unnecessary swap rebalance.
+// This validates that pods whose only spec change is a PVC update are excluded from the swap rebalance skip set in handleVolumeExpansion.
+func TestSwapRebalanceOnlineVolumeExpansionPVCOnly(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).ExpandableStorage()
+
+	clusterSize := 3
+
+	// Create a persistent cluster with swap rebalance (default) and online volume expansion enabled.
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Trigger a PVC only change by increasing the volume size.
+	newSize := v1.ResourceList{v1.ResourceStorage: *e2espec.NewResourceQuantityMi(4096)}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", newSize), time.Minute)
+
+	// Wait for online volume expansion to complete.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Validate that online expansion events occurred and NO swap rebalance events occurred.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestSwapRebalanceSkipsVolumeExpansionForVersionUpgrade tests that when a version upgrade and a PVC size change happen simultaneously with swap rebalance
+// volume expansion is skipped because swap rebalance replaces the entire pod and its PVCs, making prior expansion redundant.
+func TestSwapRebalanceSkipsVolumeExpansionForVersionUpgrade(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable().ExpandableStorage()
+
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create a persistent cluster at the old version with online volume expansion enabled.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Simultaneously trigger a version upgrade AND a PVC size change.
+	newSize := *e2espec.NewResourceQuantityMi(4096)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().
+			Replace("/spec/image", f.CouchbaseServerImage).
+			Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", v1.ResourceList{v1.ResourceStorage: newSize}),
+		time.Minute)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Validate swap rebalance events occurred and NO volume expansion events occurred.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: e2eutil.SwapRebalanceSequence},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestInPlaceUpgradeOnlineVolumeExpansionWithVersionChange tests that when using InPlaceUpgrade with online volume expansion enabled, a version upgrade combined with a PVC size change results in online expansion still running because InPlaceUpgrade reuses existing PVCs.
+func TestInPlaceUpgradeOnlineVolumeExpansionWithVersionChange(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).InplaceUpgradeable().ExpandableStorage()
+
+	clusterSize := 3
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Create a persistent cluster at the old version with InPlaceUpgrade and online volume expansion.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeProcess: couchbasev2.InPlaceUpgrade,
+	}
+	cluster.Spec.EnableOnlineVolumeExpansion = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Simultaneously trigger a version upgrade AND a PVC size change.
+	// With InPlaceUpgrade, the skip logic in handleVolumeExpansion does not apply
+	newSize := *e2espec.NewResourceQuantityMi(4096)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().
+			Replace("/spec/image", f.CouchbaseServerImage).
+			Replace("/spec/volumeClaimTemplates/0/spec/resources/requests", v1.ResourceList{v1.ResourceStorage: newSize}),
+		time.Minute)
+
+	// Wait for both operations to complete.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Validate that both online expansion AND InPlaceUpgrade events occurred.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeStarted}},
+		eventschema.Event{Reason: k8sutil.EventReasonExpandVolumeSucceeded},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		}}},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
