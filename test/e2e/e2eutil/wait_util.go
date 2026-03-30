@@ -2011,3 +2011,29 @@ func MustWaitForKeyRotation(t *testing.T, kubernetes *types.Cluster, cluster *co
 		Die(t, err)
 	}
 }
+
+// MustFindUpgradePodWithConf waits for the first upgrade pod starting from initialIndex
+// that carries the given server config label value (e.g. "stateless" or "stateful").
+// In async CBS-add mode the upgrade order is non-deterministic so pods of the other
+// topology type may appear before the intended victim; their NMA events are consumed here
+// so callers can proceed directly to the actual victim pod.
+// Returns the final victimIndex that matched conf.
+func MustFindUpgradePodWithConf(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, initialIndex int, conf string, timeout time.Duration) int {
+	victimIndex := initialIndex
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
+	MustWaitForClusterEvent(t, k8s, cluster, NewMemberAddEvent(cluster, victimIndex), timeout)
+	for {
+		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(
+			context.Background(), victimName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Cannot get pod %s: %v", victimName, err)
+		}
+		if pod.Labels[constants.CouchbaseNodeConfKey] == conf {
+			break
+		}
+		victimIndex++
+		victimName = couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
+		MustWaitForClusterEvent(t, k8s, cluster, NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	}
+	return victimIndex
+}

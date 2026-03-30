@@ -768,6 +768,13 @@ func (c *Cluster) reconcileBuckets() error {
 		return nil
 	}
 
+	// Defer all bucket operations until pending init pods have CBS-added.
+	if pendingInit := c.getPendingInitPods(); len(pendingInit) > 0 {
+		log.V(1).Info("Deferring bucket reconciliation until pending pods are CBS-initialized",
+			"cluster", c.namespacedName(), "pending", k8sutil.GetPodNames(pendingInit))
+		return nil
+	}
+
 	create, update, updateDuringMigration, remove, requested, err := c.inspectBuckets()
 	if err != nil {
 		return err

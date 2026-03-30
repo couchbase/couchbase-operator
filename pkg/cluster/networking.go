@@ -437,6 +437,14 @@ func (c *Cluster) reconcileClusterNetworking() error {
 	var updateMembers []couchbaseutil.Member
 
 	for _, member := range c.members {
+		// Skip members that have not been CBS-added yet (async initialization pending)
+		// or are in the process of being deleted. Both can appear in c.members transiently:
+		// In both cases, info.GetNode would fail with "requested resource not found".
+		if pod, ok := c.k8s.Pods.Get(member.Name()); ok &&
+			(pod.DeletionTimestamp != nil || k8sutil.HasPendingInitializationCondition(pod)) {
+			continue
+		}
+
 		node, err := info.GetNode(member.GetHostName())
 		if err != nil {
 			return err

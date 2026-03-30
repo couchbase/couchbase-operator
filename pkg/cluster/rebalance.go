@@ -193,10 +193,6 @@ WitnessLoop:
 	return nil, nil, errors.NewStackTracedError(errors.ErrRebalanceIncomplete)
 }
 
-func (c *Cluster) rebalance(ms couchbaseutil.MemberSet) error {
-	return c.rebalanceWithRetriesOnVerifyFails(ms, nil, 1)
-}
-
 // rebalanceWithRetriesOnVerifyFails will retry the rebalance if the verifyRebalance fails.
 // nolint:gocognit
 func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, ejectMembers couchbaseutil.MemberSet, maxRetries uint) error {

@@ -40,6 +40,15 @@ const (
 	// API operations to report success.
 	extendedRetryPeriod = 3 * time.Minute
 
+	// asyncAddNodeRetryPeriod is a shorter retry window for CBS addNode in the
+	// async pod initialization flow.
+	asyncAddNodeRetryPeriod = 10 * time.Second
+
+	// silentReAddRetryPeriod is the retry window for the cancel+re-add sequence
+	// in attemptSilentReAdd (FailedAdd recovery). Longer than asyncAddNodeRetryPeriod
+	// because CBS must complete internal CancelAddNode cleanup before the re-add.
+	silentReAddRetryPeriod = 30 * time.Second
+
 	// externalConnectionRetryPeriod is an even longer amount of time to wait for
 	// operations that are known to take a very long time.
 	// For example operations that need to wait for DNS caches to update.
@@ -169,6 +178,11 @@ func (c *Cluster) reconcile() error {
 		if err := c.create(); err != nil {
 			return err
 		}
+		// create() flags the initial pod with PendingInitializationCondition and returns.
+		// RunReconcile will not call reconcile() again until the pod is CBS-initialized
+		// (the pendingInitPods + readyMembers().Empty() guard in RunReconcile returns early).
+		// Once CBS-initialized, c.members will be non-empty and we won't re-enter this branch.
+		return nil
 	}
 
 	// Run pre-topology change reconcilers.  These are the things that need
@@ -260,17 +274,40 @@ func (c *Cluster) reconcile() error {
 	}
 
 	c.clearFailedSchedulingServerGroupsIfReady()
+	c.updateFinalReconcileStatus()
 
-	c.cluster.Status.Size = c.members.Size()
+	return nil
+}
+
+// updateFinalReconcileStatus sets status.size (excluding pending-init pods),
+// clears scaling/rebalancing conditions, and sets the balanced/ready conditions.
+func (c *Cluster) updateFinalReconcileStatus() {
+	// Count only CBS-initialized members for status.size.  Pods with
+	// PendingInitializationCondition are Running in Kubernetes but have not yet
+	// been added to Couchbase Server.  Including them would make status.size reach
+	// spec.size prematurely — before all async CBS-adds complete — causing
+	// WaitClusterStatusHealthy (and any observer of status.size) to fire too early.
+	cbsInitializedSize := 0
+	for name := range c.members {
+		pod, exists := c.k8s.Pods.Get(name)
+		if exists && k8sutil.HasPendingInitializationCondition(pod) {
+			continue
+		}
+		cbsInitializedSize++
+	}
+	c.cluster.Status.Size = cbsInitializedSize
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 
-	c.cluster.Status.SetBalancedCondition()
+	// Only mark as balanced when no pods are still pending async CBS initialization.
+	if len(c.getPendingInitPods()) > 0 {
+		c.cluster.Status.SetUnbalancedCondition()
+	} else {
+		c.cluster.Status.SetBalancedCondition()
+	}
 	c.cluster.Status.SetReadyCondition()
-
-	return nil
 }
 
 func (c *Cluster) reconcilePeerServices() error {
@@ -505,6 +542,13 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 			defaultAllowFailoverEphemeralNoReplicas := constants.DefaultAllowFailoverEphemeralNoReplicas
 			specFailoverSettings.AllowFailoverEphemeralNoReplicas = &defaultAllowFailoverEphemeralNoReplicas
 		}
+	} else {
+		// GET from an 8.0.0 node returns these 8.0.0 fields
+		// while the spec (lowest version still < 8.0.0) leaves them nil.  Mask the fetched
+		// values so that DeepEqual does not trigger spurious ClusterSettingsEdited events
+		// every reconcile cycle until all nodes are on 8.0.0.
+		failoverSettings.FailoverOnDataDiskNonResponsiveness = nil
+		failoverSettings.AllowFailoverEphemeralNoReplicas = nil
 	}
 
 	// Mask out any existing read only values, e.g. set it to the default value

@@ -61,6 +61,8 @@ const (
 	MetricsContainerName                      = "metrics"
 	PodReadinessCondition                     = v1.PodConditionType("pod.couchbase.com/readiness")
 	PodPendingExternalDNSCondition            = v1.PodConditionType("pod.couchbase.com/pending-external-dns")
+	PodPendingInitializationCondition         = v1.PodConditionType("pod.couchbase.com/pending-initialization")
+	PodPendingUpgradeBeforeEjectionCondition  = v1.PodConditionType("pod.couchbase.com/pending-upgrade-before-ejection")
 	CouchbaseLogSidecarContainerName          = "logging"
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
@@ -2522,6 +2524,112 @@ func SetPodInitialized(client *client.Client, name string) error {
 	return retryutil.Retry(ctx, time.Second, callback)
 }
 
+// SetPodUpgradeTracking marks a pod with the UpgradeTrackingAnnotation.
+// This persists async upgrade intent across reconcile cycles and operator restarts,
+// allowing later phases to attribute metrics and gate the stabilization period.
+func SetPodUpgradeTracking(client *client.Client, name, process string) error {
+	return setPodAnnotation(client, name, constants.UpgradeTrackingAnnotation, process)
+}
+
+// ClearPodUpgradeTracking removes the UpgradeTrackingAnnotation from a pod.
+// Called when the stabilization period expires or is not configured.
+func ClearPodUpgradeTracking(client *client.Client, name string) error {
+	return removePodAnnotation(client, name, constants.UpgradeTrackingAnnotation)
+}
+
+// GetPodUpgradeTracking returns the UpgradeTrackingAnnotation value, or "" if absent.
+func GetPodUpgradeTracking(pod *v1.Pod) string {
+	if pod.Annotations == nil {
+		return ""
+	}
+	return pod.Annotations[constants.UpgradeTrackingAnnotation]
+}
+
+// SetPodPendingUpgradeBeforeEjection marks a pod for ejection during the next rebalance by setting
+// PodPendingUpgradeBeforeEjectionCondition. The condition survives reconcile cycles and operator restarts.
+func SetPodPendingUpgradeBeforeEjection(client *client.Client, name string) error {
+	pod, ok := client.Pods.Get(name)
+	if !ok {
+		return fmt.Errorf("%w: unable to set pending upgrade before ejection condition on pod %s", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+	}
+	condition := NewPodCondition(PodPendingUpgradeBeforeEjectionCondition, v1.ConditionTrue, "Pod marked for ejection during swap-rebalance upgrade")
+	return UpsertPodCondition(client, pod, condition)
+}
+
+// ClearPodPendingUpgradeBeforeEjection removes the PodPendingUpgradeBeforeEjectionCondition from the pod.
+func ClearPodPendingUpgradeBeforeEjection(client *client.Client, name string) error {
+	pod, ok := client.Pods.Get(name)
+	if !ok {
+		// Pod not in local cache — either already deleted or condition already gone.
+		return nil
+	}
+	return RemovePodCondition(client, pod, PodPendingUpgradeBeforeEjectionCondition)
+}
+
+// IsPodPendingUpgradeBeforeEjection returns true if the pod has a pending upgrade before ejection condition set.
+func IsPodPendingUpgradeBeforeEjection(pod *v1.Pod) bool {
+	condition := GetPodCondition(pod, PodPendingUpgradeBeforeEjectionCondition)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// setPodAnnotation is a helper that sets a single annotation on a pod with retry.
+func setPodAnnotation(client *client.Client, name, key, value string) error {
+	callback := func() error {
+		pod, ok := client.Pods.Get(name)
+		if !ok {
+			return fmt.Errorf("%w: unable to set annotation %s on pod %s", errors.NewStackTracedError(errors.ErrResourceRequired), key, name)
+		}
+
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+
+		pod.Annotations[key] = value
+
+		if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	return retryutil.Retry(ctx, time.Second, callback)
+}
+
+// removePodAnnotation is a helper that removes a single annotation from a pod with retry.
+func removePodAnnotation(client *client.Client, name, key string) error {
+	callback := func() error {
+		pod, ok := client.Pods.Get(name)
+		if !ok {
+			return fmt.Errorf("%w: unable to remove annotation %s from pod %s", errors.NewStackTracedError(errors.ErrResourceRequired), key, name)
+		}
+
+		if pod.Annotations == nil {
+			return nil
+		}
+
+		if _, exists := pod.Annotations[key]; !exists {
+			return nil
+		}
+
+		delete(pod.Annotations, key)
+
+		if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Update(context.Background(), pod, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	return retryutil.Retry(ctx, time.Second, callback)
+}
+
 // GetResourceRequestQuantity returns the total quantity of a given resource type that is currently requested by the pod.
 func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
 	var resourceQuantity resource.Quantity
@@ -2644,6 +2752,37 @@ func FlagPodUnready(client *client.Client, name, reason string) error {
 	return nil
 }
 
+// FlagPodPendingInitialization adds a condition to the pod indicating that
+// it has been created but is not yet ready to be added to the cluster.
+func FlagPodPendingInitialization(client *client.Client, pod *v1.Pod, message string) error {
+	condition := NewPodCondition(PodPendingInitializationCondition, v1.ConditionTrue, message)
+
+	err := UpsertPodCondition(client, pod, condition)
+	if err != nil {
+		return err
+	}
+
+	return client.Pods.Update(pod)
+}
+
+// HasPendingInitializationCondition returns true if the pod has a pending initialization condition.
+func HasPendingInitializationCondition(pod *v1.Pod) bool {
+	condition := GetPodCondition(pod, PodPendingInitializationCondition)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// ClearPodPendingInitialization removes the pending initialization condition from the pod.
+func ClearPodPendingInitialization(client *client.Client, pod *v1.Pod) error {
+	err := RemovePodCondition(client, pod, PodPendingInitializationCondition)
+	if err != nil {
+		return err
+	}
+
+	log.V(1).Info("Pod initialization complete, clearing pending condition", "pod", pod.Name)
+
+	return nil
+}
+
 // FlagPodExternallyUnreachable adds a condition to the pod indicating that
 // it external DNS cannot be reached.
 func FlagPodPendingExternalDNS(client *client.Client, pod *v1.Pod, message string) error {
@@ -2657,10 +2796,10 @@ func FlagPodPendingExternalDNS(client *client.Client, pod *v1.Pod, message strin
 	return client.Pods.Update(pod)
 }
 
-// IsPendingMember returns true if the pod is not ready to be added to the cluster, but should not be ejected.
-// For example, if we are waiting for external DNS propagation, we don't want want to block reconciliation but
-// we don't want to add it into the cluster either.
-func IsPendingMember(pod *v1.Pod) bool {
+// IsPendingDNSMember returns true if the pod is waiting for external DNS propagation.
+// Such pods have been CBS-added (PendingAddNodes) but should not yet be rebalanced in —
+// they are excluded from rebalance until the alternate address is confirmed reachable.
+func IsPendingDNSMember(pod *v1.Pod) bool {
 	condition := GetPodCondition(pod, PodPendingExternalDNSCondition)
 	if condition == nil {
 		return false

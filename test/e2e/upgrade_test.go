@@ -127,68 +127,43 @@ func upgradeFailedAddRecoverableSequence(victimName string) eventschema.Validata
 	}
 }
 
-// upgradeFailedAddUnrecoverableSequence is a common sequence for generating events for a new
-// member being added, the pod being killed before a rebalance can commence, and the
-// recovery steps.
+// upgradeFailedAddUnrecoverableSequence is the event sequence for a new upgrade pod being
+// CBS-added (NMA), the pod being killed immediately after NMA, and the unrecoverable
+// (stateless, no PVC) recovery.
+//
+// The pod is inactiveAdded (PendingAdd) when killed — CBS treats it as FailedAdd, not a
+// failover target (no active vbuckets). The intermediate events between NMA and FailedAddNode
+// depend on timing: whether CBS detected the kill before or after handleRebalance started.
 func upgradeFailedAddUnrecoverableSequence(victimName string) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: victimName},
-			// This suffers from race conditions, so it's essentially random...
-			eventschema.AnyOf{
-				Validators: []eventschema.Validatable{
-					// ... either the pod is added to the cluster and rebalance is started before
-					// server complains ...
-					eventschema.Sequence{
-						Validators: []eventschema.Validatable{
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-							eventschema.Optional{
-								Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
-							},
-							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
-						},
-					},
-					// ... or the operator notices it's gone pop, aborts the topology reconcile
-					// and next time around the pod is already in failed add. This is logged as
-					// a reconcile failed event.
-					eventschema.Sequence{
-						Validators: []eventschema.Validatable{
-							eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
-							eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
-						},
-					},
-					eventschema.Sequence{
-						Validators: []eventschema.Validatable{
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-							eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-						},
-					},
-				},
-			},
-			eventschema.Optional{
-				Validator: eventschema.Sequence{
-					Validators: []eventschema.Validatable{
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-						eventschema.Optional{
-							Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
-						},
-						// I wonder why this is the only case where a member removed event doesn't happen?
-						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-					},
-				},
-			},
+			// RS fires if handleRebalance started before CBS detected the kill.
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+			// RI fires if the rebalance POST succeeded but verifyRebalance failed after the abort.
+			// RI is absent if the progress stream closed with an error signal directly.
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}},
+			// ReconciliationFailed fires whenever handleRebalance returns a non-nil error.
+			// Absent when no error occurred (e.g. handleRebalance was deferred by pendingInitPods).
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+			eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 		},
 	}
 }
 
-// MemberAddAndDownUnecoverableSequence is a common sequence for generating events for a new
-// member being added, the pod being killed during a rebalance and the recovery steps.  Warning,
-// the behaviour of this changes based on what kind of stateful service is enabled - eventing
-// being the prime cause of inconsistency.
+// upgradeDownUnrecoverableSequence is the event sequence for a new upgrade pod being CBS-added,
+// the rebalance starting, the pod being killed at ~25% progress, and the async recovery steps.
+//
+// With canAbortRebalance=true (CBS default), CBS aborts the in-progress rebalance and immediately
+// begins auto-failover. The operator may or may not observe the brief "unhealthy+active" window
+// (NodeStateDown → MemberDown) before CBS completes the transition to "unhealthy+inactiveFailed"
+// (NodeStateFailed → MemberFailedOver) during the ~5s gap between operator reconcile cycles.
+// Hence MemberDown is Optional.
+//
+// After the victim is failed over, handleUpgradeNode creates a new replacement for the old
+// upgrade candidate (which still has its PodPendingUpgradeBeforeEjection condition). The combined
+// rebalance ejects the old candidate and removes the failed victim's CBS record in one pass,
+// producing at least two MemberRemoved events.
 func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
@@ -198,38 +173,14 @@ func upgradeDownUnrecoverableSequence(victimName string) eventschema.Validatable
 			eventschema.Optional{
 				Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 			},
-			eventschema.AnyOf{
-				Validators: []eventschema.Validatable{
-					// In the first incarnation, the candidate has already been
-					// ejected, so is removed while the upgraded node is failed
-					// and replaced.
-					eventschema.Sequence{
-						Validators: []eventschema.Validatable{
-							eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-						},
-					},
-					// In the second incarnation, the candidate is still active
-					// so the failed node is ejected and the upgrade restarts.
-					eventschema.Sequence{
-						Validators: []eventschema.Validatable{
-							eventschema.Optional{
-								Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
-							},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-							eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName},
-							eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-							upgradeSequence,
-						},
-					},
-				},
+			eventschema.Optional{
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
 			},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
 	}
 }
@@ -405,8 +356,9 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 
 	// Static configuration.
 	clusterSize := constants.Size3
-	victimCycle := 1
-	victimIndex := clusterSize + victimCycle
+	// victimUpgradeIteration is the 0-based index of the upgrade cycle to kill (second cycle).
+	victimUpgradeIteration := 1
+	victimIndex := clusterSize + victimUpgradeIteration
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
@@ -425,16 +377,16 @@ func TestUpgradeKillPodOnCreate(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
+	// * For iterations up to the victim upgrade iteration expect nodes upgrade
 	// * Victim node failed to add and is balanced out
 	// * For the remaining iterations upgrades nodes upgrade
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: victimUpgradeIteration, Validator: upgradeSequence},
 		upgradeFailedAddUnrecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - victimUpgradeIteration, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
@@ -571,8 +523,9 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
-	victimCycle := 1
-	victimIndex := clusterSize + victimCycle
+	// Start searching from the first upgrade pod. In async CBS-add mode the upgrade order is
+	// non-deterministic: stateful pods may appear at any position among the upgrade pods.
+	victimIndex := clusterSize
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -581,32 +534,37 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	// In async CBS-add mode the upgrade order is non-deterministic so a stateless pod may
+	// arrive at victimIndex instead of a stateful one.  Skip stateless pods and advance
+	// to the next upgrade pod until we find a stateful victim.
+	victimIndex = e2eutil.MustFindUpgradePodWithConf(t, kubernetes, cluster, victimIndex, "stateful", 10*time.Minute)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
-	// * Victim node failed to add and is balanced out
-	// * For the remaining iterations upgrades nodes upgrade
+	// * For clean upgrade cycles before the victim
+	// * Victim node failed to add; recoverable (has PVC) so it is recreated (MemberRecovered)
+	//   and the upgrade continues.  The recovery sequence also removes the old candidate pod.
+	// * For the remaining clean upgrade cycles after the victim
 	// * Upgrade completes
+	cyclesBeforeVictim := victimIndex - clusterSize
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: cyclesBeforeVictim, Validator: upgradeSequence},
 		upgradeFailedAddRecoverableSequence(victimName),
-		// both the victim pod and upgraded pod occurred in same sequence.
-		// therefore, these 2 do not need to be accounted for here
-		eventschema.Repeat{Times: clusterSize - victimCycle - 1, Validator: upgradeSequence},
+		// The recovery sequence covers both the victim pod and the old candidate pod,
+		// so only clusterSize-cyclesBeforeVictim-1 clean upgrade cycles remain.
+		eventschema.Repeat{Times: clusterSize - cyclesBeforeVictim - 1, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
@@ -633,8 +591,9 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
-	victimCycle := 1
-	victimIndex := clusterSize + victimCycle
+	// Start searching from the first upgrade pod. In async CBS-add mode the upgrade order is
+	// non-deterministic: stateful pods may appear at any position among the upgrade pods.
+	victimIndex := clusterSize
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -648,7 +607,10 @@ func TestUpgradeSupportableKillStatefulPodOnRebalance(t *testing.T) {
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 10*time.Minute)
+	// In async CBS-add mode the upgrade order is non-deterministic so a stateless pod may
+	// arrive at victimIndex instead of a stateful one.  Skip stateless pods and advance
+	// to the next upgrade pod until we find a stateful victim.
+	victimIndex = e2eutil.MustFindUpgradePodWithConf(t, kubernetes, cluster, victimIndex, "stateful", 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 30*time.Minute)
@@ -668,7 +630,8 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
-	victimCycle := 1
+	// victimPodIndex is the index of the existing cluster pod to kill during its upgrade rebalance.
+	victimPodIndex := 1
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -677,7 +640,7 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimCycle)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimPodIndex)
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
@@ -685,7 +648,7 @@ func TestUpgradeSupportableKillExistingStatefulPodOnRebalance(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForRebalanceEjectingNode(t, kubernetes, cluster, victimName, 10*time.Minute)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
-	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimCycle, false)
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimPodIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, k8sutil.UpgradeFinishedEvent(cluster), 10*time.Minute)
 
@@ -706,9 +669,10 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 
 	// Static configuration.
 	mdsGroupSize := constants.Size2
-	clusterSize := mdsGroupSize * 2          //4
-	victimCycle := mdsGroupSize + 1          //3
-	victimIndex := clusterSize + victimCycle // 7
+	clusterSize := mdsGroupSize * 2 //4
+	// Start searching from the first upgrade pod. In async CBS-add mode the upgrade order is
+	// non-deterministic: stateless pods may appear at any position among the upgrade pods.
+	victimIndex := clusterSize
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -717,30 +681,33 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is created immediately
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 20*time.Minute)
+	// Find the first stateless upgrade pod regardless of its position in the upgrade order.
+	victimIndex = e2eutil.MustFindUpgradePodWithConf(t, kubernetes, cluster, victimIndex, "stateless", 20*time.Minute)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
-	// * Victim node failed to add and is balanced out
-	// * For the remaining iterations upgrades nodes upgrade
+	// * cyclesBeforeVictim clean upgrade cycles (determined at runtime by MustFindUpgradePodWithConf)
+	// * Victim upgrade cycle: pod killed immediately after NMA — FailedAdd recovery
+	//   (old candidate still needs upgrading, handled by the following repeat block)
+	// * clusterSize-cyclesBeforeVictim remaining clean cycles (includes retry for victim's old candidate)
 	// * Upgrade completes
+	cyclesBeforeVictim := victimIndex - clusterSize
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: cyclesBeforeVictim, Validator: upgradeSequence},
 		upgradeFailedAddUnrecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - cyclesBeforeVictim, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
@@ -768,8 +735,9 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// Static configuration.
 	mdsGroupSize := constants.Size2
 	clusterSize := mdsGroupSize * 2
-	victimCycle := mdsGroupSize + 1
-	victimIndex := clusterSize + victimCycle
+	// Start searching from the first upgrade pod. In async CBS-add mode the upgrade order is
+	// non-deterministic: stateless pods may appear at any position among the upgrade pods.
+	victimIndex := clusterSize
 
 	// Create the cluster, checking the version is as we expect, we need an upgrade path.
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
@@ -778,13 +746,14 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
-	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
 	// When the cluster is ready, start the upgrade.  When the victim pod is balancing in
 	// kill it.  The cluster should reach a healthy upgraded condition.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, victimIndex), 20*time.Minute)
+	// Find the first stateless upgrade pod regardless of its position in the upgrade order.
+	victimIndex = e2eutil.MustFindUpgradePodWithConf(t, kubernetes, cluster, victimIndex, "stateless", 20*time.Minute)
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 40*time.Minute)
@@ -792,17 +761,20 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Upgrade starts
-	// * For iterations up to the victim cycle expect nodes upgrade
-	// * Victim node failed to balance in and is ejected to maintain scale
-	// * For the remaining iterations upgrades nodes upgrade
+	// * cyclesBeforeVictim clean upgrade cycles (determined at runtime by MustFindUpgradePodWithConf)
+	// * Victim upgrade cycle: pod killed at ~25% rebalance progress — the victim sequence absorbs
+	//   both the failed pod's failover and its replacement's combined rebalance (which ejects the
+	//   old upgrade candidate and cleans up the victim's CBS record in one pass)
+	// * clusterSize-cyclesBeforeVictim-1 remaining clean cycles for the other old candidates
 	// * Upgrade completes
+	cyclesBeforeVictim := victimIndex - clusterSize
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: victimCycle, Validator: upgradeSequence},
+		eventschema.Repeat{Times: cyclesBeforeVictim, Validator: upgradeSequence},
 		upgradeDownUnrecoverableSequence(victimName),
-		eventschema.Repeat{Times: clusterSize - (victimCycle + 1), Validator: upgradeSequence},
+		eventschema.Repeat{Times: clusterSize - cyclesBeforeVictim - 1, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 

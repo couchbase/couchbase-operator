@@ -38,7 +38,9 @@ import (
 const ServerGroupAvoidDelimiter = ","
 
 // createPod is used to create EVERY Couchbase server pod, either provisioning or
-// reprovisioning them.
+// reprovisioning them.  Pod creation is non-blocking: the pod is flagged with a
+// PendingInitializationCondition and initialization will be completed asynchronously
+// by updatePendingInitializationConditions() in the next reconciliation cycle.
 func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, deleteVolumes bool) (err error) {
 	// In the event of an error, dump out all information we know about
 	// and raise an event.  Delete all resources
@@ -59,11 +61,18 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 		return c.createPodWithRescheduling(ctx, m, serverSpec)
 	}
 
-	if _, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig()); err != nil {
+	pod, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig())
+	if err != nil {
 		return err
 	}
 
-	return c.waitForCreatePod(ctx, m)
+	if err := k8sutil.FlagPodPendingInitialization(c.k8s, pod, "pod created, waiting for readiness"); err != nil {
+		log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+		return err
+	}
+
+	log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
+	return nil
 }
 
 type failedSchedulingServerGroupsTracker map[string]int
@@ -123,16 +132,12 @@ func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil
 		return err
 	}
 
-	// Pod failed to schedule, add server group to avoid list.
-	if err := c.waitForCreatePod(ctx, m); err != nil {
-		serverGroup := pod.Spec.NodeSelector[constants.ServerGroupLabel]
-		if err := c.addFailedSchedulingServerGroups(serverGroup); err != nil {
-			log.Error(err, "Failed to add server group to avoid list", "cluster", c.namespacedName(), "serverGroup", serverGroup)
-		}
-
+	if err := k8sutil.FlagPodPendingInitialization(c.k8s, pod, "pod created with rescheduling, waiting for readiness"); err != nil {
+		log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
 		return err
 	}
 
+	log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
 	return nil
 }
 
@@ -151,6 +156,9 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 
 // Delete pod and create with same name.
 // Persisted members will reuse volume mounts.
+// Pod recreation is non-blocking: the new pod is flagged with a
+// PendingInitializationCondition and initialization will be completed
+// asynchronously by updatePendingInitializationConditions().
 func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
@@ -175,9 +183,12 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 		return err
 	}
 
-	// To get here the pod would need to be initialized and clustered, so this is
-	// safe.
-	return k8sutil.SetPodInitialized(c.k8s, m.Name())
+	// createPod now flags the pod with PendingInitializationCondition.
+	// The pod will be initialized asynchronously. SetPodInitialized will
+	// be called after the pending initialization is cleared.
+	log.V(1).Info("Pod recreated with pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+
+	return nil
 }
 
 // waitForPodAdded waits for a pod to be added to the cluster.
@@ -198,11 +209,6 @@ func (c *Cluster) waitForPodAdded(ctx context.Context, member couchbaseutil.Memb
 	}
 
 	return retryutil.Retry(ctx, time.Second, callback)
-}
-
-// wait with context.
-func (c *Cluster) waitForCreatePod(ctx context.Context, member couchbaseutil.Member) error {
-	return k8sutil.WaitForPod(ctx, c.k8s.KubeClient, c.cluster.Namespace, member.Name(), member.GetHostPort())
 }
 
 func (c *Cluster) waitForDeletePod(podName string, timeout int64) error {

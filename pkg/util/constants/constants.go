@@ -53,12 +53,18 @@ var (
 	AutoFailoverOnDataDiskNonResponsivenessTimePeriodDefault float64 = 120
 	AutoFailoverOnDataDiskNonResponsivenessTimePeriodMax     float64 = 3600
 
-	PodSpecAnnotation             = "pod.couchbase.com/spec"
-	PVCSpecAnnotation             = "pvc.couchbase.com/spec"
-	PVCImageAnnotation            = "pvc.couchbase.com/image"
-	SVCSpecAnnotation             = "svc.couchbase.com/spec"
-	PodTLSAnnotation              = "pod.couchbase.com/tls"
-	PodInitializedAnnotation      = "pod.couchbase.com/initialized"
+	PodSpecAnnotation        = "pod.couchbase.com/spec"
+	PVCSpecAnnotation        = "pvc.couchbase.com/spec"
+	PVCImageAnnotation       = "pvc.couchbase.com/image"
+	SVCSpecAnnotation        = "svc.couchbase.com/spec"
+	PodTLSAnnotation         = "pod.couchbase.com/tls"
+	PodInitializedAnnotation = "pod.couchbase.com/initialized"
+	// UpgradeTrackingAnnotation tracks the upgrade lifecycle of an async pod
+	// (value is the upgrade process, e.g. InPlaceUpgrade or SwapRebalance).
+	// Used first for metric attribution (handleReadyPendingPod) and then to
+	// derive stabilizingMembers for the stabilization-period gate.
+	UpgradeTrackingAnnotation = "operator.couchbase.com/upgrade-tracking"
+
 	CouchbaseVersionAnnotationKey = "server.couchbase.com/version"
 	ResourceVersionAnnotation     = "operator.couchbase.com/version"
 	CouchbaseHostnameAnnotation   = "server.couchbase.com/hostname"

@@ -267,11 +267,17 @@ func testCreateXDCRCluster(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
+	// With mTLS (policy != nil), async pod creation causes enableMutualTLS to fire
+	// ClusterSettingsEdited after the first pod is CBS-initialized, interleaved
+	// between the NewMemberAdded events rather than after rebalance completes.
+	var targetCreateSeq eventschema.Validatable
+	if policy != nil {
+		targetCreateSeq = e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize)
+	} else {
+		targetCreateSeq = e2eutil.ClusterCreateSequence(clusterSize)
+	}
 	expectedEvents2 := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Optional{
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
-		},
+		targetCreateSeq,
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
@@ -995,7 +1001,12 @@ func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
+		// Async pod creation can cause extra reconcile cycles during TLS rotation,
+		// leading to more than one RemoteClusterUpdated event on the source side.
+		eventschema.RepeatAtLeast{
+			Times:     1,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
+		},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),

@@ -1143,6 +1143,13 @@ func (c *Cluster) reconcileMemberTLS(member couchbaseutil.Member, leaf *x509.Cer
 		return nil
 	}
 
+	// Skip pods that are pending CBS initialization. These pods are Running in
+	// Kubernetes but have not yet been CBS-added via initMember, so the TLS
+	// certificate has not been loaded into Couchbase Server.
+	if k8sutil.HasPendingInitializationCondition(pod) {
+		return nil
+	}
+
 	// Reload the server certificate chain.
 	if err := c.reloadChainAndVerify(member, leaf); err != nil {
 		return err

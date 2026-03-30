@@ -250,6 +250,13 @@ func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.Exposed
 
 // ClusterCreateSequenceWithMutualTLS is a common function for generating cluster
 // creation events, when mTLS is enabled.
+//
+// With async pod creation the operator CBS-initializes the first pod, then
+// immediately enables mTLS client-auth (ClusterSettingsEdited) in that same
+// reconcile cycle — before the remaining pods are CBS-added.  The expected
+// event order is therefore:
+//
+//	NewMemberAdded(0) → ClusterSettingsEdited → NewMemberAdded(1…N-1) → Rebalance
 func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 	if size == 1 {
 		return eventschema.Sequence{
@@ -262,14 +269,16 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			// First pod is CBS-initialized; enableMutualTLS fires on that reconcile cycle.
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+			// Remaining pods are created and CBS-added asynchronously.
 			eventschema.Repeat{
 				Times:     size - 1,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
 	}
 }

@@ -30,6 +30,17 @@ import (
 // associated Autoscaler CR. Applies changes when sizing
 // differs.
 func (c *Cluster) reconcileAutoscalers() error {
+	// Skip autoscaler reconciliation while pods are pending CBS initialization.
+	// During the async scale-up window, newly created pods have not yet been
+	// CBS-added or rebalanced. Applying further HPA size changes here would
+	// trigger additional scale-ups before the current one completes, creating
+	// a cascade that indefinitely defers rebalance.
+	if len(c.getPendingInitPods()) > 0 {
+		log.V(1).Info("Pods pending CBS initialization, deferring autoscaler reconciliation",
+			"cluster", c.namespacedName())
+		return nil
+	}
+
 	// Ensure all expected Autoscaler resources are created
 	autoscalers, err := c.updateRequestedAutoscalers()
 	if err != nil {

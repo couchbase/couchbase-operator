@@ -333,35 +333,40 @@ func (c *Cluster) initializeClusterState() error {
 		return err
 	}
 
-	if err := c.state.Insert(persistence.PodIndex, "0"); err != nil {
+	// Use Upsert instead of Insert here: after Clear() the persistence Secret is empty
+	// in k8s, but the informer cache may still reflect the pre-Clear state. Insert() uses
+	// a "key must not exist" guard that apply() silently swallows when the guard fires,
+	// meaning the write never reaches k8s and the next Get() times out. Upsert() always
+	// writes through regardless of cache state.
+	if err := c.state.Upsert(persistence.PodIndex, "0"); err != nil {
 		return err
 	}
 
-	if err := c.state.Insert(persistence.Version, version); err != nil {
+	if err := c.state.Upsert(persistence.Version, version); err != nil {
 		return err
 	}
 
-	if err := c.state.Insert(persistence.Password, c.password); err != nil {
+	if err := c.state.Upsert(persistence.Password, c.password); err != nil {
 		return err
 	}
 
-	if err := c.state.Insert(persistence.Upgrading, string(persistence.UpgradeInactive)); err != nil {
+	if err := c.state.Upsert(persistence.Upgrading, string(persistence.UpgradeInactive)); err != nil {
 		return err
 	}
 
 	tls := c.api.GetTLS()
 
 	if tls != nil {
-		if err := c.state.Insert(persistence.CACertificate, string(tls.CACert)); err != nil {
+		if err := c.state.Upsert(persistence.CACertificate, string(tls.CACert)); err != nil {
 			return err
 		}
 
 		if tls.ClientAuth != nil {
-			if err := c.state.Insert(persistence.ClientCertificate, string(tls.ClientAuth.Cert)); err != nil {
+			if err := c.state.Upsert(persistence.ClientCertificate, string(tls.ClientAuth.Cert)); err != nil {
 				return err
 			}
 
-			if err := c.state.Insert(persistence.ClientKey, string(tls.ClientAuth.Key)); err != nil {
+			if err := c.state.Upsert(persistence.ClientKey, string(tls.ClientAuth.Key)); err != nil {
 				return err
 			}
 		}
@@ -479,49 +484,17 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	start := time.Now()
-
-	member, class, err := c.createInitialMember()
-	if err != nil {
-		return err
-	}
-
-	if err := c.configureInitialMember(member, class); err != nil {
-		return err
-	}
-
-	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
-
-	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
-
-	metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
-
-	return c.initalizeClusterKubernetesResources(member)
+	// createInitialMember creates the pod async and flags it with PendingInitializationCondition.
+	// handleReadyPendingPod() will call configureInitialMember + fetchAndPersistClusterUUID
+	// once the pod is Running.
+	return c.createInitialMember()
 }
 
+// initalizeClusterKubernetesResources stores the cluster UUID and syncs member
+// state after the initial cluster target is contactable. Used by migration clusters.
 func (c *Cluster) initalizeClusterKubernetesResources(target any) error {
-	// This takes a while to get set, yawn...
-	var uuid string
-
-	callback := func() error {
-		info := &couchbaseutil.PoolsInfo{}
-		if err := couchbaseutil.GetPools(info).On(c.api, target); err != nil {
-			return err
-		}
-
-		uuid = info.GetUUID()
-		if uuid == "" {
-			return fmt.Errorf("cluster UUID not set: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
-		}
-
-		return nil
-	}
-
-	if err := retryutil.RetryWithBackoff(time.Second, time.Minute, callback); err != nil {
-		return err
-	}
-
-	if err := c.state.Insert(persistence.UUID, uuid); err != nil {
+	uuid, err := c.fetchAndPersistClusterUUID(target)
+	if err != nil {
 		return err
 	}
 
@@ -562,21 +535,6 @@ func (c *Cluster) podInitialized(pod *v1.Pod) bool {
 	}
 
 	return false
-}
-func (c *Cluster) handlePendingPods(pods []*v1.Pod) {
-	for _, pod := range pods {
-		podAge := time.Since(pod.GetCreationTimestamp().Time)
-		if podAge > c.config.PodCreateTimeout {
-			log.Info("Pod creation timeout exceeded", "cluster", c.namespacedName(), "pod", pod.Name)
-
-			if rerr := c.removePod(pod.Name, true); rerr != nil {
-				log.Error(rerr, "Failed to delete pod", "cluster", c.namespacedName(), "pod", pod.Name)
-				continue
-			}
-
-			c.raiseEventCached(k8sutil.MemberCreationFailedEvent(pod.Name, c.cluster))
-		}
-	}
 }
 
 // RunReconcile gathers a list of pods in cluster from Kubernetes, optionally
@@ -650,17 +608,23 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// Otherwise indicate that we are in control.
 	c.cluster.Status.Control()
 
-	running, pending := c.getClusterPodsByPhase()
-	if len(pending) > 0 {
-		// Pod startup might take long, e.g. pulling image. It would
-		// deterministically become running or succeeded/failed later.
-		log.Info("Pods pending creation, skipping", "cluster", c.namespacedName(), "running", len(running), "pending", len(pending))
-
-		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "pending"})...).Inc()
-
-		c.handlePendingPods(pending)
-
+	// Process pods with PendingInitializationCondition (async pod creation).
+	// For new clusters (no ready members), skip updateMembers and just handle pending pods.
+	// For existing clusters, process pending pods but continue with normal reconciliation.
+	pendingInitPods := c.getPendingInitPods()
+	if len(pendingInitPods) > 0 && c.readyMembers().Empty() {
+		log.V(1).Info("Pods pending initialization during cluster creation, skipping updateMembers",
+			"cluster", c.namespacedName(), "count", len(pendingInitPods))
+		c.updatePendingInitializationConditions()
+		// Return early - next cycle will either complete initialization or retry
 		return
+	}
+
+	if len(pendingInitPods) > 0 {
+		log.V(1).Info("Pods pending initialization, processing before reconciliation",
+			"cluster", c.namespacedName(), "count", len(pendingInitPods))
+		c.updatePendingInitializationConditions()
+		// Continue with normal reconciliation
 	}
 
 	// Members are updated each iteration by performing a union of Kubernetes resources
@@ -679,6 +643,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		// operator got killed or rescheduled before pods were correctly initialized,
 		// and thus will not respond to our pleas for help.  Execute any uninitialized
 		// nodes, so that we may recreate the cluster next time around.
+		running, _ := c.getClusterPodsByPhase()
 		for _, pod := range running {
 			if c.podInitialized(pod) {
 				continue
@@ -869,6 +834,12 @@ func (c *Cluster) recoverClusterDown() (bool, error) {
 	for _, name := range c.members.Names() {
 		m := c.members[name]
 		if c.isPodRecoverable(m) {
+			pod, podExists := c.k8s.Pods.Get(name)
+			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
+				log.V(1).Info("Down pod already exists, skipping recreation", "cluster", c.namespacedName(), "name", name)
+				continue
+			}
+
 			if err := c.recreatePod(m); err != nil {
 				return false, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
 			}
@@ -924,13 +895,15 @@ func (c *Cluster) getClusterPodsByPhase() (running, pending []*v1.Pod) {
 	return
 }
 
-func (c *Cluster) getPendingPods() []*v1.Pod {
+// getPendingDNSPods returns all cluster pods that have the PodPendingExternalDNSCondition set,
+// i.e. pods that have been CBS-added but are waiting for external DNS propagation.
+func (c *Cluster) getPendingDNSPods() []*v1.Pod {
 	clusterPods := c.getClusterPods()
 
 	var pendingPods []*v1.Pod
 
 	for _, pod := range clusterPods {
-		if k8sutil.IsPendingMember(pod) {
+		if k8sutil.IsPendingDNSMember(pod) {
 			pendingPods = append(pendingPods, pod)
 		}
 	}
@@ -1372,4 +1345,331 @@ func (c *Cluster) isMirWatchdogEnabled() bool {
 
 func (c *Cluster) isMirWatchdogRunning() bool {
 	return c.mirWatchdog != nil && c.mirWatchdog.isRunning()
+}
+
+// memberFromPod constructs a Member from a pod's labels and annotations.
+// This is used for pods that are not yet in c.members (e.g., during async initialization).
+func (c *Cluster) memberFromPod(pod *v1.Pod) couchbaseutil.Member {
+	labels := pod.GetLabels()
+	configName := labels[constants.LabelNodeConf]
+	version := pod.Annotations[constants.CouchbaseVersionAnnotationKey]
+	_, secure := pod.Annotations[constants.PodTLSAnnotation]
+	hostname := pod.Annotations[constants.CouchbaseHostnameAnnotation]
+	image := extractCouchbaseImage(pod)
+
+	member := couchbaseutil.NewMember(pod.Namespace, c.cluster.Name, pod.Name, version, configName, secure, image)
+	if hostname != "" && hostname != member.GetDNSName() {
+		member = couchbaseutil.NewExtConnectedMember(pod.Namespace, c.cluster.Name, pod.Name, version, configName, secure, hostname, image)
+	}
+
+	return member
+}
+
+// isPodActuallyReady checks if a pod is running and the main container is ready.
+func (c *Cluster) isPodActuallyReady(pod *v1.Pod) bool {
+	// Pod must be in running phase
+	if pod.Status.Phase != v1.PodRunning {
+		return false
+	}
+
+	return k8sutil.IsPodMainContainerReady(pod)
+}
+
+// handleReadyPendingPod routes a Running pod with PendingInitializationCondition to
+// the correct initialization path:
+//  1. Already-initialized annotation present AND ClusterID set → condition clear missed; retry clear.
+//  2. Existing cluster (callableMembers non-empty AND ClusterID set) → initMember + CBS-add.
+//  3. PVC recovery (ClusterID set, pod recoverable) → set initialized + clear condition.
+//  4. Initial cluster creation (fallthrough) → initMember + configureInitialMember + UUID fetch.
+func (c *Cluster) handleReadyPendingPod(pod *v1.Pod) {
+	if pod.DeletionTimestamp != nil {
+		log.V(1).Info("Pod has deletion timestamp, skipping pending init",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	log.V(1).Info("Pod is ready, attempting to initialize", "cluster", c.namespacedName(), "pod", pod.Name)
+
+	member := c.memberFromPod(pod)
+	config := c.cluster.Spec.GetServerConfigByName(member.Config())
+	if config == nil {
+		log.Error(errors.NewStackTracedError(errors.ErrInternalError), "Cannot initialize pod: config not found",
+			"cluster", c.namespacedName(), "pod", pod.Name, "config", member.Config())
+		return
+	}
+
+	// Early-exit: if the pod already has the initialized annotation it was CBS-added in a
+	// previous cycle but ClearPodPendingInitialization failed. Retry the clear and return —
+	// no need to re-run initMember or AddNode.
+	// Also requires ClusterID: if configureInitialMember succeeded (setting annotation)
+	// but fetchAndPersistClusterUUID failed (ClusterID=""), path 4 must retry the UUID fetch.
+	if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok && c.cluster.Status.ClusterID != "" {
+		if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+			log.Error(err, "Failed to clear stale pending initialization condition",
+				"cluster", c.namespacedName(), "pod", pod.Name)
+		}
+		return
+	}
+
+	if !c.callableMembers.Empty() && c.cluster.Status.ClusterID != "" {
+		// Pod already callable in CBS — skip initMember/addNode (which would
+		// fail on a configured node) and just mark initialized.
+		if _, alreadyCallable := c.callableMembers[member.Name()]; alreadyCallable {
+			c.handlePendingPodAlreadyInitialized(pod, member)
+			return
+		}
+
+		c.handlePendingPodForExistingCluster(pod, member, config)
+		return
+	}
+
+	if c.cluster.Status.ClusterID != "" && c.isPodRecoverable(member) {
+		c.handlePendingPodAlreadyInitialized(pod, member)
+		return
+	}
+
+	c.handlePendingPodForNewCluster(pod, member, config)
+}
+
+// handlePendingPodForExistingCluster initializes a pod being added to an existing cluster:
+// CBS hostname/TLS/storage init, then addNode. On success: set initialized + clear condition.
+func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchbaseutil.Member, config *couchbasev2.ServerConfig) {
+	if err := c.initMember(c.ctx, member, *config, false); err != nil {
+		log.Error(err, "Pod initialization failed, will retry next cycle",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	url := member.GetDNSName()
+	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
+		url = member.GetHostURLPlaintext()
+	}
+
+	services, err := couchbaseutil.ServiceListFromStringArray(
+		couchbasev2.ServiceList(config.Services).StringSlice())
+	if err != nil {
+		log.Error(err, "Failed to build services list for pod",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	if err := c.AddNodeWithPodReadyCheck(member, url, services, c.readyMembers(), asyncAddNodeRetryPeriod); err != nil {
+		log.Error(err, "Failed to add pod to cluster, will retry next cycle",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	ctx, cancelWait := context.WithTimeout(c.ctx, time.Minute)
+	defer cancelWait()
+	if err := c.waitForPodAdded(ctx, member); err != nil {
+		log.Error(err, "Node did not reach inactiveAdded state after addNode, will retry next cycle",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
+	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
+
+	// Fire upgrade metrics at the correct semantic point: after CBS acknowledged the node.
+	// The durable UpgradeTrackingAnnotation survives reconcile cycles and restarts.
+	// It is NOT cleared here — cleared by handleUpgradeNode after stabilization.
+	switch pod.Annotations[constants.UpgradeTrackingAnnotation] {
+	case string(couchbasev2.InPlaceUpgrade):
+		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+	case string(couchbasev2.SwapRebalance):
+		metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+	}
+
+	if condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingInitializationCondition); condition != nil {
+		metrics.PodReadinessDurationMetric.WithLabelValues(
+			c.addOptionalLabelValues([]string{c.cluster.Name, config.Name})...,
+		).Observe(float64(time.Since(condition.LastTransitionTime.Time)))
+	}
+
+	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
+		log.Error(err, "Failed to set pod initialized",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		// Do NOT fall through to ClearPodPendingInitialization — without the initialized
+		// annotation, kill-uninitialized-pods would delete a live CBS-active node next cycle.
+		return
+	}
+
+	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+		log.Error(err, "Failed to clear pending initialization condition")
+	}
+}
+
+// handlePendingPodAlreadyInitialized handles a pod that is already known to CBS
+// (either recovering with its PVC or after a previous CBS-add where SetPodInitialized
+// failed). No CBS init or addNode is needed — just mark initialized and clear PendingInit.
+func (c *Cluster) handlePendingPodAlreadyInitialized(pod *v1.Pod, member couchbaseutil.Member) {
+	log.V(1).Info("Pod already initialized in CBS, marking initialized",
+		"cluster", c.namespacedName(), "pod", pod.Name)
+	// SetPodInitialized BEFORE ClearPodPendingInitialization: if Set succeeds but Clear
+	// fails, the early-exit in handleReadyPendingPod retries the clear on the next cycle.
+	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
+		log.Error(err, "Failed to set pod initialized", "cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+		log.Error(err, "Failed to clear pending initialization condition")
+	}
+}
+
+// handlePendingPodForNewCluster initializes the very first member of a new cluster:
+// CBS init, cluster-level configuration (passwords, RAM quotas), then UUID fetch.
+func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseutil.Member, config *couchbasev2.ServerConfig) {
+	log.V(1).Info("Initializing initial cluster member", "cluster", c.namespacedName(), "pod", pod.Name)
+
+	if err := c.initMember(c.ctx, member, *config, false); err != nil {
+		log.Error(err, "Failed to initialize ready pod", "cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	c.clusterAddMember(member)
+
+	// If the pod is already initialized (annotation set from a previous cycle where
+	// configureInitialMember succeeded but fetchAndPersistClusterUUID failed), skip
+	// reconfiguration and go straight to the UUID fetch — idempotent via Upsert.
+	if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; !ok {
+		if err := c.configureInitialMember(member, config); err != nil {
+			log.Error(err, "Failed to configure initial member")
+			c.callableMembers = couchbaseutil.MemberSet{}
+			return
+		}
+	}
+
+	uuid, err := c.fetchAndPersistClusterUUID(member)
+	if err != nil {
+		log.Error(err, "Failed to fetch cluster UUID")
+		c.callableMembers = couchbaseutil.MemberSet{}
+		return
+	}
+
+	c.cluster.Status.SetClusterID(uuid)
+	c.cluster.Status.SetBalancedCondition()
+
+	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
+	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
+
+	if condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingInitializationCondition); condition != nil {
+		metrics.PodReadinessDurationMetric.WithLabelValues(
+			c.addOptionalLabelValues([]string{c.cluster.Name, config.Name})...,
+		).Observe(float64(time.Since(condition.LastTransitionTime.Time)))
+	}
+
+	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+		log.Error(err, "Failed to clear pending initialization condition")
+	}
+
+	log.V(1).Info("Pod initialization complete", "cluster", c.namespacedName(), "pod", pod.Name)
+}
+
+// handleTimedOutPendingPod cleans up a pod that has exceeded its initialization timeout.
+func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
+	log.Info("Pod initialization timed out, removing", "cluster", c.namespacedName(), "pod", pod.Name)
+
+	if pod.Status.Phase != v1.PodRunning {
+		if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok && serverGroup != "" {
+			if err := c.addFailedSchedulingServerGroups(serverGroup); err != nil {
+				log.Error(err, "Failed to record server group scheduling failure",
+					"cluster", c.namespacedName(), "pod", pod.Name, "serverGroup", serverGroup)
+			}
+		}
+	}
+
+	// Remove the pod first. If this fails, the condition remains set so the next
+	// cycle retries the removal. Clearing the condition before removal would
+	// expose the pod to handleUnclusteredNodes which would attempt to CBS-add it.
+	if err := c.removePod(pod.Name, true); err != nil {
+		log.Error(err, "Failed to remove timed-out pending pod", "cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	// Condition cleared only after successful removal.
+	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+		log.Error(err, "Failed to clear pending initialization condition", "pod", pod.Name)
+	}
+
+	c.raiseEventCached(k8sutil.MemberCreationFailedEvent(pod.Name, c.cluster))
+}
+
+// updatePendingInitializationConditions processes pods with the PendingInitialization condition.
+// Ready pods are initialized; timed-out pods are cleaned up. Errors are logged by the
+// individual handlers and do not abort processing of other pods.
+func (c *Cluster) updatePendingInitializationConditions() {
+	pendingPods := c.getPendingInitPods()
+	if len(pendingPods) == 0 {
+		return
+	}
+
+	for _, pod := range pendingPods {
+		condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingInitializationCondition)
+		if condition == nil {
+			continue
+		}
+
+		// Ready pods should be CBS-added regardless of how long they took.
+		if c.isPodActuallyReady(pod) {
+			c.handleReadyPendingPod(pod)
+			continue
+		}
+
+		podAge := time.Since(condition.LastTransitionTime.Time)
+		if podAge > c.config.PodCreateTimeout {
+			c.handleTimedOutPendingPod(pod)
+			continue
+		}
+
+		log.V(1).Info("Pod pending initialization, not yet ready",
+			"cluster", c.namespacedName(), "pod", pod.Name, "age", podAge.Round(time.Second))
+	}
+}
+
+// getPendingInitPods returns all cluster pods that have the PendingInitializationCondition.
+func (c *Cluster) getPendingInitPods() []*v1.Pod {
+	clusterPods := c.getClusterPods()
+
+	var pendingPods []*v1.Pod
+	for _, pod := range clusterPods {
+		if k8sutil.HasPendingInitializationCondition(pod) {
+			pendingPods = append(pendingPods, pod)
+		}
+	}
+
+	return pendingPods
+}
+
+// fetchAndPersistClusterUUID retries until it fetches a non-empty cluster UUID from the
+// Couchbase pools API, then stores it in persistence.
+func (c *Cluster) fetchAndPersistClusterUUID(target any) (string, error) {
+	var uuid string
+
+	callback := func() error {
+		info := &couchbaseutil.PoolsInfo{}
+		if err := couchbaseutil.GetPools(info).On(c.api, target); err != nil {
+			return err
+		}
+
+		uuid = info.GetUUID()
+		if uuid == "" {
+			return fmt.Errorf("cluster UUID not set: %w", errors.NewStackTracedError(errors.ErrCouchbaseServerError))
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryWithBackoff(time.Second, time.Minute, callback); err != nil {
+		return "", err
+	}
+
+	// Upsert and not Insert incase the cluster UUID was already set by a previous pod that initialized and fetched the UUID but failed to clear its pending initialization condition / the operator restarted.
+	if err := c.state.Upsert(persistence.UUID, uuid); err != nil {
+		return "", err
+	}
+
+	return uuid, nil
 }

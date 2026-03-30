@@ -246,6 +246,10 @@ func (c *Cluster) getStatusFromClusterInfo(info *couchbaseutil.ClusterInfo, memb
 		nodes := info.Nodes
 
 		for _, node := range nodes {
+			// Skip unhealthy (Down/Failed) nodes — CBS cannot retrieve their version.
+			if node.Status == "unhealthy" {
+				continue
+			}
 			nodeCurrentVersion, _, found = strings.Cut(node.Version, "-")
 			if !found {
 				log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "cluster", c.namespacedName(), "node", node.HostName)
@@ -292,6 +296,10 @@ func areNodesVersionUpgrading(nodes []couchbaseutil.NodeInfo) bool {
 	version := ""
 
 	for _, node := range nodes {
+		// Skip unhealthy (Down/Failed) nodes — CBS cannot retrieve their version.
+		if node.Status == "unhealthy" {
+			continue
+		}
 		nodeCurrentVersion, _, found := strings.Cut(node.Version, "-")
 		if !found {
 			log.Error(errors.ErrImageVersionUnretrievable, "failed to retrieve node version", "node", node.HostName)

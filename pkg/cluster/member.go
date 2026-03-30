@@ -282,10 +282,8 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 
 	var allErr = true
 
-	for index, result := range results {
-		if results[index].Err == nil {
-			err = c.initMember(ctx, result.Member, serverSpecs[index])
-			results[index].Err = err
+	for _, result := range results {
+		if result.Err == nil {
 			allErr = false
 		}
 	}
@@ -300,14 +298,14 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	return results, nil
 }
 
-func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member, serverSpec couchbasev2.ServerConfig) error {
+func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, cleanupOnFailure bool) error {
 	log.V(1).Info("initialising pod", "pod", newMember.Name(), "cluster", c.namespacedName())
 	// From this point on, if something goes wrong, we blow the pod (and any volumes)
 	// away, as they are uninitialized and not clustered, hoping it will fix itself
 	// next time around.
 	var err error
 	defer func() {
-		if err == nil {
+		if err == nil || !cleanupOnFailure {
 			return
 		}
 
@@ -415,81 +413,137 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 		return nil, err
 	}
 
-	for index, memberResult := range memberResults {
-		start := time.Now()
-		serverSpec := serverSpecs[index]
+	if !c.cluster.IsMigrationCluster() {
+		return memberResults, nil
+	}
 
+	// Migration cluster path: synchronous init + AddNode.
+	// Migration requires special DNS/service ordering that async doesn't support.
+	for index, memberResult := range memberResults {
 		if memberResult.Err != nil {
 			log.V(1).Info("skipping clustering pod due to error", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", memberResult.Err)
 			continue
 		}
-		// Add to the cluster. Note we have to use the plain text url as
-		// /controller/addNode will not work with a https reference
-		services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
-		if err != nil {
-			memberResult.Err = err
-		}
-		// Get dns name of member being added but reduce to plain text http if insecure annotation exists.
-		url := memberResult.Member.GetDNSName()
-
-		if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
-			log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
-			url = memberResult.Member.GetHostURLPlaintext()
-		}
-
-		retryPeriod := extendedRetryPeriod
-
-		// For externally connected migrated clusters we need to first create a service for the pod
-		// so that it can be accessed by the outside world. It also needs a longer retry period
-		// to wait for DNS propagation to the source cluster.
-		if c.cluster.IsExternalMigrationCluster() && c.cluster.Spec.HasExposedFeatures() {
-			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member); err != nil {
-				if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
-					log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
-					continue
-				}
-
-				return nil, err
-			}
-
-			retryPeriod = externalConnectionRetryPeriod
-		}
-
-		log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
-
-		if err := c.AddNodeWithPodReadyCheck(memberResult.Member, url, services, target, retryPeriod); err != nil {
-			log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
-			memberResult.Err = err
-
-			continue
-		}
-
-		// Notify that we have added a new member, this makes it callable.
-		c.clusterAddMember(memberResult.Member)
-
-		log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
-		c.raiseEvent(k8sutil.MemberAddEvent(memberResult.Member.Name(), c.cluster))
-
-		if err := k8sutil.SetPodInitialized(c.k8s, memberResult.Member.Name()); err != nil {
-			memberResult.Err = err
-		}
-
-		class := serverSpecs[index]
-
-		metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, class.Name})...).Observe(float64(time.Since(start)))
-
-		context, cancel := context.WithTimeout(c.ctx, time.Minute)
-
-		if err := c.waitForPodAdded(context, memberResult.Member); err != nil {
-			cancel()
-
+		if err := c.addMigrationMember(memberResult, serverSpecs[index], target); err != nil {
 			return nil, err
 		}
-
-		cancel()
 	}
 
 	return memberResults, nil
+}
+
+// addMigrationMember performs the synchronous CBS-add sequence for a single pod in a
+// migration cluster. Per-member failures are recorded on memberResult.Err (returns nil so
+// the caller continues to the next pod). Fatal errors (e.g. waitForPodAdded) are returned
+// as non-nil, causing the caller to abort the whole batch.
+func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResult, serverSpec couchbasev2.ServerConfig, target interface{}) error {
+	start := time.Now()
+
+	// Add to the cluster. Note we have to use the plain text url as
+	// /controller/addNode will not work with a https reference
+	services, err := couchbaseutil.ServiceListFromStringArray(couchbasev2.ServiceList(serverSpec.Services).StringSlice())
+	if err != nil {
+		memberResult.Err = err
+	}
+
+	// Get dns name of member being added but reduce to plain text http if insecure annotation exists.
+	url := memberResult.Member.GetDNSName()
+
+	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
+		log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+		url = memberResult.Member.GetHostURLPlaintext()
+	}
+
+	retryPeriod := extendedRetryPeriod
+
+	// For externally connected migrated clusters we need to first create a service for the pod
+	// so that it can be accessed by the outside world. It also needs a longer retry period
+	// to wait for DNS propagation to the source cluster.
+	if c.cluster.IsExternalMigrationCluster() && c.cluster.Spec.HasExposedFeatures() {
+		if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member); err != nil {
+			if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
+				log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
+				return nil
+			}
+
+			return err
+		}
+
+		retryPeriod = externalConnectionRetryPeriod
+	}
+
+	// Wait until the pod's main container is ready before making any CBS API calls.
+	// createPod() returns immediately after flagging PendingInitializationCondition.
+	if err := c.waitForPodMainContainerReady(memberResult.Member, c.config.PodCreateTimeout); err != nil {
+		log.Error(err, "Pod not ready for initialization", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+		memberResult.Err = err
+		return nil
+	}
+
+	if err := c.initMember(c.ctx, memberResult.Member, serverSpec, true); err != nil {
+		log.Error(err, "Failed to initialize pod before cluster add", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+		memberResult.Err = err
+		return nil
+	}
+
+	log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+
+	if err := c.AddNodeWithPodReadyCheck(memberResult.Member, url, services, target, retryPeriod); err != nil {
+		log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
+		memberResult.Err = err
+		return nil
+	}
+
+	c.clusterAddMember(memberResult.Member)
+
+	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+	c.raiseEvent(k8sutil.MemberAddEvent(memberResult.Member.Name(), c.cluster))
+
+	if err := k8sutil.SetPodInitialized(c.k8s, memberResult.Member.Name()); err != nil {
+		memberResult.Err = err
+	}
+
+	if pod, found := c.k8s.Pods.Get(memberResult.Member.Name()); found {
+		if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+			log.Error(err, "Failed to clear pending initialization condition", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+		}
+	}
+
+	metrics.PodReadinessDurationMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, serverSpec.Name})...).Observe(float64(time.Since(start)))
+
+	ctx, cancel := context.WithTimeout(c.ctx, time.Minute)
+	defer cancel()
+
+	return c.waitForPodAdded(ctx, memberResult.Member)
+}
+
+// waitForPodMainContainerReady polls until the pod's main container is ready or PodCreateTimeout expires.
+func (c *Cluster) waitForPodMainContainerReady(member couchbaseutil.Member, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(c.ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		pod, ok := c.k8s.Pods.Get(member.Name())
+		if !ok || pod.DeletionTimestamp != nil {
+			return fmt.Errorf("%w: member pod %s not found or terminating", errors.ErrPodNotFound, member.Name())
+		}
+
+		if c.isPodActuallyReady(pod) {
+			return nil
+		}
+
+		log.V(1).Info("Waiting for pod main container to be ready", "cluster", c.namespacedName(), "pod", member.Name())
+
+		select {
+		case <-ticker.C:
+			// continue
+		case <-ctx.Done():
+			return fmt.Errorf("pod %s main container not ready after %v: %w", member.Name(), timeout, errors.ErrNodeNotAdded)
+		}
+	}
 }
 
 // checkTargetPodsExist checks if target pod(s) still exist and are not terminating.
@@ -543,9 +597,7 @@ func (c *Cluster) attemptAddNode(member couchbaseutil.Member, url string, servic
 
 	// Pod is ready, attempt to add node
 	if err := couchbaseutil.AddNode(url, c.username, c.password, services).On(c.api, target); err != nil {
-		// AddNode failed, will retry (might be transient cluster issue)
-		log.V(1).Info("AddNode failed, will retry", "cluster", c.namespacedName(), "pod", member.Name())
-		return false, nil
+		return false, err
 	}
 	// If pod not ready or AddNode failed, continue to retry
 	return true, nil
@@ -575,7 +627,11 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 		// The next reconcile cycle will detect the missing pod and recreate it.
 		success, err := c.attemptAddNode(member, url, services, target)
 		if err != nil {
-			return err
+			if goerrors.Is(err, errors.ErrPodNotFound) {
+				return err
+			}
+
+			log.Error(err, "AddNode attempt failed, will retry", "cluster", c.namespacedName(), "pod", member.Name())
 		}
 		if success {
 			return nil
@@ -616,15 +672,16 @@ func (c *Cluster) cancelAddMember(member couchbaseutil.Member) error {
 }
 
 // createInitialMember picks a server class containing the data service and
-// creates a member/pod for it.
-func (c *Cluster) createInitialMember() (couchbaseutil.Member, *couchbasev2.ServerConfig, error) {
+// creates a member/pod for it. The pod is flagged with PendingInitializationCondition
+// and initialization completes asynchronously via handleReadyPendingPod.
+func (c *Cluster) createInitialMember() error {
 	if len(c.cluster.Spec.Servers) == 0 {
-		return nil, nil, fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+		return fmt.Errorf("cluster create: no server specification defined: %w", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	index := c.indexOfServerConfigWithService(couchbasev2.DataService)
 	if index == -1 {
-		return nil, nil, fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
+		return fmt.Errorf("%w: cluster create: at least one server specification must contain the data service", errors.NewStackTracedError(errors.ErrConfigurationInvalid))
 	}
 
 	c.members = couchbaseutil.NewMemberSet()
@@ -633,21 +690,20 @@ func (c *Cluster) createInitialMember() (couchbaseutil.Member, *couchbasev2.Serv
 
 	member, err := c.createMembers(class)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	if len(member) == 0 {
-		return nil, nil, errors.NewStackTracedError(errors.ErrInternalError) // this is basically impossible
+		return errors.NewStackTracedError(errors.ErrInternalError) // this is basically impossible
 	}
 
 	if member[0].Err != nil {
-		return nil, nil, member[0].Err
+		return member[0].Err
 	}
 
-	// Notify that we have added a new member, this makes it callable.
-	c.clusterAddMember(member[0].Member)
-
-	return member[0].Member, &class, nil
+	log.Info("Initial member pod created, pending async initialization",
+		"cluster", c.namespacedName(), "pod", member[0].Member.Name())
+	return nil
 }
 
 // configureInitialMember sets up passwords, defaults, that kind of stuff.  It's unlikely
@@ -810,6 +866,13 @@ func (c *Cluster) initMemberTLS(ctx context.Context, m couchbaseutil.Member) err
 
 // initMemberTLSNew handles TLS initialization on CBS versions 7.1+.
 func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) error {
+	// tlsCache is populated by initTLSCache() inside reconcile() → preCreationReconcilers.
+	// On the first reconcile cycle after operator restart, updatePendingInitializationConditions()
+	// may run before reconcile(), so tlsCache can be nil. Return an error to retry next cycle.
+	if c.tlsCache == nil {
+		return fmt.Errorf("%w: TLS cache not yet initialized", errors.NewStackTracedError(errors.ErrInternalError))
+	}
+
 	if err := couchbaseutil.LoadCAs().InPlaintext().On(c.api, m); err != nil {
 		return err
 	}
@@ -829,6 +892,12 @@ func (c *Cluster) initMemberTLSNew(ctx context.Context, m couchbaseutil.Member) 
 
 // initMemberTLSLegacy handles TLS initialization on CBS versions <=7.0.
 func (c *Cluster) initMemberTLSLegacy(ctx context.Context, m couchbaseutil.Member) error {
+	// tlsCache is populated by initTLSCache() inside reconcile() → preCreationReconcilers.
+	// Guard against nil on operator restart before preCreationReconcilers have run.
+	if c.tlsCache == nil {
+		return fmt.Errorf("%w: TLS cache not yet initialized", errors.NewStackTracedError(errors.ErrInternalError))
+	}
+
 	// Update Couchbase's TLS configuration
 	if err := couchbaseutil.SetClusterCACert(c.tlsCache.serverCA).InPlaintext().On(c.api, m); err != nil {
 		return err

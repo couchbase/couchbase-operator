@@ -31,12 +31,12 @@ import (
 )
 
 var ErrReconcileInhibited = fmt.Errorf("reconcile was blocked from running")
-var ErrOrchestratorNotUpgraded = fmt.Errorf("orchestrator not upgraded yet")
 var ErrFailoverStartCounterNotIncremented = fmt.Errorf("failover start counter not incremented")
 var ErrFailoverSuccessCounterNotIncremented = fmt.Errorf("failover success counter not incremented")
 var ErrUnexpectedCounterChange = fmt.Errorf("unexpected counter change")
 var ErrNodeNotInCluster = fmt.Errorf("node not in the cluster: ")
 var ErrNodeNotActive = fmt.Errorf("node not active: ")
+var ErrSwapRebalanceSetupFailed = fmt.Errorf("swap rebalance setup failed")
 
 // This is a temporary measure to maintain the interface.  This is all smell code
 // and will probably get killed off fairly soon.
@@ -124,8 +124,9 @@ type ReconcileMachine struct {
 	// if and when we rebalance.
 	ejectMembers couchbaseutil.MemberSet
 
-	// upgradedMembers are the nodes that we have successfully upgraded.
-	upgradedMembers couchbaseutil.MemberSet
+	// stabilizingMembers are replacement nodes that became Active post-rebalance
+	// but haven't yet finished the upgrade stabilization period.
+	stabilizingMembers couchbaseutil.MemberSet
 
 	// unclusteredMembers members Couchbase knows about but we have no resource for
 	// so they need ejecting and deleting.  They are treated separately from ejectMembers
@@ -134,11 +135,14 @@ type ReconcileMachine struct {
 	// FSM is called.
 	unclusteredMembers couchbaseutil.MemberSet
 
-	// pendingMembers are nodes that have been created but are not yet ready to be rebalanced into the cluster.
-	// In the future, we will split the pod creation and cluster addion steps which will make use of this
-	// set more often. For now, it acts as an indicator that there are pods which we have added to the cluster and therefore shouldn't
-	// remove them, but we don't want to rebalance them into the cluster yet as checks have not passed.
-	pendingMembers couchbaseutil.MemberSet
+	// pendingDNSMembers are nodes that have been CBS-added (PendingAddNodes state) but are not yet
+	// ready to be rebalanced in because their external DNS has not propagated yet.
+	// handleNodeServices manages DNS timeout ejection; canRebalance waits for DNS propagation.
+	pendingDNSMembers couchbaseutil.MemberSet
+
+	// pendingInitPods are members with PendingInitializationCondition, snapshotted at
+	// FSM creation time (after updatePendingInitializationConditions has run).
+	pendingInitPods couchbaseutil.MemberSet
 
 	// needsRebalance records whether we think Couchbase Server will require a rebalance.
 	// We could just let it report this fact and we take action in the next iteration, but
@@ -169,7 +173,7 @@ type ReconcileMachine struct {
 }
 
 func (r *ReconcileMachine) logState() {
-	log.V(0).Info("reconciler", "cluster", r.c.namespacedName(), "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pending", r.pendingMembers.Names())
+	log.V(0).Info("reconciler", "cluster", r.c.namespacedName(), "clustered", r.clusteredMembers.Names(), "running", r.runningMembers.Names(), "eject", r.ejectMembers.Names(), "unclustered", r.unclusteredMembers.Names(), "rebalance", r.needsRebalance, "pendingDNS", r.pendingDNSMembers.Names())
 }
 
 // addMember simulates creating and clustering a new member.
@@ -286,6 +290,9 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 	for name, member := range c.members {
 		if _, ok := status.NodeStates[name]; !ok {
+			if pod, exists := c.k8s.Pods.Get(name); exists && k8sutil.HasPendingInitializationCondition(pod) {
+				continue
+			}
 			state.UnclusteredNodes.Add(member)
 		}
 	}
@@ -302,11 +309,14 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		}
 	}
 
+	pendingInit := podsToMemberSet(c.getPendingInitPods())
+
 	fsm := &ReconcileMachine{
 		// c.members contains all members we know about from Kubernetes or from
-		// Couchbase server.  By removing all the ones that Couchbase doesn't know
-		// about we get the current set of things in the Couchbase cluster.
-		clusteredMembers: c.members.Diff(state.UnclusteredNodes),
+		// Couchbase server.  By removing the ones Couchbase doesn't know about
+		// (UnclusteredNodes) and pods still awaiting async CBS initialization
+		// (PendingInitializationCondition) we get the set of fully-clustered members.
+		clusteredMembers: c.members.Diff(state.UnclusteredNodes).Diff(pendingInit),
 
 		// By intersecting all known members with the set of members pods we
 		// get a set of members that we know are running (in some capacity) and
@@ -326,9 +336,11 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 		rebalanceRetries: uint(rebalanceRetries),
 
-		upgradedMembers: couchbaseutil.NewMemberSet(),
+		stabilizingMembers: couchbaseutil.NewMemberSet(),
 
-		pendingMembers: c.members.Intersect(podsToMemberSet(c.getPendingPods())),
+		pendingInitPods: pendingInit,
+
+		pendingDNSMembers: c.members.Intersect(podsToMemberSet(c.getPendingDNSPods())),
 	}
 
 	// Reset any timeout counters if nodes have recovered.
@@ -336,7 +348,53 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 		delete(c.recoveryTime, name)
 	}
 
+	c.deriveStabilizingFSMMembers(fsm, state)
+	c.deriveEjectFSMMembers(fsm, state)
+
 	return fsm, nil
+}
+
+// deriveStabilizingFSMMembers populates fsm.stabilizingMembers from active nodes that still carry the durable UpgradeTrackingAnnotation.
+func (c *Cluster) deriveStabilizingFSMMembers(fsm *ReconcileMachine, state *MemberState) {
+	for name := range state.ActiveNodes {
+		pod, ok := c.k8s.Pods.Get(name)
+		if !ok {
+			continue
+		}
+		if process := k8sutil.GetPodUpgradeTracking(pod); process != "" {
+			if member, ok := c.members[name]; ok {
+				fsm.stabilizingMembers.Add(member)
+			}
+		}
+	}
+}
+
+// deriveEjectFSMMembers populates fsm.ejectMembers from active nodes marked with
+// PodPendingUpgradeBeforeEjectionCondition. Swap-rebalance marks old members for ejection durably so
+// that the intent survives across reconcile cycles. The condition is NOT cleared here —
+// it is cleared by handleRebalance after successful ejection.
+//
+// NOTE: The ejected member is also removed from clusteredMembers. In the migration path
+// swapRebalanceMembers called removeMemberUser which did this in the same cycle. In the
+// async path the swap is split across reconcile cycles, so clusteredMembers is rebuilt
+// from CBS state each time and reincludes the old pod (still Active) plus the
+// pending-init replacement. Without the removal, handleRemoveNode counts one extra node
+// and scale-downs the wrong pod, and verifyRebalance fails because it expects the ejected
+// node to remain Active after rebalance.
+func (c *Cluster) deriveEjectFSMMembers(fsm *ReconcileMachine, state *MemberState) {
+	for name := range state.ActiveNodes {
+		pod, ok := c.k8s.Pods.Get(name)
+		if !ok {
+			continue
+		}
+		if k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
+			if member, ok := c.members[name]; ok {
+				fsm.ejectMembers.Add(member)
+				fsm.clusteredMembers.Remove(name)
+				fsm.needsRebalance = true
+			}
+		}
+	}
 }
 
 // exec runs the state machine until a finished condition or error
@@ -363,8 +421,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handleNodeServices,
 		(*ReconcileMachine).handleAutoscaleServerConfigs,
 		(*ReconcileMachine).handleRebalance,
-		(*ReconcileMachine).handleUpgradeStabilizationPeriod,
-		(*ReconcileMachine).handleDeadMembers,
+		(*ReconcileMachine).handleEjectedMembers,
 		(*ReconcileMachine).handleNotifyFinished,
 	}
 
@@ -687,7 +744,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	// stable state before we do "dangerous" things like reconcile TLS, which needs to
 	// be done one-shot.
 	if !c.allDownNodesRecoveryTimedout(r.couchbase.DownNodes) {
-		r.abort(errors.NewStackTracedError(ErrReconcileInhibited).Error() + ": waiting for pod failover")
+		r.abort("waiting for down node failover timeout")
 		return nil
 	}
 
@@ -731,6 +788,14 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		c.logFailedMember("Node failed", name)
 
 		// Timeout has expired, recreate the pod.
+		// Guard: if the pod already exists and has the PendingInitializationCondition, it was
+		// already recreated asynchronously in a previous cycle — skip to avoid a second recreate.
+		pod, podExists := c.k8s.Pods.Get(name)
+		if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
+			log.V(1).Info("Down pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+			continue
+		}
+
 		if err := c.recreatePod(m); err != nil {
 			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
@@ -806,23 +871,47 @@ func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) error {
 	r.log()
 
 	for name := range r.unclusteredMembers {
+		// Skip pods that are already Terminating: they were CBS-ejected in the previous
+		// reconcile cycle and MemberRemoved was already emitted from rebalanceWithRetriesOnVerifyFails.
+		// Re-emitting here would produce duplicate events while Kubernetes finishes removing the pod.
+		if pod, ok := c.k8s.Pods.Get(name); ok && pod.DeletionTimestamp != nil {
+			if err := c.destroyMember(name, r.shouldRemoveVolumes(name)); err != nil {
+				return fmt.Errorf("unable to remove unclustered node: %w", err)
+			}
+
+			continue
+		}
+
 		if err := c.destroyMember(name, r.shouldRemoveVolumes(name)); err != nil {
 			return fmt.Errorf("unable to remove unclustered node: %w", err)
 		}
 
 		log.Info("Pod unclustered, deleting", "cluster", c.namespacedName(), "name", name)
-
-		// Nodes may be rebalanced out in a previous iteration (caused by
-		// node failover) and thus miss out the ejection events from rebalance().
-		//
-		// TODO: it makes sense to unify handling all unclustered nodes *after*
-		// reblancing has occurred, however tests will probably fail left right
-		// and center due to the events occurring after the cluster is in a healthy
-		// state.
-		c.raiseEvent(k8sutil.MemberRemoveEvent(name, c.cluster))
 	}
 
 	return nil
+}
+
+// attemptSilentReAdd tries to cancel a FailedAdd state in CBS and re-add the node
+// without raising events or recreating the pod. Returns true if the re-add succeeded.
+func (c *Cluster) attemptSilentReAdd(m couchbaseutil.Member) bool {
+	config := c.cluster.Spec.GetServerConfigByName(m.Config())
+	if config == nil {
+		return false
+	}
+	url := m.GetDNSName()
+	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
+		url = m.GetHostURLPlaintext()
+	}
+	services, err := couchbaseutil.ServiceListFromStringArray(
+		couchbasev2.ServiceList(config.Services).StringSlice())
+	if err != nil {
+		return false
+	}
+	if cancelErr := couchbaseutil.CancelAddNode(m.GetOTPNode()).RetryFor(extendedRetryPeriod).On(c.api, c.getMigratingReadyTarget()); cancelErr != nil {
+		return false
+	}
+	return c.AddNodeWithPodReadyCheck(m, url, services, c.readyMembers(), silentReAddRetryPeriod) == nil
 }
 
 func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
@@ -839,6 +928,22 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 		c.logFailedMember("Node failed", name)
 
 		if c.isPodRecoverable(m) {
+			// Guard: only skip if the pod was already async-recreated (has PendingInit).
+			// A pod that was successfully AddNode'd (condition cleared) but then crashed
+			// into FailedAdd does not have PendingInit and must be recreated.
+			pod, podExists := c.k8s.Pods.Get(name)
+			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
+				log.V(1).Info("Pending add pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+				continue
+			}
+
+			// If the pod is still running, attempt a silent cancel-and-retry before
+			// falling back to pod recreation.
+			if podExists && pod.DeletionTimestamp == nil && c.attemptSilentReAdd(m) {
+				r.abort("FailedAdd node silently re-added after retry: " + name)
+				return nil
+			}
+
 			if err := c.recreatePod(m); err != nil {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
 				r.abort("unable to recover pod pending addition")
@@ -848,7 +953,18 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 
-			return fmt.Errorf("%w: recovering pending add node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
+			r.abort("pending add pod recreated asynchronously, waiting for initialization: " + name)
+
+			return nil
+		}
+
+		// For stateless (non-recoverable) pods, attempt a silent cancel-and-retry
+		// before escalating to cancelAddMember which fires a FailedAddNode event.
+		if pod, podExists := c.k8s.Pods.Get(name); podExists && pod.DeletionTimestamp == nil {
+			if c.attemptSilentReAdd(m) {
+				r.abort("FailedAdd stateless node silently re-added after retry: " + name)
+				return nil
+			}
 		}
 
 		err := c.cancelAddMember(m)
@@ -872,6 +988,11 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 // otherwise a full recovery is performed.
 func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 	if r.couchbase.AddBackNodes.Empty() {
+		return nil
+	}
+
+	ready := c.readyMembers()
+	if ready.Empty() {
 		return nil
 	}
 
@@ -914,7 +1035,7 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 
 		log.Info("Setting recovery type", "cluster", c.namespacedName(), "name", name, "type", recoveryType)
 
-		if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), recoveryType).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), recoveryType).On(c.api, ready); err != nil {
 			return err
 		}
 
@@ -941,6 +1062,12 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 		log.Info("Pods failed over", "cluster", c.namespacedName())
 
 		if c.isPodRecoverable(m) {
+			pod, podExists := c.k8s.Pods.Get(name)
+			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
+				log.V(1).Info("Failed pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+				continue
+			}
+
 			if err := c.recreatePod(m); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
 
@@ -955,7 +1082,9 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 
 			metrics.PodRecoveriesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
-			return fmt.Errorf("%w: recovering node %s", errors.NewStackTracedError(ErrReconcileInhibited), name)
+			r.abort("failed pod recreated asynchronously, waiting for initialization: " + name)
+
+			return nil
 		}
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
@@ -1117,6 +1246,18 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 }
 
 func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
+	// Do not remove any node while other nodes are being recovered or pending rebalance.
+	// This covers the three states a recovering node can be in:
+	//   FailedNodes    (unhealthy+inactiveFailed): pod recreated from PVC, CBS not yet responsive
+	//   AddBackNodes   (healthy+inactiveFailed):   pod responsive, SetRecoveryType not yet called
+	//   PendingAddNodes (healthy+inactiveAdded):   SetRecoveryType called, awaiting rebalance
+	// Removing a node in any of these states risks data loss and confuses the topology
+	// count (e.g. temporary upgrade-replacement pods appear as permanent members, causing
+	// the scheduler to eject an original node instead of the replacement).
+	if len(r.couchbase.FailedNodes) > 0 || len(r.couchbase.AddBackNodes) > 0 || len(r.couchbase.PendingAddNodes) > 0 {
+		return nil
+	}
+
 	var deletions []couchbasev2.ServerConfig
 
 	var scheduledScaling couchbasev2.ScalingMessageList
@@ -1182,7 +1323,9 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		whereEqualsServerConfig := func(m couchbaseutil.Member) bool {
 			return m.Config() == serverSpec.Name
 		}
+		// clusteredMembers excludes pending-init pods; add them back so we don't create duplicates.
 		existingNodes := r.clusteredMembers.GroupBy(whereEqualsServerConfig).Size()
+		existingNodes += r.pendingInitPods.GroupBy(whereEqualsServerConfig).Size()
 
 		nodesToCreate := serverSpec.Size - existingNodes
 		if nodesToCreate <= 0 {
@@ -1243,12 +1386,21 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		if result.Err != nil {
 			errs = append(errs, fmt.Errorf("failed to create new node for cluster: %w", result.Err))
 			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
-		} else {
+		} else if c.cluster.IsMigrationCluster() {
+			// Migration clusters perform CBS add-node synchronously inside addMembersToTarget,
+			// so the pod is already known to Couchbase and it is safe to mark it as clustered
+			// and set needsRebalance=true here.
 			r.addMember(result.Member)
 		}
+		// Non-migration (async): the pod has PendingInitializationCondition and has NOT been
+		// CBS-added yet. Calling r.addMember() would set needsRebalance=true and cause
+		// handleRebalance to attempt a premature rebalance.
 	}
 
 	if len(errs) == 0 {
+		if !c.cluster.IsMigrationCluster() {
+			r.abort("scale-up pods created, waiting for async initialization")
+		}
 		return nil
 	}
 
@@ -1567,33 +1719,22 @@ func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil
 	return true, nil
 }
 
-func (r *ReconcileMachine) checkOrchestratorOnLatestVersion(c *Cluster, targetVersion string) error {
-	callback := func() error {
-		clusterInfo := &couchbaseutil.TerseClusterInfo{}
-		if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-
-		if couchbaseutil.MemberOnVersion(c.members, clusterInfo.Orchestrator, targetVersion) {
-			return nil
-		}
-
-		return ErrOrchestratorNotUpgraded
-	}
-
-	return retryutil.RetryFor(1*time.Minute, callback)
-}
-
 func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Member, canDeltaRecover bool) error {
 	if len(c.members) > 1 {
+		ready := c.readyMembers()
+		if ready.Empty() {
+			log.Info("No ready members to set recovery type, yielding", "cluster", c.namespacedName())
+			return fmt.Errorf("%w: no ready members to set recovery type", errors.NewStackTracedError(ErrReconcileInhibited))
+		}
+
 		if canDeltaRecover {
-			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, c.readyMembers()); err != nil {
+			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeDelta).On(c.api, ready); err != nil {
 				return err
 			}
 		} else {
 			log.Info("Unable to set delta recovery type. Reverting to full recovery.", "cluster", c.namespacedName())
 
-			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
+			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, ready); err != nil {
 				return err
 			}
 		}
@@ -1603,42 +1744,11 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 		return err
 	}
 
-	if err := c.waitForPodAdded(c.ctx, candidate); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *ReconcileMachine) rebalanceAfterInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
-	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err == nil {
-		// Rebalance succeeded; mark the candidates as upgraded so the stabilization period logic can detect that an upgrade occurred.
-		for _, candidate := range candidates {
-			r.upgradedMembers.Add(candidate)
-		}
-		return nil
-	} else {
-		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
-	}
-
-	if err := r.checkOrchestratorOnLatestVersion(c, targetVersion); err != nil {
-		if !goerrors.Is(err, ErrOrchestratorNotUpgraded) {
-			return err
-		}
-	}
-
-	for _, candidate := range candidates {
-		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
-			return err
-		}
-	}
-
-	if err := c.rebalance(c.members); err != nil {
-		return err
-	}
-
-	for _, candidate := range candidates {
-		r.upgradedMembers.Add(candidate)
+	// Mark the new pod with the durable upgrade tracking annotation so later async
+	// phases can attribute metrics and gate the stabilization period.
+	if err := k8sutil.SetPodUpgradeTracking(c.k8s, candidate.Name(), string(couchbasev2.InPlaceUpgrade)); err != nil {
+		log.Error(err, "Failed to mark pod with upgrade tracking; upgrade metrics may not fire",
+			"cluster", c.namespacedName(), "pod", candidate.Name())
 	}
 
 	return nil
@@ -1686,9 +1796,25 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 		return err
 	}
 
-	canDoMultipleInPlaceUpgrades, multipleInPlaceUpgradesErr := c.multipleInPlaceUpgradesSupported(candidates)
-	if multipleInPlaceUpgradesErr != nil {
-		return multipleInPlaceUpgradesErr
+	// When multipleInPlaceUpgradesSupported returns true (server-group upgrade),
+	// the entire candidates set is processed in one cycle: all are failover'd and
+	// recreated asynchronously, then handleReadyPendingPod / handleRebalance
+	// complete the upgrade across subsequent cycles.
+	// When false (quorum or replica safety check failed), constrain to one
+	// candidate even if selectUpgradeCandidates passed multiple through, matching
+	// the original sync one-at-a-time behavior that guarded against quorum loss.
+	canDoMultipleInPlaceUpgrades, err := c.multipleInPlaceUpgradesSupported(candidates)
+	if err != nil {
+		return err
+	}
+
+	if !canDoMultipleInPlaceUpgrades && len(candidates) > 1 {
+		// Safety check failed — limit to a single candidate this cycle.
+		// The remaining candidates will be picked up in subsequent cycles.
+		for _, first := range candidates {
+			candidates = couchbaseutil.NewMemberSet(first)
+			break
+		}
 	}
 
 	for _, candidate := range candidates {
@@ -1747,29 +1873,12 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 
 			return err
 		}
-
-		metrics.InPlaceUpgradeTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-		metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-
-		if !canDoMultipleInPlaceUpgrades {
-			singleCandidate := couchbaseutil.NewMemberSet(candidate)
-			if err := r.rebalanceAfterInPlaceUpgrade(c, singleCandidate, targetVersion); err != nil {
-				metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-				metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-
-				return err
-			}
-		}
 	}
 
-	if canDoMultipleInPlaceUpgrades {
-		if err := r.rebalanceAfterInPlaceUpgrade(c, candidates, targetVersion); err != nil {
-			metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
-			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(float64(len(candidates)))
-
-			return err
-		}
-	}
+	// All candidates failover'd + recreated. Pods are pending async initialization
+	// via handleReadyPendingPod. Yield the FSM — subsequent cycles will CBS-add
+	// the pods and handleRebalance will rebalance them back in.
+	r.abort("in-place upgrade pods recreated, waiting for async initialization")
 
 	return nil
 }
@@ -1876,19 +1985,45 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
 }
 
-// nolint:gocognit,gocyclo
-func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
-	// Something is broken, let that get fixed up first.
-	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 {
-		return nil
+// handleUpgradeStabilization manages the stabilization-period guards for upgrade.
+// Returns true if the upgrade should be blocked (waiting for stabilization).
+func (r *ReconcileMachine) handleUpgradeStabilization(c *Cluster) bool {
+	// If stabilizingMembers exist but WBU hasn't been set yet, either set it
+	// (stabilization configured) or let it fall through (no stabilization).
+	if len(r.stabilizingMembers) > 0 && !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
+		upgradeSpec := r.c.cluster.Spec.Upgrade
+		if upgradeSpec != nil && upgradeSpec.StabilizationPeriod != nil {
+			r.c.cluster.Status.SetWaitingBetweenUpgrades()
+		}
 	}
 
 	if c.cluster.UpgradeWaitingForStabilizationPeriod() || c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
-		return nil
+		return true
 	}
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
+
+	// Stabilization period expired — clear the durable annotation so
+	// stabilizingMembers won't be repopulated on the next cycle.
+	for _, member := range r.stabilizingMembers {
+		if err := k8sutil.ClearPodUpgradeTracking(c.k8s, member.Name()); err != nil {
+			log.Error(err, "Failed to clear upgrade tracking annotation", "cluster", c.namespacedName(), "pod", member.Name())
+		}
+	}
+
+	return false
+}
+
+func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
+	// Block upgrades while topology is unsettled or pods are pending async CBS init.
+	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 || r.pendingInitPods.Size() > 0 {
+		return nil
+	}
+
+	if r.handleUpgradeStabilization(c) {
+		return nil
+	}
 
 	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
@@ -1992,30 +2127,6 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	return r.swapRebalanceMembers(c, constrainedCandidates)
 }
 
-// handleApplyingUpgradeStabilizationPeriod adds the waiting between upgrades condition to the cluster
-// if a stabilization period is configured in the spec and at least one member has been upgraded this
-// reconcile loop.
-func (r *ReconcileMachine) handleUpgradeStabilizationPeriod(c *Cluster) error {
-	upgradeSpec := r.c.cluster.Spec.Upgrade
-	if upgradeSpec == nil {
-		return nil
-	}
-
-	if upgradeSpec.StabilizationPeriod == nil {
-		return nil
-	}
-
-	if len(r.upgradedMembers) == 0 {
-		return nil
-	}
-
-	if !c.cluster.HasCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades) {
-		r.c.cluster.Status.SetWaitingBetweenUpgrades()
-	}
-
-	return nil
-}
-
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.
 func CheckNodesToCreate(cluster *couchbasev2.CouchbaseCluster, clusteredMembers couchbaseutil.MemberSet, arbiterNodesSupported bool) bool {
 	for _, serverSpec := range cluster.Spec.Servers {
@@ -2061,14 +2172,14 @@ func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 		return err
 	}
 
-	// Update the pending members after reconciling alternative addresses.
-	r.pendingMembers = c.members.Intersect(podsToMemberSet(c.getPendingPods()))
+	// Update the DNS-pending members after reconciling alternative addresses.
+	r.pendingDNSMembers = c.members.Intersect(podsToMemberSet(c.getPendingDNSPods()))
 
 	// If at this point a pod is still pending DNS propagation and the timeout
 	// has elapsed, we should remove the member if it has not been rebalanced (activated) into the cluster
 	// If it has already been activated, we will continue to attempt to set the alternate address,
 	// but we should not remove the member from the cluster.
-	for _, member := range r.pendingMembers.Intersect(r.couchbase.PendingAddNodes) {
+	for _, member := range r.pendingDNSMembers.Intersect(r.couchbase.PendingAddNodes) {
 		pod, found := c.k8s.Pods.Get(member.Name())
 		if !found {
 			continue
@@ -2076,7 +2187,7 @@ func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 
 		if c.hasDNSCheckTimeoutElapsed(pod) {
 			r.removeMember(member)
-			r.pendingMembers.Remove(member.Name())
+			r.pendingDNSMembers.Remove(member.Name())
 		}
 	}
 
@@ -2107,6 +2218,16 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 //nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	if shouldRebalance(c, r) {
+		// Defer rebalance while any pod is still pending CBS initialization (not yet
+		// addNode'd). Waiting ensures all replacement pods are known to CBS before
+		// rebalancing, which batches add+eject operations into a single rebalance and
+		// avoids a follow-up rebalance after each pod initializes individually.
+		if r.pendingInitPods.Size() > 0 {
+			log.V(1).Info("Deferring rebalance until pending pods are CBS-initialized",
+				"cluster", c.namespacedName(), "pending", r.pendingInitPods.Names())
+			return nil
+		}
+
 		if len(r.couchbase.ServerRebalanceReasons) > 0 {
 			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
@@ -2166,10 +2287,37 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 					}
 				}
 
-				return fmt.Errorf("%w: rebalance failed, forcing full recovery", errors.NewStackTracedError(ErrReconcileInhibited))
+				// Full recovery type is now set; yield the FSM so the next cycle
+				// retries the rebalance with the updated recovery type.
+				r.abort("rebalance failed, retrying with full recovery")
+				return nil
+			}
+
+			// Permanent rebalance failure (no delta nodes to recover from).
+			// Fire upgrade failure metrics for any in-place upgrade pods waiting to be
+			// rebalanced in — equivalent to sync rebalanceAfterInPlaceUpgrade failure path.
+			for name := range addNodes {
+				pod, ok := c.k8s.Pods.Get(name)
+				if !ok {
+					continue
+				}
+				if k8sutil.GetPodUpgradeTracking(pod) == string(couchbasev2.InPlaceUpgrade) {
+					metrics.InPlaceUpgradeFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+					metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+				}
 			}
 
 			return fmt.Errorf("failed to rebalance: %w", err)
+		}
+	}
+
+	// Clear PodPendingUpgradeBeforeEjectionCondition on members that were successfully ejected.
+	// This is done here (rather than in newReconcileMachine) so that if the FSM
+	// aborts before reaching handleRebalance, the durable condition survives and
+	// the ejection is retried on the next cycle.
+	for _, member := range r.ejectMembers {
+		if err := k8sutil.ClearPodPendingUpgradeBeforeEjection(c.k8s, member.Name()); err != nil {
+			log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
 		}
 	}
 
@@ -2192,7 +2340,7 @@ func canRebalance(c *Cluster, r *ReconcileMachine) bool {
 	// If the allowExternallyUnreachablePods flag is set, we will rebalance the cluster if all the pending members have had their DNS check delay elapsed.
 	// If it is not set, we will only rebalance if there are no pending members that have not been activated in the cluster.
 	if c.cluster.Spec.Networking.AllowExternallyUnreachablePods != nil && *c.cluster.Spec.Networking.AllowExternallyUnreachablePods {
-		for _, member := range r.pendingMembers {
+		for _, member := range r.pendingDNSMembers {
 			pod, found := c.k8s.Pods.Get(member.Name())
 			if !found {
 				continue
@@ -2206,18 +2354,26 @@ func canRebalance(c *Cluster, r *ReconcileMachine) bool {
 		return true
 	}
 
-	return r.pendingMembers.Diff(r.couchbase.ActiveNodes).Empty()
+	return r.pendingDNSMembers.Diff(r.couchbase.ActiveNodes).Empty()
 }
 
-// Dead members are members that the operator is tracking, but do not have a
-// corresponding running pod.
-func (r *ReconcileMachine) handleDeadMembers(c *Cluster) error {
+// handleEjectedMembers cleans up members that have been CBS-ejected but whose
+// K8s pods are still running. The pod is only deleted after CBS ejection is
+// confirmed (PodPendingUpgradeBeforeEjection condition cleared by handleRebalance).
+func (r *ReconcileMachine) handleEjectedMembers(c *Cluster) error {
 	// If we can't rebalance, we should not destroy eject members as they won't be ejected safely from the cluster yet.
 	if !canRebalance(c, r) {
 		return nil
 	}
 
 	for name := range r.ejectMembers {
+		// Do not delete a pod that still carries PodPendingUpgradeBeforeEjection — the CBS
+		// eject-rebalance (handleRebalance) has not yet run for it.
+		pod, ok := c.k8s.Pods.Get(name)
+		if ok && k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
+			continue
+		}
+
 		if err := c.destroyMember(name, r.shouldRemoveVolumes(name)); err != nil {
 			return fmt.Errorf("failed to remove dead members: %w", err)
 		}
@@ -2429,22 +2585,64 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	errs := make([]error, 0, numErrors)
 
 	for index, result := range memberResults {
-		if result.Err != nil {
+		switch {
+		case result.Err != nil:
 			errs = append(errs, fmt.Errorf("swap rebalance failed to add new node to cluster: %w", result.Err))
 			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
 
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
-		} else { // Update book keeping
+		case c.cluster.IsMigrationCluster():
+			// Migration: addMembersToTarget blocked until CBS-add. Bookkeeping
+			// and metrics happen at the correct point (same as original sync).
 			r.addMember(result.Member)
 			r.removeMemberUser(candidatesSlice[index])
-			r.upgradedMembers.Add(result.Member)
+			r.stabilizingMembers.Add(result.Member)
 
 			metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			metrics.PodReplacementsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+		default:
+			// New pods are pending init. Defer metrics to handleReadyPendingPod.
+			setupOK := true
+
+			if err := k8sutil.SetPodUpgradeTracking(c.k8s, result.Member.Name(), string(couchbasev2.SwapRebalance)); err != nil {
+				log.Error(err, "Failed to mark replacement pod with upgrade tracking",
+					"cluster", c.namespacedName(), "pod", result.Member.Name())
+				setupOK = false
+			}
+
+			// Only mark the old member for ejection if the annotation succeeded.
+			// Setting the condition without the annotation is dangerous: the old
+			// pod gets ejected but stabilizingMembers stays empty, skipping the
+			// stabilization period.
+			if setupOK {
+				if err := k8sutil.SetPodPendingUpgradeBeforeEjection(c.k8s, candidatesSlice[index].Name()); err != nil {
+					log.Error(err, "Failed to mark old pod for ejection",
+						"cluster", c.namespacedName(), "pod", candidatesSlice[index].Name())
+					setupOK = false
+				}
+			}
+
+			if !setupOK {
+				log.Info("Deleting replacement pod due to failed swap-rebalance setup",
+					"cluster", c.namespacedName(), "pod", result.Member.Name())
+				if delErr := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, result.Member.Name(), c.config.GetDeleteOptions()); delErr != nil {
+					log.Error(delErr, "Failed to delete replacement pod during cleanup",
+						"cluster", c.namespacedName(), "pod", result.Member.Name())
+				}
+				errs = append(errs, fmt.Errorf("%w: candidate %s, replacement pod cleaned up",
+					ErrSwapRebalanceSetupFailed, candidatesSlice[index].Name()))
+			}
 		}
 	}
 
 	if len(errs) == 0 {
+		// For async (non-migration) clusters, yield the FSM. The replacement
+		// pods need CBS-add via handleReadyPendingPod, then rebalance ejects
+		// the old members (via PodPendingUpgradeBeforeEjectionCondition) and finalizes the swap.
+		if !c.cluster.IsMigrationCluster() {
+			r.abort("swap rebalance pods created, waiting for async initialization")
+		}
+
 		return nil
 	}
 
