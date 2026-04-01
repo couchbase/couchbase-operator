@@ -1424,9 +1424,9 @@ type CouchbaseBucketSpec struct {
 	// EvictionPolicy controls how Couchbase handles memory exhaustion.  Value only eviction
 	// flushes documents to disk but maintains document metadata in memory in order to improve
 	// query performance.  Full eviction removes all data from memory after the document is
-	// flushed to disk.  This field must be "valueOnly" or "fullEviction", defaulting to
-	// "valueOnly".
-	// +kubebuilder:default="valueOnly"
+	// flushed to disk.  This field must be "valueOnly" or "fullEviction".
+	// When not specified, the default depends on the storage backend: "fullEviction" for magma
+	// and "valueOnly" for couchstore.
 	EvictionPolicy CouchbaseBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
 
 	// OnlineEvictionPolicyChange controls whether eviction policy changes can be made online

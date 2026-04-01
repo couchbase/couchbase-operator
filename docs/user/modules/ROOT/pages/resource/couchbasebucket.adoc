@@ -43,7 +43,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasebuckets-spec-encryptionatrest-keylifetime,keyLifetime>>: 8760h
     <<couchbasebuckets-spec-encryptionatrest-keyname,keyName>>: ""
     <<couchbasebuckets-spec-encryptionatrest-rotationinterval,rotationInterval>>: 720h
-  <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: valueOnly
+  <<couchbasebuckets-spec-evictionpolicy,evictionPolicy>>: ""
   <<couchbasebuckets-spec-expirypagersleeptime,expiryPagerSleepTime>>: 10m
   <<couchbasebuckets-spec-historyretention,historyRetention>>:
     <<couchbasebuckets-spec-historyretention-bytes,bytes>>: 0
@@ -442,8 +442,6 @@ Default is 30 days.
 
 *Type*: `string`
 
-*Default*: `valueOnly`
-
 *Enumerations*: `valueOnly, fullEviction`
 
 ==== Description
@@ -454,8 +452,9 @@ flushes documents to disk but maintains document metadata in memory in order to 
 query performance.
 Full eviction removes all data from memory after the document is
 flushed to disk.
-This field must be "valueOnly" or "fullEviction", defaulting to
-"valueOnly".
+This field must be "valueOnly" or "fullEviction".
+When not specified, the default depends on the storage backend: "fullEviction" for magma
+and "valueOnly" for couchstore.
 
 === couchbasebuckets.spec.expiryPagerSleepTime
 
