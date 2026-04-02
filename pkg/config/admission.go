@@ -563,6 +563,7 @@ func (o *generateAdmissionOptions) getAdmissionDeployment() *appsv1.Deployment {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
+						"app":                         AdmissionResourceName,
 						"app.kubernetes.io/name":      AdmissionResourceName,
 						"app.kubernetes.io/instance":  "couchbase-admission",
 						"app.kubernetes.io/component": "admission-webhook",
@@ -689,6 +690,7 @@ func (o *generateAdmissionOptions) getAdmissionService() *corev1.Service {
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
+				"app":                        AdmissionResourceName,
 				"app.kubernetes.io/name":     AdmissionResourceName,
 				"app.kubernetes.io/instance": "couchbase-admission",
 			},

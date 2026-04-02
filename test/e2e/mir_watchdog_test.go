@@ -109,6 +109,59 @@ func TestMirWatchdogDisabledWhenTurnedOffInSpec(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestMirWatchdogRemovesConditionsMetricWhenDisabled tests that disabling the manual intervention watchdog after it's fired an alert
+// removes the MIR condition and resets the metric.
+func TestMirWatchdogRemovesConditionsMetricWhenDisabled(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.MirWatchdog = &couchbasev2.MirWatchdog{
+		Enabled: boolPtr(true),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Fetch the auth secret so we can change the password back later.
+	authSecret := e2eutil.MustGetSecret(t, kubernetes, kubernetes.DefaultSecret.Name)
+	originalPassword := string(authSecret.Data["password"])
+	updatedPassword := fmt.Sprintf("%s!", originalPassword)
+
+	// Check the current value of the intervention metric is 0.
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 5*time.Minute)
+
+	// Change the cluster password directly using the API.
+	e2eutil.MustChangeClusterPassword(t, kubernetes, cluster, "", updatedPassword, 1*time.Minute)
+
+	// Check the watchdog adds the cluster condition and updates the intervention metric.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionManualInterventionRequired, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 1, 1*time.Minute)
+
+	// Disable the MirWatchdog.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Replace("/spec/mirWatchdog/enabled", false),
+		time.Minute)
+
+	// Check the cluster condition is removed and the intervention metric is 0.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 15*time.Minute, couchbasev2.ClusterConditionManualInterventionRequired)
+	e2eutil.MustCheckOperatorGaugeMetric(t, kubernetes, nil, "cluster_manual_intervention", 0, 2*time.Minute)
+
+	// Check the events match what we expect. Depending on where the reconciliation loop is when we add the condition, we may see a reconcile failed event before the manual intervention events are applied.
+	// We should continue to see reconcile failed events after removing the mirWatchdog because the underlying issue is still there, but we won't see any more manual intervention events.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
+		eventschema.RepeatAtLeast{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestMirWatchdogOnInvalidClusterCredentials tests the manual intervention watchdog checks for unauthorised cluster credentials and
 // triggers the mir cluster condition, metric and events accordingly.
 func TestMirWatchdogOnInvalidClusterCredentials(t *testing.T) {

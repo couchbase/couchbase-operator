@@ -636,6 +636,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		case !running:
 			// If we have the condition but it's not running, we should have already cleared it. This is just a safety check.
 			c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+			metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
 		case !enabled:
 			// If the MirWatchdog is running but not enabled, it's possible that the spec has been updated to disable it before the mirWatchdogContext is reconciled.
 			// We can handle stopping it here if this occurs.
@@ -1346,6 +1347,7 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 func (c *Cluster) StopMirWatchdog() {
 	log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
+	metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
 	c.mirWatchdog.Stop()
 }
 
