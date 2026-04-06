@@ -1604,6 +1604,10 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 
 func (r *ReconcileMachine) rebalanceAfterInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err == nil {
+		// Rebalance succeeded; mark the candidates as upgraded so the stabilization period logic can detect that an upgrade occurred.
+		for _, candidate := range candidates {
+			r.upgradedMembers.Add(candidate)
+		}
 		return nil
 	} else {
 		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
