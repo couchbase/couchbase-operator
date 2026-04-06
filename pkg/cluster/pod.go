@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	goerrors "errors"
@@ -156,13 +157,18 @@ func (c *Cluster) removePod(name string, removeVolumes bool) error {
 
 // Delete pod and create with same name.
 // Persisted members will reuse volume mounts.
-// Pod recreation is non-blocking: the new pod is flagged with a
-// PendingInitializationCondition and initialization will be completed
-// asynchronously by updatePendingInitializationConditions().
-func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
+// When recovery is true, the recovery attempt counter on the member's PVCs is
+// incremented before recreation and reset on success.
+func (c *Cluster) recreatePod(m couchbaseutil.Member, recovery bool) error {
 	config := c.cluster.Spec.GetServerConfigByName(m.Config())
 	if config == nil {
 		return fmt.Errorf("%w: config %s for pod does not exist", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), m.Config())
+	}
+
+	if recovery {
+		if err := c.incrementRecoveryAttempts(m.Name()); err != nil {
+			log.Error(err, "Failed to increment recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
+		}
 	}
 
 	if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, m.Name(), c.config.GetDeleteOptions()); err != nil {
@@ -187,6 +193,18 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member) error {
 	// The pod will be initialized asynchronously. SetPodInitialized will
 	// be called after the pending initialization is cleared.
 	log.V(1).Info("Pod recreated with pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+
+	// To get here the pod would need to be initialized and clustered, so this is
+	// safe.
+	if err := k8sutil.SetPodInitialized(c.k8s, m.Name()); err != nil {
+		return err
+	}
+
+	if recovery {
+		if err := c.resetRecoveryAttempts(m.Name()); err != nil {
+			log.Error(err, "Failed to reset recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
+		}
+	}
 
 	return nil
 }
@@ -515,4 +533,91 @@ func (c *Cluster) updatePersistenceVersion(version string) error {
 	}
 
 	return c.state.Update(persistence.Version, version)
+}
+
+// getRecoveryAttempts returns the number of recovery attempts tracked on a member's PVCs.
+// If multiple PVCs exist for the member, returns the maximum count to handle cases where
+// PVC updates may have partially failed, causing counts to diverge.
+func (c *Cluster) getRecoveryAttempts(memberName string) int {
+	maxAttempts := 0
+
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == memberName {
+			if pvc.Annotations == nil {
+				continue
+			}
+
+			if attemptsStr, ok := pvc.Annotations[constants.PodRecoveryAttemptsAnnotation]; ok {
+				if attempts, err := strconv.Atoi(attemptsStr); err == nil {
+					if attempts > maxAttempts {
+						maxAttempts = attempts
+					}
+				}
+			}
+		}
+	}
+
+	return maxAttempts
+}
+
+// incrementRecoveryAttempts increments the recovery attempt counter on all PVCs belonging to a member.
+func (c *Cluster) incrementRecoveryAttempts(memberName string) error {
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == memberName {
+			if pvc.Annotations == nil {
+				pvc.Annotations = map[string]string{}
+			}
+
+			attempts := 0
+			if attemptsStr, ok := pvc.Annotations[constants.PodRecoveryAttemptsAnnotation]; ok {
+				if parsed, err := strconv.Atoi(attemptsStr); err == nil {
+					attempts = parsed
+				}
+			}
+
+			pvc.Annotations[constants.PodRecoveryAttemptsAnnotation] = strconv.Itoa(attempts + 1)
+
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(
+				context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// resetRecoveryAttempts resets the recovery attempt counter on all PVCs belonging to a member.
+func (c *Cluster) resetRecoveryAttempts(memberName string) error {
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		if name, ok := pvc.Labels[constants.LabelNode]; ok && name == memberName {
+			if pvc.Annotations == nil {
+				continue
+			}
+
+			if _, ok := pvc.Annotations[constants.PodRecoveryAttemptsAnnotation]; !ok {
+				continue
+			}
+
+			delete(pvc.Annotations, constants.PodRecoveryAttemptsAnnotation)
+
+			if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(
+				context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// hasExceededRecoveryMaxRetries checks if the member has exceeded the configured maximum number of recovery retries.
+// Returns false if max retries is 0 (infinite).
+func (c *Cluster) hasExceededRecoveryMaxRetries(memberName string) bool {
+	maxRetries := c.config.PodRecoveryMaxRetries
+	if maxRetries == 0 {
+		return false
+	}
+
+	return c.getRecoveryAttempts(memberName) >= maxRetries
 }

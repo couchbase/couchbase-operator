@@ -1380,3 +1380,115 @@ func TestOnlinePersistentVolumeResizeAnnotationFalseOverridesGlobal(t *testing.T
 	dataMemberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
 	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, dataMemberName, pvcDataName, originalQuantity, VolumeExpansionWaitTimeout)
 }
+
+// TestPodRecoveryMaxRetriesWithFailedNode verifies that when a PVC backed member
+// exceeds max recovery retries, the operator correctly falls back to swap rebalance.
+func TestPodRecoveryMaxRetriesWithFailedNode(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	victim := 1
+	maxRetries := 3
+
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
+
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(120)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+	}
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, e2espec.DefaultBucketTwoReplicas(), time.Minute)
+	time.Sleep(30 * time.Second)
+
+	// Restart operator with --pod-recovery-max-retries flag to enable the max retry limit.
+	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
+	kubernetes.OperatorDeployment.Spec.Template.Spec.Containers[0].Args = append(
+		kubernetes.OperatorDeployment.Spec.Template.Spec.Containers[0].Args,
+		fmt.Sprintf("--pod-recovery-max-retries=%d", maxRetries),
+	)
+	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
+	if err := e2eutil.WaitUntilOperatorReady(kubernetes, 5*time.Minute); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// Pre-set the recovery attempts annotation on the victim's PVCs to
+	// simulate previous failed recovery attempts that have reached the max retry threshold.
+	mustSetPVCRecoveryAttempts(t, kubernetes, cluster, victim, maxRetries)
+
+	// Kill the pod. With annotations already at max retries, the operator should
+	// fall back to swap rebalance instead of attempting PVC recovery.
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberDownEvent(cluster, victim), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// After swap rebalance, the annotation should be cleared.
+	mustVerifyPVCRecoveryAttemptsCleared(t, kubernetes, cluster, victim)
+}
+
+// mustVerifyPVCRecoveryAttemptsCleared verifies that the recovery-attempts annotation
+// is not present on any PVCs belonging to the specified member.
+func mustVerifyPVCRecoveryAttemptsCleared(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int) {
+	t.Helper()
+
+	memberName := couchbaseutil.CreateMemberName(cl.Name, memberID)
+
+	callback := func() error {
+		pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(
+			context.Background(), metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
+		if err != nil {
+			return err
+		}
+
+		for _, pvc := range pvcList.Items {
+			if pvc.Annotations != nil {
+				if _, exists := pvc.Annotations[pkgconstants.PodRecoveryAttemptsAnnotation]; exists {
+					return fmt.Errorf("PVC %s still has recovery-attempts annotation", pvc.Name)
+				}
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(2*time.Minute, callback); err != nil {
+		e2eutil.Die(t, err)
+	}
+}
+
+// mustSetPVCRecoveryAttempts sets the recovery-attempts annotation on all PVCs
+// belonging to the specified member to simulate previous failed recovery attempts.
+func mustSetPVCRecoveryAttempts(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, memberID int, attempts int) {
+	t.Helper()
+
+	memberName := couchbaseutil.CreateMemberName(cl.Name, memberID)
+
+	pvcList, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).List(
+		context.Background(), metav1.ListOptions{LabelSelector: "couchbase_node=" + memberName})
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	for i := range pvcList.Items {
+		pvc := &pvcList.Items[i]
+		if pvc.Annotations == nil {
+			pvc.Annotations = map[string]string{}
+		}
+
+		pvc.Annotations[pkgconstants.PodRecoveryAttemptsAnnotation] = fmt.Sprintf("%d", attempts)
+
+		if _, err := k8s.KubeClient.CoreV1().PersistentVolumeClaims(k8s.Namespace).Update(
+			context.Background(), pvc, metav1.UpdateOptions{}); err != nil {
+			e2eutil.Die(t, err)
+		}
+	}
+}

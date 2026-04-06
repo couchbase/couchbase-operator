@@ -258,6 +258,10 @@ const (
 	// VolumeDetachedAnnotation is attached to a PVC to give an indication of
 	// when it was detected as not being attached to a pod.
 	VolumeDetachedAnnotation = "pv.couchbase.com/detached"
+
+	// PodRecoveryAttemptsAnnotation tracks the number of recovery attempts for a pod via its PVC.
+	// Used to implement max retry logic before falling back to swap rebalance.
+	PodRecoveryAttemptsAnnotation = "pvc.couchbase.com/recovery-attempts"
 )
 
 const (

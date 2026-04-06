@@ -748,9 +748,24 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		return nil
 	}
 
+	// Build a list of nodes that have exceeded the max recovery retry limit.
+	// These will need to be failed over (PrioritizeUptime) or require manual action (PrioritizeDataIntegrity).
+	nodesToRecover := []string{}
+
+	for name, m := range r.couchbase.DownNodes {
+		if c.isPodRecoverable(m) && c.hasExceededRecoveryMaxRetries(name) {
+			log.Info("Pod recovery max retries exceeded",
+				"cluster", c.namespacedName(), "name", name,
+				"maxRetries", c.config.PodRecoveryMaxRetries,
+				"attempts", c.getRecoveryAttempts(name))
+
+			nodesToRecover = append(nodesToRecover, name)
+		}
+	}
+
 	// If the recovery policy is set to prioritize data integrity (default) and any down nodes are
-	// not recoverable, we need to abort here to wait for user action. If the MirWatchdog is running, this
-	// should also trigger the MIR state.
+	// not recoverable or have exceeded retries, we need to abort here to wait for user action.
+	// If the MirWatchdog is running, this should also trigger the MIR state.
 	if c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeDataIntegrity {
 		manualActionNodes := []string{}
 
@@ -759,6 +774,8 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 				manualActionNodes = append(manualActionNodes, name)
 			}
 		}
+
+		manualActionNodes = append(manualActionNodes, nodesToRecover...)
 
 		if len(manualActionNodes) > 0 {
 			log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
@@ -785,6 +802,11 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			continue
 		}
 
+		// Skip nodes that have exceeded recovery retries, they will be failed over below.
+		if c.hasExceededRecoveryMaxRetries(name) {
+			continue
+		}
+
 		c.logFailedMember("Node failed", name)
 
 		// Timeout has expired, recreate the pod.
@@ -795,8 +817,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			log.V(1).Info("Down pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 			continue
 		}
-
-		if err := c.recreatePod(m); err != nil {
+		if err := c.recreatePod(m, true); err != nil {
 			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
 			return fmt.Errorf("pod recovery failed for member %s: %w", name, err)
@@ -818,40 +839,46 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		return nil
 	}
 
-	// By this point we know:
-	// * Things that cannot be recovered (have no PVC) and the user is demanding data
-	//   integrity, and have been rejected.
-	// * Things that haven't timed out yet, and have been rejected.
-	// * Things that can be recovered (have a PVC) have been, these are enforced to
-	//   be stateful services that require persistence e.g. data, index, analytics.
-	// Leaving us with:
-	// * Nothing to do
-	// * Stuff that server thinks cannot be failed over e.g. a bunch of query nodes.
-	// Give the system a helping hand...
+	// Build the OTP failover list.
+	// Nodes that exceeded max retries are always added
+	// we only reach here under PrioritizeUptime since PrioritizeDataIntegrity returns above
+	nodesToFailover := couchbaseutil.OTPNodeList{}
+	failoverNames := []string{}
+
+	for _, name := range nodesToRecover {
+		m := r.couchbase.DownNodes[name]
+
+		if err := c.resetRecoveryAttempts(name); err != nil {
+			log.Error(err, "Failed to reset recovery attempts before failover", "cluster", c.namespacedName(), "name", name)
+		}
+
+		nodesToFailover = append(nodesToFailover, m.GetOTPNode())
+		failoverNames = append(failoverNames, name)
+	}
+
+	// Add all remaining unrecoverable down/failed nodes when PrioritizeUptime is set.
 	if c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeUptime {
-		log.Info("Forcing failover of unrecoverable nodes", "cluster", c.namespacedName())
-
-		otpNodes := couchbaseutil.OTPNodeList{}
-
 		for _, member := range r.couchbase.DownNodes {
 			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name())
 
-			otpNodes = append(otpNodes, member.GetOTPNode())
+			nodesToFailover = append(nodesToFailover, member.GetOTPNode())
+			failoverNames = append(failoverNames, member.Name())
 		}
 
 		for _, member := range r.couchbase.FailedNodes {
-			otpNodes = append(otpNodes, member.GetOTPNode())
+			nodesToFailover = append(nodesToFailover, member.GetOTPNode())
+			failoverNames = append(failoverNames, member.Name())
 		}
+	}
 
-		if err := couchbaseutil.Failover(otpNodes, true).On(c.api, c.getMigratingReadyTarget()); err != nil {
+	if len(nodesToFailover) > 0 {
+		log.Info("Forcing failover of nodes", "cluster", c.namespacedName())
+
+		if err := couchbaseutil.Failover(nodesToFailover, true).On(c.api, c.getMigratingReadyTarget()); err != nil {
 			return err
 		}
 
-		for _, name := range r.couchbase.DownNodes.Names() {
-			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
-		}
-
-		for _, name := range r.couchbase.FailedNodes.Names() {
+		for _, name := range failoverNames {
 			c.raiseEventCached(k8sutil.MemberFailedOverEvent(name, c.cluster))
 		}
 
@@ -944,7 +971,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 				return nil
 			}
 
-			if err := c.recreatePod(m); err != nil {
+			if err := c.recreatePod(m, false); err != nil {
 				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
 				r.abort("unable to recover pod pending addition")
 
@@ -1061,14 +1088,14 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 	for name, m := range r.couchbase.FailedNodes {
 		log.Info("Pods failed over", "cluster", c.namespacedName())
 
-		if c.isPodRecoverable(m) {
+		if c.isPodRecoverable(m) && !c.hasExceededRecoveryMaxRetries(name) {
 			pod, podExists := c.k8s.Pods.Get(name)
 			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
 				log.V(1).Info("Failed pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 				continue
 			}
 
-			if err := c.recreatePod(m); err != nil {
+			if err := c.recreatePod(m, true); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
 
 				metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
@@ -1085,6 +1112,13 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 			r.abort("failed pod recreated asynchronously, waiting for initialization: " + name)
 
 			return nil
+		}
+
+		if c.hasExceededRecoveryMaxRetries(name) {
+			log.Info("Pod recovery max retries exceeded, removing member",
+				"cluster", c.namespacedName(), "name", name,
+				"maxRetries", c.config.PodRecoveryMaxRetries,
+				"attempts", c.getRecoveryAttempts(name))
 		}
 
 		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
@@ -1764,7 +1798,7 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 		}
 	}
 
-	if err := c.recreatePod(candidate); err != nil {
+	if err := c.recreatePod(candidate, false); err != nil {
 		return err
 	}
 

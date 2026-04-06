@@ -54,10 +54,11 @@ var log = logf.Log.WithName("cluster")
 // var podTerminationGracePeriod = int64(0)
 
 type Config struct {
-	PodCreateTimeout   time.Duration
-	PodDeleteDelay     time.Duration
-	PodReadinessDelay  time.Duration
-	PodReadinessPeriod time.Duration
+	PodCreateTimeout      time.Duration
+	PodDeleteDelay        time.Duration
+	PodReadinessDelay     time.Duration
+	PodReadinessPeriod    time.Duration
+	PodRecoveryMaxRetries int
 }
 
 // Cluster is the core internal data type representing a Couchbase cluster.
@@ -840,7 +841,7 @@ func (c *Cluster) recoverClusterDown() (bool, error) {
 				continue
 			}
 
-			if err := c.recreatePod(m); err != nil {
+			if err := c.recreatePod(m, false); err != nil {
 				return false, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
 			}
 

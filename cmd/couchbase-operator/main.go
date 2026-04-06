@@ -43,14 +43,15 @@ import (
 )
 
 var (
-	listenAddr         string
-	printVersion       bool
-	podCreateTimeout   string
-	podDeleteDelay     string
-	podReadinessDelay  string
-	podReadinessPeriod string
-	chaosLevel         int
-	concurrency        int
+	listenAddr            string
+	printVersion          bool
+	podCreateTimeout      string
+	podDeleteDelay        string
+	podReadinessDelay     string
+	podReadinessPeriod    string
+	podRecoveryMaxRetries int
+	chaosLevel            int
+	concurrency           int
 
 	metricsHost       = "0.0.0.0"
 	metricsPort int32 = 8383
@@ -72,6 +73,7 @@ func main() {
 	pflag.StringVar(&podDeleteDelay, "pod-delete-delay", "0m", "Sets the amount of time to wait to allow a pod to recover before deleting it")
 	pflag.StringVar(&podReadinessDelay, "pod-readiness-delay", "10s", "Sets the amount of time to wait after the pod has started before readiness probes are initiated")
 	pflag.StringVar(&podReadinessPeriod, "pod-readiness-period", "20s", "Sets the period between readiness probes")
+	pflag.IntVar(&podRecoveryMaxRetries, "pod-recovery-max-retries", 0, "Maximum number of pod recovery retries before falling back to swap rebalance. 0 means infinite retries (default behavior)")
 	pflag.IntVar(&concurrency, "concurrency", 4, "Number of concurrent reconciles to allow")
 	pflag.Parse()
 
@@ -132,10 +134,11 @@ func main() {
 	log.V(1).Info("Initializing controller.")
 
 	clusterConfig := cluster.Config{
-		PodCreateTimeout:   parseDuration(podCreateTimeout),
-		PodDeleteDelay:     parseDuration(podDeleteDelay),
-		PodReadinessDelay:  parseDuration(podReadinessDelay),
-		PodReadinessPeriod: parseDuration(podReadinessPeriod),
+		PodCreateTimeout:      parseDuration(podCreateTimeout),
+		PodDeleteDelay:        parseDuration(podDeleteDelay),
+		PodReadinessDelay:     parseDuration(podReadinessDelay),
+		PodReadinessPeriod:    parseDuration(podReadinessPeriod),
+		PodRecoveryMaxRetries: podRecoveryMaxRetries,
 	}
 
 	if err := controller.AddToManager(mgr, concurrency, clusterConfig); err != nil {
