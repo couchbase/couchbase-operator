@@ -3814,7 +3814,7 @@ func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.Cou
 		return nil
 	}
 
-	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	buckets, err := getClusterBuckets(v, cluster)
 	if err != nil {
 		return err
 	}
@@ -3872,23 +3872,8 @@ func validateReplicationConflictLogging(v *types.Validator, cluster *couchbasev2
 		return nil
 	}
 
-	buckets, err := v.Abstraction.GetBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
-	if err != nil {
-		return err
-	}
-
-	bucketExists := func(bucketName string) bool {
-		for _, b := range buckets {
-			if b.GetCouchbaseName() == bucketName {
-				return true
-			}
-		}
-
-		return false
-	}
-
-	if !bucketExists(string(replication.ConflictLogging.LogCollection.Bucket)) {
-		return fmt.Errorf("bucket %s not found", replication.ConflictLogging.LogCollection.Bucket)
+	if replication.ConflictLogging.LogCollection.Bucket == "" {
+		return fmt.Errorf("spec.conflictLogging.logCollection.bucket is required for conflict logging")
 	}
 
 	if replication.ConflictLogging.LogCollection.Scope == "" {
@@ -3899,17 +3884,39 @@ func validateReplicationConflictLogging(v *types.Validator, cluster *couchbasev2
 		return fmt.Errorf("spec.conflictLogging.logCollection.collection is required for conflict logging")
 	}
 
+	buckets, err := getClusterBuckets(v, cluster)
+	if err != nil {
+		return err
+	}
+
+	bucketMap := make(map[string]couchbasev2.AbstractBucket)
+	for _, bucket := range buckets {
+		bucketMap[bucket.GetCouchbaseName()] = bucket
+	}
+
+	if bucket, ok := bucketMap[string(replication.ConflictLogging.LogCollection.Bucket)]; !ok {
+		return fmt.Errorf("spec.conflictLogging.logCollection.bucket %s does not exist", replication.ConflictLogging.LogCollection.Bucket)
+	} else if bucket.IsSampleBucket() {
+		return fmt.Errorf("spec.conflictLogging.logCollection.bucket cannot be a sample bucket")
+	}
+
 	for _, rule := range replication.ConflictLogging.LoggingRules.CustomCollectionRules {
-		if !bucketExists(string(rule.LogCollection.Bucket)) {
-			return fmt.Errorf("bucket %s not found", rule.LogCollection.Bucket)
+		if rule.LogCollection.Bucket == "" {
+			return fmt.Errorf("spec.conflictLogging.logCollection.customCollectionRules.bucket is required for conflict logging")
+		}
+
+		if _, ok := bucketMap[string(rule.LogCollection.Bucket)]; !ok {
+			return fmt.Errorf("spec.conflictLogging.logCollection.customCollectionRules.bucket %s does not exist", rule.LogCollection.Bucket)
+		} else if bucketMap[string(rule.LogCollection.Bucket)].IsSampleBucket() {
+			return fmt.Errorf("spec.conflictLogging.logCollection.customCollectionRules.bucket cannot be a sample bucket")
 		}
 
 		if rule.LogCollection.Scope == "" {
-			return fmt.Errorf("spec.conflictLogging.logCollection.scope is required for conflict logging")
+			return fmt.Errorf("spec.conflictLogging.logCollection.customCollectionRules.scope is required for conflict logging")
 		}
 
 		if rule.LogCollection.Collection == "" {
-			return fmt.Errorf("spec.conflictLogging.logCollection.collection is required for conflict logging")
+			return fmt.Errorf("spec.conflictLogging.logCollection.customCollectionRules.collection is required for conflict logging")
 		}
 	}
 
