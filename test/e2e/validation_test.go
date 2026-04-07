@@ -6054,6 +6054,24 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 			},
 			shouldFail: false,
 		},
+		{
+			name: "TestNegValidateBucketMemoryQuotaMultipleClusters",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector/matchLabels/cluster", "cluster1-memory-quota").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "1Gi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket memory allocation \(2Gi\) exceeds data service quota \(1Gi\) on cluster cluster1`},
+		},
+		{
+			name: "TestValidateBucketMemoryQuotaMultipleClusters",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector/matchLabels/cluster", "cluster1-memory-quota").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "1Gi"),
+				"bucket9": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "1Gi"),
+			},
+			shouldFail: false,
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "validation-storagebackend.yaml"})

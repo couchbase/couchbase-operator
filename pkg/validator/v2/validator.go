@@ -3693,6 +3693,18 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object, cluste
 
 	for i := range clusters.Items {
 		cluster := clusters.Items[i]
+		selector := labels.Everything()
+		if cluster.Spec.Buckets.Selector != nil {
+			var err error
+			selector, err = metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+			if err != nil {
+				return err
+			}
+		}
+
+		if !selector.Matches(labels.Set(bucket.GetLabels())) {
+			continue
+		}
 
 		if err := validateClusterMemoryConstraints(v, &cluster, bucket); err != nil {
 			return err

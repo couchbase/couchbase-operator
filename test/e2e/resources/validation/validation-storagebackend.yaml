@@ -216,3 +216,14 @@ metadata:
 spec:
   name: bucket80
   evictionPolicy: fullEviction
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket9
+  labels:
+    cluster: cluster1-memory-quota
+spec:
+  name: bucket80
+  evictionPolicy: fullEviction
+  memoryQuota: 2Gi
