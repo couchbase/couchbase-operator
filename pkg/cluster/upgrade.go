@@ -848,8 +848,10 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return nil
 	}
 
-	// If the cluster isn't in mixed mode, there's nothing to do
-	if c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
+	// Do a version check against the cluster compatibility version first. If that fails, we'll fallback to a check on lowest vs highest active member versions.
+	if versionAfter, err := c.CompatibleWithVersion(baselineVersion); err == nil && !versionAfter {
+		return errors.ErrClusterNoLongerCompatible
+	} else if err != nil && c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
 		return nil
 	}
 

@@ -11,7 +11,9 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -139,7 +141,31 @@ func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
 	return versions
 }
 
+func (c *Cluster) CompatibleWithVersion(version string) (bool, error) {
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return false, err
+	}
+
+	// CompatVersion returns only major.minor, without a maintenance version, so we need to add .0 so we can parse it with our version util.
+	// Given this relies entirely on a contract w/ server..., calls to this method should have an appropriate fallback
+	// in case that contract changes at any point.
+	compatVersion := clusterInfo.ClusterCompatVersion
+	if strings.Count(compatVersion, ".") == 1 {
+		compatVersion = fmt.Sprintf("%s.0", compatVersion)
+	}
+	return couchbaseutil.VersionAfter(compatVersion, version)
+}
+
 func (c *Cluster) SupportsVersionFeatures(version string) bool {
+	// Try comparing the compat version first. This only checks major.minor
+	// and therefore should not be used when checking for new features
+	// on maintenance releases.
+	if versionAfter, err := c.CompatibleWithVersion(version); err == nil && versionAfter {
+		return versionAfter
+	}
+
+	// Fallback to checking the lowest member version
 	lowestVersion := c.GetLowestMemberVersion()
 
 	if lowestVersion == "" {
