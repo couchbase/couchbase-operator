@@ -836,6 +836,7 @@ func registerTests() {
 		framework.NewTestDef(TestMirWatchdogOnCACertTLSExpiration).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnClientCertTLSExpiration).WithTags(TagSuiteP1, TagFeatureMir),
 		framework.NewTestDef(TestMirWatchdogOnInvalidClusterCredentialsSkipReconciliationWhenEnabled).WithTags(TagSuiteP1, TagFeatureMir),
+		framework.NewTestDef(TestMirWatchdogRemovesConditionsMetricWhenDisabled).WithTags(TagSuiteP1, TagFeatureMir),
 
 		// Encryption at rest tests
 		framework.NewTestDef(TestEncryptionAtRest).WithTags(TagSuiteP1, TagFeatureEAR),

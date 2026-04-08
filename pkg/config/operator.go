@@ -652,6 +652,7 @@ func (o *generateOperatorOptions) getOperatorDeployment() *appsv1.Deployment {
 						constants.AnnotationPrometheusScheme: "http",
 					},
 					Labels: map[string]string{
+						"app":                         OperatorResourceName,
 						"app.kubernetes.io/name":      OperatorResourceName,
 						"app.kubernetes.io/instance":  "couchbase-operator",
 						"app.kubernetes.io/component": "controller",
@@ -785,6 +786,7 @@ func (o *generateOperatorOptions) getOperatorService() *corev1.Service {
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: map[string]string{
+				"app":                        OperatorResourceName,
 				"app.kubernetes.io/name":     OperatorResourceName,
 				"app.kubernetes.io/instance": "couchbase-operator",
 			},

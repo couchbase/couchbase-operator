@@ -119,15 +119,21 @@ func (c *Cluster) UpdateFailedValidation(err error) error {
 	return nil
 }
 
-func (c *Cluster) GetRunningVersions() []string {
-	versions := []string{}
+func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
+	versions := []*couchbaseutil.Version{}
 
 	for _, member := range c.members {
 		if member.Version() == "" || member.Version() == "unknown" {
 			continue
 		}
 
-		versions = append(versions, member.Version())
+		version, err := couchbaseutil.NewVersion(member.Version())
+		if err != nil {
+			log.Error(err, "Failed to parse member version", "member", member.Name(), "version", member.Version())
+			continue
+		}
+
+		versions = append(versions, version)
 	}
 
 	return versions
@@ -196,25 +202,29 @@ func (c *Cluster) GetRunningImageForVersion(version string) string {
 func (c *Cluster) GetLowestMemberVersion() string {
 	versions := c.GetRunningVersions()
 
-	sort.Strings(versions)
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].Less(versions[j])
+	})
 
 	if len(versions) == 0 {
 		return ""
 	}
 
-	return versions[0]
+	return versions[0].Version()
 }
 
 func (c *Cluster) GetHighestMemberVersion() string {
 	versions := c.GetRunningVersions()
 
-	sort.Strings(versions)
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].Less(versions[j])
+	})
 
 	if len(versions) == 0 {
 		return ""
 	}
 
-	return versions[len(versions)-1]
+	return versions[len(versions)-1].Version()
 }
 
 func (c *Cluster) GetEncryptionKeyFinalizer() string {

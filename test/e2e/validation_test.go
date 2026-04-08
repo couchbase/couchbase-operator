@@ -2138,7 +2138,7 @@ func TestValidationXDCRConflictLogging(t *testing.T) {
 			name:           "TestValidateXDCRConflictLoggingInvalidBucket",
 			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/conflictLogging/logCollection/bucket", "bucket8001")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket8001 not found`},
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.bucket bucket8001 does not exist`},
 		},
 		{
 			name: "TestValidateXDCRConflictLoggingManagedBucketsDisabled",
@@ -2147,24 +2147,34 @@ func TestValidationXDCRConflictLogging(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name:       "TestValidateXDCRConflictLoggingMissingScope",
-			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/scope")},
-			shouldFail: true,
+			name:           "TestValidateXDCRConflictLoggingMissingBucket",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/bucket")},
+			shouldFail:     true,
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.bucket is required for conflict logging`},
 		},
 		{
-			name:       "TestValidateXDCRConflictLoggingMissingCollection",
-			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/collection")},
-			shouldFail: true,
+			name:           "TestValidateXDCRConflictLoggingMissingScope",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.scope is required for conflict logging`},
 		},
 		{
-			name:       "TestValidateXDCRConflictLoggingRuleCollectionMissingScope",
-			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/scope")},
-			shouldFail: true,
+			name:           "TestValidateXDCRConflictLoggingMissingCollection",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/logCollection/collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.collection is required for conflict logging`},
 		},
 		{
-			name:       "TestValidateXDCRConflictLoggingRuleCollectionMissingCollection",
-			mutations:  patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/collection")},
-			shouldFail: true,
+			name:           "TestValidateXDCRConflictLoggingRuleCollectionMissingScope",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/scope")},
+			shouldFail:     true,
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.customCollectionRules.scope is required for conflict logging`},
+		},
+		{
+			name:           "TestValidateXDCRConflictLoggingRuleCollectionMissingCollection",
+			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Remove("/spec/conflictLogging/loggingRules/customCollectionRules/0/logCollection/collection")},
+			shouldFail:     true,
+			expectedErrors: []string{`couchbasereplications.couchbase.com/replication0 has an invalid conflict logging configuration: spec.conflictLogging.logCollection.customCollectionRules.collection is required for conflict logging`},
 		},
 		{
 			name:       "TestValidateXDCRConflictLoggingRuleWithoutCollection",
@@ -6051,6 +6061,24 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 			name: "TestValidateMagmaNumVBuckets128",
 			mutations: patchMap{
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/numVBuckets", 128),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestNegValidateBucketMemoryQuotaMultipleClusters",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector/matchLabels/cluster", "cluster1-memory-quota").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "1Gi"),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{`bucket memory allocation \(2Gi\) exceeds data service quota \(1Gi\) on cluster cluster1`},
+		},
+		{
+			name: "TestValidateBucketMemoryQuotaMultipleClusters",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector/matchLabels/cluster", "cluster1-memory-quota").
+					Replace("/spec/cluster/dataServiceMemoryQuota", "1Gi"),
+				"bucket9": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "1Gi"),
 			},
 			shouldFail: false,
 		},

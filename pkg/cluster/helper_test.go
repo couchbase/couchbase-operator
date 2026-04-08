@@ -11,10 +11,12 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
 type versionTest struct {
@@ -70,6 +72,122 @@ func TestClusterIsAtLeastVersion(t *testing.T) {
 
 		if valid != testcase.valid {
 			t.Errorf("unexpectedly failed version check: %s,%s - %s", testcase.actualVersion, testcase.requiredVersion, strconv.FormatBool(testcase.valid))
+		}
+	}
+}
+
+func TestGetLowestMemberVersion(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name            string
+		memberVersions  []string
+		expectedVersion string
+	}{
+		{
+			name:            "empty",
+			memberVersions:  []string{},
+			expectedVersion: "",
+		},
+		{
+			name:            "single",
+			memberVersions:  []string{"7.0.0"},
+			expectedVersion: "7.0.0",
+		},
+		{
+			name:            "members",
+			memberVersions:  []string{"7.0.0", "6.6.2", "7.1.0"},
+			expectedVersion: "6.6.2",
+		},
+		{
+			name:            "members with multiple figures",
+			memberVersions:  []string{"7.0.0", "6.8.10", "6.8.7"},
+			expectedVersion: "6.8.7",
+		},
+		{
+			name:            "same",
+			memberVersions:  []string{"6.8.10", "6.8.10"},
+			expectedVersion: "6.8.10",
+		},
+		{
+			name:            "multiple second digit",
+			memberVersions:  []string{"7.0.0", "6.10.1", "6.8.10", "6.8.11"},
+			expectedVersion: "6.8.10",
+		},
+	}
+
+	for _, testcase := range testcases {
+		c := Cluster{
+			members: couchbaseutil.MemberSet{},
+		}
+
+		for _, version := range testcase.memberVersions {
+			name := fmt.Sprintf("%s-%s", testcase.name, version)
+			m := couchbaseutil.NewMember("", "", name, version, "", false, "")
+			c.members.Add(m)
+		}
+
+		lowestVersion := c.GetLowestMemberVersion()
+		if lowestVersion != testcase.expectedVersion {
+			t.Errorf("unexpectedly got lowest version: %s expected %s", lowestVersion, testcase.expectedVersion)
+		}
+	}
+}
+
+func TestGetHighestMemberVersion(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		name            string
+		memberVersions  []string
+		expectedVersion string
+	}{
+		{
+			name:            "empty",
+			memberVersions:  []string{},
+			expectedVersion: "",
+		},
+		{
+			name:            "single",
+			memberVersions:  []string{"7.0.0"},
+			expectedVersion: "7.0.0",
+		},
+		{
+			name:            "members",
+			memberVersions:  []string{"7.0.0", "6.6.2", "7.1.0"},
+			expectedVersion: "7.1.0",
+		},
+		{
+			name:            "members with multiple figures",
+			memberVersions:  []string{"7.0.0", "6.8.10", "6.8.7"},
+			expectedVersion: "7.0.0",
+		},
+		{
+			name:            "same",
+			memberVersions:  []string{"6.8.10", "6.8.10"},
+			expectedVersion: "6.8.10",
+		},
+		{
+			name:            "multiple second digit",
+			memberVersions:  []string{"7.0.0", "6.10.1", "6.8.10", "7.1.11"},
+			expectedVersion: "7.1.11",
+		},
+	}
+
+	for _, testcase := range testcases {
+		c := Cluster{
+			members: couchbaseutil.MemberSet{},
+		}
+
+		for _, version := range testcase.memberVersions {
+			name := fmt.Sprintf("%s-%s", testcase.name, version)
+			m := couchbaseutil.NewMember("", "", name, version, "", false, "")
+			c.members.Add(m)
+		}
+
+		highestVersion := c.GetHighestMemberVersion()
+		if highestVersion != testcase.expectedVersion {
+			t.Errorf("unexpectedly got highest version: %s expected %s", highestVersion, testcase.expectedVersion)
 		}
 	}
 }

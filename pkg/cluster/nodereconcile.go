@@ -493,7 +493,9 @@ func (c *Cluster) getNodeServiceMismatchCandidates() (couchbaseutil.MemberSet, e
 		expectedServices := serverConfig.Services
 		expectedServicesString := make([]string, 0, len(expectedServices))
 		for _, service := range expectedServices {
-			expectedServicesString = append(expectedServicesString, service.String())
+			if service.String() != "admin" {
+				expectedServicesString = append(expectedServicesString, service.String())
+			}
 		}
 
 		for i := 0; i < len(candidateServices); i++ {
@@ -1610,6 +1612,10 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 
 func (r *ReconcileMachine) rebalanceAfterInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, targetVersion string) error {
 	if err := c.rebalanceWithRetriesOnVerifyFails(c.members, nil, 2); err == nil {
+		// Rebalance succeeded; mark the candidates as upgraded so the stabilization period logic can detect that an upgrade occurred.
+		for _, candidate := range candidates {
+			r.upgradedMembers.Add(candidate)
+		}
 		return nil
 	} else {
 		log.Info(fmt.Sprintf("Rebalance failed, reverting to full recovery: %s", err.Error()), "cluster", c.namespacedName())
@@ -1769,13 +1775,6 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 }
 
 func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
-	// Don't do anything if the cluster is currently upgrading
-	if upgrading, err := c.isUpgrading(); upgrading && err == nil {
-		return nil
-	} else if err != nil {
-		return err
-	}
-
 	// If the cluster needs a rebalance, let's do that first
 	if r.needsRebalance {
 		return nil
@@ -1814,6 +1813,8 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	for _, candidate := range candidates {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
+
+		log.Info("Moving node", "cluster", c.namespacedName(), "candidate", candidate.Name())
 
 		if c.isPodReschedulable(candidate) == false {
 			canDoInPlaceReschedule = false
