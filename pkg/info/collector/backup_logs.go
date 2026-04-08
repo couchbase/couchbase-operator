@@ -88,7 +88,20 @@ func collectBackupLogs(ctx *context.Context, backup couchbasev2.CouchbaseBackup,
 	fmt.Printf("collecting logs for backup %s...\n", backup.Name)
 
 	// Create job
-	jobName := fmt.Sprintf("backup-logs-collector-%s-%d", backup.Name, time.Now().Unix())
+	// Truncate backup name so the total job name stays within the 63-character
+	// Kubernetes label value limit. The format is "bkp-log-<name>-<timestamp>"
+	// where the prefix is 8 chars, separator is 1 char, and timestamp is 10 digits.
+	const jobPrefix = "bkp-log-"
+	const maxJobNameLen = 63
+	timestampStr := fmt.Sprintf("%d", time.Now().Unix())
+	maxNameLen := maxJobNameLen - len(jobPrefix) - 1 - len(timestampStr)
+
+	truncatedName := backup.Name
+	if len(truncatedName) > maxNameLen {
+		truncatedName = truncatedName[:maxNameLen]
+	}
+
+	jobName := fmt.Sprintf("%s%s-%s", jobPrefix, truncatedName, timestampStr)
 	job, err := buildBackupLogsJob(ctx, jobName, backup, pvc)
 	if err != nil {
 		return fmt.Errorf("failed to build backup logs job: %w", err)

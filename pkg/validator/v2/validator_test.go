@@ -689,3 +689,153 @@ func TestCheckConstraintAutoFailoverOnDataDiskNonResponsivenessTimePeriod(t *tes
 		})
 	}
 }
+
+func TestCheckConstraintBackupNameLength(t *testing.T) {
+	testcases := []struct {
+		name        string
+		backupName  string
+		strategy    couchbasev2.Strategy
+		expectedErr string
+	}{
+		{
+			name:       "short name with full_incremental is valid",
+			backupName: "my-backup",
+			strategy:   couchbasev2.FullIncremental,
+		},
+		{
+			name:       "name at max 44 chars for logs collector is valid with immediate strategy",
+			backupName: strings.Repeat("a", 44),
+			strategy:   couchbasev2.ImmediateFull,
+		},
+		{
+			name:        "name exceeding 44 chars fails logs collector limit",
+			backupName:  strings.Repeat("a", 45),
+			strategy:    couchbasev2.FullIncremental,
+			expectedErr: "collect-logs job name would exceed 63 characters",
+		},
+		{
+			name:       "name at max 40 chars with full_incremental is valid",
+			backupName: strings.Repeat("b", 40),
+			strategy:   couchbasev2.FullIncremental,
+		},
+		{
+			name:        "name exceeding cronjob limit with full_incremental",
+			backupName:  strings.Repeat("b", 41),
+			strategy:    couchbasev2.FullIncremental,
+			expectedErr: "CronJob suffix '-incremental' would exceed limit",
+		},
+		{
+			name:       "name at max 40 chars with periodic_merge is valid",
+			backupName: strings.Repeat("c", 40),
+			strategy:   couchbasev2.PeriodicMerge,
+		},
+		{
+			name:        "name exceeding cronjob limit with periodic_merge",
+			backupName:  strings.Repeat("c", 41),
+			strategy:    couchbasev2.PeriodicMerge,
+			expectedErr: "CronJob suffix '-incremental' would exceed limit",
+		},
+		{
+			name:       "name at max 47 chars with full_only is valid",
+			backupName: strings.Repeat("d", 44),
+			strategy:   couchbasev2.FullOnly,
+		},
+		{
+			name:        "name exceeding logs collector limit with full_only",
+			backupName:  strings.Repeat("d", 45),
+			strategy:    couchbasev2.FullOnly,
+			expectedErr: "collect-logs job name would exceed 63 characters",
+		},
+		{
+			name:       "long name with immediate_full strategy only checks logs limit",
+			backupName: strings.Repeat("e", 44),
+			strategy:   couchbasev2.ImmediateFull,
+		},
+		{
+			name:        "name exceeding logs limit with immediate_full strategy",
+			backupName:  strings.Repeat("e", 45),
+			strategy:    couchbasev2.ImmediateFull,
+			expectedErr: "collect-logs job name would exceed 63 characters",
+		},
+		{
+			name:       "immediate_incremental at logs limit is valid",
+			backupName: strings.Repeat("f", 44),
+			strategy:   couchbasev2.ImmediateIncremental,
+		},
+		{
+			name:        "immediate_incremental over logs limit",
+			backupName:  strings.Repeat("f", 45),
+			strategy:    couchbasev2.ImmediateIncremental,
+			expectedErr: "collect-logs job name would exceed 63 characters",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			backup := &couchbasev2.CouchbaseBackup{
+				ObjectMeta: metav1.ObjectMeta{Name: testcase.backupName},
+				Spec: couchbasev2.CouchbaseBackupSpec{
+					Strategy: testcase.strategy,
+				},
+			}
+
+			err := checkConstraintBackupNameLength(backup)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error but got: %s", err.Error())
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+				} else if !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestCheckConstraintRestoreNameLength(t *testing.T) {
+	testcases := []struct {
+		name        string
+		restoreName string
+		expectedErr string
+	}{
+		{
+			name:        "short restore name is valid",
+			restoreName: "my-restore",
+		},
+		{
+			name:        "restore name at 63 chars is valid",
+			restoreName: strings.Repeat("a", 63),
+		},
+		{
+			name:        "restore name at 64 chars exceeds label limit",
+			restoreName: strings.Repeat("a", 64),
+			expectedErr: "cannot be longer than 63 characters",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			restore := &couchbasev2.CouchbaseBackupRestore{
+				ObjectMeta: metav1.ObjectMeta{Name: testcase.restoreName},
+			}
+
+			err := checkConstraintRestoreNameLength(nil, restore)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error but got: %s", err.Error())
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+				} else if !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
