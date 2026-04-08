@@ -662,6 +662,8 @@ func registerTests() {
 		framework.NewTestDef(TestOnlinePersistentVolumeResizeWithDocs).WithTags(TagSuiteP1, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestOnlinePersistentVolumeResizeNop).WithTags(TagSuiteP1, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestOnlinePersistentVolumeResizeWhenPodKilled).WithTags(TagSuiteP1, TagFeaturePersistentVolumes),
+		framework.NewTestDef(TestOnlinePersistentVolumeResizePerVCTAnnotation).WithTags(TagSuiteP1, TagFeaturePersistentVolumes),
+		framework.NewTestDef(TestOnlinePersistentVolumeResizeAnnotationFalseOverridesGlobal).WithTags(TagSuiteP1, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestEventingResizeCluster).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestEventingKillEventingPods).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestLogCollectRbacPermission).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureSupportability),

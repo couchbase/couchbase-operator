@@ -3004,6 +3004,8 @@ type ClusterSpec struct {
 	AutoscaleStabilizationPeriod *metav1.Duration `json:"autoscaleStabilizationPeriod,omitempty"`
 
 	// EnableOnlineVolumeExpansion enables online expansion of Persistent Volumes.
+	// This acts as the cluster-level default. Individual volume claim templates can
+	// override this setting via the "storage.couchbase.com/enableVolumeExpansion" annotation with a value of "true" or "false".
 	// You can only expand a PVC if its storage class's "allowVolumeExpansion" field is set to true.
 	// Additionally, Kubernetes feature "ExpandInUsePersistentVolumes" must be enabled in order to
 	// expand the volumes which are actively bound to Pods.

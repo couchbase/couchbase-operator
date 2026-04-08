@@ -1281,3 +1281,102 @@ func TestLocalVolumeAutoFailover(t *testing.T) {
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// createExpandableCluster creates a two server group cluster where the data VCT
+// has the enableVolumeExpansion annotation set to the given value.
+func createExpandableCluster(t *testing.T, globalExpansion bool, dataAnnotationValue string) (*types.Cluster, *couchbasev2.CouchbaseCluster) {
+	t.Helper()
+
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	t.Cleanup(cleanup)
+
+	framework.Requires(t, kubernetes).ExpandableStorage()
+
+	groupSize := 1
+	pvcDataName := "couchbase_data"
+	pvcIndexName := "couchbase_index"
+
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucketTwoReplicas())
+	cluster := clusterOptions().WithPersistentTopology(groupSize).Generate(kubernetes)
+	cluster.Spec.EnableOnlineVolumeExpansion = globalExpansion
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcDataName,
+		DataClaim:    pvcDataName,
+	}
+
+	dataPvc := createPersistentVolumeClaimSpec(f.StorageClassName, pvcDataName, f.LocalPV, 2)
+	if dataPvc.ObjectMeta.Annotations == nil {
+		dataPvc.ObjectMeta.Annotations = make(map[string]string)
+	}
+	dataPvc.ObjectMeta.Annotations[pkgconstants.EnableVolumeExpansionAnnotation] = dataAnnotationValue
+
+	indexPvc := createPersistentVolumeClaimSpec(f.StorageClassName, pvcIndexName, f.LocalPV, 2)
+
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{dataPvc, indexPvc}
+
+	newService := couchbasev2.ServerConfig{
+		Size:     groupSize,
+		Name:     "test_config_2",
+		Services: couchbasev2.ServiceList{couchbasev2.IndexService},
+	}
+	cluster.Spec.Servers = append(cluster.Spec.Servers, newService)
+	cluster.Spec.Servers[1].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcIndexName,
+		IndexClaim:   pvcIndexName,
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	return kubernetes, cluster
+}
+
+// TestOnlinePersistentVolumeResizePerVCTAnnotation tests that a per VCT annotation
+// can enable online volume expansion even when the global setting is disabled.
+func TestOnlinePersistentVolumeResizePerVCTAnnotation(t *testing.T) {
+	// Global OFF, data VCT annotation "true" -- only data should expand.
+	kubernetes, cluster := createExpandableCluster(t, false, "true")
+
+	pvcDataName := "couchbase_data"
+	pvcIndexName := "couchbase_index"
+
+	// Resize data VCT from 2Gi to 3Gi
+	requestedQuantity := e2espec.NewResourceQuantityGi(3)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/0/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+
+	// Verify data volumes are resized
+	memberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, memberName, pvcDataName, requestedQuantity, VolumeExpansionWaitTimeout)
+
+	// Verify index volumes are still 2Gi (global is false, no annotation)
+	originalQuantity := e2espec.NewResourceQuantityGi(2)
+	indexMemberName := couchbaseutil.CreateMemberName(cluster.Name, 1)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, indexMemberName, pvcIndexName, originalQuantity, VolumeExpansionWaitTimeout)
+}
+
+// TestOnlinePersistentVolumeResizeAnnotationFalseOverridesGlobal tests that a per VCT
+// annotation set to "false" disables online volume expansion even when the global setting is enabled.
+func TestOnlinePersistentVolumeResizeAnnotationFalseOverridesGlobal(t *testing.T) {
+	// Global ON, data VCT annotation "false" -- only index (inherits global) should expand.
+	kubernetes, cluster := createExpandableCluster(t, true, "false")
+
+	pvcDataName := "couchbase_data"
+	pvcIndexName := "couchbase_index"
+
+	// Resize index VCT from 2Gi to 3Gi (should expand online, inherits global true)
+	requestedQuantity := e2espec.NewResourceQuantityGi(3)
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/volumeClaimTemplates/1/spec/resources/requests/storage", requestedQuantity), time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ExpandVolumeSucceededEvent(cluster), 10*time.Minute)
+
+	// Verify index volumes are resized
+	indexMemberName := couchbaseutil.CreateMemberName(cluster.Name, 1)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, indexMemberName, pvcIndexName, requestedQuantity, VolumeExpansionWaitTimeout)
+
+	// Verify data volumes are still 2Gi (annotation "false" overrides global)
+	originalQuantity := e2espec.NewResourceQuantityGi(2)
+	dataMemberName := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	e2eutil.MustWaitForPodVolumeSize(t, kubernetes, dataMemberName, pvcDataName, originalQuantity, VolumeExpansionWaitTimeout)
+}

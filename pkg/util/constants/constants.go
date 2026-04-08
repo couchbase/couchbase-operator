@@ -73,6 +73,11 @@ var (
 	// that does not offer dynamic provisioning.
 	LocalStorageAnnotation = "storage.couchbase.com/local"
 
+	// EnableVolumeExpansionAnnotation is used on a volume claim template to override
+	// the cluster level EnableOnlineVolumeExpansion setting on a per VCT basis.
+	// Accepts "true" or "false". When absent, the global setting is used.
+	EnableVolumeExpansionAnnotation = "storage.couchbase.com/enableVolumeExpansion"
+
 	// AddNodeInsecureAnnotation is an experimental and insecure annotation
 	// that enforces the use of HTTP use when clustering Couchbase Nodes.
 	// This will only work for Server versions 6.5 - 7.0 since 7.1 will

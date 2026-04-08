@@ -1542,7 +1542,7 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 
 	var errs []error
 
-	if (cluster.Spec.VolumeClaimTemplates == nil || len(cluster.Spec.VolumeClaimTemplates) == 0) && cluster.Spec.EnableOnlineVolumeExpansion {
+	if len(cluster.Spec.VolumeClaimTemplates) == 0 && cluster.Spec.EnableOnlineVolumeExpansion {
 		errs = append(errs, fmt.Errorf("spec.cluster.enableOnlineVolumeExpansion cannot be enabled since no volume claim templates have been definied"))
 	}
 
@@ -1560,6 +1560,13 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 	}
 
 	for i, template := range cluster.Spec.VolumeClaimTemplates {
+		// Validate the enableVolumeExpansion annotation value if present.
+		if val, ok := template.ObjectMeta.Annotations[constants.EnableVolumeExpansionAnnotation]; ok {
+			if val != "true" && val != "false" {
+				errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates[%d].metadata.annotations[%s] must be \"true\" or \"false\"", i, constants.EnableVolumeExpansionAnnotation))
+			}
+		}
+
 		if template.Spec.StorageClassName == nil {
 			if !hasDefaultStorageClass {
 				errs = append(errs, fmt.Errorf("spec.volumeClaimTemplates[%d].spec.storageClassName has not been configured and no default exists in the cluster", i))
@@ -1581,7 +1588,7 @@ func checkConstraintVolumeTemplateStorageClass(v *types.Validator, cluster *couc
 			continue
 		}
 
-		if !cluster.Spec.EnableOnlineVolumeExpansion {
+		if !cluster.Spec.IsVolumeExpansionEnabled(template.ObjectMeta.Annotations) {
 			continue
 		}
 
@@ -4820,13 +4827,13 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 // checkImmutableVolumeTemplateSize checks that you aren't downscaling volumes
 // as this is not allowed by the underlying platform.
 func checkImmutableVolumeTemplateSize(current, updated *couchbasev2.CouchbaseCluster) error {
-	if !updated.Spec.EnableOnlineVolumeExpansion {
-		return nil
-	}
-
 	var errs []error
 
 	for _, updatedClaimTemplate := range updated.Spec.VolumeClaimTemplates {
+		if !updated.Spec.IsVolumeExpansionEnabled(updatedClaimTemplate.ObjectMeta.Annotations) {
+			continue
+		}
+
 		currentClaimTemplate := current.Spec.GetVolumeClaimTemplate(updatedClaimTemplate.ObjectMeta.Name)
 		if currentClaimTemplate == nil {
 			// Claim is being added

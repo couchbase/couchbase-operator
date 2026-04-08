@@ -1409,7 +1409,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 // handleVolumeExpansion attempts to perform online expansion of Persistent Volumes.
 func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
-	if !c.cluster.Spec.EnableOnlineVolumeExpansion {
+	if !c.cluster.Spec.HasAnyVolumeExpansionEnabled() {
 		return nil
 	}
 

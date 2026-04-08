@@ -265,6 +265,29 @@ func (cs *ClusterSpec) GetVolumeClaimTemplate(name string) *v1.PersistentVolumeC
 	return nil
 }
 
+// HasAnyVolumeExpansionEnabled returns true if any volume claim template resolves to having
+// online volume expansion enabled, taking per-VCT annotation overrides into account.
+func (cs *ClusterSpec) HasAnyVolumeExpansionEnabled() bool {
+	for _, template := range cs.VolumeClaimTemplates {
+		if cs.IsVolumeExpansionEnabled(template.ObjectMeta.Annotations) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsVolumeExpansionEnabled resolves whether online volume expansion is enabled for a given volume claim template.
+// The per VCT annotation takes precedence over the cluster level EnableOnlineVolumeExpansion setting.
+// A nil or empty map is safe to pass and will return the cluster level default.
+func (cs *ClusterSpec) IsVolumeExpansionEnabled(templateAnnotations map[string]string) bool {
+	if val, ok := templateAnnotations[constants.EnableVolumeExpansionAnnotation]; ok {
+		return val == "true"
+	}
+
+	return cs.EnableOnlineVolumeExpansion
+}
+
 // Get GetVolumeClaimTemplateNames returns all template names defined.
 func (cs *ClusterSpec) GetVolumeClaimTemplateNames() []string {
 	names := []string{}
