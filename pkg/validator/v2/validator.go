@@ -2810,6 +2810,10 @@ func CheckConstraintsBackup(v *types.Validator, backup *couchbasev2.CouchbaseBac
 	if err := validateBackupCronSchedules(backup); err != nil {
 		errs = err
 	}
+	// Ensure generated CronJob names will be within Kubernetes limits.
+	if err := checkConstraintBackupNameLength(backup); err != nil {
+		errs = append(errs, err)
+	}
 
 	if err := checkConstraintBackupObjStore(v, backup); err != nil {
 		errs = append(errs, err)
@@ -3050,6 +3054,7 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		checkContraintRestoreData,
 		checkConstraintBackupRestoreObjStoreSecret,
 		checkConstraintRestoreAdditionalArgs,
+		checkConstraintRestoreNameLength,
 	}
 
 	var errs []error
@@ -3077,6 +3082,18 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 func checkConstraintRestoreAdditionalArgs(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
 	if strings.Contains(restore.Spec.AdditionalOperatorRestoreArgs, "--force-delete-lockfile") {
 		return fmt.Errorf("spec.additionalOperatorRestoreArgs cannot contain --force-delete-lockfile")
+	}
+
+	return nil
+}
+
+// checkConstraintRestoreNameLength ensures that the CouchbaseBackupRestore name does not
+// exceed the Kubernetes label value length limit (63 characters). The restore name is used
+// as a Job name and as a label value on both the Job and Pod metadata.
+func checkConstraintRestoreNameLength(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	const maxLabelValueLength = 63
+	if len(restore.Name) > maxLabelValueLength {
+		return fmt.Errorf("backup restore name %q cannot be longer than %d characters", restore.Name, maxLabelValueLength)
 	}
 
 	return nil
@@ -3983,6 +4000,44 @@ func validateBackupCronSchedules(backup *couchbasev2.CouchbaseBackup) []error {
 	}
 
 	return errs
+}
+
+// checkConstraintBackupNameLength ensures that the generated CronJob names (backup.Name + "-<action>")
+// will not exceed the Kubernetes name length limit for CronJobs, and that the backup-logs-collector
+// job name (bkp-log-<backup.Name>-<timestamp>) will not exceed the label value length limit.
+func checkConstraintBackupNameLength(backup *couchbasev2.CouchbaseBackup) error {
+	name := backup.Name
+	ln := len(name)
+
+	// The collect-logs tool creates jobs with the format "bkp-log-<name>-<timestamp>".
+	// The prefix "bkp-log-" is 8 chars, separator "-" is 1 char, and unix timestamp is 10 digits.
+	const maxBackupLogsJobNameLen = 63
+	const backupLogsOverhead = 8 + 1 + 10                          // len("bkp-log-") + separator + timestamp digits
+	maxNameForLogs := maxBackupLogsJobNameLen - backupLogsOverhead // 44 chars
+
+	if ln > maxNameForLogs {
+		return fmt.Errorf("backup name %q cannot be longer than %d characters (collect-logs job name would exceed 63 characters)", name, maxNameForLogs)
+	}
+
+	const maxCronjobNameLength = 52
+
+	// Only check the longest suffix per strategy since shorter suffixes are implicitly safe.
+	switch backup.Spec.Strategy {
+	case couchbasev2.FullIncremental, couchbasev2.PeriodicMerge:
+		// "-incremental" (12 chars) is the longest suffix; "-full" and "-merge" are implicitly safe.
+		if ln+12 > maxCronjobNameLength {
+			return fmt.Errorf("backup name %s cannot be longer than %d characters when using strategy %s (CronJob suffix '-incremental' would exceed limit)", name, maxCronjobNameLength-12, backup.Spec.Strategy)
+		}
+	case couchbasev2.FullOnly:
+		// "-full" (5 chars) is the only suffix.
+		if ln+5 > maxCronjobNameLength {
+			return fmt.Errorf("backup name %s cannot be longer than %d characters when using strategy %s (CronJob suffix '-full' would exceed limit)", name, maxCronjobNameLength-5, backup.Spec.Strategy)
+		}
+	default:
+		// Immediate strategies do not create CronJobs, nothing to validate.
+	}
+
+	return nil
 }
 
 func validateCronJobString(schedule *couchbasev2.CouchbaseBackupSchedule, name string) error {
