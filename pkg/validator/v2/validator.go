@@ -819,7 +819,7 @@ func checkConstraintAdminSecret(v *types.Validator, cluster *couchbasev2.Couchba
 // - The mount path is valid.
 func checkConstraintLoggingSidecarTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	fbs := cluster.Spec.Logging.Server
-	if fbs == nil {
+	if fbs == nil || !fbs.Enabled {
 		return nil
 	}
 
