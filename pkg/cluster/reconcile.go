@@ -1352,6 +1352,25 @@ func (c *Cluster) reconcileReadiness() error {
 			}
 		}
 
+		var waitForCNGContainer bool
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == k8sutil.CloudNativeGatewayContainerName && !status.Ready {
+				waitForCNGContainer = true
+				break
+			}
+		}
+
+		// If the pod is waiting for the CNG container to be ready, we should not mark it as ready to avoid it being in a svc Endpoint Slice.
+		if waitForCNGContainer {
+			if condition := k8sutil.GetPodCondition(pod, k8sutil.PodReadinessCondition); condition != nil && condition.Status == v1.ConditionTrue {
+				if err := k8sutil.FlagPodUnready(c.k8s, name, "cng container not ready"); err != nil {
+					return err
+				}
+			}
+
+			continue
+		}
+
 		if err := k8sutil.FlagPodReady(c.k8s, name); err != nil {
 			return err
 		}

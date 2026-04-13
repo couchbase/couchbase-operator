@@ -19,6 +19,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -466,4 +467,63 @@ func TestCNGServiceTemplate(t *testing.T) {
 		},
 	}
 	ValidateEvents(t, kubernetesCluster, cluster, expectedEvents)
+}
+
+func TestScaleDownMarksPodUnreadyAndRemovedFromCNGEndpointSlices(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
+	defer cleanup()
+
+	// Static configuration.
+	serverClassSize := constants.Size1
+
+	// Create the cluster spec
+	cluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).MustCreate(t, kubernetes)
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetes, cluster, 5*time.Minute)
+
+	cngService := fmt.Sprintf("%s-cloud-native-gateway-service", cluster.Name)
+	staticMember := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	ejectMember := couchbaseutil.CreateMemberName(cluster.Name, 1)
+	newMember := couchbaseutil.CreateMemberName(cluster.Name, 2)
+
+	// Check the two initial members are ready and in the CNG endpoint slices.
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 0, v1.ConditionTrue, time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, staticMember, cngService, time.Minute)
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 1, v1.ConditionTrue, time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, ejectMember, cngService, time.Minute)
+
+	// Scale down the cluster by removing a server class
+	cluster = e2eutil.MustRemoveServices(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, 2*time.Minute)
+	// Check pod readiness is false after the server class is removed and that the pod is removed from CNG endpoint slices.
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 1, v1.ConditionFalse, 5*time.Minute)
+	e2eutil.MustWaitForPodIPNotInServiceEndpointSlice(t, kubernetes, ejectMember, cngService, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
+
+	// Scale up the cluster
+	e2eutil.MustScaleServices(t, kubernetes, cluster, map[string]int{cluster.Spec.Servers[0].Name: 2}, time.Minute)
+	// Check pod readiness is disabled on the new pod until rebalance is complete and that the pod is added to CNG endpoint slices after rebalance.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, 2), 5*time.Minute)
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 2, v1.ConditionFalse, time.Minute)
+	e2eutil.MustWaitForPodIPNotInServiceEndpointSlice(t, kubernetes, newMember, cngService, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 5*time.Minute)
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 2, v1.ConditionTrue, time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, newMember, cngService, time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(serverClassSize * 2),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
+		e2eutil.ClusterScaleDownSequenceWithMemberNames([]string{ejectMember}),
+		e2eutil.ClusterScaleUpSequenceWithMemberNames([]string{newMember}),
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

@@ -38,7 +38,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -2624,6 +2624,26 @@ func FlagPodReady(client *client.Client, name string) error {
 	return nil
 }
 
+func FlagPodUnready(client *client.Client, name, reason string) error {
+	pod, found := client.Pods.Get(name)
+	if !found {
+		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+	}
+
+	readinessCondition := NewPodCondition(PodReadinessCondition, v1.ConditionFalse, "")
+
+	err := UpsertPodCondition(client, pod, readinessCondition)
+	if err != nil {
+		return err
+	}
+
+	// Extract cluster name from pod labels for logging
+	clusterName := pod.Namespace + "/" + pod.Labels[constants.LabelCluster]
+	log.V(1).Info("Pod marked unready by operator", "cluster", clusterName, "pod", pod.Name, "reason", reason)
+
+	return nil
+}
+
 // FlagPodExternallyUnreachable adds a condition to the pod indicating that
 // it external DNS cannot be reached.
 func FlagPodPendingExternalDNS(client *client.Client, pod *v1.Pod, message string) error {
@@ -2680,7 +2700,7 @@ func GetPodCondition(pod *v1.Pod, conditionType v1.PodConditionType) *v1.PodCond
 	return nil
 }
 
-// AddPodCondition adds a new condition to a pod without overwriting existing conditions.
+// UpsertPodCondition adds a new condition to a pod without overwriting existing conditions.
 // If a condition of the same type already exists, it will be updated with the new status and message.
 func UpsertPodCondition(client *client.Client, pod *v1.Pod, condition *v1.PodCondition) error {
 	// Get current pod conditions so we can add or update the latest conditions.
@@ -2754,7 +2774,14 @@ func patchConditions(client *client.Client, pod *v1.Pod, conditions *[]v1.PodCon
 		return err
 	}
 
-	if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
+	callback := func() error {
+		if _, err := client.KubeClient.CoreV1().Pods(pod.Namespace).Patch(context.Background(), pod.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}, "status"); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if err := retryutil.RetryFor(10*time.Second, callback); err != nil {
 		return err
 	}
 

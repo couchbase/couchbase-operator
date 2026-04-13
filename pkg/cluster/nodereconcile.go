@@ -2119,6 +2119,12 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			return err
 		}
 
+		for _, member := range r.ejectMembers {
+			if err := k8sutil.FlagPodUnready(r.c.k8s, member.Name(), "pod is being ejected"); err != nil {
+				return err
+			}
+		}
+
 		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, r.ejectMembers, r.rebalanceRetries); err != nil {
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state

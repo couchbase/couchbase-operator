@@ -267,3 +267,66 @@ func MustGetNodeForPod(t *testing.T, k8s *types.Cluster, name string) *v1.Node {
 
 	return node
 }
+
+func MustWaitForPodIPNotInServiceEndpointSlice(t *testing.T, k8s *types.Cluster, podName, svc string, timeout time.Duration) {
+	if err := waitForPodServiceEndpointSliceReadyCondition(k8s, podName, svc, false, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForPodIPInServiceEndpointSlice(t *testing.T, k8s *types.Cluster, podName, svc string, timeout time.Duration) {
+	if err := waitForPodServiceEndpointSliceReadyCondition(k8s, podName, svc, true, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func waitForPodServiceEndpointSliceReadyCondition(k8s *types.Cluster, podName, svc string, expectReady bool, timeout time.Duration) error {
+	// Helper to clean up the inner address loop
+	containsAddress := func(addresses []string, target string) bool {
+		for _, a := range addresses {
+			if a == target {
+				return true
+			}
+		}
+		return false
+	}
+
+	callback := func() error {
+		pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(context.Background(), podName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		podIP := pod.Status.PodIP
+
+		slices, err := k8s.KubeClient.DiscoveryV1().EndpointSlices(k8s.Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("kubernetes.io/service-name=%s", svc),
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to list endpoint slices for DNS service: %w", err)
+		}
+
+		for _, slice := range slices.Items {
+			for _, ep := range slice.Endpoints {
+				if !containsAddress(ep.Addresses, podIP) {
+					continue
+				}
+
+				if ep.Conditions.Ready == nil {
+					return fmt.Errorf("pod %s found but Ready condition is nil", podIP)
+				}
+
+				if *ep.Conditions.Ready != expectReady {
+					return fmt.Errorf("pod %s Ready condition is %t, want %t", podIP, *ep.Conditions.Ready, expectReady)
+				}
+
+				return nil // Pod found and is in the expected state.
+			}
+		}
+
+		return fmt.Errorf("pod IP %s not found in any endpoint slice for service %s", podIP, svc)
+	}
+
+	return retryutil.RetryFor(timeout, callback)
+}
