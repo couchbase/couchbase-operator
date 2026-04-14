@@ -161,7 +161,7 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	// Try comparing the compat version first. This only checks major.minor
 	// and therefore should not be used when checking for new features
 	// on maintenance releases.
-	if versionAfter, err := c.CompatibleWithVersion(version); err == nil && versionAfter {
+	if versionAfter, err := c.CompatibleWithVersion(version); err == nil {
 		return versionAfter
 	}
 
