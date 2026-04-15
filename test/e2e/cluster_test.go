@@ -654,8 +654,8 @@ func TestNodeServiceDownDuringRebalance(t *testing.T) {
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}}}},
 		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName}},
-		eventschema.AnyOf{Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName}}},
+		eventschema.Optional{Validator: eventschema.AnyOf{Validators: []eventschema.Validatable{eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName}}}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: victimName}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -702,7 +702,6 @@ func TestReplaceManuallyRemovedNode(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},

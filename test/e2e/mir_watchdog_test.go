@@ -405,6 +405,7 @@ func TestMirWatchdogOnManualActionDownNodes(t *testing.T) {
 	// 5. Cluster scaled back up by the operator
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionRequired},
 		eventschema.Event{Reason: k8sutil.EventReasonManualInterventionResolved},

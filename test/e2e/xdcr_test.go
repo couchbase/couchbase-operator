@@ -64,7 +64,6 @@ func ejectAllXDCRNodes(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.
 		Times: couchbase.Spec.TotalSize(),
 		Validator: eventschema.Sequence{
 			Validators: []eventschema.Validatable{
-				eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},

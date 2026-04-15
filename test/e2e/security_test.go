@@ -227,10 +227,19 @@ func testRotateAdminPasswordDuringRestart(t *testing.T, kubernetes *types.Cluste
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
 
 	// Check the events match what we expect:
-	// * Cluster created
+	// * Cluster created (ClusterSettingsEdited is interleaved when mTLS is active)
 	// * Password rotated
+	var createSeq eventschema.Validatable
+	if policy != nil {
+		// With mTLS, enableMutualTLS fires after the first pod is CBS-initialized
+		// (async creation), so ClusterSettingsEdited appears before the remaining
+		// NewMemberAdded events rather than after rebalance.
+		createSeq = e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize)
+	} else {
+		createSeq = e2eutil.ClusterCreateSequence(clusterSize)
+	}
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		createSeq,
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},

@@ -138,7 +138,6 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 	scaleSize := constants.Size5
-	triggerIndex := 3
 	victimIndex := 1
 
 	// Create the cluster.
@@ -154,10 +153,15 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
-	// When the cluster is ready begin scaling up.  When the third new member is added
-	// kill the victim node.  Expect the cluster to become healthy again.
+	// When the cluster is ready begin scaling up.  Wait until a rebalance is underway
+	// and has made some progress, then kill the victim node.  Expect the cluster to
+	// become healthy again.
+	// Note: with async pod creation all scale-up pods are CBS-added concurrently, so
+	// the rebalance may start (and complete) very quickly after NewMemberAdded fires.
+	// Waiting for rebalance progress ensures the kill interrupts the rebalance.
 	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, kubernetes, cluster)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, triggerIndex), 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+	e2eutil.MustWaitForRebalanceProgress(t, kubernetes, cluster, 25.0, 5*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
