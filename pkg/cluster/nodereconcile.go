@@ -817,6 +817,11 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			log.V(1).Info("Down pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 			continue
 		}
+
+		c.lastRecoveryAttemptTime[name] = time.Now()
+		metrics.PodTimeSinceLastRecoveryAttemptMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Set(0)
+		c.persistRecoveryTimestamps()
+
 		if err := c.recreatePod(m, true); err != nil {
 			metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
@@ -829,6 +834,9 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		delete(c.recoveryTime, name)
 
 		metrics.PodRecoveriesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, name})...).Inc()
+		c.lastSuccessfulRecoveryTime[name] = time.Now()
+		metrics.PodTimeSinceLastSuccessfulRecoveryMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, name})...).Set(0)
+		c.persistRecoveryTimestamps()
 
 		recovered++
 	}
@@ -1095,6 +1103,10 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 				continue
 			}
 
+			c.lastRecoveryAttemptTime[name] = time.Now()
+			metrics.PodTimeSinceLastRecoveryAttemptMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Set(0)
+			c.persistRecoveryTimestamps()
+
 			if err := c.recreatePod(m, true); err != nil {
 				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
 
@@ -1108,6 +1120,9 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 
 			metrics.PodRecoveriesMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
+			c.lastSuccessfulRecoveryTime[name] = time.Now()
+			metrics.PodTimeSinceLastSuccessfulRecoveryMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Set(0)
+			c.persistRecoveryTimestamps()
 
 			r.abort("failed pod recreated asynchronously, waiting for initialization: " + name)
 

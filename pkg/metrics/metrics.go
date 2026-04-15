@@ -258,6 +258,30 @@ var (
 	// nolint:godot
 	PodRecoveryFailuresMetric = prometheus.CounterVec{}
 
+	// PodTimeSinceLastSuccessfulRecoveryMetric
+	// name: pod_time_since_last_successful_recovery_seconds
+	// type: gauge
+	// help: Number of seconds since the last successful pod recovery
+	// unit: seconds
+	// added: 2.10.0
+	// stability: committed
+	// labels: name, podName
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodTimeSinceLastSuccessfulRecoveryMetric = prometheus.GaugeVec{}
+
+	// PodTimeSinceLastRecoveryAttemptMetric
+	// name: pod_time_since_last_recovery_attempt_seconds
+	// type: gauge
+	// help: Number of seconds since the last pod recovery attempt
+	// unit: seconds
+	// added: 2.10.0
+	// stability: committed
+	// labels: name, podName
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	PodTimeSinceLastRecoveryAttemptMetric = prometheus.GaugeVec{}
+
 	// PodReadinessDurationMetric
 	// name: pod_readiness_duration
 	// type: gauge
@@ -629,6 +653,20 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"name", "podName"}))
 
+	PodTimeSinceLastSuccessfulRecoveryMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "pod_time_since_last_successful_recovery_seconds",
+		Help:      "Number of seconds since the last successful pod recovery",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "podName"}))
+
+	PodTimeSinceLastRecoveryAttemptMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "pod_time_since_last_recovery_attempt_seconds",
+		Help:      "Number of seconds since the last pod recovery attempt",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name", "podName"}))
+
 	PodReadinessDurationMetric = *prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:      "pod_readiness_duration",
 		Help:      "The time it takes for a pod to enter a ready state",
@@ -724,6 +762,8 @@ func InitMetrics() {
 		PodReplacementsFailedMetric,
 		PodRecoveriesMetric,
 		PodRecoveryFailuresMetric,
+		PodTimeSinceLastSuccessfulRecoveryMetric,
+		PodTimeSinceLastRecoveryAttemptMetric,
 		UpgradeDurationMSMetric,
 		PodReadinessDurationMetric,
 		KubernetesAPIRequestTotalMetric,

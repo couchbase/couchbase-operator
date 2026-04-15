@@ -163,6 +163,8 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 
 	metrics.PodRecoveryFailuresMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
 	metrics.PodRecoveriesMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Add(0)
+	metrics.PodTimeSinceLastSuccessfulRecoveryMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Set(0)
+	metrics.PodTimeSinceLastRecoveryAttemptMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pod.Name})...).Set(0)
 
 	return CreatePod(ctx, client, cluster.Namespace, pod)
 }

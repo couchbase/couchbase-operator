@@ -255,6 +255,7 @@ func registerTests() {
 		framework.NewTestDef(TestRecoveryAfterTwoPodFailureBucketTwoReplica).WithTags(TagSuiteP0, TagFeatureRecovery),
 		framework.NewTestDef(TestLightsOutPersistent).WithTags(TagSuiteP0, TagFeaturePersistentVolumes, TagFeatureRecovery),
 		framework.NewTestDef(TestAutoRecoveryEphemeralWithNoAutofailover).WithTags(TagSuiteP0, TagFeatureRecovery),
+		framework.NewTestDef(TestPodRecoveryTimestampMetrics).WithTags(TagSuiteP0, TagFeatureRecovery, TagFeatureMetrics, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestAntiAffinityOff).WithTags(TagSuiteP0, TagFeatureScheduling),
 		framework.NewTestDef(TestAntiAffinityOnCannotBePlaced).WithTags(TagSuiteP0, TagFeatureScheduling),
 		framework.NewTestDef(TestKillOperator).WithTags(TagSuiteP0, TagSuitePlatform),

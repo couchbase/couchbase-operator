@@ -86,6 +86,14 @@ const (
 	ChangesMadeBeforeOperatorStart = "changesMadeBeforeOperatorStart"
 
 	RebalanceRetries = "rebalanceRetries"
+
+	// LastRecoveryAttemptTimes stores a JSON map of pod name -> RFC3339 timestamp
+	// for the last recovery attempt per pod. Persisted across operator restarts.
+	LastRecoveryAttemptTimes PersistentKind = "lastRecoveryAttemptTimes"
+
+	// LastSuccessfulRecoveryTimes stores a JSON map of pod name -> RFC3339 timestamp
+	// for the last successful recovery per pod. Persisted across operator restarts.
+	LastSuccessfulRecoveryTimes PersistentKind = "lastSuccessfulRecoveryTimes"
 )
 
 // PersistentUpgradeStatus tracks the status of cluster upgrade.

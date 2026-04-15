@@ -135,6 +135,12 @@ type Cluster struct {
 	// then we attempt manual recovery by recreating the pod.
 	recoveryTime map[string]time.Time
 
+	// lastRecoveryAttemptTime tracks the time of the last recovery attempt per pod.
+	lastRecoveryAttemptTime map[string]time.Time
+
+	// lastSuccessfulRecoveryTime tracks the time of the last successful recovery per pod.
+	lastSuccessfulRecoveryTime map[string]time.Time
+
 	// generation is the most recent resource generation we know about.  For
 	// some reason a read after write can go back in time, I'm not certain it's
 	// caching we are doing, but the API itself.
@@ -163,17 +169,93 @@ func (c *Cluster) namespacedName() string {
 	return c.cluster.NamespacedName()
 }
 
+// updateRecoveryElapsedMetrics updates the time-since recovery metrics with the
+// current elapsed seconds since the last recovery attempt and last successful recovery.
+func (c *Cluster) updateRecoveryElapsedMetrics() {
+	for name, t := range c.lastRecoveryAttemptTime {
+		metrics.PodTimeSinceLastRecoveryAttemptMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, name})...).Set(time.Since(t).Seconds())
+	}
+
+	for name, t := range c.lastSuccessfulRecoveryTime {
+		metrics.PodTimeSinceLastSuccessfulRecoveryMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, name})...).Set(time.Since(t).Seconds())
+	}
+}
+
+// persistRecoveryTimestamps writes the in-memory recovery timestamp maps to the
+// persistent storage so they survive operator restarts.
+func (c *Cluster) persistRecoveryTimestamps() {
+	if len(c.lastRecoveryAttemptTime) > 0 {
+		serialized := make(map[string]string, len(c.lastRecoveryAttemptTime))
+		for name, t := range c.lastRecoveryAttemptTime {
+			serialized[name] = t.Format(time.RFC3339)
+		}
+
+		b, err := json.Marshal(serialized)
+		if err != nil {
+			log.Error(err, "Failed to marshal lastRecoveryAttemptTime", "cluster", c.namespacedName())
+		} else if err := c.state.Upsert(persistence.LastRecoveryAttemptTimes, string(b)); err != nil {
+			log.Error(err, "Failed to persist lastRecoveryAttemptTime", "cluster", c.namespacedName())
+		}
+	}
+
+	if len(c.lastSuccessfulRecoveryTime) > 0 {
+		serialized := make(map[string]string, len(c.lastSuccessfulRecoveryTime))
+		for name, t := range c.lastSuccessfulRecoveryTime {
+			serialized[name] = t.Format(time.RFC3339)
+		}
+
+		b, err := json.Marshal(serialized)
+		if err != nil {
+			log.Error(err, "Failed to marshal lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
+		} else if err := c.state.Upsert(persistence.LastSuccessfulRecoveryTimes, string(b)); err != nil {
+			log.Error(err, "Failed to persist lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
+		}
+	}
+}
+
+// restoreRecoveryTimestamps reads persisted recovery timestamps from the
+// persistent storage and repopulates the in-memory maps.
+func (c *Cluster) restoreRecoveryTimestamps() {
+	if raw, err := c.state.Get(persistence.LastRecoveryAttemptTimes); err == nil {
+		var serialized map[string]string
+		if err := json.Unmarshal([]byte(raw), &serialized); err != nil {
+			log.Error(err, "Failed to unmarshal lastRecoveryAttemptTimes", "cluster", c.namespacedName())
+		} else {
+			for name, ts := range serialized {
+				if t, err := time.Parse(time.RFC3339, ts); err == nil {
+					c.lastRecoveryAttemptTime[name] = t
+				}
+			}
+		}
+	}
+
+	if raw, err := c.state.Get(persistence.LastSuccessfulRecoveryTimes); err == nil {
+		var serialized map[string]string
+		if err := json.Unmarshal([]byte(raw), &serialized); err != nil {
+			log.Error(err, "Failed to unmarshal lastSuccessfulRecoveryTimes", "cluster", c.namespacedName())
+		} else {
+			for name, ts := range serialized {
+				if t, err := time.Parse(time.RFC3339, ts); err == nil {
+					c.lastSuccessfulRecoveryTime[name] = t
+				}
+			}
+		}
+	}
+}
+
 // New is called when we first observe a CouchbaseCluster resource.  This may be due to
 // creation or recovery after an Operator restart.
 func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
-		config:          config,
-		cluster:         cluster,
-		eventCache:      lru.New(1024),
-		recoveryTime:    map[string]time.Time{},
-		members:         couchbaseutil.MemberSet{},
-		callableMembers: couchbaseutil.MemberSet{},
-		generation:      cluster.Generation,
+		config:                     config,
+		cluster:                    cluster,
+		eventCache:                 lru.New(1024),
+		recoveryTime:               map[string]time.Time{},
+		lastRecoveryAttemptTime:    map[string]time.Time{},
+		lastSuccessfulRecoveryTime: map[string]time.Time{},
+		members:                    couchbaseutil.MemberSet{},
+		callableMembers:            couchbaseutil.MemberSet{},
+		generation:                 cluster.Generation,
 	}
 
 	log.Info("Watching new cluster", "cluster", c.namespacedName())
@@ -204,6 +286,8 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 	}
 
 	log.Info("Running", "cluster", c.namespacedName())
+
+	c.restoreRecoveryTimestamps()
 
 	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
 		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
@@ -549,6 +633,8 @@ func (c *Cluster) podInitialized(pod *v1.Pod) bool {
 func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// Always update the cluster status and reconcile loop time.
 	start := time.Now()
+
+	c.updateRecoveryElapsedMetrics()
 
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {

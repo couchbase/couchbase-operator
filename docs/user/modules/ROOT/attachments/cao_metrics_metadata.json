@@ -185,6 +185,36 @@
             "cluster_name"
         ]
     },
+    "pod_time_since_last_recovery_attempt_seconds": {
+        "type": "gauge",
+        "help": "Number of seconds since the last pod recovery attempt",
+        "unit": "seconds",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "podName"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
+    "pod_time_since_last_successful_recovery_seconds": {
+        "type": "gauge",
+        "help": "Number of seconds since the last successful pod recovery",
+        "unit": "seconds",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name",
+            "podName"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
     "rebalance_attempt_failures_total": {
         "type": "counter",
         "help": "Total number of times a request to rebalance Couchbase Server has failed",

@@ -956,3 +956,47 @@ func TestRebalanceMetrics(t *testing.T) {
 	// Verify gauge metric: rebalance time should be greater than 0 seconds.
 	e2eutil.MustWaitForOperatorGaugeMetricGreaterThan(t, kubernetes, nil, "rebalance_time_seconds", nil, 0, 2*time.Minute)
 }
+
+// TestPodRecoveryTimestampMetrics verifies that the pod recovery timestamp
+// metrics are updated after a successful pod recovery with persistent volumes.
+func TestPodRecoveryTimestampMetrics(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 3
+	victimIndex := 1
+
+	pvcName := e2eutil.GetPvcName(f.LocalPV)
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.AutoFailoverTimeout = e2espec.NewDurationS(30)
+	cluster.Spec.ClusterSettings.AutoFailoverMaxCount = 3
+	cluster.Spec.Servers[0].VolumeMounts = &couchbasev2.VolumeMounts{
+		DefaultClaim: pvcName,
+		DataClaim:    pvcName,
+	}
+	cluster.Spec.VolumeClaimTemplates = []couchbasev2.PersistentVolumeClaimTemplate{
+		createPersistentVolumeClaimSpec(f.StorageClassName, pvcName, f.LocalPV, 2),
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
+	metricLabels := map[string]string{
+		"name":    cluster.Name,
+		"podName": victimName,
+	}
+
+	// Kill the victim pod, keeping volumes so recovery is triggered.
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.MemberRecoveredEvent(cluster, victimIndex), 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Verify the recovery counter was incremented.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "pod_recoveries_total", metricLabels, 1, 2*time.Minute)
+
+	// Verify both elapsed-time gauges have been set to a value greater than zero.
+	e2eutil.MustWaitForOperatorGaugeMetricGreaterThan(t, kubernetes, nil, "pod_time_since_last_successful_recovery_seconds", metricLabels, 0, 2*time.Minute)
+	e2eutil.MustWaitForOperatorGaugeMetricGreaterThan(t, kubernetes, nil, "pod_time_since_last_recovery_attempt_seconds", metricLabels, 0, 2*time.Minute)
+}
