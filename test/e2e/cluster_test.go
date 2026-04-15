@@ -1229,11 +1229,17 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		cluster := e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/minReplicasCount", minReplicaCounts), time.Minute)
 		e2eutil.MustPatchDataServiceSettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinReplicasCount", minReplicaCounts), time.Minute)
 
-		numPatches++
+		// Check removing the entire data field resets it to the default value. The first subsequent test will need to re-add the field.
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/cluster/data"), time.Minute)
+		e2eutil.MustPatchDataServiceSettings(t, kubernetes, cluster, jsonpatch.NewPatchSet().Test("/MinReplicasCount", 0), time.Minute)
+		numPatches += 2
 	}
 
 	if after80 {
-		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data/diskUsageLimit", &couchbasev2.DiskUsageLimit{Enabled: util.BoolPtr(true), Percent: util.IntPtr(80)}), time.Minute)
+		// Re-add the data field as well as the diskUsageLimit field.
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+			DiskUsageLimit: &couchbasev2.DiskUsageLimit{Enabled: util.BoolPtr(true), Percent: util.IntPtr(80)},
+		}), time.Minute)
 		e2eutil.MustVerifyDiskUsageLimit(t, kubernetes, cluster, time.Minute, true, 80)
 		// Check removing the field resets it to the default value
 		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/cluster/data/diskUsageLimit"), time.Minute)
