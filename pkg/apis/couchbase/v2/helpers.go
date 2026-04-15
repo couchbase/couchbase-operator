@@ -447,6 +447,18 @@ func (cs *ClusterSpec) CloudNativeGatewayImage() string {
 	return image
 }
 
+func (cs *ClusterSpec) PreserveCNGReadyInstances() int {
+	if cs.Networking.CloudNativeGateway == nil {
+		return 0
+	}
+
+	if cs.Networking.CloudNativeGateway.PreserveReadyInstances != nil {
+		return *cs.Networking.CloudNativeGateway.PreserveReadyInstances
+	}
+
+	return 1
+}
+
 // get list of items which are in first array but not in second.
 func MissingItems(a1, a2 []string) []string {
 	missingItems := []string{}

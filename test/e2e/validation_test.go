@@ -4519,8 +4519,43 @@ func TestCNGVersionValidation(t *testing.T) {
 					LogLevel: "debug",
 				}).
 				Replace("/spec/image", "couchbase/server:7.2.2")},
-			expectedErrors: []string{"to support cloud native gateway versio"},
+			expectedErrors: []string{"to support cloud native gateway version"},
 			shouldFail:     true,
+		},
+		{
+			name: "TestRestrictedCNGVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
+					Image:                  "ghcr.io/cb-vanilla/cloud-native-gateway:1.0.0",
+					LogLevel:               "debug",
+					PreserveReadyInstances: util.IntPtr(5),
+				}).
+				Replace("/spec/image", "couchbase/server:8.0.0")},
+			expectedErrors: []string{`spec.networking.cloudNativeGateway.preserveReadyInstances must be less than the total desired size of the cluster \(5\)`},
+			shouldFail:     true,
+		},
+		{
+			name: "TestRestrictedCNGVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
+					Image:                  "ghcr.io/cb-vanilla/cloud-native-gateway:1.0.0",
+					LogLevel:               "debug",
+					PreserveReadyInstances: util.IntPtr(10),
+				}).
+				Replace("/spec/image", "couchbase/server:8.0.0")},
+			expectedErrors: []string{`spec.networking.cloudNativeGateway.preserveReadyInstances must be less than the total desired size of the cluster \(5\)`},
+			shouldFail:     true,
+		},
+		{
+			name: "TestRestrictedCNGVersion",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Add("/spec/networking/cloudNativeGateway", couchbasev2.CloudNativeGateway{
+					Image:                  "ghcr.io/cb-vanilla/cloud-native-gateway:1.0.0",
+					LogLevel:               "debug",
+					PreserveReadyInstances: util.IntPtr(4),
+				}).
+				Replace("/spec/image", "couchbase/server:8.0.0")},
+			shouldFail: false,
 		},
 	}
 

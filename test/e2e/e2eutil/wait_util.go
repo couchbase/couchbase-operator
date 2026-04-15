@@ -735,6 +735,15 @@ func MustWaitForClusterEvent(t *testing.T, k8s *types.Cluster, cluster *couchbas
 	mustWaitForResourceEventFromNow(t, k8s, cluster, event, timeout)
 }
 
+func MustNotObserveClusterEventFor(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, event *v1.Event, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, cluster, event, time.Now(), true); err == nil {
+		Die(t, fmt.Errorf("unexpectedly observed event %v/%v", event.Reason, event.Message))
+	}
+}
+
 // MustObserveClusterEvent differs from MustWaitForClusterEvent in that the latter waits for
 // an event after the time the function was called.  The former however expects that the event
 // has or will happen e.g. is less racy.  This requires that the event is unique within a test

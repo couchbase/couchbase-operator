@@ -220,6 +220,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-networking-cloudnativegateway,cloudNativeGateway>>:
       <<couchbaseclusters-spec-networking-cloudnativegateway-image,image>>: ""
       <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
+      <<couchbaseclusters-spec-networking-cloudnativegateway-preservereadyinstances,preserveReadyInstances>>: 0
       <<couchbaseclusters-spec-networking-cloudnativegateway-servicetemplate,serviceTemplate>>: {}
       <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 75
       <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
@@ -3381,6 +3382,21 @@ No validation is carried out as this can be any arbitrary repo and tag.
 LogLevel controls the verbosity of cloud native logs.
 This field must be one of
 "fatal", "panic", "dpanic", "error", "warn", "info", "debug" defaulting to "info".
+
+=== couchbaseclusters.spec.networking.cloudNativeGateway.preserveReadyInstances
+
+==== Constraints
+
+*Type*: `integer`
+
+==== Description
+
+PreserveReadyInstances determines a minimum number of ready CNG containers
+that should always be running on the cluster.
+If upgrading a pod or scaling down the cluster will breach this number, the
+Operator will wait until there are enough ready containers that will be persisted throughout the upgrade or after ejection.
+This field defaults to 1 and must be < than the desired size of the cluster.
+The Operator will continue to remove members if the number of ready CNG containers is 0.
 
 === couchbaseclusters.spec.networking.cloudNativeGateway.serviceTemplate
 

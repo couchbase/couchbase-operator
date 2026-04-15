@@ -1326,6 +1326,16 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 		return nil
 	}
 
+	// If we need to preserve ready CNG containers, check that the number of pods to remove won't breach the limit.
+	// We abort the scale down wholesale as we can't determine at this point which members will be removed.
+	if preserveReadyCNG := c.cluster.Spec.PreserveCNGReadyInstances(); preserveReadyCNG > 0 {
+		readyCNGInstances := c.getReadyCNGMembers()
+		if len(readyCNGInstances) > 0 && len(deletions) > len(readyCNGInstances)-preserveReadyCNG {
+			log.Info("Aborting scale down to maintain CNG availability", "cluster", c.namespacedName(), "deletions", len(deletions), "readyCNGInstances", len(readyCNGInstances))
+			return nil
+		}
+	}
+
 	r.log()
 
 	c.cluster.Status.SetScalingDownCondition(scheduledScaling.BuildMessage())
@@ -1597,6 +1607,16 @@ func (c *Cluster) selectOrderedUpgradeCandidates(candidates couchbaseutil.Member
 		}
 
 		constrained.Add(candidate)
+	}
+
+	// If using CNG, preserve a minimum number of ready instances by removing upgrade candidates.
+	if c.cluster.Spec.Networking.CloudNativeGateway != nil && len(candidates) > 0 {
+		filteredCNGCandidates := c.filterUpgradeCandidatesToPreserveCNG(constrained)
+		preservedCandidates := constrained.Diff(filteredCNGCandidates)
+		for _, preserved := range preservedCandidates {
+			log.Info("Preserving candidate to maintain CNG availability", "cluster", c.namespacedName(), "candidate", preserved.Name())
+		}
+		constrained = filteredCNGCandidates
 	}
 
 	return constrained, nil
@@ -2073,6 +2093,7 @@ func (r *ReconcileMachine) handleUpgradeStabilization(c *Cluster) bool {
 	return false
 }
 
+//nolint:gocyclo
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	// Block upgrades while topology is unsettled or pods are pending async CBS init.
 	if r.needsRebalance || len(r.couchbase.PendingAddNodes) > 0 || r.pendingInitPods.Size() > 0 {
@@ -2125,6 +2146,10 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	constrainedCandidates, zoneChangeDetected, pvcChangeDetected, err := c.selectUpgradeCandidatesIgnoringOrchestrator(orderedCandidates, zoneChanges, pvcChanges)
 	if err != nil {
 		return err
+	}
+
+	if len(constrainedCandidates) == 0 {
+		return nil
 	}
 
 	// Calculate the number of nodes already in the target state before we

@@ -3551,6 +3551,13 @@ type CloudNativeGateway struct {
 	// reserves the right to modify or replace any field.  More info:
 	// https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-core
 	ServiceTemplate *ServiceTemplateSpec `json:"serviceTemplate,omitempty"`
+
+	// PreserveReadyInstances determines a minimum number of ready CNG containers
+	// that should always be running on the cluster. If upgrading a pod or scaling down the cluster will breach this number, the
+	// Operator will wait until there are enough ready containers that will be persisted throughout the upgrade or after ejection.
+	// This field defaults to 1 and must be < than the desired size of the cluster.
+	// The Operator will continue to remove members if the number of ready CNG containers is 0.
+	PreserveReadyInstances *int `json:"preserveReadyInstances,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {

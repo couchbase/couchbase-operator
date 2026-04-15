@@ -121,3 +121,68 @@ func (c *Cluster) reconcileCloudNativeGatewayConfig() error {
 
 	return nil
 }
+
+func (c *Cluster) getReadyCNGMembers() couchbaseutil.MemberSet {
+	clusterPods := c.getClusterPods()
+
+	readyCNGMembers := couchbaseutil.MemberSet{}
+	for _, pod := range clusterPods {
+		member, ok := c.members[pod.Name]
+		if !ok {
+			continue
+		}
+
+		for _, container := range pod.Status.ContainerStatuses {
+			if container.Name == k8sutil.CloudNativeGatewayContainerName && container.Ready {
+				readyCNGMembers.Add(member)
+			}
+		}
+	}
+
+	return readyCNGMembers
+}
+
+func (c *Cluster) filterUpgradeCandidatesToPreserveCNG(candidates couchbaseutil.MemberSet) couchbaseutil.MemberSet {
+	minReadyCNG := c.cluster.Spec.PreserveCNGReadyInstances()
+
+	if minReadyCNG == 0 {
+		return candidates
+	}
+
+	readyCNGMembers := c.getReadyCNGMembers()
+
+	// If there are no ready CNG members, we don't need to preserve any and can proceed with the upgrade as normal.
+	if len(readyCNGMembers) == 0 {
+		return candidates
+	}
+
+	// Get the number of ready CNG candidates we can afford to lose.
+	ejectionBudget := len(readyCNGMembers) - minReadyCNG
+
+	// If the budget is <= 0, we need to filter out all ready nodes.
+	if ejectionBudget <= 0 {
+		return candidates.Diff(readyCNGMembers)
+	}
+
+	finalCandidates := couchbaseutil.MemberSet{}
+	readyEjectedCount := 0
+
+	// Any candidates not running a CNG container can be upgraded without impacting CNG availability.
+	// Candidates with a ready CNG container should only be upgraded if we have ejection budget remaining.
+	for _, candidate := range candidates {
+		if _, ok := readyCNGMembers[candidate.Name()]; !ok {
+			finalCandidates.Add(candidate)
+			continue
+		}
+
+		if readyEjectedCount < ejectionBudget {
+			finalCandidates.Add(candidate)
+			readyEjectedCount++
+		}
+
+		// Once the budget is full, any subsequent ready nodes
+		// are not added to finalCandidates, effectively preserving them.
+	}
+
+	return finalCandidates
+}

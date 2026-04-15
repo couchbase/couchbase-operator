@@ -322,6 +322,8 @@ func registerTests() {
 		framework.NewTestDef(TestMultiNodeAutoFailover).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestAutoFailoverDiskNonResponsivenessAnnotations).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestScaleDownMarksPodUnreadyAndRemovedFromCNGEndpointSlices).WithTags(TagSuiteP0, TagFeatureScheduling),
+		framework.NewTestDef(TestPreserveReadyCNGInstancesStopsUpgrade).WithTags(TagSuiteP0, TagFeatureCNG),
+		framework.NewTestDef(TestPreserveReadyCNGInstancesStopsScaleDown).WithTags(TagSuiteP0, TagFeatureCNG),
 		framework.NewTestDef(TestAnalyticsResizeCluster).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestNegLogCollectValidateArgs).WithTags(TagSuiteP0, TagFeatureSupportability),
 		framework.NewTestDef(TestLogCollect).WithTags(TagSuiteP0, TagFeatureSupportability),

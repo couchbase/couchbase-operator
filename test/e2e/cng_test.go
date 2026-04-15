@@ -28,6 +28,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
+	"github.com/couchbase/couchbase-operator/test/e2e/util"
 	"github.com/couchbase/gocbcoreps"
 	"github.com/couchbase/goprotostellar/genproto/admin_bucket_v1"
 	"github.com/couchbase/goprotostellar/genproto/kv_v1"
@@ -526,4 +527,202 @@ func TestScaleDownMarksPodUnreadyAndRemovedFromCNGEndpointSlices(t *testing.T) {
 		e2eutil.ClusterScaleUpSequenceWithMemberNames([]string{newMember}),
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestPreserveReadyCNGInstancesStopsUpgrade(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG).Upgradable()
+
+	defer cleanup()
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetes)
+	cluster.Spec.Networking.CloudNativeGateway.PreserveReadyInstances = util.IntPtr(2)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
+	}
+
+	// Create the cluster and wait for the sidecar to be re ready.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	firstUpgradeCandidate := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	secondUpgradeCandidate := couchbaseutil.CreateMemberName(cluster.Name, 1)
+	thirdUpgradeCandidate := couchbaseutil.CreateMemberName(cluster.Name, 2)
+	firstNewMember := couchbaseutil.CreateMemberName(cluster.Name, 3)
+	secondNewMember := couchbaseutil.CreateMemberName(cluster.Name, 4)
+	thirdNewMember := couchbaseutil.CreateMemberName(cluster.Name, 5)
+
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetes, cluster, 5*time.Minute)
+
+	// Wait until all the members are in the endpoint slice to ensure CNG is fully ready before we start the upgrade.
+	cngService := fmt.Sprintf("%s-cloud-native-gateway-service", cluster.Name)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, firstUpgradeCandidate, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, secondUpgradeCandidate, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, thirdUpgradeCandidate, cngService, 2*time.Minute)
+
+	// Start the upgrade and wait for the first member to be upgraded and rebalance to complete.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
+		Add("/spec/upgrade/upgradeOrder", []string{firstUpgradeCandidate, secondUpgradeCandidate, thirdUpgradeCandidate}).
+		Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 10*time.Minute)
+
+	// Sabotage the readiness of the CNG container on the second upgrade candidate and the new member.
+	// This should mean the number of ready CNG contains is < 2 (the number to preserve) and the upgrade should be paused until we stop sabotaging.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sabotageCNGContainerReadiness(kubernetes, ctx, secondUpgradeCandidate)
+	sabotageCNGContainerReadiness(kubernetes, ctx, firstNewMember)
+
+	// We should not see a rebalance started event while there is only 1 ready CNG instance (third upgrade candidate).
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), time.Minute)
+
+	// Stop sabotaging the readiness of the two members to allow the upgrade to continue.
+	cancel()
+
+	// Wait until the upgrade has completed and the cluster is healthy.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Check that all new members are in the endpoint slice to ensure they were successfully added to the cluster and CNG updated the endpoint slices correctly.
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, firstNewMember, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, secondNewMember, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, thirdNewMember, cngService, 2*time.Minute)
+
+	// Check the upgrade completed successfully and the new version is running.
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Repeat{Validator: e2eutil.SwapRebalanceSequence, Times: clusterSize},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+func TestPreserveReadyCNGInstancesStopsScaleDown(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	framework.Requires(t, kubernetes).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG).Upgradable()
+
+	defer cleanup()
+	// Static configuration.
+	clusterSize := constants.Size4
+
+	cluster := clusterOptionsUpgrade().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetes)
+	cluster.Spec.Networking.CloudNativeGateway.PreserveReadyInstances = util.IntPtr(2)
+
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
+	}
+
+	// Create the cluster and wait for the sidecar to be re ready.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	firstMember := couchbaseutil.CreateMemberName(cluster.Name, 0)
+	secondMember := couchbaseutil.CreateMemberName(cluster.Name, 1)
+	thirdMember := couchbaseutil.CreateMemberName(cluster.Name, 2)
+	fourthMember := couchbaseutil.CreateMemberName(cluster.Name, 3)
+
+	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetes, cluster, 5*time.Minute)
+
+	// Wait until all the members are in the endpoint slice to ensure CNG is fully ready before we start the upgrade.
+	cngService := fmt.Sprintf("%s-cloud-native-gateway-service", cluster.Name)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, firstMember, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, secondMember, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, thirdMember, cngService, 2*time.Minute)
+	e2eutil.MustWaitForPodIPInServiceEndpointSlice(t, kubernetes, fourthMember, cngService, 2*time.Minute)
+
+	// Start sabotaging the readiness of 3 containers. This should breach the preservation threshold and stop scale downs.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sabotageCNGContainerReadiness(kubernetes, ctx, firstMember)
+	sabotageCNGContainerReadiness(kubernetes, ctx, secondMember)
+	sabotageCNGContainerReadiness(kubernetes, ctx, thirdMember)
+
+	// Start the upgrade and wait for the first member to be upgraded and rebalance to complete.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", 3), time.Minute)
+
+	time.Sleep(20 * time.Second)
+
+	// Make sure we aren't scaling down.
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, time.Minute, couchbasev2.ClusterConditionScalingDown)
+
+	// Make sure we don't see a rebalance to remove any members.
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), time.Minute)
+
+	// Stop sabotaging the readiness of the members to allow the scale down to continue.
+	cancel()
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScalingDown, v1.ConditionTrue, cluster, 2*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceCompletedEvent(cluster), 10*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+
+	// Check the events match what we expect:
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.Event{
+				Reason: k8sutil.EventReasonUserCreated,
+			},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// sabotageCNGContainerReadiness continuously sets the Ready condition to false on the  CNG container of the pod to prevent it from being marked ready by the Kubelet.
+// Kubelet will try and update this field every 10 seconds. It's the job of this goroutine to update it more frequently than that to ensure it remains false for the duration of the test.
+// Probably going to relate in some flakiness but...
+func sabotageCNGContainerReadiness(k8s *types.Cluster, ctx context.Context, podName string) {
+	go func() {
+		ticker := time.NewTicker(250 * time.Millisecond) // Patch 5 times a second to beat the Kubelet
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				pod, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).Get(ctx, podName, metav1.GetOptions{})
+				if err != nil {
+					continue
+				}
+
+				found := false
+				for i, status := range pod.Status.ContainerStatuses {
+					if status.Name == k8sutil.CloudNativeGatewayContainerName {
+						pod.Status.ContainerStatuses[i].Ready = false
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					continue
+				}
+
+				_, _ = k8s.KubeClient.CoreV1().Pods(k8s.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+			}
+		}
+	}()
 }

@@ -98,6 +98,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintTLS,
 		checkConstraintCloudNativeGatewayProvisioning,
 		checkConstraintCloudNativeGatewayTLS,
+		checkConstraintCloudNativeGatewayPreserveReadyInstances,
 		checkConstraintXDCRConnectionTLS,
 		checkConstraintPublicNetworking,
 		checkConstraintBucketNames,
@@ -1733,6 +1734,24 @@ func checkConstraintCloudNativeGatewayProvisioning(_ *types.Validator, cluster *
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func checkConstraintCloudNativeGatewayPreserveReadyInstances(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	cng := cluster.Spec.Networking.CloudNativeGateway
+	if cng == nil || cng.PreserveReadyInstances == nil {
+		return nil
+	}
+
+	var clusterSize int
+	for _, sc := range cluster.Spec.Servers {
+		clusterSize += sc.Size
+	}
+
+	if *cng.PreserveReadyInstances >= clusterSize {
+		return fmt.Errorf("spec.networking.cloudNativeGateway.preserveReadyInstances must be less than the total desired size of the cluster (%d)", clusterSize)
 	}
 
 	return nil
