@@ -47,8 +47,6 @@ var (
 	}
 
 	v = validator.New(admission.GetClient(), admission.GetCouchbaseClient(), &options)
-
-	errResourceNotFound = errors.New("resource not found in cache")
 )
 
 func isValidationError(err error) bool {
@@ -100,19 +98,20 @@ func (n *bucketNamer) GenerateCollectionName(bucket *couchbaseutil.Bucket, scope
 	return fmt.Sprintf("collection-%s", n.generateSuffix(input))
 }
 
-func ValidateImmutableFields(currentCluster *cluster.Cluster) []error {
+func ValidateImmutableFields(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
 	var errs []error
 
 	if currentCluster.GetCouchbaseCluster().Spec.Paused {
-		return nil
+		return nil, nil
 	}
 
-	errs = append(errs, validateBucketsImmutableFields(currentCluster)...)
+	bucketErrs, failedBuckets := validateBucketsImmutableFields(currentCluster)
+	errs = append(errs, bucketErrs...)
 	errs = append(errs, validateReplicationsImmutableFields(currentCluster)...)
 	errs = append(errs, validateBackupsImmutableFields(currentCluster)...)
 	errs = append(errs, validateAutoscalersImmutableField(currentCluster)...)
 
-	return errs
+	return errs, failedBuckets
 }
 
 func validateAutoscalersImmutableField(currentCluster *cluster.Cluster) []error {
@@ -225,24 +224,18 @@ func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []erro
 	return errs
 }
 
-func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
+func validateBucketsImmutableFields(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
 	var errs []error
 
-	var couchbaseBucketMap = make(map[string]*couchbasev2.CouchbaseBucket)
+	failedBuckets := make(map[string]bool)
 
-	couchbaseBucketList, _, _ := util.GetBucketsFromStatus(currentCluster)
-
-	for _, b := range couchbaseBucketList {
-		couchbaseBucketMap[string(b.Spec.Name)] = b
-	}
-
-	updateBuckets, err := currentCluster.GetBucketsToUpdate(couchbaseBucketMap)
+	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
 		if checkIsMemberError(err) {
-			return nil
+			return nil, failedBuckets
 		}
 
-		return append(errs, err)
+		return append(errs, err), failedBuckets
 	}
 
 	namer := &bucketNamer{
@@ -263,46 +256,25 @@ func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 		}
 
 		if err := validator.CheckImmutableFields(oldBucket, newBucket); isValidationError(err) {
-			switch t := newBucket.(type) {
-			case *couchbasev2.CouchbaseBucket:
-				couchbaseutil.AddAnnotation(&t.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-				if _, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseBuckets(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), t, metav1.UpdateOptions{}); updateErr != nil {
-					errs = append(errs, updateErr)
-				}
-			case *couchbasev2.CouchbaseEphemeralBucket:
-				couchbaseutil.AddAnnotation(&t.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-				_, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), t, metav1.UpdateOptions{})
-				if updateErr != nil {
-					errs = append(errs, updateErr)
-				}
-			case *couchbasev2.CouchbaseMemcachedBucket:
-				couchbaseutil.AddAnnotation(&t.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-				_, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), t, metav1.UpdateOptions{})
-				if updateErr != nil {
-					errs = append(errs, updateErr)
-				}
-			}
-
 			errs = append(errs, err)
+			failedBuckets[update.BucketName] = true
 		}
 	}
 
-	return errs
+	return errs, failedBuckets
 }
 
-func CheckChangeConstraints(currentCluster *cluster.Cluster) []error {
+func CheckChangeConstraints(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
 	var errs []error
 
 	if currentCluster.GetCouchbaseCluster().Spec.Paused {
-		return nil
+		return nil, nil
 	}
 
-	errs = append(errs, validateBucketsChangeConstraints(currentCluster)...)
+	bucketErrs, failedBuckets := validateBucketsChangeConstraints(currentCluster)
+	errs = append(errs, bucketErrs...)
 
-	return errs
+	return errs, failedBuckets
 }
 
 func CheckClusterChangeConstraints(currentCluster, updatedCluster *couchbasev2.CouchbaseCluster) error {
@@ -318,28 +290,22 @@ func CheckClusterChangeConstraints(currentCluster, updatedCluster *couchbasev2.C
 }
 
 //nolint:gocognit
-func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
+func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
 	var errs []error
+
+	failedBuckets := make(map[string]bool)
 
 	namer := &bucketNamer{
 		c: currentCluster,
 	}
 
-	var couchbaseBucketMap = make(map[string]*couchbasev2.CouchbaseBucket)
-
-	couchbaseBucketList, _, _ := util.GetBucketsFromStatus(currentCluster)
-
-	for _, b := range couchbaseBucketList {
-		couchbaseBucketMap[string(b.Spec.Name)] = b
-	}
-
-	updateBuckets, err := currentCluster.GetBucketsToUpdate(couchbaseBucketMap)
+	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
 		if checkIsMemberError(err) {
-			return nil
+			return nil, failedBuckets
 		}
 
-		return append(errs, err)
+		return append(errs, err), failedBuckets
 	}
 
 	for actual, update := range updateBuckets {
@@ -360,42 +326,14 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseBucket); ok {
 				if _, err := validationv2.CheckChangeConstraintsBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
 					errs = append(errs, err)
-
-					cbBucket, found := currentCluster.GetK8sClient().CouchbaseBuckets.Get(update.BucketName)
-					if !found {
-						errs = append(errs, errResourceNotFound)
-					}
-
-					couchbaseutil.AddAnnotation(&cbBucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-					if _, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseBuckets(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), cbBucket, metav1.UpdateOptions{}); updateErr != nil {
-						if errors.Is(err, couchbaseutil.ErrMemberError) {
-							return nil
-						}
-
-						errs = append(errs, err)
-					}
+					failedBuckets[update.BucketName] = true
 				}
 			}
 		case *couchbasev2.CouchbaseEphemeralBucket:
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseEphemeralBucket); ok {
 				if err := validationv2.CheckChangeConstraintsEphemeralBucket(v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
 					errs = append(errs, err)
-
-					ephemeralBucket, found := currentCluster.GetK8sClient().CouchbaseEphemeralBuckets.Get(update.BucketName)
-					if !found {
-						errs = append(errs, errResourceNotFound)
-					}
-
-					couchbaseutil.AddAnnotation(&ephemeralBucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-					if _, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), ephemeralBucket, metav1.UpdateOptions{}); updateErr != nil {
-						if errors.Is(err, couchbaseutil.ErrMemberError) {
-							return nil
-						}
-
-						errs = append(errs, err)
-					}
+					failedBuckets[update.BucketName] = true
 				}
 			}
 
@@ -405,7 +343,7 @@ func validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 		}
 	}
 
-	return errs
+	return errs, failedBuckets
 }
 
 func CheckConstraints(cluster *cluster.Cluster) []error {
@@ -650,15 +588,7 @@ func validateCouchbaseBuckets(buckets []*couchbasev2.CouchbaseBucket, client *cl
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
 		if err := checkCouchbaseBucketsConstraints(bucket, cluster); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := client.CouchbaseClient.CouchbaseV2().CouchbaseBuckets(cluster.Namespace).Update(ctx.Background(), bucket, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
-
 			errs = append(errs, err)
 		}
 	}
@@ -674,15 +604,7 @@ func validateMemcachedBuckets(buckets []*couchbasev2.CouchbaseMemcachedBucket, c
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
 		if err := checkMemcachedBucketsConstraints(bucket, cluster); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := client.CouchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(cluster.Namespace).Update(ctx.Background(), bucket, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
-
 			errs = append(errs, err)
 		}
 	}
@@ -698,15 +620,7 @@ func validateEphemeralBuckets(buckets []*couchbasev2.CouchbaseEphemeralBucket, c
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
 		if err := checkEphemeralBucketConstraints(bucket, cluster); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&bucket.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := client.CouchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(cluster.Namespace).Update(ctx.Background(), bucket, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
-
 			errs = append(errs, err)
 		}
 	}

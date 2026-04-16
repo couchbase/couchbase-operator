@@ -12,7 +12,6 @@ package e2e
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
@@ -101,17 +100,9 @@ func TestCAOValidationUnreconcilable(t *testing.T) {
 		},
 	}
 
-	apiBucket, _ := e2eutil.NewBucketOld(kubernetes, bucket)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	// Check the bucket has had the unreconcilable annotation added.
-	annotations := apiBucket.GetAnnotations()
-	if value, found := annotations[constants.AnnotationUnreconcilable]; found {
-		if !strings.EqualFold(value, "true") {
-			t.Errorf("Unreconcilable annotation not set.")
-			t.FailNow()
-		}
-	}
-
+	// The operator should detect the invalid spec and surface a cluster error condition.
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionError, v1.ConditionTrue, cluster, 5*time.Minute)
 }
 

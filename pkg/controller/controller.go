@@ -228,7 +228,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		validationFailed = true
 	}
 
-	changeErrs := validationrunner.CheckChangeConstraints(c)
+	changeErrs, failedBuckets := validationrunner.CheckChangeConstraints(c)
 
 	for _, err := range changeErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
@@ -236,7 +236,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		validationErrors = append(validationErrors, err.Error())
 	}
 
-	immutableErrs := validationrunner.ValidateImmutableFields(c)
+	immutableErrs, immutableFailedBuckets := validationrunner.ValidateImmutableFields(c)
 
 	for _, err := range immutableErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
@@ -244,16 +244,37 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		validationErrors = append(validationErrors, err.Error())
 	}
 
+	// Merge failed buckets from both validators into a single set.
+	if failedBuckets == nil {
+		failedBuckets = immutableFailedBuckets
+	} else {
+		for name := range immutableFailedBuckets {
+			failedBuckets[name] = true
+		}
+	}
+
+	c.SetFailedValidation("bucket", failedBuckets)
+
 	// Existing cluster updated
 	// TODO: We should just reload the cluster and aggregate other resources in
 	// the cluster controller and check for updates there.
 	log.V(2).Info("Updating cluster", "cluster", request.NamespacedName)
 
+	// Set or clear the validation error condition on BOTH the in-memory
+	// c.cluster (used by the validationFailed path below) and the fresh
+	// couchbase CRD from etcd (used by the c.Update path).  RunReconcile's
+	// success path no longer clears ClusterConditionError — only the
+	// controller manages it.  RunReconcile still sets it on failure to
+	// surface reconcile-time errors.
 	if len(validationErrors) != 0 {
-		c.GetCouchbaseCluster().Status.SetErrorCondition(strings.Join(validationErrors, "; "))
+		msg := strings.Join(validationErrors, "; ")
+		c.GetCouchbaseCluster().Status.SetErrorCondition(msg)
+		couchbase.Status.SetErrorCondition(msg)
 	} else {
 		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterConditionError)
 		c.GetCouchbaseCluster().Status.ClearCondition(couchbasev2.ClusterUnreconcilable)
+		couchbase.Status.ClearCondition(couchbasev2.ClusterConditionError)
+		couchbase.Status.ClearCondition(couchbasev2.ClusterUnreconcilable)
 	}
 
 	if validationFailed {
