@@ -848,8 +848,9 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return nil
 	}
 
-	// Do a version check against the cluster compatibility version first. If that fails, we'll fallback to a check on lowest vs highest active member versions.
-	if versionAfter, err := c.CompatibleWithVersion(baselineVersion); err == nil && !versionAfter {
+	// Do a version check against the cluster compatibility version first. If the cluster compat version is <= baseline, we know the baseline is still compatible with the cluster.
+	// If that fails, we'll fallback to a check on lowest vs highest active member versions.
+	if clusterCompatLe, err := c.CheckClusterCompatVersion(baselineVersion, false); err == nil && !clusterCompatLe {
 		return errors.ErrClusterNoLongerCompatible
 	} else if err != nil && c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
 		return nil

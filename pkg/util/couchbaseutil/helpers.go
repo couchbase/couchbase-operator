@@ -37,6 +37,21 @@ func VersionAfter(version, required string) (bool, error) {
 	return v1.GreaterEqual(v2), nil
 }
 
+// VersionEqual determines whether the configured version is equal to the required version.
+func VersionEqual(version, required string) (bool, error) {
+	v1, err := NewVersion(version)
+	if err != nil {
+		return false, err
+	}
+
+	v2, err := NewVersion(required)
+	if err != nil {
+		return false, err
+	}
+
+	return v1.Equal(v2), nil
+}
+
 func VersionsWithinTwoMajorVersions(oldVersion string, newVersion string) (bool, error) {
 	old, err := NewVersion(oldVersion)
 	if err != nil {
