@@ -500,9 +500,9 @@ func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.
 				if !reflect.DeepEqual(r, a) {
 					updateBuckets[a] = r
 				}
-			}
 
-			break
+				break
+			}
 		}
 	}
 
