@@ -461,7 +461,7 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	return allBuckets, nil
 }
 
-func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.CouchbaseBucket) (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
+func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
 	updateBuckets := make(map[couchbaseutil.Bucket]couchbaseutil.Bucket)
 
 	requested, err := c.gatherBuckets()
@@ -509,30 +509,6 @@ func (c *Cluster) GetBucketsToUpdate(couchbaseBucketMap map[string]*couchbasev2.
 	return updateBuckets, nil
 }
 
-func (c *Cluster) isUnreconilableBucket(bucket couchbaseutil.Bucket) bool {
-	var annotations = make(map[string]string)
-
-	switch bucket.BucketType {
-	case constants.BucketTypeCouchbase:
-		apiBucket, ok := c.GetK8sClient().CouchbaseBuckets.Get(bucket.BucketName)
-		if ok {
-			annotations = apiBucket.Annotations
-		}
-	case constants.BucketTypeMemcached:
-		apiBucket, ok := c.GetK8sClient().CouchbaseMemcachedBuckets.Get(bucket.BucketName)
-		if ok {
-			annotations = apiBucket.Annotations
-		}
-	case constants.BucketTypeEphemeral:
-		apiBucket, ok := c.GetK8sClient().CouchbaseEphemeralBuckets.Get(bucket.BucketName)
-		if ok {
-			annotations = apiBucket.Annotations
-		}
-	}
-
-	return !couchbaseutil.ShouldReconcile(annotations)
-}
-
 // inspectBuckets compares Kubernetes buckets with Couchbase buckets and returns lists
 // of buckets to create, update or remove and the requested set for status updates.
 //
@@ -543,18 +519,9 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 		return nil, nil, nil, nil, nil, err
 	}
 
-	unfilteredActual := couchbaseutil.BucketList{}
-	if err := couchbaseutil.ListBuckets(&unfilteredActual).On(c.api, c.readyMembers()); err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
-
-	// Filter out unreconcilable buckets.
 	actual := couchbaseutil.BucketList{}
-
-	for _, bucket := range unfilteredActual {
-		if !c.isUnreconilableBucket(bucket) {
-			actual = append(actual, bucket)
-		}
+	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
+		return nil, nil, nil, nil, nil, err
 	}
 
 	isOver71, err := c.IsAtLeastVersion("7.1.0")
@@ -589,12 +556,14 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 	for _, r := range requested {
 		found := false
 
+		// Skip buckets that failed change-constraint validation — they must
+		// not be created, updated, or deleted until the user fixes the CRD.
+		if c.IsFailedValidation("bucket", r.BucketName) {
+			continue
+		}
+
 		for _, a := range actual {
 			if r.BucketName == a.BucketName {
-				if found = c.isUnreconilableBucket(a); found {
-					continue
-				}
-
 				// If the bucket is a sample bucket, we don't update it until this field is false or removed to avoid unnecessary updates.
 				if found = r.SampleBucket; found {
 					continue
@@ -676,10 +645,6 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []couchbaseutil.Buck
 
 		for _, r := range unfilteredRequested {
 			if a.BucketName == r.BucketName {
-				if found = c.isUnreconilableBucket(a); found {
-					continue
-				}
-
 				matchBackendsIfBefore76(&r, &a, c.cluster)
 
 				found = true
@@ -806,6 +771,7 @@ func (c *Cluster) reconcileBuckets() error {
 
 	for i := range update {
 		bucket := &update[i]
+
 		if err := couchbaseutil.UpdateBucket(bucket).On(c.api, c.readyMembers()); err != nil {
 			return err
 		}
@@ -829,8 +795,24 @@ func (c *Cluster) reconcileBuckets() error {
 	names := make([]string, len(requested))
 	statuses := map[string]couchbasev2.BucketStatus{}
 
+	// Snapshot the existing status so that failed-validation buckets keep
+	// their last-known-good status rather than being overwritten with the
+	// (invalid) desired state from the CRD.
+	existingStatuses := make(map[string]couchbasev2.BucketStatus, len(c.cluster.Status.Buckets))
+	for _, s := range c.cluster.Status.Buckets {
+		existingStatuses[s.BucketName] = s
+	}
+
 	for i, bucket := range requested {
 		names[i] = bucket.BucketName
+
+		if c.IsFailedValidation("bucket", bucket.BucketName) {
+			if existing, ok := existingStatuses[bucket.BucketName]; ok {
+				statuses[bucket.BucketName] = existing
+
+				continue
+			}
+		}
 
 		statuses[bucket.BucketName] = bucketToClusterStatus(bucket)
 	}

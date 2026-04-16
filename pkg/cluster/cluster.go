@@ -152,6 +152,34 @@ type Cluster struct {
 	// scheduling server groups tracker to prevent lost updates when multiple
 	// pod creation goroutines run concurrently.
 	failedGroupsMu sync.RWMutex
+
+	// failedValidation holds the names of resources that failed change-
+	// constraint validation in this reconcile cycle, keyed by resource kind
+	// (e.g. "bucket").  Resources in this map are skipped during reconciliation
+	// so other reconcilers and valid resources are not blocked.  The map is
+	// rebuilt every cycle, so it is naturally restart-safe.
+	failedValidation map[string]map[string]bool
+}
+
+// SetFailedValidation stores the set of resource names that failed
+// change-constraint validation for the given kind.  Called once per
+// reconcile cycle, before RunReconcile.
+func (c *Cluster) SetFailedValidation(kind string, names map[string]bool) {
+	if c.failedValidation == nil {
+		c.failedValidation = make(map[string]map[string]bool)
+	}
+
+	c.failedValidation[kind] = names
+}
+
+// IsFailedValidation returns true if the named resource of the given kind
+// failed change-constraint validation in this reconcile cycle.
+func (c *Cluster) IsFailedValidation(kind, name string) bool {
+	if c.failedValidation == nil {
+		return false
+	}
+
+	return c.failedValidation[kind][name]
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -744,7 +772,11 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		return
 	}
 
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionError)
+	// Validation error conditions are managed by the controller (set before
+	// RunReconcile and written on the couchbase arg that becomes c.cluster).
+	// We must NOT clear ClusterConditionError here — doing so would erase
+	// the validation error the controller just set.  The controller clears
+	// it on the next cycle when validation passes.
 	if err := retryutil.RetryFor(4*time.Second, c.updateCRStatus); err != nil {
 		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
