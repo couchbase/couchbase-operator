@@ -807,6 +807,9 @@ func removeCouchbaseClusterFinalizers(k8s *types.Cluster) error {
 		}
 
 		item.SetFinalizers(nil)
+		item.SetAnnotations(map[string]string{
+			constants.AnnotationDisableAdmissionController: "true",
+		})
 
 		_, err = k8s.DynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Update(context.Background(), item, metav1.UpdateOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
