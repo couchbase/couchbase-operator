@@ -1605,6 +1605,15 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 
 	patchset := jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", &newEncryptionType)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.SecuritySettingsUpdatedEvent(cluster, k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified), 5*time.Minute)
+
+	// Given we check the pod readiness, we should give k8s a bit of time for any changes to propagate to readiness.
+	time.Sleep(30 * time.Second)
+	// Check the cluster is healthy and all pods are ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	for i := 0; i < clusterSize; i++ {
+		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created

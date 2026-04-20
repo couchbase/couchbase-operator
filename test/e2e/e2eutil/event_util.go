@@ -107,6 +107,10 @@ func RebalanceStartedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceStartedEvent(cl)
 }
 
+func SecuritySettingsUpdatedEvent(cl *couchbasev2.CouchbaseCluster, message string) *v1.Event {
+	return k8sutil.SecuritySettingsUpdatedEvent(cl, message)
+}
+
 func RebalanceCompletedEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.RebalanceCompletedEvent(cl)
 }
