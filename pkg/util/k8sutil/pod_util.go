@@ -2736,7 +2736,9 @@ func FlagPodReady(client *client.Client, name string) error {
 func FlagPodUnready(client *client.Client, name, reason string) error {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+		// Pod already deleted (by an external actor such as chaos testing)
+		// nothing to mark unready, so treat as a no-op.
+		return nil
 	}
 
 	readinessCondition := NewPodCondition(PodReadinessCondition, v1.ConditionFalse, "")
