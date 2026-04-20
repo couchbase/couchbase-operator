@@ -268,6 +268,12 @@ func ResourceCondition(k8s *types.Cluster, resource runtime.Object, conditionTyp
 	return ResourceConstraints(k8s, resource, resourceExists, resourceConditionExists(conditionType, conditionStatus))
 }
 
+// ResourceCondition checks if a given resource has the given condition. This returns a closure
+// that should be used with RetryFor().
+func ResourceWithoutCondition(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus string) func() error {
+	return ResourceConstraints(k8s, resource, resourceExists, resourceConditionNotExists(conditionType))
+}
+
 // ResourceConditionWithMessage checks if a given resource has the given condition. This returns a closure
 // that should be used with RetryFor().
 func ResourceConditionWithMessage(k8s *types.Cluster, resource runtime.Object, conditionType, conditionStatus, conditionMessage string) func() error {
@@ -1560,6 +1566,44 @@ func waitForPodVolumeSize(k8s *types.Cluster, memberName string, claimName strin
 func MustWaitForCloudNativeGatewaySidecarReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	err := WaitForContainerReady(k8s, couchbase, timeout, k8sutil.CloudNativeGatewayContainerName)
 	if err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForPodReady(t *testing.T, k8s *types.Cluster, name string, timeout time.Duration) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: k8s.Namespace,
+		},
+	}
+
+	if err := retryutil.RetryFor(timeout, ResourceCondition(k8s, pod, string(k8sutil.PodReadinessCondition), string(v1.ConditionTrue))); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustWaitForPodUnready(t *testing.T, k8s *types.Cluster, name string, timeout time.Duration) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: k8s.Namespace,
+		},
+	}
+
+	callback := func() error {
+		if err := ResourceCondition(k8s, pod, string(k8sutil.PodReadinessCondition), string(v1.ConditionFalse)); err == nil {
+			return nil
+		}
+
+		if err := ResourceWithoutCondition(k8s, pod, string(v1.PodScheduled), string(v1.ConditionFalse))(); err == nil {
+			return nil
+		}
+
+		return fmt.Errorf("pod %s is not unready", name)
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
 		Die(t, err)
 	}
 }
