@@ -1508,7 +1508,7 @@ func MustGetMaxScale(t *testing.T, k8s *types.Cluster, memory float64) int {
 	return result
 }
 
-func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, timeout time.Duration) error {
+func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tls *TLSContext, n2nStrict bool, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: constants.CouchbaseServerClusterKey + "=" + tls.ClusterName})
 		if err != nil {
@@ -1519,7 +1519,7 @@ func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluste
 		for i := range pods.Items {
 			pod := pods.Items[i]
 
-			if err := tlsCheckForPod(k8s, cluster, pod.GetName(), tls); err != nil {
+			if err := tlsCheckForPod(k8s, cluster, pod.GetName(), tls, n2nStrict); err != nil {
 				return fmt.Errorf("TLS verification failed: %w", err)
 			}
 		}
@@ -1529,7 +1529,13 @@ func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluste
 }
 
 func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
-	if err := TLSCheckForCluster(k8s, cluster, ctx, timeout); err != nil {
+	if err := TLSCheckForCluster(k8s, cluster, ctx, false, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustCheckClusterTLSStrict(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
+	if err := TLSCheckForCluster(k8s, cluster, ctx, true, timeout); err != nil {
 		Die(t, err)
 	}
 }
