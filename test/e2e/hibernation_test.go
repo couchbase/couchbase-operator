@@ -60,6 +60,7 @@ func TestHibernateEphemeralImmediate(t *testing.T) {
 	// * Cluster recreated
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -105,6 +106,7 @@ func TestHibernateSupportableImmediate(t *testing.T) {
 	// * Cluster recovered
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.PodDownWithPVCRecoverySequenceWithEphemeral(t, clusterSize, mdsGroupSize, mdsGroupSize, f.CouchbaseServerImage),
@@ -156,6 +158,7 @@ func TestHibernateOccursAfterUpgrade(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		RollingUpgradeSequence(clusterSize, 1),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonHibernationEnded},
 		e2eutil.ClusterCreateSequence(clusterSize),

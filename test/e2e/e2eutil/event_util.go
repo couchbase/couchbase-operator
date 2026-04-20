@@ -232,6 +232,9 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 
 // ClusterCreateSequenceWithExposedFeatures is a common function for generating cluster
 // creation events, with specific featuresets.
+// With async pod creation, BucketCreated timing relative to rebalance is
+// non-deterministic — it may fire before or after the initial rebalance
+// depending on reconciler scheduling.
 func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.ExposedFeature) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
@@ -244,8 +247,10 @@ func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.Exposed
 
 	if size > 1 {
 		schema.Validators = append(schema.Validators,
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		)
 	}
 
@@ -289,25 +294,44 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 
 // ClusterCreateSequenceWithN2N is a common function for generating cluster
 // creation events, when N2N is enabled.
+//
+// With async pod creation the operator CBS-initializes the first pod, then
+// enables N2N encryption (SecuritySettingsUpdated) in that same reconcile
+// cycle — before the remaining pods are CBS-added.  For Full mode a second
+// SecuritySettingsUpdated fires for the mode change.
 func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNodeEncryptionType) eventschema.Validatable {
-	schema := eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		},
+	// Build the N2N security event(s).
+	n2nEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated},
 	}
-
-	if size > 1 {
-		schema.Validators = append(schema.Validators, ClusterScaleUpSequence(size-1))
-	}
-
-	schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
-
-	// Control Plane Only is the default, anything else will change the mode.
 	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
-		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
+		n2nEvents = append(n2nEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
 	}
 
-	return schema
+	if size == 1 {
+		validators := []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		}
+		validators = append(validators, n2nEvents...)
+		return eventschema.Sequence{Validators: validators}
+	}
+
+	validators := []eventschema.Validatable{
+		// First pod is CBS-initialized; N2N encryption fires on that reconcile cycle.
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+	}
+	validators = append(validators, n2nEvents...)
+	validators = append(validators,
+		// Remaining pods are created and CBS-added asynchronously.
+		eventschema.Repeat{
+			Times:     size - 1,
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	)
+
+	return eventschema.Sequence{Validators: validators}
 }
 
 // ClusterScaleUpSequence is a common function for generating cluster scaling up events.
@@ -375,6 +399,8 @@ func ClusterScaleDownSequenceWithMemberNames(names []string) eventschema.Validat
 // PodDownFailoverRecoverySequence is a common function for generating down/failover/recovery events.
 // Observing the pod go down is optional, and not of any real consequence.  It's entirely possible
 // that the pod is failed while the Operator is inactive for whatever reason.
+// With async pod creation, the replacement pod (NewMemberAdded) may be created before
+// or after MemberFailedOver completes.
 func PodDownFailoverRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
@@ -384,8 +410,24 @@ func PodDownFailoverRecoverySequence() eventschema.Validatable {
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 			},
-			eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.AnyOf{
+				Validators: []eventschema.Validatable{
+					// Pattern 1: Failover completes before replacement pod is added
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+							eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+						},
+					},
+					// Pattern 2: Replacement pod added before failover completes (async)
+					eventschema.Sequence{
+						Validators: []eventschema.Validatable{
+							eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+							eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
+						},
+					},
+				},
+			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},

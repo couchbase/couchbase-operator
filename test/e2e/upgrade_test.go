@@ -1266,7 +1266,10 @@ func TestDeltaRecovery(t *testing.T) {
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 
-	e2eutil.MustWaitClusterStatusHealthyWithoutError(t, kubernetes, cluster, 20*time.Minute)
+	// Use MustWaitClusterStatusHealthy instead of WithoutError: async pod creation
+	// causes transient Error conditions during in-place upgrade (pod hostname not found,
+	// CBS API unavailable while pod restarts). These clear on the next successful reconcile.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -1932,15 +1935,9 @@ func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
 	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
 
-	expectedIndexUpgradeOrder := []int{2, 3, 0, 1}
-
-	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(classSize * 2),
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-	}
-
-	for _, podIndex := range expectedIndexUpgradeOrder {
-		upgradeSequence := eventschema.Sequence{
+	// Build upgrade sub-sequence for a single pod swap.
+	upgradeSeq := func(podIndex int) eventschema.Sequence {
+		return eventschema.Sequence{
 			Validators: []eventschema.Validatable{
 				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 				eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
@@ -1948,10 +1945,28 @@ func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
 				eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 			},
 		}
-		expectedEvents = append(expectedEvents, upgradeSequence)
 	}
 
-	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(classSize * 2),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		// Arbiter pods (2, 3) upgraded first; intra-group order is non-deterministic
+		// because MemberSet.ToList() iterates a Go map.
+		eventschema.AnyOf{
+			Validators: []eventschema.Validatable{
+				eventschema.Sequence{Validators: []eventschema.Validatable{upgradeSeq(2), upgradeSeq(3)}},
+				eventschema.Sequence{Validators: []eventschema.Validatable{upgradeSeq(3), upgradeSeq(2)}},
+			},
+		},
+		// Data pods (0, 1) upgraded second; same intra-group non-determinism.
+		eventschema.AnyOf{
+			Validators: []eventschema.Validatable{
+				eventschema.Sequence{Validators: []eventschema.Validatable{upgradeSeq(0), upgradeSeq(1)}},
+				eventschema.Sequence{Validators: []eventschema.Validatable{upgradeSeq(1), upgradeSeq(0)}},
+			},
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }

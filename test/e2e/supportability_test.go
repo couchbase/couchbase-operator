@@ -1561,6 +1561,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		eventschema.Repeat{Times: len(victims), Validator: validator},
 	}
 
@@ -1615,6 +1616,8 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 	// * Cluster created
 	// * Pod goes down (optionally it may failover while the operator is down) and fails
 	// * Scales from 3 -> 1
+	// With async pod creation, the failover-removal and scale-down happen in
+	// separate rebalances rather than a single rebalance.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -1623,7 +1626,10 @@ func LogCollectWithClusterResizeAndServerPodKilledGeneric(t *testing.T, isOperat
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver},
-		e2eutil.ClusterScaleDownSequence(2),
+		// Async: failover-removal and scale-down are separate operations,
+		// each in its own rebalance cycle.
+		e2eutil.ClusterScaleDownSequence(1),
+		e2eutil.ClusterScaleDownSequence(1),
 	}
 
 	ValidateEvents(t, kubernetes, cbCluster, expectedEvents)

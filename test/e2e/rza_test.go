@@ -84,6 +84,9 @@ func validateRzaMap(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 
 	rzaMap := rzaMap{}
 	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		rzaMap[pod.Spec.NodeSelector[constants.FailureDomainZoneLabel]]++
 	}
 
@@ -473,9 +476,10 @@ func TestServerGroupAddGroup(t *testing.T) {
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
-	// Check things are spread out as we expect.
+	// Check things are spread out as we expect.  Use retry as during a swap
+	// upgrade the replacement pod may be created before the old one is deleted.
 	expected := getExpectedRzaResultMap(clusterSize, availableServerGroups)
-	expected.mustValidateRzaMap(t, kubernetes, cluster)
+	MustWaitForRzaMap(t, kubernetes, cluster, expected, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),

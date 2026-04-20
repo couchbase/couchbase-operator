@@ -479,15 +479,19 @@ func (c *Cluster) reconcilePodServerVersions() error {
 	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.namespacedName())
 
 	for _, member := range c.callableMembers {
+		pod, found := c.k8s.Pods.Get(member.Name())
+		if !found {
+			continue
+		}
+
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
+
 		info := &couchbaseutil.PoolsInfo{}
 
 		if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, member); err != nil {
 			return err
-		}
-
-		pod, found := c.k8s.Pods.Get(member.Name())
-		if !found {
-			continue
 		}
 
 		config := c.cluster.Spec.GetServerConfigByName(member.Config())

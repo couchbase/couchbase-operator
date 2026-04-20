@@ -224,14 +224,12 @@ func xdcrClusterRemoveNode(t *testing.T, kubernetes1, kubernetes2 *types.Cluster
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	// * any cluster/operation specific things happened as expected
@@ -422,14 +420,12 @@ func TestXDCRCreateCluster(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -471,14 +467,12 @@ func TestXDCROptionalUUID(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -530,7 +524,6 @@ func TestXDCRPauseReplication(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
@@ -539,7 +532,6 @@ func TestXDCRPauseReplication(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -589,7 +581,6 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
@@ -598,7 +589,6 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -646,7 +636,6 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		e2eutil.ClusterScaleUpSequence(clusterScaledSize - clusterSize),
@@ -654,7 +643,6 @@ func TestXDCRSourceNodeAdd(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -777,7 +765,6 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationRemoved},
@@ -785,7 +772,6 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -840,14 +826,12 @@ func TestXDCRFilterExp(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -893,7 +877,6 @@ func TestXDCRRotatePassword(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
@@ -901,7 +884,6 @@ func TestXDCRRotatePassword(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
 	}
 
@@ -928,7 +910,6 @@ func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster,
 
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
@@ -997,7 +978,6 @@ func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns
 
 	expectedEvents1 := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		// Async pod creation can cause extra reconcile cycles during TLS rotation,
@@ -1123,7 +1103,6 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -1131,7 +1110,6 @@ func TestXDCRReplicateLocalScopesAndCollections(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1220,7 +1198,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -1228,7 +1205,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1328,7 +1304,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
@@ -1338,7 +1313,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
@@ -1464,7 +1438,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -1472,7 +1445,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1535,7 +1507,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -1543,7 +1514,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsImplicit(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1649,14 +1619,12 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1781,14 +1749,12 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 	}
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}
 
@@ -1857,7 +1823,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
@@ -1865,7 +1830,6 @@ func TestXDCRReplicateLocalScopesAndCollectionsToUnmanaged(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
 	}

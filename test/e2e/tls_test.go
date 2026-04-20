@@ -211,7 +211,9 @@ func TestTLSResizeCluster(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		e2eutil.ClusterScaleUpSequence(1),
 		e2eutil.ClusterScaleUpSequence(1),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		e2eutil.ClusterScaleDownSequence(1),
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}}},
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 

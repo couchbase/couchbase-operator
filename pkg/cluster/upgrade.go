@@ -744,6 +744,17 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return c.state.Update(persistence.Version, lowestImageVer)
 	}
 
+	// Wait until all pods pending ejection have been removed before declaring the upgrade complete.
+	for name := range c.members {
+		pod, ok := c.k8s.Pods.Get(name)
+		if !ok {
+			continue
+		}
+		if k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
+			return nil
+		}
+	}
+
 	// Check to see if there are any more upgrade candidates.
 	// If there are then we are still upgrading.
 	candidates, _, _, err := c.getUpgradeCandidates(false)

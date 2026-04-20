@@ -490,8 +490,12 @@ func TestMigrationNotAllowedWithRollbackVersion(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, srcCluster, 2*time.Minute)
 	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
-	// When the upgrade starts, pause the source cluster, leaving it in mixed mode.
+	// When the upgrade starts, wait for at least one pod to actually be replaced (MemberRemoved),
+	// ensuring the source cluster is in mixed-version mode. Then pause.
+	// With async pod creation, Upgrading=True fires before any pods are replaced, so waiting
+	// only for Upgrading=True may catch the cluster before mixed mode is achieved.
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, srcCluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, srcCluster, k8sutil.MemberRemoveEvent(couchbaseutil.CreateMemberName(srcCluster.Name, 0), srcCluster), 5*time.Minute)
 	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Replace("/spec/paused", true), time.Minute)
 	srcCluster = e2eutil.MustPatchCluster(t, kubernetes, srcCluster, jsonpatch.NewPatchSet().Test("/status/controlPaused", true), 5*time.Minute)
 	// Create the destination cluster with the original server version of the source cluster before it was upgraded.

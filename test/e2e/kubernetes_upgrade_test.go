@@ -22,9 +22,10 @@ import (
 )
 
 // TestPodReadiness creates a cluster and watches the first pod that is created
-// during the process.  We expect its 'Ready' condition to be 'False' and the reason
-// to be 'ReadinessGatesNotReady' until the cluster is fully balanced, at which
-// point, now data is distributed, and we can tolerate a deletion, it turns to 'True'.
+// during the process.  With K8S-4601 (CNG readiness integration), the readiness gate
+// is set to True immediately after a pod is CBS-initialized (not deferred until
+// rebalance completes), because CNG needs the pod in EndpointSlices as soon as it
+// can serve traffic.  We verify readiness stays True through the scaling process.
 func TestPodReadiness(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
@@ -39,12 +40,14 @@ func TestPodReadiness(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster = e2eutil.MustNewClusterFromSpecAsync(t, kubernetes, cluster)
 
-	// Wait for the other members to come up, expecting the pod to stay unready
-	// until after rebalance.
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, 1), 5*time.Minute)
-	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 0, v1.ConditionFalse, time.Minute)
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, 2), 5*time.Minute)
-	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 0, v1.ConditionFalse, time.Minute)
+	// After K8S-4601, pod[0]'s readiness gate is set True during initialization,
+	// before other members are added or rebalance runs.
+	// With async pod creation, member init order is non-deterministic (0002 may
+	// init before 0001), so use MustObserveClusterEvent for both to avoid missing
+	// an already-emitted event.
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, 1), 5*time.Minute)
+	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 0, v1.ConditionTrue, time.Minute)
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, 2), 5*time.Minute)
 	e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, 0, v1.ConditionTrue, time.Minute)
 }
 

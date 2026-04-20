@@ -897,8 +897,15 @@ func testFullOnlyOverTLS(t *testing.T, providerType cloud.ProviderType, tls *e2e
 	// * Cluster created
 	// * Bucket created
 	// * Backup created
+	var createSeq eventschema.Validatable
+	if policy != nil {
+		createSeq = e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize)
+	} else {
+		createSeq = e2eutil.ClusterCreateSequence(clusterSize)
+	}
+
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		createSeq,
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		},
