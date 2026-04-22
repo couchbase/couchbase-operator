@@ -64,6 +64,7 @@ pipeline {
     PATH = "${env.WORKSPACE}/bin:${env.WORKSPACE}/kubectl:${env.WORKSPACE}/go/bin:$PATH"
     DOCKER_CREDENTIALS = credentials('couchbaseqe-dockerhub')
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
+    AWS_CREDS = credentials('CAO_AWS')
     GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
