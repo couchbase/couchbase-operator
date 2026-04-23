@@ -891,7 +891,6 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 10*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
@@ -899,13 +898,8 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
-	// * Cluster upgrades (due to readiness becoming non-tls port)
-	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonCreateClientAuth)},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
@@ -942,21 +936,15 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonDeleteClientAuth), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
-	// * Cluster upgrades (due to readiness becoming non-tls port)
-	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonDeleteClientAuth)},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

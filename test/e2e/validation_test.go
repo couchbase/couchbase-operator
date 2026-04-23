@@ -932,6 +932,7 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 								MountPath:   "/fluent-bit/certs/",
@@ -948,6 +949,7 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 								MountPath:   "/fluent-bit/certs/",
@@ -964,6 +966,7 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 								MountPath:   "/fluent-bit/certs/",

@@ -483,10 +483,27 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	// Handle immediate upgrade strategy - upgrade everything
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
+		specImage := c.cluster.Spec.CouchbaseImage()
+		targetVersion, err := k8sutil.CouchbaseVersion(specImage)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		allCandidates := couchbaseutil.MemberSet{}
-		allCandidates.Merge(changes.VersionOnly)
 		allCandidates.Merge(changes.SpecOnly)
-		allCandidates.Merge(changes.Both)
+
+		// Version-change candidates need the new image/version so the
+		// replacement pods are created with the correct image.
+		versionCandidates := couchbaseutil.MemberSet{}
+		versionCandidates.Merge(changes.VersionOnly)
+		versionCandidates.Merge(changes.Both)
+		for _, candidate := range versionCandidates {
+			cloned := candidate.Clone()
+			cloned.SetImage(specImage)
+			cloned.SetVersion(targetVersion)
+			allCandidates.Add(cloned)
+		}
+
 		return allCandidates.ToList(), changes.ChangedZones, nil
 	}
 

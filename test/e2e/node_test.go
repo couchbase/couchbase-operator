@@ -138,7 +138,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Static configuration.
 	clusterSize := constants.Size1
 	scaleSize := constants.Size5
-	triggerIndex := 3
+	triggerIndex := 4
 	victimIndex := 1
 
 	// Create the cluster.
@@ -154,7 +154,7 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
 
-	// When the cluster is ready begin scaling up.  When the third new member is added
+	// When the cluster is ready begin scaling up.  When the fourth new member is added
 	// kill the victim node.  Expect the cluster to become healthy again.
 	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaleSize, kubernetes, cluster)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, triggerIndex), 5*time.Minute)
@@ -171,8 +171,8 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: scaleSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},

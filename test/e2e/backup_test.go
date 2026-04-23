@@ -2943,7 +2943,7 @@ func TestBackupAndRestoreServices(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestBackupAndRestoreToSubPath(t *testing.T) {
+func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
@@ -3017,7 +3017,7 @@ func TestBackupAndRestoreToSubPath(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-func TestBackupAndRestoreEphemeralVolume(t *testing.T) {
+func TestBackupAndRestoreEphemeralVolumeS3(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)
