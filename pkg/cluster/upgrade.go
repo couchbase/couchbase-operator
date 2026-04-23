@@ -103,6 +103,10 @@ func (c *Cluster) analyzePodChange(name string, member couchbaseutil.Member, mov
 
 	needsVersionChange := currentImage != specImage
 
+	if currentImage == c.cluster.Spec.Image {
+		needsVersionChange = false
+	}
+
 	needsSpecChange, actualSpec, preservedSpec, err := c.checkSpecChange(member, actual, serverClass, pvcState, moves)
 	if err != nil {
 		return nil, err
