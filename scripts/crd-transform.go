@@ -368,8 +368,8 @@ func parseVersionMarkers(path string) (map[string]string, error) {
 	return result, nil
 }
 
-// injectVersionMarkers walks the CRD schema and injects x-couchbase-version-minimum
-// extensions into property definitions that match the provided version map.
+// injectVersionMarkers walks the CRD schema and appends version availability
+// information to the description of properties that match the provided version map.
 func injectVersionMarkers(schema interface{}, versionMap map[string]string) {
 	obj, ok := schema.(map[string]interface{})
 	if !ok {
@@ -385,9 +385,7 @@ func injectVersionMarkers(schema interface{}, versionMap map[string]string) {
 			}
 
 			if version, found := versionMap[name]; found {
-				propMap["x-couchbase-version-minimum"] = version
-
-				// Automatically append version info to the description
+				// Append version info to the description
 				versionSuffix := "This field is available in Couchbase Server " + version + " and later."
 
 				if desc, ok := propMap["description"].(string); ok {
@@ -470,7 +468,7 @@ func main() {
 			glog.Exit("Pruned CRD in wrong format")
 		}
 
-		// Inject x-couchbase-version-minimum extensions into the CRD schema
+		// Inject version availability text into CRD schema descriptions
 		// from the parsed +couchbase:version:minimum= markers in types.go.
 		if specMap, ok := prunedObject["spec"].(map[string]interface{}); ok {
 			if versionsList, ok := specMap["versions"].([]interface{}); ok {

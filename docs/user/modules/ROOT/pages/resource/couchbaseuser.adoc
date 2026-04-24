@@ -111,8 +111,6 @@ Full Name of Couchbase user.
 
 *Type*: `boolean`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
@@ -134,8 +132,6 @@ Username of the couchbase user.
 
 *Type*: `object`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 Password allows user specific password settings to be set.
@@ -146,8 +142,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `string`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -164,8 +158,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 
 *Type*: `string`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 ExpiresAt allows setting a timestamp when a user's password will expire.
@@ -180,8 +172,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `boolean`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 

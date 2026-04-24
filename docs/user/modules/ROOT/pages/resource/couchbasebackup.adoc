@@ -916,8 +916,6 @@ This field defaults to `true`.
 
 *Default*: `False`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 Users enables the backup of users including their roles and permissions.

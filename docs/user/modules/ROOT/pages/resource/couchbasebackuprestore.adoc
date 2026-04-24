@@ -719,8 +719,6 @@ If set, will override `CouchbaseCluster.spec.backup.useIAM`.
 
 *Default*: `False`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 Overwrites the already existing users in the cluster when  user restoration is enabled (spec.services.users).
@@ -929,8 +927,6 @@ defaults to true.
 *Type*: `boolean`
 
 *Default*: `False`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 

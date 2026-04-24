@@ -140,8 +140,6 @@ defaulting to "seqno".
 
 *Enumerations*: `disabled, fallbackToActiveAck`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
@@ -153,8 +151,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `boolean`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
@@ -201,8 +197,6 @@ defaulting to "noEviction".
 *Type*: `string`
 
 *Default*: `10m`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -263,8 +257,6 @@ https://golang.org/pkg/time/#ParseDuration.
 
 *Maximum*: `90`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 MemoryHighWatermark defines the memory high watermark for the bucket.
@@ -284,8 +276,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 *Minimum*: `50`
 
 *Maximum*: `89`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -371,8 +361,6 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 *Minimum*: `0`
 
 *Maximum*: `1000`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
@@ -515,8 +503,6 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselect
 
 *Type*: `integer`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
@@ -532,8 +518,6 @@ This field is available in Couchbase Server 7.6.0 and later.
 *Default*: `background`
 
 *Enumerations*: `none, background, blocking`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 

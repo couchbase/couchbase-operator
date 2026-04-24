@@ -1154,8 +1154,6 @@ failover characteristics and index settings.
 
 *Type*: `boolean`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
@@ -1212,8 +1210,6 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 ==== Constraints
 
 *Type*: `object`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -1563,8 +1559,6 @@ Data allows the data service to be configured.
 
 *Maximum*: `64`
 
-*Minimum Server Version*: `7.1.0`
-
 ==== Description
 
 AuxIOThreads allows the number of threads used by the data service,
@@ -1583,8 +1577,6 @@ This field is available in Couchbase Server 7.1.0 and later.
 ==== Constraints
 
 *Type*: `object`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -1651,8 +1643,6 @@ This field must be between 0 and 3, defaulting to 0.
 
 *Maximum*: `64`
 
-*Minimum Server Version*: `7.1.0`
-
 ==== Description
 
 NonIOThreads allows the number of threads used by the data service,
@@ -1689,8 +1679,6 @@ If not specified, this defaults to default/balanced.
 
 *Type*: `integer`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 TCPKeepAliveIdle is the number of seconds before the first TCP probe is sent.
@@ -1701,8 +1689,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `integer`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -1715,8 +1701,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 
 *Type*: `integer`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 TCPKeepAliveProbes is the number of TCP probes missing before the connection is considered dead.
@@ -1727,8 +1711,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `integer`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -1854,8 +1836,6 @@ Indexer allows the indexer to be configured.
 
 *Default*: `False`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 DeferBuild allows the indexer to defer building indexes.
@@ -1868,8 +1848,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 *Type*: `boolean`
 
 *Default*: `False`
-
-*Minimum Server Version*: `7.1.0`
 
 ==== Description
 
@@ -1887,8 +1865,6 @@ This field is available in Couchbase Server 7.1.0 and later.
 *Type*: `boolean`
 
 *Default*: `False`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
@@ -2140,8 +2116,6 @@ As new completed requests are added, old ones are removed.
 
 *Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
@@ -2157,8 +2131,6 @@ This field is available in Couchbase Server 7.6.0 and later.
 *Type*: `integer`
 
 *Minimum*: `0`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -2301,8 +2273,6 @@ Defaults to 0.
 
 *Maximum*: `100`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 NodeQuotaValPercent sets the  percentage of the `useReplica` that is dedicated to tracked
@@ -2339,8 +2309,6 @@ Default to 1024 and has a minimum of 1.
 *Default*: `0`
 
 *Minimum*: `0`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
@@ -2484,8 +2452,6 @@ Defaults to 0ms (no timeout).
 ==== Constraints
 
 *Type*: `boolean`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
@@ -3292,8 +3258,6 @@ topology, TLS and DDNS settings.
 
 *Enumerations*: `IPv4, IPv6, IPv4Priority, IPv6Priority, IPv6Only, IPv4Only`
 
-*Minimum Server Version*: `7.0.2`
-
 ==== Description
 
 AddressFamily allows the manual selection of the address family to use.
@@ -3882,8 +3846,6 @@ excluding newlines and extraneous spaces.
 
 *Enumerations*: `inet, inet6`
 
-*Minimum Server Version*: `7.0.2`
-
 ==== Description
 
 AddressFamily is the address family to use.
@@ -4345,8 +4307,6 @@ must be at least 6 characters in length, and not contain the any of the characte
 
 *Type*: `object`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 EncryptionAtRest configures encryption at rest for the cluster.
@@ -4770,8 +4730,6 @@ Host name must be a valid IP address or DNS Name e.g openldap.default.svc, 10.0.
 
 *Default*: `True`
 
-*Minimum Server Version*: `7.6.0`
-
 ==== Description
 
 Sets middlebox compatibility mode for LDAP.
@@ -4964,8 +4922,6 @@ zero-length passwords which is not recommended.
 
 *Type*: `[]string`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
@@ -4977,8 +4933,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 ==== Constraints
 
 *Type*: `boolean`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -6306,8 +6260,6 @@ This field must be one of "Auto" or "None", defaulting to "Auto".
 
 *Type*: `object`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 ConflictLogging is the configuration for conflict logging.
@@ -6762,8 +6714,6 @@ Nil values can be used to explicitly unset merge functions for specific collecti
 *Type*: `string`
 
 *Enumerations*: `Off, Active`
-
-*Minimum Server Version*: `7.6.4`
 
 ==== Description
 
@@ -7322,8 +7272,6 @@ BucketName is the full name of the bucket.
 
 *Type*: `integer`
 
-*Minimum Server Version*: `8.0.0`
-
 ==== Description
 
 NumVBuckets is the number of vbuckets in the bucket.
@@ -7336,8 +7284,6 @@ This field is available in Couchbase Server 8.0.0 and later.
 *Required*
 
 *Type*: `string`
-
-*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -7361,8 +7307,6 @@ BucketReplicas is the number of data replicas.
 ==== Constraints
 
 *Type*: `string`
-
-*Minimum Server Version*: `7.0.0`
 
 ==== Description
 
@@ -7578,8 +7522,6 @@ pod status conditions are listed in the members status.
 ==== Constraints
 
 *Type*: `[]string`
-
-*Minimum Server Version*: `7.6.0`
 
 ==== Description
 
