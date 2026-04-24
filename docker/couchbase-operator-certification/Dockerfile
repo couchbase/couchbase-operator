@@ -6,31 +6,50 @@
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
 
-# This must be kept in lockstep with the builder images due to library
-# dependencies.
-ARG GO_VERSION=1.24.7
-FROM golang:${GO_VERSION}
+# ------------------------------------------------------------------------------
+# Stage 1: Extraction
+# Install bzip2 and isolate the binary + libraries for copying
+# ------------------------------------------------------------------------------
+FROM dhi.io/debian-base:trixie-dev AS extractor
 
-# Install whatever compression and archival stuff we need to stream off
-# the test archive (logs).
-RUN apt-get update 
-RUN apt-get -y install apt-transport-https tar bzip2 libc6
+# Update apt, install bzip2, and stage the files.
+# The wildcard /usr/lib/*/ gracefully catches both x86_64 and aarch64 paths.
+RUN apt-get update && apt-get install -y --no-install-recommends bzip2 && \
+    mkdir -p /extra-bins && \
+    cp /usr/bin/bzip2 /extra-bins/bzip2 && \
+    cp /usr/lib/*/libbz2.so.1* /extra-bins/
+
+# ------------------------------------------------------------------------------
+# Stage 2: Hardened Runtime
+# ------------------------------------------------------------------------------
+FROM dhi.io/debian-base:trixie
 
 ARG TARGETARCH
 
-COPY kubernetes-linux-${TARGETARCH}/cao /
-COPY kubernetes-linux-${TARGETARCH}/couchbase-operator-certification /
-COPY crd.yaml /
+# Switch to root via numeric ID to create folders and set permissions
+USER 0
 
-COPY README.txt /
-COPY License.txt /
-COPY validation /resources/validation/
+# 1. Copy bzip2 and its libraries from the extractor stage.
+# Dropping the libraries globally into /usr/lib/ ensures the dynamic 
+# linker finds them instantly, regardless of the architecture.
+COPY --from=extractor /extra-bins/bzip2 /usr/bin/bzip2
+COPY --from=extractor /extra-bins/libbz2.so.1* /usr/lib/
 
-# Create a non-root user to run as.
-RUN adduser --uid 8453 --shell /bin/false couchbase
-RUN mkdir /artifacts
-RUN chown couchbase /artifacts
+# Ensure the binary is strictly executable
+RUN chmod +x /usr/bin/bzip2
 
-USER 8453
+# 2. Setup application directories
+RUN mkdir -p /artifacts && chown 65532:65532 /artifacts
+
+# 3. Copy application binaries and resources
+COPY --chown=65532:65532 kubernetes-linux-${TARGETARCH}/cao /
+COPY --chown=65532:65532 kubernetes-linux-${TARGETARCH}/couchbase-operator-certification /
+COPY --chown=65532:65532 crd.yaml /
+COPY --chown=65532:65532 README.txt /
+COPY --chown=65532:65532 License.txt /
+COPY --chown=65532:65532 validation /resources/validation/
+
+# 4. Drop privileges back to the secure non-root user
+USER 65532
 
 ENTRYPOINT ["/couchbase-operator-certification"]

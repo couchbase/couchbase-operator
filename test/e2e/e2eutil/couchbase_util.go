@@ -57,13 +57,26 @@ func (c *CouchbaseClient) Host() string {
 
 // newClient returns a new Couchbase management client (internal not go SDK).
 func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, host string) (*CouchbaseClient, error) {
+	return newClientWithTLS(kubeClient, cl, host, nil)
+}
+
+func newClientWithTLS(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster, host string, caCert []byte) (*CouchbaseClient, error) {
 	username, password, err := GetClusterAuth(kubeClient, cl.Namespace, cl.Spec.Security.AdminSecret)
 	if err != nil {
 		return nil, err
 	}
 
+	apiClient := couchbaseutil.New(context.Background(), "", username, password)
+
+	// Set TLS configuration with CA certificate
+	if len(caCert) > 0 {
+		apiClient.SetTLS(&couchbaseutil.TLSAuth{
+			CACert: caCert,
+		})
+	}
+
 	client := &CouchbaseClient{
-		client: couchbaseutil.New(context.Background(), "", username, password),
+		client: apiClient,
 		host:   host,
 	}
 
@@ -76,6 +89,11 @@ func newClient(kubeClient kubernetes.Interface, cl *couchbasev2.CouchbaseCluster
 // the cleanup callback must be invoked first.
 func CreateAdminConsoleClient(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) (*CouchbaseClient, error) {
 	return newClient(k8s.KubeClient, cluster, fmt.Sprintf("http://%s.%s.svc:8091", cluster.Name, cluster.Namespace))
+}
+
+func CreateAdminConsoleClientTLS(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tlsCtx *TLSContext) (*CouchbaseClient, error) {
+	// Connect to the headless service DNS name which is already in the certificate SANs
+	return newClientWithTLS(k8s.KubeClient, cluster, fmt.Sprintf("https://%s-srv.%s.svc:18091", cluster.Name, cluster.Namespace), tlsCtx.CA.Certificate)
 }
 
 func MustCreateAdminConsoleClient(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) *CouchbaseClient {
@@ -1440,9 +1458,21 @@ func MustCheckLDAPSettingsPersisted(t *testing.T, k8s *types.Cluster, couchbase 
 }
 
 // CheckN2N checks that all nodes are in the requested encryption state.
-func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) error {
+func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled bool, encryptionLevel couchbasev2.NodeToNodeEncryptionType, ctx *TLSContext, timeout time.Duration) error {
+	var tlsAdminPort bool
+	if encryptionLevel == couchbasev2.NodeToNodeStrict && enabled && ctx != nil {
+		tlsAdminPort = true
+	}
+
 	callback := func() error {
-		client, err := CreateAdminConsoleClient(k8s, cluster)
+		var client *CouchbaseClient
+		var err error
+		if tlsAdminPort {
+			client, err = CreateAdminConsoleClientTLS(k8s, cluster, ctx)
+		} else {
+			client, err = CreateAdminConsoleClient(k8s, cluster)
+		}
+
 		if err != nil {
 			return err
 		}
@@ -1469,8 +1499,11 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 
 				apiLevel := couchbaseutil.ClusterEncryptionAll
 
-				if encryptionLevel == couchbasev2.NodeToNodeControlPlaneOnly {
+				switch encryptionLevel {
+				case couchbasev2.NodeToNodeControlPlaneOnly:
 					apiLevel = couchbaseutil.ClusterEncryptionControl
+				case couchbasev2.NodeToNodeStrict:
+					apiLevel = couchbaseutil.ClusterEncryptionStrict
 				}
 
 				if apiLevel != securityInfo.ClusterEncryptionLevel {
@@ -1485,14 +1518,14 @@ func CheckN2N(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, enabled
 	return retryutil.RetryFor(timeout, callback)
 }
 
-func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) {
-	if err := CheckN2N(k8s, cluster, true, encryptionLevel, timeout); err != nil {
+func MustCheckN2NEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, ctx *TLSContext, timeout time.Duration) {
+	if err := CheckN2N(k8s, cluster, true, encryptionLevel, ctx, timeout); err != nil {
 		Die(t, err)
 	}
 }
 
 func MustCheckN2NDisabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, encryptionLevel couchbasev2.NodeToNodeEncryptionType, timeout time.Duration) {
-	if err := CheckN2N(k8s, cluster, false, encryptionLevel, timeout); err != nil {
+	if err := CheckN2N(k8s, cluster, false, encryptionLevel, nil, timeout); err != nil {
 		Die(t, err)
 	}
 }

@@ -710,21 +710,12 @@ func recreateCRDs(k8s *types.Cluster) error {
 		crd := &crds.Items[i]
 
 		if crd.Spec.Group == "couchbase.com" {
-			// In Kubernetes 1.33+, CRD deletion can hang if finalizers exist or custom resources still reference it.
-			// Remove finalizers first to allow immediate deletion.
-			if len(crd.Finalizers) > 0 {
-				crd.Finalizers = []string{}
-				updatedCRD, err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Update(context.Background(), crd, metav1.UpdateOptions{})
-				if err != nil {
-					logrus.Warnf("Failed to remove finalizers from CRD %s: %v, attempting deletion anyway", crd.Name, err)
-				} else {
-					crd = updatedCRD
-				}
-			}
-
 			if err := clientSet.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, *metav1.NewDeleteOptions(0)); err != nil {
 				return fmt.Errorf("failed to delete CRD: %w", err)
 			}
+
+			deletionStart := time.Now()
+			cleanupDelay := 30 * time.Second
 
 			// Wait for the CRD to be deleted by checking directly using the API Client.
 			if err := retryutil.RetryFor(2*time.Minute, func() error {
@@ -736,6 +727,17 @@ func recreateCRDs(k8s *types.Cluster) error {
 				if err != nil {
 					return err
 				}
+
+				// In Kubernetes 1.33+, CRD deletion can hang if finalizers exist or custom resources still reference it.
+				// If the CouchbaseCluster CRD hasn't been deleted after 30 seconds, attempt to remove finalizers to unblock deletion.
+				if crd.Name == "couchbaseclusters.couchbase.com" && time.Since(deletionStart) >= cleanupDelay {
+					logrus.Warnf("CRD %s still exists after %s, attempting to remove finalizers from CouchbaseClusters", crd.Name, cleanupDelay)
+
+					if cleanupErr := removeCouchbaseClusterFinalizers(k8s); cleanupErr != nil {
+						logrus.Warnf("failed to remove finalizers from CouchbaseClusters for CRD %s: %v", crd.Name, cleanupErr)
+					}
+				}
+
 				return fmt.Errorf("CRD %s still exists", crd.Name)
 			}); err != nil {
 				return err
@@ -775,6 +777,48 @@ func recreateCRDs(k8s *types.Cluster) error {
 		if err := e2eutil.ResourceCondition(k8s, crd, string(apiextensionsv1.NonStructuralSchema), string(apiextensionsv1.ConditionTrue)); err == nil {
 			return fmt.Errorf("CRD %s reports as non-structural", crd.Name)
 		}
+	}
+
+	return nil
+}
+
+func removeCouchbaseClusterFinalizers(k8s *types.Cluster) error {
+	var errs []string
+
+	gvr := schema.GroupVersionResource{
+		Group:    "couchbase.com",
+		Version:  "v2",
+		Resource: "couchbaseclusters",
+	}
+
+	list, err := k8s.DynamicClient.Resource(gvr).Namespace(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to list CouchbaseClusters: %w", err)
+	}
+
+	for i := range list.Items {
+		item := &list.Items[i]
+		if len(item.GetFinalizers()) == 0 {
+			continue
+		}
+
+		item.SetFinalizers(nil)
+		item.SetAnnotations(map[string]string{
+			constants.AnnotationDisableAdmissionController: "true",
+		})
+
+		_, err = k8s.DynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Update(context.Background(), item, metav1.UpdateOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			errs = append(errs, fmt.Sprintf("failed to clear finalizers on CouchbaseCluster %s/%s: %v", item.GetNamespace(), item.GetName(), err))
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 
 	return nil

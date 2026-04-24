@@ -256,16 +256,17 @@ func TestMagmaBucketToCouchstoreMigrationFromDefault(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	bucket := testMagmaBucket(e2e_constants.DefaultBucket)
-
-	couchbaseutil.AddAnnotation(&bucket.ObjectMeta, "cao.couchbase.com/historyRetention.collectionHistoryDefault", "false")
-
+	bucket.Spec.HistoryRetentionSettings = &couchbasev2.HistoryRetentionSettings{
+		CollectionDefault: boolPtr(false),
+	}
 	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
 
 	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
-		Remove("/spec/storageBackend"),
+		Remove("/spec/storageBackend").
+		Remove("/spec/historyRetention"),
 		time.Minute)
 
 	e2eutil.MustWaitUntilAllNodeStorageBackendCouchstore(t, kubernetes, cluster, 10*time.Minute)
@@ -413,10 +414,20 @@ func TestEvictionPolicyOnlineChangeMigrationDisabled(t *testing.T) {
 	e2eutil.NodesMustNotHaveClusterEvictionPolicy(t, kubernetes, cluster, 3*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
-	// Change the online eviction policy change to false and expect the eviction policy to change through
+	// Switch the eviction policy back to valueOnly and expect the eviction policy to change through without bucket restarts.
+	// We must do this as eviction policies cannot be changed while a bucket migration is considered in action if noRestart os false.
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly),
+		time.Minute)
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.BucketEditedEvent(cluster, bucket.Name), 10*time.Second, 5*time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionBucketMigration)
+	e2eutil.MustWaitUntilAllNodeEvictionPolicyMatch(t, kubernetes, cluster, 10*time.Minute, string(couchbasev2.CouchbaseBucketEvictionPolicyValueOnly))
+
+	// Change the online eviction policy again but with onlineEvictionPolicyChange set to false, expect the eviction policy to change but with bucket restarts
 	// bucket restarts
 	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
-		Replace("/spec/onlineEvictionPolicyChange", false),
+		Replace("/spec/onlineEvictionPolicyChange", false).
+		Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
 		time.Minute)
 
 	e2eutil.MustWaitUntilAllNodeEvictionPolicyMatch(t, kubernetes, cluster, 10*time.Minute, string(couchbasev2.CouchbaseBucketEvictionPolicyFullEviction))
@@ -425,6 +436,7 @@ func TestEvictionPolicyOnlineChangeMigrationDisabled(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 	}

@@ -928,10 +928,45 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 			expectedWarnings: []string{"IPv6Only should be used in place of IPv6 for spec.networking.addressFamily. IPv6 is deprecated and will be removed in a future release"},
 		},
 		{
-			name: "TestValidateLoggingTLSConfigurationValid",
+			name: "TestValidateLoggingTLSNoSecret",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
 					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
+						Sidecar: &couchbasev2.LogShipperSidecarSpec{
+							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+								MountPath:   "/fluent-bit/certs/",
+								SecretNames: []string{},
+							},
+						},
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.server.sidecar.tls.secretNames must contain at least one secret when TLS is configured"},
+		},
+		{
+			name: "TestValidateLoggingTLSEmptySecret",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
+					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
+						Sidecar: &couchbasev2.LogShipperSidecarSpec{
+							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+								MountPath:   "/fluent-bit/certs/",
+								SecretNames: []string{""},
+							},
+						},
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.server.sidecar.tls.secretNames cannot contain empty values"},
+		},
+		{
+			name: "TestValidateLoggingTLSMissingSecret",
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
+				Replace("/spec/logging", &couchbasev2.CouchbaseClusterLoggingSpec{
+					Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+						Enabled: true,
 						Sidecar: &couchbasev2.LogShipperSidecarSpec{
 							TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 								MountPath:   "/fluent-bit/certs/",
@@ -940,8 +975,8 @@ func TestNegValidationCreateCouchbaseCluster(t *testing.T) {
 						},
 					},
 				})},
-			shouldFail:       false,
-			expectedWarnings: []string{},
+			shouldFail:     true,
+			expectedErrors: []string{"spec.logging.server.sidecar.tls.secretNames references secret \"fluent-bit-ca\" which does not exist"},
 		},
 	}
 

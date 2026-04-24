@@ -1255,7 +1255,7 @@ func newTLSAPI(cluster *couchbasev2.CouchbaseCluster) (bool, error) {
 
 // tlsCheckForPod checks a single pod's TLS configuration.  Don't export this, instead consider
 // using TlsCheckForCluster which is safer.
-func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, podName string, ctx *TLSContext) error {
+func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, podName string, ctx *TLSContext, n2nStrict bool) error {
 	clientCert, err := tls.X509KeyPair(ctx.ClientCert, ctx.ClientKey)
 	if err != nil {
 		return err
@@ -1300,7 +1300,14 @@ func tlsCheckForPod(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, p
 
 	if ok {
 		// Handle 7.1+
-		adminClient, err := CreateAdminConsoleClient(k8s, cluster)
+		var adminClient *CouchbaseClient
+		var err error
+		if n2nStrict {
+			adminClient, err = CreateAdminConsoleClientTLS(k8s, cluster, ctx)
+		} else {
+			adminClient, err = CreateAdminConsoleClient(k8s, cluster)
+		}
+
 		if err != nil {
 			return err
 		}

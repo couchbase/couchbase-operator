@@ -867,8 +867,8 @@ func TestAllowExternallyUnreachablePodsActivatesUnreachablePods(t *testing.T) {
 		DNS: &couchbasev2.DNS{
 			Domain: testDomain,
 		},
-		WaitForAddressReachableDelay:   &metav1.Duration{Duration: time.Minute},
-		WaitForAddressReachable:        &metav1.Duration{Duration: 2 * time.Minute},
+		WaitForAddressReachableDelay:   &metav1.Duration{Duration: 2 * time.Minute},
+		WaitForAddressReachable:        &metav1.Duration{Duration: 3 * time.Minute},
 		AllowExternallyUnreachablePods: util.BoolPtr(true),
 		ExposedFeatures:                []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
 	}
@@ -885,9 +885,9 @@ func TestAllowExternallyUnreachablePodsActivatesUnreachablePods(t *testing.T) {
 	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pod1Name, k8sutil.PodReadinessCondition, time.Minute)
 	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pod2Name, k8sutil.PodReadinessCondition, time.Minute)
 
-	// Once the pods are waiting on dns propagation, we should wait at least 40 seconds (timeout - delay + 10 second overlap to consider reconciliation time)
+	// Once the pods are waiting on dns propagation, we should wait at least 70 seconds (WaitForAddressReachable - WaitForAddressReachableDelay + 10 second overlap to consider reconciliation time)
 	// to ensure the DNS check timeout elapses.
-	time.Sleep(40 * time.Second)
+	time.Sleep(70 * time.Second)
 
 	// The pods should now be marked as ready as the delay has elapsed.
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pod1Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)

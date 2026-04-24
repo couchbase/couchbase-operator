@@ -94,6 +94,7 @@ type Member interface { //nolint: interfacebloat
 	GetOTPNode() OTPNode
 	SetImage(string)
 	GetImage() string
+	Clone() Member
 }
 
 // memberImpl is the core internal representation of a Couchbase server node.
@@ -277,6 +278,21 @@ func (m *memberImpl) Version() string {
 	}
 
 	return m.version
+}
+
+// Clone returns a deep copy of the member so that mutations (e.g. SetImage,
+// SetVersion) do not affect the original.
+func (m *memberImpl) Clone() Member {
+	return &memberImpl{
+		namespace:   m.namespace,
+		cluster:     m.cluster,
+		name:        m.name,
+		version:     m.version,
+		config:      m.config,
+		useTLS:      m.useTLS,
+		dnsHostName: m.dnsHostName,
+		image:       m.image,
+	}
 }
 
 func (m *memberImpl) UseTLS() bool {
@@ -624,6 +640,11 @@ func (m *externamMemberImpl) GetImage() string {
 
 func (m *externamMemberImpl) Version() string {
 	return "unknown"
+}
+
+func (m *externamMemberImpl) Clone() Member {
+	clone := *m
+	return &clone
 }
 
 func (m *externamMemberImpl) GetDNSName() string {

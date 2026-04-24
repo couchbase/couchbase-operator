@@ -12,6 +12,7 @@ package collector
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"strings"
@@ -173,14 +174,15 @@ func buildCbBackupMgrCommand(backup *couchbasev2.CouchbaseBackup) string {
 			}
 		}
 
-		// Construct the final command string: cbbackupmgr ... > /tmp/log 2>&1 && rm -rf <stagingDir> && cat /tmp/*.zip
-		// The redirection and cleanup are applied to the full cbbackupmgr command.
-		return fmt.Sprintf("cbbackupmgr %s > /tmp/cbbackupmgr-output.log 2>&1 && rm -rf %s && cat /tmp/*.zip",
+		// Construct the final command string: cbbackupmgr ... > /tmp/log 2>&1 && rm -rf <stagingDir> && base64 /tmp/*.zip
+		// base64-encode the zip so binary data is safe to pass through the Kubernetes log stream.
+		return fmt.Sprintf("cbbackupmgr %s > /tmp/cbbackupmgr-output.log 2>&1 && rm -rf %s && base64 /tmp/*.zip",
 			strings.Join(cbbackupmgrArgs, " "), stagingDir)
 	}
 
 	// For local backups without object store, construct the command.
-	return fmt.Sprintf("cbbackupmgr %s > /tmp/cbbackupmgr-output.log 2>&1 && cat /tmp/*.zip",
+	// base64-encode the zip so binary data is safe to pass through the Kubernetes log stream.
+	return fmt.Sprintf("cbbackupmgr %s > /tmp/cbbackupmgr-output.log 2>&1 && base64 /tmp/*.zip",
 		strings.Join(cbbackupmgrArgs, " "))
 }
 
@@ -444,11 +446,21 @@ func captureZipFromLogs(ctx *context.Context, jobName string) ([]byte, error) {
 	}
 	defer stream.Close()
 
-	// Read zip data
+	// Read base64-encoded zip data from the log stream.
+	// The pod outputs base64 (not raw binary) to avoid corruption in the
+	// Kubernetes log infrastructure, which is line-oriented and not safe for
+	// binary data containing 0x0a bytes.
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, stream); err != nil {
 		return nil, fmt.Errorf("failed to read logs: %w", err)
 	}
 
-	return buf.Bytes(), nil
+	// Strip newlines inserted by base64 line-wrapping, then decode.
+	cleaned := strings.ReplaceAll(strings.ReplaceAll(buf.String(), "\n", ""), "\r", "")
+	decoded, err := base64.StdEncoding.DecodeString(cleaned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base64 zip data: %w", err)
+	}
+
+	return decoded, nil
 }

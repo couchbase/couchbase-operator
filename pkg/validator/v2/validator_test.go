@@ -241,6 +241,7 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 				Spec: couchbasev2.ClusterSpec{
 					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
 						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Enabled: true,
 							Sidecar: &couchbasev2.LogShipperSidecarSpec{
 								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 									MountPath:   "/fluent-bit/certs/",
@@ -259,6 +260,7 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 				Spec: couchbasev2.ClusterSpec{
 					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
 						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Enabled: true,
 							Sidecar: &couchbasev2.LogShipperSidecarSpec{
 								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 									MountPath:   "/fluent-bit/certs/",
@@ -277,6 +279,7 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 				Spec: couchbasev2.ClusterSpec{
 					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
 						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Enabled: true,
 							Sidecar: &couchbasev2.LogShipperSidecarSpec{
 								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
 									MountPath:   "",
@@ -288,6 +291,25 @@ func TestCheckConstraintLoggingSidecarTLS(t *testing.T) {
 				},
 			},
 			expectedErr: "spec.logging.server.sidecar.tls.mountPath cannot be empty when TLS is configured",
+		},
+		{
+			name: "should allow if server logging is disabled even if TLS is configured incorrrectly",
+			clusterSpec: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Logging: couchbasev2.CouchbaseClusterLoggingSpec{
+						Server: &couchbasev2.CouchbaseClusterLoggingConfigurationSpec{
+							Enabled: false,
+							Sidecar: &couchbasev2.LogShipperSidecarSpec{
+								TLS: &couchbasev2.LogShipperSidecarTLSSpec{
+									MountPath:   "",
+									SecretNames: []string{"fluent-bit-ca"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: "",
 		},
 		{
 			name: "should allow if logging sidecar TLS is nil",

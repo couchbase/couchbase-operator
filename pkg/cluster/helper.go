@@ -11,7 +11,9 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -139,7 +141,44 @@ func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
 	return versions
 }
 
+func (c *Cluster) CheckClusterCompatVersion(version string, compatAfter bool) (bool, error) {
+	clusterInfo := &couchbaseutil.TerseClusterInfo{}
+	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
+		return false, err
+	}
+
+	// CompatVersion returns only major.minor, without a maintenance version, so we need to add .0 so we can parse it with our version util.
+	// Given this relies entirely on a contract w/ server..., calls to this method should have an appropriate fallback
+	// in case that contract changes at any point.
+	compatVersion := clusterInfo.ClusterCompatVersion
+	if strings.Count(compatVersion, ".") == 1 {
+		compatVersion = fmt.Sprintf("%s.0", compatVersion)
+	}
+
+	// When checking feature support, we want to check that the compat version is >= required version, meaning the cluster will support those features.
+	if compatAfter {
+		return couchbaseutil.VersionAfter(compatVersion, version)
+	}
+
+	// When checking whether we can create a pod on a previous version, we need to check the compat version <= required version. We can't just inverse the versionAfter result.
+	before, err := couchbaseutil.VersionBefore(compatVersion, version)
+	if err != nil {
+		return before, err
+	}
+
+	after, err := couchbaseutil.VersionEqual(compatVersion, version)
+	return before || after, err
+}
+
 func (c *Cluster) SupportsVersionFeatures(version string) bool {
+	// Try comparing the compat version first. This only checks major.minor
+	// and therefore should not be used when checking for new features
+	// on maintenance releases.
+	if versionAfter, err := c.CheckClusterCompatVersion(version, true); err == nil {
+		return versionAfter
+	}
+
+	// Fallback to checking the lowest member version
 	lowestVersion := c.GetLowestMemberVersion()
 
 	if lowestVersion == "" {

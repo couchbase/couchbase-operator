@@ -891,7 +891,6 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	e2eutil.MustDeleteOperatorDeployment(t, kubernetes, time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonCreateClientAuth), 10*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
@@ -899,13 +898,8 @@ func testMutualTLSEnable(t *testing.T, policy couchbasev2.ClientCertificatePolic
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
-	// * Cluster upgrades (due to readiness becoming non-tls port)
-	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonCreateClientAuth)},
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 	}
@@ -942,21 +936,15 @@ func testMutualTLSDisable(t *testing.T, policy couchbasev2.ClientCertificatePoli
 	e2eutil.MustCreateOperatorDeployment(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.ClientTLSUpdatedEvent(cluster, k8sutil.ClientTLSUpdateReasonDeleteClientAuth), 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
-	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
-	// * Cluster upgrades (due to readiness becoming non-tls port)
-	// * Cluster resized successfully
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated, Message: string(k8sutil.ClientTLSUpdateReasonDeleteClientAuth)},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
-		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1209,7 +1197,13 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
+
+	// Check the cluster is healthy and all pods are ready
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	for i := 0; i < clusterSize; i++ {
+		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1222,6 +1216,10 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 
 func TestCreateClusterWithTLSAndControlPlaneNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNode(t, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+func TestCreateClusterWithTLSAndStrictNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNode(t, couchbasev2.NodeToNodeStrict)
 }
 
 func TestCreateClusterWithTLSAndFullNodeToNode(t *testing.T) {
@@ -1256,7 +1254,7 @@ func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionTy
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 	e2eutil.MustRotateServerCertificateAndCA(t, ctx)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 
@@ -1293,6 +1291,10 @@ func TestCreateClusterWithTLSAndFullNodeToNodeAndRotateCA(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t, couchbasev2.NodeToNodeAll)
 }
 
+func TestCreateClusterWithTLSAndStrictNodeToNodeAndRotateCA(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t, couchbasev2.NodeToNodeStrict)
+}
+
 // testCreateClusterWithTLSAndNodeToNodeThenScale creates a cluster with N2N initially enabled
 // and ensures scaling works.
 func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
@@ -1322,9 +1324,15 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect, then scale, and repeat the check.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+scaleUp, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
+
+	// Check the cluster is healthy and all pods are ready
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	for i := 0; i < clusterSize+scaleUp; i++ {
+		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1343,6 +1351,10 @@ func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenScale(t *testing.T) {
 
 func TestCreateClusterWithTLSAndFullNodeToNodeThenScale(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenScale(t, couchbasev2.NodeToNodeAll)
+}
+
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenScale(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenScale(t, couchbasev2.NodeToNodeStrict)
 }
 
 // testCreateClusterWithTLSAndNodeToNodeThenKillPod creates a cluster with N2N initially enabled
@@ -1374,11 +1386,11 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect, kill a pod, let it recover and recheck N2N.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1397,6 +1409,10 @@ func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenKillPod(t *testing.T) 
 
 func TestCreateClusterWithTLSAndFullNodeToNodeThenKillPod(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenKillPod(t, couchbasev2.NodeToNodeAll)
+}
+
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenKillPod(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenKillPod(t, couchbasev2.NodeToNodeStrict)
 }
 
 // testCreateClusterWithTLSThenEnableNodeToNode creates a cluster and enables N2N after
@@ -1421,7 +1437,7 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	// Enable N2N encryption and check the state is as we expect.
 	patchset := jsonpatch.NewPatchSet().Add("/spec/networking/tls/nodeToNodeEncryption", encryptionType)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1445,6 +1461,10 @@ func TestCreateClusterWithTLSThenEnableControlPlaneNodeToNode(t *testing.T) {
 
 func TestCreateClusterWithTLSThenEnableFullNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSThenEnableNodeToNode(t, couchbasev2.NodeToNodeAll)
+}
+
+func TestCreateClusterWithTLSThenEnableStrictNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSThenEnableNodeToNode(t, couchbasev2.NodeToNodeStrict)
 }
 
 // testCreateClusterThenEnableNodeToNode tests enabling N2N at the same time as TLS which
@@ -1480,7 +1500,7 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1512,6 +1532,10 @@ func TestCreateClusterThenEnableFullNodeToNode(t *testing.T) {
 	testCreateClusterThenEnableNodeToNode(t, couchbasev2.NodeToNodeAll)
 }
 
+func TestCreateClusterThenEnableStrictNodeToNode(t *testing.T) {
+	testCreateClusterThenEnableNodeToNode(t, couchbasev2.NodeToNodeStrict)
+}
+
 // testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode tests disabling node to node
 // encryption, unlikely though it is to be required.
 func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
@@ -1541,7 +1565,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Disable N2N then check state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Remove("/spec/networking/tls/nodeToNodeEncryption")
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
@@ -1570,6 +1594,10 @@ func TestCreateClusterWithTLSAnControlPlanedNodeToNodeThenDisableNodeToNode(t *t
 
 func TestCreateClusterWithTLSAndFullNodeToNodeThenDisableNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t, couchbasev2.NodeToNodeAll)
+}
+
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenDisableNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t, couchbasev2.NodeToNodeStrict)
 }
 
 // testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode tests modifying N2N mode
@@ -1601,7 +1629,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect.
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", &newEncryptionType)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
@@ -1609,6 +1637,12 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 
 	// Given we check the pod readiness, we should give k8s a bit of time for any changes to propagate to readiness.
 	time.Sleep(30 * time.Second)
+	// Check the cluster is healthy and all pods are ready.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	for i := 0; i < clusterSize; i++ {
+		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
+	}
+
 	// Check the cluster is healthy and all pods are ready.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	for i := 0; i < clusterSize; i++ {
@@ -1625,12 +1659,34 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// ControlPlaneOnly -> Full.
 func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToFullNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeControlPlaneOnly, couchbasev2.NodeToNodeAll)
 }
 
+// ControlPlaneOnly -> Strict.
+func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenChangeToStrictNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeControlPlaneOnly, couchbasev2.NodeToNodeStrict)
+}
+
+// Full -> ControlPlaneOnly.
 func TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToControlPlaneNodeToNode(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeAll, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+// Full -> Strict.
+func TestCreateClusterWithTLSAndFullNodeToNodeThenChangeToStrictNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeAll, couchbasev2.NodeToNodeStrict)
+}
+
+// Strict -> ControlPlaneOnly.
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenChangeToControlPlaneNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeStrict, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+// Strict -> Full.
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenChangeToFullNodeToNode(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t, couchbasev2.NodeToNodeStrict, couchbasev2.NodeToNodeAll)
 }
 
 func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
@@ -1659,9 +1715,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	}
 	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
-	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, time.Minute)
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
 	e2eutil.MustRotateServerCertificate(t, ctx, &e2eutil.TLSOpts{})
-	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	if encryptionType == couchbasev2.NodeToNodeStrict {
+		e2eutil.MustCheckClusterTLSStrict(t, kubernetes, cluster, ctx, 5*time.Minute)
+	} else {
+		e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	}
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1685,6 +1745,10 @@ func TestCreateClusterWithTLSAndControlPlaneNodeToNodeThenRotateServerCertificat
 
 func TestCreateClusterWithTLSAndFullNodeToNodeThenRotateServerCertificate(t *testing.T) {
 	testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t, couchbasev2.NodeToNodeControlPlaneOnly)
+}
+
+func TestCreateClusterWithTLSAndStrictNodeToNodeThenRotateServerCertificate(t *testing.T) {
+	testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t, couchbasev2.NodeToNodeStrict)
 }
 
 // TestTLSEditSettings checks that doing so works.

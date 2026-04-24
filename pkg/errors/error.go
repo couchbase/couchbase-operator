@@ -162,6 +162,8 @@ var (
 	ErrNewPodsExceedAdditions = errors.New("pods to be added on old version is greater than the number of new pods to be added")
 
 	ErrOldImageNotFound = errors.New("running image not found for member version")
+
+	ErrClusterNoLongerCompatible = errors.New("cluster is not compatible with previous version")
 )
 
 // CLI errors.

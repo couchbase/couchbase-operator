@@ -116,4 +116,6 @@ func MustRotateClusterPasswordToValue(t *testing.T, k8s *types.Cluster, value st
 	if err := UpdateSecret(k8s.KubeClient, secret.Namespace, secret); err != nil {
 		Die(t, err)
 	}
+
+	k8s.DefaultSecret.Data["password"] = []byte(value)
 }

@@ -105,6 +105,10 @@ func (c *Cluster) analyzePodChange(name string, member couchbaseutil.Member, mov
 
 	needsVersionChange := currentImage != specImage
 
+	if currentImage == c.cluster.Spec.Image {
+		needsVersionChange = false
+	}
+
 	needsSpecChange, actualSpec, preservedSpec, err := c.checkSpecChange(member, actual, serverClass, pvcState, moves)
 	if err != nil {
 		return nil, err
@@ -485,10 +489,27 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	// Handle immediate upgrade strategy - upgrade everything
 	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
+		specImage := c.cluster.Spec.CouchbaseImage()
+		targetVersion, err := k8sutil.CouchbaseVersion(specImage)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
 		allCandidates := couchbaseutil.MemberSet{}
-		allCandidates.Merge(changes.VersionOnly)
 		allCandidates.Merge(changes.SpecOnly)
-		allCandidates.Merge(changes.Both)
+
+		// Version-change candidates need the new image/version so the
+		// replacement pods are created with the correct image.
+		versionCandidates := couchbaseutil.MemberSet{}
+		versionCandidates.Merge(changes.VersionOnly)
+		versionCandidates.Merge(changes.Both)
+		for _, candidate := range versionCandidates {
+			cloned := candidate.Clone()
+			cloned.SetImage(specImage)
+			cloned.SetVersion(targetVersion)
+			allCandidates.Add(cloned)
+		}
+
 		return allCandidates.ToList(), changes.ChangedZones, changes.ChangedPVCs, nil
 	}
 
@@ -855,8 +876,11 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return nil
 	}
 
-	// If the cluster isn't in mixed mode, there's nothing to do
-	if c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
+	// Do a version check against the cluster compatibility version first. If the cluster compat version is <= baseline, we know the baseline is still compatible with the cluster.
+	// If that fails, we'll fallback to a check on lowest vs highest active member versions.
+	if clusterCompatLe, err := c.CheckClusterCompatVersion(baselineVersion, false); err == nil && !clusterCompatLe {
+		return errors.ErrClusterNoLongerCompatible
+	} else if err != nil && c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
 		return nil
 	}
 
