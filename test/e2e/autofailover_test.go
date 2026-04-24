@@ -93,6 +93,7 @@ func TestServerGroupAutoFailover(t *testing.T) {
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver}},
 		eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Optional{Validator: eventschema.Repeat{Times: len(victims), Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved}}},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 	}
 

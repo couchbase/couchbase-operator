@@ -1485,36 +1485,12 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	// To cross check number of persistent vol claims matches the defined spec
 	expectedPvcMap := map[string]int{}
 
-	for i := 0; i < clusterSize; i++ {
+	for i := range clusterSize {
 		expectedPvcMap[couchbaseutil.CreateMemberName(cbCluster.Name, i)] = 1
 	}
 
 	// Verifying the persistence of log PVs are preserved by operator
 	mustVerifyPvcMappingForPods(t, kubernetes, expectedPvcMap)
-
-	// If the couchbase server version is below 7.2.6, or 7.6.0/7.6.1, we need to wait for rebalance after killing the members. This is no longer an issue in 7.2.6 and 7.6.2 onwards.
-	isAtLeast726, err := cbCluster.IsAtLeastVersion("7.2.6")
-
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	waitForRebalance := !isAtLeast726
-
-	// If at least 7.2.6, check if the version is between 7.6.0 and 7.6.2.
-	if isAtLeast726 {
-		isAtLeast760, err := cbCluster.IsAtLeastVersion("7.6.0")
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		isAtLeast762, err := cbCluster.IsAtLeastVersion("7.6.2")
-		if err != nil {
-			e2eutil.Die(t, err)
-		}
-
-		waitForRebalance = isAtLeast760 && !isAtLeast762
-	}
 
 	// Kill PV log enabled pods and verify the logs are persisted after pod deletion
 	for i, victim := range victims {
@@ -1533,12 +1509,6 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 		case "killServerProcess":
 			podNameToKill := couchbaseutil.CreateMemberName(cbCluster.Name, victim)
 			e2eutil.MustExecShellInPod(t, kubernetes, podNameToKill, "pkill beam.smp")
-
-			if waitForRebalance {
-				e2eutil.MustWaitForClusterEvent(t, kubernetes, cbCluster, e2eutil.RebalanceCompletedEvent(cbCluster), 10*time.Minute)
-			} else {
-				time.Sleep(15 * time.Second)
-			}
 		}
 
 		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cbCluster, 2*time.Minute)
@@ -1553,7 +1523,7 @@ func EphemeralLogCollectUsingLogPVGeneric(t *testing.T, k8s *types.Cluster, podD
 	case "deletePod":
 		validator = e2eutil.PodDownFailoverRecoverySequence()
 	case "killServerProcess":
-		validator = e2eutil.ServerCrashRecoverySequence(waitForRebalance)
+		validator = e2eutil.ServerCrashRecoverySequence()
 	default:
 		e2eutil.Die(t, fmt.Errorf("invalid murder weapon: %s", podDownMethod))
 	}

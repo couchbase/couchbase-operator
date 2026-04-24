@@ -340,6 +340,11 @@ func (ms MemberSet) ToList() MemberList {
 	for _, m := range ms {
 		list = append(list, m)
 	}
+
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name() < list[j].Name()
+	})
+
 	return list
 }
 
