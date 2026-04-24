@@ -70,6 +70,7 @@ MINIMUM_ITEMS_LABEL = 'Minimum Items'
 MAXIMUM_ITEMS_LABEL = 'Maximum Items'
 ENUMERATIONS_LABEL = 'Enumerations'
 PATTERN_LABEL = 'Pattern (Regular Expression)'
+MINIMUM_SERVER_VERSION_LABEL = 'Minimum Server Version'
 
 # Asciidoc directory layout.
 AUTOGEN_DIR = 'resource'
@@ -321,6 +322,15 @@ class AsciidocVisitor:
 
         self._generate_scalar_constraints(WalkContext(None, None, context.schema["items"]))
 
+    def _generate_version_constraint(self, context):
+        """
+        If the schema has an x-couchbase-version-minimum extension, render
+        a minimum server version constraint.
+        """
+
+        if 'x-couchbase-version-minimum' in context.schema:
+            self._generate_constraint(MINIMUM_SERVER_VERSION_LABEL, context.schema['x-couchbase-version-minimum'])
+
     def _generate_description(self, context):
         """
         Process the description strings for any special markup, and also format to
@@ -367,6 +377,7 @@ class AsciidocVisitor:
         self._generate_default(context)
         self._generate_scalar_constraints(context)
         self._generate_array_constraints(context)
+        self._generate_version_constraint(context)
 
         # Print out the description after the flags.
         self._generate_heading(depth+1, DESCRIPTION_HEADING)

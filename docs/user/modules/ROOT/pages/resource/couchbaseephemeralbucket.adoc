@@ -140,11 +140,13 @@ defaulting to "seqno".
 
 *Enumerations*: `disabled, fallbackToActiveAck`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
-This feature is only supported for Couchbase Server 8.0.0+.
 Defaults to disabled.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseephemeralbuckets.spec.enableCrossClusterVersioning
 
@@ -152,11 +154,13 @@ Defaults to disabled.
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
-This feature is only supported for Couchbase Server 7.6.0+.
 Once it has been set to true, it cannot be toggled to false.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseephemeralbuckets.spec.enableFlush
 
@@ -198,10 +202,13 @@ defaulting to "noEviction".
 
 *Default*: `10m`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 ExpiryPagerSleepTime defines the time between Expiry Pager runs.
 It defaults to 10 minutes.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseephemeralbuckets.spec.ioPriority
 
@@ -256,12 +263,15 @@ https://golang.org/pkg/time/#ParseDuration.
 
 *Maximum*: `90`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 MemoryHighWatermark defines the memory high watermark for the bucket.
 It must be between 51 and 90.
 It must also be greater than spec.memoryLowWatermark.
 It defaults to 85.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseephemeralbuckets.spec.memoryLowWatermark
 
@@ -275,12 +285,15 @@ It defaults to 85.
 
 *Maximum*: `89`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 MemoryLowWatermark defines the memory low watermark for the bucket.
 It must be between 50 and 89.
 It must also be less than spec.memoryHighWatermark.
 It defaults to 75.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseephemeralbuckets.spec.memoryQuota
 
@@ -359,6 +372,8 @@ characters and may be composed of any character from "a-z", "A-Z", "0-9" and "-_
 
 *Maximum*: `1000`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 Rank determines the bucket's place in the order in which the rebalance process
@@ -368,8 +383,7 @@ The higher a bucket's assigned integer
 rebalance process the bucket is handled.
 This assignment of rank allows a
 cluster's most mission-critical data to be rebalanced with top priority.
-cluster’s most mission-critical data to be rebalanced with top priority.
-This option is only supported for Couchbase Server 7.6.0+.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseephemeralbuckets.spec.replicas
 
@@ -501,10 +515,13 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselect
 
 *Type*: `integer`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 This field must be an integer larger than 23, defaulting to 720 (30 days).
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseephemeralbuckets.spec.warmupBehavior
 
@@ -516,7 +533,10 @@ This field must be an integer larger than 23, defaulting to 720 (30 days).
 
 *Enumerations*: `none, background, blocking`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 WarmupBehavior defines the behavior of the bucket when it is being warmed up.
 It defaults to "background".
+This field is available in Couchbase Server 8.0.0 and later.

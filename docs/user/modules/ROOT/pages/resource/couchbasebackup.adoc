@@ -916,12 +916,13 @@ This field defaults to `true`.
 
 *Default*: `False`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 Users enables the backup of users including their roles and permissions.
-This is
-only available for Couchbase Server 7.6 and later.
 This field defaults to `false`.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbasebackups.spec.services.views
 

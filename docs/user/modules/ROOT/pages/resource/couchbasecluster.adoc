@@ -1154,10 +1154,12 @@ failover characteristics and index settings.
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
-This is only supported on Couchbase Server 8.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.analytics
 
@@ -1211,10 +1213,12 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 AppTelemetry allows the configuration of application telemetry.
-This is only supported on Couchbase Server 8.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.appTelemetry.enabled
 
@@ -1559,17 +1563,20 @@ Data allows the data service to be configured.
 
 *Maximum*: `64`
 
+*Minimum Server Version*: `7.1.0`
+
 ==== Description
 
 AuxIOThreads allows the number of threads used by the data service,
 per pod, to be altered.
 This indicates the number of threads that are
 to be used in the AuxIO thread pool to run auxiliary I/O tasks.
-This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
+This value must be between 1 and 64 threads
 and should only be increased where there are sufficient CPU resources
 allocated for their use.
 If not specified, this defaults to the
 default value set by Couchbase Server.
+This field is available in Couchbase Server 7.1.0 and later.
 
 === couchbaseclusters.spec.cluster.data.diskUsageLimit
 
@@ -1577,12 +1584,14 @@ default value set by Couchbase Server.
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 DiskUsageLimit allows a threshold to be set to limit the amount of disk space that can be used by buckets.
 If the disk usage limit is reached, Couchbase server will prevent data writes to buckets.
 Setting this value reserves disk space for recovery operations like performing rebalances to add a new node.
-This field is only supported on Couchbase server versions 8.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.diskUsageLimit.enabled
 
@@ -1642,17 +1651,20 @@ This field must be between 0 and 3, defaulting to 0.
 
 *Maximum*: `64`
 
+*Minimum Server Version*: `7.1.0`
+
 ==== Description
 
 NonIOThreads allows the number of threads used by the data service,
 per pod, to be altered.
 This indicates the number of threads that are
 to be used in the NonIO thread pool to run in memory tasks.
-This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
+This value must be between 1 and 64 threads
 and should only be increased where there are sufficient CPU resources
 allocated for their use.
 If not specified, this defaults to the
 default value set by Couchbase Server.
+This field is available in Couchbase Server 7.1.0 and later.
 
 === couchbaseclusters.spec.cluster.data.readerThreads
 
@@ -1677,10 +1689,12 @@ If not specified, this defaults to default/balanced.
 
 *Type*: `integer`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 TCPKeepAliveIdle is the number of seconds before the first TCP probe is sent.
-This field is only supported on Couchbase server versions 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.tcpKeepAliveInterval
 
@@ -1688,10 +1702,12 @@ This field is only supported on Couchbase server versions 8.0.0 and later.
 
 *Type*: `integer`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 TCPKeepAliveInterval is the number of seconds between TCP probes.
-This field is only supported on Couchbase server versions 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.tcpKeepAliveProbes
 
@@ -1699,10 +1715,12 @@ This field is only supported on Couchbase server versions 8.0.0 and later.
 
 *Type*: `integer`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 TCPKeepAliveProbes is the number of TCP probes missing before the connection is considered dead.
-This field is only supported on Couchbase server versions 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.tcpUserTimeout
 
@@ -1710,10 +1728,12 @@ This field is only supported on Couchbase server versions 8.0.0 and later.
 
 *Type*: `integer`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 TCPUserTimeout is the number of seconds data is stuck in the send buffer before the connection gets torn down.
-This field is only supported on Couchbase server versions 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.data.writerThreads
 
@@ -1834,10 +1854,12 @@ Indexer allows the indexer to be configured.
 
 *Default*: `False`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 DeferBuild allows the indexer to defer building indexes.
-This field is only supported on CB versions 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.indexer.enablePageBloomFilter
 
@@ -1847,6 +1869,8 @@ This field is only supported on CB versions 8.0.0+.
 
 *Default*: `False`
 
+*Minimum Server Version*: `7.1.0`
+
 ==== Description
 
 EnablePageBloomFilter gives Couchbase Server guidance whether
@@ -1854,7 +1878,7 @@ bloom filters should be used when item lookups occur.
 These help to
 indicate during a lookup that an item is not on disk, and therefore
 prevent unnecessary on-disk searches.
-This field is only supported on CB versions 7.1.0+.
+This field is available in Couchbase Server 7.1.0 and later.
 
 === couchbaseclusters.spec.cluster.indexer.enableShardAffinity
 
@@ -1864,13 +1888,15 @@ This field is only supported on CB versions 7.1.0+.
 
 *Default*: `False`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 EnableShardAffinity when false Index Servers rebuild any index that
 are newly assigned to them during a rebalance.
 When set to true,
 Couchbase Server moves a reassigned index’s files between Index Servers.
-This field is only supported on CB versions 7.6.0+.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.cluster.indexer.logLevel
 
@@ -2114,13 +2140,15 @@ As new completed requests are added, old ones are removed.
 
 *Pattern (Regular Expression)*: `^(\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]\*)?)|(\.[0-9]+))))?$`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
 completed requests catalog.
 Queries with plans larger than this are not logged.
-This field is only supported on CB versions 7.6.0+.
 Defaults to 262144, maximum value is 20840448, and minimum value is 0.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.cluster.query.completedStreamSize
 
@@ -2130,14 +2158,16 @@ Defaults to 262144, maximum value is 20840448, and minimum value is 0.
 
 *Minimum*: `0`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 CompletedStreamSize controls how much data about completed N1QL queries is saved to disk
 for analysis.
 When set to a value greater than 0 (measured in MiB), Couchbase saves
 information about completed queries to GZIP-compressed files with prefix local_request_log.
-This field is only supported on CB versions 8.0.0+.
 Defaults to 0 (disabled), minimum value is 0.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.cluster.query.completedThreshold
 
@@ -2271,12 +2301,14 @@ Defaults to 0.
 
 *Maximum*: `100`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 NodeQuotaValPercent sets the  percentage of the `useReplica` that is dedicated to tracked
 value content memory across all active requests for every Query node in the cluster.
-This field is only supported on CB versions 7.6.0+.
 Defaults to 67.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.cluster.query.numActiveTransactionRecords
 
@@ -2308,6 +2340,8 @@ Default to 1024 and has a minimum of 1.
 
 *Minimum*: `0`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 NumCpus is the number of CPUs the Query service can use on any Query node in the cluster.
@@ -2315,10 +2349,10 @@ When set to 0 (the default), the Query service can use all available CPUs, up to
 The number of CPUs can never be greater than the number of logical CPUs.
 In Community Edition, the number of allowed CPUs cannot be greater than 4.
 In Enterprise Edition, there is no limit to the number of allowed CPUs.
-This field is only supported on CB versions 7.6.0+.
 NOTE: This change requires a restart of the Query service to take effect which can be done by rescheduling
 nodes that are running the query service.
-Defaults to 0.
+Defaults to 0
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.cluster.query.pipelineBatch
 
@@ -2451,6 +2485,8 @@ Defaults to 0ms (no timeout).
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 UseReplica specifies whether a query can fetch data from a replica vBucket if active vBuckets
@@ -2461,7 +2497,7 @@ If set to false read from replica is disabled for all queries
 and cannot be overridden at request level.
 If this field is unset then it is enabled/disabled
 at the request level.
-This field is only supported on CB versions 7.6.0+.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.cluster.queryServiceMemoryQuota
 
@@ -3256,6 +3292,8 @@ topology, TLS and DDNS settings.
 
 *Enumerations*: `IPv4, IPv6, IPv4Priority, IPv6Priority, IPv6Only, IPv4Only`
 
+*Minimum Server Version*: `7.0.2`
+
 ==== Description
 
 AddressFamily allows the manual selection of the address family to use.
@@ -3264,7 +3302,7 @@ Setting this field to IPv4Priority or IPv6Priority will allow dual stack network
 the given address family being prioritised.
 When this field is not set, Couchbase server will default to using IPv4
 for internal communication and also support IPv6 on dual stack systems.
-This is only supported in Couchbase Server 7.0.2+.
+This field is available in Couchbase Server 7.0.2 and later.
 
 === couchbaseclusters.spec.networking.adminConsoleServiceTemplate
 
@@ -3844,10 +3882,13 @@ excluding newlines and extraneous spaces.
 
 *Enumerations*: `inet, inet6`
 
+*Minimum Server Version*: `7.0.2`
+
 ==== Description
 
 AddressFamily is the address family to use.
 By default inet (meaning IPV4) is used.
+This field is available in Couchbase Server 7.0.2 and later.
 
 === couchbaseclusters.spec.networking.tls.passphrase.rest.headers
 
@@ -4304,10 +4345,12 @@ must be at least 6 characters in length, and not contain the any of the characte
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 EncryptionAtRest configures encryption at rest for the cluster.
-This field is only supported on Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.security.encryptionAtRest.audit
 
@@ -4727,11 +4770,12 @@ Host name must be a valid IP address or DNS Name e.g openldap.default.svc, 10.0.
 
 *Default*: `True`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 Sets middlebox compatibility mode for LDAP.
-This option is only available on
-Couchbase Server 7.6.0+.
+This field is available in Couchbase Server 7.6.0 and later.
 
 === couchbaseclusters.spec.security.ldap.nestedGroupsEnabled
 
@@ -4920,11 +4964,13 @@ zero-length passwords which is not recommended.
 
 *Type*: `[]string`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
 their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.security.passwordPolicy.requirePasswordResetOnPolicyChange
 
@@ -4932,11 +4978,13 @@ This field is only available for Couchbase Server 8.0.0+.
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 RequirePasswordResetOnPolicyChange defines whether users will be required to change
 their password when the password policy is updated.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.security.podSecurityContext
 
@@ -6258,10 +6306,12 @@ This field must be one of "Auto" or "None", defaulting to "Auto".
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 ConflictLogging is the configuration for conflict logging.
-This feature is available in Couchbase Server 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.spec.xdcr.globalSettings.conflictLogging.enabled
 
@@ -6713,10 +6763,13 @@ Nil values can be used to explicitly unset merge functions for specific collecti
 
 *Enumerations*: `Off, Active`
 
+*Minimum Server Version*: `7.6.4`
+
 ==== Description
 
 Mobile enables mobile (Sync Gateway) active-active mode.
 This field must be one of "Active" or "Off", defaulting to "Off".
+This field is available in Couchbase Server 7.6.4 and later.
 
 === couchbaseclusters.spec.xdcr.globalSettings.networkUsageLimit
 
@@ -7269,9 +7322,12 @@ BucketName is the full name of the bucket.
 
 *Type*: `integer`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 NumVBuckets is the number of vbuckets in the bucket.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.status.buckets.password
 
@@ -7281,9 +7337,12 @@ NumVBuckets is the number of vbuckets in the bucket.
 
 *Type*: `string`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 BucketPassword will never be populated.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseclusters.status.buckets.replicas
 
@@ -7303,9 +7362,12 @@ BucketReplicas is the number of data replicas.
 
 *Type*: `string`
 
+*Minimum Server Version*: `7.0.0`
+
 ==== Description
 
 BucketStorageBackend is the storage backend of the bucket.
+This field is available in Couchbase Server 7.0.0 and later.
 
 === couchbaseclusters.status.buckets.type
 
@@ -7517,6 +7579,9 @@ pod status conditions are listed in the members status.
 
 *Type*: `[]string`
 
+*Minimum Server Version*: `7.6.0`
+
 ==== Description
 
 Users describes all the users managed by the cluster.
+This field is available in Couchbase Server 7.6.0 and later.

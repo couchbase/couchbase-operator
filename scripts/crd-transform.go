@@ -14,7 +14,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -283,6 +287,134 @@ func prune(in interface{}, group, kind, path string) (interface{}, error) {
 	}
 }
 
+// versionMarkerPrefix is the comment marker prefix for minimum server version.
+const versionMarkerPrefix = "+couchbase:version:minimum="
+
+// typesFile is the path to the types.go source file.
+const typesFile = "pkg/apis/couchbase/v2/types.go"
+
+// extractJSONName extracts the JSON field name from a struct tag.
+func extractJSONName(tag string) string {
+	jsonTag := reflect.StructTag(tag).Get("json")
+	if jsonTag == "" || jsonTag == "-" {
+		return ""
+	}
+
+	name, _, _ := strings.Cut(jsonTag, ",")
+
+	return name
+}
+
+// parseVersionMarkers parses the types.go source file and returns a map of
+// JSON field name to minimum server version string. The markers are extracted
+// from comments of the form: // +couchbase:version:minimum=X.Y.Z
+func parseVersionMarkers(path string) (map[string]string, error) {
+	fset := token.NewFileSet()
+
+	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
+
+	result := make(map[string]string)
+
+	// Walk all type declarations.
+	for _, decl := range file.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+
+			for _, field := range structType.Fields.List {
+				if field.Tag == nil {
+					continue
+				}
+
+				// Strip the backtick quotes from the tag.
+				tag := strings.Trim(field.Tag.Value, "`")
+
+				jsonName := extractJSONName(tag)
+				if jsonName == "" {
+					continue
+				}
+
+				// Check the field's doc comment for the version marker.
+				if field.Doc == nil {
+					continue
+				}
+
+				for _, comment := range field.Doc.List {
+					text := strings.TrimSpace(strings.TrimPrefix(comment.Text, "//"))
+					if strings.HasPrefix(text, versionMarkerPrefix) {
+						version := strings.TrimPrefix(text, versionMarkerPrefix)
+						result[jsonName] = version
+					}
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// injectVersionMarkers walks the CRD schema and injects x-couchbase-version-minimum
+// extensions into property definitions that match the provided version map.
+func injectVersionMarkers(schema interface{}, versionMap map[string]string) {
+	obj, ok := schema.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	// If this node has "properties", walk each property.
+	if props, ok := obj["properties"].(map[string]interface{}); ok {
+		for name, prop := range props {
+			propMap, ok := prop.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			if version, found := versionMap[name]; found {
+				propMap["x-couchbase-version-minimum"] = version
+
+				// Automatically append version info to the description
+				versionSuffix := "This field is available in Couchbase Server " + version + " and later."
+
+				if desc, ok := propMap["description"].(string); ok {
+					if !strings.Contains(desc, versionSuffix) {
+						propMap["description"] = strings.TrimRight(desc, " \n") + "\n" + versionSuffix
+					}
+				} else {
+					propMap["description"] = versionSuffix
+				}
+			}
+
+			// Recurse into the property.
+			injectVersionMarkers(propMap, versionMap)
+		}
+	}
+
+	// Handle arrays with object items.
+	if items, ok := obj["items"].(map[string]interface{}); ok {
+		injectVersionMarkers(items, versionMap)
+	}
+
+	// Handle additionalProperties.
+	if addlProps, ok := obj["additionalProperties"].(map[string]interface{}); ok {
+		injectVersionMarkers(addlProps, versionMap)
+	}
+}
+
 func main() {
 	var in string
 
@@ -296,6 +428,12 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	// Parse version markers from the types.go source file.
+	versionMap, err := parseVersionMarkers(typesFile)
+	if err != nil {
+		glog.Exitf("Failed to parse version markers: %v", err)
 	}
 
 	manifests := strings.Split(string(input), "\n---\n")
@@ -330,6 +468,22 @@ func main() {
 		prunedObject, ok := pruned.(map[string]interface{})
 		if !ok {
 			glog.Exit("Pruned CRD in wrong format")
+		}
+
+		// Inject x-couchbase-version-minimum extensions into the CRD schema
+		// from the parsed +couchbase:version:minimum= markers in types.go.
+		if specMap, ok := prunedObject["spec"].(map[string]interface{}); ok {
+			if versionsList, ok := specMap["versions"].([]interface{}); ok {
+				for _, v := range versionsList {
+					if versionEntry, ok := v.(map[string]interface{}); ok {
+						if schema, ok := versionEntry["schema"].(map[string]interface{}); ok {
+							if openAPI, ok := schema["openAPIV3Schema"].(map[string]interface{}); ok {
+								injectVersionMarkers(openAPI, versionMap)
+							}
+						}
+					}
+				}
+			}
 		}
 
 		output := unstructured.Unstructured{

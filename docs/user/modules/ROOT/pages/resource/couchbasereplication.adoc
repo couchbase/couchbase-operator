@@ -379,10 +379,12 @@ CompressionType is the compression used for XDCR traffic.
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 ConflictLogging is the configuration for conflict logging.
-This feature is available in Couchbase Server 8.0.0 and later.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbasereplications.spec.conflictLogging.enabled
 
@@ -828,10 +830,12 @@ Nil values can be used to explicitly unset merge functions for specific collecti
 
 *Enumerations*: `Off, Active`
 
+*Minimum Server Version*: `7.6.4`
+
 ==== Description
 
 Mobile enables mobile (Sync Gateway) active-active mode.
-This feature is available in Couchbase Server 7.6.4 and later.
+This field is available in Couchbase Server 7.6.4 and later.
 
 === couchbasereplications.spec.networkUsageLimit
 

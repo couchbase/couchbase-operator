@@ -111,10 +111,12 @@ Full Name of Couchbase user.
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseusers.spec.name
 
@@ -132,10 +134,12 @@ Username of the couchbase user.
 
 *Type*: `object`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 Password allows user specific password settings to be set.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseusers.spec.password.expiresAfter
 
@@ -143,20 +147,24 @@ This field is only available for Couchbase Server 8.0.0+.
 
 *Type*: `string`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 ExpiresAfter allows setting a fixed duration after a user changes their password when they will be required to change their password again.
 Consider that this duration will be checked against the users last password change date, not the current date and time and could therefore
 result in the user being required to change their password immediately.
-This field is only available for Couchbase Server 8.0.0+.
 More info:
-https://golang.org/pkg/time/#ParseDuration.
+https://golang.org/pkg/time/#ParseDuration
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseusers.spec.password.expiresAt
 
 ==== Constraints
 
 *Type*: `string`
+
+*Minimum Server Version*: `8.0.0`
 
 ==== Description
 
@@ -165,7 +173,7 @@ After that timestamp has passed, the user
 will be required to change their password.
 If set to a timestamp in the past, the user's password must have been changed since then or they
 will be required to change their password.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.
 
 === couchbaseusers.spec.password.requireInitialChange
 
@@ -173,8 +181,10 @@ This field is only available for Couchbase Server 8.0.0+.
 
 *Type*: `boolean`
 
+*Minimum Server Version*: `8.0.0`
+
 ==== Description
 
 RequireInitialChange defines whether a user will be required to change
 their password the first time they login and is only effective when a user is first being created.
-This field is only available for Couchbase Server 8.0.0+.
+This field is available in Couchbase Server 8.0.0 and later.

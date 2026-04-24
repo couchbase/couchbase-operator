@@ -28,9 +28,8 @@ import (
 type BucketName string
 
 // CouchbaseStorageBackend can either be "couchstore" or "magma".
-// Defaults to magma for server versions 8.0.0+. Defaults to
-// couchstore for server versions earlier than 8.0.0.
 // +kubebuilder:validation:Enum=couchstore;magma
+// +couchbase:version:minimum=7.0.0
 type CouchbaseStorageBackend string
 
 const (
@@ -39,8 +38,8 @@ const (
 )
 
 // DurabilityImpossibleFallback can either be "disabled" or "fallbackToActiveAck".
-// This setting is only available for server versions 8.0.0+.
 // +kubebuilder:validation:Enum=disabled;fallbackToActiveAck
+// +couchbase:version:minimum=8.0.0
 type DurabilityImpossibleFallback string
 
 const (
@@ -417,9 +416,10 @@ type CouchbaseBackupServiceFilter struct {
 	// +kubebuilder:default=true
 	ClusterQuery *bool `json:"clusterQuery,omitempty"`
 
-	// Users enables the backup of users including their roles and permissions. This is
-	// only available for Couchbase Server 7.6 and later. This field defaults to `false`.
+	// Users enables the backup of users including their roles and permissions.
+	// This field defaults to `false`.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=7.6.0
 	Users *bool `json:"users,omitempty"`
 }
 
@@ -669,9 +669,9 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// Overwrites the already existing users in the cluster when  user restoration is enabled (spec.services.users).
 	// The default behavior of backup/restore of users is to skip already existing users.
-	// This is only available for Couchbase Server 7.6 and later.
 	// This field defaults to `false`.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=7.6.0
 	OverwriteUsers bool `json:"overwriteUsers,omitempty"`
 
 	// StagingVolume contains configuration related to the
@@ -836,9 +836,10 @@ type CouchbaseBackupRestoreServices struct {
 	// +kubebuilder:default=true
 	ClusterQuery *bool `json:"clusterQuery,omitempty"`
 
-	// Users restores cluster level users, including their roles and permissions. This is
-	// only available for Couchbase Server 7.6 and later. This field defaults to `false`.
+	// Users restores cluster level users, including their roles and permissions.
+	// This field defaults to `false`.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=7.6.0
 	Users *bool `json:"users,omitempty"`
 }
 
@@ -1384,15 +1385,17 @@ type CouchbaseBucketSpec struct {
 	// This annotation cannot be added to an existing bucket and should not be used for production clusters.
 	SampleBucket bool `json:"-" annotation:"sampleBucket"`
 
-	// StorageBackend to be assigned to and used by the bucket. Only valid for Couchbase Server 7.0.0 onward.
+	// StorageBackend to be assigned to and used by the bucket.
 	// Two different backend storage mechanisms can be used - "couchstore" or "magma", defaulting to "couchstore" for server versions earlier than 8.0.0.
 	// Defaults to "magma" for server versions 8.0.0 and onward.
 	// Note: "magma" is only valid for Couchbase Server 7.1.0 onward.
+	// +couchbase:version:minimum=7.0.0
 	StorageBackend CouchbaseStorageBackend `json:"storageBackend,omitempty"`
 
 	// NumVBuckets defines the number of virtual buckets (vBuckets) to be used by the bucket.
-	// Can be either 128 or 1024 and is only configurable for magma buckets on server versions 8.0.0 and onward. If migrating from a couchstore
+	// Can be either 128 or 1024 and is only configurable for magma buckets. If migrating from a couchstore
 	// to magma bucket, this must be set to 1024.
+	// +couchbase:version:minimum=8.0.0
 	NumVBuckets *int `json:"numVBuckets,omitempty"`
 
 	// MemoryQuota is a memory limit to the size of a bucket.  When this limit is exceeded,
@@ -1433,9 +1436,9 @@ type CouchbaseBucketSpec struct {
 	// without requiring a bucket restart. If set the eviction policy change will only take effect
 	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
 	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
-	// This field is only supported for Couchbase Server 8.0.0+.
 	// DEVELOPER PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	// +kubebuilder:validation:Optional
+	// +couchbase:version:minimum=8.0.0
 	OnlineEvictionPolicyChange bool `json:"onlineEvictionPolicyChange,omitempty"`
 
 	// ConflictResolution defines how XDCR handles concurrent write conflicts.  Sequence number
@@ -1507,10 +1510,10 @@ type CouchbaseBucketSpec struct {
 	// (in relation to the integers assigned other buckets), the sooner in the
 	// rebalance process the bucket is handled. This assignment of rank allows a
 	// cluster's most mission-critical data to be rebalanced with top priority.
-	// This option is only supported for Couchbase Server 7.6.0+.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1000
+	// +couchbase:version:minimum=7.6.0
 	Rank int `json:"rank,omitempty"`
 
 	// AutoCompaction allows the configuration of auto-compaction settings, including on what
@@ -1521,53 +1524,60 @@ type CouchbaseBucketSpec struct {
 	AutoCompaction *AutoCompactionSpecBucket `json:"autoCompaction,omitempty" annotation:"autoCompaction"`
 
 	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
-	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
+	// Once it has been set to true, it cannot be toggled to false.
+	// +couchbase:version:minimum=7.6.0
 	EnableCrossClusterVersioning *bool `json:"enableCrossClusterVersioning,omitempty" annotation:"enableCrossClusterVersioning"`
 
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
-	// This feature is only supported for Couchbase Server 7.6.0+.
+	// +couchbase:version:minimum=7.6.0
 	VersionPruningWindowHrs *uint64 `json:"versionPruningWindowHrs,omitempty" annotation:"versionPruningWindowHrs"`
 
 	// AccessScannerEnabled allows the bucket to be configured to allow enabling and disabling the access scanner.
-	// This feature is only supported for Couchbase Server 8.0.0+. It is set to true by default.
+	// It is set to true by default.
 	// +kubebuilder:default=true
+	// +couchbase:version:minimum=8.0.0
 	AccessScannerEnabled *bool `json:"accessScannerEnabled,omitempty"`
 
 	// ExpiryPagerSleepTime defines the time between Expiry Pager runs.
-	// It defaults to 10 minutes. This field is only supported for Couchbase Server 8.0.0+.
+	// It defaults to 10 minutes.
 	// +kubebuilder:default="10m"
+	// +couchbase:version:minimum=8.0.0
 	ExpiryPagerSleepTime *metav1.Duration `json:"expiryPagerSleepTime,omitempty"`
 
 	// WarmupBehavior defines the behavior of the bucket when it is being warmed up.
-	// It defaults to "background". This field is only supported for Couchbase Server 8.0.0+.
+	// It defaults to "background".
 	// +kubebuilder:validation:Enum=none;background;blocking
 	// +kubebuilder:default="background"
+	// +couchbase:version:minimum=8.0.0
 	WarmupBehavior CouchbaseBucketWarmupBehavior `json:"warmupBehavior,omitempty"`
 
 	// MemoryLowWatermark defines the memory low watermark for the bucket.
 	// It must be between 50 and 89. It must also be less than spec.memoryHighWatermark.
-	// It defaults to 75. This field is only supported for Couchbase Server 8.0.0+.
+	// It defaults to 75.
 	// +kubebuilder:default=75
 	// +kubebuilder:validation:Minimum=50
 	// +kubebuilder:validation:Maximum=89
+	// +couchbase:version:minimum=8.0.0
 	MemoryLowWatermark *int `json:"memoryLowWatermark,omitempty"`
 
 	// MemoryHighWatermark defines the memory high watermark for the bucket.
 	// It must be between 51 and 90. It must also be greater than spec.memoryLowWatermark.
-	// It defaults to 85. This field is only supported for Couchbase Server 8.0.0+.
+	// It defaults to 85.
 	// +kubebuilder:default=85
 	// +kubebuilder:validation:Minimum=51
 	// +kubebuilder:validation:Maximum=90
+	// +couchbase:version:minimum=8.0.0
 	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
 
 	// DurabilityImpossibleFallback defines whether to report writes as durable even if not enough replicas are written to.
-	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
+	// Defaults to disabled.
+	// +couchbase:version:minimum=8.0.0
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 
 	// EncryptionAtRest defines the encryption at rest settings for the bucket.
-	// This field is only supported for Couchbase Server 8.0.0+.
 	// +optional
+	// +couchbase:version:minimum=8.0.0
 	EncryptionAtRest *BucketEncryptionAtRestConfiguration `json:"encryptionAtRest,omitempty"`
 }
 
@@ -1730,19 +1740,20 @@ type CouchbaseEphemeralBucketSpec struct {
 	// (in relation to the integers assigned other buckets), the sooner in the
 	// rebalance process the bucket is handled. This assignment of rank allows a
 	// cluster's most mission-critical data to be rebalanced with top priority.
-	// cluster’s most mission-critical data to be rebalanced with top priority.
-	// This option is only supported for Couchbase Server 7.6.0+.
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=1000
+	// +couchbase:version:minimum=7.6.0
 	Rank int `json:"rank,omitempty"`
 
 	// EnableCrossClusterVersioning allows the bucket to be configured to allow cross-cluster versioning.
-	// This feature is only supported for Couchbase Server 7.6.0+. Once it has been set to true, it cannot be toggled to false.
+	// Once it has been set to true, it cannot be toggled to false.
+	// +couchbase:version:minimum=7.6.0
 	EnableCrossClusterVersioning *bool `json:"enableCrossClusterVersioning,omitempty" annotation:"enableCrossClusterVersioning"`
 
 	// VersionPruningWindowHrs defines the number of hours to retain version history for a bucket.
 	// This field must be an integer larger than 23, defaulting to 720 (30 days).
+	// +couchbase:version:minimum=7.6.0
 	VersionPruningWindowHrs *uint64 `json:"versionPruningWindowHrs,omitempty" annotation:"versionPruningWindowHrs"`
 
 	// ExpiryPagerSleepTime defines the time between Expiry Pager runs.
@@ -1773,7 +1784,8 @@ type CouchbaseEphemeralBucketSpec struct {
 	MemoryHighWatermark *int `json:"memoryHighWatermark,omitempty"`
 
 	// DurabilityImpossibleFallback defines whether to report write as durable even if not enough replicas are written to.
-	// This feature is only supported for Couchbase Server 8.0.0+. Defaults to disabled.
+	// Defaults to disabled.
+	// +couchbase:version:minimum=8.0.0
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
 }
 
@@ -2083,8 +2095,8 @@ type CouchbaseReplicationSpec struct {
 	LogLevel *string `json:"logLevel,omitempty"`
 
 	// Mobile enables mobile (Sync Gateway) active-active mode.
-	// This feature is available in Couchbase Server 7.6.4 and later
 	// +kubebuilder:validation:Enum=Off;Active
+	// +couchbase:version:minimum=7.6.4
 	Mobile *string `json:"mobile,omitempty" annotation:"mobile"`
 
 	// NetworkUsageLimit is the upper limit for replication network usage (MB/s).
@@ -2129,7 +2141,7 @@ type CouchbaseReplicationSpec struct {
 	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
 
 	// ConflictLogging is the configuration for conflict logging.
-	// This feature is available in Couchbase Server 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
 }
 
@@ -2244,32 +2256,33 @@ type CouchbaseUserSpec struct {
 	AuthSecret string `json:"authSecret,omitempty"`
 
 	// Locked defines whether the user is locked and can only be used when a using the internal auth domain for the user.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	Locked *bool `json:"locked,omitempty"`
 
 	// Password allows user specific password settings to be set.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	Password *CouchbaseUserPasswordSpec `json:"password,omitempty"`
 }
 
 type CouchbaseUserPasswordSpec struct {
 	// RequireInitialChange defines whether a user will be required to change
 	// their password the first time they login and is only effective when a user is first being created.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	RequireInitialChange *bool `json:"requireInitialChange,omitempty"`
 
 	// ExpiresAt allows setting a timestamp when a user's password will expire. After that timestamp has passed, the user
 	// will be required to change their password.
 	// If set to a timestamp in the past, the user's password must have been changed since then or they
 	// will be required to change their password.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	ExpiresAt *metav1.Time `json:"expiresAt,omitempty"`
 
 	// ExpiresAfter allows setting a fixed duration after a user changes their password when they will be required to change their password again.
 	// Consider that this duration will be checked against the users last password change date, not the current date and time and could therefore
 	// result in the user being required to change their password immediately.
-	// This field is only available for Couchbase Server 8.0.0+. More info:
+	// More info:
 	// https://golang.org/pkg/time/#ParseDuration
+	// +couchbase:version:minimum=8.0.0
 	ExpiresAfter *metav1.Duration `json:"expiresAfter,omitempty"`
 }
 
@@ -3309,10 +3322,10 @@ type CouchbaseClusterLDAPSpec struct {
 	// +kubebuilder:default=30000
 	CacheValueLifetime uint64 `json:"cacheValueLifetime,omitempty"`
 
-	// Sets middlebox compatibility mode for LDAP. This option is only available on
-	// Couchbase Server 7.6.0+.
+	// Sets middlebox compatibility mode for LDAP.
 	// +optional
 	// +kubebuilder:default=true
+	// +couchbase:version:minimum=7.6.0
 	MiddleboxCompMode bool `json:"middleboxCompMode"`
 }
 
@@ -3372,7 +3385,7 @@ type CouchbaseClusterSecuritySpec struct {
 	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty"`
 
 	// EncryptionAtRest configures encryption at rest for the cluster.
-	// This field is only supported on Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	EncryptionAtRest *EncryptionAtRestSpec `json:"encryptionAtRest,omitempty"`
 
 	// PasswordPolicy specifies a series of character-related requirements that
@@ -3571,7 +3584,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// the given address family being prioritised.
 	// When this field is not set, Couchbase server will default to using IPv4
 	// for internal communication and also support IPv6 on dual stack systems.
-	// This is only supported in Couchbase Server 7.0.2+.
+	// +couchbase:version:minimum=7.0.2
 	AddressFamily *AddressFamily `json:"addressFamily,omitempty"`
 
 	// ExposeAdminConsole creates a service referencing the admin console.
@@ -3895,17 +3908,18 @@ type ClusterConfig struct {
 
 	// AutoFailoverOnDataDiskNonResponsiveness defines whether Couchbase server should failover a pod
 	// when the data disk has not completed an operation in the specified time period.
-	// This setting is only supported on Couchbase Server 8.0+.
 	// This field is configured via annotations only and is not exposed in the CRD.
 	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsiveness
+	// +couchbase:version:minimum=8.0.0
 	AutoFailoverOnDataDiskNonResponsiveness bool `json:"-" annotation:"autoFailoverOnDataDiskNonResponsiveness"`
 
 	// AutoFailoverOnDataDiskNonResponsivenessTimePeriod defines how long to wait before
 	// failing over a pod with an unresponsive disk.  This field must be in the range 5-3600s,
-	// defaulting to 120s. This setting is only supported on Couchbase Server 8.0+.
+	// defaulting to 120s.
 	// This field is configured via annotations only and is not exposed in the CRD.
 	// Use annotation: cao.couchbase.com/autoFailoverOnDataDiskNonResponsivenessTimePeriod
 	// More info:  https://golang.org/pkg/time/#ParseDuration
+	// +couchbase:version:minimum=8.0.0
 	AutoFailoverOnDataDiskNonResponsivenessTimePeriod *metav1.Duration `json:"-" annotation:"autoFailoverOnDataDiskNonResponsivenessTimePeriod"`
 
 	// AutoFailoverServerGroup whether to enable failing over a server group.
@@ -3920,11 +3934,11 @@ type ClusterConfig struct {
 	AutoCompaction *AutoCompaction `json:"autoCompaction,omitempty" annotation:"autoCompaction"`
 
 	// AllowFailoverEphemeralNoReplicas allows failover of ephemeral buckets with no replicas.
-	// This is only supported on Couchbase Server 8.0+.
+	// +couchbase:version:minimum=8.0.0
 	AllowFailoverEphemeralNoReplicas *bool `json:"allowFailoverEphemeralNoReplicas,omitempty"`
 
 	// AppTelemetry allows the configuration of application telemetry.
-	// This is only supported on Couchbase Server 8.0+.
+	// +couchbase:version:minimum=8.0.0
 	AppTelemetry *CouchbaseClusterAppTelemetrySettings `json:"appTelemetry,omitempty"`
 }
 
@@ -4001,21 +4015,21 @@ type CouchbaseClusterIndexerSettings struct {
 	// EnableShardAffinity when false Index Servers rebuild any index that
 	// are newly assigned to them during a rebalance. When set to true,
 	// Couchbase Server moves a reassigned index’s files between Index Servers.
-	// This field is only supported on CB versions 7.6.0+.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=7.6.0
 	EnableShardAffinity bool `json:"enableShardAffinity,omitempty"`
 
 	// EnablePageBloomFilter gives Couchbase Server guidance whether
 	// bloom filters should be used when item lookups occur. These help to
 	// indicate during a lookup that an item is not on disk, and therefore
 	// prevent unnecessary on-disk searches.
-	// This field is only supported on CB versions 7.1.0+.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=7.1.0
 	EnablePageBloomFilter bool `json:"enablePageBloomFilter,omitempty"`
 
 	// DeferBuild allows the indexer to defer building indexes.
-	// This field is only supported on CB versions 8.0.0+.
 	// +kubebuilder:default=false
+	// +couchbase:version:minimum=8.0.0
 	DeferBuild bool `json:"deferBuild,omitempty"`
 }
 
@@ -4173,16 +4187,16 @@ type CouchbaseClusterQuerySettings struct {
 	// be disabled at request level. If set to false read from replica is disabled for all queries
 	// and cannot be overridden at request level. If this field is unset then it is enabled/disabled
 	// at the request level.
-	// This field is only supported on CB versions 7.6.0+.
+	// +couchbase:version:minimum=7.6.0
 	UseReplica *bool `json:"useReplica,omitempty"`
 
 	// NodeQuotaValPercent sets the  percentage of the `useReplica` that is dedicated to tracked
 	// value content memory across all active requests for every Query node in the cluster.
-	// This field is only supported on CB versions 7.6.0+.
 	// Defaults to 67.
 	// +kubebuilder:default=67
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
+	// +couchbase:version:minimum=7.6.0
 	NodeQuotaValPercent int32 `json:"nodeQuotaValPercent"`
 
 	// NumCpus is the number of CPUs the Query service can use on any Query node in the cluster.
@@ -4190,28 +4204,28 @@ type CouchbaseClusterQuerySettings struct {
 	// The number of CPUs can never be greater than the number of logical CPUs.
 	// In Community Edition, the number of allowed CPUs cannot be greater than 4.
 	// In Enterprise Edition, there is no limit to the number of allowed CPUs.
-	// This field is only supported on CB versions 7.6.0+.
 	// NOTE: This change requires a restart of the Query service to take effect which can be done by rescheduling
 	// nodes that are running the query service.
 	// Defaults to 0
 	// +kubebuilder:default=0
 	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=7.6.0
 	NumCpus int32 `json:"numCpus"`
 
 	// CompletedMaxPlanSize limits the size of query execution plans that can be logged in the
 	// completed requests catalog. Queries with plans larger than this are not logged.
-	// This field is only supported on CB versions 7.6.0+.
 	// Defaults to 262144, maximum value is 20840448, and minimum value is 0.
 	// +kubebuilder:default="262144"
 	// +kubebuilder:validation:Type=string
+	// +couchbase:version:minimum=7.6.0
 	CompletedMaxPlanSize *resource.Quantity `json:"completedMaxPlanSize"`
 
 	// CompletedStreamSize controls how much data about completed N1QL queries is saved to disk
 	// for analysis. When set to a value greater than 0 (measured in MiB), Couchbase saves
 	// information about completed queries to GZIP-compressed files with prefix local_request_log.
-	// This field is only supported on CB versions 8.0.0+.
 	// Defaults to 0 (disabled), minimum value is 0.
 	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=8.0.0
 	CompletedStreamSize *int32 `json:"completedStreamSize,omitempty"`
 }
 
@@ -4314,23 +4328,25 @@ type CouchbaseClusterDataSettings struct {
 	// NonIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
 	// to be used in the NonIO thread pool to run in memory tasks.
-	// This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
+	// This value must be between 1 and 64 threads
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
+	// +couchbase:version:minimum=7.1.0
 	NonIOThreads *int `json:"nonIOThreads,omitempty"`
 
 	// AuxIOThreads allows the number of threads used by the data service,
 	// per pod, to be altered.  This indicates the number of threads that are
 	// to be used in the AuxIO thread pool to run auxiliary I/O tasks.
-	// This value must be between 1 and 64 threads and is only supported on CB versions 7.1.0+.
+	// This value must be between 1 and 64 threads
 	// and should only be increased where there are sufficient CPU resources
 	// allocated for their use. If not specified, this defaults to the
 	// default value set by Couchbase Server.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=64
+	// +couchbase:version:minimum=7.1.0
 	AuxIOThreads *int `json:"auxIOThreads,omitempty"`
 
 	// MinReplicasCount allows the minimum number of replicas required for
@@ -4344,23 +4360,23 @@ type CouchbaseClusterDataSettings struct {
 	// DiskUsageLimit allows a threshold to be set to limit the amount of disk space that can be used by buckets.
 	// If the disk usage limit is reached, Couchbase server will prevent data writes to buckets.
 	// Setting this value reserves disk space for recovery operations like performing rebalances to add a new node.
-	// This field is only supported on Couchbase server versions 8.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	DiskUsageLimit *DiskUsageLimit `json:"diskUsageLimit,omitempty"`
 
 	// TCPKeepAliveIdle is the number of seconds before the first TCP probe is sent.
-	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	TCPKeepAliveIdle *int `json:"tcpKeepAliveIdle,omitempty"`
 
 	// TCPKeepAliveInterval is the number of seconds between TCP probes.
-	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	TCPKeepAliveInterval *int `json:"tcpKeepAliveInterval,omitempty"`
 
 	// TCPKeepAliveProbes is the number of TCP probes missing before the connection is considered dead.
-	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	TCPKeepAliveProbes *int `json:"tcpKeepAliveProbes,omitempty"`
 
 	// TCPUserTimeout is the number of seconds data is stuck in the send buffer before the connection gets torn down.
-	// This field is only supported on Couchbase server versions 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	TCPUserTimeout *int `json:"tcpUserTimeout,omitempty"`
 }
 
@@ -4721,7 +4737,7 @@ type XDCRGlobalSettings struct {
 	WorkerBatchSize *int32 `json:"workerBatchSize,omitempty"`
 
 	// ConflictLogging is the configuration for conflict logging.
-	// This feature is available in Couchbase Server 8.0.0 and later.
+	// +couchbase:version:minimum=8.0.0
 	ConflictLogging *CouchbaseConflictLoggingSpec `json:"conflictLogging,omitempty"`
 
 	// MergeFunctionMapping maps collection specifiers (scope.collection) to merge function names for custom conflict resolution.
@@ -5822,12 +5838,12 @@ type CouchbaseEncryptionKeyList struct {
 type PasswordPolicySpec struct {
 	// RequirePasswordResetOnPolicyChange defines whether users will be required to change
 	// their password when the password policy is updated.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	RequirePasswordResetOnPolicyChange *bool `json:"requirePasswordResetOnPolicyChange,omitempty"`
 
 	// PolicyChangePasswordResetExemptUsers defines names of CouchbaseUser resources that will not be required to change
 	// their password if requirePasswordResetOnPolicyChange is set to true and the password policy is updated.
-	// This field is only available for Couchbase Server 8.0.0+.
+	// +couchbase:version:minimum=8.0.0
 	PasswordResetOnPolicyChangeExemptUsers []*string `json:"passwordResetOnPolicyChangeExemptUsers,omitempty"`
 
 	// MinLength sets the minimum length a password must be,
