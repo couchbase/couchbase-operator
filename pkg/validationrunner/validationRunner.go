@@ -315,6 +315,12 @@ func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *c
 		switch t1 := oldBucket.(type) {
 		case *couchbasev2.CouchbaseBucket:
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseBucket); ok {
+				// ConvertAbstractBucketToAPIBucket only sets Name, not Namespace.
+				// Validators that list namespace-scoped resources (e.g. collections)
+				// need the correct namespace to query against.
+				ns := currentCluster.GetCouchbaseCluster().Namespace
+				t1.Namespace = ns
+				t2.Namespace = ns
 				if _, err := validationv2.CheckChangeConstraintsBucket(rv.v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
 					errs = append(errs, err)
 					failedBuckets[update.BucketName] = true
