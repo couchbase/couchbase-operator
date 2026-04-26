@@ -207,10 +207,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 				b.DurabilityImpossibleFallback = constants.DurabilityImpossibleFallbackDefault
 			}
 
-			if bucket.Spec.OnlineEvictionPolicyChange {
-				noRestart := true
-				b.NoRestart = &noRestart
-			}
+			noRestart := bucket.Spec.OnlineEvictionPolicyChange
+			b.NoRestart = &noRestart
 
 			b.EncryptionAtRestDekRotationInterval = util.IntPtr(constants.DefaultEncryptionAtRestRotationInterval)
 			b.EncryptionAtRestDekLifetime = util.IntPtr(constants.DefaultEncryptionAtRestKeyLifetime)
@@ -593,11 +591,10 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 					a.NumVBuckets = nil
 				}
 
-				// We have to do this to prevent deepEqual from updating the bucket just because of the NoRestart field.
-				// This is OK to do as we don't actually get a.NoRestart from the API endpoint we just infer it and
-				// once an offline eviction policy change is requested, we can't do anything about it so this difference doesn't matter.
-				// On the other hande if a.NoRestart is true and r.NoRestart is false, we want to switch from and online upgrade to an offline upgrade.
-				if r.NoRestart != nil && *r.NoRestart && r.NoRestart != a.NoRestart {
+				// Normalize a.NoRestart when CBS reports no per-node overrides (nil).
+				// If overrides exist (a=&true) and user wants offline (r=&false), the
+				// diff is kept so UpdateBucket sends noRestart=false to trigger a restart.
+				if r.NoRestart != nil && a.NoRestart == nil {
 					a.NoRestart = r.NoRestart
 				}
 
@@ -625,8 +622,9 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 				} else if !reflect.DeepEqual(r, a) {
 					setBucketFieldsForEncoding(&r, isOver71)
 
-					// During migration, use specialized API that only sends allowed fields.
-					// Otherwise, use normal full update.
+					// During storage backend migration, use specialized API that only sends
+					// fields CBS allows during migration. For eviction-only migration
+					// (BucketEvictionMigrating), use the normal path so all fields are sent.
 					if c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
 						updateDuringMigration = append(updateDuringMigration, r)
 					} else {

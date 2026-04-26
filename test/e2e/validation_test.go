@@ -4619,20 +4619,17 @@ func TestBucketMigrationPre76Invalid(t *testing.T) {
 func TestBlockChangingMigrationProcessDuringMigration(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "TestBlockChangingMigrationProcessDuringMigration",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "false"})},
-			expectedErrors: []string{"spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
-			shouldFail:     true,
+			name:       "TestChangingMigrationProcessDuringMigration",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "false"})},
+			shouldFail: false,
 		}, {
-			name:           "TestBlockRemovingMigrationProcessDuringMigration",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{})},
-			expectedErrors: []string{"spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
-			shouldFail:     true,
+			name:       "TestRemovingMigrationProcessDuringMigration",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{})},
+			shouldFail: false,
 		}, {
-			name:           "TestBlockRemovingAnnotationsMigrationProcessDuringMigration",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/metadata/annotations")},
-			expectedErrors: []string{"spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place"},
-			shouldFail:     true,
+			name:       "TestRemovingAnnotationsMigrationProcessDuringMigration",
+			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/metadata/annotations")},
+			shouldFail: false,
 		},
 	}
 
@@ -6453,7 +6450,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 			expectedErrors: []string{`spec.numVBuckets is immutable`},
 		},
 		{
-			name: "TestNegValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
+			name: "TestValidateApplyBucketEvictionPolicyOnlineChangeMigrationDisabled",
 			mutations: patchMap{
 				"cluster0": jsonpatch.NewPatchSet().Replace("/spec/buckets/enableBucketMigrationRoutines", false),
 				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/image", "couchbase/server:8.0.0"),
@@ -6463,8 +6460,7 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 					}).
 					Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
 					Replace("/spec/onlineEvictionPolicyChange", true)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.evictionPolicy cannot be changed unless all referencing clusters have spec.buckets.enableBucketMigrationRoutines set to true"},
+			shouldFail: false,
 		},
 	}
 

@@ -415,7 +415,7 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		(*ReconcileMachine).handlePodHostname,
 		(*ReconcileMachine).handleRemoveNode,
 		(*ReconcileMachine).handleUpgradeNode,
-		(*ReconcileMachine).handleBucketStorageBackendMigration,
+		(*ReconcileMachine).handleBucketMigration,
 		(*ReconcileMachine).handleAddNode,
 		(*ReconcileMachine).handleServerGroups,
 		(*ReconcileMachine).handleNodeServices,
@@ -1241,7 +1241,7 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 			return candidates, err
 		},
 		func() (couchbaseutil.MemberSet, error) {
-			candidates, _, err := c.getBucketMigrationCandidates()
+			candidates, _, _, _, err := c.getBucketMigrationCandidates()
 			return candidates, err
 		},
 		c.getNodeServiceMismatchCandidates,
@@ -2506,20 +2506,20 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 // getBucketMigrationCandidates returns nodes that have in-progress backend or
 // eviction-policy migrations, and whether any of those nodes actually require a
 // swap-rebalance to converge to spec.
-func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, swapsNeeded bool, err error) {
+func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, swapsNeeded bool, hasStorageBackendOverrides bool, hasEvictionOverrides bool, err error) {
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, false, err
 	}
 
 	// Node-level migration fields are only reported by CB server >= 7.6.
 	if !atleast76 {
-		return nil, false, nil
+		return nil, false, false, false, nil
 	}
 
 	bucketSpecs, err := c.gatherBuckets()
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, false, err
 	}
 
 	bucketMap := make(map[string]couchbaseutil.Bucket, len(bucketSpecs))
@@ -2530,7 +2530,7 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 
 	clusterBuckets := couchbaseutil.BucketStatusList{}
 	if err = couchbaseutil.ListBucketStatuses(&clusterBuckets).On(c.api, c.readyMembers()); err != nil {
-		return nil, false, err
+		return nil, false, false, false, err
 	}
 
 	candidates = couchbaseutil.MemberSet{}
@@ -2547,6 +2547,14 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 
 			candidates.Add(c.members[node.HostName.GetMemberName()])
 
+			if node.StorageBackend != "" {
+				hasStorageBackendOverrides = true
+			}
+
+			if node.EvictionPolicy != "" {
+				hasEvictionOverrides = true
+			}
+
 			// If the node's current vBucket format differs from spec, a
 			// swap-rebalance is required to move the data.  If it already matches
 			// spec the server just needs a corrective REST push — no pod ejection.
@@ -2557,10 +2565,13 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 		}
 	}
 
-	return candidates, swapsNeeded, nil
+	return candidates, swapsNeeded, hasStorageBackendOverrides, hasEvictionOverrides, nil
 }
 
-func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error {
+// handleBucketMigration detects and manages per-node storage backend and eviction policy overrides.
+// When EnableBucketMigrationRoutines is true and overrides require convergence,
+// this function schedules swap-rebalances to move vBuckets to the new format.
+func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 	// Something is broken, let that get fixed up first.
 	if r.needsRebalance {
 		return nil
@@ -2588,7 +2599,7 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return nil
 	}
 
-	candidates, swapsNeeded, err := c.getBucketMigrationCandidates()
+	candidates, swapsNeeded, hasStorageBackendOverrides, hasEvictionOverrides, err := c.getBucketMigrationCandidates()
 	if err != nil {
 		return err
 	}
@@ -2597,13 +2608,24 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 
 	if len(candidatesNoOrchestrator) == 0 && orchestrator == nil {
 		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketEvictionMigration)
 		return nil
 	}
 
-	// Always set the condition so reconcileBuckets uses the migration-safe API
-	// to push corrective bucket updates — regardless of whether swap routines
-	// are enabled.
-	r.c.cluster.Status.SetBucketMigrationCondition()
+	// Set conditions based on which types of per-node overrides exist.
+	// BucketMigrating: storage backend overrides → reconcileBuckets uses restricted API.
+	// BucketEvictionMigrating: eviction policy overrides → informational, does not restrict fields.
+	if hasStorageBackendOverrides {
+		r.c.cluster.Status.SetBucketMigrationCondition()
+	} else {
+		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+	}
+
+	if hasEvictionOverrides {
+		r.c.cluster.Status.SetBucketEvictionMigrationCondition()
+	} else {
+		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketEvictionMigration)
+	}
 
 	// Swap-rebalances are skipped when either:
 	// * Migration routines are disabled (operator not permitted to eject pods), or

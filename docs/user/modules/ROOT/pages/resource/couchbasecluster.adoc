@@ -1002,7 +1002,10 @@ bucket resources.
 
 ==== Description
 
-Used to define whether managed bucket storage backend migration routines should be enabled.
+Used to define whether managed bucket migration routines (swap-rebalances) should be
+enabled.
+When true, the operator performs swap-rebalances on nodes that have per-node
+overrides for storage backend or eviction policy that differ from the bucket spec.
 This value defaults to false.
 
 === couchbaseclusters.spec.buckets.managed
@@ -7409,7 +7412,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, Unreconcilable, WaitingBetweenUpgrades, MixedMode, ManualInterventionRequired, ServicesMismatch`
+*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, BucketEvictionMigrating, Unreconcilable, WaitingBetweenUpgrades, MixedMode, ManualInterventionRequired, ServicesMismatch`
 
 ==== Description
 

@@ -420,7 +420,7 @@ func TestEvictionPolicyOnlineChangeMigrationDisabled(t *testing.T) {
 		Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly),
 		time.Minute)
 	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.BucketEditedEvent(cluster, bucket.Name), 10*time.Second, 5*time.Minute)
-	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionBucketMigration)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionBucketEvictionMigration)
 	e2eutil.MustWaitUntilAllNodeEvictionPolicyMatch(t, kubernetes, cluster, 10*time.Minute, string(couchbasev2.CouchbaseBucketEvictionPolicyValueOnly))
 
 	// Change the online eviction policy again but with onlineEvictionPolicyChange set to false, expect the eviction policy to change but with bucket restarts

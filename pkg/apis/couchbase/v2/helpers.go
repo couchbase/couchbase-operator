@@ -918,6 +918,11 @@ func (cs *ClusterStatus) SetBucketMigrationCondition() {
 	cs.setClusterCondition(c)
 }
 
+func (cs *ClusterStatus) SetBucketEvictionMigrationCondition() {
+	c := newClusterCondition(ClusterConditionBucketEvictionMigration, v1.ConditionTrue, "BucketEvictionMigration", "Migrating bucket eviction policy")
+	cs.setClusterCondition(c)
+}
+
 func (cs *ClusterStatus) SetMixedModeCondition() {
 	c := newClusterCondition(ClusterConditionMixedMode, v1.ConditionTrue, "MixedMode", "Cluster running in mixed mode with two versions")
 	cs.setClusterCondition(c)
@@ -1826,7 +1831,7 @@ func (c *CouchbaseCluster) CanHibernate() (bool, string) {
 		return false, "Cluster is upgrading"
 	}
 
-	if c.HasCondition(ClusterConditionBucketMigration) {
+	if c.HasCondition(ClusterConditionBucketMigration) || c.HasCondition(ClusterConditionBucketEvictionMigration) {
 		return false, "Cluster is migrating buckets"
 	}
 

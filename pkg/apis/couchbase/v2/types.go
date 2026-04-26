@@ -1433,9 +1433,12 @@ type CouchbaseBucketSpec struct {
 	EvictionPolicy CouchbaseBucketEvictionPolicy `json:"evictionPolicy,omitempty"`
 
 	// OnlineEvictionPolicyChange controls whether eviction policy changes can be made online
-	// without requiring a bucket restart. If set the eviction policy change will only take effect
-	// on the bucket nodes after a swap rebalance, delta recovery, or full recovery. If EnableBucketMigrationRoutines is set to true,
-	// on the cluster the operator will perform the swap rebalances. This field defaults to false.
+	// without requiring a bucket restart. When set to true, the operator sends the eviction policy
+	// change to Couchbase Server with noRestart=true, which changes the bucket-level setting but
+	// leaves per-node overrides with the old policy. To apply the new policy to all nodes, either
+	// set this field back to false (the operator will trigger a bucket restart that clears all
+	// per-node overrides) or set enableBucketMigrationRoutines to true (the operator will perform
+	// swap-rebalances to converge all nodes to the new policy). This field defaults to false.
 	// DEVELOPER PREVIEW: This feature is in developer preview and should not be used in production clusters.
 	// +kubebuilder:validation:Optional
 	// +couchbase:version:minimum=8.0.0
@@ -4798,7 +4801,9 @@ type Buckets struct {
 	// this value.
 	TargetUnmanagedBucketStorageBackend *CouchbaseStorageBackend `json:"-" annotation:"targetUnmanagedBucketStorageBackend"`
 
-	// Used to define whether managed bucket storage backend migration routines should be enabled.
+	// Used to define whether managed bucket migration routines (swap-rebalances) should be
+	// enabled. When true, the operator performs swap-rebalances on nodes that have per-node
+	// overrides for storage backend or eviction policy that differ from the bucket spec.
 	// This value defaults to false.
 	EnableBucketMigrationRoutines bool `json:"enableBucketMigrationRoutines,omitempty" annotation:"enableBucketMigrationRoutines"`
 
@@ -5233,7 +5238,7 @@ type ClusterCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;ManualInterventionRequired;ServicesMismatch;
+// +kubebuilder:validation:Enum=Available;Balanced;ManageConfig;Scaling;ScalingUp;ScalingDown;Upgrading;Hibernating;Error;AutoscaleReady;Synchronized;WaitingBetweenMigrations;Migrating;Rebalancing;ExpandingVolume;BucketMigrating;BucketEvictionMigrating;Unreconcilable;WaitingBetweenUpgrades;MixedMode;ManualInterventionRequired;ServicesMismatch;
 type ClusterConditionType string
 
 const (
@@ -5255,6 +5260,7 @@ const (
 	ClusterConditionExpandingVolume            ClusterConditionType = "ExpandingVolume"
 	ClusterLastUpdateTime                      ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration            ClusterConditionType = "BucketMigrating"
+	ClusterConditionBucketEvictionMigration    ClusterConditionType = "BucketEvictionMigrating"
 	ClusterUnreconcilable                      ClusterConditionType = "Unreconcilable"
 	ClusterConditionMixedMode                  ClusterConditionType = "MixedMode"
 	ClusterConditionManualInterventionRequired ClusterConditionType = "ManualInterventionRequired"
