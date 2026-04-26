@@ -373,12 +373,33 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 
 	requestedCollection := existingCollection
 
-	// If backend is not magma we can't modify history
-	if cbBucket.Spec.StorageBackend != couchbasev2.CouchbaseStorageBackendMagma {
+	// If backend is not magma we can't modify history.
+	// Check the server-side backend from cluster status rather than the CRD spec,
+	// because during a couchstore→magma migration reconcileScopesAndCollections
+	// runs before reconcileBuckets — the CRD may already say magma while the
+	// server is still couchstore.
+	actualBackend := c.cluster.Status.GetBucketStorageBackendFromStatus(cbBucket.GetCouchbaseName())
+	if actualBackend == "" {
+		// Status not populated yet (first reconcile); fall back to CRD spec.
+		actualBackend = cbBucket.Spec.StorageBackend
+	}
+
+	switch {
+	case actualBackend != couchbasev2.CouchbaseStorageBackendMagma:
 		requestedCollection.History = nil
 		existingCollection.History = nil
-	} else if collection.Spec.History != nil {
+	case collection.Spec.History != nil:
+		// Explicit collection-level override — always respected.
 		requestedCollection.History = collection.Spec.History
+	default:
+		// No explicit collection override; inherit bucket collectionHistoryDefault.
+		// requestedCollection starts as existingCollection (CBS state), so without
+		// setting History here, desired=actual and history is never patched for
+		// nil-spec collections.  Nil/true → true (magma default), false → false.
+		historyEnabled := cbBucket.Spec.HistoryRetentionSettings == nil ||
+			cbBucket.Spec.HistoryRetentionSettings.CollectionDefault == nil ||
+			*cbBucket.Spec.HistoryRetentionSettings.CollectionDefault
+		requestedCollection.History = &historyEnabled
 	}
 
 	canEditTTL, err := c.IsAtLeastVersion("7.6.0")
