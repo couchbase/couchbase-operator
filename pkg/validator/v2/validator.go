@@ -2100,16 +2100,16 @@ func checkHistoryRetentionBytes(bytes uint64) error {
 	return nil
 }
 
-func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, storageBackend couchbasev2.CouchbaseStorageBackend) error {
+func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, storageBackend couchbasev2.CouchbaseStorageBackend) (string, error) {
 	if bucket.Spec.HistoryRetentionSettings != nil {
 		if storageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
-			return fmt.Errorf("historyRetentionSettings can only be used with magma storage backend")
+			return "spec.historyRetentionSettings can only be used with a magma storage backend; the operator will omit these settings", nil
 		}
 
-		return checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
+		return "", checkHistoryRetentionBytes(bucket.Spec.HistoryRetentionSettings.Bytes)
 	}
 
-	return nil
+	return "", nil
 }
 
 func checkMagmaDataBlockSize(val string) error {
@@ -2169,7 +2169,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if checkAnnotationSkipValidation(bucket.Annotations) {
 		return nil, nil
 	}
-	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster); err != nil {
+
+	var warnings []string
+
+	if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, bucket, cluster, &warnings); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -2222,8 +2225,6 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	if err := checkBucketUnsupportedFields(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
-
-	var warnings []string
 
 	w, err := checkBucketCRDFieldsForNonDefaultUnsupportedFields(v, bucket, cluster)
 	if err != nil {
@@ -4082,11 +4083,12 @@ func checkMaxTTL(path string, value *metav1.Duration, allowNegOverride bool) err
 	return nil
 }
 
-func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.CouchbaseCollection) error {
+func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.CouchbaseCollection) ([]string, error) {
 	var errs []error
+	var warnings []string
 
 	if checkAnnotationSkipValidation(collection.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	if collection.Spec.MaxTTL != nil {
@@ -4095,22 +4097,31 @@ func CheckConstraintsCollection(v *types.Validator, collection *couchbasev2.Couc
 		}
 	}
 
+	// Warn when spec.history is set but no magma bucket exists. History retention is
+	// only supported by magma-backend buckets; the operator silently omits it for couchstore.
+	if collection.Spec.History != nil {
+		if w := checkNoMagmaBucketWarning(v, collection.Namespace); w != "" {
+			warnings = append(warnings, w)
+		}
+	}
+
 	if err := checkAllScopeCollectionsUnique(v, collection.Namespace); err != nil {
 		errs = append(errs, err)
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
-func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchbasev2.CouchbaseCollectionGroup) error {
+func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchbasev2.CouchbaseCollectionGroup) ([]string, error) {
 	var errs []error
+	var warnings []string
 
 	if checkAnnotationSkipValidation(collectionGroup.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	if collectionGroup.Spec.MaxTTL != nil {
@@ -4119,15 +4130,39 @@ func CheckConstraintsCollectionGroup(v *types.Validator, collectionGroup *couchb
 		}
 	}
 
+	if collectionGroup.Spec.History != nil {
+		if w := checkNoMagmaBucketWarning(v, collectionGroup.Namespace); w != "" {
+			warnings = append(warnings, w)
+		}
+	}
+
 	if err := checkAllScopeCollectionsUnique(v, collectionGroup.Namespace); err != nil {
 		errs = append(errs, err)
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
+}
+
+// checkNoMagmaBucketWarning returns a warning string when no magma bucket exists
+// in the namespace. Returns "" if a magma bucket is found or if listing fails.
+func checkNoMagmaBucketWarning(v *types.Validator, namespace string) string {
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(namespace, nil)
+	if err != nil {
+		return ""
+	}
+
+	for i := range buckets.Items {
+		backend, _ := buckets.Items[i].GetStorageBackend(nil)
+		if backend == couchbasev2.CouchbaseStorageBackendMagma {
+			return ""
+		}
+	}
+
+	return "spec.history can only be set for collections used with a magma storage backend bucket; the operator will omit this setting"
 }
 
 func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope) error {
@@ -5273,12 +5308,22 @@ func CheckChangeConstraintsBucket(v *types.Validator, prev, curr *couchbasev2.Co
 			}
 
 			if prevBackend == couchbasev2.CouchbaseStorageBackendMagma && currBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
-				// Bucket history must have been disabled on the previous bucket spec. Cannot be done as part of the same change operation.
+				// The user must set collectionHistoryDefault=false on the bucket CRD
+				// before migrating.  The operator propagates that setting to existing
+				// collections (including _default/_default) during normal reconciliation
+				// while the bucket is still magma.
 				if err := checkBucketHistoryDisabled(prev); err != nil {
 					errs = append(errs, err)
 				}
 
-				warnings = append(warnings, "Changing bucket storagebackend could have associated collections with history retention enabled. This must be disabled to prevent errors.")
+				// Block migration if any collection CRD has explicit spec.history=true.
+				// The operator respects explicit overrides so those collections would
+				// keep history=true on the server, causing CBS to reject the migration.
+				if err := checkUserCollectionsHistoryExplicitTrue(v, curr.Namespace); err != nil {
+					errs = append(errs, err)
+				}
+
+				warnings = append(warnings, "Changing bucket storagebackend from magma to couchstore: ensure collectionHistoryDefault is set to false and all collections have history retention disabled before proceeding.")
 			}
 		}
 
@@ -5388,7 +5433,40 @@ func checkBucketHistoryDisabled(bucket *couchbasev2.CouchbaseBucket) error {
 		return nil
 	}
 
-	return fmt.Errorf("spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket")
+	return fmt.Errorf("bucket %q: spec.storageBackend can only be changed from magma to couchstore if spec.historyRetention.collectionHistoryDefault is first disabled on the bucket", bucket.Name)
+}
+
+// checkUserCollectionsHistoryExplicitTrue blocks a magma→couchstore migration
+// when any CouchbaseCollection or CouchbaseCollectionGroup CRD in the namespace
+// has spec.history explicitly set to true.  The operator respects explicit
+// collection-level overrides, so those collections will keep history=true on the
+// server and CBS will reject the storage backend change.
+func checkUserCollectionsHistoryExplicitTrue(v *types.Validator, namespace string) error {
+	collections, err := v.Abstraction.GetCouchbaseCollections(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := range collections.Items {
+		h := collections.Items[i].Spec.History
+		if h != nil && *h {
+			return fmt.Errorf("spec.storageBackend cannot be changed from magma to couchstore while CouchbaseCollection %q has spec.history set to true; remove or set spec.history to false on all collections first", collections.Items[i].Name)
+		}
+	}
+
+	collectionGroups, err := v.Abstraction.GetCouchbaseCollectionGroups(namespace, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := range collectionGroups.Items {
+		h := collectionGroups.Items[i].Spec.History
+		if h != nil && *h {
+			return fmt.Errorf("spec.storageBackend cannot be changed from magma to couchstore while CouchbaseCollectionGroup %q has spec.history set to true; remove or set spec.history to false on all collection groups first", collectionGroups.Items[i].Name)
+		}
+	}
+
+	return nil
 }
 
 //nolint:gocognit
@@ -5538,7 +5616,7 @@ func checkClusterConstraintMagmaStorageBackend(v *types.Validator, cluster *couc
 			return err
 		}
 
-		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster); err != nil {
+		if err := validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v, &cbBucket, cluster, nil); err != nil {
 			return err
 		}
 	}
@@ -6541,7 +6619,7 @@ func getUserRelatedClusters(v *types.Validator, user *couchbasev2.CouchbaseUser)
 }
 
 //nolint:gocognit
-func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster, warnings *[]string) error {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
@@ -6563,8 +6641,12 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 	}
 
 	if len(clusters) == 0 && bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
-		if err := checkBucketHistoryRetentionSettings(bucket, couchbasev2.CouchbaseStorageBackendCouchstore); err != nil {
+		w, err := checkBucketHistoryRetentionSettings(bucket, couchbasev2.CouchbaseStorageBackendCouchstore)
+		if err != nil {
 			return err
+		}
+		if w != "" && warnings != nil {
+			*warnings = append(*warnings, w)
 		}
 	}
 
@@ -6581,8 +6663,12 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		// if it's set specifically on the bucket as well so we can validate values that the operator would override.
 		storageBackend, _ := bucket.GetStorageBackend(c)
 
-		if err := checkBucketHistoryRetentionSettings(bucket, storageBackend); err != nil {
+		w, err := checkBucketHistoryRetentionSettings(bucket, storageBackend)
+		if err != nil {
 			return err
+		}
+		if w != "" && warnings != nil {
+			*warnings = append(*warnings, w)
 		}
 
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma || bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {

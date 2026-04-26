@@ -719,11 +719,13 @@ func (rv *reconcileValidator) checkCouchbaseBackupRestoreResourceConstraints(bac
 }
 
 func (rv *reconcileValidator) checkCouchbaseCollectionResourceConstraints(collection *couchbasev2.CouchbaseCollection) error {
-	return validationv2.CheckConstraintsCollection(rv.v, collection)
+	_, err := validationv2.CheckConstraintsCollection(rv.v, collection)
+	return err
 }
 
 func (rv *reconcileValidator) checkCouchbaseCollectionGroupResourceConstraints(collectionGroup *couchbasev2.CouchbaseCollectionGroup) error {
-	return validationv2.CheckConstraintsCollectionGroup(rv.v, collectionGroup)
+	_, err := validationv2.CheckConstraintsCollectionGroup(rv.v, collectionGroup)
+	return err
 }
 
 func (rv *reconcileValidator) checkCouchbaseScopeResourceConstraints(scope *couchbasev2.CouchbaseScope) error {
