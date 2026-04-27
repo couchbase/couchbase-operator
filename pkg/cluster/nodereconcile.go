@@ -1866,7 +1866,7 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return nil
 	}
 
-	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
+	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.Version())
 }
 
 func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {

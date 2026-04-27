@@ -156,6 +156,17 @@ func (v *Version) String() string {
 	return v.Semver()
 }
 
+// extractBuildNumber extracts the build number from a version string.
+// Returns the build number as a string, or empty string if not present.
+func extractBuildNumber(versionStr string) string {
+	re := regexp.MustCompile(`^(?:[0-9]+.*:)?(?:(\w+)-)?\d+\.\d+\.\d+(?:-(\d+))?(?:-(\w+))?$`)
+	matches := re.FindStringSubmatch(versionStr)
+	if len(matches) > 2 {
+		return matches[2]
+	}
+	return ""
+}
+
 // Compare semantic versions.
 // Returns -1 if v < o, 0 if v == o and 1 if v > o.
 func (v *Version) Compare(o *Version) int {
@@ -169,6 +180,33 @@ func (v *Version) Compare(o *Version) int {
 		}
 	}
 
+	// If semver is equal, compare build numbers.
+	// A version with a build number is considered greater than one without, with the assumption that
+	// you always want to upgrade to a version with a build number, and can't then go back to the same major/minor/maintenance version without a build number.
+	vBuildStr := extractBuildNumber(v.version)
+	oBuildStr := extractBuildNumber(o.version)
+
+	// Handle cases where one or both are empty
+	if vBuildStr == "" || oBuildStr == "" {
+		if vBuildStr == oBuildStr {
+			return 0 // Both are empty
+		}
+		if vBuildStr != "" {
+			return 1 // Only v has a build
+		}
+		return -1 // Only o has a build
+	}
+
+	// If we're here, both have build numbers
+	vBuild, _ := strconv.Atoi(vBuildStr)
+	oBuild, _ := strconv.Atoi(oBuildStr)
+
+	if vBuild > oBuild {
+		return 1
+	}
+	if vBuild < oBuild {
+		return -1
+	}
 	return 0
 }
 

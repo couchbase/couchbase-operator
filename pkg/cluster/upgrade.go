@@ -593,9 +593,14 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 			if i >= numToUpgradeVersion {
 				break
 			}
-			candidate.SetImage(specImage)
-			candidate.SetVersion(targetVersion)
-			candidates.Add(candidate)
+
+			// Clone first so we don't mutate c.members while calculating candidates.
+			// Mutating member versions/images here can make downstream logic (for
+			// example lowest-version persistence) observe target versions too early.
+			cloned := candidate.Clone()
+			cloned.SetImage(specImage)
+			cloned.SetVersion(targetVersion)
+			candidates.Add(cloned)
 		}
 	}
 
