@@ -29,7 +29,7 @@ import (
 )
 
 func (c *Cluster) reconcileEncryptionAtRest() error {
-	if c.cluster.Spec.Security.EncryptionAtRest == nil || !c.cluster.Spec.Security.EncryptionAtRest.Managed {
+	if !c.IsEncryptionAtRestManaged() {
 		return nil
 	}
 
