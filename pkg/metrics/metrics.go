@@ -363,6 +363,66 @@ var (
 	// nolint:godot
 	BackupJobsCreatedTotalMetric = prometheus.CounterVec{}
 
+	// RebalanceAttemptsTotalMetric
+	// name: rebalance_attempts_total
+	// type: counter
+	// help: Total number of times the operator has made a request to Couchbase Server to rebalance the cluster
+	// unit:
+	// added: 2.10.0
+	// stability: committed
+	// labels: name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	RebalanceAttemptsTotalMetric = prometheus.CounterVec{}
+
+	// RebalanceAttemptFailuresTotalMetric
+	// name: rebalance_attempt_failures_total
+	// type: counter
+	// help: Total number of times a request to rebalance Couchbase Server has failed
+	// unit:
+	// added: 2.10.0
+	// stability: committed
+	// labels: name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	RebalanceAttemptFailuresTotalMetric = prometheus.CounterVec{}
+
+	// RebalanceTimeSecondsMetric
+	// name: rebalance_time_seconds
+	// type: gauge
+	// help: The duration in seconds that the last rebalance took to complete
+	// unit: seconds
+	// added: 2.10.0
+	// stability: committed
+	// labels: name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	RebalanceTimeSecondsMetric = prometheus.GaugeVec{}
+
+	// RebalancesTotalMetric
+	// name: rebalances_total
+	// type: counter
+	// help: Total number of reconcile loops in which the operator attempted a rebalance
+	// unit:
+	// added: 2.10.0
+	// stability: committed
+	// labels: name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	RebalancesTotalMetric = prometheus.CounterVec{}
+
+	// RebalancesFailedTotalMetric
+	// name: rebalances_failed_total
+	// type: counter
+	// help: Total number of reconcile loops in which the operator failed to rebalance the cluster
+	// unit:
+	// added: 2.10.0
+	// stability: committed
+	// labels: name
+	// optionalLabels: cluster_uuid, cluster_name
+	// nolint:godot
+	RebalancesFailedTotalMetric = prometheus.CounterVec{}
+
 	// ManualInterventionRequiredMetric
 	// name: cluster_manual_intervention
 	// type: gauge
@@ -604,6 +664,41 @@ func InitMetrics() {
 		Subsystem: MetricSubsystem,
 	}, addOptionalLabels([]string{"namespace", "backup_type"}))
 
+	RebalanceAttemptsTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "rebalance_attempts_total",
+		Help:      "Total number of times the operator has made a request to Couchbase Server to rebalance the cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	RebalanceAttemptFailuresTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "rebalance_attempt_failures_total",
+		Help:      "Total number of times a request to rebalance Couchbase Server has failed",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	RebalanceTimeSecondsMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "rebalance_time_seconds",
+		Help:      "The duration in seconds that the last rebalance took to complete",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	RebalancesTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "rebalances_total",
+		Help:      "Total number of reconcile loops in which the operator attempted a rebalance",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
+	RebalancesFailedTotalMetric = *prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name:      "rebalances_failed_total",
+		Help:      "Total number of reconcile loops in which the operator failed to rebalance the cluster",
+		Namespace: MetricNamespace,
+		Subsystem: MetricSubsystem,
+	}, addOptionalLabels([]string{"name"}))
+
 	ManualInterventionRequiredMetric = *prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name:      "cluster_manual_intervention",
 		Help:      "Indicates whether manual intervention is required for the cluster",
@@ -638,6 +733,11 @@ func InitMetrics() {
 		MemoryUnderManagementBytesMetric,
 		CPUUnderManagementMetric,
 		BackupJobsCreatedTotalMetric,
+		RebalanceAttemptsTotalMetric,
+		RebalanceAttemptFailuresTotalMetric,
+		RebalanceTimeSecondsMetric,
+		RebalancesTotalMetric,
+		RebalancesFailedTotalMetric,
 		ManualInterventionRequiredMetric,
 	)
 }

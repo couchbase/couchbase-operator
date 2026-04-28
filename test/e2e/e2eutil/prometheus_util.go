@@ -417,6 +417,27 @@ func MustCheckOperatorGaugeMetric(t *testing.T, k8s *types.Cluster, ctx *TLSCont
 	}
 }
 
+// MustWaitForOperatorGaugeMetricGreaterThan waits until the gauge metric with the given labels has a value greater than the threshold.
+func MustWaitForOperatorGaugeMetricGreaterThan(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, labels map[string]string, threshold float64, timeout time.Duration) {
+	callback := func() error {
+		metricVal := getOperatorMetric(t, k8s, ctx, metric, labels, 10*time.Second)
+
+		if metricVal == nil || metricVal.GetGauge() == nil {
+			return fmt.Errorf("metric %q not found", metric)
+		}
+
+		if metricVal.GetGauge().GetValue() <= threshold {
+			return fmt.Errorf("metric %q value %v is not greater than %v", metric, metricVal.GetGauge().GetValue(), threshold)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 func getOperatorMetric(t *testing.T, k8s *types.Cluster, ctx *TLSContext, metric string, labels map[string]string, timeout time.Duration) *dto.Metric {
 	operatorMetricsPort := "8383"
 

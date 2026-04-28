@@ -2329,7 +2329,11 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			}
 		}
 
+		metrics.RebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 		if err := c.rebalanceWithRetriesOnVerifyFails(r.clusteredMembers, r.ejectMembers, r.rebalanceRetries); err != nil {
+			metrics.RebalancesFailedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 			// If rebalance error occurred due to a node that could not be delta
 			// recovered then it should be set to a full recovery type.  The state
 			// will have changed from add-back to pending-add, so we won't loop

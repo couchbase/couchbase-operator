@@ -185,6 +185,72 @@
             "cluster_name"
         ]
     },
+    "rebalance_attempt_failures_total": {
+        "type": "counter",
+        "help": "Total number of times a request to rebalance Couchbase Server has failed",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
+    "rebalance_attempts_total": {
+        "type": "counter",
+        "help": "Total number of times the operator has made a request to Couchbase Server to rebalance the cluster",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
+    "rebalance_time_seconds": {
+        "type": "gauge",
+        "help": "The duration in seconds that the last rebalance took to complete",
+        "unit": "seconds",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
+    "rebalances_failed_total": {
+        "type": "counter",
+        "help": "Total number of reconcile loops in which the operator failed to rebalance the cluster",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
+    "rebalances_total": {
+        "type": "counter",
+        "help": "Total number of reconcile loops in which the operator attempted a rebalance",
+        "added": "2.10.0",
+        "stability": "committed",
+        "labels": [
+            "name"
+        ],
+        "optionalLabels": [
+            "cluster_uuid",
+            "cluster_name"
+        ]
+    },
     "reconcile_failures": {
         "type": "counter",
         "help": "Total failed reconcile operations performed on a specific cluster",

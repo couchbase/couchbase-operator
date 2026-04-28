@@ -926,3 +926,33 @@ func TestScaleDownPrioritizesServiceMumatchedNodes(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestRebalanceMetrics verifies that rebalance metrics are updated after a
+// successful scale-up rebalance. It creates a 1 node cluster, scales to 2,
+// waits for the rebalance to complete, and then checks that the counter and
+// gauge metrics are populated correctly.
+func TestRebalanceMetrics(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size1
+
+	// Create the cluster.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Scale up to trigger a rebalance.
+	e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)
+
+	// Verify counter metrics: at least 1 reconcile-level rebalance attempted.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "rebalances_total", nil, 1, 2*time.Minute)
+
+	// Verify counter metrics: at least 1 CBS-level rebalance attempt made.
+	e2eutil.MustWaitForOperatorCounterMetric(t, kubernetes, nil, "rebalance_attempts_total", nil, 1, 2*time.Minute)
+
+	// Verify gauge metric: rebalance time should be greater than 0 seconds.
+	e2eutil.MustWaitForOperatorGaugeMetricGreaterThan(t, kubernetes, nil, "rebalance_time_seconds", nil, 0, 2*time.Minute)
+}

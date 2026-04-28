@@ -1337,6 +1337,11 @@ func (c *Cluster) InitCounterMetrics() {
 	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Add(0)
 	metrics.SwapRebalanceFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
 	metrics.SwapRebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.RebalanceAttemptsTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.RebalanceAttemptFailuresTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.RebalancesTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.RebalancesFailedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Add(0)
+	metrics.RebalanceTimeSecondsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(0)
 	metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
 }
 

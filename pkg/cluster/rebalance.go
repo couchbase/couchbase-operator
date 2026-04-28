@@ -20,6 +20,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
@@ -230,9 +231,14 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 		known[i] = node.OTPNode
 	}
 
+	rebalanceStart := time.Now()
+
 	var err error
 	for i := uint(0); i < maxRetries; i++ {
+		metrics.RebalanceAttemptsTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
+
 		if err := couchbaseutil.Rebalance(known, eject).On(c.api, ms); err != nil {
+			metrics.RebalanceAttemptFailuresTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 			c.raiseEvent(k8sutil.RebalanceIncompleteEvent(c.cluster))
 			return err
 		}
@@ -308,6 +314,8 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
+
+	metrics.RebalanceTimeSecondsMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(time.Since(rebalanceStart).Seconds())
 
 	if err := c.state.Delete(persistence.RebalanceClusteredMembers); err != nil {
 		return err

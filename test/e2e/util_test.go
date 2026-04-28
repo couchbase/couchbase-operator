@@ -287,6 +287,7 @@ func registerTests() {
 		framework.NewTestDef(TestBareHostnameValidation).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestServiceChangedOnNode).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestScaleDownPrioritizesServiceMumatchedNodes).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestRebalanceMetrics).WithTags(TagSuiteP0),
 
 		framework.NewTestDef(TestXDCRCreateClusterLocal).WithTags(TagSuiteP0, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRCreateClusterLocalTLS).WithTags(TagSuiteP0, TagSuitePlatform, TagFeatureTLS, TagFeatureXDCR),
