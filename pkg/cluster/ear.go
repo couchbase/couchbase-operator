@@ -145,7 +145,7 @@ func (c *Cluster) reconcileLogEncryptionAtRestSettings(encryptionKeys couchbaseu
 }
 
 func (c *Cluster) reconcileEncryptionKeys() error {
-	if c.cluster.Spec.Security.EncryptionAtRest == nil || !c.cluster.Spec.Security.EncryptionAtRest.Managed {
+	if !c.IsEncryptionAtRestManaged() {
 		return nil
 	}
 
@@ -333,10 +333,6 @@ func (c *Cluster) removeFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
 }
 
 func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, []*couchbasev2.CouchbaseEncryptionKey, error) {
-	if !c.IsEncryptionAtRestManaged() {
-		return nil, nil, nil
-	}
-
 	selector := labels.Everything()
 
 	deletedKeys := []*couchbasev2.CouchbaseEncryptionKey{}
@@ -601,6 +597,10 @@ func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey) []string
 	return usageList
 }
 
+// refreshKeyShadowSecret ensures the key shadow secret is up to date with the credential secrets referenced by the encryption keys in the cluster.
+// This will not contain encryption keys themselves, only AWS or KMIP credentials that need to be mounted to pods.
+// Whether ear.managed is true or false does not matter here. We will maintain shadows of the referenced key secrets. To empty the shadowed secrets,
+// the secrets which they are shadowing need to be emptied as well.
 func (c *Cluster) refreshKeyShadowSecret() error {
 	// If the cluster spec is at least 8.0, refresh the shadow secrets as during upgrades to 8.0, we want to create the
 	// shadow secrets for the new version so we can mount them while upgrading the pods.
