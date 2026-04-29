@@ -333,6 +333,10 @@ func (c *Cluster) removeFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
 }
 
 func (c *Cluster) gatherRequestedKeys() ([]*couchbasev2.CouchbaseEncryptionKey, []*couchbasev2.CouchbaseEncryptionKey, error) {
+	if c.cluster.Spec.Security.EncryptionAtRest == nil {
+		return nil, nil, nil
+	}
+
 	selector := labels.Everything()
 
 	deletedKeys := []*couchbasev2.CouchbaseEncryptionKey{}
