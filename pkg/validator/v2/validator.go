@@ -2551,7 +2551,7 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return warnings, nil
 }
 
-func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseReplication) error {
+func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseReplication) error {
 	if checkAnnotationSkipValidation(r.Annotations) {
 		return nil
 	}
@@ -2570,6 +2570,23 @@ func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseRep
 	case "", "Active", "Off":
 	default:
 		return fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
+	}
+
+	clusters, err := getReplicationRelatedClusters(v, r)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+
+	for _, cluster := range clusters {
+		if err := validateReplicationConflictLogging(v, cluster, &r.Spec); err != nil {
+			errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", r.Name, err))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
@@ -6469,6 +6486,39 @@ func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.
 
 		if selector.Matches(labels.Set(bucket.Labels)) {
 			relatedClusters = append(relatedClusters, &cluster)
+		}
+	}
+
+	return relatedClusters, nil
+}
+
+func getReplicationRelatedClusters(v *types.Validator, r *couchbasev2.CouchbaseReplication) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(r.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.XDCR.Managed {
+			continue
+		}
+
+		for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+			selector := labels.Everything()
+			if remoteCluster.Replications.Selector != nil {
+				selector, err = metav1.LabelSelectorAsSelector(remoteCluster.Replications.Selector)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if selector.Matches(labels.Set(r.Labels)) {
+				relatedClusters = append(relatedClusters, &cluster)
+
+				break
+			}
 		}
 	}
 
