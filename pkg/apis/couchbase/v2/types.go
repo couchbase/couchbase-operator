@@ -3612,7 +3612,7 @@ type CouchbaseClusterNetworkingSpec struct {
 
 	// TLS defines the TLS configuration for the cluster including
 	// server and client certificate configuration, and TLS security policies.
-	TLS *TLSPolicy `json:"tls,omitempty"`
+	TLS *TLSPolicy `json:"tls,omitempty" annotation:"tls"`
 
 	// DNS defines information required for Dynamic DNS support.
 	DNS *DNS `json:"dns,omitempty"`
@@ -5047,6 +5047,13 @@ type TLSPolicy struct {
 	// TLS verification. Defaults to true for backward compatibility.
 	// +kubebuilder:default=true
 	ValidateBareHostnames bool `json:"validateBareHostnames"`
+
+	// ValidateShortHostnames, when false, stops the operator from mandating
+	// the presence of short-form wildcards (e.g., *.<cluster>) in certificates.
+	// This allows the use of certificates that only contain fully qualified
+	// domain names (3+ labels), satisfying security policies that prohibit
+	// "short" or unqualified SAN entries.
+	ValidateShortHostnames *bool `json:"-" annotation:"validateShortHostnames"`
 }
 
 type PassphraseType string

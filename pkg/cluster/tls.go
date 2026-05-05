@@ -1014,7 +1014,12 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 		validateBareHostnames = c.cluster.Spec.Networking.TLS.ValidateBareHostnames
 	}
 
-	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace, validateBareHostnames)
+	validateShortHostnames := true
+	if c.cluster.Spec.Networking.TLS != nil && c.cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
+		validateShortHostnames = *c.cluster.Spec.Networking.TLS.ValidateShortHostnames
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(c.cluster.Name, c.cluster.Namespace, validateBareHostnames, validateShortHostnames)
 
 	if c.cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, "*."+c.cluster.Spec.Networking.DNS.Domain)

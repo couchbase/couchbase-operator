@@ -154,7 +154,7 @@ func getCouchbaseClientSDK(k8s *types.Cluster, cluster *couchbasev2.CouchbaseClu
 		Password: string(k8s.DefaultSecret.Data["password"]),
 	}
 
-	host, err := gocb.Connect(fmt.Sprintf("couchbase://%s.%s", cluster.Name, cluster.Namespace), opts)
+	host, err := gocb.Connect(fmt.Sprintf("couchbase://%s-srv.%s", cluster.Name, cluster.Namespace), opts)
 	if err != nil {
 		return host, nil, err
 	}

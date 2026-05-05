@@ -1666,7 +1666,12 @@ func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluste
 		includeBareHostnames = cluster.Spec.Networking.TLS.ValidateBareHostnames
 	}
 
-	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace, includeBareHostnames)
+	validateShortHostnames := true
+	if cluster.Spec.Networking.TLS != nil && cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
+		validateShortHostnames = *cluster.Spec.Networking.TLS.ValidateShortHostnames
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace, includeBareHostnames, validateShortHostnames)
 
 	if cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", cluster.Spec.Networking.DNS.Domain))

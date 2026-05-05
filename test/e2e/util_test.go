@@ -281,6 +281,7 @@ func registerTests() {
 		framework.NewTestDef(TestTLSRestCreateRestRotate).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestTLSScriptCreateRestRotate).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestBareHostnameValidation).WithTags(TagSuiteP0, TagFeatureTLS),
+		framework.NewTestDef(TestShortHostnamesValidation).WithTags(TagSuiteP0, TagFeatureTLS),
 		framework.NewTestDef(TestServiceChangedOnNode).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestScaleDownPrioritizesServiceMumatchedNodes).WithTags(TagSuiteP0),
 

@@ -40,7 +40,7 @@ func testBareHostnameValidationCase(t *testing.T, kubernetes *types.Cluster, clu
 	// Create TLS context based on test case using the consistent cluster name
 	tlsOpts := &e2eutil.TLSOpts{
 		ClusterName: clusterName,
-		AltNames:    util_x509.MandatorySANs(clusterName, kubernetes.Namespace, includeBareHostnamesInCert),
+		AltNames:    util_x509.MandatorySANs(clusterName, kubernetes.Namespace, includeBareHostnamesInCert, true),
 	}
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOpts)
 
@@ -102,5 +102,95 @@ func TestBareHostnameValidation(t *testing.T) {
 		defer cleanup()
 
 		testBareHostnameValidationCase(t, kubernetes, clusterSize, false, false, false, "")
+	})
+}
+
+// testShortHostnamesValidationCase runs a single test case for short hostnames validation.
+func testShortHostnamesValidationCase(t *testing.T, kubernetes *types.Cluster, clusterSize int, includeShortHostnamesInCert, validateShortHostnamesInSpec bool, expectAdmissionFailure bool, expectedAdmissionFailureReason string) {
+	// Use a consistent cluster name for both certificate generation and validation
+	clusterName := "test-couchbase-" + e2eutil.RandomSuffix()
+
+	// Create TLS context based on test case using the consistent cluster name
+	tlsOpts := &e2eutil.TLSOpts{
+		ClusterName: clusterName,
+		AltNames:    util_x509.MandatorySANs(clusterName, kubernetes.Namespace, true, includeShortHostnamesInCert),
+	}
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, tlsOpts)
+
+	// Generate cluster spec with TLS and set the cluster name
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithTLS(ctx).Generate(kubernetes)
+	cluster.Name = clusterName
+
+	// Set DisableShortSANEnforcement after Generate() to avoid it being overwritten by applyTLS()
+	if cluster.Spec.Networking.TLS == nil {
+		cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{}
+	}
+
+	if !validateShortHostnamesInSpec {
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		cluster.Annotations["cao.couchbase.com/networking.tls.validateShortHostnames"] = "false"
+	}
+
+	if expectAdmissionFailure {
+		// This scenario expects cluster creation to fail at admission
+		mustGetAdmissionFailureOnCreateCluster(t, kubernetes, cluster, expectedAdmissionFailureReason)
+	} else {
+		// This scenario expects cluster to be created successfully
+		cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+		// Verify cluster becomes healthy and TLS checks pass
+		e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+		e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+	}
+}
+
+func TestShortHostnamesValidation(t *testing.T) {
+	f := framework.Global
+	kubernetes, cleanup := f.SetupTestExclusive(t)
+
+	defer cleanup()
+
+	clusterSize := constants.Size3
+
+	t.Run("Default_WithShortHostnames_ShouldSucceed", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		includeInCert := true
+		validateShortHostnames := true
+
+		testShortHostnamesValidationCase(t, kubernetes, clusterSize, includeInCert, validateShortHostnames, false, "")
+	})
+
+	t.Run("Default_WithoutShortHostnames_ShouldFail", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		includeInCert := false
+		validateShortHostnames := true
+
+		testShortHostnamesValidationCase(t, kubernetes, clusterSize, includeInCert, validateShortHostnames, true, "certificate cannot be verified for zone")
+	})
+
+	t.Run("Disabled_WithShortHostnames_ShouldSucceed", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		includeInCert := true
+		validateShortHostnames := false
+
+		testShortHostnamesValidationCase(t, kubernetes, clusterSize, includeInCert, validateShortHostnames, false, "")
+	})
+
+	t.Run("Disabled_WithoutShortHostnames_ShouldSucceed", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		includeInCert := false
+		validateShortHostnames := false
+
+		testShortHostnamesValidationCase(t, kubernetes, clusterSize, includeInCert, validateShortHostnames, false, "")
 	})
 }
