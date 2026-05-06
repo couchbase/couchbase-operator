@@ -59,6 +59,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintClusterName,
 		checkConstraintDataServiceMemoryQuota,
 		checkConstraintDataServiceMemcachedThreadCounts,
+		checkConstraintMagmaFlusherThreadPercentage,
 		checkConstraintIndexServiceMemoryQuota,
 		checkConstraintSearchServiceMemoryQuota,
 		checkConstraintEventingServiceMemoryQuota,
@@ -521,6 +522,40 @@ func checkConstraintDataServiceMemcachedThreadCounts(_ *types.Validator, cluster
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+// checkConstraintMagmaFlusherThreadPercentage validates the magmaFlusherThreadPercentage cluster setting.
+// The feature is available in 7.6.10+, but NOT in 8.0.0.
+func checkConstraintMagmaFlusherThreadPercentage(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MagmaFlusherThreadPercentage == nil {
+		return nil
+	}
+
+	after7610, err := cluster.IsAtLeastVersion("7.6.10")
+	if err != nil {
+		return err
+	}
+
+	if !after7610 {
+		return fmt.Errorf("spec.cluster.data.magmaFlusherThreadPercentage is only supported for Couchbase Server 7.6.10+")
+	}
+
+	// 8.0.0 does not include this feature; it was added in 8.0.1.
+	is800, err := cluster.IsAtLeastVersion("8.0.0")
+	if err != nil {
+		return err
+	}
+
+	after801, err := cluster.IsAtLeastVersion("8.0.1")
+	if err != nil {
+		return err
+	}
+
+	if is800 && !after801 {
+		return fmt.Errorf("spec.cluster.data.magmaFlusherThreadPercentage is not supported in Couchbase Server 8.0.0, use 8.0.1+")
 	}
 
 	return nil

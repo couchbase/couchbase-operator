@@ -4381,6 +4381,14 @@ type CouchbaseClusterDataSettings struct {
 	// TCPUserTimeout is the number of seconds data is stuck in the send buffer before the connection gets torn down.
 	// +couchbase:version:minimum=8.0.0
 	TCPUserTimeout *int `json:"tcpUserTimeout,omitempty"`
+
+	// MagmaFlusherThreadPercentage sets the percentage of threads dedicated to magma flusher
+	// operations. This is available in 7.6.10+, but not in 8.0.0.
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	// +couchbase:version:minimum=7.6.10
+	// +optional
+	MagmaFlusherThreadPercentage *int `json:"magmaFlusherThreadPercentage,omitempty"`
 }
 
 type DiskUsageLimit struct {

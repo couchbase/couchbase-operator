@@ -1235,6 +1235,19 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		numPatches += 2
 	}
 
+	// magmaFlusherThreadPercentage is available in 7.6.10+, but not 8.0.0.
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.10"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		is800, _ := couchbaseutil.VersionEqual(cbVersion, "8.0.0")
+		if !is800 {
+			magmaFlusherThreadPercentage := 50
+			e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{MagmaFlusherThreadPercentage: &magmaFlusherThreadPercentage}), time.Minute)
+			e2eutil.MustVerifyMemcachedMagmaFlusherThreadPercentage(t, kubernetes, cluster, magmaFlusherThreadPercentage, 2*time.Minute)
+			numPatches++
+		}
+	}
+
 	if after80 {
 		// Re-add the data field as well as the diskUsageLimit field.
 		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{

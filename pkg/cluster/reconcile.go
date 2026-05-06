@@ -774,6 +774,18 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 			requested.TCPKeepAliveProbes = c.cluster.Spec.ClusterSettings.Data.TCPKeepAliveProbes
 			requested.TCPUserTimeout = c.cluster.Spec.ClusterSettings.Data.TCPUserTimeout
 		}
+
+		// magmaFlusherThreadPercentage is available in 7.6.10+ and 8.0.1+, but not 8.0.0.
+		// SupportsVersionFeatures cannot be used here as it only checks major.minor via compat version.
+		if lowestVersion := c.GetLowestMemberVersion(); lowestVersion != "" {
+			after7610, _ := couchbaseutil.VersionAfter(lowestVersion, "7.6.10")
+			before800, _ := couchbaseutil.VersionBefore(lowestVersion, "8.0.0")
+			after801, _ := couchbaseutil.VersionAfter(lowestVersion, "8.0.1")
+
+			if after7610 && before800 || after801 {
+				requested.MagmaFlusherThreadPercentage = c.cluster.Spec.ClusterSettings.Data.MagmaFlusherThreadPercentage
+			}
+		}
 	}
 
 	if reflect.DeepEqual(current, requested) {

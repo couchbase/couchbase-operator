@@ -1656,6 +1656,37 @@ func MustVerifyDataServerSettingsMemcachedTCPSettings(t *testing.T, k8s *types.C
 	}
 }
 
+// MustVerifyMemcachedMagmaFlusherThreadPercentage checks that the magmaFlusherThreadPercentage
+// is set correctly on the server via the memcached global settings endpoint.
+func MustVerifyMemcachedMagmaFlusherThreadPercentage(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expected int, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.MemcachedGlobals{}
+
+		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.MagmaFlusherThreadPercentage == nil {
+			return fmt.Errorf("expected magmaFlusherThreadPercentage=%d, got nil", expected)
+		}
+
+		if *current.MagmaFlusherThreadPercentage != expected {
+			return fmt.Errorf("expected magmaFlusherThreadPercentage=%d, got %d", expected, *current.MagmaFlusherThreadPercentage)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustVerifyDataServerSettingsMemcachedThreads checks memcached's reader, writer, auxIo, nonIo thread settings.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
 func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads *intstr.IntOrString, nonIOThreads, auxIOThreads *int, timeout time.Duration) {
