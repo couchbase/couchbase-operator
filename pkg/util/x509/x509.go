@@ -83,12 +83,10 @@ func getRootDomain() string {
 
 // MandatorySANs returns the list of SANs that all server certificates must implement.
 // If includeBareHostnames is false, bare hostname entries (like "{clusterName}-srv") are excluded.
-func MandatorySANs(clusterName, namespace string, includeBareHostnames bool) []string {
+func MandatorySANs(clusterName, namespace string, includeBareHostnames bool, includeShortHostnames bool) []string {
 	root := getRootDomain()
 
 	sans := []string{
-		fmt.Sprintf("*.%s", clusterName),
-		fmt.Sprintf("*.%s.%s", clusterName, namespace),
 		// Used by the Operator for node connections.
 		fmt.Sprintf("*.%s.%s.svc", clusterName, namespace),
 		// Used for GCCCP SRV connectons.
@@ -105,6 +103,11 @@ func MandatorySANs(clusterName, namespace string, includeBareHostnames bool) []s
 	// Add bare hostname entries only if requested
 	if includeBareHostnames {
 		sans = append(sans, fmt.Sprintf("%s-srv", clusterName))
+	}
+
+	if includeShortHostnames {
+		sans = append(sans, fmt.Sprintf("*.%s", clusterName))
+		sans = append(sans, fmt.Sprintf("*.%s.%s", clusterName, namespace))
 	}
 
 	return sans

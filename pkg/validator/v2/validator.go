@@ -1674,7 +1674,12 @@ func checkConstraintTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluste
 		includeBareHostnames = cluster.Spec.Networking.TLS.ValidateBareHostnames
 	}
 
-	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace, includeBareHostnames)
+	validateShortHostnames := true
+	if cluster.Spec.Networking.TLS != nil && cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
+		validateShortHostnames = *cluster.Spec.Networking.TLS.ValidateShortHostnames
+	}
+
+	subjectAltNames := util_x509.MandatorySANs(cluster.Name, cluster.Namespace, includeBareHostnames, validateShortHostnames)
 
 	if cluster.Spec.Networking.DNS != nil {
 		subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", cluster.Spec.Networking.DNS.Domain))
@@ -6137,11 +6142,6 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 		return err
 	} else if !encryptionAtRestSupported {
 		return fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
-	}
-
-	// Encryption at rest cannot be enabled in mixed mode as it requires all nodes to be running Couchbase Server 8.0.0+
-	if cluster.HasCondition(couchbasev2.ClusterConditionMixedMode) {
-		return fmt.Errorf("encryption at rest cannot be enabled while cluster is in mixed mode")
 	}
 
 	encryptionAtRest := cluster.Spec.Security.EncryptionAtRest

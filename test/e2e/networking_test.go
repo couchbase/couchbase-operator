@@ -189,7 +189,7 @@ func TestExposedFeatureDNSModify(t *testing.T) {
 	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, domain, time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, domain, time.Minute)
 	e2eutil.MustCheckForNodeServiceType(t, kubernetes, cluster, corev1.ServiceTypeLoadBalancer, time.Minute)
-	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace, true)
+	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace, true, true)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	opts := e2eutil.TLSOpts{
 		AltNames: subjectAltNames,
@@ -354,7 +354,7 @@ func TestConsoleServiceDNSModify(t *testing.T) {
 	// Verify that all nodes advertise a DNS based alternate address, and it changes when updated.
 	e2eutil.MustCheckForDNSAdminAnnotation(t, kubernetes, cluster, domain, time.Minute)
 	e2eutil.MustCheckForConsoleServiceType(t, kubernetes, cluster, corev1.ServiceTypeLoadBalancer, time.Minute)
-	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace, true)
+	subjectAltNames := x509.MandatorySANs(cluster.Name, cluster.Namespace, true, true)
 	subjectAltNames = append(subjectAltNames, fmt.Sprintf("*.%s", newDomain))
 	opts := e2eutil.TLSOpts{
 		AltNames: subjectAltNames,
