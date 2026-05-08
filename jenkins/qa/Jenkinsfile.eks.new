@@ -66,6 +66,8 @@ pipeline {
     GITLAB_CREDENTIALS = credentials('couchbaseqe-gitlab')
     AWS_CREDS = credentials('CAO_AWS')
     GHCR_CREDENTIALS = credentials('couchbaseqe-ghrc')
+    JIRA_USERNAME = "operator-bot@couchbase.com"
+    JIRA_API_TOKEN = credentials('operator-bot-jira')
     LOG_DIR = "/data/operator-pipeline/${env.BUILD_NUMBER}"
     NAME = "${env.JOB_NAME}-${env.BUILD_NUMBER}"
     TF_IN_AUTOMATION = 'TRUE'
@@ -722,6 +724,28 @@ pipeline {
           return
         }
 
+
+        try {
+          sh "go run ./jenkins/qa/jira/jira.go \
+          -jobBuildNumber=${env.BUILD_NUMBER} \
+          -jira-username=${env.JIRA_USERNAME} \
+          -jira-api-key=${env.JIRA_API_TOKEN} \
+          -platform EKS \
+          -test-info kubernetes-version=${params.kubernetes_version} \
+          -test-info operator-image=${params.operator_image} \
+          -test-info admission-image=${params.admission_image} \
+          -test-info server-image=${params.server_image} \
+          -test-info server-image-upgrade=${params.server_image_upgrade} \
+          -test-info backup-image=${params.backup_image} \
+          -test-info logging-image=${params.logging_image} \
+          -test-info logging-image-upgrade=${params.logging_image_upgrade} \
+          -test-info cloud-native-gateway-image=${params.cloud_native_gateway_image}"
+        }
+        catch (Exception e) {
+          echo "Caught Exception: cannot create the Jira issue: ${e.message}"
+          currentBuild.result = 'FAILURE'
+          return
+        }
 
         // Recording all the test results.
         def testSuites = ['validation', 'sanity', 'p0', 'p1', 'platform', 'custom']
