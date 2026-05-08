@@ -22,6 +22,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	vtypes "github.com/couchbase/couchbase-operator/pkg/validator/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -109,6 +110,10 @@ func (c *Cluster) GetCouchbaseCluster() *couchbasev2.CouchbaseCluster {
 
 func (c *Cluster) GetK8sClient() *client.Client {
 	return c.k8s
+}
+
+func (c *Cluster) GetValidator() *vtypes.Validator {
+	return c.validator
 }
 
 func (c *Cluster) UpdateFailedValidation(err error) error {

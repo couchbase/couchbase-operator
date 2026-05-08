@@ -76,17 +76,13 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	GetCouchbaseEncryptionKeys(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error)
 	// GetCouchbaseMigrationeplications returns all migration replications for a specified selector.
 	GetCouchbaseMigrationReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error)
-	// InitCollectionCache initializes the collection cache for the specified namespace.
-	InitCollectionCache(string) error
-	// InitCollectionGroupCache initializes the collection group cache for the specified namespace.
-	InitCollectionGroupCache(string) error
 }
 
 // kubeAbstractionImpl Implements KubeAbstraction, operating on a real kubernetes cluster.
 type kubeAbstractionImpl struct {
 	client          kubernetes.Interface
 	couchbaseClient versioned.Interface
-	cache           *ValidationCache
+	cache           ResourceCacheProvider
 }
 
 // secretExists checks whether the named secret exists in the specified namespace.
@@ -131,13 +127,13 @@ func (ab *kubeAbstractionImpl) GetCouchbaseClusters(namespace string) (*couchbas
 
 // GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitBucketCache(namespace, func() (*couchbasev2.CouchbaseBucketList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetBuckets(namespace, selector)
 }
 
 // GetCouchbaseEphemeralBuckets returns all ephemeral buckets for a specified selector.
@@ -269,80 +265,44 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, sele
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), listOpts)
 }
 
-// GetCouchbaseCollection returns the named collection.
 func (ab *kubeAbstractionImpl) GetCouchbaseCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error) {
-	// Return from the cache if we can hit it.
-	collection, ok, cacheHit := ab.cache.GetCollection(namespace, name)
-	if cacheHit {
-		return collection, ok, nil
-	}
-
-	// Use the direct API lookup as fallback if cache is not initialized.
-	collection, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, nil
-		}
-
+	if err := ab.cache.InitCollectionCache(namespace, func() (*couchbasev2.CouchbaseCollectionList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
 		return nil, false, err
 	}
 
-	return collection, true, nil
+	return ab.cache.GetCollection(namespace, name)
 }
 
-// GetCouchbaseCollectionGroup returns the named collection group.
 func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error) {
-	// Return from the cache if we can hit it.
-	collectionGroup, ok, cacheHit := ab.cache.GetCollectionGroup(namespace, name)
-	if cacheHit {
-		return collectionGroup, ok, nil
-	}
-
-	// Use the direct API lookup as fallback if cache is not initialized.
-	collectionGroup, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, nil
-		}
-
+	if err := ab.cache.InitCollectionGroupCache(namespace, func() (*couchbasev2.CouchbaseCollectionGroupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
 		return nil, false, err
 	}
 
-	return collectionGroup, true, nil
+	return ab.cache.GetCollectionGroup(namespace, name)
 }
 
-// GetCouchbaseCollections returns the selected collections.
 func (ab *kubeAbstractionImpl) GetCouchbaseCollections(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, error) {
-	// Return from the cache if we can hit it.
-	collections, cacheHit := ab.cache.GetCollections(namespace, selector)
-	if cacheHit {
-		return collections, nil
+	if err := ab.cache.InitCollectionCache(namespace, func() (*couchbasev2.CouchbaseCollectionList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	// Use the direct API lookup as fallback if cache is not initialized.
-	listOpts := metav1.ListOptions{}
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
-	}
-
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetCollections(namespace, selector)
 }
 
-// GetCouchbaseCollectionGroups returns the selected collection groups.
 func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, error) {
-	// Return from the cache if we can hit it.
-	collections, cacheHit := ab.cache.GetCollectionGroups(namespace, selector)
-	if cacheHit {
-		return collections, nil
+	if err := ab.cache.InitCollectionGroupCache(namespace, func() (*couchbasev2.CouchbaseCollectionGroupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	// Use the direct API lookup as fallback if cache is not initialized.
-	listOpts := metav1.ListOptions{}
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
-	}
-
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetCollectionGroups(namespace, selector)
 }
 
 // GetCouchbaseScope returns the named scope.
@@ -406,28 +366,6 @@ func (ab *kubeAbstractionImpl) GetCouchbaseEncryptionKeys(namespace string, sele
 	return ab.couchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.Background(), listOpts)
 }
 
-// InitCollectionCache loads collections into the validation cache for the given namespace.
-func (ab *kubeAbstractionImpl) InitCollectionCache(namespace string) error {
-	collections, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollections(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil || collections == nil {
-		return err
-	}
-
-	ab.cache.LoadCollections(namespace, collections)
-	return nil
-}
-
-// InitCollectionGroupCache loads collection groups into the validation cache for the given namespace.
-func (ab *kubeAbstractionImpl) InitCollectionGroupCache(namespace string) error {
-	groups, err := ab.couchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil || groups == nil {
-		return err
-	}
-
-	ab.cache.LoadCollectionGroups(namespace, groups)
-	return nil
-}
-
 // ValidatorOptions are configurable, as opposed to required, bits of the
 // validator.
 type ValidatorOptions struct {
@@ -451,12 +389,19 @@ type Validator struct {
 	Options *ValidatorOptions
 }
 
-// New instantiates a new Validator with kubeAbstractionImpl.
+// New instantiates a new Validator backed by a AdmissionControlCache (on-demand API loading).
 func New(client kubernetes.Interface, couchbaseClient versioned.Interface, options *ValidatorOptions) *Validator {
+	return NewWithCache(client, couchbaseClient, options, NewAdmissionControlCache())
+}
+
+// NewWithCache instantiates a new Validator with the provided ResourceCacheProvider.
+// Use this when the caller already has a warm cache (e.g. the operator's informer caches)
+// to avoid redundant API calls during validation.
+func NewWithCache(client kubernetes.Interface, couchbaseClient versioned.Interface, options *ValidatorOptions, cache ResourceCacheProvider) *Validator {
 	abs := kubeAbstractionImpl{
 		client:          client,
 		couchbaseClient: couchbaseClient,
-		cache:           NewValidationCache(),
+		cache:           cache,
 	}
 
 	// The main validator code expects this to be populated in order to

@@ -4137,15 +4137,6 @@ func CheckConstraintsScope(v *types.Validator, scope *couchbasev2.CouchbaseScope
 		return nil
 	}
 
-	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
-	if err := v.Abstraction.InitCollectionCache(scope.Namespace); err != nil {
-		return err
-	}
-
-	if err := v.Abstraction.InitCollectionGroupCache(scope.Namespace); err != nil {
-		return err
-	}
-
 	if err := checkScopeCollectionsUnique(v, scope.Namespace, couchbasev2.ScopeCRDResourceKind, scope.Name, scope.Spec.Collections); err != nil {
 		errs = append(errs, err)
 	}
@@ -4166,15 +4157,6 @@ func CheckConstraintsScopeGroup(v *types.Validator, scopeGroup *couchbasev2.Couc
 
 	if checkAnnotationSkipValidation(scopeGroup.Annotations) {
 		return nil
-	}
-
-	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
-	if err := v.Abstraction.InitCollectionCache(scopeGroup.Namespace); err != nil {
-		return err
-	}
-
-	if err := v.Abstraction.InitCollectionGroupCache(scopeGroup.Namespace); err != nil {
-		return err
 	}
 
 	if err := checkScopeCollectionsUnique(v, scopeGroup.Namespace, couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, scopeGroup.Spec.Collections); err != nil {
@@ -4427,15 +4409,6 @@ func validateKMIPKey(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey
 // we check every scope in the namespace in case a scope references the collection, before validating
 // each of those scopes individually.
 func checkAllScopeCollectionsUnique(v *types.Validator, namespace string) error {
-	// Initialize the collection and collection group caches to avoid hitting apiserver rate limits.
-	if err := v.Abstraction.InitCollectionCache(namespace); err != nil {
-		return err
-	}
-
-	if err := v.Abstraction.InitCollectionGroupCache(namespace); err != nil {
-		return err
-	}
-
 	scopes, err := v.Abstraction.GetCouchbaseScopes(namespace, nil)
 	if err != nil {
 		return err

@@ -20,16 +20,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// ValidationCache is a one off, in memory cache to avoid hitting rate limits during validation when querying K8S api server.
-// Resources need to be explicitly loaded into the cache by type.
-// This is not a general purpose cache, does not inform/watch for resource changes and should only be used during validation.
-type ValidationCache struct {
-	collections      *SimpleIndexCache[*couchbasev2.CouchbaseCollection]
-	collectionGroups *SimpleIndexCache[*couchbasev2.CouchbaseCollectionGroup]
-}
-
-func NewValidationCache() *ValidationCache {
-	return &ValidationCache{}
+// ResourceCacheProvider abstracts cache implementation for resource validation between the Operator and the DAC. The Operator uses a watcher/informer cache, whereas the DAC uses a simple in-memory cache populated at the start of each admission request.
+type ResourceCacheProvider interface {
+	InitCollectionCache(namespace string, load func() (*couchbasev2.CouchbaseCollectionList, error)) error
+	InitCollectionGroupCache(namespace string, load func() (*couchbasev2.CouchbaseCollectionGroupList, error)) error
+	InitBucketCache(namespace string, load func() (*couchbasev2.CouchbaseBucketList, error)) error
+	GetCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error)
+	GetCollections(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, error)
+	GetCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error)
+	GetCollectionGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, error)
+	GetBucket(namespace, name string) (*couchbasev2.CouchbaseBucket, bool, error)
+	GetBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error)
 }
 
 // SimpleIndexCache is a typed, single namespace cache backed by a client-go Indexer.
@@ -63,6 +64,9 @@ func (c *SimpleIndexCache[T]) Load(namespace string, items []T) {
 // Get retrieves a single typed object by name.
 func (c *SimpleIndexCache[T]) Get(name string) (T, bool) {
 	var zero T
+	if c == nil {
+		return zero, false
+	}
 	key := c.namespace + "/" + name
 	obj, exists, err := c.index.GetByKey(key)
 	if err != nil || !exists || obj == nil {
@@ -79,6 +83,9 @@ func (c *SimpleIndexCache[T]) Get(name string) (T, bool) {
 
 // List returns all typed objects that match the optional label selector.
 func (c *SimpleIndexCache[T]) List(selector *metav1.LabelSelector) ([]T, error) {
+	if c == nil {
+		return nil, nil
+	}
 	out := []T{}
 	if selector == nil {
 		for _, o := range c.index.List() {
@@ -114,8 +121,57 @@ func (c *SimpleIndexCache[T]) List(selector *metav1.LabelSelector) ([]T, error) 
 	return out, nil
 }
 
-// LoadCollections resets and fills the collections cache for the given namespace.
-func (c *ValidationCache) LoadCollections(namespace string, collections *couchbasev2.CouchbaseCollectionList) {
+// listDeref lists items from a pointer cache and returns them dereferenced.
+// The T is required to be a pointer to E, and T must implement runtime.Object.
+func listDeref[T interface {
+	*E
+	runtime.Object
+}, E any](c *SimpleIndexCache[T], selector *metav1.LabelSelector) ([]E, error) {
+	if c == nil {
+		return nil, nil
+	}
+	// Load from the cache.
+	ptrs, err := c.List(selector)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]E, 0, len(ptrs))
+	for _, p := range ptrs {
+		if p != nil {
+			out = append(out, *p)
+		}
+	}
+	return out, nil
+}
+
+// AdmissionControlCache is an in-memory cache used by the DAC to avoid
+// hitting rate limits when querying the K8s API server during admission validation.
+// It is not a general-purpose cache, does not watch for resource changes and must
+// not be used outside of the admission controller path.
+// Cache contents are loaded on the first Get or List request for a given namespace.
+// This implements the ResourceCacheProvider interface.
+// To add a new resource type, add Get/List/Init methods to the ResourceCacheProvider and implement here.
+// Then update the KubeAbstractionImpl Get/List methods to warm the cache before returning results.
+type AdmissionControlCache struct {
+	collections      *SimpleIndexCache[*couchbasev2.CouchbaseCollection]
+	collectionGroups *SimpleIndexCache[*couchbasev2.CouchbaseCollectionGroup]
+	buckets          *SimpleIndexCache[*couchbasev2.CouchbaseBucket]
+}
+
+func NewAdmissionControlCache() *AdmissionControlCache {
+	return &AdmissionControlCache{}
+}
+
+func (c *AdmissionControlCache) InitCollectionCache(namespace string, load func() (*couchbasev2.CouchbaseCollectionList, error)) error {
+	if c.collections != nil && c.collections.Initialised(namespace) {
+		return nil
+	}
+
+	collections, err := load()
+	if err != nil || collections == nil {
+		return err
+	}
+
 	ptrs := make([]*couchbasev2.CouchbaseCollection, 0, len(collections.Items))
 	for i := range collections.Items {
 		ptrs = append(ptrs, &collections.Items[i])
@@ -123,42 +179,33 @@ func (c *ValidationCache) LoadCollections(namespace string, collections *couchba
 
 	c.collections = NewSimpleIndexCache[*couchbasev2.CouchbaseCollection]()
 	c.collections.Load(namespace, ptrs)
+
+	return nil
 }
 
-// GetCollection retrieves a collection by name. The boolean return values indicate (in order) whether the collection was found in the cache and whether the cache was initialised for the namespace.
-// If the cache was not initialised for the namespace, the calling method should fallback to direct API lookup.
-func (c *ValidationCache) GetCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, bool) {
-	if c.collections == nil || !c.collections.Initialised(namespace) {
-		return nil, false, false
-	}
-
-	collection, ok := c.collections.Get(name)
-	return collection, ok, true
+func (c *AdmissionControlCache) GetCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error) {
+	col, ok := c.collections.Get(name)
+	return col, ok, nil
 }
 
-func (c *ValidationCache) GetCollections(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, bool) {
-	if c.collections == nil || !c.collections.Initialised(namespace) {
-		return nil, false
-	}
-
-	collections := &couchbasev2.CouchbaseCollectionList{}
-	cols, err := c.collections.List(selector)
+func (c *AdmissionControlCache) GetCollections(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionList, error) {
+	items, err := listDeref(c.collections, selector)
 	if err != nil {
-		// If there's an error listing from the cache, treat it as a cache miss and fallback to direct API lookup.
-		return collections, false
+		return nil, err
 	}
-
-	for _, c := range cols {
-		if c != nil {
-			collections.Items = append(collections.Items, *c)
-		}
-	}
-
-	return collections, true
+	return &couchbasev2.CouchbaseCollectionList{Items: items}, nil
 }
 
-// LoadCollectionGroups resets and fills the collection groups cache for the given namespace.
-func (c *ValidationCache) LoadCollectionGroups(namespace string, groups *couchbasev2.CouchbaseCollectionGroupList) {
+func (c *AdmissionControlCache) InitCollectionGroupCache(namespace string, load func() (*couchbasev2.CouchbaseCollectionGroupList, error)) error {
+	if c.collectionGroups != nil && c.collectionGroups.Initialised(namespace) {
+		return nil
+	}
+
+	groups, err := load()
+	if err != nil || groups == nil {
+		return err
+	}
+
 	ptrs := make([]*couchbasev2.CouchbaseCollectionGroup, 0, len(groups.Items))
 	for i := range groups.Items {
 		ptrs = append(ptrs, &groups.Items[i])
@@ -166,34 +213,53 @@ func (c *ValidationCache) LoadCollectionGroups(namespace string, groups *couchba
 
 	c.collectionGroups = NewSimpleIndexCache[*couchbasev2.CouchbaseCollectionGroup]()
 	c.collectionGroups.Load(namespace, ptrs)
+
+	return nil
 }
 
-func (c *ValidationCache) GetCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, bool) {
-	if c.collectionGroups == nil || !c.collectionGroups.Initialised(namespace) {
-		return nil, false, false
-	}
-
-	collectionGroup, ok := c.collectionGroups.Get(name)
-	return collectionGroup, ok, true
+func (c *AdmissionControlCache) GetCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error) {
+	cg, ok := c.collectionGroups.Get(name)
+	return cg, ok, nil
 }
 
-func (c *ValidationCache) GetCollectionGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, bool) {
-	if c.collectionGroups == nil || !c.collectionGroups.Initialised(namespace) {
-		return nil, false
-	}
-
-	groups := &couchbasev2.CouchbaseCollectionGroupList{}
-	cols, err := c.collectionGroups.List(selector)
+func (c *AdmissionControlCache) GetCollectionGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, error) {
+	items, err := listDeref(c.collectionGroups, selector)
 	if err != nil {
-		// If there's an error listing from the cache, treat it as a cache miss and fallback to direct API lookup.
-		return groups, false
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseCollectionGroupList{Items: items}, nil
+}
+
+func (c *AdmissionControlCache) InitBucketCache(namespace string, load func() (*couchbasev2.CouchbaseBucketList, error)) error {
+	if c.buckets != nil && c.buckets.Initialised(namespace) {
+		return nil
 	}
 
-	for _, g := range cols {
-		if g != nil {
-			groups.Items = append(groups.Items, *g)
-		}
+	buckets, err := load()
+	if err != nil || buckets == nil {
+		return err
 	}
 
-	return groups, true
+	ptrs := make([]*couchbasev2.CouchbaseBucket, 0, len(buckets.Items))
+	for i := range buckets.Items {
+		ptrs = append(ptrs, &buckets.Items[i])
+	}
+
+	c.buckets = NewSimpleIndexCache[*couchbasev2.CouchbaseBucket]()
+	c.buckets.Load(namespace, ptrs)
+
+	return nil
+}
+
+func (c *AdmissionControlCache) GetBucket(namespace, name string) (*couchbasev2.CouchbaseBucket, bool, error) {
+	bucket, ok := c.buckets.Get(name)
+	return bucket, ok, nil
+}
+
+func (c *AdmissionControlCache) GetBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error) {
+	items, err := listDeref(c.buckets, selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseBucketList{Items: items}, nil
 }

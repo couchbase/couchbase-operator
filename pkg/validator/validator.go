@@ -37,6 +37,10 @@ func New(client kubernetes.Interface, couchbaseClient versioned.Interface, optio
 	return types.New(client, couchbaseClient, options)
 }
 
+func NewWithCache(client kubernetes.Interface, couchbaseClient versioned.Interface, options *types.ValidatorOptions, cache types.ResourceCacheProvider) *types.Validator {
+	return types.NewWithCache(client, couchbaseClient, options, cache)
+}
+
 func CheckConstraints(v *types.Validator, resource runtime.Object) ([]string, error) {
 	switch t := resource.(type) {
 	case *couchbasev2.CouchbaseCluster:

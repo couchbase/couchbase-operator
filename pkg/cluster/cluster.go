@@ -33,6 +33,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
+	vtypes "github.com/couchbase/couchbase-operator/pkg/validator/types"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/groupcache/lru"
@@ -166,6 +167,10 @@ type Cluster struct {
 	// so other reconcilers and valid resources are not blocked.  The map is
 	// rebuilt every cycle, so it is naturally restart-safe.
 	failedValidation map[string]map[string]bool
+
+	// validator is the validator instance for this cluster, backed by the operator's
+	// watch-backed informer caches. Created once alongside k8s in New.
+	validator *vtypes.Validator
 }
 
 // SetFailedValidation stores the set of resource names that failed
@@ -298,6 +303,9 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 	if err != nil {
 		return nil, err
 	}
+
+	// Initialise the Operator validation, using the watch-backed informer caches.
+	c.validator = newOperatorValidator(c.k8s)
 
 	c.InitCounterMetrics()
 

@@ -162,15 +162,6 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	warnings, err := validationrunner.CheckCouchbaseClusterResource(couchbase)
-	if err != nil {
-		return r.reconcileFailedValidationCluster(couchbase, err)
-	}
-
-	if warnings != nil {
-		log.V(1).Info("Validation warnings.", "cluster", request.NamespacedName, "warnings", warnings)
-	}
-
 	// See if we know about the cluster already.
 	c, existingCluster := r.clusters.Load(request.NamespacedName.String())
 
@@ -193,8 +184,17 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			return reconcile.Result{}, err
 		}
 
-		errs := validationrunner.CheckConstraints(c)
+		warnings, err := validationrunner.CheckCouchbaseClusterResource(c.GetValidator(), c.GetK8sClient(), couchbase)
+		if err != nil {
+			r.clusters.Store(request.NamespacedName.String(), c)
+			return r.reconcileFailedValidationCluster(c, err)
+		}
 
+		if warnings != nil {
+			log.V(1).Info("Validation warnings.", "cluster", request.NamespacedName, "warnings", warnings)
+		}
+
+		errs := validationrunner.CheckManagedResourceConstraints(c)
 		for _, err := range errs {
 			log.Error(err, "Validation failed", "cluster", request.NamespacedName)
 			validationErrors = append(validationErrors, err.Error())
@@ -206,7 +206,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			existingCluster := c.GetCouchbaseCluster().DeepCopy()
 
 			existingCluster.Spec = *existingSpec
-			if err := validationrunner.CheckClusterChangeConstraints(existingCluster, c.GetCouchbaseCluster()); err != nil {
+			if err := validationrunner.CheckClusterChangeConstraints(c.GetValidator(), c.GetK8sClient(), existingCluster, c.GetCouchbaseCluster()); err != nil {
 				log.Error(err, "Validation failed", "cluster", request.NamespacedName)
 				c.UpdateOnFailedValidationOperatorRestart(err, existingCluster)
 			}
@@ -217,27 +217,34 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		r.clusters.Store(request.NamespacedName.String(), c)
 
 		return requeueResult, nil
+	} else {
+		warnings, err := validationrunner.CheckCouchbaseClusterResource(c.GetValidator(), c.GetK8sClient(), couchbase)
+		if err != nil {
+			return r.reconcileFailedValidationCluster(c, err)
+		}
+
+		if warnings != nil {
+			log.V(1).Info("Validation warnings.", "cluster", request.NamespacedName, "warnings", warnings)
+		}
 	}
 
 	c.ReconcileMirWatchdogContext()
 
-	if err := validationrunner.CheckClusterChangeConstraints(c.GetCouchbaseCluster(), couchbase); err != nil {
+	if err := validationrunner.CheckClusterChangeConstraints(c.GetValidator(), c.GetK8sClient(), c.GetCouchbaseCluster(), couchbase); err != nil {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
 		validationErrors = append(validationErrors, err.Error())
 		validationFailed = true
 	}
 
-	changeErrs, failedBuckets := validationrunner.CheckChangeConstraints(c)
-
+	changeErrs, failedBuckets := validationrunner.CheckManagedResourceChangeConstraints(c)
 	for _, err := range changeErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
 		validationErrors = append(validationErrors, err.Error())
 	}
 
-	immutableErrs, immutableFailedBuckets := validationrunner.ValidateImmutableFields(c)
-
+	immutableErrs, immutableFailedBuckets := validationrunner.CheckManagedResourceImmutableConstraints(c)
 	for _, err := range immutableErrs {
 		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
@@ -290,35 +297,15 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	return requeueResult, nil
 }
 
-func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(couchbase *couchbasev2.CouchbaseCluster, validationErr error) (reconcile.Result, error) {
-	c, existingCluster := r.clusters.Load(couchbase.NamespacedName())
-	reconcileResult := reconcile.Result{
-		RequeueAfter: 10 * time.Second,
-	}
-
-	if !existingCluster {
-		// Cluster created or detected during a restart, start a new management routine.
-		log.V(2).Info("Creating cluster", "cluster", couchbase.NamespacedName())
-
-		var err error
-		c, err = cluster.New(r.clusterConfig, couchbase)
-
-		if err != nil {
-			log.Error(err, "Failed to create Couchbase cluster", "cluster", couchbase.NamespacedName())
-			return reconcileResult, err
-		}
-
-		r.clusters.Store(couchbase.NamespacedName(), c)
-	}
-
-	log.Error(validationErr, "Validation failed.", "cluster", couchbase.NamespacedName())
+func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(c *cluster.Cluster, validationErr error) (reconcile.Result, error) {
+	log.Error(validationErr, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 
 	if err := c.UpdateFailedValidation(validationErr); err != nil {
-		log.Error(err, "Failed to update cluster status", "cluster", couchbase.NamespacedName())
+		log.Error(err, "Failed to update cluster status", "cluster", c.GetCouchbaseCluster().NamespacedName())
 	}
 
-	// Do not return an error here. Controller runtime will ignore RequeueAfter and wait apply an exponential backoff.
-	return reconcileResult, nil
+	// Do not return an error here. Controller runtime will ignore RequeueAfter and apply an exponential backoff.
+	return reconcile.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 // AddToManager registers a controller reconciler with the manager and triggers updates
