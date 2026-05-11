@@ -134,7 +134,7 @@ func TestCreateBaseJobSpec(t *testing.T) {
 	validateBackupJob(t, c.cluster, jobSpec, &boLimit, &ttlSecondsAfterFinished, container, volume)
 }
 
-//nolint:goerr113
+//nolint:err113
 func validateBackupJob(t *testing.T, cluster *couchbasev2.CouchbaseCluster, jobSpec *v1.JobSpec, backoffLimit, ttlSecondsAfterFinished *int32, container corev1.Container, volume corev1.Volume) {
 	jobTemplateSpec := jobSpec.Template.Spec
 	backup := cluster.Spec.Backup

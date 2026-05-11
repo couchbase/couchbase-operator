@@ -1,4 +1,12 @@
 {
+    "": {
+        "type": "",
+        "help": "",
+        "added": "",
+        "stability": "",
+        "labels": null,
+        "optionalLabels": null
+    },
     "backup_jobs_created_total": {
         "type": "counter",
         "help": "Total number of backup jobs that have been created by the operator",

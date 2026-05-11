@@ -1,6 +1,6 @@
 module github.com/couchbase/couchbase-operator
 
-go 1.22
+go 1.26.2
 
 require (
 	cloud.google.com/go/storage v1.38.0

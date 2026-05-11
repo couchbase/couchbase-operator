@@ -99,7 +99,7 @@ const (
 	// Not defined by the library, usually due to ordering mismatches across
 	// architectures. This is the number of processes/PIDs/TIDs that are allowed
 	// within the container.
-	RLIMIT_NPROC = 6 //nolint:golint,stylecheck,revive
+	RLIMIT_NPROC = 6 //nolint:revive
 )
 
 // rlimitCheck defines an rlimit check.

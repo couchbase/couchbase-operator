@@ -58,7 +58,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = '1.22.1'
+    GOVERSION = '1.26.2'
     GOROOT = "${env.WORKSPACE}/go"
     KUBECTL_DIR = "${env.WORKSPACE}/kubectl"
     PATH = "${env.WORKSPACE}/kubectl:${env.WORKSPACE}/bin:${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}/go/bin:$PATH"

@@ -799,7 +799,7 @@ func ValidateEvents(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.Cou
 	}
 
 	if err := retryutil.RetryFor(time.Minute, callback); err != nil {
-		e2eutil.Die(t, fmt.Errorf(out.String()))
+		e2eutil.Die(t, fmt.Errorf("%s", out.String()))
 	}
 }
 

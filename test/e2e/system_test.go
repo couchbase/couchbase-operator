@@ -220,12 +220,12 @@ func DeleteJob(t *testing.T, f *framework.Framework, jobName string) {
 
 	err := kubernetes.KubeClient.BatchV1().Jobs(kubernetes.Namespace).Delete(context.Background(), jobName, *metav1.NewDeleteOptions(0))
 	if err != nil {
-		t.Fatalf("failed to delete job %v \n", err)
+		t.Fatalf("failed to delete job %s: %v", jobName, err)
 	}
 
 	pods, err := kubernetes.KubeClient.CoreV1().Pods(kubernetes.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "job=" + jobName})
 	if err != nil {
-		t.Fatalf("failed to list pods for cluster: " + err.Error())
+		t.Fatalf("failed to list pods for cluster: %v", err)
 	}
 
 	for _, pod := range pods.Items {

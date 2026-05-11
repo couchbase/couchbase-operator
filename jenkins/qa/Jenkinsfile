@@ -45,7 +45,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = "1.22.1"
+    GOVERSION = "1.26.2"
     GOBIN = "${env.WORKSPACE}/bin"
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"

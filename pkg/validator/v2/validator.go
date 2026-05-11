@@ -3318,7 +3318,7 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 				errMsg = fmt.Sprintf("%s, sample buckets have a memory quota of 200Mi", errMsg)
 			}
 
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("%s", errMsg)
 		}
 	}
 
