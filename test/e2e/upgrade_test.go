@@ -2138,9 +2138,10 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	// Add an arbiter serverclass to the cluster at the start of the cluster servers list.
 	cluster.Spec.Servers = append([]couchbasev2.ServerConfig{{
 		Name:         "no_services",
-		Size:         classSize,
+		Size:         1,
 		Services:     []couchbasev2.Service{},
 		VolumeMounts: cluster.Spec.Servers[0].VolumeMounts.DeepCopy(),
+		ServerGroups: []string{availableServerGroups[0]},
 	}}, cluster.Spec.Servers...)
 
 	// Enable server groups
@@ -2159,7 +2160,12 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
 
-	// When the cluster is ready, start the upgrade.
+	// Scale the arbiter service and remove the server groups. We expect the new node to be added to availableServerGroups[1].
+	// This helps guarantee the indexes of the arbiter nodes are 0001 (as arbiter won't be the first member but should be the second as it's next in the server groups list) and 0005 (next index after initial 5 nodes are created).
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", 2).Remove("/spec/servers/0/serverGroups"), time.Minute)
+
+	time.Sleep(20 * time.Second)
+	// When the cluster has finished scaling, start the upgrade.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
 
@@ -2176,7 +2182,8 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	// * Each node is upgraded in the expected order (with arbiter nodes upgraded last for each server group)
 	// * Upgrade completes
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(classSize * 3),
+		e2eutil.ClusterCreateSequence(classSize*3 - 1),
+		e2eutil.ClusterScaleUpSequence(1),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 	}
 
@@ -2203,7 +2210,7 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	}
 
 	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
-	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(2))
+	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(5))
 	expectedEvents = append(expectedEvents, eventschema.Repeat{Times: 2, Validator: normalUpgradeSequence})
 	expectedEvents = append(expectedEvents, arbiterUpgradeSequence(1))
 	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished})

@@ -437,19 +437,7 @@ func KubernetesUpgradeSequenceEphemeral(clusterSize int) eventschema.Validatable
 }
 
 // ServerCrashRecoverySequence is generated when you kill NS server. Some older server versions may wait for a rebalance during recovery.
-func ServerCrashRecoverySequence(waitForRebalance bool) eventschema.Validatable {
-	if !waitForRebalance {
-		return eventschema.Sequence{
-			Validators: []eventschema.Validatable{
-				// The server instance may come back before being registered as down,
-				// especially if the operator is dead that time.
-				eventschema.Optional{
-					Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
-				},
-			},
-		}
-	}
-
+func ServerCrashRecoverySequence() eventschema.Validatable {
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			// The server instance may come back before being registered as down,
@@ -457,8 +445,8 @@ func ServerCrashRecoverySequence(waitForRebalance bool) eventschema.Validatable 
 			eventschema.Optional{
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonMemberDown},
 			},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted}},
 		},
 	}
 }
