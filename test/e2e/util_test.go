@@ -354,6 +354,8 @@ func registerTests() {
 		framework.NewTestDef(TestUpgradePrevent3Versions).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestPreviousVersionPodCountSpecOnlyUpdate).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestPreviousVersionPodCountScaleUp).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestPreviousVersionPodCountScaleUpWithServerClassesUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
+		framework.NewTestDef(TestPreviousVersionPodCountScaleUpWithServicesUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
