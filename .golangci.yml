@@ -6,25 +6,28 @@
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
 
+version: "2"
+
 run:
   timeout: 5m
-  skip-dirs:
-    - pkg/generated
-  skip-files: zz_generated.deepcopy.go
 
 linters:
-  # Enable all linters
-  presets:
-    - bugs
-    - complexity
-    - format
-    - performance
-    - style
-    - unused
-
-  # Selectively disable things to get a pass.  These probably are
-  # masking bugs so re-enable and fix them!
+  default: all
+  settings:
+    dupl:
+      threshold: 300
   disable:
+    - dupword
+    - embeddedstructfieldcheck
+    - funcorder
+    - godoclint
+    - iotamixing
+    - lll
+    - modernize
+    - noinlineerr
+    - gomodguard
+    - unqueryvet
+    - usetesting
     - varnamelen
     - exhaustruct
     - contextcheck
@@ -33,42 +36,38 @@ linters:
     - nilnil
     - maintidx
     - ireturn
-    - gosimple
     - containedctx
-    - gosec # insecure!
-    - nestif # complicated code
-    - mnd # magic numbers
-    - testpackage # packages for test, need to be marked as test
-    - godox # TODOs are bad, it suggests it's not finished
-    - funlen # complicated functions
-    - gochecknoglobals # global variables
-    - lll # long lines
-    - gochecknoinits # init functions
-    - goconst # repeated things that should be constants
-    - prealloc # constant sized arrays can be preallocated
-    - nakedret # using naked returns in complicated functions
-    - exhaustive # doesn't pay attention to default in switch statements
-    - gofumpt # really anal
-    - paralleltest # really really anal
-    - nlreturn # seems at odds with cuddling
-    - noctx # do want to fix this
-    - wrapcheck # we do want this, but I want https://github.com/tomarrell/wrapcheck/issues/2 fixing first
-    - forbidigo # allow println
-    - promlinter # don't check that our metrics are all broken...
-    - cyclop # we just did this...??
-    - nilerr # turn me on
-    - forcetypeassert # turn me on (maybe, some times we know it's the correct type)
-    - tagliatelle # don't complain about Kubernetes json tag formats, they are standard
-    - predeclared # turn me on
-    - thelper # turn me on
-    - gci # turn me on (perhaps new conding standards?)
-    - durationcheck # turn me on (perhaps)
+    - gosec
+    - nestif
+    - mnd
+    - testpackage
+    - godox
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - prealloc
+    - nakedret
+    - exhaustive
+    - paralleltest
+    - nlreturn
+    - noctx
+    - wrapcheck
+    - forbidigo
+    - promlinter
+    - cyclop
+    - nilerr
+    - forcetypeassert
+    - tagliatelle
+    - predeclared
+    - thelper
+    - durationcheck
     - depguard
     - tagalign
     - mirror
-    ## Everything that follows was disabled for go1.20 update - reenable
     - nolintlint
     - usestdlibvars
+    - staticcheck
     - reassign
     - musttag
     - loggercheck
@@ -76,6 +75,7 @@ linters:
     - revive
     - inamedparam
     - perfsprint
+    - err113
     - recvcheck
     - govet
     - intrange
@@ -83,50 +83,65 @@ linters:
     - protogetter
     - testifylint
     - unparam
+    - wsl_v5
     - wsl
-    - staticcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - staticcheck
+        text: ST1016
+      - linters:
+          - unparam
+        text: always receives
+      - linters:
+          - gocritic
+        text: appendAssign
+      - linters:
+          - gocritic
+        text: deprecatedComment
+      - linters:
+          - err113
+          - gocognit
+          - gocyclo
+        path: test/.*
+      - linters:
+          - err113
+        path: cmd/.*
+      - linters:
+          - err113
+        path: pkg/admission/.*
+      - linters:
+          - err113
+        path: pkg/config/.*
+      - linters:
+          - err113
+        path: pkg/info/.*
+      - linters:
+          - err113
+        path: pkg/validator/.*
+    paths:
+      - '^pkg/generated/'
+      - '.*zz_generated\\.deepcopy\\.go$'
+      - third_party$
+      - builtin$
+      - examples$
 
-linters-settings:
-  # Code duplication filter catches a lot of duplication in test
-  # this needs refactoring at some point.
-  dupl:
-    threshold: 300
-
-issues:
-  exclude-rules:
-    # Deep copies have 'in' as the receiver, ours have something else.
-    # This linter should ignore the auto generated stuff, but doesn't.
-    - text: ST1016
-      linters:
-        - stylecheck
-    # Things that are parameterized, and don't need to be.  This is probably
-    # a gap in testing.
-    - text: always receives
-      linters:
-        - unparam
-    # turn me on
-    - text: appendAssign
-      linters:
-        - gocritic
-    # Test is exempt from proper error handling.
-    # Validation and tools are exempt for now...
-    - path: test/.*
-      linters:
-        - err113
-        - gocognit
-        - gocyclo
-    - path: cmd/.*
-      linters:
-        - err113
-    - path: pkg/admission/.*
-      linters:
-        - err113
-    - path: pkg/config/.*
-      linters:
-        - err113
-    - path: pkg/info/.*
-      linters:
-        - err113
-    - path: pkg/validator/.*
-      linters:
-        - err113
+formatters:
+  # enable:
+    # - gofmt
+    # - goimports
+    # - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - '^pkg/generated/'
+      - '.*zz_generated\\.deepcopy\\.go$'
+      - third_party$
+      - builtin$
+      - examples$
