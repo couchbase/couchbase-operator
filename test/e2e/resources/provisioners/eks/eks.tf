@@ -169,11 +169,18 @@ resource "aws_iam_openid_connect_provider" "eks" {
   url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
   tags = merge(local.tags, { Name = "${var.name}-eks-oidc" })
 }
+# Data source to resolve the latest compatible EBS CSI driver version
+data "aws_eks_addon_version" "ebs_csi" {
+  addon_name         = "aws-ebs-csi-driver"
+  kubernetes_version = aws_eks_cluster.this.version
+  most_recent        = true
+}
+
 # EBS CSI Driver via EKS Addon
 resource "aws_eks_addon" "ebs_csi" {
   cluster_name             = aws_eks_cluster.this.name
   addon_name               = "aws-ebs-csi-driver"
-  addon_version            = "v1.35.0-eksbuild.1"
+  addon_version            = data.aws_eks_addon_version.ebs_csi.version
   # resolve_conflicts        = "OVERWRITE"
   service_account_role_arn = aws_iam_role.ebs_csi.arn
   tags = merge(local.tags, { Name = "${var.name}-ebs-csi" })

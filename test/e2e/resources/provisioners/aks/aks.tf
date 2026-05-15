@@ -3,7 +3,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=2.40.0"
+      version = "~> 3.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
@@ -60,27 +60,22 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
-    name               = "nodepool1"
-    node_count         = 12
-    vm_size            = "Standard_D4s_v4"
-    availability_zones = ["1", "2", "3"]
-    os_disk_size_gb    = 30
-    vnet_subnet_id     = azurerm_subnet.vnet1-subnet.id
-    tags               = local.tags
+    name            = "nodepool1"
+    node_count      = 12
+    vm_size         = "Standard_D4s_v4"
+    zones           = ["1", "2", "3"]
+    os_disk_size_gb = 30
+    vnet_subnet_id  = azurerm_subnet.vnet1-subnet.id
+    tags            = local.tags
   }
 
   network_profile {
-    network_plugin     = "azure"
-    dns_service_ip     = "10.0.0.10"
-    docker_bridge_cidr = "172.17.0.1/16"
-    service_cidr       = "10.0.0.0/16"
+    network_plugin = "azure"
+    dns_service_ip = "10.0.0.10"
+    service_cidr   = "10.0.0.0/16"
   }
 
-  addon_profile {
-    http_application_routing {
-      enabled = true
-    }
-  }
+  http_application_routing_enabled = true
 
   service_principal {
     client_id     = var.service-principal-id
@@ -125,27 +120,22 @@ resource "azurerm_kubernetes_cluster" "cluster2" {
   kubernetes_version  = var.kubernetes-version
 
   default_node_pool {
-    name               = "nodepool2"
-    node_count         = 12
-    vm_size            = "Standard_D4s_v4"
-    availability_zones = ["1", "2", "3"]
-    os_disk_size_gb    = 30
-    vnet_subnet_id     = azurerm_subnet.vnet2-subnet[0].id
-    tags               = local.tags
+    name            = "nodepool2"
+    node_count      = 12
+    vm_size         = "Standard_D4s_v4"
+    zones           = ["1", "2", "3"]
+    os_disk_size_gb = 30
+    vnet_subnet_id  = azurerm_subnet.vnet2-subnet[0].id
+    tags            = local.tags
   }
 
   network_profile {
-    network_plugin     = "azure"
-    dns_service_ip     = "10.16.0.10"
-    docker_bridge_cidr = "172.17.0.1/16"
-    service_cidr       = "10.16.0.0/16"
+    network_plugin = "azure"
+    dns_service_ip = "10.16.0.10"
+    service_cidr   = "10.16.0.0/16"
   }
 
-  addon_profile {
-    http_application_routing {
-      enabled = true
-    }
-  }
+  http_application_routing_enabled = true
 
   service_principal {
     client_id     = var.service-principal-id
