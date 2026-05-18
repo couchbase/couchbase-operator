@@ -271,6 +271,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 			state.ActiveNodes.Add(member)
 		case NodeStatePendingAdd:
 			state.PendingAddNodes.Add(member)
+			state.NeedsRebalance = true
 		case NodeStateFailedAdd:
 			state.FailedAddNodes.Add(member)
 		case NodeStateWarmup:

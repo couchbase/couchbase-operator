@@ -312,6 +312,7 @@ func NewMigrationReconcileMachine(c *Cluster) (*MigrationReconcileMachine, error
 			state.ActiveNodes.Add(allNodes[name])
 		case NodeStatePendingAdd:
 			state.PendingAddNodes.Add(allNodes[name])
+			state.NeedsRebalance = true
 		case NodeStateFailedAdd:
 			state.FailedAddNodes.Add(allNodes[name])
 		case NodeStateWarmup:
