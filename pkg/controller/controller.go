@@ -255,6 +255,17 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 	c.SetFailedValidation("bucket", failedBuckets)
 
+	// Validate XDCR replication buckets, mark broken replications as failed
+	// so they are skipped during reconciliation without blocking the cluster.
+	xdcrErrs, failedReplications := validationrunner.ValidateXDCRReplicationBuckets(c)
+	for _, err := range xdcrErrs {
+		log.Error(err, "XDCR validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
+
+		validationErrors = append(validationErrors, err.Error())
+	}
+
+	c.SetFailedValidation("replication", failedReplications)
+
 	// Existing cluster updated
 	// TODO: We should just reload the cluster and aggregate other resources in
 	// the cluster controller and check for updates there.

@@ -79,7 +79,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
-		checkConstraintXDCRReplicationBuckets,
+		checkConstraintXDCRReplicationConflictLogging,
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
@@ -1229,7 +1229,63 @@ func checkConstraintXDCRReplicationScopesAndCollectionsSupported(v *types.Valida
 	return nil
 }
 
-func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// CheckConstraintXDCRReplicationBucketsForReconcile validates that buckets referenced by XDCR
+// replications exist. Called during reconcile, returns failed replication names so they can be
+// skipped without blocking the entire cluster.
+func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if !cluster.Spec.XDCR.Managed {
+		return nil, nil
+	}
+
+	var errs []error
+	var failedNames []string
+
+	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, replication := range replications.Items {
+			if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
+				failedNames = append(failedNames, replication.Name)
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
+			}
+		}
+
+		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, migration := range migrations.Items {
+			if err := annotations.Populate(&migration.Spec, migration.Annotations); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
+				failedNames = append(failedNames, migration.Name)
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
+			}
+		}
+	}
+
+	if errs != nil {
+		return failedNames, errors.CompositeValidationError(errs...)
+	}
+
+	return failedNames, nil
+}
+
+// checkConstraintXDCRReplicationConflictLogging validates conflict logging configuration
+// for all XDCR replications at the cluster level.
+func checkConstraintXDCRReplicationConflictLogging(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.Spec.XDCR.Managed {
 		return nil
 	}
@@ -1244,34 +1300,12 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		}
 
 		for _, replication := range replications.Items {
-			err = annotations.Populate(&replication.Spec, replication.Annotations)
-			if err != nil {
+			if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
 				errs = append(errs, err)
-			}
-
-			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
 			}
 
 			if err := validateReplicationConflictLogging(v, cluster, &replication.Spec); err != nil {
 				errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", replication.Name, err))
-			}
-		}
-
-		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		for _, migration := range migrations.Items {
-			err = annotations.Populate(&migration.Spec, migration.Annotations)
-			if err != nil {
-				errs = append(errs, err)
-			}
-
-			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
 			}
 		}
 	}
@@ -2580,6 +2614,10 @@ func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseRep
 	var errs []error
 
 	for _, cluster := range clusters {
+		if err := validateReplicationBucketValid(v, cluster, &r.Spec); err != nil {
+			errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket must be valid: %w", r.Spec.Bucket, err))
+		}
+
 		if err := validateReplicationConflictLogging(v, cluster, &r.Spec); err != nil {
 			errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", r.Name, err))
 		}

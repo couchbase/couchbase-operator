@@ -787,6 +787,37 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
+// TestXDCRDeleteSourceBucketReconciles tests that deleting a source bucket referenced by
+// an active XDCR replication does not block cluster reconciliation.
+func TestXDCRDeleteSourceBucketReconciles(t *testing.T) {
+	// Platform configuration.
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Create the clusters.
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	// Establish the XDCR replication.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	// Delete the source bucket while the replication still references it.
+	e2eutil.MustDeleteBucket(t, kubernetes1, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes1, sourceCluster, bucket.GetName(), 2*time.Minute)
+
+	// The cluster must remain healthy and not get stuck in an Unreconcilable state.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+}
+
 // TestXDCRFilterExp checks that the filter expressions when applied to XDCR cluster
 // is behaving as expected.
 func TestXDCRFilterExp(t *testing.T) {

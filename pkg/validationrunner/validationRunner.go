@@ -732,3 +732,29 @@ func shouldSkipValidation(annotations map[string]string) bool {
 func checkIsMemberError(err error) bool {
 	return errors.Is(err, couchbaseutil.ErrMemberError)
 }
+
+// ValidateXDCRReplicationBuckets checks bucket existence for all XDCR replications during
+// the reconcile cycle. Instead of blocking the entire cluster, it returns a set of failed
+// replication names so only those replications are skipped during reconciliation.
+func ValidateXDCRReplicationBuckets(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+	cbCluster := currentCluster.GetCouchbaseCluster()
+
+	if !cbCluster.Spec.XDCR.Managed {
+		return nil, nil
+	}
+
+	var errs []error
+
+	failedReplications := make(map[string]bool)
+
+	failedNames, err := validationv2.CheckConstraintXDCRReplicationBucketsForReconcile(v, cbCluster)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	for _, name := range failedNames {
+		failedReplications[name] = true
+	}
+
+	return errs, failedReplications
+}
