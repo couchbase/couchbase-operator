@@ -2109,3 +2109,45 @@ func TestXDCRConflictLogging(t *testing.T) {
 
 	e2eutil.MustPatchReplicationSettings(t, kubernetes, cluster, replication, &cluster.Spec.XDCR.RemoteClusters[0], jsonpatch.NewPatchSet().Test("/ConflictLogging", &expectedConflictLoggingSettings), time.Minute)
 }
+
+// TestXDCRMismatchedConflictResolutionReconciles verifies that creating an XDCR replication
+// between buckets with different conflict resolution types (seqno vs lww) does not block
+// the reconcile loop. The server rejects such replications with a 400 error, and the operator
+// should log the error and continue reconciling.
+func TestXDCRMismatchedConflictResolutionReconciles(t *testing.T) {
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().IstioDisabled()
+
+	clusterSize := 1
+
+	// Create source bucket with seqno conflict resolution (default).
+	sourceBucket := e2espec.DefaultBucket()
+	sourceBucket.Name = "source-seqno"
+	sourceBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	sourceBucket.Spec.ConflictResolution = couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber
+	e2eutil.MustNewBucket(t, kubernetes1, sourceBucket)
+
+	// Create target bucket with lww conflict resolution (mismatched).
+	targetBucket := e2espec.DefaultBucket()
+	targetBucket.Name = "target-lww"
+	targetBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	targetBucket.Spec.ConflictResolution = couchbasev2.CouchbaseBucketConflictResolutionTimestamp
+	e2eutil.MustNewBucket(t, kubernetes2, targetBucket)
+
+	// Create clusters.
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, sourceBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, targetBucket, time.Minute)
+
+	// Set up XDCR replication without waiting for ReplicationAdded (it won't arrive).
+	replication := e2espec.GetReplication(sourceBucket.GetName(), targetBucket.GetName())
+	e2eutil.MustSetupXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	// The server will reject the replication with a 400 error due to mismatched
+	// conflict resolution. We verify the source cluster remains healthy and the
+	// reconcile loop is not blocked.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 5*time.Minute)
+}

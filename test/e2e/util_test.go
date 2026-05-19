@@ -646,6 +646,7 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRDeleteReplication).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRDeleteSourceBucketReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRFilterExp).WithTags(TagSuiteP1, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRMismatchedConflictResolutionReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateClientMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateCAMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateClientMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),

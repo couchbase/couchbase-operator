@@ -652,6 +652,16 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 		// Create via creation API
 		if err := couchbaseutil.CreateReplication(createPayload.Create).On(c.api, c.readyMembers()); err != nil {
+			// If the server rejects the request (e.g. mismatched conflict resolution),
+			// log the error and skip this replication so we don't block the reconcile loop.
+			var reqErr couchbaseutil.FailedRequestError
+			if goerrors.As(err, &reqErr) && reqErr.StatusCode == 400 {
+				log.Error(fmt.Errorf("%s", reqErr.Body), "XDCR replication creation rejected by server",
+					"cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
+
+				continue
+			}
+
 			return err
 		}
 
