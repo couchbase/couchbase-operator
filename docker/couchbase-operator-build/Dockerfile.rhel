@@ -17,10 +17,11 @@ RUN microdnf update \
     tar \
     gzip \
     bzip2 \
-    gcc \
+    gcc-toolset-13-gcc \
     git \
     findutils \
  && microdnf clean all
+ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 
 ARG TARGETARCH
 ARG GO_VERSION=1.26.2
