@@ -605,6 +605,53 @@ func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, pr
 	return retryutil.RetryFor(timeout, callback)
 }
 
+func MustHaveListenerSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, listenerSettings []*couchbaseutil.ListenerConfiguration, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		info := &couchbaseutil.ClusterInfo{}
+		if err := couchbaseutil.GetPoolsDefault(info).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if len(info.Nodes) != couchbase.Spec.TotalSize() {
+			return fmt.Errorf("found %d nodes, expected %d", len(info.Nodes), couchbase.Spec.TotalSize())
+		}
+
+		for _, node := range info.Nodes {
+			if len(node.ExternalListeners) != len(listenerSettings) {
+				return fmt.Errorf("node %s has %d external listeners, expected %d", node.HostName, len(node.ExternalListeners), len(listenerSettings))
+			}
+
+			for _, externalListener := range node.ExternalListeners {
+				listener := externalListener.ConvertExternalListenerToListenerConfiguration()
+				if !containsListenerSettings(listenerSettings, listener) {
+					return fmt.Errorf("node %s has unexpected external listener settings: afamily=%s nodeEncryption=%s", node.HostName, listener.AddressFamily, listener.NodeEncryption)
+				}
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+func containsListenerSettings(listeners []*couchbaseutil.ListenerConfiguration, target *couchbaseutil.ListenerConfiguration) bool {
+	for _, listener := range listeners {
+		if listener.AddressFamily == target.AddressFamily && listener.NodeEncryption == target.NodeEncryption {
+			return true
+		}
+	}
+
+	return false
+}
+
 func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, timeout time.Duration) {
 	if err := exposePorts(k8s, couchbase, protocol, timeout); err != nil {
 		Die(t, err)

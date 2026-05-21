@@ -1862,6 +1862,18 @@ func (f AddressFamilyOut) ConvertAddressFamilyOutToAddressFamily() AddressFamily
 	return ""
 }
 
+func (l ExternalListener) ConvertExternalListenerToListenerConfiguration() *ListenerConfiguration {
+	nodeEncryption := Off
+	if l.NodeEncryption {
+		nodeEncryption = On
+	}
+
+	return &ListenerConfiguration{
+		AddressFamily:  l.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+		NodeEncryption: nodeEncryption,
+	}
+}
+
 // NodeNetworkConfiguration allows configuration of node networking for a specific address family.
 // I can only guess this default to IPv4, which is fine.
 type NodeNetworkConfiguration struct {

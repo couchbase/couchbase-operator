@@ -588,9 +588,10 @@ func TestNetworkAddressFamily(t *testing.T) {
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	expectedUpdates := 0
 
-	// We can only test IPv6 settings when the certify flag is set, otherwise the cluster will default to IPv4
+	// We can only test IPv6 settings when the certify flag is set, otherwise the cluster will default to IPv4.
 	if kubernetes.IPv6 {
-		// Check that the cluster is initialised with IPv6 (The --up)
+		// Pods are initialised with addressFamilyOnly = false. The Operator will update this on the next reconcile loop for IPv6Only.
+		expectedUpdates++
 		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv6Only, time.Minute)
 		cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", couchbasev2.IPv6Priority), time.Minute)
 		e2eutil.MustExposePorts(t, kubernetes, cluster, couchbasev2.IPv6Priority, time.Minute)
@@ -613,6 +614,205 @@ func TestNetworkAddressFamily(t *testing.T) {
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: expectedUpdates, Validator: eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified}},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestNetworkAddressFamilyChange ensures changing the address family, scaling the cluster and changing back correctly updates the network configuration and listeners on couchbase server.
+// This test runs with both IPv4 and IPv6 depending on the cao certify --ipv6 flag.
+func TestNetworkAddressFamilyChange(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	aFamilyBaseline := couchbasev2.IPv4Only
+	aFamilyChange := couchbasev2.IPv4Priority
+	aFamilyBaselineListener := couchbaseutil.AddressFamilyIPV4
+	if kubernetes.IPv6 {
+		aFamilyBaseline = couchbasev2.IPv6Only
+		aFamilyChange = couchbasev2.IPv6Priority
+		aFamilyBaselineListener = couchbaseutil.AddressFamilyIPV6
+	} else {
+		cluster.Spec.Networking.AddressFamily = &aFamilyBaseline
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is initialised correctly.
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyBaseline, time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyBaselineListener,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Update the cluster to a dual networking setup.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyChange), time.Minute)
+
+	// Check that the address family updates to dual networking and the listener settings are updated to match.
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyChange, time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV6,
+			NodeEncryption: couchbaseutil.Off,
+		},
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Scale the cluster and check the new pod has the correct settings.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", clusterSize+1), time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyChange, time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV6,
+			NodeEncryption: couchbaseutil.Off,
+		},
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Change the address family back to the original and check the settings are reverted correctly, and the cluster remains healthy with the new node.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyBaseline), time.Minute)
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyBaseline, time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyBaselineListener,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Ensure the expected events were raised.
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	// The cluster is always initialised with IPv4 in the external listeners. We can't disable this when starting a node as it has no current state.
+	// When using IPv6, we'll update this on the next reconcile loop.
+	if kubernetes.IPv6 {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+	}
+
+	expectedEvents = append(expectedEvents,
+		// Clusters are always initiated with dual stack listeners. The following reconcile loop will update these to single stack.
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		// Update to dual stack.
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		e2eutil.ClusterScaleUpSequence(1),
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestNetworkAddressFamilyChangeToOppositePriority ensures changing the address family from IPv4Only -> IPv6Priority or IPv6Only -> IPv4Priority is allowed and works correctly.
+// This test runs with both IPv4 and IPv6 depending on the cao certify --ipv6 flag.
+func TestNetworkAddressFamilyChangeToOppositePriority(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+
+	aFamilyBaseline := couchbasev2.IPv4Only
+	aFamilyChange := couchbasev2.IPv6Priority
+	aFamilyBaselineListener := couchbaseutil.AddressFamilyIPV4
+	if kubernetes.IPv6 {
+		aFamilyBaseline = couchbasev2.IPv6Only
+		aFamilyChange = couchbasev2.IPv4Priority
+		aFamilyBaselineListener = couchbaseutil.AddressFamilyIPV6
+	} else {
+		cluster.Spec.Networking.AddressFamily = &aFamilyBaseline
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Check that the cluster is initialised correctly.
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyBaseline, time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyBaselineListener,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Update the cluster to the opposite priority setup.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyChange), time.Minute)
+
+	// Check that the address family updates to the opposite priority and the listener settings are updated to match.
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyChange, 5*time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV6,
+			NodeEncryption: couchbaseutil.Off,
+		},
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Scale the cluster to check we can still add pods ok.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/servers/0/size", clusterSize+1), 5*time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, 5*time.Minute, couchbasev2.ClusterConditionScaling)
+
+	// Check all the members again (includes new member).
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyChange, 5*time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV6,
+			NodeEncryption: couchbaseutil.Off,
+		},
+		{
+			AddressFamily:  couchbaseutil.AddressFamilyIPV4,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	// Return the cluster to the baseline address family.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyBaseline), time.Minute)
+
+	// Check that the address family updates to the opposite priority and the listener settings are updated to match.
+	e2eutil.MustExposePorts(t, kubernetes, cluster, aFamilyBaseline, 5*time.Minute)
+	e2eutil.MustHaveListenerSettings(t, kubernetes, cluster, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyBaselineListener,
+			NodeEncryption: couchbaseutil.Off,
+		},
+	}, time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		// Clusters are always initiated with dual stack listeners. The following reconcile loop will update these to single stack.
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		// Update to opposite dual stack priority.
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		e2eutil.ClusterScaleUpSequence(1),
+		// Revert to original single stack.
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
