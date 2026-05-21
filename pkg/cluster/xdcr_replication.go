@@ -279,7 +279,11 @@ func getXDCRHostnameAndNetwork(cluster couchbasev2.RemoteCluster) (string, strin
 	// because XDCR has no way of autoconfiguring.  These two modes
 	// translate to public addressing, DNS based round-robin and SRV
 	// (the port is stripped for the latter).
+	// The couchbase2 scheme indicates a CNG-enabled remote cluster and
+	// must be passed through as-is so XDCR can identify the connection type.
 	switch connectionString.Scheme {
+	case "couchbase2":
+		hostname = connectionString.Scheme + "://" + connectionString.Host
 	case "https", "couchbases":
 		if connectionString.Port() == "" {
 			hostname += ":" + strconv.Itoa(k8sutil.AdminServicePortTLS)
