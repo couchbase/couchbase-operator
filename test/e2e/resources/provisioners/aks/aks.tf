@@ -75,8 +75,6 @@ resource "azurerm_kubernetes_cluster" "cluster1" {
     service_cidr   = "10.0.0.0/16"
   }
 
-  http_application_routing_enabled = true
-
   service_principal {
     client_id     = var.service-principal-id
     client_secret = var.service-principal-secret
@@ -134,8 +132,6 @@ resource "azurerm_kubernetes_cluster" "cluster2" {
     dns_service_ip = "10.16.0.10"
     service_cidr   = "10.16.0.0/16"
   }
-
-  http_application_routing_enabled = true
 
   service_principal {
     client_id     = var.service-principal-id

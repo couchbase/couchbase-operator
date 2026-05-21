@@ -172,7 +172,7 @@ resource "aws_iam_openid_connect_provider" "eks" {
 # Data source to resolve the latest compatible EBS CSI driver version
 data "aws_eks_addon_version" "ebs_csi" {
   addon_name         = "aws-ebs-csi-driver"
-  kubernetes_version = aws_eks_cluster.this.version
+  kubernetes_version = var.kubernetes-version
   most_recent        = true
 }
 
