@@ -126,9 +126,10 @@ const (
 	EventReasonManualInterventionResolved = "ManualInterventionResolved"
 
 	// Encryption at rest.
-	EventReasonEncryptionKeyCreated = "EncryptionKeyCreated"
-	EventReasonEncryptionKeyUpdated = "EncryptionKeyUpdated"
-	EventReasonEncryptionKeyDeleted = "EncryptionKeyDeleted"
+	EventReasonEncryptionKeyCreated            = "EncryptionKeyCreated"
+	EventReasonEncryptionKeyUpdated            = "EncryptionKeyUpdated"
+	EventReasonEncryptionKeyDeleted            = "EncryptionKeyDeleted"
+	EventReasonEncryptionKeyPendingPropagation = "EncryptionKeyPendingPropagation"
 
 	// Services mismatch.
 	EventReasonServicesMismatch = "ServicesMismatch"
@@ -738,6 +739,15 @@ func EncryptionKeyDeletedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonEncryptionKeyDeleted
 	event.Message = fmt.Sprintf("Encryption key `%s` was deleted", name)
+
+	return event
+}
+
+func EncryptionKeyPendingPropagationEvent(cl *couchbasev2.CouchbaseCluster, name, reason string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonEncryptionKeyPendingPropagation
+	event.Message = fmt.Sprintf("Encryption key `%s` reconciliation deferred: %s", name, reason)
 
 	return event
 }

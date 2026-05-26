@@ -159,6 +159,15 @@ type Cluster struct {
 	// so other reconcilers and valid resources are not blocked.  The map is
 	// rebuilt every cycle, so it is naturally restart-safe.
 	failedValidation map[string]map[string]bool
+
+	// deferredEncryptionKeys holds the names of CouchbaseEncryptionKey
+	// resources whose create/update was skipped this cycle due to a
+	// transient external condition (credential file not yet projected to
+	// pods, or a dependency key not yet provisioned on the server). It is
+	// rebuilt every cycle by reconcileEncryptionKeys and consumed by
+	// reconcileEncryptionAtRest to skip settings that reference a key that
+	// is in spec but not yet on the server.
+	deferredEncryptionKeys map[string]struct{}
 }
 
 // SetFailedValidation stores the set of resource names that failed
