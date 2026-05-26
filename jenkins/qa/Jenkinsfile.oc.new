@@ -88,6 +88,28 @@ pipeline {
       }
     }
 
+    stage('Cleanup Orphaned EIPs') {
+      steps {
+        sh '''
+          echo "Checking for unassociated Elastic IPs..."
+          UNASSOCIATED_EIPS=$(aws ec2 describe-addresses \
+            --query 'Addresses[?AssociationId==null].AllocationId' \
+            --output text 2>/dev/null || true)
+
+          if [ -n "$UNASSOCIATED_EIPS" ] && [ "$UNASSOCIATED_EIPS" != "None" ]; then
+            echo "Found unassociated EIPs: $UNASSOCIATED_EIPS"
+            for eip in $UNASSOCIATED_EIPS; do
+              echo "Releasing EIP: $eip"
+              aws ec2 release-address --allocation-id "$eip" || true
+            done
+            echo "EIP cleanup complete"
+          else
+            echo "No orphaned EIPs found"
+          fi
+        '''
+      }
+    }
+
     stage('Provision OC') {
       steps {
         // Read and compact the pull secret, then generate install-config.yaml
@@ -122,7 +144,7 @@ PYEOF
         sh "docker run -i ${params.operator_image} /usr/local/bin/couchbase-operator --version 2>&1 | jq -c {version:'.version'}"
         sh "docker rmi -f ${params.operator_image}"
         
-        sh 'make touch-generated tools'
+        sh 'make touch-generated tools TARGET=openshift-linux-amd64'
       }
     }
 
@@ -175,7 +197,7 @@ PYEOF
                 echo "Running ${suite} Test Suite"
 
                 try {
-                  sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+                  sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
                   --clean \
                   --parallel 6 \
                   --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
@@ -295,7 +317,7 @@ PYEOF
           echo "Running Custom Tests"
 
           try {
-            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+            sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
             --clean \
             --parallel 6 \
             --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
@@ -438,7 +460,7 @@ PYEOF
 
           if (failedTestsStr != '') {
             try {
-              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
               --clean \
               --parallel 6 \
               --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \
@@ -576,7 +598,7 @@ PYEOF
 
           if (failedTestsStr != '') {
             try {
-              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/kubernetes-linux-amd64/cao certify \
+              sh "KUBECONFIG=${env.WORKSPACE}/config1 ./build/bin/openshift-linux-amd64/cao certify \
               --clean \
               --parallel 6 \
               --registry=https://ghcr.io/,${env.GHCR_CREDENTIALS_USR},${env.GHCR_CREDENTIALS_PSW} \

@@ -686,8 +686,18 @@ func (o *certifyOptions) createCertificationPod(args []string, secrets []string)
 
 	// All our images should be run as non root as we have control.
 	runAsNonRoot := true
+	allowPrivilegeEscalation := false
 	certificationPod.Spec.SecurityContext = &corev1.PodSecurityContext{
 		RunAsNonRoot: &runAsNonRoot,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+	certificationPod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
 	}
 
 	if o.useFSGroup {
@@ -855,8 +865,18 @@ func (o *certifyOptions) createArtifactsPod(secrets []string) (func(), error) {
 	// compromise, we'll just force the container into a specific non-root user.
 	// All our images should be run as non root as we have control.
 	runAsNonRoot := true
+	allowPrivilegeEscalation := false
 	artifactPod.Spec.SecurityContext = &corev1.PodSecurityContext{
 		RunAsNonRoot: &runAsNonRoot,
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+	artifactPod.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
 	}
 
 	if o.useFSGroup {
