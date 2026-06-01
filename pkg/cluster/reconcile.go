@@ -956,18 +956,15 @@ func (c *Cluster) configureCompletedTrackingSettings(apiSettings *couchbasev2.Co
 	}
 }
 
-// configureVersionSpecificSettings configures settings based on CB version using efficient if-else-if logic.
+// configureVersionSpecificSettings applies version gated query settings only when all nodes
+// support them. SupportsVersionFeatures checks the cluster compat version, which remains at
+// the lowest common version during mixed-mode upgrades, preventing 400 errors on older nodes.
 func (c *Cluster) configureVersionSpecificSettings(apiSettings *couchbasev2.CouchbaseClusterQuerySettings, requested *couchbaseutil.QuerySettings) error {
-	atleast76, err := c.IsAtLeastVersion("7.6.0")
-	if err != nil {
-		return err
-	}
-
 	if c.SupportsVersionFeatures("8.0.0") {
 		// CB 8.0.0+ - configure both 7.6.0+ and 8.0.0+ settings
 		c.configure76PlusSettings(apiSettings, requested)
 		c.configure80PlusSettings(apiSettings, requested)
-	} else if atleast76 {
+	} else if c.SupportsVersionFeatures("7.6.0") {
 		// CB 7.6.0+ but < 8.0.0 - configure only 7.6.0+ settings
 		c.configure76PlusSettings(apiSettings, requested)
 	}
