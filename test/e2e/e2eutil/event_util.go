@@ -166,6 +166,18 @@ func BackupUpdatedEvent(c *couchbasev2.CouchbaseCluster, backup string) *v1.Even
 	return k8sutil.BackupUpdateEvent(backup, c)
 }
 
+func BackupRestoreStartedEvent(c *couchbasev2.CouchbaseCluster, restore string) *v1.Event {
+	return k8sutil.BackupRestoreStartEvent(restore, c)
+}
+
+func BackupRestoreCompletedEvent(c *couchbasev2.CouchbaseCluster, restore string) *v1.Event {
+	return k8sutil.BackupRestoreCompleteEvent(restore, c)
+}
+
+func BackupRestoreDeletedEvent(c *couchbasev2.CouchbaseCluster, restore string) *v1.Event {
+	return k8sutil.BackupRestoreDeleteEvent(restore, c)
+}
+
 func AutoscaleUpEvent(cl *couchbasev2.CouchbaseCluster, configName string, from int, to int) *v1.Event {
 	return k8sutil.AutoscaleUpEvent(cl, configName, from, to)
 }

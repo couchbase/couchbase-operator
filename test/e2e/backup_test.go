@@ -583,7 +583,9 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType, useBlan
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(useBlankBackupName).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(useBlankBackupName).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -602,6 +604,7 @@ func testBackupAndRestore(t *testing.T, providerType cloud.ProviderType, useBlan
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1240,7 +1243,9 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutEventing().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutEventing().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// if eventing function is restored raise error.
@@ -1265,6 +1270,7 @@ func testBackupAndRestoreDisableEventing(t *testing.T, providerType cloud.Provid
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted}},
 		eventschema.Repeat{Times: len(buckets), Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1345,7 +1351,9 @@ func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderTyp
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutGSI().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutGSI().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check Index is not restored.
@@ -1377,6 +1385,7 @@ func testBackupAndRestoreDisableGSI(t *testing.T, providerType cloud.ProviderTyp
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1470,7 +1479,9 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, providerType cloud.Provi
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutAnalytics().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutAnalytics().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	datasetCount := e2eutil.MustGetDatasetCount(t, kubernetes, cluster, time.Minute)
@@ -1494,6 +1505,7 @@ func testBackupAndRestoreDisableAnalytics(t *testing.T, providerType cloud.Provi
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1564,7 +1576,9 @@ func testBackupAndRestoreDisableData(t *testing.T, providerType cloud.ProviderTy
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutData().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithoutData().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
@@ -1584,6 +1598,7 @@ func testBackupAndRestoreDisableData(t *testing.T, providerType cloud.ProviderTy
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1652,7 +1667,9 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, newBucket, 2*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithBucketConfig().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithBucketConfig().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// verify replica count was restored.
@@ -1673,6 +1690,7 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
 				Validators: []eventschema.Validatable{
@@ -1748,7 +1766,9 @@ func testBackupAndRestoreMapBuckets(t *testing.T, providerType cloud.ProviderTyp
 	e2eutil.MustNewBucket(t, kubernetes, newBucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithMapping(bucket.GetName(), targetBucketName).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithMapping(bucket.GetName(), targetBucketName).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, newBucket.GetName(), f.DocsCount, 5*time.Minute)
@@ -1767,6 +1787,7 @@ func testBackupAndRestoreMapBuckets(t *testing.T, providerType cloud.ProviderTyp
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1840,7 +1861,9 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, providerType cloud.Provide
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithIncludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), f.DocsCount, time.Minute)
@@ -1862,6 +1885,7 @@ func testBackupAndRestoreIncludeBuckets(t *testing.T, providerType cloud.Provide
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1938,7 +1962,9 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, providerType cloud.Provide
 	}
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithExcludes(buckets[0].GetName()).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, buckets[0].GetName(), 0, time.Minute)
@@ -1960,6 +1986,7 @@ func testBackupAndRestoreExcludeBuckets(t *testing.T, providerType cloud.Provide
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2048,7 +2075,9 @@ func testBackupAndRestoreNodeSelector(t *testing.T, providerType cloud.ProviderT
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that no items were restored.
@@ -2068,6 +2097,7 @@ func testBackupAndRestoreNodeSelector(t *testing.T, providerType cloud.ProviderT
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2090,6 +2120,8 @@ func TestBackupAndRestoreNodeSelectorGCP(t *testing.T) {
 }
 
 // TestBackupBucketInclusion tests we can selectively include a bucket in the backup.
+//
+//nolint:dupl
 func TestBackupBucketInclusion(t *testing.T) {
 	f := framework.Global
 
@@ -2122,6 +2154,8 @@ func TestBackupBucketInclusion(t *testing.T) {
 
 	// Create and wait for restore.
 	restore := e2eutil.NewRestore(backup).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitForResourceDeletion(t, kubernetes, restore, time.Minute)
 
 	// Expect bucket1 to be included, and bucket2 to be ignored.
@@ -2130,6 +2164,8 @@ func TestBackupBucketInclusion(t *testing.T) {
 }
 
 // TestBackupBucketExclusion tests we can selectively exclude a bucket from the backup.
+//
+//nolint:dupl
 func TestBackupBucketExclusion(t *testing.T) {
 	f := framework.Global
 
@@ -2161,6 +2197,8 @@ func TestBackupBucketExclusion(t *testing.T) {
 
 	// Create and wait for restore.
 	restore := e2eutil.NewRestore(backup).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitForResourceDeletion(t, kubernetes, restore, time.Minute)
 
 	// Expect bucket1 to be implicitly included, and bucket2 to be explicitly excluded.
@@ -2225,7 +2263,9 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in collection.
@@ -2246,6 +2286,7 @@ func testBackupAndRestoreScopesAndCollections(t *testing.T, providerType cloud.P
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2334,7 +2375,9 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in collection.
@@ -2358,6 +2401,7 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 			Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2439,7 +2483,9 @@ func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -2462,6 +2508,7 @@ func testBackupAndRestoreScope(t *testing.T, providerType cloud.ProviderType) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2546,7 +2593,9 @@ func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderTyp
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
 	// restore job is too fast, just validate that all items were restored in included collection only.
@@ -2568,6 +2617,7 @@ func testBackupAndRestoreCollection(t *testing.T, providerType cloud.ProviderTyp
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2728,9 +2778,13 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 
 	// create new restore
 	if legacy {
-		e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+		restore := e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	} else {
-		e2eutil.NewRestore(backup).FromObjStore("s3://"+s3BucketName).WithObjStoreSecret(s3secret).WithCustomStoreURL(minio.Endpoint).WithCustomStoreCert(minio.CASecret).MustCreate(t, kubernetes)
+		restore := e2eutil.NewRestore(backup).FromObjStore("s3://"+s3BucketName).WithObjStoreSecret(s3secret).WithCustomStoreURL(minio.Endpoint).WithCustomStoreCert(minio.CASecret).MustCreate(t, kubernetes)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	}
 
 	// restore job is too fast, just validate bucket item count
@@ -2750,6 +2804,7 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2808,7 +2863,9 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).UseIAM(true).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromS3(s3BucketName).UseIAM(true).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -2827,6 +2884,7 @@ func TestBackupAndRestoreS3WithIAMRole(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2877,7 +2935,9 @@ func TestBackupAndForcedRestore(t *testing.T) {
 	docSet.WithValue("key1", "thatsnew").MustCreate(t, kubernetes, cluster)
 
 	// create new restore
-	e2eutil.NewRestore(backup).WithForcedUpdates().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).WithForcedUpdates().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	err = e2eutil.VerifyContents(600*time.Second, docSet, contents)
 	if err != nil {
@@ -2894,6 +2954,7 @@ func TestBackupAndForcedRestore(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2929,7 +2990,9 @@ func TestBackupAndRestoreServices(t *testing.T) {
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
 	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
-	e2eutil.NewRestore(backup).WithoutFTAlias().MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).WithoutFTAlias().MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Bucket created
@@ -2993,7 +3056,9 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3012,6 +3077,7 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3085,7 +3151,9 @@ func TestBackupAndRestoreEphemeralVolumeS3(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3104,6 +3172,7 @@ func TestBackupAndRestoreEphemeralVolumeS3(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3160,7 +3229,9 @@ func TestBackupAndRestoreUsers(t *testing.T) {
 	// Delete after the backup has been taken.
 	e2eutil.MustDeleteUsers(t, kubernetes, cluster, users...)
 
-	e2eutil.NewRestore(backup).WithoutFTAlias().WithUsers(true).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).WithoutFTAlias().WithUsers(true).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	e2eutil.MustWaitUntilUsersExist(t, kubernetes, cluster, users, 2*time.Minute)
 
@@ -3174,6 +3245,7 @@ func TestBackupAndRestoreUsers(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3288,7 +3360,9 @@ func TestAutoCreateBucketOnRestore(t *testing.T) {
 	time.Sleep(30 * time.Second)
 
 	// create new restore
-	e2eutil.NewRestore(backup).UseBlankBackupName(false).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).UseBlankBackupName(false).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// wait for the bucket to be recreated
 	e2eutil.MustWaitUntilUnmanagedBucketExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
@@ -3309,6 +3383,7 @@ func TestAutoCreateBucketOnRestore(t *testing.T) {
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3423,6 +3498,8 @@ func TestBackupAndKeepRestore(t *testing.T) {
 
 	// create new restore
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).WithPreserveRestoreRecord(true).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	// restore job is too fast, just validate bucket item count
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3511,6 +3588,8 @@ func TestBackupAndRestorePreserveRecord(t *testing.T) {
 
 		// create new restore with preserveRestoreRecord: true
 		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).WithPreserveRestoreRecord(true).MustCreate(t, kubernetes)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 		// restore job is too fast, just validate bucket item count
 		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3541,6 +3620,8 @@ func TestBackupAndRestorePreserveRecord(t *testing.T) {
 
 		// create new restore with default behavior (preserveRestoreRecord: false)
 		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).MustCreate(t, kubernetes)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 		// restore job is too fast, just validate bucket item count
 		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3608,8 +3689,9 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 	}
 
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--purge"}).UseBlankBackupName(false).MustCreate(t, kubernetes)
-
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	container = e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
 	var restoreAdditionalArgsEnvVar *corev1.EnvVar
@@ -3659,8 +3741,10 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithDefaultRecoveryMethod(v2.DefaultRecoveryTypePurge).UseBlankBackupName(false).MustCreate(t, kubernetes)
-
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+
 	container := e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
 
 	found := false
