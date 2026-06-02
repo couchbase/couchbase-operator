@@ -3971,6 +3971,11 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 		return false, err
 	}
 
+	if imageVersion == "9.9.9" {
+		// we have no idea what this is so we trust the user
+		return true, nil
+	}
+
 	return imageVersion == c.Status.CurrentVersion, nil
 }
 
