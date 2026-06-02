@@ -16,5 +16,5 @@ var (
 	// Note: these should be updated every release.
 	technicalLowerBound = &version.Info{Major: "1", Minor: "23", GitVersion: "v1.23.0"}
 	supportedLowerBound = &version.Info{Major: "1", Minor: "26", GitVersion: "v1.26.0"}
-	supportedUpperBound = &version.Info{Major: "1", Minor: "32", GitVersion: "v1.32.0"}
+	supportedUpperBound = &version.Info{Major: "1", Minor: "35", GitVersion: "v1.35.0"}
 )
