@@ -351,10 +351,12 @@ Log Level: Required
 Scope: cluster
 +
 Reason: Used to determine issues with Couchbase Cluster state, server environment variables, and logging configuration
-Endpoints::
+EndpointSlice::
 Log Level: Required
 +
 Scope: cluster
++
+Reason: Used to inspect service endpoint topology without hitting deprecated Endpoints API
 PersistentVolumeClaim::
 Log Level: Required
 +
