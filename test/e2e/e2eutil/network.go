@@ -564,7 +564,7 @@ func MustCheckConsoleServiceLoadBalancerSourceRanges(t *testing.T, k8s *types.Cl
 // exposePorts checks if the server ports are exposed only on the requested protocols.
 // Works with 7.0.2+ only.  Don't be tempted to actually probe the ports themselves,
 // you'll find it practically impossible to actually test this on 99% of platforms.
-func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, timeout time.Duration) error {
+func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, ctx *TLSContext, timeout time.Duration) error {
 	// Get the expected number of pods (with kubernetes as the source of truth, we expect Couchbase to match).
 	options := metav1.ListOptions{
 		LabelSelector: labels.Set(k8sutil.SelectorForClusterResource(couchbase)).String(),
@@ -596,18 +596,26 @@ func exposePorts(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, pr
 	for i := range pods.Items {
 		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamily", i), addressFamily)
 		patchset.Test(fmt.Sprintf("/Nodes/%d/AddressFamilyOnly", i), addressFamilyOnly)
+		patchset.Test(fmt.Sprintf("/Nodes/%d/NodeEncryption", i), ctx != nil)
 	}
 
 	callback := func() error {
-		return PatchCouchbaseInfo(k8s, couchbase, patchset, timeout)
+		return PatchCouchbaseInfo(k8s, couchbase, patchset, ctx, timeout)
 	}
 
 	return retryutil.RetryFor(timeout, callback)
 }
 
-func MustHaveListenerSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, listenerSettings []*couchbaseutil.ListenerConfiguration, timeout time.Duration) {
+func MustHaveListenerSettingsTLS(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, ctx *TLSContext, listenerSettings []*couchbaseutil.ListenerConfiguration, timeout time.Duration) {
 	callback := func() error {
-		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		var client *CouchbaseClient
+		var err error
+		if ctx != nil {
+			client, err = CreateAdminConsoleClientTLS(k8s, couchbase, ctx)
+		} else {
+			client, err = CreateAdminConsoleClient(k8s, couchbase)
+		}
+
 		if err != nil {
 			return err
 		}
@@ -642,6 +650,10 @@ func MustHaveListenerSettings(t *testing.T, k8s *types.Cluster, couchbase *couch
 	}
 }
 
+func MustHaveListenerSettings(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, listenerSettings []*couchbaseutil.ListenerConfiguration, timeout time.Duration) {
+	MustHaveListenerSettingsTLS(t, k8s, couchbase, nil, listenerSettings, timeout)
+}
+
 func containsListenerSettings(listeners []*couchbaseutil.ListenerConfiguration, target *couchbaseutil.ListenerConfiguration) bool {
 	for _, listener := range listeners {
 		if listener.AddressFamily == target.AddressFamily && listener.NodeEncryption == target.NodeEncryption {
@@ -653,7 +665,13 @@ func containsListenerSettings(listeners []*couchbaseutil.ListenerConfiguration, 
 }
 
 func MustExposePorts(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, timeout time.Duration) {
-	if err := exposePorts(k8s, couchbase, protocol, timeout); err != nil {
+	if err := exposePorts(k8s, couchbase, protocol, nil, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
+func MustExposePortsTLS(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, protocol couchbasev2.AddressFamily, ctx *TLSContext, timeout time.Duration) {
+	if err := exposePorts(k8s, couchbase, protocol, ctx, timeout); err != nil {
 		Die(t, err)
 	}
 }

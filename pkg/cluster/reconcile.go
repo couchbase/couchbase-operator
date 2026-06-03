@@ -224,7 +224,7 @@ func (c *Cluster) reconcile() error {
 		return nil
 	}
 
-	//  If wer're not upgrading, then we can clear the upgrading condition.
+	//  If we're not upgrading, then we can clear the upgrading condition.
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionUpgrading)
 
 	// Run post-topology reconcilers.  These typically manage Couchbase
@@ -233,6 +233,7 @@ func (c *Cluster) reconcile() error {
 	postTopologyReconcilers := reconcileFuncList{
 		(*Cluster).reconcilePersistentStatus,
 		(*Cluster).reconcileClusterNetworking,
+		(*Cluster).reconcilePeerServicesFinalize,
 		(*Cluster).reconcileTLSPostTopologyChange,
 		(*Cluster).reconcilePods,
 		(*Cluster).reconcileClusterSettings,
@@ -275,6 +276,10 @@ func (c *Cluster) reconcile() error {
 
 func (c *Cluster) reconcilePeerServices() error {
 	return k8sutil.ReconcilePeerServices(c.k8s, c.cluster)
+}
+
+func (c *Cluster) reconcilePeerServicesFinalize() error {
+	return k8sutil.ReconcilePeerServicesFinalize(c.k8s, c.cluster)
 }
 
 // reconcileMembers reconciles

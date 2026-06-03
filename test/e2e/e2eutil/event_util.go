@@ -288,7 +288,7 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 
 // ClusterCreateSequenceWithN2N is a common function for generating cluster
 // creation events, when N2N is enabled.
-func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNodeEncryptionType) eventschema.Validatable {
+func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNodeEncryptionType, ipv6 bool) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
@@ -297,6 +297,10 @@ func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNod
 
 	if size > 1 {
 		schema.Validators = append(schema.Validators, ClusterScaleUpSequence(size-1))
+	}
+
+	if ipv6 {
+		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
 	}
 
 	schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
@@ -702,5 +706,45 @@ func MultiNodeSwapRebalanceSequence(nodes int) eventschema.Validatable {
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 		},
+	}
+}
+
+func EnableN2NEncryptionSequence(n2n *couchbasev2.NodeToNodeEncryptionType) eventschema.Validatable {
+	if n2n == nil {
+		return eventschema.Sequence{}
+	}
+
+	var enableEncryptionSequence []eventschema.Validatable
+	if *n2n == couchbasev2.NodeToNodeControlPlaneOnly {
+		enableEncryptionSequence = []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
+		}
+	} else {
+		// Control Plane Only is the default, anything else means we change the mode back.
+		enableEncryptionSequence = []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
+			eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
+		}
+	}
+
+	return eventschema.Sequence{
+		Validators: enableEncryptionSequence,
+	}
+}
+
+func DisableN2NEncryptionSequence(n2n *couchbasev2.NodeToNodeEncryptionType) eventschema.Validatable {
+	if n2n == nil {
+		return eventschema.Sequence{}
+	}
+
+	var disableEncryptionSequence []eventschema.Validatable
+	if *n2n != couchbasev2.NodeToNodeControlPlaneOnly {
+		// Strict and All must be downgraded to Control Plane Only before disabling encryption.
+		disableEncryptionSequence = append(disableEncryptionSequence, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
+	}
+	disableEncryptionSequence = append(disableEncryptionSequence, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified})
+
+	return eventschema.Sequence{
+		Validators: disableEncryptionSequence,
 	}
 }
