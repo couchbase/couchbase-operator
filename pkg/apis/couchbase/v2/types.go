@@ -3507,6 +3507,7 @@ type CloudNativeGateway struct {
 
 	OTLP *CloudNativeGatewayOTLP `json:"-" annotation:"otlp"`
 
+	// DEPRECATED - field no longer has any effect.
 	// TerminationGracePeriodSeconds specifies the grace period for the container to
 	// terminate. Defaults to 75 seconds.
 	// +kubebuilder:default=75
