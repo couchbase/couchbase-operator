@@ -1094,9 +1094,16 @@ func CreateCouchbasePodSpec(m couchbaseutil.Member, cluster *couchbasev2.Couchba
 	return pod, nil
 }
 
-// createReadinessProbe creates a TCP socket readiness probe that connects to the pod's IP.
-// Since IPv6 can now be configured as the primary pod IP, the TCP socket probe will
-// connect to the appropriate IP family (IPv4 or IPv6) based on pod.status.podIP.
+// createReadinessProbe creates an exec-based readiness probe for the Couchbase Server container.
+// The probe uses bash's /dev/tcp to attempt a TCP connection from inside the pod's network
+// namespace, trying IPv6 loopback first then IPv4 loopback. This approach works for all
+// address family modes and survives address family migration without pod recreation:
+//   - IPv4Only: CBS on 0.0.0.0 → ::1 fails, 127.0.0.1 succeeds
+//   - IPv6Only: CBS on [::] → ::1 succeeds
+//   - Priority/nil: CBS on both → ::1 succeeds
+//
+// TCP socket probes cannot be used because the kubelet executes them from the node's
+// network namespace targeting pod.status.podIP, which may not match the family CBS listens on.
 func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Probe {
 	return &v1.Probe{
 		InitialDelaySeconds: int32(readinessConfig.PodReadinessDelay.Seconds()),
@@ -1104,8 +1111,8 @@ func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Prob
 		PeriodSeconds:       int32(readinessConfig.PodReadinessPeriod.Seconds()),
 		FailureThreshold:    1,
 		ProbeHandler: v1.ProbeHandler{
-			TCPSocket: &v1.TCPSocketAction{
-				Port: intstr.FromInt(port),
+			Exec: &v1.ExecAction{
+				Command: []string{"bash", "-c", fmt.Sprintf("timeout 3 bash -c '</dev/tcp/::1/%d' || timeout 3 bash -c '</dev/tcp/127.0.0.1/%d'", port, port)},
 			},
 		},
 	}

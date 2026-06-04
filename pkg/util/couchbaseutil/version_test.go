@@ -120,3 +120,69 @@ func TestCouchbaseVersionEmpty(t *testing.T) {
 		t.Errorf("expected version parsing to fail: %s", versionStr)
 	}
 }
+
+func TestCouchbaseVersionBuildNumber(t *testing.T) {
+	versionStr := "8.0.0-1000"
+
+	version, err := NewVersion(versionStr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if version.Version() != versionStr {
+		t.Errorf("expected version=%s, got=%s", versionStr, version.Version())
+	}
+
+	if version.Major() != 8 || version.Minor() != 0 || version.Patch() != 0 {
+		t.Errorf("expected semver=8.0.0, got=%s", version.Semver())
+	}
+}
+
+func TestCouchbaseVersionCompareSameSemverDifferentBuildNumbers(t *testing.T) {
+	v1, _ := NewVersion("8.0.0-1000")
+	v2, _ := NewVersion("8.0.0-1001")
+
+	if v1.Compare(v2) >= 0 {
+		t.Errorf("expected 8.0.0-1000 < 8.0.0-1001")
+	}
+
+	if v2.Compare(v1) <= 0 {
+		t.Errorf("expected 8.0.0-1001 > 8.0.0-1000")
+	}
+}
+
+func TestCouchbaseVersionCompareSameSemverSameBuildNumbers(t *testing.T) {
+	v1, _ := NewVersion("8.0.0-1000")
+	v2, _ := NewVersion("8.0.0-1000")
+
+	if v1.Compare(v2) != 0 {
+		t.Errorf("expected 8.0.0-1000 == 8.0.0-1000")
+	}
+}
+
+func TestCouchbaseVersionCompareSameSemverOnlyOneBuildNumber(t *testing.T) {
+	v1, _ := NewVersion("8.0.0")
+	v2, _ := NewVersion("8.0.0-1000")
+
+	// Version with build number should be greater
+	if v1.Compare(v2) >= 0 {
+		t.Errorf("expected 8.0.0 < 8.0.0-1000 (version with build number is greater)")
+	}
+
+	if v2.Compare(v1) <= 0 {
+		t.Errorf("expected 8.0.0-1000 > 8.0.0 (version with build number is greater)")
+	}
+}
+
+func TestCouchbaseVersionCompareDifferentSemverWithBuildNumbers(t *testing.T) {
+	v1, _ := NewVersion("7.6.0-1000")
+	v2, _ := NewVersion("8.0.0-500")
+
+	if v1.Compare(v2) >= 0 {
+		t.Errorf("expected 7.6.0-1000 < 8.0.0-500 (semver takes precedence)")
+	}
+
+	if v2.Compare(v1) <= 0 {
+		t.Errorf("expected 8.0.0-500 > 7.6.0-1000 (semver takes precedence)")
+	}
+}

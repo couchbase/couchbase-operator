@@ -1891,6 +1891,8 @@ func (c *Cluster) deleteCouchbaseRestore(restoreName string) error {
 		return err
 	}
 
+	c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(restoreName, c.cluster))
+
 	return nil
 }
 

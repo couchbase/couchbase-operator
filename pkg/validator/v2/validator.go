@@ -80,7 +80,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
 		checkConstraintXDCRRemoteAuthentication,
-		checkConstraintXDCRReplicationBuckets,
+		checkConstraintXDCRReplicationConflictLogging,
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
 		checkConstraintServerClassContainsDataService,
@@ -1265,7 +1265,63 @@ func checkConstraintXDCRReplicationScopesAndCollectionsSupported(v *types.Valida
 	return nil
 }
 
-func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+// CheckConstraintXDCRReplicationBucketsForReconcile validates that buckets referenced by XDCR
+// replications exist. Called during reconcile, returns failed replication names so they can be
+// skipped without blocking the entire cluster.
+func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if !cluster.Spec.XDCR.Managed {
+		return nil, nil
+	}
+
+	var errs []error
+	var failedNames []string
+
+	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, replication := range replications.Items {
+			if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
+				failedNames = append(failedNames, replication.Name)
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
+			}
+		}
+
+		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		for _, migration := range migrations.Items {
+			if err := annotations.Populate(&migration.Spec, migration.Annotations); err != nil {
+				errs = append(errs, err)
+			}
+
+			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
+				failedNames = append(failedNames, migration.Name)
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
+			}
+		}
+	}
+
+	if errs != nil {
+		return failedNames, errors.CompositeValidationError(errs...)
+	}
+
+	return failedNames, nil
+}
+
+// checkConstraintXDCRReplicationConflictLogging validates conflict logging configuration
+// for all XDCR replications at the cluster level.
+func checkConstraintXDCRReplicationConflictLogging(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if !cluster.Spec.XDCR.Managed {
 		return nil
 	}
@@ -1280,34 +1336,12 @@ func checkConstraintXDCRReplicationBuckets(v *types.Validator, cluster *couchbas
 		}
 
 		for _, replication := range replications.Items {
-			err = annotations.Populate(&replication.Spec, replication.Annotations)
-			if err != nil {
+			if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
 				errs = append(errs, err)
-			}
-
-			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
 			}
 
 			if err := validateReplicationConflictLogging(v, cluster, &replication.Spec); err != nil {
 				errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", replication.Name, err))
-			}
-		}
-
-		migrations, err := v.Abstraction.GetCouchbaseMigrationReplications(cluster.Namespace, remoteCluster.Replications.Selector)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		for _, migration := range migrations.Items {
-			err = annotations.Populate(&migration.Spec, migration.Annotations)
-			if err != nil {
-				errs = append(errs, err)
-			}
-
-			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
 			}
 		}
 	}
@@ -2613,7 +2647,7 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return warnings, nil
 }
 
-func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseReplication) error {
+func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseReplication) error {
 	if checkAnnotationSkipValidation(r.Annotations) {
 		return nil
 	}
@@ -2632,6 +2666,27 @@ func CheckConstraintsReplication(_ *types.Validator, r *couchbasev2.CouchbaseRep
 	case "", "Active", "Off":
 	default:
 		return fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
+	}
+
+	clusters, err := getReplicationRelatedClusters(v, r)
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+
+	for _, cluster := range clusters {
+		if err := validateReplicationBucketValid(v, cluster, &r.Spec); err != nil {
+			errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket must be valid: %w", r.Spec.Bucket, err))
+		}
+
+		if err := validateReplicationConflictLogging(v, cluster, &r.Spec); err != nil {
+			errs = append(errs, fmt.Errorf("couchbasereplications.couchbase.com/%s has an invalid conflict logging configuration: %w", r.Name, err))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
 	}
 
 	return nil
@@ -4264,6 +4319,10 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 		if key.Spec.AutoGenerated != nil && key.Spec.AutoGenerated.Rotation != nil && key.Spec.AutoGenerated.Rotation.IntervalDays != 0 && key.Spec.AutoGenerated.Rotation.StartTime == nil {
 			errs = append(errs, fmt.Errorf("spec.autoGenerated.rotation.startTime must be set when spec.autoGenerated.rotation.intervalDays is set"))
 		}
+
+		if err := validateEncryptWithKeyExists(v, key); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	if key.Spec.KeyType == couchbasev2.CouchbaseEncryptionKeyTypeAWS {
@@ -4293,6 +4352,27 @@ func CheckConstraintsEncryptionKey(v *types.Validator, key *couchbasev2.Couchbas
 	}
 
 	return nil
+}
+
+// validateEncryptWithKeyExists checks that spec.autoGenerated.encryptWithKey
+// references an existing CouchbaseEncryptionKey in the same namespace.
+func validateEncryptWithKeyExists(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) error {
+	if key.Spec.AutoGenerated == nil || key.Spec.AutoGenerated.EncryptWithKey == "" {
+		return nil
+	}
+
+	allKeys, err := v.Abstraction.GetCouchbaseEncryptionKeys(key.Namespace, nil)
+	if err != nil {
+		return fmt.Errorf("failed to list encryption keys: %w", err)
+	}
+
+	for i := range allKeys.Items {
+		if allKeys.Items[i].Name == key.Spec.AutoGenerated.EncryptWithKey {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("spec.autoGenerated.encryptWithKey references key %q which does not exist", key.Spec.AutoGenerated.EncryptWithKey)
 }
 
 func checkEncryptionKeyUsage(v *types.Validator, key *couchbasev2.CouchbaseEncryptionKey) []error {
@@ -6617,6 +6697,39 @@ func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.
 
 		if selector.Matches(labels.Set(bucket.Labels)) {
 			relatedClusters = append(relatedClusters, &cluster)
+		}
+	}
+
+	return relatedClusters, nil
+}
+
+func getReplicationRelatedClusters(v *types.Validator, r *couchbasev2.CouchbaseReplication) ([]*couchbasev2.CouchbaseCluster, error) {
+	clusters, err := v.Abstraction.GetCouchbaseClusters(r.Namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	relatedClusters := []*couchbasev2.CouchbaseCluster{}
+
+	for _, cluster := range clusters.Items {
+		if !cluster.Spec.XDCR.Managed {
+			continue
+		}
+
+		for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+			selector := labels.Everything()
+			if remoteCluster.Replications.Selector != nil {
+				selector, err = metav1.LabelSelectorAsSelector(remoteCluster.Replications.Selector)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if selector.Matches(labels.Set(r.Labels)) {
+				relatedClusters = append(relatedClusters, &cluster)
+
+				break
+			}
 		}
 	}
 

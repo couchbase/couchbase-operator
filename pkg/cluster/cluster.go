@@ -161,6 +161,15 @@ type Cluster struct {
 	// pod creation goroutines run concurrently.
 	failedGroupsMu sync.RWMutex
 
+	// deferredEncryptionKeys holds the names of CouchbaseEncryptionKey
+	// resources whose create/update was skipped this cycle due to a
+	// transient external condition (credential file not yet projected to
+	// pods, or a dependency key not yet provisioned on the server). It is
+	// rebuilt every cycle by reconcileEncryptionKeys and consumed by
+	// reconcileEncryptionAtRest to skip settings that reference a key that
+	// is in spec but not yet on the server.
+	deferredEncryptionKeys map[string]struct{}
+
 	// failedValidation holds the names of resources that failed change-
 	// constraint validation in this reconcile cycle, keyed by resource kind
 	// (e.g. "bucket").  Resources in this map are skipped during reconciliation

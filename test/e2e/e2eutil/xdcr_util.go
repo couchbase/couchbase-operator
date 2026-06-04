@@ -344,6 +344,35 @@ func MustEstablishXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Clu
 	return info
 }
 
+// MustSetupXDCRReplicationGeneric sets up the XDCR replication (secret, CRD, remote cluster)
+// without waiting for the ReplicationAdded event. Returns the XDCRInfo and the remote cluster
+// name. This is useful for tests where the replication is expected to fail.
+func MustSetupXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*XDCRInfo, string) {
+	replication.Namespace = srcK8s.Namespace
+
+	xdcrSecret, err := createRemoteClusterSecret(srcK8s, dstK8s, source, target)
+	if err != nil {
+		Die(t, err)
+	}
+
+	replicationSpec, err := srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	clusterName, err := createRemoteClusterGeneric(srcK8s, dstK8s, source, target, xdcrSecret)
+	if err != nil {
+		Die(t, err)
+	}
+
+	info := &XDCRInfo{
+		Replication: replicationSpec,
+		SecretName:  xdcrSecret,
+	}
+
+	return info, clusterName
+}
+
 // establishXDCRReplicationGenericWithoutUUID creates a remote cluster without UUID and a replication from the source bucket to the destination
 // bucket. This tests the optional UUID functionality where the operator should auto-resolve the UUID.
 func establishXDCRReplicationGenericWithoutUUID(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*XDCRInfo, error) {

@@ -590,12 +590,48 @@ func generateDiscoveryService(cluster *couchbasev2.CouchbaseCluster) *v1.Service
 	return service
 }
 
+// ipFamiliesRestricted checks if the requested service update would make the current service IP family config more restrictive.
+func ipFamiliesRestricted(current, requested *v1.Service) bool {
+	if current == nil || len(current.Spec.IPFamilies) == 0 {
+		return false
+	}
+
+	if requested.Spec.IPFamilyPolicy == nil || *requested.Spec.IPFamilyPolicy != v1.IPFamilyPolicySingleStack {
+		return false
+	}
+
+	return !reflect.DeepEqual(current.Spec.IPFamilies, requested.Spec.IPFamilies)
+}
+
 // ReconcilePeerServices creates/updates all cluster-wide services required for
-// communication to and discovery of the cluster.
+// communication to and discovery of the cluster. The peer service IP family config
+// is additive-only: existing address families are never removed here, preventing
+// CBS nodes from losing DNS resolution for their current address family mid-migration.
+// We call ReconcilePeerServicesFinalize after reconcileClusterNetworking to apply the
+// final IP family policy.
 func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
 	requested, err := generatePeerService(cluster)
 	if err != nil {
 		return err
+	}
+
+	current, _ := c.Services.Get(requested.Name)
+	if ipFamiliesRestricted(current, requested) {
+		families := append([]v1.IPFamily(nil), current.Spec.IPFamilies...)
+		for _, reqFamily := range requested.Spec.IPFamilies {
+			found := false
+			for _, f := range families {
+				if f == reqFamily {
+					found = true
+					break
+				}
+			}
+			if !found {
+				families = append(families, reqFamily)
+			}
+		}
+		requested.Spec.IPFamilies = families
+		requested.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
 	}
 
 	if err := reconcileService(c, cluster, requested); err != nil {
@@ -603,6 +639,18 @@ func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseClust
 	}
 
 	requested = generateDiscoveryService(cluster)
+
+	return reconcileService(c, cluster, requested)
+}
+
+// ReconcilePeerServicesFinalize applies the final desired IP family policy to the
+// peer service. This must be called after reconcileClusterNetworking so that CBS
+// nodes have already been migrated off any address family being removed.
+func ReconcilePeerServicesFinalize(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+	requested, err := generatePeerService(cluster)
+	if err != nil {
+		return err
+	}
 
 	return reconcileService(c, cluster, requested)
 }

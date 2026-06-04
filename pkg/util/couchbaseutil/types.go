@@ -1840,6 +1840,14 @@ const (
 	Off OnOrOff = "off"
 )
 
+func OnOrOffBool(b bool) OnOrOff {
+	if b {
+		return On
+	}
+
+	return Off
+}
+
 // AddressFamily The address family to apply the settings.
 type AddressFamily string
 
@@ -1860,6 +1868,23 @@ func (f AddressFamilyOut) ConvertAddressFamilyOutToAddressFamily() AddressFamily
 	}
 
 	return ""
+}
+
+func (l ExternalListener) ConvertExternalListenerToListenerConfiguration() *ListenerConfiguration {
+	nodeEncryption := Off
+	if l.NodeEncryption {
+		nodeEncryption = On
+	}
+
+	return &ListenerConfiguration{
+		AddressFamily:  l.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+		NodeEncryption: nodeEncryption,
+	}
+}
+
+type MemberNetworkConfigState struct {
+	Member        Member
+	NetworkConfig *NodeNetworkConfiguration
 }
 
 // NodeNetworkConfiguration allows configuration of node networking for a specific address family.

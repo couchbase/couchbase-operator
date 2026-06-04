@@ -885,7 +885,6 @@ func EnableExternalListener(s *ListenerConfiguration) *Request {
 	return NewRequest((*Client).Post, "/node/controller/enableExternalListener", data, nil)
 }
 
-// EnableExternalListener disables a listener (probably an API port, for a specific protocol for a node).
 func DisableExternalListener(s *ListenerConfiguration) *Request {
 	data, err := urlencoding.Marshal(s)
 	if err != nil {
@@ -893,6 +892,10 @@ func DisableExternalListener(s *ListenerConfiguration) *Request {
 	}
 
 	return NewRequest((*Client).Post, "/node/controller/disableExternalListener", data, nil)
+}
+
+func DisableUnusedExternalListeners() *Request {
+	return NewRequest((*Client).Post, "/node/controller/disableUnusedExternalListeners", nil, nil)
 }
 
 func GetRunningTasks(runningTasks *RunningTasks) *Request {

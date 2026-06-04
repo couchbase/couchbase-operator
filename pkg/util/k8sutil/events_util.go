@@ -88,14 +88,16 @@ const (
 	EventReasonBackupDeleted = "BackupDeleted"
 	// These are raised by the jobs themselves and are not part of the
 	// CouchbaseCluster documentation.
-	EventReasonBackupStarted        = "BackupStarted"
-	EventReasonBackupCompleted      = "BackupCompleted"
-	EventReasonBackupFailed         = "BackupFailed"
-	EventReasonBackupRestoreCreated = "BackupRestoreCreated"
-	EventReasonBackupRestoreDeleted = "BackupRestoreDeleted"
-	EventReasonBackupMergeStarted   = "BackupMergeStarted"
-	EventReasonBackupMergeCompleted = "BackupMergeCompleted"
-	EventReasonBackupMergeFailed    = "BackupMergeFailed"
+	EventReasonBackupStarted          = "BackupStarted"
+	EventReasonBackupCompleted        = "BackupCompleted"
+	EventReasonBackupFailed           = "BackupFailed"
+	EventReasonBackupRestoreCreated   = "BackupRestoreCreated"
+	EventReasonBackupRestoreStarted   = "BackupRestoreStarted"
+	EventReasonBackupRestoreCompleted = "BackupRestoreCompleted"
+	EventReasonBackupRestoreDeleted   = "BackupRestoreDeleted"
+	EventReasonBackupMergeStarted     = "BackupMergeStarted"
+	EventReasonBackupMergeCompleted   = "BackupMergeCompleted"
+	EventReasonBackupMergeFailed      = "BackupMergeFailed"
 
 	// Security lifecycle.
 	EventReasonSecuritySettingsUpdated = "SecuritySettingsUpdated"
@@ -126,9 +128,10 @@ const (
 	EventReasonManualInterventionResolved = "ManualInterventionResolved"
 
 	// Encryption at rest.
-	EventReasonEncryptionKeyCreated = "EncryptionKeyCreated"
-	EventReasonEncryptionKeyUpdated = "EncryptionKeyUpdated"
-	EventReasonEncryptionKeyDeleted = "EncryptionKeyDeleted"
+	EventReasonEncryptionKeyCreated            = "EncryptionKeyCreated"
+	EventReasonEncryptionKeyUpdated            = "EncryptionKeyUpdated"
+	EventReasonEncryptionKeyDeleted            = "EncryptionKeyDeleted"
+	EventReasonEncryptionKeyPendingPropagation = "EncryptionKeyPendingPropagation"
 
 	// Services mismatch.
 	EventReasonServicesMismatch = "ServicesMismatch"
@@ -353,11 +356,29 @@ func BackupRestoreCreateEvent(restore string, cl *couchbasev2.CouchbaseCluster) 
 	return event
 }
 
+func BackupRestoreStartEvent(restore string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupRestoreStarted
+	event.Message = fmt.Sprintf("Restore `%s` started", restore)
+
+	return event
+}
+
+func BackupRestoreCompleteEvent(restore string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonBackupRestoreCompleted
+	event.Message = fmt.Sprintf("Restore `%s` completed", restore)
+
+	return event
+}
+
 func BackupRestoreDeleteEvent(restore string, cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonBackupRestoreDeleted
-	event.Message = fmt.Sprintf("A new restore `%s` was deleted", restore)
+	event.Message = fmt.Sprintf("Restore `%s` was deleted", restore)
 
 	return event
 }
@@ -738,6 +759,15 @@ func EncryptionKeyDeletedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v
 	event.Type = v1.EventTypeNormal
 	event.Reason = EventReasonEncryptionKeyDeleted
 	event.Message = fmt.Sprintf("Encryption key `%s` was deleted", name)
+
+	return event
+}
+
+func EncryptionKeyPendingPropagationEvent(cl *couchbasev2.CouchbaseCluster, name, reason string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonEncryptionKeyPendingPropagation
+	event.Message = fmt.Sprintf("Encryption key `%s` reconciliation deferred: %s", name, reason)
 
 	return event
 }

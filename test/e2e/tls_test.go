@@ -28,6 +28,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1172,6 +1173,25 @@ func skipN2NCheck(t *testing.T) {
 	}
 }
 
+func MustInitClusterWithTLSAndNodeToNode(t *testing.T, k8s *types.Cluster, clusterSize int, encryptionType *couchbasev2.NodeToNodeEncryptionType) (*couchbasev2.CouchbaseCluster, *e2eutil.TLSContext) {
+	cluster, ctx := MustGenerateClusterWithTLSAndNodeToNode(t, k8s, clusterSize, encryptionType)
+	return e2eutil.MustNewClusterFromSpec(t, k8s, cluster), ctx
+}
+
+func MustGenerateClusterWithTLSAndNodeToNode(t *testing.T, k8s *types.Cluster, clusterSize int, encryptionType *couchbasev2.NodeToNodeEncryptionType) (*couchbasev2.CouchbaseCluster, *e2eutil.TLSContext) {
+	ctx := e2eutil.MustInitClusterTLS(t, k8s, &e2eutil.TLSOpts{})
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(k8s)
+	cluster.Name = ctx.ClusterName
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   ctx.ClusterSecretName,
+			OperatorSecret: ctx.OperatorSecretName,
+		},
+		NodeToNodeEncryption: encryptionType,
+	}
+	return cluster, ctx
+}
+
 // testCreateClusterWithTLSAndNodeToNode creates a cluster with N2N initially enabled.
 func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbasev2.NodeToNodeEncryptionType) {
 	// Platform configuration.
@@ -1210,7 +1230,7 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1266,7 +1286,7 @@ func testCreateClusterWithTLSAndNodeToNodeAndRotateCA(t *testing.T, encryptionTy
 	// * TLS rotated
 	// * Node to node reactivated
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
 		eventschema.Optional{
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
 		},
@@ -1323,7 +1343,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 		},
 		NodeToNodeEncryption: &encryptionType,
 	}
-	e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// As of 3/6/26, IPV6 + strict does not work with the index service. Can remove this once fixed.
+	if kubernetes.IPv6 && encryptionType == couchbasev2.NodeToNodeStrict {
+		cluster.Spec.Servers[0].Services = []couchbasev2.Service{couchbasev2.DataService, couchbasev2.QueryService}
+	}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Check the state is as we expect, then scale, and repeat the check.
 	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
@@ -1340,7 +1366,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	// * Cluster created
 	// * Cluster scaled
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
 		e2eutil.ClusterScaleUpSequence(scaleUp),
 	}
 
@@ -1398,7 +1424,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenKillPod(t *testing.T, encryptionTy
 	// * Cluster created
 	// * Pod down, failed and recovered
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
 		e2eutil.PodDownFailoverRecoverySequence(),
 	}
 
@@ -1446,8 +1472,13 @@ func testCreateClusterWithTLSThenEnableNodeToNode(t *testing.T, encryptionType c
 	// * N2N enabled
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
 	}
+
+	if kubernetes.IPv6 {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+	}
+
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified})
 
 	// Control plane only is the default, anything else will trigger a mode change.
 	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
@@ -1511,12 +1542,18 @@ func testCreateClusterThenEnableNodeToNode(t *testing.T, encryptionType couchbas
 	// * N2N enabled
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	if kubernetes.IPv6 {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+	}
+
+	expectedEvents = append(expectedEvents,
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
 		eventschema.Repeat{Times: clusterSize, Validator: upgradeSequence},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
-		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified},
-	}
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified})
 
 	// Control plane only is the default, anything else will trigger a mode change.
 	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
@@ -1577,7 +1614,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenDisableNodeToNode(t *testing.T, en
 	// Check the events match what we expect:
 	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
 	}
 
 	// If the mode is "All" it needs changing before disabling
@@ -1619,6 +1656,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	// Create the cluster.
 	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
 
+	aFamily := couchbasev2.IPv4Priority
+	aFamilyListener := couchbaseutil.AddressFamilyIPV4
+	if kubernetes.IPv6 {
+		aFamily = couchbasev2.IPv6Only
+		aFamilyListener = couchbaseutil.AddressFamilyIPV6
+	}
+
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Name = ctx.ClusterName
 	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
@@ -1632,6 +1676,13 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 
 	// Check the state is as we expect.
 	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryptionType, ctx, time.Minute)
+	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamily, ctx, time.Minute)
+	e2eutil.MustHaveListenerSettingsTLS(t, kubernetes, cluster, ctx, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyListener,
+			NodeEncryption: couchbaseutil.On,
+		},
+	}, time.Minute)
 
 	patchset := jsonpatch.NewPatchSet().Replace("/spec/networking/tls/nodeToNodeEncryption", &newEncryptionType)
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
@@ -1651,12 +1702,29 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
 	}
 
+	// Check the state is still as we expect.
+	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamily, ctx, time.Minute)
+	e2eutil.MustHaveListenerSettingsTLS(t, kubernetes, cluster, ctx, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyListener,
+			NodeEncryption: couchbaseutil.On,
+		},
+	}, time.Minute)
+
 	// Check the events match what we expect:
-	// * Cluster created
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
-		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
+		e2eutil.ClusterCreateSequence(clusterSize),
 	}
+
+	// Default is IPv4Priority. Update to IPv6Only if needed.
+	if kubernetes.IPv6 {
+		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+	}
+
+	// Encryption mode enabled.
+	expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(&encryptionType))
+	// Encryption mode changed.
+	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -1731,11 +1799,8 @@ func testCreateClusterWithTLSAndNodeToNodeThenRotateServerCertificate(t *testing
 	// * TLS update event occurred
 	// * N2N enabled
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType),
-		eventschema.Repeat{
-			Times:     clusterSize,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated},
-		},
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
+		eventschema.Repeat{Times: clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonTLSUpdated}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

@@ -2745,6 +2745,339 @@ func TestPreviousVersionPodCountScaleUp(t *testing.T) {
 	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMapFinal)
 }
 
+// TestPreviousVersionPodCountScaleUpWithServerClassesUpgradeOrder tests that during a mixed-mode upgrade with previousVersionPodCount and UpgradeOrderType=ServerClasses,
+// scaling up creates new pods with the old version image when required to maintain the previousVersionPodCount and that the upgrade order is respected when adding these new pods,
+// such that the order is prioritized, and pods with high priority that take PVPC spots will be upgraded, whereas scaling pods that have lower upgrade priority will
+// be initialised on the old version.
+func TestPreviousVersionPodCountScaleUpWithServerClassesUpgradeOrder(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size2
+	clusterSize := classSize * 2
+	pvpc := 3
+
+	// Static configuration.
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Initialise the cluster.
+	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).Generate(kubernetes)
+	// servers[0] -> default
+	// servers[1] -> query
+
+	// We'll start the cluster initially without the query server class. This enforces pods 0000 and 0001 are initialised as the default server class, allowing us to validate their removal order.
+	querySC := cluster.Spec.Servers[1]
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{cluster.Spec.Servers[0]}
+
+	// Set the upgrade order to upgrade the second server class first and keep three pods on the initial version.
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: pvpc,
+		UpgradeOrderType:        couchbasev2.UpgradeOrderTypeServerClasses,
+		UpgradeOrder: []string{
+			cluster.Spec.Servers[0].Name,
+		},
+	}
+
+	// Create the cluster.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Add the query server class. These pods will have the index 0002 and 0003.
+	cluster = e2eutil.MustAddServices(t, kubernetes, cluster, querySC, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScaling, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Start an upgrade once the cluster is ready.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster is in mixed mode and still marked as the old version.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify we have 3 pods at old version and 1 pod at new version, and that the query server class (servers[1]) is fully on the initial version as per the upgrade order.
+	expectedImageCountMap := map[string]int{
+		f.CouchbaseServerImageUpgrade: pvpc,               // 3 pods at old version
+		f.CouchbaseServerImage:        clusterSize - pvpc, // 1 pod at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Scale up the query server class by 1 pod. This pod should be created on the OLD version, followed by an upgrade of the old version default server class pod to the new version.
+	cluster = e2eutil.MustScaleServices(t, kubernetes, cluster, map[string]int{cluster.Spec.Servers[1].Name: classSize + 1}, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+
+	// Verify we still have 3 pods at old version, but now 2 pods at new version.
+	expectedImageCountMap = map[string]int{
+		f.CouchbaseServerImageUpgrade: pvpc,                     // 3 pods at old version
+		f.CouchbaseServerImage:        (clusterSize + 1) - pvpc, // 2 pods at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+
+	// Check that all pods in the query server class (servers[1]) are still on the initial version, and that the new pod is created at the old version as per the upgrade order.
+	// Then check that the default server class (servers[0]) pods are on the upgraded versions.
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	// Remove the PVPC field to allow the upgrade to complete.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/upgrade/previousVersionPodCount"), time.Minute)
+
+	// Wait for the upgrade to finish.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Let some reconciliation loops pass.
+	time.Sleep(30 * time.Second)
+
+	// Verify the cluster version is the upgrade version and that all pods are upgraded.
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	/*
+		Pods should be initialised as:
+		0000 and 0001 = servers[0] (default)
+		0002 and 0003 = servers[1] (query)
+
+		After initial upgrade with PVPC=3:
+		0004 = upgrade version (0000 replaced with a new pod due to SwapRebalance)
+		0001, 0002 and 0003 = initial version (PVPC = 3)
+
+		After scale of servers[1]
+		0004 and 0006 = upgrade version (0000 and 0001 replaced)
+		0002, 0003 and 0005 = initial version (PVPC = 3, new pod 0004 created at old version due to PVPC, then 0001 upgraded to new version as per server class upgrade order)
+	*/
+
+	upgradeOrderWithPVPC := []int{0}
+	upgradeOrderAfterScaling := []int{1}
+	upgradeOrderWithoutPVPC := []int{2, 3, 5}
+
+	upgradeOrderSequence := func(order []int) []eventschema.Validatable {
+		events := make([]eventschema.Validatable, 0, len(order))
+		for i := range order {
+			upgradeSequence := eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, order[i])},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			}
+			events = append(events, upgradeSequence)
+		}
+
+		return events
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Query server class added (size 2)
+	// * One node is initially upgraded
+	// * Servers[1] scaled with previous version
+	// * Servers[0] node upgraded
+	// * Remaining pods upgraded
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize / 2),
+		e2eutil.ClusterScaleUpSequence(classSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderWithPVPC),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		e2eutil.ClusterScaleUpSequence(1),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderAfterScaling),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderWithoutPVPC),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestPreviousVersionPodCountScaleUpWithServicesUpgradeOrder tests that during a mixed-mode upgrade with previousVersionPodCount and UpgradeOrderType=Services,
+// scaling up creates new pods with the old version image when required to maintain the previousVersionPodCount and that the upgrade order is respected when adding these new pods,
+// such that the order is prioritized, and pods with high priority that take PVPC spots will be upgraded, whereas scaling pods that have lower upgrade priority will
+// be initialised on the old version.
+// This test is almost identical to the one above, with the difference being the upgrade order type.
+func TestPreviousVersionPodCountScaleUpWithServicesUpgradeOrder(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	classSize := constants.Size2
+	clusterSize := classSize * 2
+	pvpc := 3
+
+	// Static configuration.
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+
+	// Initialise the cluster.
+	cluster := clusterOptionsUpgrade().WithMixedEphemeralTopology(classSize).Generate(kubernetes)
+	// servers[0] -> data + index
+	// servers[1] -> query
+
+	// We'll start the cluster initially without the query service. This enforces pods 0000 and 0001 are initialised as the data + index service, allowing us to validate their removal order.
+	querySC := cluster.Spec.Servers[1]
+	cluster.Spec.Servers = []couchbasev2.ServerConfig{cluster.Spec.Servers[0]}
+
+	// Set the upgrade order to upgrade the second server class first and keep three pods on the initial version.
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: pvpc,
+		UpgradeOrderType:        couchbasev2.UpgradeOrderTypeServices,
+		UpgradeOrder: []string{
+			string(couchbasev2.DataService),
+		},
+	}
+
+	// Create the cluster.
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Add the query service. These pods will have the index 0002 and 0003.
+	cluster = e2eutil.MustAddServices(t, kubernetes, cluster, querySC, 5*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionScaling, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Start an upgrade once the cluster is ready.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+
+	// Wait for the upgrade to finish.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Verify the cluster is in mixed mode and still marked as the old version.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, 1*time.Minute)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, initialVersion, time.Minute)
+
+	// Verify we have 3 pods at old version and 1 pod at new version, and that the query service (servers[1]) is fully on the initial version as per the upgrade order.
+	expectedImageCountMap := map[string]int{
+		f.CouchbaseServerImageUpgrade: pvpc,               // 3 pods at old version
+		f.CouchbaseServerImage:        clusterSize - pvpc, // 1 pod at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+
+	// Scale up the query service by 1 pod. This pod should be created on the OLD version, followed by an upgrade of the old version data + index pod to the new version.
+	cluster = e2eutil.MustScaleServices(t, kubernetes, cluster, map[string]int{cluster.Spec.Servers[1].Name: classSize + 1}, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+
+	// Verify we still have 3 pods at old version, but now 2 pods at new version.
+	expectedImageCountMap = map[string]int{
+		f.CouchbaseServerImageUpgrade: pvpc,                     // 3 pods at old version
+		f.CouchbaseServerImage:        (clusterSize + 1) - pvpc, // 2 pods at new version
+	}
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, expectedImageCountMap)
+
+	// Check that all pods in the query service (servers[1]) are still on the initial version, and that the new pod is created at the old version as per the upgrade order.
+	// Then check that the data + index service (servers[0]) pods are on the upgraded versions.
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImageUpgrade, initialVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	// Remove the PVPC field to allow the upgrade to complete.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Remove("/spec/upgrade/previousVersionPodCount"), time.Minute)
+
+	// Wait for the upgrade to finish.
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewUpgradeFinishedEvent(cluster), 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Let some reconciliation loops pass.
+	time.Sleep(30 * time.Second)
+
+	// Verify the cluster version is the upgrade version and that all pods are upgraded.
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, upgradeVersion, time.Minute)
+
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[1].Name, f.CouchbaseServerImage, upgradeVersion)
+	e2eutil.MustCheckServerClassPodsForVersion(t, kubernetes, cluster, cluster.Spec.Servers[0].Name, f.CouchbaseServerImage, upgradeVersion)
+
+	/*
+		Pods should be initialised as:
+		0000 and 0001 = servers[0] (data + index)
+		0002 and 0003 = servers[1] (query)
+
+		After initial upgrade with PVPC=3:
+		0004 = upgrade version (0000 replaced with a new pod due to SwapRebalance)
+		0001, 0002 and 0003 = initial version (PVPC = 3)
+
+		After scale of servers[1]
+		0004 and 0006 = upgrade version (0000 and 0001 replaced)
+		0002, 0003 and 0005 = initial version (PVPC = 3, new pod 0004 created at old version due to PVPC, then 0001 upgraded to new version as per server class upgrade order)
+	*/
+
+	upgradeOrderWithPVPC := []int{0}
+	upgradeOrderAfterScaling := []int{1}
+	upgradeOrderWithoutPVPC := []int{2, 3, 5}
+
+	upgradeOrderSequence := func(order []int) []eventschema.Validatable {
+		events := make([]eventschema.Validatable, 0, len(order))
+		for i := range order {
+			upgradeSequence := eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: couchbaseutil.CreateMemberName(cluster.Name, order[i])},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			}
+			events = append(events, upgradeSequence)
+		}
+
+		return events
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Query service added (size 2)
+	// * One node is initially upgraded
+	// * Servers[1] scaled with previous version
+	// * Servers[0] node upgraded
+	// * Remaining pods upgraded
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize / 2),
+		e2eutil.ClusterScaleUpSequence(classSize),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderWithPVPC),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		e2eutil.ClusterScaleUpSequence(1),
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderAfterScaling),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
+		eventschema.Sequence{
+			Validators: upgradeOrderSequence(upgradeOrderWithoutPVPC),
+		},
+		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
 // TestInPlaceUpgradeRecoverabilityOnServerGroupChanges tests that the operator will revert to SwapRebalance if a pod is not recoverable
 // due to a change in the cluster.spec.serverGroups list as PVC's cannot be recovered if the pod is going to be moved to a different node.
 func TestInPlaceUpgradeGlobalServerGroupChangesWithPV(t *testing.T) {

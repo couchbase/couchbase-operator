@@ -1511,22 +1511,37 @@ func (c *Cluster) updateNodeToNode() error {
 }
 
 // reconcileNodeToNodeGetUpdatableMembers checks each member and returns a set of those
-// whose N2N settings don't match the requested on/off state.
-func (c *Cluster) reconcileNodeToNodeGetUpdatableMembers(requestedEncryption bool) (couchbaseutil.MemberSet, error) {
-	updatableMembers := couchbaseutil.NewMemberSet()
+// whose N2N encryption setting doesn't match the requested state, along with their current network configuration.
+func (c *Cluster) reconcileNodeToNodeGetUpdatableMembers(requestedEncryption bool) ([]couchbaseutil.MemberNetworkConfigState, error) {
+	memberConfigState := []couchbaseutil.MemberNetworkConfigState{}
 
-	for _, m := range c.callableMembers {
-		s := &couchbaseutil.NodeNetworkConfiguration{}
-		if err := c.getNodeNetworkConfiguration(m, s); err != nil {
+	var info couchbaseutil.ClusterInfo
+	if err := couchbaseutil.GetPoolsDefault(&info).On(c.api, c.callableMembers); err != nil {
+		return nil, err
+	}
+
+	for _, member := range c.callableMembers {
+		node, err := info.GetNode(member.GetHostName())
+		if err != nil {
 			return nil, err
 		}
 
-		if (s.NodeEncryption == couchbaseutil.On) != requestedEncryption {
-			updatableMembers.Add(m)
+		actualConfig := &couchbaseutil.NodeNetworkConfiguration{
+			AddressFamily:  node.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+			NodeEncryption: couchbaseutil.OnOrOffBool(node.NodeEncryption),
+		}
+
+		if (actualConfig.NodeEncryption == couchbaseutil.On) != requestedEncryption {
+			memberConfig := couchbaseutil.MemberNetworkConfigState{
+				Member:        member,
+				NetworkConfig: actualConfig,
+			}
+
+			memberConfigState = append(memberConfigState, memberConfig)
 		}
 	}
 
-	return updatableMembers, nil
+	return memberConfigState, nil
 }
 
 // reconcileNodeToNodeSetControlPlaneOnly changes the cluster N2N configuration to control plane only,
@@ -1558,83 +1573,38 @@ func (c *Cluster) reconcileNodeToNodeSetControlPlaneOnly(requestedEncryption boo
 }
 
 // reconcileNodeToNodeUpdateMembers turns N2N excryption on/off across all nodes in the cluster.
-func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, updatableMembers couchbaseutil.MemberSet) error {
-	if updatableMembers.Empty() {
-		return nil
-	}
+// Address family settings on each node's network configuration will not be changed.
+func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, memberConfigState []couchbaseutil.MemberNetworkConfigState) error {
+	targetEncryption := couchbaseutil.OnOrOffBool(requestedEncryption)
 
-	// For some reasons you need to disable failover because server is
-	// incapable of doing this itself...
-	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
-	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
-		return err
-	}
+	// Make sure a listener exists with the target NodeEncryption for all nodes. By not passing an address family, server will create the listener for the address family in use.
+	// The server requires the corresponding listener to exist before accepting the config change but we can't disable the existing listeners as they will still be in use.
+	for _, memberConfig := range memberConfigState {
+		enableListener := &couchbaseutil.ListenerConfiguration{
+			NodeEncryption: targetEncryption,
+		}
 
-	failoverWasEnabled := failoverSettings.Enabled
-
-	if failoverWasEnabled {
-		failoverSettings.Enabled = false
-
-		if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.EnableExternalListener(enableListener).RetryFor(time.Minute).On(c.api, memberConfig.Member); err != nil {
 			return err
 		}
 	}
 
-	// Booleans obviously don't exist in serverland...
-	encryptionEnabledString := couchbaseutil.Off
-	encryptionDisabledString := couchbaseutil.On
-
-	if requestedEncryption {
-		encryptionEnabledString = couchbaseutil.On
-		encryptionDisabledString = couchbaseutil.Off
-	}
-
-	listenerSettings := &couchbaseutil.ListenerConfiguration{
-		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
-		NodeEncryption: encryptionEnabledString,
-	}
-
-	networkSettings := &couchbaseutil.NodeNetworkConfiguration{
-		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
-		NodeEncryption: encryptionEnabledString,
-	}
-
-	antiListenerSettings := &couchbaseutil.ListenerConfiguration{
-		AddressFamily:  couchbaseutil.AddressFamilyIPV4,
-		NodeEncryption: encryptionDisabledString,
-	}
-
-	// Update one API per node...
-	for _, m := range updatableMembers {
-		// The auto-failover settings may take a while to take effect, so retry
-		// this call a few times.
-		if err := couchbaseutil.EnableExternalListener(listenerSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
-			return err
+	// Update the node network configuration for each member.
+	for _, memberConfig := range memberConfigState {
+		if memberConfig.NetworkConfig == nil {
+			continue
 		}
-	}
-	// Update another API per node, with exactly the same configuration...
-	for _, m := range updatableMembers {
-		if err := couchbaseutil.SetNodeNetworkConfiguration(networkSettings).On(c.api, m); err != nil {
+
+		memberConfig.NetworkConfig.NodeEncryption = targetEncryption
+
+		if err := couchbaseutil.SetNodeNetworkConfiguration(memberConfig.NetworkConfig).On(c.api, memberConfig.Member); err != nil {
 			return err
 		}
 	}
 
-	// And another API per node...
-	// The prior command does seem to trigger a network restart and may cause the
-	// following calls to fail, so retry.
-	for i := range updatableMembers {
-		m := updatableMembers[i]
-
-		if err := couchbaseutil.DisableExternalListener(antiListenerSettings).RetryFor(time.Minute).On(c.api, m); err != nil {
-			return err
-		}
-	}
-
-	// Reenable auto failover
-	if failoverWasEnabled {
-		failoverSettings.Enabled = true
-
-		if err := couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+	// Once the network configuration is aligned with the requested encryption, we can disable any listeners that are no longer required.
+	for _, memberConfig := range memberConfigState {
+		if err := couchbaseutil.DisableUnusedExternalListeners().RetryFor(time.Minute).On(c.api, memberConfig.Member); err != nil {
 			return err
 		}
 	}
@@ -1647,7 +1617,7 @@ func (c *Cluster) reconcileNodeToNodeUpdateMembers(requestedEncryption bool, upd
 // reconcileNodeToNode turns node-to-node encryption on/off.
 func (c *Cluster) reconcileNodeToNode(requestedEncryption bool) error {
 	// See if any nodes are in the wrong state.
-	updatableMembers, err := c.reconcileNodeToNodeGetUpdatableMembers(requestedEncryption)
+	memberConfigState, err := c.reconcileNodeToNodeGetUpdatableMembers(requestedEncryption)
 	if err != nil {
 		// This is a soft error, caused by various external conditions.  Once topology is
 		// sorted out it will start working again.
@@ -1655,14 +1625,23 @@ func (c *Cluster) reconcileNodeToNode(requestedEncryption bool) error {
 		return nil
 	}
 
-	// If we are disabling encryption then we need to set the mode to control plane only first...
-	if err := c.reconcileNodeToNodeSetControlPlaneOnly(requestedEncryption); err != nil {
-		return err
-	}
+	if len(memberConfigState) > 0 {
+		resetAutoFailover, err := c.DisableAutoFailover()
+		if err != nil {
+			return err
+		}
 
-	// Modify encryption settings for each node.
-	if err := c.reconcileNodeToNodeUpdateMembers(requestedEncryption, updatableMembers); err != nil {
-		return err
+		defer resetAutoFailover()
+
+		// If we are disabling encryption then we need to set the mode to control plane only first.
+		if err := c.reconcileNodeToNodeSetControlPlaneOnly(requestedEncryption); err != nil {
+			return err
+		}
+
+		// Modify encryption settings for each node.
+		if err := c.reconcileNodeToNodeUpdateMembers(requestedEncryption, memberConfigState); err != nil {
+			return err
+		}
 	}
 
 	// Encryption is not enabled, ignore any further settings.

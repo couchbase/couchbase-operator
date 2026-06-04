@@ -114,6 +114,16 @@ func TestGetLowestMemberVersion(t *testing.T) {
 			memberVersions:  []string{"7.0.0", "6.10.1", "6.8.10", "6.8.11"},
 			expectedVersion: "6.8.10",
 		},
+		{
+			name:            "with build numbers",
+			memberVersions:  []string{"7.0.0-1000", "7.0.0-1001", "7.0.0-1002", "7.0.0-1003"},
+			expectedVersion: "7.0.0-1000",
+		},
+		{
+			name:            "with and without build numbers",
+			memberVersions:  []string{"7.0.0-1000", "7.0.0", "7.0.0-1003"},
+			expectedVersion: "7.0.0",
+		},
 	}
 
 	for _, testcase := range testcases {

@@ -3544,6 +3544,7 @@ type CloudNativeGateway struct {
 
 	OTLP *CloudNativeGatewayOTLP `json:"-" annotation:"otlp"`
 
+	// DEPRECATED - field no longer has any effect.
 	// TerminationGracePeriodSeconds specifies the grace period for the container to
 	// terminate. Defaults to 75 seconds.
 	// +kubebuilder:default=75
@@ -3582,12 +3583,11 @@ type CloudNativeGatewayOTLP struct {
 
 type CouchbaseClusterNetworkingSpec struct {
 	// AddressFamily allows the manual selection of the address family to use.
-	// Setting this field to either IPv4Only or IPv6Only will exclusively use that address family.
-	// Setting this field to IPv4Priority or IPv6Priority will allow dual stack networking with
-	// the given address family being prioritised.
-	// When this field is not set, Couchbase server will default to using IPv4
-	// for internal communication and also support IPv6 on dual stack systems.
-	// +couchbase:version:minimum=7.0.2
+	// Setting this to either IPv4Only or IPv6Only will restrict the cluster to only using that address family for internal communication.
+	// Alternatively, set this to IPv4Priority or IPv6Priority to allow dual stack networking with the given address family being prioritised.
+	// If this field changes the address family (IPv4Only/Priority to IPv6Only/Priority), all couchbase services hosted on each node other than the Data service will be restarted.
+	// When this field is not set, Couchbase server will default to IPv4Priority.
+	// This is only supported in Couchbase Server 7.0.2+.
 	AddressFamily *AddressFamily `json:"addressFamily,omitempty"`
 
 	// ExposeAdminConsole creates a service referencing the admin console.

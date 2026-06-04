@@ -275,6 +275,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 			state.ActiveNodes.Add(member)
 		case NodeStatePendingAdd:
 			state.PendingAddNodes.Add(member)
+			state.NeedsRebalance = true
 		case NodeStateFailedAdd:
 			state.FailedAddNodes.Add(member)
 		case NodeStateWarmup:
@@ -2009,6 +2010,9 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 
 	// Is it possible to do InPlaceUpgrade if that's what they asked for?
 	canDoInPlaceReschedule := true
+	hasIndexCandidates := false
+	indexCandidates := couchbaseutil.MemberSet{}
+	nonIndexCandidates := couchbaseutil.MemberSet{}
 
 	var targetVersion string
 
@@ -2023,10 +2027,11 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 			break
 		}
 
-		// If any of the candidates are index nodes and the cluster is configured to revert index node moves to swap rebalance, then we can't do in-place rescheduling.
 		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) {
-			canDoInPlaceReschedule = false
-			break
+			hasIndexCandidates = true
+			indexCandidates.Add(candidate)
+		} else {
+			nonIndexCandidates.Add(candidate)
 		}
 	}
 
@@ -2042,6 +2047,21 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	// Carry out the move
 	// We can use the upgrade methods to do this (even though we're not changing the version)
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
+		if hasIndexCandidates {
+			log.Info("Reschedule candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
+				"cluster", c.namespacedName(),
+				"swapRebalance", indexCandidates.Names(),
+				"inPlaceUpgrade", nonIndexCandidates.Names())
+
+			if nonIndexCandidates.Size() > 0 {
+				if err := r.handleInPlaceUpgrade(c, nonIndexCandidates, targetVersion); err != nil {
+					return err
+				}
+			}
+
+			return r.swapRebalanceMembers(c, indexCandidates)
+		}
+
 		err := r.handleInPlaceUpgrade(c, candidates, targetVersion)
 		if err != nil {
 			return err
@@ -2075,7 +2095,7 @@ func (r *ReconcileMachine) checkIfValidUpgradePath() error {
 		return nil
 	}
 
-	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.String())
+	return couchbaseutil.CheckUpgradePath(currentVersion, newVersion.Version())
 }
 
 // handleUpgradeStabilization manages the stabilization-period guards for upgrade.
@@ -2194,35 +2214,62 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
-		allCandidatesRecoverable := true
-		swapRebalanceIndexNodes := false
-		for _, candidate := range constrainedCandidates {
-			if !c.isPodRecoverable(candidate) {
-				allCandidatesRecoverable = false
-				break
-			}
-			if swapRebalanceIndexNodes = c.cluster.ShouldRevertCandidateToSwapRebalance(candidate); swapRebalanceIndexNodes {
-				break
-			}
-		}
-
-		switch {
-		case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected:
-			log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
-			return r.handleInPlaceUpgrade(c, constrainedCandidates, targetVersion)
-		case allCandidatesRecoverable && zoneChangeDetected:
-			log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-		case allCandidatesRecoverable && swapRebalanceIndexNodes:
-			log.Info("An upgrade candidate has the index service and SwapRebalanceIndexServiceUpgrade enabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-		case allCandidatesRecoverable && pvcChangeDetected:
-			log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
-		default:
-			log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		if handled, err := r.tryInPlaceUpgrade(c, constrainedCandidates, zoneChangeDetected, pvcChangeDetected, targetVersion); err != nil || handled {
+			return err
 		}
 	}
 
 	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 	return r.swapRebalanceMembers(c, constrainedCandidates)
+}
+
+// tryInPlaceUpgrade attempts to upgrade candidates using InPlaceUpgrade.
+// Returns (true, nil) if the upgrade was handled, (true, err) on error,
+// or (false, nil) if the caller should fall through to SwapRebalance.
+func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseutil.MemberSet, zoneChangeDetected bool, pvcChangeDetected bool, targetVersion string) (bool, error) {
+	allCandidatesRecoverable := true
+	swapRebalanceIndexNodes := false
+	indexCandidates := couchbaseutil.MemberSet{}
+	nonIndexCandidates := couchbaseutil.MemberSet{}
+
+	for _, candidate := range candidates {
+		if !c.isPodRecoverable(candidate) {
+			allCandidatesRecoverable = false
+			break
+		}
+
+		if c.cluster.ShouldRevertCandidateToSwapRebalance(candidate) {
+			swapRebalanceIndexNodes = true
+			indexCandidates.Add(candidate)
+		} else {
+			nonIndexCandidates.Add(candidate)
+		}
+	}
+
+	switch {
+	case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected:
+		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
+		return true, r.handleInPlaceUpgrade(c, candidates, targetVersion)
+	case allCandidatesRecoverable && zoneChangeDetected:
+		log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	case allCandidatesRecoverable && swapRebalanceIndexNodes:
+		log.Info("Upgrade candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
+			"cluster", c.namespacedName(),
+			"swapRebalance", indexCandidates.Names(),
+			"inPlaceUpgrade", nonIndexCandidates.Names())
+
+		if nonIndexCandidates.Size() > 0 {
+			if err := r.handleInPlaceUpgrade(c, nonIndexCandidates, targetVersion); err != nil {
+				return true, err
+			}
+		}
+
+		return true, r.swapRebalanceMembers(c, indexCandidates)
+	default:
+		log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	}
+
+	return false, nil
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.

@@ -656,6 +656,16 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 		// Create via creation API
 		if err := couchbaseutil.CreateReplication(createPayload.Create).On(c.api, c.readyMembers()); err != nil {
+			// If the server rejects the request (e.g. mismatched conflict resolution),
+			// log the error and skip this replication so we don't block the reconcile loop.
+			var reqErr couchbaseutil.FailedRequestError
+			if goerrors.As(err, &reqErr) && reqErr.StatusCode == 400 {
+				log.Error(fmt.Errorf("%s", reqErr.Body), "XDCR replication creation rejected by server",
+					"cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
+
+				continue
+			}
+
 			return err
 		}
 
@@ -768,6 +778,12 @@ func (c *Cluster) processMigrationReplications(selector labels.Selector, generat
 			continue
 		}
 
+		// Skip replications whose source bucket no longer exists.
+		if c.IsFailedValidation("replication", migration.Name) {
+			log.Info("Skipping migration replication with missing source bucket", "cluster", c.namespacedName(), "replication", migration.Name)
+			continue
+		}
+
 		// Populate spec from annotations (allows annotation-based overrides)
 		// Errors are logged but don't stop processing
 		if err := annotations.Populate(&migration.Spec, migration.Annotations); err != nil {
@@ -813,6 +829,12 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 
 	for _, replication := range apiReplications {
 		if !selector.Matches(labels.Set(replication.Labels)) {
+			continue
+		}
+
+		// Skip replications whose source bucket no longer exists.
+		if c.IsFailedValidation("replication", replication.Name) {
+			log.Info("Skipping replication with missing source bucket", "cluster", c.namespacedName(), "replication", replication.Name)
 			continue
 		}
 

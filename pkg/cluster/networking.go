@@ -143,26 +143,6 @@ func (c *Cluster) getAlternateAddressesExternalInto(m couchbaseutil.Member, alte
 	return nil
 }
 
-// getNodeNetworkConfiguration gets the network configuration settings for a node.
-func (c *Cluster) getNodeNetworkConfiguration(m couchbaseutil.Member, s *couchbaseutil.NodeNetworkConfiguration) error {
-	node := &couchbaseutil.NodeInfo{}
-	if err := couchbaseutil.GetNodesSelf(node).On(c.api, m); err != nil {
-		return err
-	}
-
-	onOrOff := couchbaseutil.Off
-
-	if node.NodeEncryption {
-		onOrOff = couchbaseutil.On
-	}
-
-	*s = couchbaseutil.NodeNetworkConfiguration{
-		NodeEncryption: onOrOff,
-	}
-
-	return nil
-}
-
 // addMemberAlternateAddresses adds the alternate addresses to the member.
 // It will return false if the alternate addresses are not yet reachable,
 // and true if they are. If the cluster's alternate address check delay has not elapsed, or
@@ -388,17 +368,30 @@ func addressFamilyResourceToCouchbase(af couchbasev2.AddressFamily) (couchbaseut
 
 // generateNetworkConfiguration generates the required network configuration for
 // the requested cluster configuration.
-func (c *Cluster) generateNetworkConfiguration() *couchbaseutil.NodeNetworkConfiguration {
+func (c *Cluster) generateNetworkConfiguration(onInit bool) (*couchbaseutil.NodeNetworkConfiguration, []*couchbaseutil.ListenerConfiguration) {
 	addressFamily, addressFamilyOnly := addressFamilyResourceToCouchbase(c.cluster.AddressFamily())
+	supportsAFFiltering := c.supportsAFFiltering()
+
 	networkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
 		AddressFamily: addressFamily,
 	}
 
-	if c.supportsAFFiltering() {
+	// Adding members during cluster startup/mid network migration can cause issues with address family filtering.
+	// To avoid this, we will not set address family only during member init, and rely on the reconcile loop to fix up the settings
+	// once a member is part of the cluster.
+	if onInit {
+		addressFamilyOnly = false
+	}
+
+	if supportsAFFiltering {
 		networkConfiguration.AddressFamilyOnly = &addressFamilyOnly
 	}
 
-	return networkConfiguration
+	listenerSettings := []*couchbaseutil.ListenerConfiguration{{
+		AddressFamily: addressFamily,
+	}}
+
+	return networkConfiguration, listenerSettings
 }
 
 // initMemberNetworking sets up IP address families on pod start up.  Sadly you cannot also
@@ -409,32 +402,26 @@ func (c *Cluster) initMemberNetworking(member couchbaseutil.Member) error {
 	// to work, there is some other magical -- and completely undocumented -- thing
 	// called a listener that needs to be manually turned on.  Why?  Surely telling
 	// it to use IPv6 is enough right?
-	addressFamily, _ := addressFamilyResourceToCouchbase(c.cluster.AddressFamily())
-	listenerSettings := &couchbaseutil.ListenerConfiguration{
-		AddressFamily: addressFamily,
+	networkConfiguration, listenerSettings := c.generateNetworkConfiguration(true)
+
+	for _, listenerSetting := range listenerSettings {
+		if err := couchbaseutil.EnableExternalListener(listenerSetting).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
+			return err
+		}
 	}
 
-	if err := couchbaseutil.EnableExternalListener(listenerSettings).InPlaintext().RetryFor(10*time.Second).On(c.api, member); err != nil {
-		return err
-	}
-
-	return couchbaseutil.SetNodeNetworkConfiguration(c.generateNetworkConfiguration()).InPlaintext().RetryFor(10*time.Second).On(c.api, member)
+	return couchbaseutil.SetNodeNetworkConfiguration(networkConfiguration).InPlaintext().RetryFor(10*time.Second).On(c.api, member)
 }
 
-// reconcileClusterNetworking allows a read/modify/write version of the above.
-func (c *Cluster) reconcileClusterNetworking() error {
-	// Work out what ne need the networking to look like.
-	requestedNetworkConfiguration := c.generateNetworkConfiguration()
-
-	// Poll Couchbase for the current network configuration, keeping record
-	// of any members whose configuration does not match what is expected.
+// detectNetworkConfigurationChanges checks the current network configuration of the cluster and compares it to the desired configuration, returning a list of members that need to be updated, and what updates they need.
+func (c *Cluster) detectNetworkConfigurationChanges(requestedNetworkConfiguration *couchbaseutil.NodeNetworkConfiguration, requestedListenerConfiguration []*couchbaseutil.ListenerConfiguration) ([]couchbaseutil.Member, map[string][]*couchbaseutil.ListenerConfiguration, error) {
 	var info couchbaseutil.ClusterInfo
-
 	if err := couchbaseutil.GetPoolsDefault(&info).On(c.api, c.members); err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	var updateMembers []couchbaseutil.Member
+	enableMemberListeners := map[string][]*couchbaseutil.ListenerConfiguration{}
 
 	for _, member := range c.members {
 		// Skip members that have not been CBS-added yet (async initialization pending)
@@ -447,11 +434,14 @@ func (c *Cluster) reconcileClusterNetworking() error {
 
 		node, err := info.GetNode(member.GetHostName())
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 
 		currentNetworkConfiguration := &couchbaseutil.NodeNetworkConfiguration{
 			AddressFamily: node.AddressFamily.ConvertAddressFamilyOutToAddressFamily(),
+			// N2N is controlled in a different reconcile step, so we'll equalize them here to avoid updating unnecessarily.
+			// Requested will be empty so should not be sent due to omitEmpty.
+			NodeEncryption: requestedNetworkConfiguration.NodeEncryption,
 		}
 
 		if c.supportsAFFiltering() {
@@ -462,46 +452,109 @@ func (c *Cluster) reconcileClusterNetworking() error {
 			continue
 		}
 
+		// Find the listeners we need to enable.
+		memberEnableListeners := []*couchbaseutil.ListenerConfiguration{}
+		for _, requiredListener := range requestedListenerConfiguration {
+			if containsExternalListenerConfiguration(node.ExternalListeners, requiredListener) {
+				continue
+			}
+
+			memberEnableListeners = append(memberEnableListeners, requiredListener)
+		}
+
+		enableMemberListeners[member.Name()] = memberEnableListeners
 		updateMembers = append(updateMembers, member)
 	}
 
-	// Nothing to do, move along...
-	if len(updateMembers) == 0 {
-		return nil
-	}
+	return updateMembers, enableMemberListeners, nil
+}
 
-	// For some reason you need to disable failover because server is
-	// incapable of doing this itself.  Perhaps it's because updating settings causes
-	// a failover because it's slow or broken in some repect?
-	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
-	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+// reconcileClusterNetworking updates the address family and listener configuration for the cluster.
+// This method should only update address family (ipv4 <-> ipv6). It should not change node-to-node encryption settings (other than the mndatory disable).
+func (c *Cluster) reconcileClusterNetworking() error {
+	requestedNetworkConfiguration, requestedListenerConfiguration := c.generateNetworkConfiguration(false)
+
+	// Poll Couchbase for the current network configuration, keeping record
+	// of any members whose configuration does not match what is expected.
+	// Server has an endpoint for updating network config, enabling listeners and disabling listeners, so we need to work out which members need which updates.
+	updateMembers, enableMemberListeners, err := c.detectNetworkConfigurationChanges(requestedNetworkConfiguration, requestedListenerConfiguration)
+	if err != nil || len(updateMembers) == 0 {
 		return err
 	}
 
-	if failoverSettings.Enabled {
-		newFailoverSettings := *failoverSettings
-		newFailoverSettings.Enabled = false
+	// For some reason you need to disable failover and N2N encryption before changing the network configuration.
+	resetAutoFailover, err := c.DisableAutoFailover()
+	if err != nil {
+		return err
+	}
 
-		if err := couchbaseutil.SetAutoFailoverSettings(&newFailoverSettings).On(c.api, c.readyMembers()); err != nil {
+	defer resetAutoFailover()
+
+	// If it needs to be, N2N will be re-enabled in the next step after this (reconcileTLSPostTopologyChange()).
+	// This is a noop if N2N is not enabled, so we can just call it regardless of the desired N2N state.
+	if err := c.disableNodeToNode(); err != nil {
+		return err
+	}
+
+	// Pass 1: Enable all necessary listeners across every member before changing any network config.
+	for _, member := range updateMembers {
+		for _, listenerSetting := range enableMemberListeners[member.Name()] {
+			if err := couchbaseutil.EnableExternalListener(listenerSetting).RetryFor(time.Minute).On(c.api, member); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Pass 2: Update network config on all members that need it. After each config update we wait for
+	// the member's management API to recover before moving to the next, ensuring each
+	// node's network stack has stabilised.
+	for _, member := range updateMembers {
+		if err := couchbaseutil.SetNodeNetworkConfiguration(requestedNetworkConfiguration).RetryFor(2*time.Minute).On(c.api, member); err != nil {
 			return err
 		}
 
-		defer func() {
-			_ = couchbaseutil.SetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers())
-		}()
+		if err := c.waitForMemberAPI(member, 2*time.Minute); err != nil {
+			return err
+		}
 	}
 
+	// Pass 3: Now that configs are updated and each member's API has recovered, disable any listeners that are no longer required.
 	for _, member := range updateMembers {
-		// Retry this because server doesn't attempt to actually perform the failover
-		// update operation, it simply says "200 okay!", which is a lie.
-		if err := couchbaseutil.SetNodeNetworkConfiguration(requestedNetworkConfiguration).RetryFor(time.Minute).On(c.api, member); err != nil {
+		if err := couchbaseutil.DisableUnusedExternalListeners().RetryFor(time.Minute).On(c.api, member); err != nil {
 			return err
 		}
 	}
 
 	c.raiseEvent(k8sutil.NetworkSettingsModifiedEvent(c.cluster))
+	log.Info("Network settings were updated", "cluster", c.cluster.NamespacedName())
 
 	return nil
+}
+
+func containsExternalListenerConfiguration(listeners []couchbaseutil.ExternalListener, target *couchbaseutil.ListenerConfiguration) bool {
+	for _, listener := range listeners {
+		if listener.AddressFamily.ConvertAddressFamilyOutToAddressFamily() == target.AddressFamily {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (c *Cluster) waitForMemberAPI(member couchbaseutil.Member, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		var info couchbaseutil.ClusterInfo
+		if err := couchbaseutil.GetPoolsDefault(&info).On(c.api, member); err == nil {
+			return nil
+		}
+
+		if time.Now().After(deadline) {
+			return errors.NewStackTracedError(fmt.Errorf("timeout waiting for member %s management API recovery", member.Name()))
+		}
+
+		time.Sleep(time.Second)
+	}
 }
 
 // hasDNSCheckDelayElapsed checks if the DNS check delay has elapsed.

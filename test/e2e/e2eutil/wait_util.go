@@ -780,6 +780,21 @@ func MustWaitForBackupEvent(t *testing.T, k8s *types.Cluster, backup *couchbasev
 	mustWaitForResourceEventFromNow(t, k8s, backup, event, timeout)
 }
 
+func MustWaitForRestoreEvent(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore, event *v1.Event, timeout time.Duration) {
+	mustWaitForResourceEventFromNow(t, k8s, restore, event, timeout)
+}
+
+// MustObserveRestoreEventFrom checks events that occur in the future until the timeout, but also checks for events that occurred from a given time before the method call time.
+// This is useful for fast restores that may finish before we start watching.
+func MustObserveRestoreEventFrom(t *testing.T, k8s *types.Cluster, restore *couchbasev2.CouchbaseBackupRestore, event *v1.Event, from, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := waitForResourceEvent(ctx, nil, k8s, restore, event, time.Now().Add(-from), false); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustObserveBackupEventFrom checks events that occur in the future until the timeout, but also checks for events that occurred from a given time before the method call time.
 // This is useful for backup tests where a (typically incremental) backup is started and finished within 1 second of eachother and therefore might be missed by the default waitForResourceEventFromNow.
 func MustObserveBackupEventFrom(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, event *v1.Event, from, timeout time.Duration) {
@@ -1824,6 +1839,45 @@ func MustWaitForPodWithoutCondition(t *testing.T, k8s *types.Cluster, podName st
 	}
 
 	return pod
+}
+
+// MustWaitForClusterPodsReady waits for all pods belonging to a cluster to have the
+// operator-managed readiness condition (pod.couchbase.com/readiness) set to True.
+func MustWaitForClusterPodsReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	t.Helper()
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	callback := func() error {
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		if len(podList.Items) == 0 {
+			return fmt.Errorf("no pods found for cluster %s", couchbase.Name)
+		}
+
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			condition := k8sutil.GetPodCondition(pod, k8sutil.PodReadinessCondition)
+			if condition == nil {
+				return fmt.Errorf("pod %s: readiness condition not found", pod.Name)
+			}
+
+			if condition.Status != v1.ConditionTrue {
+				return fmt.Errorf("pod %s: readiness condition is %s", pod.Name, condition.Status)
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
 }
 
 // MustChangeClusterPassword changes the cluster password. If it is changed, you will need to update the auth password in order to change it back.

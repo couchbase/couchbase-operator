@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -23,9 +24,9 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ChangeSet holds the three types of upgrade candidates.
@@ -224,6 +225,7 @@ func (c *Cluster) needsMove() couchbaseutil.MemberSet {
 
 // filterCandidatesByUpgradeOrder returns the upgrade candidates ordered by the upgrade order specified in the cluster spec.
 // This method does not apply any limits to the number of candidates that can be upgraded at once.
+// If ordering by server class or service, only candidates from the first non-empty class/service group are returned.
 func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.MemberSet) (couchbaseutil.MemberList, error) {
 	if c.cluster.Spec.Upgrade == nil {
 		return candidates.ToList(), nil
@@ -246,7 +248,7 @@ func (c *Cluster) filterCandidatesByUpgradeOrder(candidates couchbaseutil.Member
 }
 
 func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	nodeOrder := c.cluster.Spec.Upgrade.UpgradeOrder
+	nodeOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
 	finalCandidates := couchbaseutil.MemberList{}
 
 	for _, node := range nodeOrder {
@@ -320,8 +322,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 		if members, ok := groupedCandidates[group]; ok && members.Size() > 0 {
 			filteredMembers := couchbaseutil.MemberList{}
 			arbiterMembers := couchbaseutil.MemberList{}
-
-			for _, member := range members {
+			for _, member := range members.ToList() {
 				serverClass := c.cluster.Spec.GetServerConfigByName(member.Config())
 				if serverClass != nil && serverClass.HasService("arbiter") {
 					arbiterMembers = append(arbiterMembers, member)
@@ -339,47 +340,72 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 	// If there are remaining candidates not in a server group then they go last
 	return candidates.ToList(), nil
 }
+
 func (c *Cluster) selectCandidatesByServicesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	servicesOrder := c.cluster.Spec.Upgrade.UpgradeOrder
-	groupedCandidates := candidates.GroupByServerConfigs()
-	filteredCandidates := couchbaseutil.MemberSet{}
-
-	// Add the default services order to the end of the services order, to
-	// ensure we upgrade services that the user didn't include.
-	servicesOrder = append(servicesOrder, DefaultServicesOrder...)
-
-	for _, service := range servicesOrder {
-		for configName, members := range groupedCandidates {
-			serverClass := c.cluster.Spec.GetServerConfigByName(configName)
-			if serverClass != nil && serverClass.HasService(couchbasev2.Service(service)) {
-				filteredCandidates.Merge(members)
-			}
+	serviceOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+	for _, svc := range DefaultServicesOrder {
+		if !slices.Contains(serviceOrder, svc) {
+			serviceOrder = append(serviceOrder, svc)
 		}
+	}
 
-		if filteredCandidates.Size() > 0 {
-			return filteredCandidates.ToList()
-		}
+	buckets, bestRank := c.groupByServiceRank(candidates, serviceOrder)
+
+	if bestRank >= 0 {
+		result := buckets[bestRank]
+		sort.Slice(result, func(i, j int) bool {
+			return result[i].Name() < result[j].Name()
+		})
+
+		return result
 	}
 
 	return candidates.ToList()
 }
 
-func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
-	serverClassOrder := c.cluster.Spec.Upgrade.UpgradeOrder
+// groupByServiceRank buckets candidates by their highest-priority service rank
+// in a single pass. Returns the buckets and the index of the best (lowest) rank,
+// or -1 if no candidates were bucketed.
+func (c *Cluster) groupByServiceRank(candidates couchbaseutil.MemberSet, serviceOrder []string) (map[int]couchbaseutil.MemberList, int) {
+	buckets := make(map[int]couchbaseutil.MemberList)
+	bestRank := -1
 
-	// Add all the server classes to the end of the order, to ensure we upgrade
-	// all server classes.
+	for _, candidate := range candidates {
+		sc := c.cluster.Spec.GetServerConfigByName(candidate.Config())
+		if sc == nil {
+			continue
+		}
+
+		for rank, svc := range serviceOrder {
+			if sc.HasService(couchbasev2.Service(svc)) {
+				buckets[rank] = append(buckets[rank], candidate)
+				if bestRank < 0 || rank < bestRank {
+					bestRank = rank
+				}
+
+				break
+			}
+		}
+	}
+
+	return buckets, bestRank
+}
+
+func (c *Cluster) selectCandidatesByServerClassesOrder(candidates couchbaseutil.MemberSet) couchbaseutil.MemberList {
+	serverClassOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+
+	// Append any missing server classes to the end of the order.
 	for _, sc := range c.cluster.Spec.Servers {
-		serverClassOrder = append(serverClassOrder, sc.Name)
+		if !slices.Contains(serverClassOrder, sc.Name) {
+			serverClassOrder = append(serverClassOrder, sc.Name)
+		}
 	}
 
 	groupedCandidates := candidates.GroupByServerConfigs()
 
 	for _, sc := range serverClassOrder {
-		if members, ok := groupedCandidates[sc]; ok {
-			if members.Size() > 0 {
-				return members.ToList()
-			}
+		if members, ok := groupedCandidates[sc]; ok && members.Size() > 0 {
+			return members.ToList()
 		}
 	}
 
@@ -434,11 +460,12 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 	requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
 	actualSpec.Containers[0].Ports = []v1.ContainerPort{}
 
-	// Ignore readiness probe port changes
-	// changed the default port from 8091 to 18091 (K8S-3828). New pods
-	// will get 18091, existing pods keep their current probe.
-	requestedSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
-	actualSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
+	// Ignore readiness probe changes entirely.
+	// The probe type may change from TCPSocket to Exec when address family
+	// is switched to an *Only mode. Existing pods should not be swap-rebalanced
+	// for probe changes — they will pick up the new probe naturally when recreated.
+	requestedSpec.Containers[0].ReadinessProbe = nil
+	actualSpec.Containers[0].ReadinessProbe = nil
 
 	// Don't force upgrades when we switch from migration mode to normal
 	// reconciliation.
@@ -572,9 +599,14 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 			if i >= numToUpgradeVersion {
 				break
 			}
-			candidate.SetImage(specImage)
-			candidate.SetVersion(targetVersion)
-			candidates.Add(candidate)
+
+			// Clone first so we don't mutate c.members while calculating candidates.
+			// Mutating member versions/images here can make downstream logic (for
+			// example lowest-version persistence) observe target versions too early.
+			cloned := candidate.Clone()
+			cloned.SetImage(specImage)
+			cloned.SetVersion(targetVersion)
+			candidates.Add(cloned)
 		}
 	}
 
@@ -796,7 +828,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 
 	metrics.UpgradeDurationMSMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Set(float64(time.Since(parsedStartTime)))
 
-	return c.updateCRStatus()
+	return retryutil.RetryFor(4*time.Second, c.updateCRStatus)
 }
 
 // isUpgrading checks for upgrade status in state which may return inactive
@@ -855,16 +887,10 @@ func (c *Cluster) getUpgradeBlockers() ([]string, error) {
 }
 
 // applyPreviousVersionToNewPods modifies the additions slice in-place to set the old version
-// image on new pods that should be created with the previous version during a mixed-mode
-// scale-up. This is called from handleAddNode when previousVersionPodCount requires that
-// some new nodes come up on the old version.
-//
-// The logic:
-//  1. Check if we are in a forward upgrade with previousVersionPodCount > 0
-//  2. Count how many existing pods are on the old (baseline) version
-//  3. If previousVersionPodCount > existingOldPods, the difference tells us how many
-//     new pods should use the old version
-//  4. Set the Image field on the appropriate ServerConfig copies to the old version image
+// image on new pods that should be created with the previous version during a mixed-mode scale-up.
+// The UpgradeOrderType determines whether we can order the additions based only on their server config.
+// When we can determine the order: Apply the old version image to additions based on their position in the upgrade order.
+// When we can't determine the order: Apply the old version image to additions based on a calculation of how many existing pods are already on the old version.
 func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerConfig) error {
 	if c.cluster.Spec.Upgrade == nil || c.cluster.Spec.Upgrade.PreviousVersionPodCount == 0 {
 		return nil
@@ -895,6 +921,44 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return nil
 	}
 
+	// Construct the old version image - What if the image to produce this version is a hash? We
+	baselineImage := c.GetRunningImageForVersion(baselineVersion)
+	if baselineImage == "" {
+		return errors.ErrOldImageNotFound
+	}
+
+	var additionsOnPreviousVersion int
+	if c.cluster.Spec.Upgrade.UpgradeOrderType == couchbasev2.UpgradeOrderTypeServerClasses || c.cluster.Spec.Upgrade.UpgradeOrderType == couchbasev2.UpgradeOrderTypeServices {
+		additionsOnPreviousVersion = c.applyPreviousVersionCandidateKnown(baselineVersion, baselineImage, additions)
+	} else {
+		additionsOnPreviousVersion, err = c.applyPreviousVersionCandidateUnknown(baselineVersion, baselineImage, additions)
+		if err != nil {
+			return err
+		}
+	}
+
+	if additionsOnPreviousVersion == 0 {
+		return nil
+	}
+
+	log.Info("Applied previous version image to new pods during scale-up",
+		"cluster", c.namespacedName(),
+		"oldImage", baselineImage,
+		"newPodsOnOldVersion", additionsOnPreviousVersion,
+		"totalNewPods", len(additions),
+		"previousVersionPodCount", c.cluster.Spec.Upgrade.PreviousVersionPodCount)
+
+	return nil
+}
+
+// applyPreviousVersionCandidateUnknown modifies the additions slice in-place to set the old version image on new pods that should be created with the previous version during a mixed-mode scale-up,
+// in the scenario where we can't determine the upgrade candidates and their order before they are created (i.e. when ordering is by node or server group).
+// This should return the number of additions modified.
+
+// 1. Count the number of existing pods that are on the old (baseline) version.
+// 2. If previousVersionPodCount > existingOldPods, the difference tells us how many new pods should use the old version.
+// 3. Set the Image field on the appropriate ServerConfig copies to the old version image.
+func (c *Cluster) applyPreviousVersionCandidateUnknown(baselineVersion, baselineImage string, additions []couchbasev2.ServerConfig) (int, error) {
 	// Count how many existing pods are running the old (baseline) version
 	existingOldPods := 0
 	for _, member := range c.members {
@@ -903,40 +967,113 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		}
 	}
 
-	// Determine how many new pods should use the old version
+	// Determine how many new pods should use the old version.
 	previousVersionPodCount := c.cluster.Spec.Upgrade.PreviousVersionPodCount
 	newPodsOnOldVersion := previousVersionPodCount - existingOldPods
 	if newPodsOnOldVersion <= 0 {
-		return nil
+		return 0, nil
 	}
 
-	// Cap at the number of new pods being added
+	// Cap at the number of new pods being added.
 	// Since newPodsOnOldVersion is calculated as previousVersionPodCount - existingOldPods, existingOldPods may not be the the stable state number since this can happen during an update too.
 	// So if this happens during an upgrade we can expect existingOldPods to settle at previousVersionPodCount.
 	if newPodsOnOldVersion > len(additions) {
-		// return error as calculated new pods to be added on old version is greater than the number of new pods to be added
-		return errors.ErrNewPodsExceedAdditions
+		// return error as calculated new pods to be added on old version is greater than the number of new pods to be added.
+		return 0, errors.ErrNewPodsExceedAdditions
 	}
 
-	// Construct the old version image - What if the image to produce this version is a hash? We
-	oldImage := c.GetRunningImageForVersion(baselineVersion)
-
-	if oldImage == "" {
-		return errors.ErrOldImageNotFound
-	}
-
-	log.Info("Applying previous version image to new pods during scale-up",
-		"cluster", c.namespacedName(),
-		"oldImage", oldImage,
-		"newPodsOnOldVersion", newPodsOnOldVersion,
-		"totalNewPods", len(additions),
-		"previousVersionPodCount", previousVersionPodCount,
-		"existingOldPods", existingOldPods)
-
-	// Set the old version image on the first newPodsOnOldVersion additions
+	// Set the old version image on the first newPodsOnOldVersion additions.
 	for i := 0; i < newPodsOnOldVersion; i++ {
-		additions[i].Image = oldImage
+		additions[i].Image = baselineImage
+	}
+	return newPodsOnOldVersion, nil
+}
+
+// buildClassOrder returns the ordered list of server class names according to the upgrade order spec.
+// For ServerClasses order: returns spec upgradeOrder with any missing classes appended.
+// For Services order: returns class names ordered by which service appears first in the service upgrade order.
+func (c *Cluster) buildClassOrder() []string {
+	if c.cluster.Spec.Upgrade == nil {
+		return nil
+	}
+	switch c.cluster.Spec.Upgrade.UpgradeOrderType {
+	case couchbasev2.UpgradeOrderTypeServerClasses:
+		order := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+		for _, sc := range c.cluster.Spec.Servers {
+			if !slices.Contains(order, sc.Name) {
+				order = append(order, sc.Name)
+			}
+		}
+		return order
+	case couchbasev2.UpgradeOrderTypeServices:
+		serviceOrder := append([]string(nil), c.cluster.Spec.Upgrade.UpgradeOrder...)
+		for _, svc := range DefaultServicesOrder {
+			if !slices.Contains(serviceOrder, svc) {
+				serviceOrder = append(serviceOrder, svc)
+			}
+		}
+		seen := make(map[string]struct{})
+		var classOrder []string
+		for _, svc := range serviceOrder {
+			for _, sc := range c.cluster.Spec.Servers {
+				if _, added := seen[sc.Name]; added {
+					continue
+				}
+				if sc.HasService(couchbasev2.Service(svc)) {
+					classOrder = append(classOrder, sc.Name)
+					seen[sc.Name] = struct{}{}
+				}
+			}
+		}
+		return classOrder
+	}
+	return nil
+}
+
+// applyPreviousVersionCandidateKnown modifies the additions slice in-place to set the old version image on new pods that should be created with the previous version during a mixed-mode scale-up,
+// in the scenario where we can determine the upgrade candidates and their order before they are created (i.e. when ordering is by server class or service).
+// This should return the number of additions modified.
+//
+// The upgrade order is determined by buildClassOrder. Starting from the class upgraded last (highest rank),
+// the PVPC budget is first consumed by existing old-version pods in that class, then by new additions.
+func (c *Cluster) applyPreviousVersionCandidateKnown(baselineVersion, baselineImage string, additions []couchbasev2.ServerConfig) int {
+	classOrder := c.buildClassOrder()
+	if len(classOrder) == 0 {
+		return 0
 	}
 
-	return nil
+	// Count existing old-version pods per class.
+	existingOldByClass := make(map[string]int)
+	for _, member := range c.members {
+		if member.Version() == baselineVersion {
+			existingOldByClass[member.Config()]++
+		}
+	}
+
+	// Group addition indices by class name.
+	type addIdx int
+	additionsByClass := make(map[string][]addIdx)
+	for pos, a := range additions {
+		additionsByClass[a.Name] = append(additionsByClass[a.Name], addIdx(pos))
+	}
+
+	budget := c.cluster.Spec.Upgrade.PreviousVersionPodCount
+	modified := 0
+
+	// Walk the class order from last (upgraded last) to first, consuming the budget.
+	// Existing old-version pods fill the budget before new additions.
+	for i := len(classOrder) - 1; i >= 0 && budget > 0; i-- {
+		className := classOrder[i]
+		budget -= existingOldByClass[className]
+		if budget <= 0 {
+			break
+		}
+		for j := len(additionsByClass[className]) - 1; j >= 0 && budget > 0; j-- {
+			additions[additionsByClass[className][j]].Image = baselineImage
+			budget--
+			modified++
+		}
+	}
+
+	return modified
 }

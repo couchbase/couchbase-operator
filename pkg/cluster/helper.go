@@ -278,3 +278,27 @@ func (c *Cluster) GetEncryptionKeyFinalizer() string {
 func (c *Cluster) IsEncryptionAtRestManaged() bool {
 	return c.SupportsVersionFeatures("8.0.0") && c.cluster.IsEncryptionAtRestManaged()
 }
+
+// DisableAutoFailover will disable auto-failover if it is currently enabled, and return a function that can be called to restore the previous setting.
+func (c *Cluster) DisableAutoFailover() (func(), error) {
+	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
+	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	if failoverSettings.Enabled {
+		newFailoverSettings := *failoverSettings
+		newFailoverSettings.Enabled = false
+
+		if err := couchbaseutil.SetAutoFailoverSettings(&newFailoverSettings).RetryFor(10*time.Second).On(c.api, c.readyMembers()); err != nil {
+			return nil, err
+		}
+
+		return func() {
+			_ = couchbaseutil.SetAutoFailoverSettings(failoverSettings).RetryFor(10*time.Second).On(c.api, c.readyMembers())
+		}, nil
+	}
+
+	// Return a noop
+	return func() {}, nil
+}
