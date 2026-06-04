@@ -134,6 +134,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintsDeprecatedNetworkingOptions,
 		checkConstraintDeprecatedAnnotations,
 		checkConstraintDeprecatedRBACRoles,
+		checkConstraintBucketsMeetMinReplicasCount,
 	}
 
 	var errs []error
@@ -6145,6 +6146,42 @@ func checkServerClassImageDeprecated(v *types.Validator, cluster *couchbasev2.Co
 	}
 
 	return nil, nil
+}
+
+// checkConstraintBucketsMeetMinReplicasCount warns when an existing CouchbaseBucket or
+// CouchbaseEphemeralBucket has fewer replicas than the cluster's minReplicasCount.
+// We just pass a warning here, existing buckets still work fine, and blocking the cluster update
+// would be too harsh.
+// Bucket admission still rejects new or changed buckets whose replicas are below the minimum.
+func checkConstraintBucketsMeetMinReplicasCount(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MinReplicasCount == 0 {
+		return nil, nil
+	}
+
+	minReplicas := cluster.Spec.ClusterSettings.Data.MinReplicasCount
+
+	buckets, ephemeralBuckets, err := getClusterBucketsByType(v, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	warnings := []string{}
+
+	for name, bucket := range buckets {
+		if bucket.Spec.Replicas < minReplicas {
+			warnings = append(warnings, fmt.Sprintf("CouchbaseBucket %q spec.replicas (%d) is less than spec.cluster.data.minReplicasCount (%d). Increase the bucket's replica count to satisfy the cluster minimum.",
+				name, bucket.Spec.Replicas, minReplicas))
+		}
+	}
+
+	for name, bucket := range ephemeralBuckets {
+		if bucket.Spec.Replicas < minReplicas {
+			warnings = append(warnings, fmt.Sprintf("CouchbaseEphemeralBucket %q spec.replicas (%d) is less than spec.cluster.data.minReplicasCount (%d). Increase the bucket's replica count to satisfy the cluster minimum.",
+				name, bucket.Spec.Replicas, minReplicas))
+		}
+	}
+
+	return warnings, nil
 }
 
 func checkConstraintsDeprecatedNetworkingOptions(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {

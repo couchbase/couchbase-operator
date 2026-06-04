@@ -4753,6 +4753,32 @@ func TestBucketMinReplicasCountApply(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.replicas"},
 		},
+		{
+			// We patch both resources because the valaidation updates everything in yaml order.
+			// The cluster update goes first and triggers our warning, since bucket0 still has
+			// replicas=2 in the API at that moment. The bucket update follows and would fail
+			// the existing bucket side check, so we bump it to 3 to keep it valid.
+			name: "TestClusterMinReplicasCountRaisedAboveExistingBucket",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 3),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
+		},
+		{
+			// The cluster update lands first and warns about bucket0 (still at replicas=2 in
+			// the API). The bucket update then tries to drop replicas to 1, which the existing
+			// bucket side check rejects. Both the warning and the error are expected.
+			name: "TestClusterMinReplicasCountRaisedAndBucketDroppedBelow",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1),
+			},
+			shouldFail:       true,
+			expectedErrors:   []string{"spec.replicas"},
+			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-replicas.yaml"})
