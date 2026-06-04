@@ -2252,6 +2252,8 @@ func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseuti
 		return true, r.handleInPlaceUpgrade(c, candidates, targetVersion)
 	case allCandidatesRecoverable && zoneChangeDetected:
 		log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+	case allCandidatesRecoverable && pvcChangeDetected:
+		log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	case allCandidatesRecoverable && swapRebalanceIndexNodes:
 		log.Info("Upgrade candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
 			"cluster", c.namespacedName(),
