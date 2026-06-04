@@ -27,7 +27,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // ChangeSet holds the three types of upgrade candidates.
@@ -456,11 +455,12 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 	requestedSpec.Containers[0].Ports = []v1.ContainerPort{}
 	actualSpec.Containers[0].Ports = []v1.ContainerPort{}
 
-	// Ignore readiness probe port changes
-	// changed the default port from 8091 to 18091 (K8S-3828). New pods
-	// will get 18091, existing pods keep their current probe.
-	requestedSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
-	actualSpec.Containers[0].ReadinessProbe.ProbeHandler.TCPSocket.Port = intstr.FromInt(18091)
+	// Ignore readiness probe changes entirely.
+	// The probe type may change from TCPSocket to Exec when address family
+	// is switched to an *Only mode. Existing pods should not be swap-rebalanced
+	// for probe changes — they will pick up the new probe naturally when recreated.
+	requestedSpec.Containers[0].ReadinessProbe = nil
+	actualSpec.Containers[0].ReadinessProbe = nil
 
 	// Don't force upgrades when we switch from migration mode to normal
 	// reconciliation.

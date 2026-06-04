@@ -12,7 +12,9 @@ package k8sutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -569,20 +571,23 @@ func assertReadinessProbe(t *testing.T, probe *v1.Probe, port int) {
 		t.Fatal("expected probe to be non-nil")
 	}
 
-	if probe.Exec != nil {
-		t.Fatal("expected no exec probe")
+	if probe.TCPSocket != nil {
+		t.Fatal("expected no TCP socket probe (exec probe should be used instead)")
 	}
 
-	if probe.TCPSocket == nil {
-		t.Fatal("expected TCP socket probe, got nil")
+	if probe.Exec == nil {
+		t.Fatal("expected exec probe, got nil")
 	}
 
-	if probe.TCPSocket.Host != "" {
-		t.Fatalf("expected TCP host to be empty, got %q", probe.TCPSocket.Host)
+	if len(probe.Exec.Command) == 0 {
+		t.Fatal("expected exec probe command to be non-empty")
 	}
 
-	if probe.TCPSocket.Port.IntValue() != port {
-		t.Fatalf("expected TCP port %d, got %d", port, probe.TCPSocket.Port.IntValue())
+	// Verify the command references the expected port (both IPv6 and IPv4 loopback).
+	portStr := fmt.Sprintf("%d", port)
+	cmd := strings.Join(probe.Exec.Command, " ")
+	if !strings.Contains(cmd, portStr) {
+		t.Fatalf("expected exec probe command to contain port %s, got: %s", portStr, cmd)
 	}
 
 	assertCommonProbeSettings(t, probe)

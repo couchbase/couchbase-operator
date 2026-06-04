@@ -1788,6 +1788,45 @@ func MustWaitForPodWithoutCondition(t *testing.T, k8s *types.Cluster, podName st
 	return pod
 }
 
+// MustWaitForClusterPodsReady waits for all pods belonging to a cluster to have the
+// operator-managed readiness condition (pod.couchbase.com/readiness) set to True.
+func MustWaitForClusterPodsReady(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	t.Helper()
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	callback := func() error {
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		if len(podList.Items) == 0 {
+			return fmt.Errorf("no pods found for cluster %s", couchbase.Name)
+		}
+
+		for i := range podList.Items {
+			pod := &podList.Items[i]
+			condition := k8sutil.GetPodCondition(pod, k8sutil.PodReadinessCondition)
+			if condition == nil {
+				return fmt.Errorf("pod %s: readiness condition not found", pod.Name)
+			}
+
+			if condition.Status != v1.ConditionTrue {
+				return fmt.Errorf("pod %s: readiness condition is %s", pod.Name, condition.Status)
+			}
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustChangeClusterPassword changes the cluster password. If it is changed, you will need to update the auth password in order to change it back.
 func MustChangeClusterPassword(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, authPassword, newPassword string, timeout time.Duration) {
 	client := MustCreateAdminConsoleClient(t, k8s, couchbase)

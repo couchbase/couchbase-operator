@@ -640,6 +640,7 @@ func testNetworkAddressFamilyAndNodeToNode(t *testing.T, nodeToNode *couchbasev2
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check we can change the address family.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyChange), time.Minute)
@@ -650,6 +651,7 @@ func testNetworkAddressFamilyAndNodeToNode(t *testing.T, nodeToNode *couchbasev2
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Check the deprecated option still works.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyDeprecated), time.Minute)
@@ -660,6 +662,7 @@ func testNetworkAddressFamilyAndNodeToNode(t *testing.T, nodeToNode *couchbasev2
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Ensure the expected events were raised.
 	expectedEvents := []eventschema.Validatable{
@@ -775,6 +778,7 @@ func testNetworkAddressFamilyAndNodeToNodeEnabled(t *testing.T, nodeToNode *couc
 			NodeEncryption: couchbaseutil.On,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -859,6 +863,7 @@ func testNetworkAddressFamilyAndNodeToNodeDisabled(t *testing.T, nodeToNode *cou
 			NodeEncryption: couchbaseutil.Off,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
@@ -951,6 +956,7 @@ func testNetworkAddressFamilyAndNodeToNodeChange(t *testing.T, nodeToNode *couch
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Update the cluster to a dual networking setup.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/networking/addressFamily", aFamilyChange), time.Minute)
@@ -963,6 +969,7 @@ func testNetworkAddressFamilyAndNodeToNodeChange(t *testing.T, nodeToNode *couch
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// time.Sleep(30 * time.Hour)
 
@@ -977,6 +984,7 @@ func testNetworkAddressFamilyAndNodeToNodeChange(t *testing.T, nodeToNode *couch
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// time.Sleep(30 * time.Hour)
 
@@ -989,6 +997,7 @@ func testNetworkAddressFamilyAndNodeToNodeChange(t *testing.T, nodeToNode *couch
 			NodeEncryption: expectedEncryption,
 		},
 	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
 
 	// Ensure the expected events were raised.
 	expectedEvents := []eventschema.Validatable{
