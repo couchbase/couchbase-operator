@@ -790,14 +790,8 @@ func (c *Cluster) reconcileResourceManagementSettings() error {
 }
 
 func (c *Cluster) reconcileDataServiceSettings() error {
-	if c.cluster.Spec.ClusterSettings.Data == nil {
-		return nil
-	}
-
-	if atleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil {
+	if atleast76, err := c.cluster.IsAtLeastVersion("7.6.0"); err != nil || !atleast76 {
 		return err
-	} else if !atleast76 {
-		return nil
 	}
 
 	current := couchbaseutil.DataServiceSettings{}
@@ -807,7 +801,11 @@ func (c *Cluster) reconcileDataServiceSettings() error {
 
 	requested := current
 
-	requested.MinReplicasCount = c.cluster.Spec.ClusterSettings.Data.MinReplicasCount
+	if c.cluster.Spec.ClusterSettings.Data != nil {
+		requested.MinReplicasCount = c.cluster.Spec.ClusterSettings.Data.MinReplicasCount
+	} else {
+		requested.MinReplicasCount = 0
+	}
 
 	if reflect.DeepEqual(current, requested) {
 		return nil
