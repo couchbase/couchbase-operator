@@ -2388,14 +2388,19 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 	candidatesNoOrchestrator, orchestrator := separateCandidatesAndOrchestrator(candidates, clusterInfo.Orchestrator)
 
 	if len(candidatesNoOrchestrator) == 0 && orchestrator == nil {
-		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
 		return nil
 	}
 
-	// Always set the condition so reconcileBuckets uses the migration-safe API
-	// to push corrective bucket updates — regardless of whether swap routines
-	// are enabled.
-	r.c.cluster.Status.SetBucketMigrationCondition()
+	// Persist before any swap pod is created so the admission webhook sees the
+	// condition. Done above the EnableBucketMigrationRoutines guard because
+	// reconcileBuckets also reads the condition to pick the migration safe REST API.
+	if !c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
+		c.cluster.Status.SetBucketMigrationCondition()
+		if err := c.updateCRStatus(); err != nil {
+			return err
+		}
+	}
 
 	// Swap-rebalances are skipped when either:
 	// * Migration routines are disabled (operator not permitted to eject pods), or
