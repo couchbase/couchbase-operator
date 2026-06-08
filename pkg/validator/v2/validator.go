@@ -312,6 +312,13 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 			return fmt.Errorf("%s annotation can only be used with server version 7.6.0 or larger", annotation)
 		}
 
+		// The annotation triggers a migration, and routines are what actually
+		// move the data. Reject the annotation if routines are off, otherwise
+		// the migration starts on the server but never finishes.
+		if !cluster.Spec.Buckets.EnableBucketMigrationRoutines {
+			return fmt.Errorf("%s annotation requires bucket migration routines to be enabled via cao.couchbase.com/buckets.enableBucketMigrationRoutines annotation", annotation)
+		}
+
 		return checkValidStorageBackend(backend, annotation)
 	}
 
@@ -5927,8 +5934,20 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 
 func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
 	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
+		// Case 1: If there is a migration in progress, we block any toggle.
 		if cond := prev.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
 			return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
+		}
+
+		// Case 2: If there is no migration in progress, the annotation needs
+		// routines enabled to finish migrations it triggers. So we block
+		// turning routines off unless the annotation is being cleared too,
+		// otherwise the next reconcile will flip a bucket and then be unable
+		// to drain it.
+		if prev.Spec.Buckets.EnableBucketMigrationRoutines && !current.Spec.Buckets.EnableBucketMigrationRoutines {
+			if current.Spec.Buckets.TargetUnmanagedBucketStorageBackend != nil {
+				return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be set to false while the cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend annotation is set, remove the annotation first")
+			}
 		}
 	}
 
