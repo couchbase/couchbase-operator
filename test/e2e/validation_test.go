@@ -4663,7 +4663,6 @@ func TestAnnotationValidation(t *testing.T) {
 				Add("/metadata/annotations", map[string]string{
 					"cao.couchbase.com/buckets.defaultStorageBackend":               "magma",
 					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
-					"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       "true",
 				})},
 			shouldFail: false,
 		},
@@ -4683,28 +4682,9 @@ func TestAnnotationValidation(t *testing.T) {
 				Add("/metadata/annotations", map[string]string{
 					"cao.couchbase.com/buckets.defaultStorageBackend":               "supamagma",
 					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "coldmagma",
-					"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       "true",
 				})},
 			shouldFail:     true,
 			expectedErrors: []string{"must be a valid storage backend"},
-		},
-		{
-			name: "TestClusterAnnotationsTargetBackendRequiresMigrationRoutines",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
-				})},
-			shouldFail:     true,
-			expectedErrors: []string{"requires bucket migration routines to be enabled"},
-		},
-		{
-			name: "TestClusterAnnotationsTargetBackendAllowedWhenRoutinesEnabled",
-			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
-				Add("/metadata/annotations", map[string]string{
-					"cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend": "magma",
-					"cao.couchbase.com/buckets.enableBucketMigrationRoutines":       "true",
-				})},
-			shouldFail: false,
 		},
 		{
 			name: "TestClusterAnnotationsEnableBucketMigrationRoutinesInvalid",
