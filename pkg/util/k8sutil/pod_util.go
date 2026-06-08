@@ -1107,7 +1107,13 @@ func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Prob
 		FailureThreshold:    1,
 		ProbeHandler: v1.ProbeHandler{
 			Exec: &v1.ExecAction{
-				Command: []string{"bash", "-c", fmt.Sprintf("timeout 3 bash -c '</dev/tcp/::1/%d' || timeout 3 bash -c '</dev/tcp/127.0.0.1/%d'", port, port)},
+				Command: []string{
+					"bash", "-c",
+					fmt.Sprintf(
+						"</dev/tcp/::1/%d || </dev/tcp/127.0.0.1/%d",
+						port, port,
+					),
+				},
 			},
 		},
 	}
