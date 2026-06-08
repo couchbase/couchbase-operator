@@ -2326,14 +2326,17 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 	}
 
 	candidates = couchbaseutil.MemberSet{}
-
+	managedBuckets := c.cluster.Spec.Buckets.Managed
 	for _, bucket := range clusterBuckets {
-		spec := bucketMap[bucket.BucketName]
+		var spec couchbaseutil.Bucket
+		if managedBuckets {
+			spec = bucketMap[bucket.BucketName]
+		}
 
 		for _, node := range bucket.Nodes {
-			// A non-empty value means that node's vBuckets still carry the old
-			// backend/eviction-policy and a migration is in progress.
-			if node.StorageBackend == "" && node.EvictionPolicy == "" {
+			storageBackendMigrating := node.StorageBackend != ""
+			evictionPolicyMigrating := node.EvictionPolicy != ""
+			if !storageBackendMigrating && !evictionPolicyMigrating {
 				continue
 			}
 
@@ -2347,11 +2350,17 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 				hasStorageBackendOverrides = true
 			}
 
-			// If the node's current vBucket format differs from spec, a
-			// swap-rebalance is required to move the data.  If it already matches
-			// spec the server just needs a corrective REST push — no pod ejection.
-			if (node.StorageBackend != "" && node.StorageBackend != string(spec.BucketStorageBackend)) ||
-				(node.EvictionPolicy != "" && node.EvictionPolicy != spec.EvictionPolicy) {
+			// If not managing buckets, any ongoing migration requires a swap.
+			if !managedBuckets {
+				swapsNeeded = true
+				continue
+			}
+
+			// If managing buckets, check if the ongoing migration mismatches the spec and therefore requires a swap to align.
+			backendMismatch := storageBackendMigrating && node.StorageBackend != string(spec.BucketStorageBackend)
+			evictionMismatch := evictionPolicyMigrating && node.EvictionPolicy != spec.EvictionPolicy
+
+			if backendMismatch || evictionMismatch {
 				swapsNeeded = true
 			}
 		}
