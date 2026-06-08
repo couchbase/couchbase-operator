@@ -5927,8 +5927,15 @@ func checkClusterGroupRBACConstraints(v *types.Validator, cluster *couchbasev2.C
 
 func checkChangeConstraintsBucketMigratingAnnotation(prev, current *couchbasev2.CouchbaseCluster) error {
 	if prev.Spec.Buckets.EnableBucketMigrationRoutines != current.Spec.Buckets.EnableBucketMigrationRoutines {
-		if cond := prev.Status.GetCondition(couchbasev2.ClusterConditionBucketMigration); cond != nil && cond.Status == v1.ConditionTrue {
-			return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be changed while a bucket migration is taking place")
+		// If there is no migration in progress, the annotation needs
+		// routines enabled to finish migrations it triggers. So we block
+		// turning routines off unless the annotation is being cleared too,
+		// otherwise the next reconcile will flip a bucket and then be unable
+		// to drain it.
+		if prev.Spec.Buckets.EnableBucketMigrationRoutines && !current.Spec.Buckets.EnableBucketMigrationRoutines {
+			if current.Spec.Buckets.TargetUnmanagedBucketStorageBackend != nil {
+				return fmt.Errorf("spec.buckets.enableBucketMigrationRoutines cannot be set to false while the cao.couchbase.com/buckets.targetUnmanagedBucketStorageBackend annotation is set, remove the annotation first")
+			}
 		}
 	}
 
