@@ -1384,11 +1384,12 @@ func GetAlternateAddressExternalPorts(c *client.Client, name string) (*couchbase
 			ports.IndexServicePort = port.NodePort
 		case indexServicePortNameTLS:
 			ports.IndexServicePortTLS = port.NodePort
-		// Reconfiguration of the ports below aren't supported. Skip these.
-		case managementExchangePortName, managementExchangePortNameTLS, memcachedDedicatedPortName, memcachedDedicatedPortNameTLS, indexAdminPortName:
-			continue
 		default:
-			return nil, fmt.Errorf("%w: unexpected port name %s", errors.NewStackTracedError(errors.ErrInternalError), port.Name)
+			// Instead of maintaining a list of all N2N ports, it should be safe to ignore any unknown port that we don't
+			// explicitly support, as these won't be used for alternate address configuration anyway.
+			// This is to allow for future expansion of the N2N ports without needing to update the operator.
+			log.V(2).Info("Unknown port found on service, skipping", "service", name, "portName", port.Name, "portNumber", port.Port)
+			continue
 		}
 	}
 

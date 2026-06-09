@@ -360,6 +360,7 @@ func registerTests() {
 		framework.NewTestDef(TestPreviousVersionPodCountScaleUpWithServicesUpgradeOrder).WithTags(TagSuiteP0, TagFeatureUpgrade),
 		framework.NewTestDef(TestExposedFeatureIP).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNS).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
+		framework.NewTestDef(TestExposedFeatureExternalConnection).WithTags(TagSuiteP0, TagFeatureNetwork, TagSuitePlatform),
 		framework.NewTestDef(TestExposedFeatureDNSModify).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestUpdatingAlternateAddressExternalDNSCheckDoesNotEjectActivatedNodes).WithTags(TagSuiteP0, TagFeatureNetwork),
 		framework.NewTestDef(TestAlternateAddressExternalDNSCheckEjectsNewPods).WithTags(TagSuiteP0, TagFeatureNetwork),

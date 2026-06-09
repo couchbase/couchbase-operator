@@ -141,6 +141,45 @@ func TestExposedFeatureDNS(t *testing.T) {
 	e2eutil.MustCheckConsolePorts(t, kubernetes, cluster, expectedPorts, rejectedPorts)
 }
 
+func TestExposedFeatureExternalConnection(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Repeat for the various topologies we want to test
+	testCases := []*e2eutil.ClusterOptions{
+		clusterOptions().WithEphemeralTopology(clusterSize),
+		clusterOptions().WithMixedEphemeralTopology(clusterSize),
+		clusterOptions().WithSplitEphemeralTopology(clusterSize),
+	}
+
+	for _, options := range testCases {
+		// Create the cluster.
+		bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+		e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+		cluster := options.Generate(kubernetes)
+		cluster.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
+			couchbasev2.FeatureClient,
+			couchbasev2.FeatureAdmin,
+			couchbasev2.FeatureExternalConnection,
+		}
+
+		cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+		// Verify that all nodes advertise an IP based alternate address.
+		e2eutil.MustCheckForIPAlternateAddresses(t, kubernetes, cluster, 2*time.Minute)
+		e2eutil.MustCheckForNodeServiceType(t, kubernetes, cluster, corev1.ServiceTypeNodePort, time.Minute)
+		e2eutil.MustCheckServicePorts(t, kubernetes, cluster, time.Minute)
+		e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	}
+}
+
 // TestExposedFeatureDNSModify tests modifications to the DNS configuration are mirrored by
 // node services.
 func TestExposedFeatureDNSModify(t *testing.T) {
