@@ -48,6 +48,13 @@ Ensure docker is allocated a decent amount of RAM as it defaults to 2GiB for som
 === Preparing to Submit Code
 
 Ensure you have set up your SSH keys, the GitHub https://docs.github.com/en/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent[documentation^] covers it reasonably well.
+Since we'll primarily be working with gerrit, ensure your local ssh agent's config file has the following in addition to github.com host.
+
+```bash
+Host review.couchbase.org
+  AddKeysToAgent yes
+  IdentityFile ~/.ssh/git_ssh_couchbase
+```
 
 To work with the code, you will need to do the following:
 
@@ -80,6 +87,7 @@ Be aware that to build the code you need a certain path structure for the code g
 $ mkdir -p github.com/couchbase
 $ git clone ssh://<gerrit username>@review.couchbase.org:29418/couchbase-operator.git github.com/couchbase/couchbase-operator
 $ cd github.com/couchbase/couchbase-operator
+$ gitdir=$(git rev-parse --git-dir); scp -p -P 29418 -O <gerrit username>@review.couchbase.org:hooks/commit-msg ${gitdir}/hooks/
 $ git review -s
 ----
 

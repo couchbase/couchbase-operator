@@ -483,7 +483,6 @@ class YAMLVisitor:
         Helper to generate labels for YAML.  This adds in links to the specific
         fields within the current document.
         """
-        # pylint: disable=no-self-use
         return '<<' + re.sub(r'\.', r'-', context.full_path.lower()) + f',{context.path.base}>>'
 
     def _implicit_default(self, t):
@@ -491,7 +490,6 @@ class YAMLVisitor:
         Helper to populate sclar fields without a default.  While this is useless
         without further context, it does communicate type information.
         """
-        # pylint: disable=no-self-use
 
         defaults = {
             'string': DEFAULT_STRING,
@@ -511,7 +509,6 @@ class YAMLVisitor:
         """
         Metadata handler.
         """
-        # pylint: disable=no-self-use
 
         self.content.append(f'<<{self.resource.plural}-metadata,metadata>>:')
         self.content.append(f'  <<{self.resource.plural}-metadata-name,name>>: {DEFAULT_STRING}')
