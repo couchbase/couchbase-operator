@@ -91,7 +91,6 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 	goMaxProcs := int32(8)
 
 	// Version-specific values
-	mobile := "Off"
 	hlvPruningWindowSec := int32(7200)
 
 	// Create a comprehensive patch with all XDCR global settings
@@ -126,13 +125,6 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 	// Add version-specific settings
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
 		e2eutil.Die(t, err)
-	} else if ok {
-		// Mobile (Active/Off, default Off) - supported in 7.6.0+
-		settingsPatch = settingsPatch.Replace("/spec/xdcr/globalSettings/mobile", mobile)
-	}
-
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
-		e2eutil.Die(t, err)
 	} else if !ok {
 		// HlvPruningWindowSec (seconds, minimum 1) - supported in versions < 7.6.0
 		settingsPatch = settingsPatch.Replace("/spec/xdcr/globalSettings/hlvPruningWindowSec", hlvPruningWindowSec)
@@ -145,14 +137,11 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 	validationPatch := jsonpatch.NewPatchSet().
 		// Global/per-replication settings
 		Test("/CheckpointInterval", &checkpointInterval).
-		Test("/CollectionsOSOMode", &collectionsOSOMode).
 		Test("/CompressionType", &compressionType).
 		Test("/DesiredLatency", &desiredLatency).
 		Test("/DocBatchSizeKb", &docBatchSizeKb).
 		Test("/FailureRestartInterval", &failureRestartInterval).
 		Test("/FilterBypassExpiry", &filterBypassExpiry).
-		Test("/FilterBinary", &filterBinary).
-		Test("/FilterBypassUncommittedTxn", &filterBypassUncommittedTxn).
 		Test("/FilterDeletion", &filterDeletion).
 		Test("/FilterExpiration", &filterExpiration).
 		Test("/JSFunctionTimeoutMs", &jsFunctionTimeoutMs).
@@ -171,10 +160,12 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 		Test("/GoMaxProcs", &goMaxProcs)
 
 	// Add version-specific validations
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.2.0"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
-		validationPatch = validationPatch.Test("/Mobile", &mobile)
+		validationPatch = validationPatch.Test("/CollectionsOSOMode", &collectionsOSOMode)
+		validationPatch = validationPatch.Test("/FilterBinary", &filterBinary)
+		validationPatch = validationPatch.Test("/FilterBypassUncommittedTxn", &filterBypassUncommittedTxn)
 	}
 
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.6.0"); err != nil {

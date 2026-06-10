@@ -2670,7 +2670,7 @@ func testExpiringServerChain(t *testing.T, leafExpiresIn time.Duration, intermed
 	e2eutil.MustRotateServerCertificateChainWithExpiration(t, ctx, 1*time.Hour, 1*time.Hour)
 
 	// Wait until we see the TLSUpdated event for at least one of the members
-	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster, couchbaseutil.CreateMemberName(cluster.Name, clusterSize-1)), 10*time.Minute)
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.TLSUpdatedEvent(cluster, couchbaseutil.CreateMemberName(cluster.Name, clusterSize-1)), 20*time.Second, 10*time.Minute)
 
 	// Resize the cluster to add a new member and check the TLS changes allow for normal operation
 	cluster = e2eutil.MustResizeCluster(t, 0, clusterSize+1, kubernetes, cluster, 5*time.Minute)

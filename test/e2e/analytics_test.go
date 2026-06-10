@@ -59,6 +59,8 @@ func TestAnalyticsServiceSettings(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
+	framework.Requires(t, kubernetes).AtLeastVersion("7.2.0")
+
 	skipAnalytics(t)
 
 	clusterSize := 3

@@ -79,7 +79,7 @@ func checkAuditSpec(auditSpec *couchbasev2.CouchbaseClusterAuditLoggingSpec, act
 		}
 
 		if auditSpec.Rotation != nil &&
-			auditSpec.Rotation.PruneAge != nil &&
+			auditSpec.Rotation.PruneAge != nil && actualSettings.PruneAge != nil &&
 			int(auditSpec.Rotation.PruneAge.Duration.Seconds()) != int(*actualSettings.PruneAge) {
 			return NewErrInvalidIntegerCheck("auditing cleanup prune age: %d != %d", int(auditSpec.Rotation.PruneAge.Duration.Seconds()), int(*actualSettings.PruneAge))
 		}

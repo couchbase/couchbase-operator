@@ -195,6 +195,8 @@ func TestCngOtlp(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 
+	framework.Requires(t, kubernetes).AtLeastVersion(podconsts.MinimumCouchbaseVersionForCNG)
+
 	defer cleanup()
 
 	// Static configuration.

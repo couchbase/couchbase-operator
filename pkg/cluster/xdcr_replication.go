@@ -1190,24 +1190,24 @@ func (c *Cluster) computeGlobalSettingsPatch(spec *couchbasev2.XDCRGlobalSetting
 
 	// Override with CRD spec values if set
 	patch.CheckpointInterval = c.useSpecIfSetInt32(spec.CheckpointInterval, current.CheckpointInterval)
-	patch.CollectionsOSOMode = c.useSpecIfSetBool(spec.CollectionsOSOMode, current.CollectionsOSOMode)
 	patch.CompressionType = c.useSpecIfSetString(spec.CompressionType, current.CompressionType)
 	patch.DesiredLatency = c.useSpecIfSetInt32(spec.DesiredLatency, current.DesiredLatency)
 	patch.DocBatchSizeKb = c.useSpecIfSetInt32(spec.DocBatchSizeKb, current.DocBatchSizeKb)
 	patch.FailureRestartInterval = c.useSpecIfSetInt32(spec.FailureRestartInterval, current.FailureRestartInterval)
 	patch.FilterBypassExpiry = c.useSpecIfSetBool(spec.FilterBypassExpiry, current.FilterBypassExpiry)
-	patch.FilterBinary = c.useSpecIfSetBool(spec.FilterBinary, current.FilterBinary)
-	patch.FilterBypassUncommittedTxn = c.useSpecIfSetBool(spec.FilterBypassUncommittedTxn, current.FilterBypassUncommittedTxn)
 	patch.FilterDeletion = c.useSpecIfSetBool(spec.FilterDeletion, current.FilterDeletion)
 	patch.FilterExpiration = c.useSpecIfSetBool(spec.FilterExpiration, current.FilterExpiration)
 	// FilterExpression and FilterSkipRestream are handled together below due to server requirement
 	patch.JSFunctionTimeoutMs = c.useSpecIfSetInt32(spec.JSFunctionTimeoutMs, current.JSFunctionTimeoutMs)
 	patch.LogLevel = c.useSpecIfSetString(spec.LogLevel, current.LogLevel)
 
-	// Mobile is only supported in Couchbase Server 7.6.0 and later
-	if supportsMobile, err := c.cluster.IsAtLeastVersion("7.6.0"); err == nil && supportsMobile {
-		patch.Mobile = c.useSpecIfSetString(spec.Mobile, current.Mobile)
+	if atLeast72 := c.SupportsVersionFeatures("7.2.0"); atLeast72 {
+		patch.CollectionsOSOMode = c.useSpecIfSetBool(spec.CollectionsOSOMode, current.CollectionsOSOMode)
+		patch.FilterBinary = c.useSpecIfSetBool(spec.FilterBinary, current.FilterBinary)
+		patch.FilterBypassUncommittedTxn = c.useSpecIfSetBool(spec.FilterBypassUncommittedTxn, current.FilterBypassUncommittedTxn)
 	}
+
+	// Note: Mobile removed from global XDCR settings (MB-70039)
 
 	patch.NetworkUsageLimit = c.useSpecIfSetInt32(spec.NetworkUsageLimit, current.NetworkUsageLimit)
 	patch.OptimisticReplicationThreshold = c.useSpecIfSetInt32(spec.OptimisticReplicationThreshold, current.OptimisticReplicationThreshold)

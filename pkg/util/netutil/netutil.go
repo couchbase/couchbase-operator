@@ -139,9 +139,14 @@ func GetFreePort() (string, error) {
 // CA's that are self-signed are excluded from the chain such that it should contain a leaf and intermediates which can be climbed to the root.
 // This should not be relied upon as a trusted or valid certificate chain as it is not verified.
 // The order of the returned slice should be respected as this is the order presented by the server.
-func GetTLSHandshakeCertificateChainInsecure(hostport string) ([]*x509.Certificate, error) {
+// clientCert is optional; when provided it is presented to the server during the handshake (required for mandatory mTLS).
+func GetTLSHandshakeCertificateChainInsecure(hostport string, clientCert *tls.Certificate) ([]*x509.Certificate, error) {
 	cfg := &tls.Config{
 		InsecureSkipVerify: true, // intentionally skip verification to capture chain.
+	}
+
+	if clientCert != nil {
+		cfg.Certificates = []tls.Certificate{*clientCert}
 	}
 
 	d := &net.Dialer{Timeout: 5 * time.Second}
