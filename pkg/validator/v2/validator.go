@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -114,6 +115,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
+		checkConstraintServerGroupsLabelOverride,
+		checkConstraintServerGroupsResolvable,
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
@@ -360,6 +363,66 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintServerGroupsLabelOverride(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Annotations.Populate has already run atp.
+	override := cluster.Spec.ServerGroupsLabelOverride
+	if override == "" {
+		return nil
+	}
+
+	if errs := k8svalidation.IsQualifiedName(override); len(errs) > 0 {
+		return fmt.Errorf("serverGroupsLabelOverride value %q is not a valid Kubernetes label key: %s",
+			override, strings.Join(errs, "; "))
+	}
+
+	// When the override resolves to the canonical zone key it is a no-op.
+	if override == constants.ServerGroupLabel {
+		return nil
+	}
+
+	// A placement group is not an availability zone, so the operator can't infer a volume's AZ from
+	// its group. Require EVERY server class to declare its zone via a topology.kubernetes.io/zone node
+	// selector in its pod template.
+	for i := range cluster.Spec.Servers {
+		server := &cluster.Spec.Servers[i]
+
+		zone := ""
+		if server.Pod != nil && server.Pod.Spec.NodeSelector != nil {
+			zone = server.Pod.Spec.NodeSelector[constants.ServerGroupLabel]
+		}
+
+		if zone == "" {
+			return fmt.Errorf("server class %q must set the %q node selector in its pod template (spec.servers[].pod) when serverGroupsLabelOverride is set, so the Operator can pin volumes to an availability zone",
+				server.Name, constants.ServerGroupLabel)
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintServerGroupsResolvable rejects clusters where server groups are enabled but a
+// server class resolves to no groups. This mirrors scheduler.GetServerGroupsForClass: a class
+// uses its own spec.servers[].serverGroups, falling back to the global spec.serverGroups. If a
+// class has neither (e.g. global serverGroups removed while only some classes define their own),
+// NewStripeScheduler errors and reconcile loops forever with no user-facing message. Fail at
+// admission with a clear error instead.
+func checkConstraintServerGroupsResolvable(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.ServerGroupsEnabled() {
+		return nil
+	}
+
+	for i := range cluster.Spec.Servers {
+		server := &cluster.Spec.Servers[i]
+
+		if len(server.ServerGroups) == 0 && len(cluster.Spec.ServerGroups) == 0 {
+			return fmt.Errorf("server groups are enabled but server class %q resolves to no server groups: set spec.servers[].serverGroups for it or define a global spec.serverGroups",
+				server.Name)
+		}
 	}
 
 	return nil

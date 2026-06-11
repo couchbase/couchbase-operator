@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -200,6 +201,46 @@ func TestMigrateDeprecatedRoles(t *testing.T) {
 			result := MigrateDeprecatedRoles(tt.input)
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("expected %v, but got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestServerGroupLabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *CouchbaseCluster
+		expected string
+	}{
+		{
+			name:     "no override returns default zone label",
+			cluster:  &CouchbaseCluster{},
+			expected: constants.ServerGroupLabel,
+		},
+		{
+			name: "override returns custom label key",
+			cluster: &CouchbaseCluster{
+				Spec: ClusterSpec{
+					ServerGroupsLabelOverride: "eks.amazonaws.com/nodegroup",
+				},
+			},
+			expected: "eks.amazonaws.com/nodegroup",
+		},
+		{
+			name: "empty override returns default zone label",
+			cluster: &CouchbaseCluster{
+				Spec: ClusterSpec{
+					ServerGroupsLabelOverride: "",
+				},
+			},
+			expected: constants.ServerGroupLabel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cluster.ServerGroupLabel(); got != tt.expected {
+				t.Errorf("ServerGroupLabel() = %q, want %q", got, tt.expected)
 			}
 		})
 	}

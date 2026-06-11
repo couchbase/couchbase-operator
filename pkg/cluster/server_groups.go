@@ -146,7 +146,7 @@ func (c *Cluster) reconcileServerGroups() (bool, error) {
 			podName := c.getPodName(existingMember)
 
 			// Just reuse the old server group location on error, the pod is likely down
-			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName)
+			scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, podName, c.cluster.ServerGroupLabel())
 			if err != nil {
 				scheduledServerGroup = existingGroup.Name
 			}

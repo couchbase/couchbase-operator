@@ -291,6 +291,17 @@ func (cs *ClusterSpec) GetAllServerGroups() []string {
 	return allServerGroups
 }
 
+// ServerGroupLabel returns the node label key used for server-group scheduling.
+// When the serverGroupsLabelOverride annotation is set on the cluster, that key
+// is returned; otherwise the standard topology.kubernetes.io/zone label is used.
+func (c *CouchbaseCluster) ServerGroupLabel() string {
+	if override := c.Spec.ServerGroupsLabelOverride; override != "" {
+		return override
+	}
+
+	return constants.ServerGroupLabel
+}
+
 // ServerGroupsEnabled returns true if any server config contains server group
 // settings or it is defined globally.
 func (cs *ClusterSpec) ServerGroupsEnabled() bool {

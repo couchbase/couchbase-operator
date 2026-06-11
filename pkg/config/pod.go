@@ -279,7 +279,13 @@ func getServerGroupAndImageFromScheduler(k8sClient *client.Client, cbc *v2.Couch
 	}
 
 	image := cbc.Spec.ServerClassCouchbaseImage(&serverClass)
-	serverGroup := pvcState.AvailabilityZone
+
+	// See CreateCouchbasePod: under a server-group label override the recorded group is a placement
+	// group, not the volume's AZ — don't pin it, let the scheduler pick a valid PG within the AZ.
+	serverGroup := ""
+	if cbc.ServerGroupLabel() == constants.ServerGroupLabel {
+		serverGroup = pvcState.RecordedServerGroup
+	}
 
 	if pvcState.Image != "" {
 		image = pvcState.Image

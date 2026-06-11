@@ -52,6 +52,9 @@ type stripeSchedulerImpl struct {
 	// avoidGroups is a list of server groups to avoid when scheduling.
 	avoidGroups map[string]bool
 
+	// serverGroupLabel is the node label key used to identify a pod's server group.
+	serverGroupLabel string
+
 	// mu allows us to lock/unlock goroutines that run concurrently if we need to avoid race conditions when accessing
 	// the scheduler cache
 	mu sync.Mutex
@@ -107,12 +110,12 @@ func (sched *stripeSchedulerImpl) initServerClasses(cluster *couchbasev2.Couchba
 
 // getPodServerGroup extracts the pod's server group from the specification.
 // With hindsight, this should have been metadata e.g. an annotation.
-func getPodServerGroup(pod *v1.Pod) (string, error) {
+func (sched *stripeSchedulerImpl) getPodServerGroup(pod *v1.Pod) (string, error) {
 	if pod.Spec.NodeSelector == nil {
 		return "", fmt.Errorf("%w: node selector not set", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
-	group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	group, ok := pod.Spec.NodeSelector[sched.serverGroupLabel]
 	if ok {
 		return group, nil
 	}
@@ -147,7 +150,7 @@ func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 
 		// Pod has no scheduling information... we're upgrading from a non-scheduled
 		// to a scheduled cluster.
-		group, err := getPodServerGroup(pod)
+		group, err := sched.getPodServerGroup(pod)
 		if err != nil {
 			if _, ok := sched.unschedulableServerClasses[class]; !ok {
 				sched.unschedulableServerClasses[class] = newLexicalServerGroups()
@@ -197,6 +200,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 		unschedulableServerClasses:        serverClassGroupMap{},
 		removableUnscheduledServerClasses: serverClassGroupMap{},
 		removableServerClasses:            serverClassServerRemovalMap{},
+		serverGroupLabel:                  cluster.ServerGroupLabel(),
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {

@@ -2931,6 +2931,17 @@ type ClusterSpec struct {
 	// If all groups fail, a random group is chosen. Only affects pods without existing PVCs.
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 
+	// ServerGroupsLabelOverride overrides the node label key used for server-group
+	// (rack-awareness) scheduling. By default the Operator uses the standard
+	// "topology.kubernetes.io/zone" label. Set this to a custom node label key
+	// (e.g. "eks.amazonaws.com/nodegroup") to distribute pods across EC2 Partition
+	// Placement Groups or GCE placement policies instead of availability zones.
+	// The values listed in serverGroups must be the values of this label on your nodes.
+	// When this is set, every server class must declare its availability zone via a
+	// topology.kubernetes.io/zone node selector in its pod template (spec.servers[].pod), so the
+	// Operator can pin volumes to an AZ and recover/upgrade in place without reading node labels.
+	ServerGroupsLabelOverride string `json:"-" annotation:"serverGroupsLabelOverride"`
+
 	// DEPRECATED - by spec.security.securityContext
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set
