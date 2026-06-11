@@ -3135,17 +3135,19 @@ func TestUpgradeInvalidMemcachedBucket(t *testing.T) {
 
 func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 	testDefs := []testDef{
+		// These tests need a cluster to already exist when the replication is
+		// admitted, so they target replication2 which is created after the cluster.
 		{
 			name:           "TestValidateXDCRReplicationBucketExists",
-			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
+			mutations:      patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: bucket huggy-bear not found`},
+			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket must be valid: bucket huggy-bear not found`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationBucketTypeInvalid",
-			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket2")},
+			mutations:      patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket2")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket2 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: memcached bucket bucket2 cannot be replicated`},
+			expectedErrors: []string{`bucket bucket2 referenced by spec.bucket must be valid: memcached bucket bucket2 cannot be replicated`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
@@ -3154,8 +3156,11 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			expectedErrors: []string{`spec.compressionType`},
 		},
 		{
+			// When a CouchbaseBucket has spec.name set, replications must reference
+			// that explicit name, not the CRD's resource name (which doesn't exist
+			// on the server). This test confirms the operator rejects that mistake.
 			name:           "TestValidateXDCRSourceNamePrecedence",
-			mutations:      patchMap{"replication1": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
+			mutations:      patchMap{"replication3": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.bucket`},
 		},
@@ -3289,17 +3294,19 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`duplicate rule`},
 		},
-		// Test that mobile active bucket cannot be used with cluster version < 7.6.4
+		// Test that mobile active bucket cannot be used with cluster version < 7.6.4.
+		// Targets replication2 so the cluster exists at admission time and the
+		// version check actually runs.
 		{
 			name: "TestValidateMobileActiveBucketInvalidVersion",
 			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.2.6"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication2": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					})},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket0 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: mobile replication requires cluster version 7.6.4 or greater`},
+			expectedErrors: []string{`bucket bucket0 referenced by spec.bucket must be valid: mobile replication requires cluster version 7.6.4 or greater`},
 		},
 	}
 
@@ -3308,25 +3315,27 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 
 func TestCreateCouchbaseReplication(t *testing.T) {
 	testDefs := []testDef{
-		// Test that buckets referenced by a replication must have cross cluster versioning enabled
+		// Test that buckets referenced by a replication must have cross cluster
+		// versioning enabled. Targets replication1 so the cluster exists at admission
+		// time and the check actually runs.
 		{
 			name: "TestValidateXDCRBucketCrossClusterVersioningDisabled",
 			mutations: patchMap{"cluster2": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.6.4").
 				Replace("/status/currentVersion", "7.6.4"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication1": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					})},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket1 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: bucket bucket1 must have cross cluster versioning enabled to be used with mobile replication`},
+			expectedErrors: []string{`bucket bucket1 referenced by spec.bucket must be valid: bucket bucket1 must have cross cluster versioning enabled to be used with mobile replication`},
 		},
 		{
 			name: "TestValidateXDCRWithMobileActive",
 			mutations: patchMap{"cluster2": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.6.4").
 				Replace("/status/currentVersion", "7.6.4"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication1": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					}),
