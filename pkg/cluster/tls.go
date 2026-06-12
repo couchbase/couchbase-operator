@@ -1011,12 +1011,12 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 
 	// Respect cluster-level setting for bare hostname validation when provided.
 	validateBareHostnames := true
-	if c.cluster.Spec.Networking.TLS != nil {
+	if c.cluster.IsTLSEnabled() {
 		validateBareHostnames = c.cluster.Spec.Networking.TLS.ValidateBareHostnames
 	}
 
 	validateShortHostnames := true
-	if c.cluster.Spec.Networking.TLS != nil && c.cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
+	if c.cluster.IsTLSEnabled() && c.cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
 		validateShortHostnames = *c.cluster.Spec.Networking.TLS.ValidateShortHostnames
 	}
 
@@ -1691,7 +1691,7 @@ func (c *Cluster) updateSecuritySettings() error {
 		ClusterEncryptionLevel:  securitySettings.ClusterEncryptionLevel,
 	}
 
-	if c.cluster.Spec.Networking.TLS != nil {
+	if c.cluster.IsTLSEnabled() {
 		var tlsVersion couchbaseutil.TLSVersion
 
 		switch c.cluster.Spec.Networking.TLS.TLSMinimumVersion {

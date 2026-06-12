@@ -172,6 +172,7 @@ func registerTests() {
 		framework.NewTestDef(TestAntiAffinityOn).WithTags(TagSuiteSanity, TagFeatureScheduling),
 		framework.NewTestDef(TestPodResourcesBasic).WithTags(TagSuiteSanity, TagFeatureScheduling),
 		framework.NewTestDef(TestTLSCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureTLS),
+		framework.NewTestDef(TestCreateClusterWithoutTLSButTLSAnnotation).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestPKCS12CreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestMutualTLSCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestXDCRCreateCluster).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureXDCR),

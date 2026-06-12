@@ -12,12 +12,14 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
@@ -53,6 +55,38 @@ func TestTLSCreateCluster(t *testing.T) {
 	// When the cluster is healthy, check the TLS is correctly configured.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestCreateClusterWithoutTLSButTLSAnnotation tests creating a cluster without TLS configuration
+// but with the TLS annotation to ensure the operator doesn't attempt to configure TLS
+// and the cluster is healthy without TLS.
+func TestCreateClusterWithoutTLSButTLSAnnotation(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+
+	// Create the Cluster
+	clusterAnnotations := map[string]string{
+		fmt.Sprintf("%snetworking.tls.validateShortHostnames", annotations.AnnotationPrefix): "false",
+	}
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithClusterAnnotations(clusterAnnotations).MustCreate(t, kubernetes)
+
+	// Ensure that cluster becomes ready
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.AssertTLSNotConfigured(t, kubernetes, cluster)
 
 	// Check the events match what we expect:
 	// * Cluster created
