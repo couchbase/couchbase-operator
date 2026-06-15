@@ -280,8 +280,9 @@ func (c *Cluster) reconcile() error {
 	return nil
 }
 
-// updateFinalReconcileStatus sets status.size (excluding pending-init pods),
-// clears scaling/rebalancing conditions, and sets the balanced/ready conditions.
+// updateFinalReconcileStatus sets status.size (excluding pending-init pods) and the
+// balanced/ready conditions. It clears the scaling and rebalancing conditions, but
+// keeps Scaling/ScalingUp set while async node additions are still pending.
 func (c *Cluster) updateFinalReconcileStatus() {
 	// Count only CBS-initialized members for status.size.  Pods with
 	// PendingInitializationCondition are Running in Kubernetes but have not yet
@@ -297,13 +298,22 @@ func (c *Cluster) updateFinalReconcileStatus() {
 		cbsInitializedSize++
 	}
 	c.cluster.Status.Size = cbsInitializedSize
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+
+	// Pending-init pods are being added in the background,
+	// so a scale up isn't really done yet. Keep the scaling conditions
+	// until they're gone, otherwise the cluster would report "not scaling"
+	// while nodes are still being added. ScalingDown and Rebalancing
+	// aren't driven by pending async adds.
+	pendingInitPods := c.getPendingInitPods()
+	if len(pendingInitPods) == 0 {
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScaling)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
+	}
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingDown)
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionScalingUp)
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionRebalancing)
 
 	// Only mark as balanced when no pods are still pending async CBS initialization.
-	if len(c.getPendingInitPods()) > 0 {
+	if len(pendingInitPods) > 0 {
 		c.cluster.Status.SetUnbalancedCondition()
 	} else {
 		c.cluster.Status.SetBalancedCondition()
