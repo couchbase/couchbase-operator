@@ -1626,6 +1626,23 @@ func MustCheckIfUpgradeOverVersion(t *testing.T, initialVersion, upgradeVersion,
 	return before && after
 }
 
+// MustCheckIsMaintenanceUpgrade returns true when the upgrade stays within the same major.minor
+// version (e.g. 7.0.0 -> 7.0.5). The first pod upgraded will not become the orchestrator node
+// if upgrading between maintenance versions.
+func MustCheckIsMaintenanceUpgrade(t *testing.T, initialVersion, upgradeVersion string) bool {
+	iV, err := couchbaseutil.NewVersion(initialVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	uV, err := couchbaseutil.NewVersion(upgradeVersion)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return iV.Major() == uV.Major() && iV.Minor() == uV.Minor()
+}
+
 func MustVerifyDataServerSettingsMemcachedTCPSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, tcpUserTimeout, tcpKeepAliveProbes, tcpKeepAliveInterval, tcpKeepAliveIdle int, timeout time.Duration) {
 	callback := func() error {
 		client, err := CreateAdminConsoleClient(k8s, cluster)
