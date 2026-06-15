@@ -264,11 +264,12 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 
 	// Validate XDCR replication buckets, mark broken replications as failed
 	// so they are skipped during reconciliation without blocking the cluster.
+	// Errors are logged only, we do not append to validationErrors, otherwise the
+	// cluster's ClusterConditionError would be set and the cluster would be
+	// treated as failed even though the rest of it is healthy.
 	xdcrErrs, failedReplications := validationrunner.ValidateXDCRReplicationBuckets(c)
 	for _, err := range xdcrErrs {
-		log.Error(err, "XDCR validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
-
-		validationErrors = append(validationErrors, err.Error())
+		log.Error(err, "XDCR validation failed; skipping affected replication, cluster reconciliation continues.", "cluster", c.GetCouchbaseCluster().NamespacedName())
 	}
 
 	c.SetFailedValidation("replication", failedReplications)

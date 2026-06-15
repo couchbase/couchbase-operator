@@ -1902,7 +1902,7 @@ func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).Upgradable()
+	framework.Requires(t, kubernetes).Upgradable().AtLeastVersion("7.6.0")
 
 	classSize := constants.Size2
 
@@ -2111,7 +2111,7 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).ServerGroups(2)
+	framework.Requires(t, kubernetes).ServerGroups(2).AtLeastVersion("7.6.0")
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
@@ -2280,6 +2280,8 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 

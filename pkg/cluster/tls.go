@@ -15,6 +15,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -1010,12 +1011,12 @@ func (c *Cluster) getVerifiedServerTLSData(rootCAs [][]byte) ([]byte, []byte, []
 
 	// Respect cluster-level setting for bare hostname validation when provided.
 	validateBareHostnames := true
-	if c.cluster.Spec.Networking.TLS != nil {
+	if c.cluster.IsTLSEnabled() {
 		validateBareHostnames = c.cluster.Spec.Networking.TLS.ValidateBareHostnames
 	}
 
 	validateShortHostnames := true
-	if c.cluster.Spec.Networking.TLS != nil && c.cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
+	if c.cluster.IsTLSEnabled() && c.cluster.Spec.Networking.TLS.ValidateShortHostnames != nil {
 		validateShortHostnames = *c.cluster.Spec.Networking.TLS.ValidateShortHostnames
 	}
 
@@ -1697,7 +1698,7 @@ func (c *Cluster) updateSecuritySettings() error {
 		ClusterEncryptionLevel:  securitySettings.ClusterEncryptionLevel,
 	}
 
-	if c.cluster.Spec.Networking.TLS != nil {
+	if c.cluster.IsTLSEnabled() {
 		var tlsVersion couchbaseutil.TLSVersion
 
 		switch c.cluster.Spec.Networking.TLS.TLSMinimumVersion {
@@ -2003,8 +2004,17 @@ func (c *Cluster) shouldRotateExpiredServerCerts() bool {
 
 	// Given we can't guarantee that the shadow certs are currently the ones in use by the server, we need to check the
 	// certificates presented by each recognised member for expiration.
+	// Older versions of CB server require a client cert to be presented during a TLS handshake.
+	var clientCert *tls.Certificate
+	if clientTLS.ClientAuth != nil && !c.checkCertExpiration(clientTLS.ClientAuth.Cert) {
+		cert, err := tls.X509KeyPair(clientTLS.ClientAuth.Cert, clientTLS.ClientAuth.Key)
+		if err == nil {
+			clientCert = &cert
+		}
+	}
+
 	for _, member := range c.readyMembers() {
-		certificates, err := netutil.GetTLSHandshakeCertificateChainInsecure(member.GetHostPortTLS())
+		certificates, err := netutil.GetTLSHandshakeCertificateChainInsecure(member.GetHostPortTLS(), clientCert)
 		if err != nil {
 			log.Error(err, "Failed to get node certificates using a TLS handshake when attempting to check for expired certs", "cluster", c.namespacedName(), "member", member.Name())
 		}
@@ -2016,7 +2026,7 @@ func (c *Cluster) shouldRotateExpiredServerCerts() bool {
 
 		// If a member presents any certificates which have expired, we should rotate them all.
 		// We don't need to compare the in-use certificate chain to the ones in the tlsCache as they will not be loaded into the cache unless they are valid
-		// and we'll bail out fo the reconcile loop before we get here.
+		// and we'll bail out of the reconcile loop before we get here.
 		for _, certificate := range certificates {
 			if c.checkx509CertExpiration(certificate) {
 				return true

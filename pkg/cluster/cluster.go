@@ -124,7 +124,8 @@ type Cluster struct {
 	// the cache implemented by the Kubernetes client library, this one
 	// does not rate-limit and discard events, which would cause non-
 	// determinism in testing.
-	eventCache *lru.Cache
+	eventCache   *lru.Cache
+	eventCacheMu sync.Mutex
 
 	// state is the persistent storage associated with the cluster.  This
 	// should be used judiciously, and where possible state observed from
@@ -1278,10 +1279,12 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 // raiseEventCached raises an event but first checks an LRU cache and optionally
 // aggregates events together.
 func (c *Cluster) raiseEventCached(event *v1.Event) {
+	c.eventCacheMu.Lock()
+	defer c.eventCacheMu.Unlock()
+
 	key := strings.Join([]string{event.Type, event.Reason, event.Message}, "")
 
-	entry, ok := c.eventCache.Get(key)
-	if ok {
+	if entry, ok := c.eventCache.Get(key); ok {
 		e := entry.(*v1.Event)
 		if time.Since(e.LastTimestamp.Time) < 10*time.Minute {
 			e.Count++

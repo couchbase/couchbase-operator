@@ -918,7 +918,7 @@ func (c *Cluster) reconcileUnmanagedBucketsBackends() error {
 		log.Info("Updating storage backend of unmanaged bucket", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName, "target-backend", targetBackend)
 
 		bucket.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(targetBackend)
-		if err := couchbaseutil.UpdateBucket(&bucket).On(c.api, c.readyMembers()); err != nil {
+		if err := couchbaseutil.UpdateBucketDuringMigration(&bucket).On(c.api, c.readyMembers()); err != nil {
 			log.Error(err, "Bucket update failed", "cluster", c.namespacedName(), "bucket-name", bucket.BucketName, "target-backend", targetBackend)
 			errs = append(errs, err)
 		}

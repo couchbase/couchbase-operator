@@ -680,3 +680,23 @@ spec:
   fullName: Administrator
   authDomain: local
   authSecret: test-example-auth
+---
+# Two extra replications placed after the cluster so the cluster exists when
+# these replications are admitted. Tests that need a working cluster use these.
+# Each uses a different remoteBucket from the replications above to keep the
+# XDCR rules unique.
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication2
+spec:
+  bucket: bucket0
+  remoteBucket: bucket0-remote
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication3
+spec:
+  bucket: explicit-name
+  remoteBucket: bucket0-remote-explicit

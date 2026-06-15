@@ -731,21 +731,32 @@ func TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing(t *tes
 
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
-	magmaServicesSupported, err := couchbaseutil.VersionAfter(cbVersion, "7.2.1")
+	magmaServicesSupported, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0")
 	if err != nil {
 		e2eutil.Die(t, err)
+	}
+
+	additionMagmaServicesSupported := false
+	if magmaServicesSupported {
+		additionMagmaServicesSupported, err = couchbaseutil.VersionAfter(cbVersion, "7.1.2")
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
 	}
 
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 	}
 
-	if magmaServicesSupported {
+	switch {
+	case magmaServicesSupported && additionMagmaServicesSupported:
 		e2eutil.MustNewBucket(t, kubernetes, bucket)
 		e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
-
 		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonBucketCreated})
-	} else {
+	case !magmaServicesSupported:
+		e2eutil.MustGetAdmissionFailureOnCreateBucket(t, kubernetes, bucket, fmt.Sprintf("magma storage backend requires Couchbase Server version 7.1.0 or later for cluster: %s", cluster.NamespacedName()))
+		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+	default:
 		// Bucket should not be created if we don't have a high enough cb version when running the services
 		e2eutil.MustGetAdmissionFailureOnCreateBucket(t, kubernetes, bucket, "search, eventing or analytics services cannot be used with magma buckets below CB Server 7.1.2.")
 		e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)

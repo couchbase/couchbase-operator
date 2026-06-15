@@ -1112,7 +1112,13 @@ func createReadinessProbe(port int, readinessConfig PodReadinessConfig) *v1.Prob
 		FailureThreshold:    1,
 		ProbeHandler: v1.ProbeHandler{
 			Exec: &v1.ExecAction{
-				Command: []string{"bash", "-c", fmt.Sprintf("timeout 3 bash -c '</dev/tcp/::1/%d' || timeout 3 bash -c '</dev/tcp/127.0.0.1/%d'", port, port)},
+				Command: []string{
+					"bash", "-c",
+					fmt.Sprintf(
+						"</dev/tcp/::1/%d || </dev/tcp/127.0.0.1/%d",
+						port, port,
+					),
+				},
 			},
 		},
 	}
@@ -2720,7 +2726,9 @@ func addOptionalLabelsToPodMetric(cluster *couchbasev2.CouchbaseCluster, existin
 func FlagPodReady(client *client.Client, name string) error {
 	pod, found := client.Pods.Get(name)
 	if !found {
-		return fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+		// Pod already deleted (by an external actor such as chaos testing)
+		// nothing to mark unready, so treat as a no-op.
+		return nil
 	}
 
 	readinessCondition := GetPodCondition(pod, PodReadinessCondition)

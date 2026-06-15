@@ -169,6 +169,23 @@ status:
   currentVersion: 8.0.0
   size: 1
 ---
+# An extra replication placed after cluster1 so the cluster exists when this
+# replication is admitted. Tests that need a working cluster use this one.
+# Uses a different remoteBucket from replication0 to keep the XDCR rules unique.
+apiVersion: couchbase.com/v2
+kind: CouchbaseReplication
+metadata:
+  name: replication1
+spec:
+  bucket: bucket1
+  remoteBucket: bucket1-remote
+  conflictLogging:
+    enabled: true
+    logCollection:
+      bucket: bucket2
+      scope: scope1
+      collection: collection1
+---
 apiVersion: couchbase.com/v2
 kind: CouchbaseEncryptionKey
 metadata:

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -52,7 +53,10 @@ func (c *Cluster) checkTargetClusterVersion() error {
 	hasEqualVersion := false
 
 	for _, node := range clusterInfo.Nodes {
-		nodeVersion, err := couchbaseutil.NewVersion(node.Version)
+		// Strip build number and edition (e.g. "7.0.5-7659-enterprise" → "7.0.5") so that
+		// semver-only image tags compare correctly against API-reported node versions.
+		nodeVersionStr, _, _ := strings.Cut(node.Version, "-")
+		nodeVersion, err := couchbaseutil.NewVersion(nodeVersionStr)
 		if err != nil {
 			return err
 		}

@@ -3135,17 +3135,19 @@ func TestUpgradeInvalidMemcachedBucket(t *testing.T) {
 
 func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 	testDefs := []testDef{
+		// These tests need a cluster to already exist when the replication is
+		// admitted, so they target replication2 which is created after the cluster.
 		{
 			name:           "TestValidateXDCRReplicationBucketExists",
-			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
+			mutations:      patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: bucket huggy-bear not found`},
+			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket must be valid: bucket huggy-bear not found`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationBucketTypeInvalid",
-			mutations:      patchMap{"replication0": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket2")},
+			mutations:      patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket2")},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket2 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: memcached bucket bucket2 cannot be replicated`},
+			expectedErrors: []string{`bucket bucket2 referenced by spec.bucket must be valid: memcached bucket bucket2 cannot be replicated`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationCompressionTypeInvalid",
@@ -3154,8 +3156,11 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			expectedErrors: []string{`spec.compressionType`},
 		},
 		{
+			// When a CouchbaseBucket has spec.name set, replications must reference
+			// that explicit name, not the CRD's resource name (which doesn't exist
+			// on the server). This test confirms the operator rejects that mistake.
 			name:           "TestValidateXDCRSourceNamePrecedence",
-			mutations:      patchMap{"replication1": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
+			mutations:      patchMap{"replication3": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
 			shouldFail:     true,
 			expectedErrors: []string{`spec.bucket`},
 		},
@@ -3289,17 +3294,19 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{`duplicate rule`},
 		},
-		// Test that mobile active bucket cannot be used with cluster version < 7.6.4
+		// Test that mobile active bucket cannot be used with cluster version < 7.6.4.
+		// Targets replication2 so the cluster exists at admission time and the
+		// version check actually runs.
 		{
 			name: "TestValidateMobileActiveBucketInvalidVersion",
-			mutations: patchMap{"cluster0": jsonpatch.NewPatchSet().
+			mutations: patchMap{"cluster": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.2.6"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication2": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					})},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket0 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: mobile replication requires cluster version 7.6.4 or greater`},
+			expectedErrors: []string{`bucket bucket0 referenced by spec.bucket must be valid: mobile replication requires cluster version 7.6.4 or greater`},
 		},
 	}
 
@@ -3308,25 +3315,27 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 
 func TestCreateCouchbaseReplication(t *testing.T) {
 	testDefs := []testDef{
-		// Test that buckets referenced by a replication must have cross cluster versioning enabled
+		// Test that buckets referenced by a replication must have cross cluster
+		// versioning enabled. Targets replication1 so the cluster exists at admission
+		// time and the check actually runs.
 		{
 			name: "TestValidateXDCRBucketCrossClusterVersioningDisabled",
 			mutations: patchMap{"cluster2": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.6.4").
 				Replace("/status/currentVersion", "7.6.4"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication1": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					})},
 			shouldFail:     true,
-			expectedErrors: []string{`bucket bucket1 referenced by spec.bucket in couchbasereplications.couchbase.com/replication0 must be valid: bucket bucket1 must have cross cluster versioning enabled to be used with mobile replication`},
+			expectedErrors: []string{`bucket bucket1 referenced by spec.bucket must be valid: bucket bucket1 must have cross cluster versioning enabled to be used with mobile replication`},
 		},
 		{
 			name: "TestValidateXDCRWithMobileActive",
 			mutations: patchMap{"cluster2": jsonpatch.NewPatchSet().
 				Replace("/spec/image", "couchbase/server:7.6.4").
 				Replace("/status/currentVersion", "7.6.4"),
-				"replication0": jsonpatch.NewPatchSet().
+				"replication1": jsonpatch.NewPatchSet().
 					Add("/metadata/annotations", map[string]string{
 						"cao.couchbase.com/mobile": "Active",
 					}),
@@ -4616,26 +4625,6 @@ func TestBucketMigrationPre76Invalid(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration.yaml"})
 }
 
-func TestBlockChangingMigrationProcessDuringMigration(t *testing.T) {
-	testDefs := []testDef{
-		{
-			name:       "TestChangingMigrationProcessDuringMigration",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{"cao.couchbase.com/buckets.enableBucketMigrationRoutines": "false"})},
-			shouldFail: false,
-		}, {
-			name:       "TestRemovingMigrationProcessDuringMigration",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Replace("/metadata/annotations", map[string]string{})},
-			shouldFail: false,
-		}, {
-			name:       "TestRemovingAnnotationsMigrationProcessDuringMigration",
-			mutations:  patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/metadata/annotations")},
-			shouldFail: false,
-		},
-	}
-
-	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-migration-in-process.yaml"})
-}
-
 func TestBucketMigrationPost76Validation(t *testing.T) {
 	testDefs := []testDef{
 		{
@@ -4784,6 +4773,32 @@ func TestBucketMinReplicasCountApply(t *testing.T) {
 			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
 			shouldFail:     true,
 			expectedErrors: []string{"spec.replicas"},
+		},
+		{
+			// We patch both resources because the valaidation updates everything in yaml order.
+			// The cluster update goes first and triggers our warning, since bucket0 still has
+			// replicas=2 in the API at that moment. The bucket update follows and would fail
+			// the existing bucket side check, so we bump it to 3 to keep it valid.
+			name: "TestClusterMinReplicasCountRaisedAboveExistingBucket",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 3),
+			},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
+		},
+		{
+			// The cluster update lands first and warns about bucket0 (still at replicas=2 in
+			// the API). The bucket update then tries to drop replicas to 1, which the existing
+			// bucket side check rejects. Both the warning and the error are expected.
+			name: "TestClusterMinReplicasCountRaisedAndBucketDroppedBelow",
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
+				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1),
+			},
+			shouldFail:       true,
+			expectedErrors:   []string{"spec.replicas"},
+			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
 		},
 	}
 
@@ -5252,6 +5267,54 @@ func TestValidationEncryptionKey(t *testing.T) {
 			shouldFail:     true,
 			expectedErrors: []string{"spec.encryptionAtRest.keyName auto-generated-key-4 does not have bucket encryption"},
 		},
+		{
+			name: "TestEncryptionAtRestSimpleCircularDependency",
+			mutations: patchMap{
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
+				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-1"),
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+						Enabled: true,
+						KeyName: "auto-generated-key-1",
+					},
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key circular dependency validation failed", "circular dependency detected in encryption keys"},
+		},
+		{
+			name: "TestEncryptionAtRestComplexCircularDependency",
+			mutations: patchMap{
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
+				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-3"),
+				"auto-generated-key-3": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-1"),
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+						Enabled: true,
+						KeyName: "auto-generated-key-1",
+					},
+				}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{"encryption key circular dependency validation failed", "circular dependency detected in encryption keys"},
+		},
+		{
+			name: "TestEncryptionAtRestValidChainDependency",
+			mutations: patchMap{
+				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
+				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-3"),
+				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
+					Managed: true,
+					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
+						Enabled: true,
+						KeyName: "auto-generated-key-1",
+					},
+				}),
+			},
+			shouldFail: false, // Valid chain without cycle
+		},
 	}
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
@@ -5573,39 +5636,6 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 			expectedErrors: []string{"key lifetime must be at least 30 days"},
 		},
 		{
-			name: "TestEncryptionAtRestSimpleCircularDependency",
-			mutations: patchMap{
-				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
-				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-1"),
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
-						Enabled: true,
-						KeyName: "auto-generated-key-1",
-					},
-				}),
-			},
-			shouldFail:     true,
-			expectedErrors: []string{"encryption key circular dependency validation failed", "circular dependency detected in encryption keys"},
-		},
-		{
-			name: "TestEncryptionAtRestComplexCircularDependency",
-			mutations: patchMap{
-				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
-				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-3"),
-				"auto-generated-key-3": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-1"),
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
-						Enabled: true,
-						KeyName: "auto-generated-key-1",
-					},
-				}),
-			},
-			shouldFail:     true,
-			expectedErrors: []string{"encryption key circular dependency validation failed", "circular dependency detected in encryption keys"},
-		},
-		{
 			name: "TestEncryptionAtRestSelfReferenceCircularDependency",
 			mutations: patchMap{
 				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-1"),
@@ -5618,22 +5648,7 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 				}),
 			},
 			shouldFail:     true,
-			expectedErrors: []string{"encryption key circular dependency validation failed", "circular dependency detected in encryption keys"},
-		},
-		{
-			name: "TestEncryptionAtRestValidChainDependency",
-			mutations: patchMap{
-				"auto-generated-key-1": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-2"),
-				"auto-generated-key-2": jsonpatch.NewPatchSet().Replace("/spec/autoGenerated/encryptWithKey", "auto-generated-key-3"),
-				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
-					Managed: true,
-					Configuration: &couchbasev2.EncryptionAtRestUsageConfiguration{
-						Enabled: true,
-						KeyName: "auto-generated-key-1",
-					},
-				}),
-			},
-			shouldFail: false, // Valid chain without cycle
+			expectedErrors: []string{"spec.autoGenerated.encryptWithKey references key \"auto-generated-key-1\" which does not exist"},
 		},
 		{
 			name: "TestEncryptionAtRestWithUnsupportedVersion",

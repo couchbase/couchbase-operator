@@ -1697,6 +1697,9 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 		eventschema.Optional{
 			Validator: eventschema.Sequence{
@@ -1706,7 +1709,9 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 				},
 			},
 		},
-		eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -2787,11 +2792,11 @@ func testBackupCustomObjectEndpoint(t *testing.T, withCA, legacy bool) {
 	if legacy {
 		restore := e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
 		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	} else {
 		restore := e2eutil.NewRestore(backup).FromObjStore("s3://"+s3BucketName).WithObjStoreSecret(s3secret).WithCustomStoreURL(minio.Endpoint).WithCustomStoreCert(minio.CASecret).MustCreate(t, kubernetes)
 		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	}
 
 	// restore job is too fast, just validate bucket item count
@@ -3596,7 +3601,7 @@ func TestBackupAndRestorePreserveRecord(t *testing.T) {
 		// create new restore with preserveRestoreRecord: true
 		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).WithPreserveRestoreRecord(true).MustCreate(t, kubernetes)
 		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 		// restore job is too fast, just validate bucket item count
 		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
@@ -3628,7 +3633,7 @@ func TestBackupAndRestorePreserveRecord(t *testing.T) {
 		// create new restore with default behavior (preserveRestoreRecord: false)
 		restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).MustCreate(t, kubernetes)
 		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+		e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 		// restore job is too fast, just validate bucket item count
 		e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)

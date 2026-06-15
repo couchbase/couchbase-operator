@@ -308,6 +308,21 @@ func applyAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[str
 	}
 }
 
+// applyClusterAnnotations optionally applies custom annotations to the cluster CRD itself.
+func applyClusterAnnotations(cluster *couchbasev2.CouchbaseCluster, annotations map[string]string) {
+	if annotations == nil {
+		return
+	}
+
+	if cluster.ObjectMeta.Annotations == nil {
+		cluster.ObjectMeta.Annotations = make(map[string]string)
+	}
+
+	for k, v := range annotations {
+		cluster.ObjectMeta.Annotations[k] = v
+	}
+}
+
 func applyCloudNativeGateway(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.CloudNativeGateway) {
 	if config == nil {
 		return
@@ -353,6 +368,17 @@ type ClusterOptions struct {
 	S3UseIAM bool
 
 	Annotations map[string]string
+
+	// ClusterAnnotations are annotations to be applied to the cluster CRD itself
+	// To apply annotations to the pods, use the Annotations field instead.
+	ClusterAnnotations map[string]string
+}
+
+// WithClusterAnnotations defines a cluster with annotations set on the cluster CRD itself.
+func (o *ClusterOptions) WithClusterAnnotations(annotations map[string]string) *ClusterOptions {
+	o.ClusterAnnotations = annotations
+
+	return o
 }
 
 // WithPodAnnotations defines a cluster with annotations set on all pods.
@@ -626,6 +652,7 @@ func (o *ClusterOptions) Generate(k8s *types.Cluster) *couchbasev2.CouchbaseClus
 	applyLogStreaming(cluster, o.LogStreaming)
 	applyAuditing(cluster, o.AuditConfiguration)
 	applyAnnotations(cluster, o.Annotations)
+	applyClusterAnnotations(cluster, o.ClusterAnnotations)
 	applyCloudNativeGateway(cluster, o.CloudNativeGateway)
 
 	return cluster
@@ -1531,6 +1558,27 @@ func TLSCheckForCluster(k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluste
 func MustCheckClusterTLS(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, ctx *TLSContext, timeout time.Duration) {
 	if err := TLSCheckForCluster(k8s, cluster, ctx, false, timeout); err != nil {
 		Die(t, err)
+	}
+}
+
+// AssertTLSNotConfigured ensures that the operator and the underlying pods
+// are not configured for TLS.
+func AssertTLSNotConfigured(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) {
+	if cluster.IsTLSEnabled() {
+		Die(t, fmt.Errorf("Expected IsTLSEnabled() to be false, but it was true"))
+	}
+
+	list, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), ClusterListOpt(cluster))
+	if err != nil {
+		Die(t, fmt.Errorf("failed to list pods for cluster %s: %w", cluster.Name, err))
+	}
+
+	for _, pod := range list.Items {
+		for _, vol := range pod.Spec.Volumes {
+			if vol.Name == "couchbase-server-tls" {
+				Die(t, fmt.Errorf("Pod %s has TLS volume 'couchbase-server-tls' mounted unexpectedly", pod.Name))
+			}
+		}
 	}
 }
 

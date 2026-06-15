@@ -2583,32 +2583,45 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 	}
 
 	candidates = couchbaseutil.MemberSet{}
-
+	managedBuckets := c.cluster.Spec.Buckets.Managed
 	for _, bucket := range clusterBuckets {
-		spec := bucketMap[bucket.BucketName]
+		var spec couchbaseutil.Bucket
+		if managedBuckets {
+			spec = bucketMap[bucket.BucketName]
+		}
 
 		for _, node := range bucket.Nodes {
-			// A non-empty value means that node's vBuckets still carry the old
-			// backend/eviction-policy and a migration is in progress.
-			if node.StorageBackend == "" && node.EvictionPolicy == "" {
+			storageBackendMigrating := node.StorageBackend != ""
+			evictionPolicyMigrating := node.EvictionPolicy != ""
+			if !storageBackendMigrating && !evictionPolicyMigrating {
 				continue
 			}
 
 			candidates.Add(c.members[node.HostName.GetMemberName()])
 
-			if node.StorageBackend != "" {
+			// Track whether any node still carries an old storage backend. Only
+			// storage-backend migrations require the restricted bucket API, so the
+			// BucketMigrating condition is gated on this (eviction-only migrations
+			// must not set it).
+			if storageBackendMigrating {
 				hasStorageBackendOverrides = true
 			}
 
-			if node.EvictionPolicy != "" {
+			if evictionPolicyMigrating {
 				hasEvictionOverrides = true
 			}
 
-			// If the node's current vBucket format differs from spec, a
-			// swap-rebalance is required to move the data.  If it already matches
-			// spec the server just needs a corrective REST push — no pod ejection.
-			if (node.StorageBackend != "" && node.StorageBackend != string(spec.BucketStorageBackend)) ||
-				(node.EvictionPolicy != "" && node.EvictionPolicy != spec.EvictionPolicy) {
+			// If not managing buckets, any ongoing migration requires a swap.
+			if !managedBuckets {
+				swapsNeeded = true
+				continue
+			}
+
+			// If managing buckets, check if the ongoing migration mismatches the spec and therefore requires a swap to align.
+			backendMismatch := storageBackendMigrating && node.StorageBackend != string(spec.BucketStorageBackend)
+			evictionMismatch := evictionPolicyMigrating && node.EvictionPolicy != spec.EvictionPolicy
+
+			if backendMismatch || evictionMismatch {
 				swapsNeeded = true
 			}
 		}
@@ -2661,13 +2674,26 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 		return nil
 	}
 
-	// Set conditions based on which types of per-node overrides exist.
-	// BucketMigrating: storage backend overrides → reconcileBuckets uses restricted API.
-	// BucketEvictionMigrating: eviction policy overrides → informational, does not restrict fields.
-	if hasStorageBackendOverrides {
-		r.c.cluster.Status.SetBucketMigrationCondition()
+	// Only advertise the migration condition when there are storage-backend overrides
+	// AND the operator is actually driving the migration. The operator is driving it
+	// when the buckets are managed — reconcileBuckets pushes corrective updates via the
+	// restricted migration-safe API even when swap routines are off — or when migration
+	// routines are enabled, in which case the operator swap-rebalances even unmanaged buckets.
+	operatorDrivingMigration := c.cluster.Spec.Buckets.Managed || c.cluster.Spec.Buckets.EnableBucketMigrationRoutines
+
+	if hasStorageBackendOverrides && operatorDrivingMigration {
+		// Persist before any swap pod is created so an external observer (and the
+		// CouchbaseCluster DAC's upgrade-during-migration block) sees the condition.
+		// Done above the EnableBucketMigrationRoutines guard because reconcileBuckets
+		// also reads the condition to pick the migration-safe REST API.
+		if !c.cluster.HasCondition(couchbasev2.ClusterConditionBucketMigration) {
+			c.cluster.Status.SetBucketMigrationCondition()
+			if err := c.updateCRStatus(); err != nil {
+				return err
+			}
+		}
 	} else {
-		r.c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
+		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionBucketMigration)
 	}
 
 	if hasEvictionOverrides {

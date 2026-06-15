@@ -4693,6 +4693,7 @@ type XDCRGlobalSettings struct {
 	// +kubebuilder:validation:Enum=Error;Info;Debug;Trace
 	LogLevel *string `json:"logLevel,omitempty"`
 
+	// DEPRECATED: This should be set per-replication.
 	// Mobile enables mobile (Sync Gateway) active-active mode.
 	// This field must be one of "Active" or "Off", defaulting to "Off".
 	// +kubebuilder:validation:Enum=Off;Active
