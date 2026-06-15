@@ -23,16 +23,40 @@ import (
 // vtypes.ResourceCacheProvider interface. The informer caches are always warm so
 // every call is a cache hit and the Init* methods are no-ops.
 type operatorCacheAdapter struct {
-	collections      *client.CouchbaseCollectionCache
-	collectionGroups *client.CouchbaseCollectionGroupCache
-	buckets          *client.CouchbaseBucketCache
+	collections           *client.CouchbaseCollectionCache
+	collectionGroups      *client.CouchbaseCollectionGroupCache
+	buckets               *client.CouchbaseBucketCache
+	ephemeralBuckets      *client.CouchbaseEphemeralBucketCache
+	memcachedBuckets      *client.CouchbaseMemcachedBucketCache
+	scopes                *client.CouchbaseScopeCache
+	scopeGroups           *client.CouchbaseScopeGroupCache
+	replications          *client.CouchbaseReplicationCache
+	users                 *client.CouchbaseUserCache
+	groups                *client.CouchbaseGroupCache
+	roleBindings          *client.CouchbaseRoleBindingCache
+	backups               *client.CouchbaseBackupCache
+	backupRestores        *client.CouchbaseBackupRestoreCache
+	migrationReplications *client.CouchbaseMigrationReplicationCache
+	encryptionKeys        *client.CouchbaseEncryptionKeyCache
 }
 
 func newOperatorCacheAdapter(k8s *client.Client) *operatorCacheAdapter {
 	return &operatorCacheAdapter{
-		collections:      k8s.CouchbaseCollections,
-		collectionGroups: k8s.CouchbaseCollectionGroups,
-		buckets:          k8s.CouchbaseBuckets,
+		collections:           k8s.CouchbaseCollections,
+		collectionGroups:      k8s.CouchbaseCollectionGroups,
+		buckets:               k8s.CouchbaseBuckets,
+		ephemeralBuckets:      k8s.CouchbaseEphemeralBuckets,
+		memcachedBuckets:      k8s.CouchbaseMemcachedBuckets,
+		scopes:                k8s.CouchbaseScopes,
+		scopeGroups:           k8s.CouchbaseScopeGroups,
+		replications:          k8s.CouchbaseReplications,
+		users:                 k8s.CouchbaseUsers,
+		groups:                k8s.CouchbaseGroups,
+		roleBindings:          k8s.CouchbaseRoleBindings,
+		backups:               k8s.CouchbaseBackups,
+		backupRestores:        k8s.CouchbaseBackupRestores,
+		migrationReplications: k8s.CouchbaseMigrationReplications,
+		encryptionKeys:        k8s.CouchbaseEncryptionKeys,
 	}
 }
 
@@ -86,6 +110,11 @@ func (a *operatorCacheAdapter) InitBucketCache(_ string, _ func() (*couchbasev2.
 	return nil
 }
 
+// Noop.
+func (a *operatorCacheAdapter) InitEphemeralBucketCache(_ string, _ func() (*couchbasev2.CouchbaseEphemeralBucketList, error)) error {
+	return nil
+}
+
 func (a *operatorCacheAdapter) GetCollection(_ string, name string) (*couchbasev2.CouchbaseCollection, bool, error) {
 	col, ok := a.collections.Get(name)
 	return col, ok, nil
@@ -123,4 +152,215 @@ func (a *operatorCacheAdapter) GetBuckets(_ string, selector *metav1.LabelSelect
 		return nil, err
 	}
 	return &couchbasev2.CouchbaseBucketList{Items: items}, nil
+}
+
+func (a *operatorCacheAdapter) GetEphemeralBucket(_ string, name string) (*couchbasev2.CouchbaseEphemeralBucket, bool, error) {
+	bucket, ok := a.ephemeralBuckets.Get(name)
+	return bucket, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetEphemeralBuckets(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
+	items, err := listFiltered(a.ephemeralBuckets.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseEphemeralBucketList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitMemcachedBucketCache(_ string, _ func() (*couchbasev2.CouchbaseMemcachedBucketList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetMemcachedBucket(_ string, name string) (*couchbasev2.CouchbaseMemcachedBucket, bool, error) {
+	bucket, ok := a.memcachedBuckets.Get(name)
+	return bucket, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetMemcachedBuckets(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
+	items, err := listFiltered(a.memcachedBuckets.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseMemcachedBucketList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitScopeCache(_ string, _ func() (*couchbasev2.CouchbaseScopeList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetScope(_ string, name string) (*couchbasev2.CouchbaseScope, bool, error) {
+	scope, ok := a.scopes.Get(name)
+	return scope, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetScopes(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error) {
+	items, err := listFiltered(a.scopes.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseScopeList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitScopeGroupCache(_ string, _ func() (*couchbasev2.CouchbaseScopeGroupList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetScopeGroup(_ string, name string) (*couchbasev2.CouchbaseScopeGroup, bool, error) {
+	group, ok := a.scopeGroups.Get(name)
+	return group, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetScopeGroups(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeGroupList, error) {
+	items, err := listFiltered(a.scopeGroups.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseScopeGroupList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitReplicationCache(_ string, _ func() (*couchbasev2.CouchbaseReplicationList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetReplication(_ string, name string) (*couchbasev2.CouchbaseReplication, bool, error) {
+	replication, ok := a.replications.Get(name)
+	return replication, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetReplications(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error) {
+	items, err := listFiltered(a.replications.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseReplicationList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitUserCache(_ string, _ func() (*couchbasev2.CouchbaseUserList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetUser(_ string, name string) (*couchbasev2.CouchbaseUser, bool, error) {
+	user, ok := a.users.Get(name)
+	return user, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetUsers(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseUserList, error) {
+	items, err := listFiltered(a.users.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseUserList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitGroupCache(_ string, _ func() (*couchbasev2.CouchbaseGroupList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetGroup(_ string, name string) (*couchbasev2.CouchbaseGroup, bool, error) {
+	group, ok := a.groups.Get(name)
+	return group, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetGroups(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseGroupList, error) {
+	items, err := listFiltered(a.groups.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseGroupList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitRoleBindingCache(_ string, _ func() (*couchbasev2.CouchbaseRoleBindingList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetRoleBinding(_ string, name string) (*couchbasev2.CouchbaseRoleBinding, bool, error) {
+	roleBinding, ok := a.roleBindings.Get(name)
+	return roleBinding, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetRoleBindings(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleBindingList, error) {
+	items, err := listFiltered(a.roleBindings.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseRoleBindingList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitBackupCache(_ string, _ func() (*couchbasev2.CouchbaseBackupList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetBackup(_ string, name string) (*couchbasev2.CouchbaseBackup, bool, error) {
+	backup, ok := a.backups.Get(name)
+	return backup, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetBackups(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error) {
+	items, err := listFiltered(a.backups.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseBackupList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitBackupRestoreCache(_ string, _ func() (*couchbasev2.CouchbaseBackupRestoreList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetBackupRestore(_ string, name string) (*couchbasev2.CouchbaseBackupRestore, bool, error) {
+	restore, ok := a.backupRestores.Get(name)
+	return restore, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetBackupRestores(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error) {
+	items, err := listFiltered(a.backupRestores.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseBackupRestoreList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitMigrationReplicationCache(_ string, _ func() (*couchbasev2.CouchbaseMigrationReplicationList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetMigrationReplication(_ string, name string) (*couchbasev2.CouchbaseMigrationReplication, bool, error) {
+	replication, ok := a.migrationReplications.Get(name)
+	return replication, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetMigrationReplications(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error) {
+	items, err := listFiltered(a.migrationReplications.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseMigrationReplicationList{Items: items}, nil
+}
+
+// Noop.
+func (a *operatorCacheAdapter) InitEncryptionKeyCache(_ string, _ func() (*couchbasev2.CouchbaseEncryptionKeyList, error)) error {
+	return nil
+}
+
+func (a *operatorCacheAdapter) GetEncryptionKey(_ string, name string) (*couchbasev2.CouchbaseEncryptionKey, bool, error) {
+	key, ok := a.encryptionKeys.Get(name)
+	return key, ok, nil
+}
+
+func (a *operatorCacheAdapter) GetEncryptionKeys(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error) {
+	items, err := listFiltered(a.encryptionKeys.List(), selector)
+	if err != nil {
+		return nil, err
+	}
+	return &couchbasev2.CouchbaseEncryptionKeyList{Items: items}, nil
 }

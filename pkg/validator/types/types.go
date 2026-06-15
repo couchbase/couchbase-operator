@@ -138,24 +138,24 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *m
 
 // GetCouchbaseEphemeralBuckets returns all ephemeral buckets for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseEphemeralBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitEphemeralBucketCache(namespace, func() (*couchbasev2.CouchbaseEphemeralBucketList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetEphemeralBuckets(namespace, selector)
 }
 
 // GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitMemcachedBucketCache(namespace, func() (*couchbasev2.CouchbaseMemcachedBucketList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetMemcachedBuckets(namespace, selector)
 }
 
 func (ab *kubeAbstractionImpl) GetBuckets(namespace string, selector *metav1.LabelSelector) ([]couchbasev2.AbstractBucket, error) {
@@ -193,76 +193,76 @@ func (ab *kubeAbstractionImpl) GetBuckets(namespace string, selector *metav1.Lab
 
 // GetCouchbaseReplications returns all replications for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseReplications(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitReplicationCache(namespace, func() (*couchbasev2.CouchbaseReplicationList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseReplications(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetReplications(namespace, selector)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseMigrationReplications(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMigrationReplicationList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitMigrationReplicationCache(namespace, func() (*couchbasev2.CouchbaseMigrationReplicationList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseMigrationReplications(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetMigrationReplications(namespace, selector)
 }
 
 // GetCouchbaseUsers returns all users for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseUsers(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseUserList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitUserCache(namespace, func() (*couchbasev2.CouchbaseUserList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseUsers(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseUsers(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetUsers(namespace, selector)
 }
 
-// GetCouchbaseGroups returns all users for a specified selector.
+// GetCouchbaseGroups returns all groups for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseGroupList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitGroupCache(namespace, func() (*couchbasev2.CouchbaseGroupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseGroups(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetGroups(namespace, selector)
 }
 
 // GetCouchbaseRoleBindings returns all user role bindings for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseRoleBindings(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseRoleBindingList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitRoleBindingCache(namespace, func() (*couchbasev2.CouchbaseRoleBindingList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseRoleBindings(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetRoleBindings(namespace, selector)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseBackups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitBackupCache(namespace, func() (*couchbasev2.CouchbaseBackupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseBackups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackups(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetBackups(namespace, selector)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseBackupRestores(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBackupRestoreList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitBackupRestoreCache(namespace, func() (*couchbasev2.CouchbaseBackupRestoreList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseBackupRestores(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetBackupRestores(namespace, selector)
 }
 
 func (ab *kubeAbstractionImpl) GetCouchbaseCollection(namespace, name string) (*couchbasev2.CouchbaseCollection, bool, error) {
@@ -307,63 +307,57 @@ func (ab *kubeAbstractionImpl) GetCouchbaseCollectionGroups(namespace string, se
 
 // GetCouchbaseScope returns the named scope.
 func (ab *kubeAbstractionImpl) GetCouchbaseScope(namespace, name string) (*couchbasev2.CouchbaseScope, bool, error) {
-	scope, err := ab.couchbaseClient.CouchbaseV2().CouchbaseScopes(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, nil
-		}
-
+	if err := ab.cache.InitScopeCache(namespace, func() (*couchbasev2.CouchbaseScopeList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseScopes(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
 		return nil, false, err
 	}
 
-	return scope, true, nil
+	return ab.cache.GetScope(namespace, name)
 }
 
-// GetCouchbaseScopeGroup returns the named scopegroup.
+// GetCouchbaseScopeGroup returns the named scope group.
 func (ab *kubeAbstractionImpl) GetCouchbaseScopeGroup(namespace, name string) (*couchbasev2.CouchbaseScopeGroup, bool, error) {
-	collectionGroup, err := ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil, false, nil
-		}
-
+	if err := ab.cache.InitScopeGroupCache(namespace, func() (*couchbasev2.CouchbaseScopeGroupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
 		return nil, false, err
 	}
 
-	return collectionGroup, true, nil
+	return ab.cache.GetScopeGroup(namespace, name)
 }
 
 // GetCouchbaseScopes returns the selected scopes.
 func (ab *kubeAbstractionImpl) GetCouchbaseScopes(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitScopeCache(namespace, func() (*couchbasev2.CouchbaseScopeList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseScopes(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseScopes(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetScopes(namespace, selector)
 }
 
 // GetCouchbaseScopeGroups returns the selected scope groups.
 func (ab *kubeAbstractionImpl) GetCouchbaseScopeGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeGroupList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitScopeGroupCache(namespace, func() (*couchbasev2.CouchbaseScopeGroupList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseScopeGroups(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetScopeGroups(namespace, selector)
 }
 
 // GetCouchbaseEncryptionKeys returns all encryption keys for a specified selector.
 func (ab *kubeAbstractionImpl) GetCouchbaseEncryptionKeys(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEncryptionKeyList, error) {
-	listOpts := metav1.ListOptions{}
-
-	if selector != nil {
-		listOpts.LabelSelector = metav1.FormatLabelSelector(selector)
+	if err := ab.cache.InitEncryptionKeyCache(namespace, func() (*couchbasev2.CouchbaseEncryptionKeyList, error) {
+		return ab.couchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.Background(), metav1.ListOptions{})
+	}); err != nil {
+		return nil, err
 	}
 
-	return ab.couchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(namespace).List(context.Background(), listOpts)
+	return ab.cache.GetEncryptionKeys(namespace, selector)
 }
 
 // ValidatorOptions are configurable, as opposed to required, bits of the
