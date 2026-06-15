@@ -571,7 +571,7 @@ Next:
 			req.Network = cur.Network
 
 			if !reflect.DeepEqual(req, cur) {
-				log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", req, "current", cur)
+				c.log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", req, "current", cur)
 
 				clusters = append(clusters, req)
 			}
@@ -622,7 +622,7 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 	// Handle deletions first (replications must be deleted before their remote clusters)
 	for _, current := range toDelete {
-		log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", current.Key)
+		c.log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", current.Key)
 
 		cluster, err := c.getRemoteClusterByName(current.Create.ToCluster)
 		if err != nil {
@@ -638,7 +638,7 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 	// Handle updates (settings changes only)
 	for _, update := range toUpdate {
-		log.Info("Updating XDCR replication settings", "cluster", c.namespacedName(), "replication", update.Desired.Key)
+		c.log.Info("Updating XDCR replication settings", "cluster", c.namespacedName(), "replication", update.Desired.Key)
 
 		current := currentStates[update.Desired.Key]
 
@@ -652,7 +652,7 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 	// Handle creations
 	for _, createPayload := range toCreate {
-		log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
+		c.log.Info("Creating XDCR replication", "cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
 
 		// Create via creation API
 		if err := couchbaseutil.CreateReplication(createPayload.Create).On(c.api, c.readyMembers()); err != nil {
@@ -660,7 +660,7 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 			// log the error and skip this replication so we don't block the reconcile loop.
 			var reqErr couchbaseutil.FailedRequestError
 			if goerrors.As(err, &reqErr) && reqErr.StatusCode == 400 {
-				log.Error(fmt.Errorf("%s", reqErr.Body), "XDCR replication creation rejected by server",
+				c.log.Error(fmt.Errorf("%s", reqErr.Body), "XDCR replication creation rejected by server",
 					"cluster", c.namespacedName(), "replication", createPayload.Desired.Key)
 
 				continue
@@ -780,14 +780,14 @@ func (c *Cluster) processMigrationReplications(selector labels.Selector, generat
 
 		// Skip replications whose source bucket no longer exists.
 		if c.IsFailedValidation("replication", migration.Name) {
-			log.Info("Skipping migration replication with missing source bucket", "cluster", c.namespacedName(), "replication", migration.Name)
+			c.log.Info("Skipping migration replication with missing source bucket", "cluster", c.namespacedName(), "replication", migration.Name)
 			continue
 		}
 
 		// Populate spec from annotations (allows annotation-based overrides)
 		// Errors are logged but don't stop processing
 		if err := annotations.Populate(&migration.Spec, migration.Annotations); err != nil {
-			log.Error(err, "failed to populate migration with annotation")
+			c.log.Error(err, "failed to populate migration with annotation")
 		}
 
 		// Build replication key
@@ -834,14 +834,14 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 
 		// Skip replications whose source bucket no longer exists.
 		if c.IsFailedValidation("replication", replication.Name) {
-			log.Info("Skipping replication with missing source bucket", "cluster", c.namespacedName(), "replication", replication.Name)
+			c.log.Info("Skipping replication with missing source bucket", "cluster", c.namespacedName(), "replication", replication.Name)
 			continue
 		}
 
 		// Populate spec from annotations (allows annotation-based overrides)
 		// Errors are logged but don't stop processing
 		if err := annotations.Populate(&replication.Spec, replication.Annotations); err != nil {
-			log.Error(err, "failed to populate replication with annotation")
+			c.log.Error(err, "failed to populate replication with annotation")
 		}
 
 		// Build replication key
@@ -1359,7 +1359,7 @@ func (c *Cluster) reconcileXDCR() error {
 	for i := range deletes {
 		cluster := &deletes[i]
 
-		log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+		c.log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
 		if err := couchbaseutil.DeleteRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -1381,7 +1381,7 @@ func (c *Cluster) reconcileXDCR() error {
 			return err
 		}
 
-		log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+		c.log.Info("Updating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
 		if err := couchbaseutil.UpdateRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -1402,7 +1402,7 @@ func (c *Cluster) reconcileXDCR() error {
 			return err
 		}
 
-		log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
+		c.log.Info("Creating XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 
 		if err := couchbaseutil.CreateRemoteCluster(cluster).On(c.api, c.readyMembers()); err != nil {
 			return err

@@ -92,7 +92,7 @@ func (c *Cluster) reconcileLogConfig() error {
 			return nil
 		}
 
-		log.Info("Updating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
+		c.log.Info("Updating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
 
 		// This will make any meta-data updates as well.
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Update(context.Background(), requestedConfig, metav1.UpdateOptions{}); err != nil {
@@ -103,7 +103,7 @@ func (c *Cluster) reconcileLogConfig() error {
 	}
 
 	// If we get here then must not exist
-	log.Info("Creating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
+	c.log.Info("Creating default log config secret", "cluster", c.namespacedName(), "name", fbs.ConfigurationName)
 
 	if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedConfig, metav1.CreateOptions{}); err != nil {
 		return errors.NewStackTracedError(err)

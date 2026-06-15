@@ -31,6 +31,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	gocb "github.com/couchbase/gocb/v2"
+	"github.com/go-logr/logr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -66,7 +67,7 @@ func newClientWithTLS(kubeClient kubernetes.Interface, cl *couchbasev2.Couchbase
 		return nil, err
 	}
 
-	apiClient := couchbaseutil.New(context.Background(), "", username, password)
+	apiClient := couchbaseutil.New(context.Background(), "", username, password, logr.Logger{})
 
 	// Set TLS configuration with CA certificate
 	if len(caCert) > 0 {

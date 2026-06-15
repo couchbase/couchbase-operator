@@ -386,6 +386,11 @@ func (in *CloudNativeGateway) DeepCopyInto(out *CloudNativeGateway) {
 		*out = new(ServiceTemplateSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PreserveReadyInstances != nil {
+		in, out := &in.PreserveReadyInstances, &out.PreserveReadyInstances
+		*out = new(int)
+		**out = **in
+	}
 	return
 }
 
@@ -578,6 +583,11 @@ func (in *ClusterConfig) DeepCopyInto(out *ClusterConfig) {
 	}
 	if in.AutoFailoverOnDataDiskIssuesTimePeriod != nil {
 		in, out := &in.AutoFailoverOnDataDiskIssuesTimePeriod, &out.AutoFailoverOnDataDiskIssuesTimePeriod
+		*out = new(v1.Duration)
+		**out = **in
+	}
+	if in.AutoFailoverOnDataDiskNonResponsivenessTimePeriod != nil {
+		in, out := &in.AutoFailoverOnDataDiskNonResponsivenessTimePeriod, &out.AutoFailoverOnDataDiskNonResponsivenessTimePeriod
 		*out = new(v1.Duration)
 		**out = **in
 	}
@@ -1916,6 +1926,11 @@ func (in *CouchbaseClusterDataSettings) DeepCopyInto(out *CouchbaseClusterDataSe
 	}
 	if in.TCPUserTimeout != nil {
 		in, out := &in.TCPUserTimeout, &out.TCPUserTimeout
+		*out = new(int)
+		**out = **in
+	}
+	if in.MagmaFlusherThreadPercentage != nil {
+		in, out := &in.MagmaFlusherThreadPercentage, &out.MagmaFlusherThreadPercentage
 		*out = new(int)
 		**out = **in
 	}
@@ -5101,6 +5116,11 @@ func (in *TLSPolicy) DeepCopyInto(out *TLSPolicy) {
 		copy(*out, *in)
 	}
 	in.PassphraseConfig.DeepCopyInto(&out.PassphraseConfig)
+	if in.ValidateShortHostnames != nil {
+		in, out := &in.ValidateShortHostnames, &out.ValidateShortHostnames
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -5173,6 +5193,11 @@ func (in *UpgradeSpec) DeepCopyInto(out *UpgradeSpec) {
 		in, out := &in.UpgradeOrder, &out.UpgradeOrder
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.SwapRebalanceIndexServiceUpgrades != nil {
+		in, out := &in.SwapRebalanceIndexServiceUpgrades, &out.SwapRebalanceIndexServiceUpgrades
+		*out = new(bool)
+		**out = **in
 	}
 	return
 }

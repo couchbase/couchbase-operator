@@ -12,6 +12,7 @@ package scheduler
 
 import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -72,11 +73,15 @@ type Scheduler interface {
 
 // New is a factory method to return the correct scheduler type for
 // the cluster configuration.
-func New(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
+func New(pods []*corev1.Pod, cluster *couchbasev2.CouchbaseCluster, logger logr.Logger) (Scheduler, error) {
+	schedulerLogger := log
+	if log.GetSink() == nil {
+		schedulerLogger = logger.WithName("scheduler")
+	}
 	// At present we only support a scheduler which evenly stripes servers
 	// across server groups on a per server class basis
 	if cluster.Spec.ServerGroupsEnabled() {
-		return NewStripeScheduler(pods, cluster)
+		return NewStripeScheduler(pods, cluster, schedulerLogger)
 	}
 
 	// The default does virtually nothing

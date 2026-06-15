@@ -166,21 +166,21 @@ func (c *Cluster) categorizePodChange(result *ChangeSet, name string, member cou
 	switch {
 	case info.needsVersionChange && info.needsSpecChange:
 		result.Both.Add(member)
-		log.V(1).Info("Pod needs both version and spec changes",
+		c.log.V(1).Info("Pod needs both version and spec changes",
 			"cluster", c.namespacedName(),
 			"pod", name,
 			"currentImage", info.currentImage,
 			"specImage", info.specImage)
 	case info.needsVersionChange:
 		result.VersionOnly.Add(member)
-		log.V(1).Info("Pod needs version change only",
+		c.log.V(1).Info("Pod needs version change only",
 			"cluster", c.namespacedName(),
 			"pod", name,
 			"currentImage", info.currentImage,
 			"specImage", info.specImage)
 	case info.needsSpecChange:
 		result.SpecOnly.Add(member)
-		log.V(1).Info("Pod needs spec change only",
+		c.log.V(1).Info("Pod needs spec change only",
 			"cluster", c.namespacedName(),
 			"pod", name)
 	}
@@ -262,7 +262,7 @@ func (c *Cluster) selectCandidatesByNodesOrder(candidates couchbaseutil.MemberSe
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
 	if err := couchbaseutil.GetTerseClusterInfo(clusterInfo).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
+		c.log.Error(err, "failed to get cluster info", "cluster", c.namespacedName())
 	} else {
 		orchestratorName := clusterInfo.Orchestrator
 		if !finalCandidates.Contains(orchestratorName) {
@@ -304,7 +304,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 		// The pod is likely down, so just skip it
 		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name())
 		if err != nil {
-			log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
+			c.log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
 			continue
 		}
 
@@ -426,7 +426,7 @@ func (c *Cluster) getRescheduleMoves() ([]scheduler.Move, error) {
 		}
 
 		for _, move := range m {
-			log.V(1).Info("rescheduled member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
+			c.log.V(1).Info("rescheduled member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
 		}
 
 		moves = m
@@ -438,7 +438,7 @@ func (c *Cluster) getRescheduleMoves() ([]scheduler.Move, error) {
 		}
 
 		for _, move := range m {
-			log.V(1).Info("rescheduled unschedulable member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
+			c.log.V(1).Info("rescheduled unschedulable member", "cluster", c.namespacedName(), "name", move.Name, "from", move.From, "to", move.To)
 		}
 
 		moves = m
@@ -617,7 +617,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 
 	// Return all candidates, all detected zone changes, and all detected PVC changes
 	if logCandidates && (lenVOS > 0 || lenIS > 0 || lenSpecOnly > 0) {
-		log.Info("Upgrade candidates calculated",
+		c.log.Info("Upgrade candidates calculated",
 			"cluster", c.namespacedName(),
 			"totalCandidates", len(orderedCandidates),
 			"versionOnly", lenVOS,
@@ -941,7 +941,7 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return nil
 	}
 
-	log.Info("Applied previous version image to new pods during scale-up",
+	c.log.Info("Applied previous version image to new pods during scale-up",
 		"cluster", c.namespacedName(),
 		"oldImage", baselineImage,
 		"newPodsOnOldVersion", additionsOnPreviousVersion,

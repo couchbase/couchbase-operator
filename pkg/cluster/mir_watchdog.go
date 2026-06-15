@@ -94,12 +94,12 @@ func newMirWatchdog(cluster *Cluster, ctx context.Context) *mirWatchdog {
 // When manual intervention is no longer required, this will clear the condition,
 // raise a ManualInterventionResolved event and set the cluster_manual_intervention metric to 0.
 func (w *mirWatchdog) run(ctx context.Context, interval time.Duration) {
-	log.Info("Manual intervention required checks started", "cluster", w.cluster.namespacedName())
+	w.cluster.log.Info("Manual intervention required checks started", "cluster", w.cluster.namespacedName())
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info("Manual intervention required checks stopped", "cluster", w.cluster.namespacedName())
+			w.cluster.log.Info("Manual intervention required checks stopped", "cluster", w.cluster.namespacedName())
 			return
 		case <-time.After(interval):
 			w.checkCluster()
@@ -145,7 +145,7 @@ func (w *mirWatchdog) checkCluster() {
 
 	// Try to update the cluster status for up to 10 seconds in case of transient failures.
 	if err := retryutil.RetryFor(10*time.Second, w.cluster.updateCRStatus); err != nil {
-		log.Error(err, "MirWatchdog failed to update cluster status", "cluster", w.cluster.namespacedName())
+		w.cluster.log.Error(err, "MirWatchdog failed to update cluster status", "cluster", w.cluster.namespacedName())
 	}
 }
 
@@ -157,7 +157,7 @@ func (w *mirWatchdog) handleManualInterventionRequired(mirList ManualInterventio
 		// If the condition doesn't exist, we will raise an event for each of the manual intervention required reasons.
 		// If it does already exist, we will only raise an event for the new reasons.
 		if !inMirStateForReason(existingCondition, *mirReason) {
-			log.Info("Manual intervention required", "cluster", w.cluster.namespacedName(), "reason", string(*mirReason))
+			w.cluster.log.Info("Manual intervention required", "cluster", w.cluster.namespacedName(), "reason", string(*mirReason))
 			w.cluster.raiseEvent(k8sutil.ManualInterventionRequiredEvent(w.cluster.cluster, string(*mirReason)))
 		}
 	}
@@ -171,7 +171,7 @@ func (w *mirWatchdog) handleManualInterventionRequired(mirList ManualInterventio
 // before the condition is cleared and the metric is set to 0.
 func (w *mirWatchdog) handleNoManualInterventionRequired(existingCondition *couchbasev2.ClusterCondition) {
 	if existingCondition != nil {
-		log.Info("Manual intervention resolved", "cluster", w.cluster.namespacedName())
+		w.cluster.log.Info("Manual intervention resolved", "cluster", w.cluster.namespacedName())
 		w.cluster.raiseEvent(k8sutil.ManualInterventionResolvedEvent(w.cluster.cluster))
 		w.cluster.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
 	}
@@ -200,7 +200,7 @@ func (w *mirWatchdog) checkForClusterLoginFailure(_ *couchbasev2.ClusterConditio
 		if errors.As(err, &failedReqErr) && failedReqErr.StatusCode == 401 {
 			return mir(MIRLoginFailure)
 		} else if errors.As(err, &failedReqErr) {
-			log.Info("Failed to get cluster info", "cluster", w.cluster.namespacedName(), "error", err)
+			w.cluster.log.Info("Failed to get cluster info", "cluster", w.cluster.namespacedName(), "error", err)
 		}
 	}
 
@@ -290,7 +290,7 @@ func (w *mirWatchdog) checkForTLSExpiration(existingCondition *couchbasev2.Clust
 	// If we are in the MIR state for TLS expiration, we should refresh the tls cache as reconcile will be blocked ontil the MIR is resolved.
 	if inMirStateForReason(existingCondition, MIRTLSExpired) {
 		if err := w.cluster.initTLSCache(); err != nil {
-			log.Error(err, "MirWatchdog failed to refresh tls cache", "cluster", w.cluster.namespacedName())
+			w.cluster.log.Error(err, "MirWatchdog failed to refresh tls cache", "cluster", w.cluster.namespacedName())
 		}
 	}
 

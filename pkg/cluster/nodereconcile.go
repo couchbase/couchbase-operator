@@ -432,12 +432,12 @@ func (r *ReconcileMachine) exec(c *Cluster) (bool, error) {
 		}
 
 		if r.abortReason != "" {
-			log.Info("Aborting topology reconcile", "cluster", c.namespacedName(), "reason", r.abortReason)
+			c.log.Info("Aborting topology reconcile", "cluster", c.namespacedName(), "reason", r.abortReason)
 			return true, nil
 		}
 
 		if err := c.updateCRStatus(); err != nil {
-			log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
+			c.log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
 		}
 	}
 
@@ -504,7 +504,7 @@ func (r *ReconcileMachine) handleServerServices(c *Cluster) error {
 	}
 
 	for _, candidate := range candidates {
-		log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name())
+		c.log.Info("Node services mismatch", "cluster", c.namespacedName(), "name", candidate.Name())
 	}
 
 	clusterInfo := &couchbaseutil.TerseClusterInfo{}
@@ -537,7 +537,7 @@ func (c *Cluster) getNodeServiceMismatchCandidates() (couchbaseutil.MemberSet, e
 		// Get the server configuration for the candidate
 		serverConfig := c.cluster.Spec.GetServerConfigByName(candidate.Config())
 		if serverConfig == nil {
-			log.Info("Server configuration not found for candidate", "name", candidate.Name())
+			c.log.Info("Server configuration not found for candidate", "name", candidate.Name())
 			continue
 		}
 
@@ -666,11 +666,11 @@ func (r *ReconcileMachine) handleRebalanceCheck(c *Cluster) error {
 	}
 
 	if err := couchbaseutil.StopRebalance().On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Rebalance cancellation failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Rebalance cancellation failed", "cluster", c.namespacedName())
 		return err
 	}
 
-	log.Info("Rebalance cancelled", "cluster", c.namespacedName())
+	c.log.Info("Rebalance cancelled", "cluster", c.namespacedName())
 
 	return nil
 }
@@ -684,7 +684,7 @@ func (c *Cluster) allDownNodesRecoveryTimedout(members couchbaseutil.MemberSet) 
 	for name := range members {
 		r, timeUntilRecovery := c.hasMemberRecoveryTimeElapsed(name)
 		if !r {
-			log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", timeUntilRecovery)
+			c.log.Info("Pod down, waiting for auto-failover", "cluster", c.namespacedName(), "name", name, "recovery_in", timeUntilRecovery)
 
 			recoverable = false
 		}
@@ -755,7 +755,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 
 	for name, m := range r.couchbase.DownNodes {
 		if c.isPodRecoverable(m) && c.hasExceededRecoveryMaxRetries(name) {
-			log.Info("Pod recovery max retries exceeded",
+			c.log.Info("Pod recovery max retries exceeded",
 				"cluster", c.namespacedName(), "name", name,
 				"maxRetries", c.config.PodRecoveryMaxRetries,
 				"attempts", c.getRecoveryAttempts(name))
@@ -779,7 +779,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		manualActionNodes = append(manualActionNodes, nodesToRecover...)
 
 		if len(manualActionNodes) > 0 {
-			log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
+			c.log.Info("Node recovery policy set to prioritize data integrity and down nodes need manual action", "cluster", c.namespacedName(), "nodes", manualActionNodes)
 
 			r.abort("waiting for manual action of down nodes")
 
@@ -815,7 +815,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		// already recreated asynchronously in a previous cycle — skip to avoid a second recreate.
 		pod, podExists := c.k8s.Pods.Get(name)
 		if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
-			log.V(1).Info("Down pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+			c.log.V(1).Info("Down pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 			continue
 		}
 
@@ -829,7 +829,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 			return fmt.Errorf("pod recovery failed for member %s: %w", name, err)
 		}
 
-		log.Info("Pod recovering", "cluster", c.namespacedName(), "name", name)
+		c.log.Info("Pod recovering", "cluster", c.namespacedName(), "name", name)
 
 		c.raiseEventCached(k8sutil.MemberRecoveredEvent(name, c.cluster))
 		delete(c.recoveryTime, name)
@@ -858,7 +858,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 		m := r.couchbase.DownNodes[name]
 
 		if err := c.resetRecoveryAttempts(name); err != nil {
-			log.Error(err, "Failed to reset recovery attempts before failover", "cluster", c.namespacedName(), "name", name)
+			c.log.Error(err, "Failed to reset recovery attempts before failover", "cluster", c.namespacedName(), "name", name)
 		}
 
 		nodesToFailover = append(nodesToFailover, m.GetOTPNode())
@@ -868,7 +868,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	// Add all remaining unrecoverable down/failed nodes when PrioritizeUptime is set.
 	if c.cluster.GetRecoveryPolicy() == couchbasev2.PrioritizeUptime {
 		for _, member := range r.couchbase.DownNodes {
-			log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name())
+			c.log.Info("Failing over node", "cluster", c.namespacedName(), "name", member.Name())
 
 			nodesToFailover = append(nodesToFailover, member.GetOTPNode())
 			failoverNames = append(failoverNames, member.Name())
@@ -881,7 +881,7 @@ func (r *ReconcileMachine) handleDownNodes(c *Cluster) error {
 	}
 
 	if len(nodesToFailover) > 0 {
-		log.Info("Forcing failover of nodes", "cluster", c.namespacedName())
+		c.log.Info("Forcing failover of nodes", "cluster", c.namespacedName())
 
 		if err := couchbaseutil.Failover(nodesToFailover, true).On(c.api, c.getMigratingReadyTarget()); err != nil {
 			return err
@@ -922,7 +922,7 @@ func (r *ReconcileMachine) handleUnclusteredNodes(c *Cluster) error {
 			return fmt.Errorf("unable to remove unclustered node: %w", err)
 		}
 
-		log.Info("Pod unclustered, deleting", "cluster", c.namespacedName(), "name", name)
+		c.log.Info("Pod unclustered, deleting", "cluster", c.namespacedName(), "name", name)
 	}
 
 	return nil
@@ -969,7 +969,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 			// into FailedAdd does not have PendingInit and must be recreated.
 			pod, podExists := c.k8s.Pods.Get(name)
 			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
-				log.V(1).Info("Pending add pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+				c.log.V(1).Info("Pending add pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 				continue
 			}
 
@@ -981,7 +981,7 @@ func (r *ReconcileMachine) handleFailedAddNodes(c *Cluster) error {
 			}
 
 			if err := c.recreatePod(m, false); err != nil {
-				log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
+				c.log.Error(err, "Pending add pod cannot be recovered", "cluster", c.namespacedName(), "name", name)
 				r.abort("unable to recover pod pending addition")
 
 				return nil
@@ -1038,14 +1038,14 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 		if terminating, err := c.isPodTerminating(m); err != nil {
 			return err
 		} else if terminating {
-			log.Info("Add back node is terminating", "cluster", c.namespacedName(), "name", name)
+			c.log.Info("Add back node is terminating", "cluster", c.namespacedName(), "name", name)
 			r.abort("add back node is terminating")
 			return nil
 		}
 
 		err := c.verifyMemberVolumes(m)
 		if err != nil {
-			log.Error(err, "Failed pod cannot be recovered, volumes unhealthy", "cluster", c.namespacedName(), "name", name)
+			c.log.Error(err, "Failed pod cannot be recovered, volumes unhealthy", "cluster", c.namespacedName(), "name", name)
 
 			r.removeMember(m)
 			c.raiseEvent(k8sutil.FailedAddBackNodeEvent(name, c.cluster))
@@ -1056,7 +1056,7 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 		// Set recovery type as delta for data nodes
 		sc := c.cluster.Spec.GetServerConfigByName(m.Config())
 		if sc == nil {
-			log.Info("Add back pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+			c.log.Info("Add back pod not in the specification, deleting", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
 			r.ejectMembers.Add(m)
 
@@ -1069,7 +1069,7 @@ func (r *ReconcileMachine) handleAddBackNodes(c *Cluster) error {
 			recoveryType = couchbaseutil.RecoveryTypeDelta
 		}
 
-		log.Info("Setting recovery type", "cluster", c.namespacedName(), "name", name, "type", recoveryType)
+		c.log.Info("Setting recovery type", "cluster", c.namespacedName(), "name", name, "type", recoveryType)
 
 		if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), recoveryType).On(c.api, ready); err != nil {
 			return err
@@ -1095,12 +1095,12 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 	}
 
 	for name, m := range r.couchbase.FailedNodes {
-		log.Info("Pods failed over", "cluster", c.namespacedName())
+		c.log.Info("Pods failed over", "cluster", c.namespacedName())
 
 		if c.isPodRecoverable(m) && !c.hasExceededRecoveryMaxRetries(name) {
 			pod, podExists := c.k8s.Pods.Get(name)
 			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
-				log.V(1).Info("Failed pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
+				c.log.V(1).Info("Failed pod already recreated and pending initialization, skipping", "cluster", c.namespacedName(), "name", name)
 				continue
 			}
 
@@ -1109,7 +1109,7 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 			c.persistRecoveryTimestamps()
 
 			if err := c.recreatePod(m, true); err != nil {
-				log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
+				c.log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", name, "reason", err)
 
 				metrics.PodRecoveryFailuresMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, m.Name()})...).Inc()
 
@@ -1131,13 +1131,13 @@ func (r *ReconcileMachine) handleFailedNodes(c *Cluster) error {
 		}
 
 		if c.hasExceededRecoveryMaxRetries(name) {
-			log.Info("Pod recovery max retries exceeded, removing member",
+			c.log.Info("Pod recovery max retries exceeded, removing member",
 				"cluster", c.namespacedName(), "name", name,
 				"maxRetries", c.config.PodRecoveryMaxRetries,
 				"attempts", c.getRecoveryAttempts(name))
 		}
 
-		log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
+		c.log.Info("Pod failed, deleting", "cluster", c.namespacedName(), "name", name)
 
 		r.removeMember(m)
 	}
@@ -1157,7 +1157,7 @@ func (r *ReconcileMachine) handleUnknownServerConfigs(c *Cluster) error {
 
 func (r *ReconcileMachine) removeMemberIfUnknownServerConfig(c *Cluster, name string, m couchbaseutil.Member) {
 	if c.cluster.Spec.GetServerConfigByName(m.Config()) == nil {
-		log.Info("Node does not match any server config in the specification. Ejecting from cluster", "cluster", c.namespacedName(), "name", name, "class", m.Config())
+		c.log.Info("Node does not match any server config in the specification. Ejecting from cluster", "cluster", c.namespacedName(), "name", name, "class", m.Config())
 
 		// Check the node is actually active before we attempt to delete the log volumes.
 		info := &couchbaseutil.PoolsInfo{}
@@ -1179,7 +1179,7 @@ func getMetrics(c *Cluster) allMetrics {
 	getServiceMetrics := func(serviceName string) couchbaseutil.StatsRangeMetrics {
 		metrics := couchbaseutil.StatsRangeMetrics{}
 		if err := couchbaseutil.GetStatsRangeAvgMetrics(serviceName, &metrics).On(c.api, c.readyMembers()); err != nil {
-			log.V(1).Info("Error getting "+serviceName+" metrics when server class removal queue is being populated", "cluster", c.namespacedName(), "error", err)
+			c.log.V(1).Info("Error getting "+serviceName+" metrics when server class removal queue is being populated", "cluster", c.namespacedName(), "error", err)
 		}
 		if serviceName == "index" {
 			metrics = couchbaseutil.StatsRangeMetrics{}
@@ -1347,7 +1347,7 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 	if preserveReadyCNG := c.cluster.Spec.PreserveCNGReadyInstances(); preserveReadyCNG > 0 {
 		readyCNGInstances := c.getReadyCNGMembers()
 		if len(readyCNGInstances) > 0 && len(deletions) > len(readyCNGInstances)-preserveReadyCNG {
-			log.Info("Aborting scale down to maintain CNG availability", "cluster", c.namespacedName(), "deletions", len(deletions), "readyCNGInstances", len(readyCNGInstances))
+			c.log.Info("Aborting scale down to maintain CNG availability", "cluster", c.namespacedName(), "deletions", len(deletions), "readyCNGInstances", len(readyCNGInstances))
 			return nil
 		}
 	}
@@ -1393,7 +1393,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 		}
 
 		if (len(serverSpec.Services) == 0 || serverSpec.Services[0] == couchbasev2.AdminService) && !arbiterNodesSupported {
-			log.Info("[WARN] Arbiter nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
+			c.log.Info("[WARN] Arbiter nodes are not supported for this cluster version, skipping node addition", "cluster", c.namespacedName(), "server", serverSpec.Name)
 			continue
 		}
 
@@ -1412,7 +1412,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	// created with the old (baseline) version. This ensures that scaling up respects
 	// the user's intent to keep a certain number of pods on the previous version.
 	if err := c.applyPreviousVersionToNewPods(additions); err != nil {
-		log.Error(err, "Failed to apply previous version to new pods, all new pods will use the current spec image", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to apply previous version to new pods, all new pods will use the current spec image", "cluster", c.namespacedName())
 	}
 
 	r.log()
@@ -1423,12 +1423,12 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	c.cluster.Status.SetScalingUpCondition(scheduledScaling.BuildMessage())
 
 	if err := c.updateCRStatus(); err != nil {
-		log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Cluster status update failed", "cluster", c.namespacedName())
 	}
 
 	memberResults, err := c.addMembers(additions...)
 	if err != nil {
-		log.Error(err, "Pod addition to cluster failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Pod addition to cluster failed", "cluster", c.namespacedName())
 	}
 
 	// count how many errors we actually have
@@ -1445,7 +1445,7 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 	for _, result := range memberResults {
 		if result.Err != nil {
 			errs = append(errs, fmt.Errorf("failed to create new node for cluster: %w", result.Err))
-			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+			c.log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
 		} else if c.cluster.IsMigrationCluster() {
 			// Migration clusters perform CBS add-node synchronously inside addMembersToTarget,
 			// so the pod is already known to Couchbase and it is safe to mark it as clustered
@@ -1479,7 +1479,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	if c.cluster.GetUpgradeProcess() == couchbasev2.SwapRebalance {
 		changes, err := c.detectChangeSets()
 		if err != nil {
-			log.Error(err, "Failed to check upgrade candidates, proceeding with volume expansion", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to check upgrade candidates, proceeding with volume expansion", "cluster", c.namespacedName())
 		} else {
 			upgradeCandidatesSet.Merge(changes.VersionOnly)
 			upgradeCandidatesSet.Merge(changes.Both)
@@ -1503,7 +1503,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 
 		// Skip volume expansion if this member needs upgrading and we're using swap rebalance
 		if !upgradeCandidatesSet.Empty() && upgradeCandidatesSet.Contains(member.Name()) {
-			log.V(2).Info("Skipping volume expansion for node that will be upgraded via Swap Rebalance", "cluster", c.namespacedName(), "node", member.Name())
+			c.log.V(2).Info("Skipping volume expansion for node that will be upgraded via Swap Rebalance", "cluster", c.namespacedName(), "node", member.Name())
 			continue
 		}
 
@@ -1521,14 +1521,14 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 			// normal rolling upgrade since the Pod must be recreated.
 			case pvcState.IsResizeFailed(pvc.Name):
 				err := pvcState.GetReasonForResizeFailed(pvc.Name)
-				log.Info("Volume expansion failed, falling back to rolling upgrade", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "error", err)
+				c.log.Info("Volume expansion failed, falling back to rolling upgrade", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "error", err)
 				c.raiseEvent(k8sutil.ExpandVolumeFallbackEvent(pvc.Name, c.cluster, err.Error()))
 				c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionExpandingVolume)
 
 				return nil
 			// Check if a volume expansion is already in progress and end reconciliation loop if so.
 			case pvcState.IsExpanding(pvc.Name):
-				log.Info("Volume expansion is in progress", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name)
+				c.log.Info("Volume expansion is in progress", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name)
 
 				return nil
 			// Check if volume spec has been updated and apply changes.
@@ -1545,7 +1545,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 				currentSize := k8sutil.GetVolumeStorageSize(pvc)
 				requestedSize := k8sutil.GetVolumeStorageSize(requestedClaim)
 				c.raiseEvent(k8sutil.ExpandVolumeStartedEvent(pvc.Name, currentSize, requestedSize, c.cluster))
-				log.Info("Volume expansion started", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "current", currentSize, "requested", requestedSize)
+				c.log.Info("Volume expansion started", "cluster", c.namespacedName(), "node", member.Name(), "volume", pvc.Name, "current", currentSize, "requested", requestedSize)
 
 				metrics.VolumeExpansionMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name, pvc.Name})...).Inc()
 
@@ -1558,7 +1558,7 @@ func (r *ReconcileMachine) handleVolumeExpansion(c *Cluster) error {
 	// Instead, if we get to this point in the method, we can assume there are no more PVC's that are expanding/failed expanding/updated, so we'll raise a single event
 	// if the condition still exists.
 	if c.cluster.HasCondition(couchbasev2.ClusterConditionExpandingVolume) {
-		log.Info("Volume expansion completed", "cluster", c.namespacedName())
+		c.log.Info("Volume expansion completed", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ExpandVolumeSucceededEvent(c.cluster))
 	}
 
@@ -1630,7 +1630,7 @@ func (c *Cluster) selectOrderedUpgradeCandidates(candidates couchbaseutil.Member
 		filteredCNGCandidates := c.filterUpgradeCandidatesToPreserveCNG(constrained)
 		preservedCandidates := constrained.Diff(filteredCNGCandidates)
 		for _, preserved := range preservedCandidates {
-			log.Info("Preserving candidate to maintain CNG availability", "cluster", c.namespacedName(), "candidate", preserved.Name())
+			c.log.Info("Preserving candidate to maintain CNG availability", "cluster", c.namespacedName(), "candidate", preserved.Name())
 		}
 		constrained = filteredCNGCandidates
 	}
@@ -1802,7 +1802,7 @@ func (r *ReconcileMachine) failoverNodeForInPlaceUpgrade(candidate couchbaseutil
 	}
 
 	// Hard failover for other nodes
-	log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
+	c.log.Info("Unable to perform graceful failover on node. Reverting to hard failover.", "cluster", c.namespacedName(), "name", candidate.Name())
 
 	otpNodeList := couchbaseutil.OTPNodeList{candidate.GetOTPNode()}
 
@@ -1817,7 +1817,7 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 	if len(c.members) > 1 {
 		ready := c.readyMembers()
 		if ready.Empty() {
-			log.Info("No ready members to set recovery type, yielding", "cluster", c.namespacedName())
+			c.log.Info("No ready members to set recovery type, yielding", "cluster", c.namespacedName())
 			return fmt.Errorf("%w: no ready members to set recovery type", errors.NewStackTracedError(ErrReconcileInhibited))
 		}
 
@@ -1826,7 +1826,7 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 				return err
 			}
 		} else {
-			log.Info("Unable to set delta recovery type. Reverting to full recovery.", "cluster", c.namespacedName())
+			c.log.Info("Unable to set delta recovery type. Reverting to full recovery.", "cluster", c.namespacedName())
 
 			if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, ready); err != nil {
 				return err
@@ -1841,7 +1841,7 @@ func (r *ReconcileMachine) recreateNode(c *Cluster, candidate couchbaseutil.Memb
 	// Mark the new pod with the durable upgrade tracking annotation so later async
 	// phases can attribute metrics and gate the stabilization period.
 	if err := k8sutil.SetPodUpgradeTracking(c.k8s, candidate.Name(), string(couchbasev2.InPlaceUpgrade)); err != nil {
-		log.Error(err, "Failed to mark pod with upgrade tracking; upgrade metrics may not fire",
+		c.log.Error(err, "Failed to mark pod with upgrade tracking; upgrade metrics may not fire",
 			"cluster", c.namespacedName(), "pod", candidate.Name())
 	}
 
@@ -1854,7 +1854,7 @@ func (c *Cluster) multipleInPlaceUpgradesSupported(candidates couchbaseutil.Memb
 	}
 
 	if len(candidates) >= len(c.callableMembers)/2 {
-		log.Info("Unable to perform multiple in-place upgrades at once without losing quorum", "cluster", c.namespacedName())
+		c.log.Info("Unable to perform multiple in-place upgrades at once without losing quorum", "cluster", c.namespacedName())
 		return false, nil
 	}
 
@@ -1865,7 +1865,7 @@ func (c *Cluster) multipleInPlaceUpgradesSupported(candidates couchbaseutil.Memb
 
 	for _, bucket := range buckets {
 		if bucket.BucketReplicas <= len(candidates) {
-			log.Info("Unable to perform multiple in-place upgrades at once due to insufficient bucket replicas", "cluster", c.namespacedName(), "bucket", bucket.BucketName)
+			c.log.Info("Unable to perform multiple in-place upgrades at once due to insufficient bucket replicas", "cluster", c.namespacedName(), "bucket", bucket.BucketName)
 			return false, nil
 		}
 	}
@@ -2020,7 +2020,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		// The target version is going to stay the same as the current version
 		targetVersion = candidate.Version()
 
-		log.Info("Moving node", "cluster", c.namespacedName(), "candidate", candidate.Name())
+		c.log.Info("Moving node", "cluster", c.namespacedName(), "candidate", candidate.Name())
 
 		if c.isPodReschedulable(candidate) == false {
 			canDoInPlaceReschedule = false
@@ -2048,7 +2048,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 	// We can use the upgrade methods to do this (even though we're not changing the version)
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && canDoInPlaceReschedule {
 		if hasIndexCandidates {
-			log.Info("Reschedule candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
+			c.log.Info("Reschedule candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
 				"cluster", c.namespacedName(),
 				"swapRebalance", indexCandidates.Names(),
 				"inPlaceUpgrade", nonIndexCandidates.Names())
@@ -2068,7 +2068,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 		}
 	} else {
 		if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade && !canDoInPlaceReschedule {
-			log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+			c.log.Info("InPlaceUpgrade not possible. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 		}
 
 		return r.swapRebalanceMembers(c, candidates)
@@ -2121,7 +2121,7 @@ func (r *ReconcileMachine) handleUpgradeStabilization(c *Cluster) bool {
 	// stabilizingMembers won't be repopulated on the next cycle.
 	for _, member := range r.stabilizingMembers {
 		if err := k8sutil.ClearPodUpgradeTracking(c.k8s, member.Name()); err != nil {
-			log.Error(err, "Failed to clear upgrade tracking annotation", "cluster", c.namespacedName(), "pod", member.Name())
+			c.log.Error(err, "Failed to clear upgrade tracking annotation", "cluster", c.namespacedName(), "pod", member.Name())
 		}
 	}
 
@@ -2161,7 +2161,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 	}
 
 	if len(blockers) > 0 {
-		log.Info("[WARN] Cluster can't be upgraded", "cluster", c.namespacedName(), "blockers", blockers)
+		c.log.Info("[WARN] Cluster can't be upgraded", "cluster", c.namespacedName(), "blockers", blockers)
 		return nil
 	}
 
@@ -2219,7 +2219,7 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		}
 	}
 
-	log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
+	c.log.Info("Upgrading pods with SwapRebalance", "cluster", c.namespacedName(), "names", constrainedCandidates.Names(), "target-version", targetVersion)
 	return r.swapRebalanceMembers(c, constrainedCandidates)
 }
 
@@ -2248,14 +2248,14 @@ func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseuti
 
 	switch {
 	case allCandidatesRecoverable && !zoneChangeDetected && !swapRebalanceIndexNodes && !pvcChangeDetected:
-		log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
+		c.log.Info("Upgrading pods with InPlaceUpgrade", "cluster", c.namespacedName(), "names", candidates.Names(), "target-version", targetVersion)
 		return true, r.handleInPlaceUpgrade(c, candidates, targetVersion)
 	case allCandidatesRecoverable && zoneChangeDetected:
-		log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		c.log.Info("Pods with PVCs need zone changes. InPlaceUpgrade cannot change zones. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	case allCandidatesRecoverable && pvcChangeDetected:
-		log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		c.log.Info("Pods have PVC changes and online volume expansion is disabled. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	case allCandidatesRecoverable && swapRebalanceIndexNodes:
-		log.Info("Upgrade candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
+		c.log.Info("Upgrade candidates with index service will use SwapRebalance, non-index candidates will use InPlaceUpgrade",
 			"cluster", c.namespacedName(),
 			"swapRebalance", indexCandidates.Names(),
 			"inPlaceUpgrade", nonIndexCandidates.Names())
@@ -2268,7 +2268,7 @@ func (r *ReconcileMachine) tryInPlaceUpgrade(c *Cluster, candidates couchbaseuti
 
 		return true, r.swapRebalanceMembers(c, indexCandidates)
 	default:
-		log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
+		c.log.Info("Not all pods are recoverable from persistent volumes. Reverting to SwapRebalance.", "cluster", c.namespacedName())
 	}
 
 	return false, nil
@@ -2370,13 +2370,13 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 		// rebalancing, which batches add+eject operations into a single rebalance and
 		// avoids a follow-up rebalance after each pod initializes individually.
 		if r.pendingInitPods.Size() > 0 {
-			log.V(1).Info("Deferring rebalance until pending pods are CBS-initialized",
+			c.log.V(1).Info("Deferring rebalance until pending pods are CBS-initialized",
 				"cluster", c.namespacedName(), "pending", r.pendingInitPods.Names())
 			return nil
 		}
 
 		if len(r.couchbase.ServerRebalanceReasons) > 0 {
-			log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
+			c.log.Info("Rebalancing Cluster", "cluster", r.c.namespacedName(), "rebalance_reasons", r.couchbase.ServerRebalanceReasons)
 		}
 
 		if err := c.state.Upsert(persistence.RebalanceClusteredMembers, strings.Join(r.clusteredMembers.Names(), ",")); err != nil {
@@ -2410,13 +2410,13 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			for _, m := range addNodes {
 				info := &couchbaseutil.ClusterInfo{}
 				if err := couchbaseutil.GetPoolsDefault(info).On(c.api, c.readyMembers()); err != nil {
-					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
+					c.log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
 					return err
 				}
 
 				node, err := info.GetNode(m.GetHostName())
 				if err != nil {
-					log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
+					c.log.Error(err, "Pod add-back failed, unable to determine recovery type", "cluster", c.namespacedName(), "name", m.Name())
 					return err
 				}
 
@@ -2426,11 +2426,11 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			}
 
 			if len(deltaNodes) != 0 {
-				log.Info("Pod add-back failed, forcing full recovery", "cluster", c.cluster.NamespacedName())
+				c.log.Info("Pod add-back failed, forcing full recovery", "cluster", c.cluster.NamespacedName())
 
 				for name, m := range deltaNodes {
 					if err := couchbaseutil.SetRecoveryType(m.GetOTPNode(), couchbaseutil.RecoveryTypeFull).On(c.api, c.readyMembers()); err != nil {
-						log.Error(err, "Pod add-back, recovery type update failed", "cluster", c.namespacedName(), "name", name)
+						c.log.Error(err, "Pod add-back, recovery type update failed", "cluster", c.namespacedName(), "name", name)
 
 						c.raiseEvent(k8sutil.FailedAddBackNodeEvent(name, c.cluster))
 
@@ -2468,7 +2468,7 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	// the ejection is retried on the next cycle.
 	for _, member := range r.ejectMembers {
 		if err := k8sutil.ClearPodPendingUpgradeBeforeEjection(c.k8s, member.Name()); err != nil {
-			log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
+			c.log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
 		}
 	}
 
@@ -2534,7 +2534,7 @@ func (r *ReconcileMachine) handleEjectedMembers(c *Cluster) error {
 }
 
 func (r *ReconcileMachine) handleNotifyFinished(c *Cluster) error {
-	log.V(1).Info("Reconcile completed", "cluster", c.namespacedName())
+	c.log.V(1).Info("Reconcile completed", "cluster", c.namespacedName())
 
 	return nil
 }
@@ -2737,7 +2737,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(members))
 
 	for _, candidate := range members {
-		log.Info("Swap-Rebalancing pod ", "cluster", c.namespacedName(), "name", candidate.Name(), "source-version", candidate.Version())
+		c.log.Info("Swap-Rebalancing pod ", "cluster", c.namespacedName(), "name", candidate.Name(), "source-version", candidate.Version())
 
 		// Remove the candidate from the scheduler.
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
@@ -2787,7 +2787,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 		switch {
 		case result.Err != nil:
 			errs = append(errs, fmt.Errorf("swap rebalance failed to add new node to cluster: %w", result.Err))
-			log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
+			c.log.Error(result.Err, "Pod addition to cluster failed", "cluster", c.namespacedName(), "pod", result.Member.Name())
 
 			metrics.PodReplacementsFailedMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Name})...).Inc()
 		case c.cluster.IsMigrationCluster():
@@ -2804,7 +2804,7 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			setupOK := true
 
 			if err := k8sutil.SetPodUpgradeTracking(c.k8s, result.Member.Name(), string(couchbasev2.SwapRebalance)); err != nil {
-				log.Error(err, "Failed to mark replacement pod with upgrade tracking",
+				c.log.Error(err, "Failed to mark replacement pod with upgrade tracking",
 					"cluster", c.namespacedName(), "pod", result.Member.Name())
 				setupOK = false
 			}
@@ -2815,17 +2815,17 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 			// stabilization period.
 			if setupOK {
 				if err := k8sutil.SetPodPendingUpgradeBeforeEjection(c.k8s, candidatesSlice[index].Name()); err != nil {
-					log.Error(err, "Failed to mark old pod for ejection",
+					c.log.Error(err, "Failed to mark old pod for ejection",
 						"cluster", c.namespacedName(), "pod", candidatesSlice[index].Name())
 					setupOK = false
 				}
 			}
 
 			if !setupOK {
-				log.Info("Deleting replacement pod due to failed swap-rebalance setup",
+				c.log.Info("Deleting replacement pod due to failed swap-rebalance setup",
 					"cluster", c.namespacedName(), "pod", result.Member.Name())
 				if delErr := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, result.Member.Name(), c.config.GetDeleteOptions()); delErr != nil {
-					log.Error(delErr, "Failed to delete replacement pod during cleanup",
+					c.log.Error(delErr, "Failed to delete replacement pod during cleanup",
 						"cluster", c.namespacedName(), "pod", result.Member.Name())
 				}
 				errs = append(errs, fmt.Errorf("%w: candidate %s, replacement pod cleaned up",

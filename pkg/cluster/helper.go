@@ -136,7 +136,7 @@ func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
 
 		version, err := couchbaseutil.NewVersion(member.Version())
 		if err != nil {
-			log.Error(err, "Failed to parse member version", "member", member.Name(), "version", member.Version())
+			c.log.Error(err, "Failed to parse member version", "member", member.Name(), "version", member.Version())
 			continue
 		}
 
@@ -189,7 +189,7 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 	if lowestVersion == "" {
 		supports, err := c.IsAtLeastVersion(version)
 		if err != nil {
-			log.Error(err, "Failed to check cluster version for feature support", "version", version)
+			c.log.Error(err, "Failed to check cluster version for feature support", "version", version)
 			return false
 		}
 
@@ -198,7 +198,7 @@ func (c *Cluster) SupportsVersionFeatures(version string) bool {
 
 	supports, err := couchbaseutil.VersionAfter(lowestVersion, version)
 	if err != nil {
-		log.Error(err, "Failed to check cluster version for feature support", "version", version)
+		c.log.Error(err, "Failed to check cluster version for feature support", "version", version)
 		return false
 	}
 

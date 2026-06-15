@@ -34,6 +34,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
 	vtypes "github.com/couchbase/couchbase-operator/pkg/validator/types"
+	"github.com/go-logr/logr"
 
 	"github.com/Masterminds/semver"
 	"github.com/golang/groupcache/lru"
@@ -60,6 +61,9 @@ type Config struct {
 	PodReadinessDelay     time.Duration
 	PodReadinessPeriod    time.Duration
 	PodRecoveryMaxRetries int
+	// LoggerFactor is a factory function which mints new Zap Loggers based on
+	// recognised log levels. Implementation is in pkg/logging
+	LoggerFactory func(logLevel string) logr.Logger
 }
 
 // Cluster is the core internal data type representing a Couchbase cluster.
@@ -181,6 +185,10 @@ type Cluster struct {
 	// validator is the validator instance for this cluster, backed by the operator's
 	// watch-backed informer caches. Created once alongside k8s in New.
 	validator *vtypes.Validator
+
+	// log is the logger instance for this cluster, with the cluster name as a structured log attribute.
+	// Created once in New, but may be updated if the operatorLogLevel annotation is set on the cluster.
+	log logr.Logger
 }
 
 // SetFailedValidation stores the set of resource names that failed
@@ -235,9 +243,9 @@ func (c *Cluster) persistRecoveryTimestamps() {
 
 		b, err := json.Marshal(serialized)
 		if err != nil {
-			log.Error(err, "Failed to marshal lastRecoveryAttemptTime", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to marshal lastRecoveryAttemptTime", "cluster", c.namespacedName())
 		} else if err := c.state.Upsert(persistence.LastRecoveryAttemptTimes, string(b)); err != nil {
-			log.Error(err, "Failed to persist lastRecoveryAttemptTime", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to persist lastRecoveryAttemptTime", "cluster", c.namespacedName())
 		}
 	}
 
@@ -249,9 +257,9 @@ func (c *Cluster) persistRecoveryTimestamps() {
 
 		b, err := json.Marshal(serialized)
 		if err != nil {
-			log.Error(err, "Failed to marshal lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to marshal lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
 		} else if err := c.state.Upsert(persistence.LastSuccessfulRecoveryTimes, string(b)); err != nil {
-			log.Error(err, "Failed to persist lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to persist lastSuccessfulRecoveryTime", "cluster", c.namespacedName())
 		}
 	}
 }
@@ -262,7 +270,7 @@ func (c *Cluster) restoreRecoveryTimestamps() {
 	if raw, err := c.state.Get(persistence.LastRecoveryAttemptTimes); err == nil {
 		var serialized map[string]string
 		if err := json.Unmarshal([]byte(raw), &serialized); err != nil {
-			log.Error(err, "Failed to unmarshal lastRecoveryAttemptTimes", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to unmarshal lastRecoveryAttemptTimes", "cluster", c.namespacedName())
 		} else {
 			for name, ts := range serialized {
 				if t, err := time.Parse(time.RFC3339, ts); err == nil {
@@ -275,7 +283,7 @@ func (c *Cluster) restoreRecoveryTimestamps() {
 	if raw, err := c.state.Get(persistence.LastSuccessfulRecoveryTimes); err == nil {
 		var serialized map[string]string
 		if err := json.Unmarshal([]byte(raw), &serialized); err != nil {
-			log.Error(err, "Failed to unmarshal lastSuccessfulRecoveryTimes", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to unmarshal lastSuccessfulRecoveryTimes", "cluster", c.namespacedName())
 		} else {
 			for name, ts := range serialized {
 				if t, err := time.Parse(time.RFC3339, ts); err == nil {
@@ -291,6 +299,7 @@ func (c *Cluster) restoreRecoveryTimestamps() {
 func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error) {
 	c := &Cluster{
 		config:                     config,
+		log:                        log,
 		cluster:                    cluster,
 		eventCache:                 lru.New(1024),
 		recoveryTime:               map[string]time.Time{},
@@ -301,7 +310,15 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		generation:                 cluster.Generation,
 	}
 
-	log.Info("Watching new cluster", "cluster", c.namespacedName())
+	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
+		c.log.Error(err, "Failed to apply annotations to cluster spec")
+	}
+
+	if c.cluster.Spec.OperatorLogLevel != "" && c.config.LoggerFactory != nil {
+		c.log = c.config.LoggerFactory(string(c.cluster.Spec.OperatorLogLevel)).WithValues("cluster", c.namespacedName())
+	}
+
+	c.log.Info("Watching new cluster")
 
 	// Cancel is used to abort the go routine when the operator is deleted
 	c.ctx, c.cancel = context.WithCancel(context.Background())
@@ -325,18 +342,18 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		c.cluster.Status.SetErrorCondition(err.Error())
 
 		if err := c.updateCRStatus(); err != nil {
-			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+			c.log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
 		return nil, err
 	}
 
-	log.Info("Running", "cluster", c.namespacedName())
+	c.log.Info("Running", "cluster", c.namespacedName())
 
 	c.restoreRecoveryTimestamps()
 
 	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
-		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
 	}
 
 	return c, nil
@@ -388,7 +405,7 @@ func (c *Cluster) newCluster() error {
 	go newJanitor(c).run()
 
 	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {
-		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
 	}
 
 	// Load the most recent username, password and TLS data from either
@@ -585,14 +602,14 @@ func (c *Cluster) clearFailedSchedulingServerGroupsIfReady() {
 	defer c.failedGroupsMu.Unlock()
 
 	if err := c.state.Delete(persistence.FailedSchedulingServerGroupsTracker); err != nil && !goerrors.Is(err, persistence.ErrKeyError) {
-		log.Error(err, "Failed to clear failed scheduling server groups", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to clear failed scheduling server groups", "cluster", c.namespacedName())
 	}
 }
 
 // create is the main cluster creation routine.  It is called on initial cluster creation
 // and any time it is recreated (e.g. all ephemeral pods have been killed).
 func (c *Cluster) create() error {
-	log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
+	c.log.Info("Cluster does not exist so the operator is attempting to create it", "cluster", c.namespacedName())
 
 	if err := c.initializeClusterState(); err != nil {
 		return err
@@ -651,7 +668,7 @@ func (c *Cluster) podInitialized(pod *v1.Pod) bool {
 
 	version, err := semver.NewVersion(versionAnnotation)
 	if err != nil {
-		log.Error(err, "Failed to parse pod version", "cluster", c.namespacedName(), "pod", pod.Name, "version", versionAnnotation)
+		c.log.Error(err, "Failed to parse pod version", "cluster", c.namespacedName(), "pod", pod.Name, "version", versionAnnotation)
 		return true
 	}
 
@@ -684,7 +701,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {
-			log.Error(err, "Status update failed", "cluster", c.namespacedName())
+			c.log.Error(err, "Status update failed", "cluster", c.namespacedName())
 		}
 
 		reconcileTime := time.Since(start)
@@ -705,7 +722,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// If the user has requested that we pause operations.
 	if c.cluster.Spec.Paused {
 		c.cluster.Status.PauseControl()
-		log.Info("Operator paused, skipping", "cluster", c.namespacedName())
+		c.log.Info("Operator paused, skipping", "cluster", c.namespacedName())
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "paused"})...).Inc()
 
@@ -717,7 +734,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		running := c.isMirWatchdogRunning()
 		enabled := c.isMirWatchdogEnabled()
 		if running && enabled && c.cluster.Spec.MirWatchdog != nil && c.cluster.Spec.MirWatchdog.SkipReconciliation != nil && *c.cluster.Spec.MirWatchdog.SkipReconciliation {
-			log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName(), "reason", condition.Message)
+			c.log.Info("Manual intervention required, skipping reconciliation", "cluster", c.namespacedName(), "reason", condition.Message)
 			metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "mir"})...).Inc()
 
 			return
@@ -734,7 +751,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 			c.StopMirWatchdog()
 		default:
 			// We have the condition and the MirWatchdog is running and enabled, but we don't want to skip reconciliation so we should log the reason and continue.
-			log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
+			c.log.Info("Manual intervention required", "cluster", c.namespacedName(), "reason", condition.Message)
 		}
 	}
 
@@ -746,7 +763,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// For existing clusters, process pending pods but continue with normal reconciliation.
 	pendingInitPods := c.getPendingInitPods()
 	if len(pendingInitPods) > 0 && c.readyMembers().Empty() {
-		log.V(1).Info("Pods pending initialization during cluster creation, skipping updateMembers",
+		c.log.V(1).Info("Pods pending initialization during cluster creation, skipping updateMembers",
 			"cluster", c.namespacedName(), "count", len(pendingInitPods))
 		c.updatePendingInitializationConditions()
 		// Return early - next cycle will either complete initialization or retry
@@ -754,7 +771,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	}
 
 	if len(pendingInitPods) > 0 {
-		log.V(1).Info("Pods pending initialization, processing before reconciliation",
+		c.log.V(1).Info("Pods pending initialization, processing before reconciliation",
 			"cluster", c.namespacedName(), "count", len(pendingInitPods))
 		c.updatePendingInitializationConditions()
 		// Continue with normal reconciliation
@@ -765,7 +782,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// to it.  By performing no caching the behaviour of the systems is identical during
 	// runtime and after a restart.
 	if err := c.updateMembers(); err != nil {
-		log.Error(err, "Failed to update members", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to update members", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
 
 		metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "error"})...).Inc()
@@ -782,10 +799,10 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 				continue
 			}
 
-			log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+			c.log.Info("Killing uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
 
 			if err := k8sutil.DeletePod(c.k8s, c.cluster.Namespace, pod.Name, c.config.GetDeleteOptions()); err != nil {
-				log.Error(err, "Failed to delete uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
+				c.log.Error(err, "Failed to delete uninitialized pod", "cluster", c.namespacedName(), "pod", pod.Name)
 				continue
 			}
 		}
@@ -793,20 +810,20 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		// Now is the time to check if any of the active client/server certs have expired
 		// otherwise we're not going to be able to update members or do anything.
 		if err := c.rotateExpiredCertificates(); err != nil {
-			log.Error(err, "Failed to rotate expired certificates", "cluster", c.namespacedName())
+			c.log.Error(err, "Failed to rotate expired certificates", "cluster", c.namespacedName())
 		}
 
 		return
 	}
 
 	if err := c.checkUpdateTime(operatorStartTime); err != nil {
-		log.Error(err, "Error when checking time of last update", "cluster", c.namespacedName())
+		c.log.Error(err, "Error when checking time of last update", "cluster", c.namespacedName())
 	}
 
 	var err error
 	// If we are in migration mode handle that differently.
 	if c.cluster.IsMigrationCluster() {
-		log.Info("Cluster is in migration mode", "cluster", c.namespacedName())
+		c.log.Info("Cluster is in migration mode", "cluster", c.namespacedName())
 		err = c.reconcileMigrationCluster()
 	} else {
 		err = c.reconcile()
@@ -823,15 +840,15 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 		var stackTracedError *errors.StackTracedError
 
 		if goerrors.As(err, &stackTracedError) {
-			log.Info("Reconciliation failed", "cluster", c.namespacedName(), "error", err.Error(), "stack", stackTracedError.GetStack())
+			c.log.Info("Reconciliation failed", "cluster", c.namespacedName(), "error", err.Error(), "stack", stackTracedError.GetStack())
 		} else {
-			log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
+			c.log.Error(err, "Reconciliation failed", "cluster", c.namespacedName())
 		}
 
 		c.cluster.Status.SetErrorCondition(err.Error())
 
 		if err := c.updateCRStatus(); err != nil {
-			log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+			c.log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 		}
 
 		c.raiseEvent(k8sutil.ReconcileFailedEvent(c.cluster, err))
@@ -848,7 +865,7 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 	// the validation error the controller just set.  The controller clears
 	// it on the next cycle when validation passes.
 	if err := retryutil.RetryFor(4*time.Second, c.updateCRStatus); err != nil {
-		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+		c.log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 
 	metrics.ReconcileTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name, "success"})...).Inc()
@@ -858,12 +875,12 @@ func (c *Cluster) RunReconcile(operatorStartTime time.Time) {
 // then update the specification and unconditionally reconcile.
 func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTime time.Time) {
 	if cluster.Generation < c.generation {
-		log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
+		c.log.Info("API returned old version, skipping reconcile", "cluster", c.namespacedName())
 		return
 	}
 
 	if err := annotations.Populate(&cluster.Spec, cluster.Annotations); err != nil {
-		log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
+		c.log.Error(err, "Failed to apply annotations to cluster spec", "cluster", c.namespacedName())
 	}
 
 	if !reflect.DeepEqual(cluster.Spec, c.cluster.Spec) {
@@ -872,7 +889,24 @@ func (c *Cluster) Update(cluster *couchbasev2.CouchbaseCluster, operatorStartTim
 	}
 
 	c.cluster = cluster
+
+	c.refreshLogger()
+
 	c.RunReconcile(operatorStartTime)
+}
+
+// refreshLogger updates the cluster-specific logger based on the current cluster specification.
+func (c *Cluster) refreshLogger() {
+	if c.config.LoggerFactory == nil {
+		return
+	}
+
+	if c.cluster.Spec.OperatorLogLevel != "" {
+		c.log = c.config.LoggerFactory(string(c.cluster.Spec.OperatorLogLevel)).WithValues("cluster", c.namespacedName())
+		c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password, c.log)
+	} else {
+		c.log = log.WithValues("cluster", c.namespacedName())
+	}
 }
 
 func (c *Cluster) logUpdate(old, new interface{}) {
@@ -882,7 +916,7 @@ func (c *Cluster) logUpdate(old, new interface{}) {
 	// empty one, so this could be legitimately triggered even if there is no
 	// difference.
 	if d != "" {
-		log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
+		c.log.Info("Resource updated", "cluster", c.namespacedName(), "diff", d)
 	}
 }
 
@@ -973,7 +1007,7 @@ func (c *Cluster) recoverClusterDown() (bool, error) {
 		if c.isPodRecoverable(m) {
 			pod, podExists := c.k8s.Pods.Get(name)
 			if podExists && pod.DeletionTimestamp == nil && k8sutil.HasPendingInitializationCondition(pod) {
-				log.V(1).Info("Down pod already exists, skipping recreation", "cluster", c.namespacedName(), "name", name)
+				c.log.V(1).Info("Down pod already exists, skipping recreation", "cluster", c.namespacedName(), "name", name)
 				continue
 			}
 
@@ -981,7 +1015,7 @@ func (c *Cluster) recoverClusterDown() (bool, error) {
 				return false, fmt.Errorf("node %s could not be recovered: %w", m.Name(), err)
 			}
 
-			log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
+			c.log.Info("Pod recovering", "cluster", c.namespacedName(), "name", m.Name())
 			c.raiseEventCached(k8sutil.MemberRecoveredEvent(m.Name(), c.cluster))
 
 			return true, nil
@@ -1002,12 +1036,12 @@ func (c *Cluster) getClusterPods() []*v1.Pod {
 func (c *Cluster) discardUntrustedPods(pods []*v1.Pod) (filtered []*v1.Pod) {
 	for _, pod := range pods {
 		if len(pod.OwnerReferences) < 1 {
-			log.Info("Pod ignored, no owner", "cluster", c.namespacedName(), "name", pod.Name)
+			c.log.Info("Pod ignored, no owner", "cluster", c.namespacedName(), "name", pod.Name)
 			continue
 		}
 
 		if pod.OwnerReferences[0].UID != c.cluster.UID {
-			log.Info("Pod ignored, invalid owner", "cluster", c.namespacedName(), "name", pod.Name, "cluster_uid", c.cluster.UID, "pod_uid", pod.OwnerReferences[0].UID)
+			c.log.Info("Pod ignored, invalid owner", "cluster", c.namespacedName(), "name", pod.Name, "cluster_uid", c.cluster.UID, "pod_uid", pod.OwnerReferences[0].UID)
 			continue
 		}
 
@@ -1098,9 +1132,9 @@ func (c *Cluster) setupAuth() error {
 }
 
 func (c *Cluster) initCouchbaseClient() error {
-	log.Info("Couchbase client starting", "cluster", c.namespacedName())
+	c.log.Info("Couchbase client starting", "cluster", c.namespacedName())
 
-	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password)
+	c.api = couchbaseutil.New(c.ctx, c.namespacedName(), c.username, c.password, c.log)
 
 	// Our source of truth is always the persistent cache.  If the user has rotated
 	// TLS while the operator is down then we have only the new certificates, while
@@ -1113,7 +1147,7 @@ func (c *Cluster) initCouchbaseClient() error {
 
 	var clientKey []byte
 
-	log.V(2).Info("Looking for registry key", "key", persistence.CACertificate)
+	c.log.V(2).Info("Looking for registry key", "key", persistence.CACertificate)
 
 	if caString, err := c.state.Get(persistence.CACertificate); err != nil {
 		if !goerrors.Is(err, persistence.ErrKeyError) {
@@ -1122,10 +1156,10 @@ func (c *Cluster) initCouchbaseClient() error {
 	} else {
 		ca = []byte(caString)
 
-		log.V(2).Info("Found key", "value", caString)
+		c.log.V(2).Info("Found key", "value", caString)
 	}
 
-	log.V(2).Info("Looking for registry key", "key", persistence.ClientCertificate)
+	c.log.V(2).Info("Looking for registry key", "key", persistence.ClientCertificate)
 
 	if clientCertString, err := c.state.Get(persistence.ClientCertificate); err != nil {
 		if !goerrors.Is(err, persistence.ErrKeyError) {
@@ -1134,10 +1168,10 @@ func (c *Cluster) initCouchbaseClient() error {
 	} else {
 		clientCert = []byte(clientCertString)
 
-		log.V(2).Info("Found key", "value", clientCertString)
+		c.log.V(2).Info("Found key", "value", clientCertString)
 	}
 
-	log.V(2).Info("Looking for registry key", "key", persistence.ClientKey)
+	c.log.V(2).Info("Looking for registry key", "key", persistence.ClientKey)
 
 	if clientKeyString, err := c.state.Get(persistence.ClientKey); err != nil {
 		if !goerrors.Is(err, persistence.ErrKeyError) {
@@ -1146,14 +1180,14 @@ func (c *Cluster) initCouchbaseClient() error {
 	} else {
 		clientKey = []byte(clientKeyString)
 
-		log.V(2).Info("Found key", "value", clientKeyString)
+		c.log.V(2).Info("Found key", "value", clientKeyString)
 	}
 
 	// If the persistent cache is not populated, but TLS is enabled, then there
 	// are two assumptions; this is either a new cluster, or it's an existing one
 	// being upgraded to this version.
 	if ca == nil && c.cluster.IsTLSEnabled() {
-		log.V(1).Info("No TLS configuration cached", "cluster", c.namespacedName())
+		c.log.V(1).Info("No TLS configuration cached", "cluster", c.namespacedName())
 
 		rootCAs, err := c.getCAs()
 		if err != nil {
@@ -1266,7 +1300,7 @@ func (c *Cluster) raiseEvent(event *v1.Event) *v1.Event {
 	// Post the event to kubernetes
 	event, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Create(context.Background(), event, metav1.CreateOptions{})
 	if err != nil {
-		log.Error(err, "Event creation failed", "cluster", c.namespacedName(), "event", event.Reason)
+		c.log.Error(err, "Event creation failed", "cluster", c.namespacedName(), "event", event.Reason)
 		return nil
 	}
 
@@ -1292,7 +1326,7 @@ func (c *Cluster) raiseEventCached(event *v1.Event) {
 
 			e, err := c.k8s.KubeClient.CoreV1().Events(c.cluster.Namespace).Update(context.Background(), e, metav1.UpdateOptions{})
 			if err != nil {
-				log.Error(err, "Event update failed", "cluster", c.namespacedName(), "event", event.Reason)
+				c.log.Error(err, "Event update failed", "cluster", c.namespacedName(), "event", event.Reason)
 			}
 
 			c.eventCache.Add(key, e)
@@ -1359,10 +1393,10 @@ func (c *Cluster) hibernate() (bool, error) {
 		canHibernate, reason := c.cluster.CanHibernate()
 
 		if !canHibernate {
-			log.Info("[WARN] Hibernation requested. Cluster will enter hibernation once it is stable", "reason", reason)
+			c.log.Info("[WARN] Hibernation requested. Cluster will enter hibernation once it is stable", "reason", reason)
 			return false, nil
 		} else {
-			log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
+			c.log.Info("Cluster hibernation requested", "cluster", c.namespacedName())
 			c.raiseEvent(k8sutil.HibernationStartedEvent(c.cluster))
 		}
 	}
@@ -1370,7 +1404,7 @@ func (c *Cluster) hibernate() (bool, error) {
 	members := podsToMemberSet(c.getClusterPods())
 
 	for _, member := range members {
-		log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
+		c.log.Info("Hibernating pod", "cluster", c.namespacedName(), "name", member.Name())
 
 		if err := c.removePod(member.Name(), false); err != nil {
 			return true, err
@@ -1389,7 +1423,7 @@ func (c *Cluster) hibernate() (bool, error) {
 		return true, err
 	}
 
-	log.Info("Cluster is hibernating", "cluster", c.namespacedName())
+	c.log.Info("Cluster is hibernating", "cluster", c.namespacedName())
 
 	return true, nil
 }
@@ -1407,7 +1441,7 @@ func (c *Cluster) checkUpdateTime(operatorStartTime time.Time) error {
 
 	if !timeOfChange.IsZero() {
 		if timeOfChange.Before(operatorStartTime) {
-			log.Info("Operator started after changes made. Revert your changes to avoid errors.")
+			c.log.Info("Operator started after changes made. Revert your changes to avoid errors.")
 			c.cluster.Status.SetErrorCondition("Operator started after changes made. Revert your changes to avoid errors.")
 
 			if err := c.state.Upsert(persistence.ChangesMadeBeforeOperatorStart, "true"); err != nil {
@@ -1450,14 +1484,14 @@ func (c *Cluster) ReconcileMirWatchdogContext() {
 			desiredInterval = mw.Interval.Duration
 		}
 
-		log.Info("Starting Manual Intervention Required watchdog", "cluster", c.namespacedName(), "interval", desiredInterval)
+		c.log.Info("Starting Manual Intervention Required watchdog", "cluster", c.namespacedName(), "interval", desiredInterval)
 		c.mirWatchdog = StartMirWatchdog(c, desiredInterval)
 		return
 	}
 }
 
 func (c *Cluster) StopMirWatchdog() {
-	log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
+	c.log.Info("Stopping Manual Intervention Required watchdog", "cluster", c.namespacedName())
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManualInterventionRequired)
 	metrics.ManualInterventionRequiredMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, c.cluster.Name})...).Set(0)
 	c.mirWatchdog.Stop()
@@ -1527,17 +1561,17 @@ func (c *Cluster) isPodActuallyReady(pod *v1.Pod) bool {
 //  4. Initial cluster creation (fallthrough) → initMember + configureInitialMember + UUID fetch.
 func (c *Cluster) handleReadyPendingPod(pod *v1.Pod) {
 	if pod.DeletionTimestamp != nil {
-		log.V(1).Info("Pod has deletion timestamp, skipping pending init",
+		c.log.V(1).Info("Pod has deletion timestamp, skipping pending init",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
-	log.V(1).Info("Pod is ready, attempting to initialize", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.V(1).Info("Pod is ready, attempting to initialize", "cluster", c.namespacedName(), "pod", pod.Name)
 
 	member := c.memberFromPod(pod)
 	config := c.cluster.Spec.GetServerConfigByName(member.Config())
 	if config == nil {
-		log.Error(errors.NewStackTracedError(errors.ErrInternalError), "Cannot initialize pod: config not found",
+		c.log.Error(errors.NewStackTracedError(errors.ErrInternalError), "Cannot initialize pod: config not found",
 			"cluster", c.namespacedName(), "pod", pod.Name, "config", member.Config())
 		return
 	}
@@ -1549,7 +1583,7 @@ func (c *Cluster) handleReadyPendingPod(pod *v1.Pod) {
 	// but fetchAndPersistClusterUUID failed (ClusterID=""), path 4 must retry the UUID fetch.
 	if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; ok && c.cluster.Status.ClusterID != "" {
 		if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-			log.Error(err, "Failed to clear stale pending initialization condition",
+			c.log.Error(err, "Failed to clear stale pending initialization condition",
 				"cluster", c.namespacedName(), "pod", pod.Name)
 		}
 		return
@@ -1579,7 +1613,7 @@ func (c *Cluster) handleReadyPendingPod(pod *v1.Pod) {
 // CBS hostname/TLS/storage init, then addNode. On success: set initialized + clear condition.
 func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchbaseutil.Member, config *couchbasev2.ServerConfig) {
 	if err := c.initMember(c.ctx, member, *config, false); err != nil {
-		log.Error(err, "Pod initialization failed, will retry next cycle",
+		c.log.Error(err, "Pod initialization failed, will retry next cycle",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
@@ -1592,13 +1626,13 @@ func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchba
 	services, err := couchbaseutil.ServiceListFromStringArray(
 		couchbasev2.ServiceList(config.Services).StringSlice())
 	if err != nil {
-		log.Error(err, "Failed to build services list for pod",
+		c.log.Error(err, "Failed to build services list for pod",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
 	if err := c.AddNodeWithPodReadyCheck(member, url, services, c.readyMembers(), asyncAddNodeRetryPeriod); err != nil {
-		log.Error(err, "Failed to add pod to cluster, will retry next cycle",
+		c.log.Error(err, "Failed to add pod to cluster, will retry next cycle",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
@@ -1606,12 +1640,12 @@ func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchba
 	ctx, cancelWait := context.WithTimeout(c.ctx, time.Minute)
 	defer cancelWait()
 	if err := c.waitForPodAdded(ctx, member); err != nil {
-		log.Error(err, "Node did not reach inactiveAdded state after addNode, will retry next cycle",
+		c.log.Error(err, "Node did not reach inactiveAdded state after addNode, will retry next cycle",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
-	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
+	c.log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
 	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
 
 	// Fire upgrade metrics at the correct semantic point: after CBS acknowledged the node.
@@ -1633,7 +1667,7 @@ func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchba
 	}
 
 	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
-		log.Error(err, "Failed to set pod initialized",
+		c.log.Error(err, "Failed to set pod initialized",
 			"cluster", c.namespacedName(), "pod", pod.Name)
 		// Do NOT fall through to ClearPodPendingInitialization — without the initialized
 		// annotation, kill-uninitialized-pods would delete a live CBS-active node next cycle.
@@ -1641,7 +1675,7 @@ func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchba
 	}
 
 	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-		log.Error(err, "Failed to clear pending initialization condition")
+		c.log.Error(err, "Failed to clear pending initialization condition")
 	}
 }
 
@@ -1649,27 +1683,27 @@ func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchba
 // (either recovering with its PVC or after a previous CBS-add where SetPodInitialized
 // failed). No CBS init or addNode is needed — just mark initialized and clear PendingInit.
 func (c *Cluster) handlePendingPodAlreadyInitialized(pod *v1.Pod, member couchbaseutil.Member) {
-	log.V(1).Info("Pod already initialized in CBS, marking initialized",
+	c.log.V(1).Info("Pod already initialized in CBS, marking initialized",
 		"cluster", c.namespacedName(), "pod", pod.Name)
 	// SetPodInitialized BEFORE ClearPodPendingInitialization: if Set succeeds but Clear
 	// fails, the early-exit in handleReadyPendingPod retries the clear on the next cycle.
 	if err := k8sutil.SetPodInitialized(c.k8s, member.Name()); err != nil {
-		log.Error(err, "Failed to set pod initialized", "cluster", c.namespacedName(), "pod", pod.Name)
+		c.log.Error(err, "Failed to set pod initialized", "cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
 	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-		log.Error(err, "Failed to clear pending initialization condition")
+		c.log.Error(err, "Failed to clear pending initialization condition")
 	}
 }
 
 // handlePendingPodForNewCluster initializes the very first member of a new cluster:
 // CBS init, cluster-level configuration (passwords, RAM quotas), then UUID fetch.
 func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseutil.Member, config *couchbasev2.ServerConfig) {
-	log.V(1).Info("Initializing initial cluster member", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.V(1).Info("Initializing initial cluster member", "cluster", c.namespacedName(), "pod", pod.Name)
 
 	if err := c.initMember(c.ctx, member, *config, false); err != nil {
-		log.Error(err, "Failed to initialize ready pod", "cluster", c.namespacedName(), "pod", pod.Name)
+		c.log.Error(err, "Failed to initialize ready pod", "cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
@@ -1680,7 +1714,7 @@ func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseuti
 	// reconfiguration and go straight to the UUID fetch — idempotent via Upsert.
 	if _, ok := pod.Annotations[constants.PodInitializedAnnotation]; !ok {
 		if err := c.configureInitialMember(member, config); err != nil {
-			log.Error(err, "Failed to configure initial member")
+			c.log.Error(err, "Failed to configure initial member")
 			c.callableMembers = couchbaseutil.MemberSet{}
 			return
 		}
@@ -1688,7 +1722,7 @@ func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseuti
 
 	uuid, err := c.fetchAndPersistClusterUUID(member)
 	if err != nil {
-		log.Error(err, "Failed to fetch cluster UUID")
+		c.log.Error(err, "Failed to fetch cluster UUID")
 		c.callableMembers = couchbaseutil.MemberSet{}
 		return
 	}
@@ -1696,7 +1730,7 @@ func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseuti
 	c.cluster.Status.SetClusterID(uuid)
 	c.cluster.Status.SetBalancedCondition()
 
-	log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
+	c.log.Info("Operator added member", "cluster", c.namespacedName(), "name", member.Name())
 	c.raiseEvent(k8sutil.MemberAddEvent(member.Name(), c.cluster))
 
 	if condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingInitializationCondition); condition != nil {
@@ -1706,20 +1740,20 @@ func (c *Cluster) handlePendingPodForNewCluster(pod *v1.Pod, member couchbaseuti
 	}
 
 	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-		log.Error(err, "Failed to clear pending initialization condition")
+		c.log.Error(err, "Failed to clear pending initialization condition")
 	}
 
-	log.V(1).Info("Pod initialization complete", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.V(1).Info("Pod initialization complete", "cluster", c.namespacedName(), "pod", pod.Name)
 }
 
 // handleTimedOutPendingPod cleans up a pod that has exceeded its initialization timeout.
 func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
-	log.Info("Pod initialization timed out, removing", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.Info("Pod initialization timed out, removing", "cluster", c.namespacedName(), "pod", pod.Name)
 
 	if pod.Status.Phase != v1.PodRunning {
 		if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok && serverGroup != "" {
 			if err := c.addFailedSchedulingServerGroups(serverGroup); err != nil {
-				log.Error(err, "Failed to record server group scheduling failure",
+				c.log.Error(err, "Failed to record server group scheduling failure",
 					"cluster", c.namespacedName(), "pod", pod.Name, "serverGroup", serverGroup)
 			}
 		}
@@ -1729,13 +1763,13 @@ func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
 	// cycle retries the removal. Clearing the condition before removal would
 	// expose the pod to handleUnclusteredNodes which would attempt to CBS-add it.
 	if err := c.removePod(pod.Name, true); err != nil {
-		log.Error(err, "Failed to remove timed-out pending pod", "cluster", c.namespacedName(), "pod", pod.Name)
+		c.log.Error(err, "Failed to remove timed-out pending pod", "cluster", c.namespacedName(), "pod", pod.Name)
 		return
 	}
 
 	// Condition cleared only after successful removal.
 	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-		log.Error(err, "Failed to clear pending initialization condition", "pod", pod.Name)
+		c.log.Error(err, "Failed to clear pending initialization condition", "pod", pod.Name)
 	}
 
 	c.raiseEventCached(k8sutil.MemberCreationFailedEvent(pod.Name, c.cluster))
@@ -1768,7 +1802,7 @@ func (c *Cluster) updatePendingInitializationConditions() {
 			continue
 		}
 
-		log.V(1).Info("Pod pending initialization, not yet ready",
+		c.log.V(1).Info("Pod pending initialization, not yet ready",
 			"cluster", c.namespacedName(), "pod", pod.Name, "age", podAge.Round(time.Second))
 	}
 }

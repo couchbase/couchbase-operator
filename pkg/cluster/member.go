@@ -214,8 +214,8 @@ func addMissingNodesToSet(nodes []couchbaseutil.NodeInfo, configs []couchbasev2.
 
 // logFailedMember outputs any debug information we can about a failed member creation.
 func (c *Cluster) logFailedMember(message, name string) {
-	log.Info(message, "cluster", c.namespacedName(), "name", name)
-	log.V(1).Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
+	c.log.Info(message, "cluster", c.namespacedName(), "name", name)
+	c.log.V(1).Info(message, "cluster", c.namespacedName(), "name", name, "resource", k8sutil.LogPod(c.k8s, c.cluster.Namespace, name))
 }
 
 // Creates new Couchbase cluster members (pods).
@@ -234,7 +234,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 		return nil, err
 	}
 
-	log.V(1).Info("creating pods with indexes", "cluster", c.namespacedName(), "indexes", availableIndexes)
+	c.log.V(1).Info("creating pods with indexes", "cluster", c.namespacedName(), "indexes", availableIndexes)
 	// Create a new member
 	memberSpecs := make([]couchbaseutil.Member, len(serverSpecs))
 
@@ -256,7 +256,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	// we want to track members and if they fail
 	results := make([]*couchbaseutil.PodCreationResult, len(memberSpecs))
 
-	log.V(1).Info("starting pod creation", "cluster", c.namespacedName())
+	c.log.V(1).Info("starting pod creation", "cluster", c.namespacedName())
 
 	for index, newMember := range memberSpecs {
 		results[index] = &couchbaseutil.PodCreationResult{
@@ -278,7 +278,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	}
 
 	wg.Wait()
-	log.V(1).Info("finished pod creation", "cluster", c.namespacedName())
+	c.log.V(1).Info("finished pod creation", "cluster", c.namespacedName())
 
 	var allErr = true
 
@@ -291,7 +291,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 	if allErr {
 		err = c.setPodIndex(availableIndexes[0])
 		if err != nil {
-			log.Error(err, "failed to rollback index", "cluster", c.namespacedName(), "index", availableIndexes[0])
+			c.log.Error(err, "failed to rollback index", "cluster", c.namespacedName(), "index", availableIndexes[0])
 		}
 	}
 
@@ -299,7 +299,7 @@ func (c *Cluster) createMembers(serverSpecs ...couchbasev2.ServerConfig) ([]*cou
 }
 
 func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member, serverSpec couchbasev2.ServerConfig, cleanupOnFailure bool) error {
-	log.V(1).Info("initialising pod", "pod", newMember.Name(), "cluster", c.namespacedName())
+	c.log.V(1).Info("initialising pod", "pod", newMember.Name(), "cluster", c.namespacedName())
 	// From this point on, if something goes wrong, we blow the pod (and any volumes)
 	// away, as they are uninitialized and not clustered, hoping it will fix itself
 	// next time around.
@@ -309,11 +309,11 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 			return
 		}
 
-		log.V(1).Info("failed to initialise pod", "pod", newMember.Name(), "cluster", c.namespacedName(), "error", err)
+		c.log.V(1).Info("failed to initialise pod", "pod", newMember.Name(), "cluster", c.namespacedName(), "error", err)
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(newMember.Name(), c.cluster))
 
 		if rerr := c.removePod(newMember.Name(), true); rerr != nil {
-			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
+			c.log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
 		}
 	}()
 
@@ -353,11 +353,11 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	// check if we already know about this SHA256
 	// update the digest map
 	serverImage := c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec)
-	newVersion, updated := couchbaseutil.UpdateImageDigestMap(serverImage, info.Version)
+	newVersion, updated := couchbaseutil.UpdateImageDigestMap(serverImage, info.Version, c.log)
 	// check the member version, if it's different then update EVERYTHING.
 	if newVersion != "" {
 		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
-			log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
+			c.log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
 			return err
 		}
 	}
@@ -366,10 +366,10 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 	// i.e this is a new cluster. We don't want to change versions until we're finished
 	// upgrading.
 	if updated {
-		log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.namespacedName())
+		c.log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.namespacedName())
 
 		if err := c.updatePersistenceVersion(newVersion); err != nil {
-			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.namespacedName())
+			c.log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.namespacedName())
 
 			return err
 		}
@@ -421,7 +421,7 @@ func (c *Cluster) addMembersToTarget(target interface{}, serverSpecs ...couchbas
 	// Migration requires special DNS/service ordering that async doesn't support.
 	for index, memberResult := range memberResults {
 		if memberResult.Err != nil {
-			log.V(1).Info("skipping clustering pod due to error", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", memberResult.Err)
+			c.log.V(1).Info("skipping clustering pod due to error", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", memberResult.Err)
 			continue
 		}
 		if err := c.addMigrationMember(memberResult, serverSpecs[index], target); err != nil {
@@ -450,7 +450,7 @@ func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResu
 	url := memberResult.Member.GetDNSName()
 
 	if _, ok := c.cluster.Annotations[constants.AddNodeInsecureAnnotation]; ok {
-		log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+		c.log.Info("Enforcing HTTP to add member", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
 		url = memberResult.Member.GetHostURLPlaintext()
 	}
 
@@ -462,7 +462,7 @@ func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResu
 	if c.cluster.IsExternalMigrationCluster() && c.cluster.Spec.HasExposedFeatures() {
 		if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member); err != nil {
 			if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
-				log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
+				c.log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
 				return nil
 			}
 
@@ -475,28 +475,28 @@ func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResu
 	// Wait until the pod's main container is ready before making any CBS API calls.
 	// createPod() returns immediately after flagging PendingInitializationCondition.
 	if err := c.waitForPodMainContainerReady(memberResult.Member, c.config.PodCreateTimeout); err != nil {
-		log.Error(err, "Pod not ready for initialization", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+		c.log.Error(err, "Pod not ready for initialization", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 		memberResult.Err = err
 		return nil
 	}
 
 	if err := c.initMember(c.ctx, memberResult.Member, serverSpec, true); err != nil {
-		log.Error(err, "Failed to initialize pod before cluster add", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+		c.log.Error(err, "Failed to initialize pod before cluster add", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 		memberResult.Err = err
 		return nil
 	}
 
-	log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+	c.log.V(1).Info("adding pod to cluster", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 
 	if err := c.AddNodeWithPodReadyCheck(memberResult.Member, url, services, target, retryPeriod); err != nil {
-		log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
+		c.log.V(1).Info("server api call to add pod to cluster failed", "cluster", c.namespacedName(), "pod", memberResult.Member.Name(), "error", err)
 		memberResult.Err = err
 		return nil
 	}
 
 	c.clusterAddMember(memberResult.Member)
 
-	log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
+	c.log.Info("Pod added to cluster", "cluster", c.namespacedName(), "name", memberResult.Member.Name())
 	c.raiseEvent(k8sutil.MemberAddEvent(memberResult.Member.Name(), c.cluster))
 
 	if err := k8sutil.SetPodInitialized(c.k8s, memberResult.Member.Name()); err != nil {
@@ -505,7 +505,7 @@ func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResu
 
 	if pod, found := c.k8s.Pods.Get(memberResult.Member.Name()); found {
 		if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
-			log.Error(err, "Failed to clear pending initialization condition", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
+			c.log.Error(err, "Failed to clear pending initialization condition", "cluster", c.namespacedName(), "pod", memberResult.Member.Name())
 		}
 	}
 
@@ -535,7 +535,7 @@ func (c *Cluster) waitForPodMainContainerReady(member couchbaseutil.Member, time
 			return nil
 		}
 
-		log.V(1).Info("Waiting for pod main container to be ready", "cluster", c.namespacedName(), "pod", member.Name())
+		c.log.V(1).Info("Waiting for pod main container to be ready", "cluster", c.namespacedName(), "pod", member.Name())
 
 		select {
 		case <-ticker.C:
@@ -583,7 +583,7 @@ func (c *Cluster) attemptAddNode(member couchbaseutil.Member, url string, servic
 	// Successfully got cluster info, check if node already added
 	for _, node := range clusterInfo.Nodes {
 		if node.HostName.WithoutPort() == url {
-			log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
+			c.log.V(1).Info("node already exists in cluster", "cluster", c.namespacedName(), "hostname", url)
 			return true, nil
 		}
 	}
@@ -591,7 +591,7 @@ func (c *Cluster) attemptAddNode(member couchbaseutil.Member, url string, servic
 	// Check main container readiness (not pod initialization).
 	// IsPodMainContainerReady checks if the Couchbase container is ready to accept requests.
 	if !k8sutil.IsPodMainContainerReady(pod) {
-		log.V(1).Info("Pod main container not ready, skipping AddNode attempt", "cluster", c.namespacedName(), "pod", member.Name())
+		c.log.V(1).Info("Pod main container not ready, skipping AddNode attempt", "cluster", c.namespacedName(), "pod", member.Name())
 		return false, nil
 	}
 
@@ -631,7 +631,7 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 				return err
 			}
 
-			log.Error(err, "AddNode attempt failed, will retry", "cluster", c.namespacedName(), "pod", member.Name())
+			c.log.Error(err, "AddNode attempt failed, will retry", "cluster", c.namespacedName(), "pod", member.Name())
 		}
 		if success {
 			return nil
@@ -701,7 +701,7 @@ func (c *Cluster) createInitialMember() error {
 		return member[0].Err
 	}
 
-	log.Info("Initial member pod created, pending async initialization",
+	c.log.Info("Initial member pod created, pending async initialization",
 		"cluster", c.namespacedName(), "pod", member[0].Member.Name())
 	return nil
 }
@@ -720,7 +720,7 @@ func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *cou
 		// problem.  They contain no data at this point.
 		if err := c.removePod(member.Name(), true); err != nil {
 			// Unlikely, print the error in scope, propagate the outer error.
-			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", err)
+			c.log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", err)
 		}
 
 		return err
@@ -731,7 +731,7 @@ func (c *Cluster) configureInitialMember(member couchbaseutil.Member, class *cou
 
 // initializes the first member in the cluster.
 func (c *Cluster) initInitialMember(m couchbaseutil.Member, serverSpec *couchbasev2.ServerConfig) error {
-	log.Info("Initialiasing first cluster member", "cluster", c.namespacedName())
+	c.log.Info("Initialiasing first cluster member", "cluster", c.namespacedName())
 	settings := c.cluster.Spec.ClusterSettings
 
 	defaults := &couchbaseutil.PoolsDefaults{
@@ -961,7 +961,7 @@ func (c *Cluster) updateMemberStatusWithClusterInfo(ready, unready couchbaseutil
 	c.cluster.Status.Members.SetUnready(unready.Names())
 
 	if err := c.updateCRStatus(); err != nil {
-		log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
+		c.log.Info("unable to update status", "cluster", c.namespacedName(), "error", err)
 	}
 }
 

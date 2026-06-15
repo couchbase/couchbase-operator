@@ -3072,7 +3072,24 @@ type ClusterSpec struct {
 	// The operator will process the request and remove the annotation after execution.
 	// +optional
 	DropDEKSystem string `json:"-" annotation:"dropDEKSystem"`
+
+	// OperatorLogLevel controls the verbosity of operator logs. This can be
+	// set at individual CouchbaseCluster CR which will override the operator's default log level.
+	// If no annotation is set, the operator will use the default log level defined in the operator configuration.
+	// +optional
+	OperatorLogLevel OperatorLogLevel `json:"-" annotation:"operatorLogLevel"`
 }
+
+// OperatorLogLevel controls the verbosity of operator logs.
+// +kubebuilder:validation:Enum=error;info;debug;2
+type OperatorLogLevel string
+
+const (
+	OperatorLogLevelError OperatorLogLevel = "error"
+	OperatorLogLevelInfo  OperatorLogLevel = "info"
+	OperatorLogLevelDebug OperatorLogLevel = "debug"
+	OperatorLogLevelTwo   OperatorLogLevel = "2"
+)
 
 type MirWatchdog struct {
 	// Enabled controls whether the additional out-of-band checks are enabled for the cluster.

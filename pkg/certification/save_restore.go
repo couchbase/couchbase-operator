@@ -32,6 +32,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
+	"github.com/go-logr/logr"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/ghodss/yaml"
@@ -698,7 +699,7 @@ func gatherClusterResources(clients *clients, cluster *couchbasev2.CouchbaseClus
 	}
 
 	// Create a client to talk to the pod.
-	apiClient := couchbaseutil.New(context.Background(), "", username, password)
+	apiClient := couchbaseutil.New(context.Background(), "", username, password, logr.Logger{})
 
 	// Here's where it gets *really* complicated, we need to gather all sources of
 	// CAs in the configuration in order to verify who we are talking to.  Then as

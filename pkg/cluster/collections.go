@@ -106,7 +106,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 	current := &couchbaseutil.ScopeList{}
 
 	if !c.bucketExists(bucket.GetCouchbaseName()) {
-		log.Info("Bucket does not yet exist", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName())
+		c.log.Info("Bucket does not yet exist", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName())
 		return nil
 	}
 
@@ -140,7 +140,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		log.Info("Deleting scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope.Name)
+		c.log.Info("Deleting scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope.Name)
 
 		if err := couchbaseutil.DeleteScope(bucket.GetCouchbaseName(), scope.Name).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -160,7 +160,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		log.Info("Creating scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope)
+		c.log.Info("Creating scope", "cluster", c.namespacedName(), "bucket", bucket.GetCouchbaseName(), "scope", scope)
 
 		if err := couchbaseutil.CreateScope(bucket.GetCouchbaseName(), scope).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -258,7 +258,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 		case couchbasev2.ScopeCRDResourceKind:
 			scope, ok := c.k8s.CouchbaseScopes.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeCRDResourceKind, "name", resource.Name)
+				c.log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeCRDResourceKind, "name", resource.Name)
 				break
 			}
 
@@ -276,7 +276,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 			// e.g. you're only dealing with one type.
 			scopeGroup, ok := c.k8s.CouchbaseScopeGroups.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
+				c.log.V(1).Info("Unable to find scope resource", "cluster", c.namespacedName(), "kind", couchbasev2.ScopeGroupCRDResourceKind, "name", resource.Name)
 				break
 			}
 
@@ -416,7 +416,7 @@ func (c *Cluster) reconcileCollectionSettings(bucket couchbasev2.AbstractBucket,
 	}
 
 	if !reflect.DeepEqual(existingCollection, requestedCollection) {
-		log.Info("Patching collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
+		c.log.Info("Patching collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "collection", collection.CouchbaseName())
 
 		if err := couchbaseutil.PatchCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), requestedCollection).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -456,7 +456,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Deleting collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.Name)
+		c.log.Info("Deleting collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.Name)
 
 		if err := couchbaseutil.DeleteCollection(bucket.GetCouchbaseName(), scope.CouchbaseName(), collection.Name).On(c.api, c.readyMembers()); err != nil {
 			return err
@@ -474,7 +474,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 		err := annotations.Populate(&collection.Spec, collection.Annotations)
 		if err != nil {
-			log.Error(err, "failed to parse collection annotations", "cluster", c.namespacedName())
+			c.log.Error(err, "failed to parse collection annotations", "cluster", c.namespacedName())
 		}
 
 		if current.GetScope(scope.CouchbaseName()).HasCollection(collection.CouchbaseName()) {
@@ -486,7 +486,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 			continue
 		}
 
-		log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
+		c.log.Info("Creating collection", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
 
 		apiCollection := couchbaseutil.Collection{
 			Name: collection.CouchbaseName(),
@@ -504,7 +504,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 				if allowNegMaxTTL {
 					apiCollection.MaxTTL = &maxTTL
 				} else {
-					log.V(2).Info("Creating collection without maxTTL as cluster does not support the requested value", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
+					c.log.V(2).Info("Creating collection without maxTTL as cluster does not support the requested value", "bucket", bucket.GetCouchbaseName(), "scope", scope.CouchbaseName(), "cluster", c.cluster.NamespacedName(), "collection", collection.CouchbaseName())
 				}
 			} else {
 				apiCollection.MaxTTL = &maxTTL
@@ -579,7 +579,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 		case couchbasev2.CollectionCRDResourceKind:
 			collection, ok := c.k8s.CouchbaseCollections.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionCRDResourceKind, "name", resource.Name)
+				c.log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionCRDResourceKind, "name", resource.Name)
 				continue
 			}
 
@@ -593,7 +593,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 			// e.g. you're only dealing with one type.
 			collectionGroup, ok := c.k8s.CouchbaseCollectionGroups.Get(resource.StrName())
 			if !ok {
-				log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
+				c.log.V(1).Info("Unable to find collection resource", "cluster", c.namespacedName(), "kind", couchbasev2.CollectionGroupCRDResourceKind, "name", resource.Name)
 				continue
 			}
 

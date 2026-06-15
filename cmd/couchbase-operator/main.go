@@ -139,6 +139,7 @@ func main() {
 		PodReadinessDelay:     parseDuration(podReadinessDelay),
 		PodReadinessPeriod:    parseDuration(podReadinessPeriod),
 		PodRecoveryMaxRetries: podRecoveryMaxRetries,
+		LoggerFactory:         logOptions.NewWithLogLevel,
 	}
 
 	if err := controller.AddToManager(mgr, concurrency, clusterConfig); err != nil {

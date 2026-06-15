@@ -25,6 +25,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
+	"github.com/go-logr/logr"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -165,7 +166,7 @@ func (c *Cluster) generateImmediateFullBackupResources(backup *couchbasev2.Couch
 
 	resource.immediateBackupJob = immediateFull
 
-	log.V(2).Info("Generated immediate full backup job")
+	c.log.V(2).Info("Generated immediate full backup job")
 
 	return nil
 }
@@ -178,7 +179,7 @@ func (c *Cluster) generateImmediateIncrementalBackupResources(backup *couchbasev
 
 	resource.immediateBackupJob = immediateIncremental
 
-	log.V(2).Info("Generated immediate incremental backup job")
+	c.log.V(2).Info("Generated immediate incremental backup job")
 
 	return nil
 }
@@ -244,7 +245,7 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 			}
 
 			if len(backup.Status.Repo) == 0 {
-				log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", "cluster", c.namespacedName(), "backup", backup.Name)
+				c.log.V(1).Info("No full backup found for backup %s, skipping creation of incremental backup cronjob", "cluster", c.namespacedName(), "backup", backup.Name)
 			} else {
 				incrementalCronJob, err := c.generateBackupCronjob(backup, Incremental)
 				if err != nil {
@@ -300,7 +301,7 @@ func (c *Cluster) generatePeriodicMergeBackupResources(backup *couchbasev2.Couch
 	return nil
 }
 
-func (c Cluster) listBackupResources() (backupResourcesList, error) {
+func (c *Cluster) listBackupResources() (backupResourcesList, error) {
 	// cronjobs take priority
 	// since a job may exist with the same backup name.
 	jobs := c.listBackupJobResources()
@@ -315,12 +316,12 @@ func (c Cluster) listBackupResources() (backupResourcesList, error) {
 	return resources, nil
 }
 
-func (c Cluster) listBackupJobResources() backupResourcesList {
+func (c *Cluster) listBackupJobResources() backupResourcesList {
 	var resources backupResourcesList
 
 	for _, job := range c.k8s.Jobs.List() {
 		if job.Labels == nil {
-			log.Info("job missing labels", "cluster", c.namespacedName(), "job", job.Name)
+			c.log.Info("job missing labels", "cluster", c.namespacedName(), "job", job.Name)
 			continue
 		}
 
@@ -331,7 +332,7 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 		// check if it's ours
 		name, ok := job.Labels[constants.LabelBackup]
 		if !ok {
-			log.Info("job missing backup label", "cluster", c.namespacedName(), "job", job.Name)
+			c.log.Info("job missing backup label", "cluster", c.namespacedName(), "job", job.Name)
 		}
 
 		resource := &backupResources{
@@ -373,7 +374,7 @@ func (c Cluster) listBackupJobResources() backupResourcesList {
 }
 
 // listBackupResources searches Kubernetes for any backup resources and returns them.
-func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
+func (c *Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 	var resources backupResourcesList
 
 	for _, cronjob := range c.k8s.CronJobs.List() {
@@ -381,13 +382,13 @@ func (c Cluster) listBackupCronjobResources() (backupResourcesList, error) {
 		// If these fire then either the job hasn't been labelled correctly or,
 		// even more sinful, we are caching things that we shouldn't.
 		if cronjob.Labels == nil {
-			log.Info("cronjob missing labels", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
+			c.log.Info("cronjob missing labels", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
 			continue
 		}
 
 		name, ok := cronjob.Labels[constants.LabelBackup]
 		if !ok {
-			log.Info("cronjob missing backup label", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
+			c.log.Info("cronjob missing backup label", "cluster", c.namespacedName(), "cronjob", cronjob.Name)
 			continue
 		}
 
@@ -500,7 +501,7 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 		metrics.BackupJobsCreatedTotalMetric.WithLabelValues(c.addOptionalLabelValues([]string{c.cluster.Namespace, "scheduled_merge"})...).Inc()
 	}
 
-	log.Info("Backup created", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
+	c.log.Info("Backup created", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupCreateEvent(resource.name, c.cluster))
 
@@ -508,12 +509,12 @@ func (c *Cluster) createBackupResource(resource backupResources) error {
 }
 
 type backupUpdateNotifier interface {
-	notify()
+	notify(log logr.Logger)
 }
 
 type blankNotifier struct{}
 
-func (n *blankNotifier) notify() {}
+func (n *blankNotifier) notify(log logr.Logger) {}
 
 // backupUpdateNotifierImpl acts like a singleton pattern, raising the even only once.
 type backupUpdateNotifierImpl struct {
@@ -527,7 +528,7 @@ type backupUpdateNotifierImpl struct {
 	raised bool
 }
 
-func (n *backupUpdateNotifierImpl) notify() {
+func (n *backupUpdateNotifierImpl) notify(log logr.Logger) {
 	if n.raised {
 		return
 	}
@@ -613,7 +614,7 @@ func (c *Cluster) updateBackupJob(notifier backupUpdateNotifier, requested, curr
 			return err
 		}
 
-		notifier.notify()
+		notifier.notify(c.log)
 
 		return nil
 	}
@@ -633,7 +634,7 @@ func (c *Cluster) updateBackupCronJob(notifier backupUpdateNotifier, requested, 
 			return err
 		}
 
-		notifier.notify()
+		notifier.notify(c.log)
 
 		return nil
 	}
@@ -643,7 +644,7 @@ func (c *Cluster) updateBackupCronJob(notifier backupUpdateNotifier, requested, 
 			return err
 		}
 
-		notifier.notify()
+		notifier.notify(c.log)
 
 		return nil
 	}
@@ -672,7 +673,7 @@ func (c *Cluster) updateBackupCronJob(notifier backupUpdateNotifier, requested, 
 		return err
 	}
 
-	notifier.notify()
+	notifier.notify(c.log)
 
 	return nil
 }
@@ -689,25 +690,25 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 			return err
 		}
 
-		notifier.notify()
+		notifier.notify(c.log)
 
 		return nil
 	}
 
 	currentRequestedSize, ok := current.Spec.Resources.Requests[corev1.ResourceStorage]
 	if !ok {
-		log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", requested.Name)
+		c.log.V(1).Info("Skipping backup volume reconcile, no storage requested", "cluster", c.namespacedName(), "backup", requested.Name)
 		return nil
 	}
 
 	currentActualSize, ok := current.Status.Capacity[corev1.ResourceStorage]
 	if !ok {
-		log.V(1).Info("Skipping backup volume reconcile, no capacity defined", "cluster", c.namespacedName(), "backup", requested.Name)
+		c.log.V(1).Info("Skipping backup volume reconcile, no capacity defined", "cluster", c.namespacedName(), "backup", requested.Name)
 		return nil
 	}
 
 	if currentRequestedSize.Cmp(currentActualSize) > 0 {
-		log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", requested.Name)
+		c.log.V(1).Info("Skipping backup volume reconcile, resize pending", "cluster", c.namespacedName(), "backup", requested.Name)
 		return nil
 	}
 
@@ -731,7 +732,7 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 
 			threshold := resource.NewQuantity((size.Value()*int64(backup.Spec.AutoScaling.ThresholdPercent))/100, resource.BinarySI)
 
-			log.V(1).Info("Backup autoscaler status", "cluster", c.namespacedName(), "backup", backup.Name, "size", size, "free", free, "used", backup.Status.CapacityUsed, "threshold", threshold)
+			c.log.V(1).Info("Backup autoscaler status", "cluster", c.namespacedName(), "backup", backup.Name, "size", size, "free", free, "used", backup.Status.CapacityUsed, "threshold", threshold)
 
 			if free.Cmp(*threshold) < 0 {
 				increment := resource.NewQuantity((size.Value()*(100+int64(backup.Spec.AutoScaling.IncrementPercent)))/100, resource.BinarySI)
@@ -741,7 +742,7 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 					size = backup.Spec.AutoScaling.Limit
 				}
 
-				log.Info("Backup autoscaler scaling", "cluster", c.namespacedName(), "backup", backup.Name, "size", size)
+				c.log.Info("Backup autoscaler scaling", "cluster", c.namespacedName(), "backup", backup.Name, "size", size)
 			}
 		}
 	}
@@ -757,9 +758,9 @@ func (c *Cluster) updateBackupPVC(notifier backupUpdateNotifier, backup *couchba
 		return err
 	}
 
-	log.Info("Backup PVC resize pending", "cluster", c.cluster.NamespacedName(), "cbbackup", pvc.Name, "new size", *size)
+	c.log.Info("Backup PVC resize pending", "cluster", c.cluster.NamespacedName(), "cbbackup", pvc.Name, "new size", *size)
 
-	notifier.notify()
+	notifier.notify(c.log)
 
 	return nil
 }
@@ -796,7 +797,7 @@ func (c *Cluster) deleteBackupResource(resource backupResources) error {
 		}
 	}
 
-	log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
+	c.log.Info("Backup deleted", "cluster", c.cluster.NamespacedName(), "cbbackup", resource.name)
 
 	c.raiseEvent(k8sutil.BackupDeleteEvent(resource.name, c.cluster))
 
@@ -1665,7 +1666,7 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 
 // gatherBackups returns CouchbaseBackups based on the cluster Spec selector.
 func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
-	log.V(2).Info("gathering backups")
+	c.log.V(2).Info("gathering backups")
 
 	selector := labels.Everything()
 
@@ -1860,7 +1861,7 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 	// less likely, been deleted and needs recreating.
 	currentjob, ok := c.k8s.Jobs.Get(requested.Name)
 	if !ok {
-		log.Info("Restore created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name)
+		c.log.Info("Restore created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name)
 
 		c.raiseEvent(k8sutil.BackupRestoreCreateEvent(currentRestore.Name, c.cluster))
 
@@ -1869,7 +1870,7 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 			return err
 		}
 
-		log.Info("restore job created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name, "created job", createdJob.Name)
+		c.log.Info("restore job created", "cluster", c.cluster.NamespacedName(), "cbrestore", currentRestore.Name, "created job", createdJob.Name)
 
 		return nil
 	}
@@ -1885,7 +1886,7 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 }
 
 func (c *Cluster) deleteCouchbaseRestore(restoreName string) error {
-	log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", restoreName)
+	c.log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", restoreName)
 
 	if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), restoreName, *metav1.NewDeleteOptions(0)); err != nil {
 		return err

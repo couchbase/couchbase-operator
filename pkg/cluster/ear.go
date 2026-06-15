@@ -131,7 +131,7 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 
 		keyID, err := strconv.Atoi(key)
 		if err != nil {
-			log.Error(err, "Invalid encryption key ID",
+			c.log.Error(err, "Invalid encryption key ID",
 				"cluster", c.namespacedName(),
 				"keyID", key)
 			failedKeys = append(failedKeys, key)
@@ -143,14 +143,14 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 		if err != nil {
 			failedKeys = append(failedKeys, key)
 
-			log.Error(err, "Failed to rotate encryption key",
+			c.log.Error(err, "Failed to rotate encryption key",
 				"cluster", c.namespacedName(),
 				"keyID", key)
 
 			continue
 		}
 
-		log.Info("Rotated encryption key",
+		c.log.Info("Rotated encryption key",
 			"cluster", c.namespacedName(),
 			"keyID", key)
 	}
@@ -159,14 +159,14 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 	if len(failedKeys) == 0 {
 		delete(c.cluster.Annotations, constants.AnnotationRotateEncryptionKey)
 
-		log.Info("Removed rotate encryption key annotation after successful operation",
+		c.log.Info("Removed rotate encryption key annotation after successful operation",
 			"cluster", c.namespacedName())
 	} else {
 		// retry only failed keys
 		c.cluster.Annotations[constants.AnnotationRotateEncryptionKey] =
 			strings.Join(failedKeys, ",")
 
-		log.Info("Some encryption key rotations failed, will retry",
+		c.log.Info("Some encryption key rotations failed, will retry",
 			"cluster", c.namespacedName(),
 			"failedKeys", failedKeys)
 	}
@@ -177,7 +177,7 @@ func (c *Cluster) reconcileRotateEncryptionKey() error {
 		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
 
 	if err != nil {
-		log.Error(err, "Failed to update rotate encryption key annotation",
+		c.log.Error(err, "Failed to update rotate encryption key annotation",
 			"cluster", c.namespacedName())
 		return err
 	}
@@ -210,14 +210,14 @@ func (c *Cluster) reconcileDropDEKBucket() error {
 		if err != nil {
 			failedBuckets = append(failedBuckets, bucket)
 
-			log.Error(err, "Failed to drop DEK for bucket",
+			c.log.Error(err, "Failed to drop DEK for bucket",
 				"cluster", c.namespacedName(),
 				"bucket", bucket)
 
 			continue
 		}
 
-		log.Info("Dropped DEK and re-encrypted bucket",
+		c.log.Info("Dropped DEK and re-encrypted bucket",
 			"cluster", c.namespacedName(),
 			"bucket", bucket)
 	}
@@ -225,13 +225,13 @@ func (c *Cluster) reconcileDropDEKBucket() error {
 	if len(failedBuckets) == 0 {
 		delete(c.cluster.Annotations, constants.AnnotationDropDEKBucket)
 
-		log.Info("Removed drop DEK annotation after successful operation",
+		c.log.Info("Removed drop DEK annotation after successful operation",
 			"cluster", c.namespacedName())
 	} else {
 		c.cluster.Annotations[constants.AnnotationDropDEKBucket] =
 			strings.Join(failedBuckets, ",")
 
-		log.Info("Some buckets failed DEK drop, will retry",
+		c.log.Info("Some buckets failed DEK drop, will retry",
 			"cluster", c.namespacedName(),
 			"failedBuckets", failedBuckets)
 	}
@@ -242,7 +242,7 @@ func (c *Cluster) reconcileDropDEKBucket() error {
 		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
 
 	if err != nil {
-		log.Error(err, "Failed to update drop DEK annotation",
+		c.log.Error(err, "Failed to update drop DEK annotation",
 			"cluster", c.namespacedName())
 		return err
 	}
@@ -275,14 +275,14 @@ func (c *Cluster) reconcileDropDEKSystem() error {
 		if err != nil {
 			failedTypes = append(failedTypes, t)
 
-			log.Error(err, "Failed to drop DEK for system data",
+			c.log.Error(err, "Failed to drop DEK for system data",
 				"cluster", c.namespacedName(),
 				"type", t)
 
 			continue
 		}
 
-		log.Info("Dropped DEK and re-encrypted system data",
+		c.log.Info("Dropped DEK and re-encrypted system data",
 			"cluster", c.namespacedName(),
 			"type", t)
 	}
@@ -291,12 +291,12 @@ func (c *Cluster) reconcileDropDEKSystem() error {
 	if len(failedTypes) == 0 {
 		delete(c.cluster.Annotations, constants.AnnotationDropDEKSystem)
 
-		log.Info("Removed drop DEK system annotation after successful operation",
+		c.log.Info("Removed drop DEK system annotation after successful operation",
 			"cluster", c.namespacedName())
 	} else {
 		c.cluster.Annotations[constants.AnnotationDropDEKSystem] = strings.Join(failedTypes, ",")
 
-		log.Info("Some system data types failed DEK drop, will retry",
+		c.log.Info("Some system data types failed DEK drop, will retry",
 			"cluster", c.namespacedName(),
 			"failedTypes", failedTypes)
 	}
@@ -307,7 +307,7 @@ func (c *Cluster) reconcileDropDEKSystem() error {
 		Update(context.Background(), c.cluster, metav1.UpdateOptions{})
 
 	if err != nil {
-		log.Error(err, "Failed to update drop DEK system annotation",
+		c.log.Error(err, "Failed to update drop DEK system annotation",
 			"cluster", c.namespacedName())
 		return err
 	}
@@ -352,7 +352,7 @@ func (c *Cluster) reconcileEncryptionAtRestSettings(
 				// earlier in this reconcile cycle) from a real misconfig
 				// (no such CRD, or the CRD did not match the EAR selector).
 				if c.isEncryptionKeyDeferred(settings.KeyName) {
-					log.Info("Encryption key not yet provisioned on server, skipping settings update",
+					c.log.Info("Encryption key not yet provisioned on server, skipping settings update",
 						"cluster", c.namespacedName(), "type", settingsDescription, "key", settings.KeyName)
 					return nil
 				}
@@ -379,7 +379,7 @@ func (c *Cluster) reconcileEncryptionAtRestSettings(
 			return err
 		}
 
-		log.Info("Encryption settings updated", "cluster", c.namespacedName(), "type", settingsDescription)
+		c.log.Info("Encryption settings updated", "cluster", c.namespacedName(), "type", settingsDescription)
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent(settingsDescription, c.cluster))
 	}
 
@@ -477,7 +477,7 @@ func (c *Cluster) deleteRemovedEncryptionKeys(requestedKeys []*couchbasev2.Couch
 			// Remove the finalizer from the key if deleted successfully
 			c.removeFinalizer(k)
 
-			log.Info("Encryption key deleted", "cluster", c.namespacedName(), "name", actualKey.Name)
+			c.log.Info("Encryption key deleted", "cluster", c.namespacedName(), "name", actualKey.Name)
 			c.raiseEvent(k8sutil.EncryptionKeyDeletedEvent(c.cluster, actualKey.Name))
 		} // If the key could not be deleted then it is probably still being used somewhere
 	}
@@ -498,7 +498,7 @@ func (c *Cluster) deleteRemovedEncryptionKeys(requestedKeys []*couchbasev2.Couch
 				return err
 			}
 
-			log.Info("Encryption key deleted", "cluster", c.namespacedName(), "name", actualKey.Name)
+			c.log.Info("Encryption key deleted", "cluster", c.namespacedName(), "name", actualKey.Name)
 			c.raiseEvent(k8sutil.EncryptionKeyDeletedEvent(c.cluster, actualKey.Name))
 		}
 	}
@@ -566,7 +566,7 @@ func (c *Cluster) reconcileSingleEncryptionKey(requestedKey *couchbasev2.Couchba
 			return err
 		}
 
-		log.Info("Encryption key created", "cluster", c.namespacedName(), "name", apiRequestedKey.Name)
+		c.log.Info("Encryption key created", "cluster", c.namespacedName(), "name", apiRequestedKey.Name)
 		c.raiseEvent(k8sutil.EncryptionKeyCreatedEvent(c.cluster, apiRequestedKey.Name))
 
 		c.applyFinalizer(requestedKey)
@@ -596,7 +596,7 @@ func (c *Cluster) reconcileSingleEncryptionKey(requestedKey *couchbasev2.Couchba
 		return err
 	}
 
-	log.Info("Encryption key updated", "cluster", c.namespacedName(), "name", apiRequestedKey.Name)
+	c.log.Info("Encryption key updated", "cluster", c.namespacedName(), "name", apiRequestedKey.Name)
 	c.raiseEvent(k8sutil.EncryptionKeyUpdatedEvent(c.cluster, apiRequestedKey.Name))
 
 	return nil
@@ -614,7 +614,7 @@ func (c *Cluster) deferEncryptionKey(name, reason string) {
 
 	c.deferredEncryptionKeys[name] = struct{}{}
 
-	log.Info("Encryption key reconciliation deferred", "cluster", c.namespacedName(), "name", name, "reason", reason)
+	c.log.Info("Encryption key reconciliation deferred", "cluster", c.namespacedName(), "name", name, "reason", reason)
 	c.raiseEvent(k8sutil.EncryptionKeyPendingPropagationEvent(c.cluster, name, reason))
 }
 
@@ -652,7 +652,7 @@ func (c *Cluster) applyFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
 	var err error
 	if key, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(c.cluster.Namespace).Update(context.Background(), key, metav1.UpdateOptions{}); err != nil {
 		// Not worth stopping the reconciliation for this
-		log.Info("[WARN] failed to apply finalizer to encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
+		c.log.Info("[WARN] failed to apply finalizer to encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
 	}
 }
 
@@ -668,7 +668,7 @@ func (c *Cluster) removeFinalizer(key *couchbasev2.CouchbaseEncryptionKey) {
 	var err error
 	if key, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseEncryptionKeys(c.cluster.Namespace).Update(context.Background(), key, metav1.UpdateOptions{}); err != nil {
 		// Not worth stopping the reconciliation for this
-		log.Info("[WARN] failed to remove finalizer from encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
+		c.log.Info("[WARN] failed to remove finalizer from encryption key", "cluster", c.namespacedName(), "name", key.Name, "error", err)
 	}
 }
 
@@ -809,7 +809,7 @@ func (c *Cluster) configureAutoGeneratedKey(encryptionKey *couchbaseutil.Encrypt
 
 		// If the key is still not found, return an error
 		if encryptWithKey == nil {
-			log.Error(errors.ErrEncryptionKeyNotFound, "cluster", c.namespacedName(), "key-name", requestedKey.Spec.AutoGenerated.EncryptWithKey)
+			c.log.Error(errors.ErrEncryptionKeyNotFound, "cluster", c.namespacedName(), "key-name", requestedKey.Spec.AutoGenerated.EncryptWithKey)
 			return errors.ErrEncryptionKeyNotFound
 		}
 
@@ -867,7 +867,7 @@ func (c *Cluster) configureKMIPKey(encryptionKey *couchbaseutil.EncryptionKey, r
 
 	secret, found := c.k8s.Secrets.Get(requestedKey.Spec.KMIPKey.ClientSecret)
 	if !found {
-		log.Error(errors.ErrResourceRequired, "secret not found", "secretName", requestedKey.Spec.KMIPKey.ClientSecret)
+		c.log.Error(errors.ErrResourceRequired, "secret not found", "secretName", requestedKey.Spec.KMIPKey.ClientSecret)
 		return errors.ErrResourceRequired
 	}
 
@@ -879,7 +879,7 @@ func (c *Cluster) configureKMIPKey(encryptionKey *couchbaseutil.EncryptionKey, r
 	passphraseData, ok := secret.Data[constants.KMIPClientSecretPassphraseKey]
 
 	if !ok {
-		log.Error(errors.ErrResourceAttributeRequired, "secret missing passphrase data key", "secretName", requestedKey.Spec.KMIPKey.ClientSecret)
+		c.log.Error(errors.ErrResourceAttributeRequired, "secret missing passphrase data key", "secretName", requestedKey.Spec.KMIPKey.ClientSecret)
 		return errors.ErrResourceAttributeRequired
 	}
 
@@ -987,12 +987,12 @@ func (c *Cluster) refreshKeyShadowSecret() error {
 	for secretName := range credentialsSecretsToAdd {
 		secret, ok := c.k8s.Secrets.Get(secretName)
 		if !ok {
-			log.Error(errors.ErrResourceRequired, "secret not found", "secretName", secret)
+			c.log.Error(errors.ErrResourceRequired, "secret not found", "secretName", secret)
 			return errors.ErrResourceRequired
 		}
 
 		if secret.Data[constants.AWSCredentialsSecretKey] == nil {
-			log.Error(errors.ErrResourceAttributeRequired, "secret missing credentials data key", "secretName", secret)
+			c.log.Error(errors.ErrResourceAttributeRequired, "secret missing credentials data key", "secretName", secret)
 			return errors.ErrResourceAttributeRequired
 		}
 
@@ -1002,17 +1002,17 @@ func (c *Cluster) refreshKeyShadowSecret() error {
 	for secretName := range kmipSecretsToAdd {
 		secret, ok := c.k8s.Secrets.Get(secretName)
 		if !ok {
-			log.Error(errors.ErrResourceRequired, "secret not found", "secretName", secret)
+			c.log.Error(errors.ErrResourceRequired, "secret not found", "secretName", secret)
 			return errors.ErrResourceRequired
 		}
 
 		if secret.Data[constants.KMIPClientSecretKeyKey] == nil {
-			log.Error(errors.ErrResourceAttributeRequired, "secret missing key data key", "secretName", secret)
+			c.log.Error(errors.ErrResourceAttributeRequired, "secret missing key data key", "secretName", secret)
 			return errors.ErrResourceAttributeRequired
 		}
 
 		if secret.Data[constants.KMIPClientSecretCertKey] == nil {
-			log.Error(errors.ErrResourceAttributeRequired, "secret missing cert data key", "secretName", secret)
+			c.log.Error(errors.ErrResourceAttributeRequired, "secret missing cert data key", "secretName", secret)
 			return errors.ErrResourceAttributeRequired
 		}
 
@@ -1023,7 +1023,7 @@ func (c *Cluster) refreshKeyShadowSecret() error {
 	// If the secret doesn't exist, create it
 	currentSecret, ok := c.k8s.Secrets.Get(requestedShadowSecret.Name)
 	if !ok {
-		log.Info("Creating Key Shadow secret", "secretName", requestedShadowSecret.Name, "cluster", c.namespacedName())
+		c.log.Info("Creating Key Shadow secret", "secretName", requestedShadowSecret.Name, "cluster", c.namespacedName())
 
 		if _, err := c.k8s.KubeClient.CoreV1().Secrets(c.cluster.Namespace).Create(context.Background(), requestedShadowSecret, metav1.CreateOptions{}); err != nil {
 			return errors.NewStackTracedError(err)
@@ -1041,7 +1041,7 @@ func (c *Cluster) refreshKeyShadowSecret() error {
 		return nil
 	}
 
-	log.Info("Updating Key Shadow secret", "secretName", requestedShadowSecret.Name, "cluster", c.namespacedName())
+	c.log.Info("Updating Key Shadow secret", "secretName", requestedShadowSecret.Name, "cluster", c.namespacedName())
 
 	updatedSecret := currentSecret.DeepCopy()
 	updatedSecret.Data = requestedShadowSecret.Data

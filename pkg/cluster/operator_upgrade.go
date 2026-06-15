@@ -96,7 +96,7 @@ func (c *Cluster) operatorUpgrade() error {
 					continue
 				}
 
-				log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
+				c.log.Info("Upgrading resource", "cluster", c.namespacedName(), "kind", resource.kind(), "name", resource.name(item), "version", versionRange.to)
 
 				if err := resource.perform(item, action); err != nil {
 					return err

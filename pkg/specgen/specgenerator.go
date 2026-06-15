@@ -18,6 +18,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/go-logr/logr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,7 +43,7 @@ type SpecGeneratorOptions struct {
 func NewSpecGenerator(o SpecGeneratorOptions) *SpecGenerator {
 	return &SpecGenerator{
 		clusterHostname: o.Cluster,
-		api:             couchbaseutil.New(context.Background(), o.Cluster, o.Username, o.Password),
+		api:             couchbaseutil.New(context.Background(), o.Cluster, o.Username, o.Password, logr.Logger{}),
 		cluster:         &couchbasev2.ClusterSpec{},
 		clusterURL:      fmt.Sprintf("http://%s:8091", o.Cluster),
 	}

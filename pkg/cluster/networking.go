@@ -179,13 +179,13 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 	}
 
 	if !c.hasDNSCheckDelayElapsed(pod) {
-		log.Info("Delaying external DNS check", "cluster", c.namespacedName(), "pod", pod.Name, "waitUntil", c.getPodDNSCheckExpiry(pod))
+		c.log.Info("Delaying external DNS check", "cluster", c.namespacedName(), "pod", pod.Name, "waitUntil", c.getPodDNSCheckExpiry(pod))
 		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Delaying DNS Check")
 	}
 
 	// Attempt to reach the alternate address. We will timeout after 5 seconds and try again on the next reconciliation.
 	if err := waitAlternateAddressReachable(5*time.Second, addresses); err != nil {
-		log.Info("Waiting on DNS Propagation", "cluster", c.namespacedName(), "member", member.Name(), "error", err)
+		c.log.Info("Waiting on DNS Propagation", "cluster", c.namespacedName(), "member", member.Name(), "error", err)
 		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Waiting on DNS Propagation")
 	}
 
@@ -194,7 +194,7 @@ func (c *Cluster) addMemberAlternateAddresses(member couchbaseutil.Member, exist
 		return false, err
 	}
 
-	log.Info("DNS available, adding alternate addresses", "cluster", c.namespacedName(), "member", member.Name())
+	c.log.Info("DNS available, adding alternate addresses", "cluster", c.namespacedName(), "member", member.Name())
 
 	return true, couchbaseutil.SetAlternateAddressesExternal(addresses).On(c.api, member)
 }
@@ -272,7 +272,7 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 		existingAddresses, err := c.getAlternateAddressesExternal(member)
 		if err != nil {
 			// If we cannot make contact then just continue, it may have been deleted
-			log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
+			c.log.Info("External address collection failed", "cluster", c.namespacedName(), "name", member.Name())
 			return nil
 		}
 
@@ -526,7 +526,7 @@ func (c *Cluster) reconcileClusterNetworking() error {
 	}
 
 	c.raiseEvent(k8sutil.NetworkSettingsModifiedEvent(c.cluster))
-	log.Info("Network settings were updated", "cluster", c.cluster.NamespacedName())
+	c.log.Info("Network settings were updated", "cluster", c.cluster.NamespacedName())
 
 	return nil
 }
@@ -583,7 +583,7 @@ func (c *Cluster) hasDNSCheckTimeoutElapsed(pod *v1.Pod) bool {
 	timeoutAfter := k8sutil.GetPendingTransitionTime(pod).Add(timeoutDuration)
 
 	if time.Now().After(timeoutAfter) {
-		log.Info("Timed out waiting for DNS Propagation", "cluster", c.namespacedName(), "pod", pod.Name, "timeoutAfter", timeoutAfter)
+		c.log.Info("Timed out waiting for DNS Propagation", "cluster", c.namespacedName(), "pod", pod.Name, "timeoutAfter", timeoutAfter)
 		return true
 	}
 

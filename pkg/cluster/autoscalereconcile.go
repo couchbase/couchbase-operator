@@ -36,7 +36,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 	// trigger additional scale-ups before the current one completes, creating
 	// a cascade that indefinitely defers rebalance.
 	if len(c.getPendingInitPods()) > 0 {
-		log.V(1).Info("Pods pending CBS initialization, deferring autoscaler reconciliation",
+		c.log.V(1).Info("Pods pending CBS initialization, deferring autoscaler reconciliation",
 			"cluster", c.namespacedName())
 		return nil
 	}
@@ -97,7 +97,7 @@ func (c *Cluster) reconcileAutoscalers() error {
 
 			// Scaling Events
 			message := fmt.Sprintf("Autoscaling service config %q from %d -> %d", config.Name, currentSize, requestedSize)
-			log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
+			c.log.Info(message, "cluster", c.namespacedName(), "name", config.Name)
 
 			if currentSize < requestedSize {
 				c.raiseEventCached(k8sutil.AutoscaleUpEvent(c.cluster, config.Name, currentSize, requestedSize))
@@ -132,7 +132,7 @@ func (c *Cluster) autoscalingReady() bool {
 		status, err := c.GetStatus()
 		if err != nil {
 			message := fmt.Sprintf("failed to get cluster status %v", err)
-			log.Error(err, message, "cluster", c.namespacedName())
+			c.log.Error(err, message, "cluster", c.namespacedName())
 
 			break
 		} else if !status.Balancing && status.Balanced {
@@ -151,7 +151,7 @@ func (c *Cluster) autoscalingReady() bool {
 		stabilizationStartTime, err := time.Parse(time.RFC3339, autoscaleReadyCondition.LastTransitionTime)
 		if err != nil {
 			message := fmt.Sprintf("Failed to parse transition time from autoscale condition %v", err)
-			log.Error(err, message, "cluster", c.namespacedName())
+			c.log.Error(err, message, "cluster", c.namespacedName())
 
 			break
 		}
@@ -162,7 +162,7 @@ func (c *Cluster) autoscalingReady() bool {
 			timeRemaining := time.Until(stabilizationEndTime)
 			if timeRemaining > 0 {
 				message := fmt.Sprintf("cluster autoscaling is stabilizing: %s remaining", timeRemaining.String())
-				log.Info(message, "cluster", c.namespacedName())
+				c.log.Info(message, "cluster", c.namespacedName())
 
 				// ensure that autoscalers remain in maintenance mode as it's possible
 				// for some external client to manual change size of CouchbaseAutoscale
@@ -170,7 +170,7 @@ func (c *Cluster) autoscalingReady() bool {
 				// sending scaling recommendations
 				err := c.applyAutoscaleMaintenanceMode(c.getAutoscalersToDisable())
 				if err != nil {
-					log.Error(err, message, "cluster", c.namespacedName())
+					c.log.Error(err, message, "cluster", c.namespacedName())
 				}
 
 				break
@@ -181,7 +181,7 @@ func (c *Cluster) autoscalingReady() bool {
 	case v1.ConditionUnknown:
 		// Should never be in unknown condition, log and clear
 		err := fmt.Errorf("autoscaler condition %w", errors.NewStackTracedError(errors.ErrUnknownCondition))
-		log.Error(err, "cluster", "cluster should not be in unknown condition", c.namespacedName())
+		c.log.Error(err, "cluster", "cluster should not be in unknown condition", c.namespacedName())
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionAutoscaleReady)
 	}
 
@@ -293,7 +293,7 @@ func (c *Cluster) updateRequestedAutoscalers() ([]string, error) {
 				}
 
 				message := fmt.Sprintf("Autoscaler created for service config %q", config.Name)
-				log.Info(message, "cluster", c.namespacedName())
+				c.log.Info(message, "cluster", c.namespacedName())
 				c.raiseEventCached(k8sutil.AutoscalerCreateEvent(c.cluster, config.Name))
 			}
 
@@ -311,7 +311,7 @@ func (c *Cluster) updateRequestedAutoscalers() ([]string, error) {
 			}
 
 			message := fmt.Sprintf("Autoscaling disabled for service config %q", configName)
-			log.Info(message, "cluster", c.namespacedName())
+			c.log.Info(message, "cluster", c.namespacedName())
 			c.raiseEventCached(k8sutil.AutoscalerDeleteEvent(c.cluster, configName))
 
 			continue
@@ -364,7 +364,7 @@ func (c *Cluster) applyAutoscaleMaintenanceMode(autoscalers []*couchbasev2.Couch
 		requestedAutoscaler.Spec.Size = 0
 
 		msg := fmt.Sprintf("Autoscaler for service config %q is entering maintenance mode", requestedAutoscaler.Spec.Servers)
-		log.Info(msg, "cluster", c.namespacedName())
+		c.log.Info(msg, "cluster", c.namespacedName())
 		_, err = k8sutil.UpdateAutoscaler(c.k8s, c.cluster.Namespace, requestedAutoscaler)
 
 		if err != nil {

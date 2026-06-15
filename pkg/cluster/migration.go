@@ -113,7 +113,7 @@ func (c *Cluster) reconcileMigrationCluster() error {
 		}
 	}
 
-	scheduler, err := scheduler.New(pods, c.cluster)
+	scheduler, err := scheduler.New(pods, c.cluster, c.log)
 	if err != nil {
 		return err
 	}

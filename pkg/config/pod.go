@@ -22,6 +22,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/scheduler"
+	"github.com/go-logr/logr"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -273,7 +274,7 @@ func getServerGroupAndImageFromScheduler(k8sClient *client.Client, cbc *v2.Couch
 		filtered = append(filtered, pod)
 	}
 
-	scheduler, err := scheduler.New(filtered, cbc)
+	scheduler, err := scheduler.New(filtered, cbc, logr.Logger{})
 	if err != nil {
 		return "", "", err
 	}

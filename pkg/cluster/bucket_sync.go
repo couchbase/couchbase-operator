@@ -184,7 +184,7 @@ func (c *Cluster) unstructuredSpecsEqual(a, b *unstructured.Unstructured) bool {
 
 	// If one has a spec, and the other doesn't, unequal.
 	if aOK != bOK {
-		log.V(1).Info("Spec existence differs", "cluster", c.namespacedName(), "a", a.Object, "b", b.Object)
+		c.log.V(1).Info("Spec existence differs", "cluster", c.namespacedName(), "a", a.Object, "b", b.Object)
 
 		return false
 	}
@@ -196,7 +196,7 @@ func (c *Cluster) unstructuredSpecsEqual(a, b *unstructured.Unstructured) bool {
 
 	ok := reflect.DeepEqual(aSpec, bSpec)
 	if !ok {
-		log.V(1).Info("Specs differ", "cluster", c.namespacedName(), "a", aSpec, "b", bSpec)
+		c.log.V(1).Info("Specs differ", "cluster", c.namespacedName(), "a", aSpec, "b", bSpec)
 
 		return false
 	}
@@ -225,7 +225,7 @@ func (c *Cluster) applyDataTopologyResources(resources []runtime.Object) error {
 		// Checking if the resource exists is free, thus avoiding an API call, so
 		// do that first and check for conflicts.
 		if existingResource, ok := c.k8s.Get(gvk, object.GetName()); ok {
-			log.V(1).Info("Synchronized resource already exists", "cluster", c.namespacedName(), "resource", object.GetName())
+			c.log.V(1).Info("Synchronized resource already exists", "cluster", c.namespacedName(), "resource", object.GetName())
 
 			eo, err := runtime.DefaultUnstructuredConverter.ToUnstructured(existingResource)
 			if err != nil {
@@ -237,7 +237,7 @@ func (c *Cluster) applyDataTopologyResources(resources []runtime.Object) error {
 			}
 
 			if !c.unstructuredSpecsEqual(object, existingObject) {
-				log.Info("Synchronized resource already exists, but differs", "cluster", c.namespacedName(), "resource", object.GetName())
+				c.log.Info("Synchronized resource already exists, but differs", "cluster", c.namespacedName(), "resource", object.GetName())
 
 				return fmt.Errorf("%w: resource reports as existing, but differs", errors.NewStackTracedError(errors.ErrInternalError))
 			}
@@ -255,7 +255,7 @@ func (c *Cluster) applyDataTopologyResources(resources []runtime.Object) error {
 			return err
 		}
 
-		log.Info("Synchronized resource", "cluster", c.namespacedName(), "resource", object.GetName())
+		c.log.Info("Synchronized resource", "cluster", c.namespacedName(), "resource", object.GetName())
 	}
 
 	return nil
@@ -289,7 +289,7 @@ func (c *Cluster) reconcileSynchronizeBuckets() error {
 	// to fully managed.  If we are doing nothing, then we need to remove any condition.
 	defer func() {
 		if err := c.updateCRStatus(); err != nil {
-			log.Info("Unable to update cluster status", "cluster", c.namespacedName(), "error", err)
+			c.log.Info("Unable to update cluster status", "cluster", c.namespacedName(), "error", err)
 		}
 	}()
 

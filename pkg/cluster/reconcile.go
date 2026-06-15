@@ -97,15 +97,15 @@ func (l reconcileFuncList) run(c *Cluster) error {
 //     not performed first.
 //   - Topology and feature updates.
 func (c *Cluster) reconcile() error {
-	log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
-	defer log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
+	c.log.V(1).Info("Reconciliation starting", "cluster", c.namespacedName())
+	defer c.log.V(1).Info("Reconciliation completed", "cluster", c.namespacedName())
 
 	pods := c.getClusterPods()
 
 	// Initialize the scheduler each time around, this saves us having to update
 	// internal state in all the cases when a pod fails to be created, deleted,
 	// or disappears.
-	scheduler, err := scheduler.New(pods, c.cluster)
+	scheduler, err := scheduler.New(pods, c.cluster, c.log)
 	if err != nil {
 		return err
 	}
@@ -370,7 +370,7 @@ func (c *Cluster) reconcileAdminService() error {
 			return err
 		}
 
-		log.Info("UI service deleted", "cluster", c.namespacedName(), "name", serviceName)
+		c.log.Info("UI service deleted", "cluster", c.namespacedName(), "name", serviceName)
 
 		c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(serviceName, c.cluster))
 
@@ -384,7 +384,7 @@ func (c *Cluster) reconcileAdminService() error {
 
 		// Service didn't exist, notify that it now does!
 		if !ok {
-			log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
+			c.log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
 
 			c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
 
@@ -407,7 +407,7 @@ func (c *Cluster) reconcilePodServices() error {
 
 			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
 				if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
-					log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
+					c.log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
 					continue
 				}
 
@@ -415,7 +415,7 @@ func (c *Cluster) reconcilePodServices() error {
 			}
 
 			if !ok {
-				log.Info("Created pod service", "cluster", c.namespacedName(), "name", member.Name())
+				c.log.Info("Created pod service", "cluster", c.namespacedName(), "name", member.Name())
 			}
 		}
 	}
@@ -435,7 +435,7 @@ func (c *Cluster) reconcilePodServices() error {
 			return err
 		}
 
-		log.Info("Deleted pod service", "cluster", c.namespacedName(), "name", service.Name)
+		c.log.Info("Deleted pod service", "cluster", c.namespacedName(), "name", service.Name)
 	}
 
 	return nil
@@ -502,7 +502,7 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Get the existing settings
 	failoverSettings := &couchbaseutil.AutoFailoverSettings{}
 	if err := couchbaseutil.GetAutoFailoverSettings(failoverSettings).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Auto-failover settings collection failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Auto-failover settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
@@ -581,14 +581,14 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	// Check to see if we need to reconcile
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
 		if err := couchbaseutil.SetAutoFailoverSettings(specFailoverSettings).On(c.api, c.readyMembers()); err != nil {
-			log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
+			c.log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
 			c.cluster.Status.SetConfigRejectedCondition(message)
 
 			return err
 		}
 
-		log.Info("Auto-failover settings updated", "cluster", c.namespacedName())
+		c.log.Info("Auto-failover settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("autofailover", c.cluster))
 	}
 
@@ -621,14 +621,14 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 
 	if !reflect.DeepEqual(current, requested) {
 		if err := couchbaseutil.SetPoolsDefault(requested).On(c.api, c.readyMembers()); err != nil {
-			log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
+			c.log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
 			message := fmt.Sprintf("Unable update memory quota's [data:%v, index:%v, search:%v]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
 			c.cluster.Status.SetConfigRejectedCondition(message)
 
 			return err
 		}
 
-		log.Info("Cluster settings updated", "cluster", c.namespacedName())
+		c.log.Info("Cluster settings updated", "cluster", c.namespacedName())
 		c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memory quota", c.cluster))
 	}
 
@@ -641,7 +641,7 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	// Read
 	actual := &couchbaseutil.SettingsStats{}
 	if err := couchbaseutil.GetSettingsStats(actual).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Software notification settings collection failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Software notification settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
@@ -655,14 +655,14 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 	}
 
 	if err := couchbaseutil.SetSettingsStats(&requested).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
 		message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
 		c.cluster.Status.SetConfigRejectedCondition(message)
 
 		return err
 	}
 
-	log.Info("Software notification settings updated", "cluster", c.namespacedName())
+	c.log.Info("Software notification settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("update notifications", c.cluster))
 
 	return nil
@@ -705,7 +705,7 @@ func (c *Cluster) reconcileAnalyticSettings() error {
 		return err
 	}
 
-	log.V(2).Info("Analytics settings updated", "cluster", c.namespacedName())
+	c.log.V(2).Info("Analytics settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("analytics settings", c.cluster))
 
 	return nil
@@ -811,7 +811,7 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 		return err
 	}
 
-	log.V(2).Info("Memcached settings updated", "cluster", c.namespacedName())
+	c.log.V(2).Info("Memcached settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memcached settings", c.cluster))
 
 	return nil
@@ -849,7 +849,7 @@ func (c *Cluster) reconcileResourceManagementSettings() error {
 		return err
 	}
 
-	log.Info("Disk usage limits updated", "cluster", c.namespacedName())
+	c.log.Info("Disk usage limits updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("disk usage limits", c.cluster))
 
 	return nil
@@ -881,7 +881,7 @@ func (c *Cluster) reconcileDataServiceSettings() error {
 		return err
 	}
 
-	log.V(2).Info("Data Service settings updated", "cluster", c.namespacedName())
+	c.log.V(2).Info("Data Service settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("data service settings", c.cluster))
 
 	return nil
@@ -891,7 +891,7 @@ func (c *Cluster) reconcileDataServiceSettings() error {
 func (c *Cluster) reconcileIndexSettings() error {
 	current := couchbaseutil.IndexSettings{}
 	if err := couchbaseutil.GetIndexSettings(&current).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Index storage settings collection failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Index storage settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
@@ -935,13 +935,13 @@ func (c *Cluster) reconcileIndexSettings() error {
 	}
 
 	if err := couchbaseutil.SetIndexSettings(&requested).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
 		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable set index settings: %v", err.Error()))
 
 		return err
 	}
 
-	log.Info("Index storage settings updated", "cluster", c.namespacedName())
+	c.log.Info("Index storage settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("index service", c.cluster))
 
 	return nil
@@ -1112,7 +1112,7 @@ func (c *Cluster) reconcileQuerySettings() error {
 		return err
 	}
 
-	log.Info("Query settings updated", "cluster", c.namespacedName())
+	c.log.Info("Query settings updated", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("query service", c.cluster))
 
 	return nil
@@ -1129,7 +1129,7 @@ func (c *Cluster) reconcileAuditSettings() error {
 	// Retrieve the current values to reconcile against (and pick up defaults)
 	current := couchbaseutil.AuditSettings{}
 	if err := couchbaseutil.GetAuditSettings(&current).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Audit settings collection failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Audit settings collection failed", "cluster", c.namespacedName())
 		return err
 	}
 
@@ -1212,13 +1212,13 @@ func (c *Cluster) reconcileAuditSettings() error {
 	}
 
 	if err := couchbaseutil.SetAuditSettings(requested).On(c.api, c.readyMembers()); err != nil {
-		log.Error(err, "Audit settings update failed", "cluster", c.namespacedName(), "old", current, "new", requested)
+		c.log.Error(err, "Audit settings update failed", "cluster", c.namespacedName(), "old", current, "new", requested)
 		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable to set audit settings: %v", err.Error()))
 
 		return err
 	}
 
-	log.Info("Audit settings updated", "cluster", c.namespacedName(), "old", current, "new", requested)
+	c.log.Info("Audit settings updated", "cluster", c.namespacedName(), "old", current, "new", requested)
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("audit", c.cluster))
 
 	return nil
@@ -1309,7 +1309,7 @@ func (c *Cluster) reconcileAutoCompactionSettings() error {
 
 	requested.AutoCompactionSettings.SetAutoCompactionUndefinedFieldsForEncoding(over71)
 
-	log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
+	c.log.Info("Updating auto compaction settings", "cluster", c.namespacedName())
 
 	if err := couchbaseutil.SetAutoCompactionSettings(requested).On(c.api, c.readyMembers()); err != nil {
 		return err
@@ -1346,7 +1346,7 @@ func (c *Cluster) reconcileAppTelemetrySettings() error {
 		return nil
 	}
 
-	log.Info("Updating app telemetry settings", "cluster", c.namespacedName())
+	c.log.Info("Updating app telemetry settings", "cluster", c.namespacedName())
 
 	if err := couchbaseutil.SetAppTelemetrySettings(requested).On(c.api, c.readyMembers()); err != nil {
 		return err
@@ -1390,7 +1390,7 @@ func (c *Cluster) resourcesEqual(current, requested interface{}) (bool, string) 
 	// so the output is deterministic.
 	d, err := diff.Diff(current, requested)
 	if err != nil {
-		log.Error(err, "failed to diff cluster", "cluster", c.namespacedName())
+		c.log.Error(err, "failed to diff cluster", "cluster", c.namespacedName())
 		return true, ""
 	}
 
@@ -1469,7 +1469,7 @@ func (c *Cluster) reconcilePersistentStatus() error {
 	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
-		log.Info("failed to update cluster status", "cluster", c.namespacedName())
+		c.log.Info("failed to update cluster status", "cluster", c.namespacedName())
 	}
 
 	return nil
@@ -1481,7 +1481,7 @@ func (c *Cluster) reconcileRBAC() error {
 	// such as users, groups, collections, and scopes, are fully managed.
 	if c.cluster.Spec.Security.RBAC.Managed {
 		if err := c.reconcileRBACResources(); err != nil {
-			log.Error(err, "RBAC reconciliation failed", "cluster", c.namespacedName())
+			c.log.Error(err, "RBAC reconciliation failed", "cluster", c.namespacedName())
 		}
 	} else if c.cluster.Spec.Networking.CloudNativeGateway != nil {
 		// need to create the admin user
@@ -1519,7 +1519,7 @@ func (c *Cluster) reconcileCompletedPods() error {
 			return err
 		}
 
-		log.Info("Deleted terminated pod", "cluster", c.namespacedName(), "name", pod.Name)
+		c.log.Info("Deleted terminated pod", "cluster", c.namespacedName(), "name", pod.Name)
 	}
 
 	return nil

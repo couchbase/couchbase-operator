@@ -190,7 +190,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 		"url", request.URL.String(),
 	}
 
-	if log.V(2).Enabled() {
+	if c.log.V(2).Enabled() {
 		// Contains admin password.
 		logLabels = append(logLabels, "headers", request.Header)
 
@@ -214,7 +214,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 
 		logLabels = append(logLabels, "time_ms", float64(delta.Nanoseconds())/1000000.0)
 
-		log.V(1).Info("http", logLabels...)
+		c.log.V(1).Info("http", logLabels...)
 	}()
 
 	// Do the request.
@@ -238,7 +238,7 @@ func (c Client) doRequest(request *http.Request, requestBody []byte, result inte
 		return errors.NewStackTracedError(err)
 	}
 
-	if log.V(2).Enabled() {
+	if c.log.V(2).Enabled() {
 		if string(body) != "" {
 			logLabels = append(logLabels, "response", string(body))
 		}

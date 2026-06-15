@@ -13,6 +13,7 @@ package scheduler_test
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 
@@ -56,7 +57,7 @@ func TestRescheduleUnschedulableOnly(t *testing.T) {
 		ServerGroups: []string{"a", "b"}, // Global server groups also exclude "c"
 	}
 
-	sched, err := scheduler.NewStripeScheduler(pods, cluster)
+	sched, err := scheduler.NewStripeScheduler(pods, cluster, logr.Discard())
 	require.NoError(t, err)
 
 	moves, err := sched.RescheduleUnschedulableOnly()
@@ -91,7 +92,7 @@ func TestCreateRespectsAvoidGroups(t *testing.T) {
 		ServerGroups: []string{"a", "b"},
 	}
 
-	sched, err := scheduler.NewStripeScheduler(pods, cluster)
+	sched, err := scheduler.NewStripeScheduler(pods, cluster, logr.Discard())
 	require.NoError(t, err)
 
 	// Mark group "a" to be avoided

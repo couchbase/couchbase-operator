@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/go-logr/logr"
 )
 
 // Extracts the version part from an image tag.
@@ -32,7 +33,7 @@ func GetVersionTag(image string) string {
 // updates the internal map of image digests
 // with the appropriate version for the given image.
 // returns the version for SHA256 images, and a bool if it was updated.
-func UpdateImageDigestMap(image string, poolsVersion string) (string, bool) {
+func UpdateImageDigestMap(image string, poolsVersion string, log logr.Logger) (string, bool) {
 	version := GetVersionTag(image)
 
 	if !IsSHA256Version(version) { // only SHA256 is eligible.

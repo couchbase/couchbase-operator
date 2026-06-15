@@ -441,6 +441,52 @@ func MustFindLog(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couchbas
 	}
 }
 
+// MustFindOperatorLog searches the couchbase-operator pod logs for a single log line
+// that contains all of the provided expectedSubstrings.
+func MustFindOperatorLog(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedSubstrings ...string) {
+	err := retryutil.RetryFor(5*time.Minute, func() error {
+		listOptions := metav1.ListOptions{
+			LabelSelector: "app=couchbase-operator",
+		}
+
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		for _, pod := range pods.Items {
+			logs, err := getLogsOfContainerInPod(k8s, cluster, pod.Name, "couchbase-operator")
+			if err != nil {
+				return err
+			}
+
+			// Split the bulk log string into individual lines to ensure
+			// all substrings are found within the same single log event.
+			logLines := strings.Split(logs, "\n")
+			for _, line := range logLines {
+				allMatch := true
+				for _, expected := range expectedSubstrings {
+					if !strings.Contains(line, expected) {
+						allMatch = false
+						break
+					}
+				}
+
+				// If a single line contains all required substrings, we found our log
+				if allMatch {
+					return nil
+				}
+			}
+		}
+
+		return fmt.Errorf("expected strings %v not found in any single log line of container %s", expectedSubstrings, "couchbase-operator")
+	})
+
+	if err != nil {
+		Die(t, err)
+	}
+}
+
 // checkLoggingTLSSecretsMounted verifies that TLS secrets are correctly mounted
 // in the FluentBit logging sidecar container at the expected paths.
 func checkLoggingTLSSecretsMounted(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, mountPath string, secretNames []string) error {

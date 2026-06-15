@@ -54,7 +54,7 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 		c.raiseEventCached(k8sutil.MemberCreationFailedEvent(m.Name(), c.cluster))
 
 		if rerr := c.removePod(m.Name(), deleteVolumes); rerr != nil {
-			log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
+			c.log.Info("Unable to remove failed member", "cluster", c.namespacedName(), "error", rerr)
 		}
 	}()
 
@@ -68,11 +68,11 @@ func (c *Cluster) createPod(ctx context.Context, m couchbaseutil.Member, serverS
 	}
 
 	if err := k8sutil.FlagPodPendingInitialization(c.k8s, pod, "pod created, waiting for readiness"); err != nil {
-		log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+		c.log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
 		return err
 	}
 
-	log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
 	return nil
 }
 
@@ -125,7 +125,7 @@ func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil
 	if serverGroupsToAvoid, err := c.getServerGroupsToAvoid(); err == nil && len(serverGroupsToAvoid) > 0 {
 		c.scheduler.AvoidGroups(serverGroupsToAvoid...)
 
-		log.Info("Avoiding server groups", "cluster", c.namespacedName(), "serverGroups", serverGroupsToAvoid)
+		c.log.Info("Avoiding server groups", "cluster", c.namespacedName(), "serverGroups", serverGroupsToAvoid)
 	}
 
 	pod, err := k8sutil.CreateCouchbasePod(ctx, c.k8s, c.scheduler, c.cluster, m, serverSpec, c.config.GetPodReadinessConfig())
@@ -134,11 +134,11 @@ func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil
 	}
 
 	if err := k8sutil.FlagPodPendingInitialization(c.k8s, pod, "pod created with rescheduling, waiting for readiness"); err != nil {
-		log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+		c.log.Error(err, "Failed to flag pod pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
 		return err
 	}
 
-	log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
+	c.log.V(1).Info("Pod flagged for async initialization", "cluster", c.namespacedName(), "pod", pod.Name)
 	return nil
 }
 
@@ -146,11 +146,11 @@ func (c *Cluster) createPodWithRescheduling(ctx context.Context, m couchbaseutil
 // or volumes are associated with default claim.
 func (c *Cluster) removePod(name string, removeVolumes bool) error {
 	if err := k8sutil.DeleteCouchbasePod(c.k8s, c.cluster.Namespace, name, c.config.GetDeleteOptions(), removeVolumes); err != nil {
-		log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
+		c.log.Error(err, "Pod deletion failed", "cluster", c.namespacedName())
 		return err
 	}
 
-	log.Info("Pod deleted", "cluster", c.namespacedName(), "name", name)
+	c.log.Info("Pod deleted", "cluster", c.namespacedName(), "name", name)
 
 	return nil
 }
@@ -167,7 +167,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member, recovery bool) error {
 
 	if recovery {
 		if err := c.incrementRecoveryAttempts(m.Name()); err != nil {
-			log.Error(err, "Failed to increment recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
+			c.log.Error(err, "Failed to increment recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
 		}
 	}
 
@@ -192,7 +192,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member, recovery bool) error {
 	// createPod now flags the pod with PendingInitializationCondition.
 	// The pod will be initialized asynchronously. SetPodInitialized will
 	// be called after the pending initialization is cleared.
-	log.V(1).Info("Pod recreated with pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
+	c.log.V(1).Info("Pod recreated with pending initialization", "cluster", c.namespacedName(), "pod", m.Name())
 
 	// To get here the pod would need to be initialized and clustered, so this is
 	// safe.
@@ -202,7 +202,7 @@ func (c *Cluster) recreatePod(m couchbaseutil.Member, recovery bool) error {
 
 	if recovery {
 		if err := c.resetRecoveryAttempts(m.Name()); err != nil {
-			log.Error(err, "Failed to reset recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
+			c.log.Error(err, "Failed to reset recovery attempts", "cluster", c.namespacedName(), "name", m.Name())
 		}
 	}
 
@@ -284,9 +284,9 @@ func (c *Cluster) isPodRecoverable(m couchbaseutil.Member) bool {
 	recoverable, err := c.checkPodRecoverability(m, false)
 	if !recoverable {
 		if err != nil {
-			log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+			c.log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		} else {
-			log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name())
+			c.log.Info("Pod unrecoverable", "cluster", c.namespacedName(), "name", m.Name())
 		}
 	}
 
@@ -300,9 +300,9 @@ func (c *Cluster) isPodReschedulable(m couchbaseutil.Member) bool {
 	recoverable, err := c.checkPodRecoverability(m, true)
 	if !recoverable {
 		if err != nil {
-			log.Info("Pod unschedulable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
+			c.log.Info("Pod unschedulable", "cluster", c.namespacedName(), "name", m.Name(), "reason", err)
 		} else {
-			log.Info("Pod unschedulable", "cluster", c.namespacedName(), "name", m.Name())
+			c.log.Info("Pod unschedulable", "cluster", c.namespacedName(), "name", m.Name())
 		}
 	}
 
@@ -476,7 +476,7 @@ func (c *Cluster) reconcilePodServerVersions() error {
 	couchbaseImageToVersion := map[string]string{}
 	couchbaseImageToVersion[c.cluster.Spec.CouchbaseImage()] = ""
 
-	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.namespacedName())
+	c.log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.namespacedName())
 
 	for _, member := range c.callableMembers {
 		pod, found := c.k8s.Pods.Get(member.Name())
@@ -513,8 +513,8 @@ func (c *Cluster) reconcilePodServerVersions() error {
 			continue
 		}
 
-		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion); newVersion != "" && updated {
-			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.namespacedName())
+		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion, c.log); newVersion != "" && updated {
+			c.log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.namespacedName())
 
 			err := c.updatePersistenceVersion(newVersion)
 

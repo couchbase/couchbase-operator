@@ -21,6 +21,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/astar"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -51,6 +52,8 @@ type stripeSchedulerImpl struct {
 
 	// avoidGroups is a list of server groups to avoid when scheduling.
 	avoidGroups map[string]bool
+
+	log logr.Logger
 
 	// mu allows us to lock/unlock goroutines that run concurrently if we need to avoid race conditions when accessing
 	// the scheduler cache
@@ -189,7 +192,7 @@ func (sched *stripeSchedulerImpl) populateServerClasses(pods []*v1.Pod) error {
 
 // NewStripeScheduler creates an initializes a new stripe scheduler, caching
 // state from the current set of pods for the cluster.
-func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (Scheduler, error) {
+func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster, log logr.Logger) (Scheduler, error) {
 	// Initialize data structures, creating maps for each server class
 	// and empty lists for each server group defined for that class
 	sched := &stripeSchedulerImpl{
@@ -197,6 +200,7 @@ func NewStripeScheduler(pods []*v1.Pod, cluster *couchbasev2.CouchbaseCluster) (
 		unschedulableServerClasses:        serverClassGroupMap{},
 		removableUnscheduledServerClasses: serverClassGroupMap{},
 		removableServerClasses:            serverClassServerRemovalMap{},
+		log:                               log,
 	}
 
 	if err := sched.initServerClasses(cluster); err != nil {

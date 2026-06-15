@@ -23,6 +23,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
+	"github.com/go-logr/logr"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -81,16 +82,24 @@ type Client struct {
 
 	// cluster is the cluster name for logging.
 	cluster string
+
+	log logr.Logger
 }
 
 // New creates a new Client HTTP(S) API client and initializes the
 // HTTP connection pool.
-func New(ctx context.Context, cluster, username, password string) *Client {
+func New(ctx context.Context, cluster, username, password string, logger logr.Logger) *Client {
 	c := &Client{
 		ctx:      ctx,
 		cluster:  cluster,
 		username: username,
 		password: password,
+	}
+
+	if logger.GetSink() == nil {
+		c.log = log
+	} else {
+		c.log = logger.WithName("api")
 	}
 
 	c.makeClient()

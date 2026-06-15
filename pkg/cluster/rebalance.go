@@ -252,9 +252,9 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 			for {
 				switch status.Status {
 				case couchbaseutil.RebalanceStatusUnknown:
-					log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", "unknown")
+					c.log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", "unknown")
 				case couchbaseutil.RebalanceStatusRunning:
-					log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", status.Progress)
+					c.log.Info("Rebalancing", "cluster", c.namespacedName(), "progress", status.Progress)
 				}
 
 				var ok bool
@@ -311,7 +311,7 @@ func (c *Cluster) rebalanceWithRetriesOnVerifyFails(ms couchbaseutil.MemberSet, 
 	}
 
 	// Report the cluster is balanced
-	log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
+	c.log.Info("Rebalance completed successfully", "cluster", c.namespacedName())
 	c.raiseEvent(k8sutil.RebalanceCompletedEvent(c.cluster))
 	c.cluster.Status.SetBalancedCondition()
 

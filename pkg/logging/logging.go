@@ -12,8 +12,10 @@ package logging
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/go-logr/logr"
+	"go.uber.org/zap/zapcore"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -31,4 +33,25 @@ func (o *Options) AddFlagSet(f *flag.FlagSet) {
 // New creates a new Zap logr.
 func New(o *Options) logr.Logger {
 	return zap.New(zap.UseFlagOptions(&o.Options))
+}
+
+func (o *Options) NewWithLogLevel(logLevel string) logr.Logger {
+	// Always create a copy to ensure we don't override anything default.
+	opts := o.Options
+
+	switch strings.ToLower(strings.TrimSpace(logLevel)) {
+	case "debug":
+		opts.Level = zapcore.DebugLevel
+	case "info":
+		opts.Level = zapcore.InfoLevel
+	case "error":
+		opts.Level = zapcore.ErrorLevel
+	case "2":
+		opts.Level = zapcore.Level(-2)
+	default:
+		// For anything else (empty string, "warn", "3", invalid strings),
+		// we do nothing. The opts.Level remains whatever the default was.
+	}
+
+	return zap.New(zap.UseFlagOptions(&opts))
 }
