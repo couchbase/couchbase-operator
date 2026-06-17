@@ -420,6 +420,7 @@ func (ca *CertificateAuthority) SignCertificateRequest(req *x509.CertificateRequ
 		BasicConstraintsValid: true,
 		SubjectKeyId:          subjectKeyID,
 		DNSNames:              req.DNSNames,
+		EmailAddresses:        req.EmailAddresses,
 	}
 
 	switch certType {

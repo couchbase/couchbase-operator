@@ -307,3 +307,43 @@ func ValidateKMIPKeyAndPassphrase(keyData, passphrase []byte) error {
 
 	return nil
 }
+
+// InternalClientCertEmailDomain is the SAN email domain Couchbase Server (7.6+) uses to
+// recognise an uploaded internal client certificate as the @internal identity.
+const InternalClientCertEmailDomain = "internal.couchbase.com"
+
+// HasInternalClientEmailSAN reports whether the leaf certificate in the PEM chain carries an
+// rfc822 (email) SAN of the form <name>@internal.couchbase.com.  Couchbase Server treats such a
+// certificate as the privileged @<name> internal (admin) identity, so this SAN must appear only
+// on the dedicated internal client certificate and nowhere else.
+func HasInternalClientEmailSAN(chainPEM []byte) (bool, error) {
+	cert, err := ParseCertificate(chainPEM)
+	if err != nil {
+		return false, err
+	}
+
+	for _, email := range cert.EmailAddresses {
+		if strings.HasSuffix(email, "@"+InternalClientCertEmailDomain) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// VerifyInternalClientEmailSAN requires the certificate to carry the internal client SAN email.
+// Couchbase Server requires this on the internal client certificate used for node-to-node client
+// identity; without it the /node/controller/reloadClientCertificate call fails with
+// "Internal client certificate must contain SAN.email=...".
+func VerifyInternalClientEmailSAN(chainPEM []byte) error {
+	has, err := HasInternalClientEmailSAN(chainPEM)
+	if err != nil {
+		return err
+	}
+
+	if !has {
+		return fmt.Errorf("internal client certificate must contain a SAN email of the form <name>@%s", InternalClientCertEmailDomain)
+	}
+
+	return nil
+}

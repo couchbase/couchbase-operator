@@ -4994,7 +4994,7 @@ type TLSPolicy struct {
 	// "kubernetes.io/tls" with "tls.crt" and "tls.key". If the "tls.key" is an encrypted
 	// private key then the secret type can be the generic Opaque type since "kubernetes.io/tls"
 	// type secrets cannot verify encrypted keys.
-	SecretSource *TLSSecretSource `json:"secretSource,omitempty"`
+	SecretSource *TLSSecretSource `json:"secretSource,omitempty" annotation:"secretSource"`
 
 	// RootCAs defines a set of secrets that reside in this namespace that contain
 	// additional CA certificates that should be installed in Couchbase.  The CA
@@ -5147,6 +5147,20 @@ type TLSSecretSource struct {
 	// the contains client TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the Kubernetes.io/tls secret type.
 	ClientSecretName string `json:"clientSecretName,omitempty"`
+
+	// NodeClientSecretName specifies the secret name, in the same namespace as the cluster,
+	// that contains the internal client certificate each Couchbase node presents when it
+	// acts as a client for node-to-node communication.  The secret is expected to contain
+	// "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.  The certificate
+	// must be valid for client authentication (clientAuth extended key usage) and chain to
+	// a trusted CA.
+	// When set, the Operator uploads this certificate to each node (inbox
+	// "client_chain.pem"/"client_pkey.key") and reloads it, so the node's internal client
+	// identity is signed by your CA rather than the server's auto-generated CA.  This lets
+	// the auto-generated CA be removed from the trust pool under mandatory client
+	// certificate authentication with strict node-to-node encryption.  Requires Couchbase
+	// Server 7.6 or greater. Configured via the annotation cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName only; not exposed in the CRD.
+	NodeClientSecretName string `json:"-" annotation:"nodeClientSecretName"`
 }
 
 // ClientCertificatePolicy defines the type of TLS policy to apply.  The default

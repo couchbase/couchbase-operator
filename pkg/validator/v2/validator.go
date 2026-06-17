@@ -3508,6 +3508,40 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 	return key, chain, true, nil
 }
 
+// getNodeClientTLS reads the node internal client certificate/key from
+// secretSource.nodeClientSecretName (kubernetes.io/tls layout).  Returns ok=false when the
+// field is unset (the feature is optional).
+func getNodeClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
+	if cluster.Spec.Networking.TLS.SecretSource == nil ||
+		cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName == "" {
+		return nil, nil, false, nil
+	}
+
+	secretName := cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName
+	secretPath := "spec.networking.tls.secretSource.nodeClientSecretName"
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	if !found {
+		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	key, ok := secret.Data["tls.key"]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain tls.key", secretName)
+	}
+
+	chain, ok := secret.Data["tls.crt"]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain tls.crt", secretName)
+	}
+
+	return key, chain, true, nil
+}
+
 // validateTLS checks TLS configuration exists and is valid
 // * correct secrets exist
 // * correct keys exist in the secrets
@@ -3556,6 +3590,14 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return []error{err}
 	}
 
+	// The reserved internal SAN email maps to a privileged @<name> internal admin identity in
+	// Couchbase Server; it must only ever appear on the node internal client certificate.
+	if has, err := util_x509.HasInternalClientEmailSAN(chain); err != nil {
+		return []error{err}
+	} else if has {
+		return []error{fmt.Errorf("server certificate (spec.networking.tls.secretSource.serverSecretName) must not contain the reserved internal SAN email <name>@%s; it is only valid on the node internal client certificate", util_x509.InternalClientCertEmailDomain)}
+	}
+
 	// Check the client certificates.
 	if !cluster.IsMutualTLSEnabled() {
 		return nil
@@ -3572,6 +3614,32 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 
 	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false, !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
 		return []error{err}
+	}
+
+	// As above: the operator/external client cert must not carry the internal SAN email, which
+	// would silently grant it the internal admin identity, bypassing clientCertificatePaths RBAC.
+	if has, err := util_x509.HasInternalClientEmailSAN(chain); err != nil {
+		return []error{err}
+	} else if has {
+		return []error{fmt.Errorf("client certificate (spec.networking.tls.secretSource.clientSecretName) must not contain the reserved internal SAN email <name>@%s; that SAN grants the internal admin identity and is only valid on the node internal client certificate", util_x509.InternalClientCertEmailDomain)}
+	}
+
+	// Check the optional node internal client certificate (secretSource.nodeClientSecretName).
+	// Must be valid for client authentication and chain to a trusted CA, same as the operator
+	// client cert.
+	nodeKey, nodeChain, ok, err := getNodeClientTLS(v, cluster)
+	if err != nil {
+		return []error{err}
+	}
+
+	if ok {
+		if _, err := util_x509.Verify(rootCAs, nodeChain, nodeKey, x509.ExtKeyUsageClientAuth, nil, false, !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
+			return []error{err}
+		}
+
+		if err := util_x509.VerifyInternalClientEmailSAN(nodeChain); err != nil {
+			return []error{err}
+		}
 	}
 
 	return nil
