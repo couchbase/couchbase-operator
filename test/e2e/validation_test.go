@@ -1486,6 +1486,8 @@ func TestNegValidationCreateCouchbaseClusterLogging(t *testing.T) {
 							"localusername/local",
 							"externalusername/external",
 							"@internalusername/local",
+							"fwws-*/local",
+							"prefix-*/external",
 						},
 					}),
 			},

@@ -486,6 +486,7 @@ func registerTests() {
 		framework.NewTestDef(TestAutoscaleEnabledAllowsStatefulTLS).WithTags(TagSuiteP0, TagFeatureTLS, TagFeatureAutoScaling),
 		framework.NewTestDef(TestAutoscaleManualMaintenanceMode).WithTags(TagSuiteP0, TagFeatureAutoScaling),
 		framework.NewTestDef(TestAuditingNoLogging).WithTags(TagSuiteP0, TagFeatureLogging),
+		framework.NewTestDef(TestAuditingDisabledUsersGlob).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestCustomLogging).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestChangeLogShipperImage).WithTags(TagSuiteP0, TagFeatureLogging),
 		framework.NewTestDef(TestInflightLogRedaction).WithTags(TagSuiteP0, TagFeatureLogging, TagSuitePlatform),

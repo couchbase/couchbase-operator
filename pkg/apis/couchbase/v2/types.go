@@ -5601,6 +5601,10 @@ type LogShipperSidecarTLSSpec struct {
 // 1. A local user, specified in the form localusername/local.
 // 2. An external user, specified in the form externalusername/external.
 // 3. An internal user, specified in the form @internalusername/local.
+// The username portion may also be a glob pattern ('*', '?', '[...]'), for example
+// fwws-*/local, in which case the operator expands it to all matching users in that
+// domain. This is convenient when many users share a common prefix
+// new users that match the pattern are picked up on the next reconcile.
 // We add a quick validation check to make sure these match and prevent being rejected by the API later.
 // This is just a sanity check, the REST API may still reject the user for other reasons.
 // +kubebuilder:validation:Pattern="^.+/(local|external)$"

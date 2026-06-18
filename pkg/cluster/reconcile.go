@@ -15,7 +15,6 @@ import (
 	goerrors "errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -1159,43 +1158,33 @@ func (c *Cluster) reconcileAuditSettings() error {
 	sort.Ints(requested.DisabledEvents)
 	sort.Ints(current.DisabledEvents)
 
-	// Deal with the conversion between two quite different arrays: JSON array of structs and CSV string
-	requested.DisabledUsers = []couchbaseutil.AuditUser{}
-
-	// The users are actually a compound string intended to feed a two-element struct (which is returned!)
-	// The disabledUsers parameter disables filterable-event auditing on a per user basis.
-	// Its value must be a list of users, specified as a comma-separated list, with no spaces. Each user may be:
-	// 1. A local user, specified in the form localusername/local.
-	// 2. An external user, specified in the form externalusername/external.
-	// 3. An internal user, specified in the form @internalusername/local.
-	//
-	// We add a quick validation check to make sure these match and prevent being rejected by the API later: https://regex101.com/r/ubrkyg/2
-	userValidator := regexp.MustCompile("^.+/(local|external)$")
-
-	for _, s := range auditSettings.DisabledUsers {
-		// Usage in a loop prefers a compiled regex
-		stringValue := string(s)
-
-		valid := userValidator.MatchString(stringValue)
-		if !valid {
-			err := fmt.Errorf("%w: audit defaults invalid user: %s", errors.NewStackTracedError(errors.ErrConfigurationInvalid), s)
+	// disabledUsers is sent to the REST API as a CSV string but returned as a JSON
+	// array of structs. Each entry is a compound "name/domain" string. The name may
+	// be a glob pattern (e.g. fwws-*/local), which the operator expands against the
+	// cluster's users, so we only fetch that list when an entry needs it.
+	var users couchbaseutil.UserList
+	if disabledUsersNeedExpansion(auditSettings.DisabledUsers) {
+		if err := couchbaseutil.ListUsers(&users).On(c.api, c.readyMembers()); err != nil {
+			log.Error(err, "Audit user list collection failed", "cluster", c.namespacedName())
 			return err
 		}
 
-		splitValues := strings.Split(stringValue, "/")
-		numberOfSplits := len(splitValues)
-
-		// At this point must have a string with a slash in it but we may have more with some weirdness matching the regex
-		if numberOfSplits == 2 {
-			requested.DisabledUsers = append(requested.DisabledUsers, couchbaseutil.AuditUser{
-				Name:   splitValues[0],
-				Domain: splitValues[1],
-			})
-		} else {
-			err := fmt.Errorf("%w: audit defaults invalid split (%d) of user: %s", errors.NewStackTracedError(errors.ErrConfigurationInvalid), numberOfSplits, s)
-			return err
+		// Internal service users are not returned by the RBAC API, so add them
+		// explicitly to let glob patterns (e.g. @*/local) match them.
+		for _, name := range constants.InternalAuditUsers {
+			users = append(users, couchbaseutil.User{ID: name, Domain: couchbaseutil.InternalAuthDomain})
 		}
 	}
+
+	disabledUsers, err := expandDisabledUsers(auditSettings.DisabledUsers, users)
+	if err != nil {
+		return err
+	}
+
+	requested.DisabledUsers = disabledUsers
+
+	// Sort the current users too so the DeepEqual below is order insensitive.
+	sortAuditUsers(current.DisabledUsers)
 
 	if auditSettings.Rotation != nil {
 		if auditSettings.Rotation.Interval != nil {

@@ -18,6 +18,8 @@ import (
 	"time"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -167,6 +169,61 @@ func TestAuditingNoLogging(t *testing.T) {
 		},
 	}
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// Glob patterns in disabledUsers are expanded by the operator to the matching
+// cluster users before being sent to the audit REST API.
+func TestAuditingDisabledUsersGlob(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Start with auditing disabled, we enable it with a glob entry further down.
+	// Disable managed RBAC so the operator does not prune the users we create
+	// directly below (managed RBAC deletes any user not backed by a CouchbaseUser).
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithAuditing(e2eutil.None).Generate(kubernetes)
+	cluster.Spec.Security.RBAC.Managed = false
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	// Create local users, two share the "fwws-" prefix, one does not. Only the two
+	// matching users should be expanded from the fwws-*/local glob below.
+	users := []*couchbaseutil.User{
+		{Name: "fwws-app1", ID: "fwws-app1", Domain: "local", Password: "password1"},
+		{Name: "fwws-app2", ID: "fwws-app2", Domain: "local", Password: "password2"},
+		{Name: "other-user", ID: "other-user", Domain: "local", Password: "password3"},
+	}
+	e2eutil.MustCreateUsers(t, kubernetes, cluster, users...)
+	e2eutil.MustWaitUntilUsersExist(t, kubernetes, cluster, users, 2*time.Minute)
+
+	// Enable auditing and disable the fwws- users via a single glob entry.
+	newConfig := &v2.CouchbaseClusterAuditLoggingSpec{
+		Enabled:       true,
+		DisabledUsers: []v2.AuditDisabledUser{"fwws-*/local"},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", newConfig), time.Minute)
+
+	// The operator should expand fwws-*/local to the two matching users only.
+	e2eutil.MustCheckAuditDisabledUsers(t, kubernetes, cluster, []couchbaseutil.AuditUser{
+		{Name: "fwws-app1", Domain: "local"},
+		{Name: "fwws-app2", Domain: "local"},
+	})
+
+	// A glob over internal users (@*/local) expands to the hardcoded internal user
+	// list, which the operator injects since they are not returned by the RBAC API.
+	internalConfig := &v2.CouchbaseClusterAuditLoggingSpec{
+		Enabled:       true,
+		DisabledUsers: []v2.AuditDisabledUser{"@*/local"},
+	}
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/logging/audit", internalConfig), time.Minute)
+
+	expectedInternal := make([]couchbaseutil.AuditUser, 0, len(constants.InternalAuditUsers))
+	for _, name := range constants.InternalAuditUsers {
+		expectedInternal = append(expectedInternal, couchbaseutil.AuditUser{Name: name, Domain: "local"})
+	}
+	e2eutil.MustCheckAuditDisabledUsers(t, kubernetes, cluster, expectedInternal)
 }
 
 // Additional logs can be streamed to standard output with a custom log configuration. Custom configuration is ignored for reconcile.

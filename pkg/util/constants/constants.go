@@ -465,3 +465,28 @@ const (
 	// KMIPClientSecretKeyKey is the key in the KMIP client secret that contains the client private key.
 	KMIPClientSecretKeyKey = "tls.key"
 )
+
+// InternalAuditUsers is the fixed set of Couchbase Server internal service users.
+// They all live in the "local" domain and are referenced in audit settings as e.g.
+// "@eventing/local". Unlike normal users they are not returned by the RBAC users
+// REST API (GET /settings/rbac/users), so we hardcode them here in order to expand
+// glob patterns (e.g. "@*/local") against them.
+//
+// This list must be kept in sync with Couchbase Server. The authoritative list is
+// the memcached admin_user + other_users in ns_server's default config:
+// https://github.com/couchbase/ns_server/blob/master/apps/ns_server/src/ns_config_default.erl
+// (search for "admin_user" / "other_users"). This ensures that any changes in
+// the default internal users in Couchbase Server are reflected here.
+// docs at https://docs.couchbase.com/server/current/rest-api/rest-auditing.html
+// which omit "@backup".
+var InternalAuditUsers = []string{
+	"@ns_server",
+	"@cbq-engine",
+	"@projector",
+	"@goxdcr",
+	"@index",
+	"@fts",
+	"@eventing",
+	"@cbas",
+	"@backup",
+}

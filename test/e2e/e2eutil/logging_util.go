@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +95,48 @@ func checkAuditSpec(auditSpec *couchbasev2.CouchbaseClusterAuditLoggingSpec, act
 func MustCheckAuditConfiguration(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster) {
 	err := checkAuditConfig(k8s, couchbase)
 	if err != nil {
+		Die(t, err)
+	}
+}
+
+// checkAuditDisabledUsers verifies the audit disabledUsers reported by the server
+// exactly match the expected set, ignoring order. This is used to assert that the
+// operator expanded a glob pattern (e.g. fwws-*/local) to the correct concrete users.
+func checkAuditDisabledUsers(k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expected []couchbaseutil.AuditUser) error {
+	return retryutil.RetryFor(2*time.Minute, func() error {
+		client, err := CreateAdminConsoleClient(k8s, couchbase)
+		if err != nil {
+			return err
+		}
+
+		info := couchbaseutil.AuditSettings{}
+
+		request := newRequest("/settings/audit", nil, &info)
+
+		if err := client.client.Get(request, client.host); err != nil {
+			return err
+		}
+
+		want := map[couchbaseutil.AuditUser]struct{}{}
+		for _, user := range expected {
+			want[user] = struct{}{}
+		}
+
+		got := map[couchbaseutil.AuditUser]struct{}{}
+		for _, user := range info.DisabledUsers {
+			got[user] = struct{}{}
+		}
+
+		if !reflect.DeepEqual(want, got) {
+			return fmt.Errorf("audit disabled users mismatch: want %v, got %v", expected, info.DisabledUsers)
+		}
+
+		return nil
+	})
+}
+
+func MustCheckAuditDisabledUsers(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, expected []couchbaseutil.AuditUser) {
+	if err := checkAuditDisabledUsers(k8s, couchbase, expected); err != nil {
 		Die(t, err)
 	}
 }
