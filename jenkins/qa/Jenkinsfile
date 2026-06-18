@@ -101,6 +101,7 @@ pipeline {
     stage('Build Container Images') {
       steps {
         sh 'docker login -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
+        sh 'docker login dhi.io -u ${DOCKER_CREDENTIALS_USR} -p ${DOCKER_CREDENTIALS_PSW}'
         sh 'make images-public -e DOCKER_USER=${DOCKER_CREDENTIALS_USR} DOCKER_TAG=${GIT_COMMIT}'
       }
 
