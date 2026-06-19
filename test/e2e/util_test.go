@@ -150,6 +150,8 @@ func registerTests() {
 		framework.NewTestDef(TestBucketStorageBackendValidationApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidateUpgradeField).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketSelectorInvalidNameRegexCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestBucketSelectorInvalidNameRegexApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -234,6 +236,8 @@ func registerTests() {
 		framework.NewTestDef(TestBucketSelection).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithExplicitName).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestBucketWithSameExplicitNameAndDifferentType).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestBucketSelectionWithMatchNames).WithTags(TagSuiteP0),
+		framework.NewTestDef(TestBucketSelectionWithMatchNamesAndLabels).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestSampleBucket).WithTags(TagSuiteP0),
 		framework.NewTestDef(TestUpdateSampleBucket).WithTags(TagSuiteP0),

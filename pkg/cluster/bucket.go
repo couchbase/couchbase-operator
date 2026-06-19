@@ -48,7 +48,7 @@ type SupportedFeatureMap map[SupportedFeature]bool
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
 //
 //nolint:gocognit,gocyclo
-func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client, encryptionKeys couchbaseutil.EncryptionKeyList) []couchbaseutil.Bucket {
+func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client, encryptionKeys couchbaseutil.EncryptionKeyList) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
@@ -72,7 +72,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			log.Error(err, "failed to populate bucket with annotation", "cluster", cluster.NamespacedName())
 		}
 
-		if !selector.Matches(labels.Set(bucket.Labels)) {
+		if !selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			continue
 		}
 
@@ -255,7 +255,7 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
-func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labels.Selector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
@@ -273,7 +273,7 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector labe
 			log.Error(err, "failed to populate bucket with annotation")
 		}
 
-		if !selector.Matches(labels.Set(bucket.Labels)) {
+		if !selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			continue
 		}
 
@@ -376,14 +376,14 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 }
 
 // gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
-func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
+func gatherMemcachedBuckets(selector *couchbasev2.ObjectSelectorAsSelector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
 	for _, bucket := range k8sMemcachedBuckets {
 		bucketA, found := client.CouchbaseMemcachedBuckets.Get(bucket.Name)
 		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
 			continue
 		}
 
-		if !selector.Matches(labels.Set(bucket.Labels)) {
+		if !selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			continue
 		}
 
@@ -409,7 +409,7 @@ func gatherMemcachedBuckets(selector labels.Selector, k8sMemcachedBuckets []*cou
 
 // gatherBuckets loads up bucket configurations from Kubernetes and marshalls them into canonical form.
 func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
-	selector, err := c.cluster.GetBucketLabelSelector()
+	selector, err := c.cluster.GetBucketObjectSelector()
 	if err != nil {
 		return nil, err
 	}

@@ -37,13 +37,13 @@ type KubeAbstraction interface { //nolint: interfacebloat
 	// GetCouchbaseClusters returns all clusters in the specified namespace.
 	GetCouchbaseClusters(string) (*couchbasev2.CouchbaseClusterList, error)
 	// GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
-	GetCouchbaseBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error)
+	GetCouchbaseBuckets(string, *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseBucketList, error)
 	// GetCouchbaseEphemeralBuckets returns all ephemeral buckets for a specified selector.
-	GetCouchbaseEphemeralBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
+	GetCouchbaseEphemeralBuckets(string, *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
 	// GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
-	GetCouchbaseMemcachedBuckets(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
+	GetCouchbaseMemcachedBuckets(string, *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
 	// GetBuckets returns all abstract buckets for a specified selector.
-	GetBuckets(string, *metav1.LabelSelector) ([]couchbasev2.AbstractBucket, error)
+	GetBuckets(string, *couchbasev2.ObjectSelector) ([]couchbasev2.AbstractBucket, error)
 	// GetCouchbaseReplications returns all replications for a specified selector.
 	GetCouchbaseReplications(string, *metav1.LabelSelector) (*couchbasev2.CouchbaseReplicationList, error)
 	// GetCouchbaseUsers returns all users for a specified selector
@@ -126,7 +126,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseClusters(namespace string) (*couchbas
 }
 
 // GetCouchbaseBuckets returns all couchbase buckets for a specified selector.
-func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseBucketList, error) {
 	if err := ab.cache.InitBucketCache(namespace, func() (*couchbasev2.CouchbaseBucketList, error) {
 		return ab.couchbaseClient.CouchbaseV2().CouchbaseBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	}); err != nil {
@@ -137,7 +137,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseBuckets(namespace string, selector *m
 }
 
 // GetCouchbaseEphemeralBuckets returns all ephemeral buckets for a specified selector.
-func (ab *kubeAbstractionImpl) GetCouchbaseEphemeralBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseEphemeralBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
 	if err := ab.cache.InitEphemeralBucketCache(namespace, func() (*couchbasev2.CouchbaseEphemeralBucketList, error) {
 		return ab.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	}); err != nil {
@@ -148,7 +148,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseEphemeralBuckets(namespace string, se
 }
 
 // GetCouchbaseMemcachedBuckets returns all memcached buckets for a specified selector.
-func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
+func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
 	if err := ab.cache.InitMemcachedBucketCache(namespace, func() (*couchbasev2.CouchbaseMemcachedBucketList, error) {
 		return ab.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(namespace).List(context.Background(), metav1.ListOptions{})
 	}); err != nil {
@@ -158,7 +158,7 @@ func (ab *kubeAbstractionImpl) GetCouchbaseMemcachedBuckets(namespace string, se
 	return ab.cache.GetMemcachedBuckets(namespace, selector)
 }
 
-func (ab *kubeAbstractionImpl) GetBuckets(namespace string, selector *metav1.LabelSelector) ([]couchbasev2.AbstractBucket, error) {
+func (ab *kubeAbstractionImpl) GetBuckets(namespace string, selector *couchbasev2.ObjectSelector) ([]couchbasev2.AbstractBucket, error) {
 	buckets, err := ab.GetCouchbaseBuckets(namespace, selector)
 	if err != nil {
 		return nil, err

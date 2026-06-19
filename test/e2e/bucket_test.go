@@ -573,7 +573,7 @@ func TestBucketSelection(t *testing.T) {
 
 	// Create a cluster that selects only labelled buckets.
 	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	couchbase.Spec.Buckets.Selector = &metav1.LabelSelector{
+	couchbase.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: labels,
 	}
 	couchbase = e2eutil.MustNewClusterFromSpec(t, kubernetes, couchbase)
@@ -655,7 +655,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketUntyped1 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped1)
 
 	cluster1 := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster1.Spec.Buckets.Selector = &metav1.LabelSelector{
+	cluster1.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: labels1,
 	}
 	cluster1 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster1)
@@ -674,7 +674,7 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 	bucketUntyped2 = e2eutil.MustNewBucket(t, kubernetes, bucketUntyped2)
 
 	cluster2 := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
-	cluster2.Spec.Buckets.Selector = &metav1.LabelSelector{
+	cluster2.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: labels2,
 	}
 	cluster2 = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster2)
@@ -691,6 +691,109 @@ func TestBucketWithSameExplicitNameAndDifferentType(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster1, expectedEvents)
 	ValidateEvents(t, kubernetes, cluster2, expectedEvents)
+}
+
+func TestBucketSelectionWithMatchNames(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+	bucketName := "madeira-manchester-madrid-turin-and-manchester-again"
+
+	// Create a default bucket and a named bucket.
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket())
+	bucket := e2espec.DefaultBucket()
+	bucket.Name = bucketName
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create a cluster that selects only selected named buckets.
+	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	couchbase.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
+		MatchNames: []string{
+			bucketName,
+		},
+	}
+	couchbase = e2eutil.MustNewClusterFromSpec(t, kubernetes, couchbase)
+
+	// Ensure the unselected bucket doesn't get created.
+	if err := e2eutil.WaitUntilBucketExists(kubernetes, couchbase, e2espec.DefaultBucket(), time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Only the named bucket is created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucketName},
+	}
+
+	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
+}
+
+func TestBucketSelectionWithMatchNamesAndLabels(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	// Static configuration.
+	clusterSize := 3
+	bucket1Name := "fergie-time"
+	bucket2Name := "invincibles"
+
+	labels1 := map[string]string{
+		"stadium": "old-trafford",
+	}
+
+	labels2 := map[string]string{
+		"stadium": "highburry",
+	}
+
+	// Create 3 buckets. 2 with name and labels and a default bucket
+	e2eutil.MustNewBucket(t, kubernetes, e2espec.DefaultBucket())
+
+	bucket1 := e2espec.DefaultBucket()
+	bucket1.Name = bucket1Name
+	bucket1.Labels = labels1
+	e2eutil.MustNewBucket(t, kubernetes, bucket1)
+
+	bucket2 := e2espec.DefaultBucket()
+	bucket2.Name = bucket2Name
+	bucket2.Labels = labels2
+	e2eutil.MustNewBucket(t, kubernetes, bucket2)
+
+	// Create a cluster that selects only labelled buckets.
+	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	couchbase.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
+		MatchNames: []string{
+			"^fergie-.*",
+		},
+		MatchLabels: labels2,
+	}
+	couchbase.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(1024)
+	couchbase = e2eutil.MustNewClusterFromSpec(t, kubernetes, couchbase)
+
+	// Ensure the unlabelled bucket doesn't get created.
+	if err := e2eutil.WaitUntilBucketExists(kubernetes, couchbase, e2espec.DefaultBucket(), time.Minute); err == nil {
+		e2eutil.Die(t, fmt.Errorf("bucket created unexpectedly"))
+	}
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Only the selected bucket is created
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket1Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated, FuzzyMessage: bucket2Name},
+	}
+
+	ValidateEvents(t, kubernetes, couchbase, expectedEvents)
 }
 
 // TestCouchbaseBucketStorageBackendMagmaInvalidForFtsAnalyticsEventing tests whether the dac will correctly accept or reject

@@ -2535,7 +2535,7 @@ func checkMagmaVBucketsSettings(bucket *couchbasev2.CouchbaseBucket, cName strin
 }
 
 // checkCrossClusterVersioning checks if the bucket's cross cluster versioning is compatible with the cluster version.
-func checkCrossClusterVersioning(v *types.Validator, namespace string, bucketLabels map[string]string, enableCrossClusterVersioning *bool) error {
+func checkCrossClusterVersioning(v *types.Validator, name, namespace string, bucketLabels map[string]string, enableCrossClusterVersioning *bool) error {
 	if enableCrossClusterVersioning == nil {
 		return nil
 	}
@@ -2546,12 +2546,13 @@ func checkCrossClusterVersioning(v *types.Validator, namespace string, bucketLab
 	}
 
 	for _, cluster := range clusters.Items {
-		clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		bucketSelector := cluster.Spec.Buckets.Selector
+		clusterBucketSelector, err := bucketSelector.AsMatcher()
 		if err != nil {
 			return err
 		}
 
-		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(labels.Set(bucketLabels)) {
+		if cluster.Spec.Buckets.Selector == nil || clusterBucketSelector.Matches(name, labels.Set(bucketLabels)) {
 			srvVerAfter76, err := cluster.IsAtLeastVersion("7.6.0")
 			if err != nil {
 				return err
@@ -2567,11 +2568,11 @@ func checkCrossClusterVersioning(v *types.Validator, namespace string, bucketLab
 }
 
 func checkBucketCrossClusterVersioning(v *types.Validator, bucket *couchbasev2.CouchbaseBucket) error {
-	return checkCrossClusterVersioning(v, bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
+	return checkCrossClusterVersioning(v, bucket.GetName(), bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
 }
 
 func checkEphemeralBucketCrossClusterVersioning(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket) error {
-	return checkCrossClusterVersioning(v, bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
+	return checkCrossClusterVersioning(v, bucket.GetName(), bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
 }
 
 func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
@@ -3860,12 +3861,13 @@ func validateBucketNameConstraints(v *types.Validator, object runtime.Object, cl
 		}
 
 		for i, cluster := range namespacedClusters.Items {
-			clusterBucketSelector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+			bucketSelector := cluster.Spec.Buckets.Selector
+			clusterBucketSelector, err := bucketSelector.AsMatcher()
 			if err != nil {
 				return err
 			}
 
-			if clusterBucketSelector.Matches(labels.Set(bucket.GetLabels())) {
+			if clusterBucketSelector.Matches(bucket.GetName(), labels.Set(bucket.GetLabels())) {
 				clusters = append(clusters, &namespacedClusters.Items[i])
 			}
 		}
@@ -3964,16 +3966,12 @@ func validateMemoryConstraints(v *types.Validator, object runtime.Object, cluste
 
 	for i := range clusters.Items {
 		cluster := clusters.Items[i]
-		selector := labels.Everything()
-		if cluster.Spec.Buckets.Selector != nil {
-			var err error
-			selector, err = metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
-			if err != nil {
-				return err
-			}
+		selector, err := cluster.Spec.Buckets.Selector.AsMatcher()
+		if err != nil {
+			return err
 		}
 
-		if !selector.Matches(labels.Set(bucket.GetLabels())) {
+		if !selector.Matches(bucket.GetResourceName(), labels.Set(bucket.GetLabels())) {
 			continue
 		}
 
@@ -5364,18 +5362,15 @@ func checkDefaultBucketStorageBackendConstraint(v *types.Validator, prev, curr *
 		return err
 	}
 
-	prevSelector := labels.Everything()
-	if prev.Spec.Buckets.Selector != nil {
-		prevSelector, err = metav1.LabelSelectorAsSelector(prev.Spec.Buckets.Selector)
-		if err != nil {
-			return nil
-		}
+	prevSelector, err := prev.Spec.Buckets.Selector.AsMatcher()
+	if err != nil {
+		return nil
 	}
 
 	var errs []error
 
 	for _, bucket := range buckets.Items {
-		if !prevSelector.Matches(labels.Set(bucket.Labels)) {
+		if !prevSelector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			continue
 		}
 
@@ -6828,12 +6823,12 @@ func getBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.Couchbase
 			continue
 		}
 
-		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		selector, err := cluster.Spec.Buckets.Selector.AsMatcher()
 		if err != nil {
 			return nil, err
 		}
 
-		if selector.Matches(labels.Set(bucket.Labels)) {
+		if selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			relatedClusters = append(relatedClusters, &cluster)
 		}
 	}
@@ -6858,12 +6853,12 @@ func getEphemeralBucketsRelatedClusters(v *types.Validator, bucket *couchbasev2.
 			continue
 		}
 
-		selector, err := metav1.LabelSelectorAsSelector(cluster.Spec.Buckets.Selector)
+		selector, err := cluster.Spec.Buckets.Selector.AsMatcher()
 		if err != nil {
 			return nil, err
 		}
 
-		if selector.Matches(labels.Set(bucket.Labels)) {
+		if selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			relatedClusters = append(relatedClusters, &cluster)
 		}
 	}

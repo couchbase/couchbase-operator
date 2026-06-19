@@ -1267,11 +1267,47 @@ func (c *CouchbaseCluster) GetHibernationStrategy() HibernationStrategy {
 // GetBucketLabelSelector returns a label selector to select buckets for
 // inclusion in the cluster.
 func (c *CouchbaseCluster) GetBucketLabelSelector() (labels.Selector, error) {
-	if c.Spec.Buckets.Selector == nil {
+	if c.Spec.Buckets.Selector.IsNil() {
 		return labels.Everything(), nil
 	}
 
-	return metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector)
+	labelSel := c.Spec.Buckets.Selector.ToLabelSelector()
+
+	// If the user specified Names, but NO Labels, the label selector portion should match nothing.
+	// (Otherwise, it would default to Everything and bypass the name restriction).
+	if labelSel == nil {
+		return labels.Nothing(), nil
+	}
+
+	return metav1.LabelSelectorAsSelector(c.Spec.Buckets.Selector.ToLabelSelector())
+}
+
+// ToLabelSelector converts our custom selector back into a standard Kubernetes LabelSelector.
+func (os *ObjectSelector) ToLabelSelector() *metav1.LabelSelector {
+	if os == nil {
+		return nil
+	}
+
+	if len(os.MatchLabels) == 0 && len(os.MatchExpressions) == 0 {
+		return nil
+	}
+
+	return &metav1.LabelSelector{
+		MatchLabels:      os.MatchLabels,
+		MatchExpressions: os.MatchExpressions,
+	}
+}
+
+// IsNil returns true if the object selector is nil or it's subfields are empty.
+func (sel *ObjectSelector) IsNil() bool {
+	if sel == nil {
+		return true
+	}
+	return len(sel.MatchLabels) == 0 && len(sel.MatchNames) == 0 && len(sel.MatchExpressions) == 0
+}
+
+func (c *CouchbaseCluster) GetBucketObjectSelector() (*ObjectSelectorAsSelector, error) {
+	return c.Spec.Buckets.Selector.AsMatcher()
 }
 
 // AddressFamily returns the cluster address family, defaulting to IPv4 dual-stack if
@@ -2034,4 +2070,74 @@ func (c *CouchbaseCluster) ShouldRevertCandidateToSwapRebalance(candidate couchb
 	candidateConfig := c.Spec.GetServerConfigByName(candidate.Config())
 
 	return candidateConfig != nil && candidateConfig.HasServiceWithout(IndexService, DataService)
+}
+
+// +kubebuilder:object:generate=false
+type ObjectSelectorAsSelector struct {
+	LabelSelector labels.Selector
+	nameMatchers  []*regexp.Regexp
+	exactNames    []string
+	hasLabels     bool
+	hasNames      bool
+}
+
+// AsMatcher compiles the ObjectSelector and returns the compiled state.
+func (os *ObjectSelector) AsMatcher() (*ObjectSelectorAsSelector, error) {
+	if os == nil {
+		return &ObjectSelectorAsSelector{hasLabels: false, hasNames: false}, nil
+	}
+
+	cs := &ObjectSelectorAsSelector{}
+
+	// 1. Compile the Label Selector using our clean helper method
+	if len(os.MatchLabels) > 0 || len(os.MatchExpressions) > 0 {
+		sel, err := metav1.LabelSelectorAsSelector(os.ToLabelSelector())
+		if err != nil {
+			return nil, err
+		}
+		cs.LabelSelector = sel
+		cs.hasLabels = true
+	}
+
+	// 2. Compile the Name Selector
+	if len(os.MatchNames) > 0 {
+		cs.hasNames = true
+		for _, pattern := range os.MatchNames {
+			cs.exactNames = append(cs.exactNames, pattern)
+
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return nil, fmt.Errorf("invalid name match pattern %q: %w", pattern, err)
+			}
+			cs.nameMatchers = append(cs.nameMatchers, re)
+		}
+	}
+
+	return cs, nil
+}
+
+// Matches evaluates the name and labels using Union (OR) logic.
+func (cs *ObjectSelectorAsSelector) Matches(name string, objLabels map[string]string) bool {
+	// Empty selector matches everything
+	if !cs.hasLabels && !cs.hasNames {
+		return true
+	}
+
+	// Check Name Conditions
+	if cs.hasNames {
+		for i, exact := range cs.exactNames {
+			if name == exact || cs.nameMatchers[i].MatchString(name) {
+				return true
+			}
+		}
+	}
+
+	// Check Label Conditions
+	if cs.hasLabels {
+		if cs.LabelSelector.Matches(labels.Set(objLabels)) {
+			return true
+		}
+	}
+
+	return false
 }

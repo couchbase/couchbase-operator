@@ -6557,3 +6557,47 @@ func TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate(t *testing
 
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation.yaml"})
 }
+
+func TestBucketSelectorInvalidNameRegexCreate(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestInvalidRegexNameSelectorOnlyIsRejected",
+			shouldFail: true,
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector", &couchbasev2.ObjectSelector{
+					MatchNames: []string{"["},
+				}),
+			},
+			expectedErrors: []string{"invalid name match pattern", "error parsing regexp"},
+		},
+		{
+			name:       "TestInvalidAndValidRegexNameSelectorIsRejected",
+			shouldFail: true,
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector", &couchbasev2.ObjectSelector{
+					MatchNames: []string{"[", "^backup-.*"},
+				}),
+			},
+			expectedErrors: []string{"invalid name match pattern", "error parsing regexp"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationCreate, validationFile: "bucket-replicas.yaml"})
+}
+
+func TestBucketSelectorInvalidNameRegexApply(t *testing.T) {
+	testDefs := []testDef{
+		{
+			name:       "TestInvalidRegexNameSelectorIsRejected",
+			shouldFail: true,
+			mutations: patchMap{
+				"cluster": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector", &couchbasev2.ObjectSelector{
+					MatchNames: []string{"["},
+				}),
+			},
+			expectedErrors: []string{"invalid name match pattern", "error parsing regexp"},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "bucket-replicas.yaml"})
+}

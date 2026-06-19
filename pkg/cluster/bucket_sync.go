@@ -267,8 +267,8 @@ func (c *Cluster) applyDataTopologyResources(resources []runtime.Object) error {
 func (c *Cluster) synchronizeBuckets() error {
 	// Perform any necessary sanity checks to prevent nil pointer dereferences,
 	// and subsequent crashes, the DAC, if in use, should stop these before hand.
-	if c.cluster.Spec.Buckets.Selector == nil || c.cluster.Spec.Buckets.Selector.MatchLabels == nil {
-		return fmt.Errorf("%w: bucket label selector not set", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	if c.cluster.Spec.Buckets.Selector.IsNil() {
+		return fmt.Errorf("%w: bucket selectors not set", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 	}
 
 	// Poll Couchbase and get all resources that should be there to maintain

@@ -76,7 +76,7 @@ func (c *Cluster) listScopedBuckets() ([]couchbasev2.AbstractBucket, error) {
 
 	// Filter out any buckets that aren't selected for cluster inclusion or
 	// are not scopes and collections enabled.
-	selector, err := c.cluster.GetBucketLabelSelector()
+	selector, err := c.cluster.GetBucketObjectSelector()
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (c *Cluster) listScopedBuckets() ([]couchbasev2.AbstractBucket, error) {
 	var filtered []couchbasev2.AbstractBucket
 
 	for _, bucket := range buckets {
-		if !selector.Matches(labels.Set(bucket.GetLabels())) {
+		if !selector.Matches(bucket.GetResourceName(), labels.Set(bucket.GetLabels())) {
 			continue
 		}
 

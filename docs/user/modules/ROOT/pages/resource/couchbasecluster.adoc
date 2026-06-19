@@ -59,6 +59,8 @@ The following is an example resource, depicting the overall structure and any de
         <<couchbaseclusters-spec-buckets-selector-matchexpressions-values,values>>:
         - ""
       <<couchbaseclusters-spec-buckets-selector-matchlabels,matchLabels>>:
+      <<couchbaseclusters-spec-buckets-selector-matchnames,matchNames>>:
+      - ""
     <<couchbaseclusters-spec-buckets-synchronize,synchronize>>: false
   <<couchbaseclusters-spec-cluster,cluster>>:
     <<couchbaseclusters-spec-cluster-allowfailoverephemeralnoreplicas,allowFailoverEphemeralNoReplicas>>: false
@@ -1102,6 +1104,23 @@ A single {key,value} in the matchLabels
 map is equivalent to an element of matchExpressions, whose key field is "key", the
 operator is "In", and the values array contains only "value".
 The requirements are ANDed.
+
+=== couchbaseclusters.spec.buckets.selector.matchNames
+
+==== Constraints
+
+*Type*: `[]string`
+
+*Maximum Items*: `50`
+
+==== Description
+
+matchNames is a list of exact strings or regular expressions used to select objects by
+their name.
+If an object's name matches any of the provided patterns, it will be selected.
+The patterns in this list are evaluated using OR logic.
+Furthermore, the overall evaluation
+of matchNames is ORed with the label selector (matchLabels and matchExpressions).
 
 === couchbaseclusters.spec.buckets.synchronize
 

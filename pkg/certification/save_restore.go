@@ -2905,44 +2905,46 @@ func gatherDataTopologyResources(clients *clients, cluster *couchbasev2.Couchbas
 		return nil, nil
 	}
 
-	selector, err := cluster.GetBucketLabelSelector()
+	selector, err := cluster.GetBucketObjectSelector()
 	if err != nil {
 		return nil, err
 	}
 
-	buckets, err := clients.couchbaseClient.CouchbaseV2().CouchbaseBuckets(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+	ctx := context.Background()
+
+	buckets, err := getFilteredCouchbaseBuckets(ctx, clients, clients.namespace, selector)
 	if err != nil {
 		return nil, err
 	}
 
-	ephemeralBuckets, err := clients.couchbaseClient.CouchbaseV2().CouchbaseEphemeralBuckets(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+	ephemeralBuckets, err := getFilteredCouchbaseEphemeralBuckets(ctx, clients, clients.namespace, selector)
 	if err != nil {
 		return nil, err
 	}
 
-	memcachedBuckets, err := clients.couchbaseClient.CouchbaseV2().CouchbaseMemcachedBuckets(clients.namespace).List(context.Background(), metav1.ListOptions{LabelSelector: selector.String()})
+	memcachedBuckets, err := getFilteredCouchbaseMemcachedBuckets(ctx, clients, clients.namespace, selector)
 	if err != nil {
 		return nil, err
 	}
 
 	var resources []runtime.Object
 
-	for _, bucket := range buckets.Items {
+	for _, bucket := range buckets {
 		b := bucket
 		resources = append(resources, &b)
 	}
 
-	for _, bucket := range ephemeralBuckets.Items {
+	for _, bucket := range ephemeralBuckets {
 		b := bucket
 		resources = append(resources, &b)
 	}
 
-	for _, bucket := range memcachedBuckets.Items {
+	for _, bucket := range memcachedBuckets {
 		b := bucket
 		resources = append(resources, &b)
 	}
 
-	for _, bucket := range buckets.Items {
+	for _, bucket := range buckets {
 		r, err := gatherScopeResources(clients, bucket.Spec.Scopes)
 		if err != nil {
 			return nil, err
@@ -2951,7 +2953,7 @@ func gatherDataTopologyResources(clients *clients, cluster *couchbasev2.Couchbas
 		resources = append(resources, r...)
 	}
 
-	for _, bucket := range ephemeralBuckets.Items {
+	for _, bucket := range ephemeralBuckets {
 		r, err := gatherScopeResources(clients, bucket.Spec.Scopes)
 		if err != nil {
 			return nil, err
@@ -3203,7 +3205,7 @@ func pivotRoot(clients *clients, cluster *couchbasev2.CouchbaseCluster, l labels
 	}
 
 	cluster.Spec.Buckets.Managed = true
-	cluster.Spec.Buckets.Selector = &metav1.LabelSelector{
+	cluster.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: l,
 	}
 

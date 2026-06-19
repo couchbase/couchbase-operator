@@ -1596,14 +1596,14 @@ func TestXDCRMigrationLocalScopesAndCollections(t *testing.T) {
 
 	// Now create our clusters which should select their appropriate buckets
 	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	sourceCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
+	sourceCluster.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: sourceLabels,
 	}
 	sourceCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, sourceCluster)
 
 	// And the target cluster
 	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	targetCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
+	targetCluster.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: targetLabels,
 	}
 	targetCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, targetCluster)
@@ -1714,14 +1714,14 @@ func TestXDCRMigrationLocalScopesAndCollectionsMultipleRules(t *testing.T) {
 
 	// Now create our clusters which should select their appropriate buckets
 	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	sourceCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
+	sourceCluster.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: sourceLabels,
 	}
 	sourceCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, sourceCluster)
 
 	// And the target cluster
 	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes)
-	targetCluster.Spec.Buckets.Selector = &metav1.LabelSelector{
+	targetCluster.Spec.Buckets.Selector = &couchbasev2.ObjectSelector{
 		MatchLabels: targetLabels,
 	}
 	targetCluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, targetCluster)

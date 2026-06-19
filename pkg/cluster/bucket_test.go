@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 func TestHistoryRetention(t *testing.T) {
@@ -50,7 +49,7 @@ func TestHistoryRetention(t *testing.T) {
 		SupportedHistoryRetention:  true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
 	if newBuckets[0].HistoryRetentionBytes != 50 {
 		t.Fatalf("expected HistoryRetentionBytes=50, found %d", newBuckets[0].HistoryRetentionBytes)
 	}
@@ -82,7 +81,7 @@ func TestMagmaNoDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 4096 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=4096, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}
@@ -113,7 +112,7 @@ func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, labels.Everything(), k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 5555 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=5555, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}

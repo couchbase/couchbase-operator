@@ -42,11 +42,11 @@ type ResourceCacheProvider interface {
 	GetCollectionGroup(namespace, name string) (*couchbasev2.CouchbaseCollectionGroup, bool, error)
 	GetCollectionGroups(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseCollectionGroupList, error)
 	GetBucket(namespace, name string) (*couchbasev2.CouchbaseBucket, bool, error)
-	GetBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error)
+	GetBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseBucketList, error)
 	GetEphemeralBucket(namespace, name string) (*couchbasev2.CouchbaseEphemeralBucket, bool, error)
-	GetEphemeralBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
+	GetEphemeralBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error)
 	GetMemcachedBucket(namespace, name string) (*couchbasev2.CouchbaseMemcachedBucket, bool, error)
-	GetMemcachedBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
+	GetMemcachedBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error)
 	GetScope(namespace, name string) (*couchbasev2.CouchbaseScope, bool, error)
 	GetScopes(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseScopeList, error)
 	GetScopeGroup(namespace, name string) (*couchbasev2.CouchbaseScopeGroup, bool, error)
@@ -150,6 +150,45 @@ func (c *SimpleIndexCache[T]) List(selector *metav1.LabelSelector) ([]T, error) 
 		if sel.Matches(labels.Set(acc.GetLabels())) {
 			if t, ok := o.(T); ok {
 				out = append(out, t)
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func listDerefByObjectSelector[T interface {
+	*E
+	runtime.Object
+}, E any](c *SimpleIndexCache[T], selector *couchbasev2.ObjectSelector) ([]E, error) {
+	if c == nil {
+		return nil, nil
+	}
+
+	// if customer doesn't provide a selector, select everything and return early
+	if selector.IsNil() {
+		return listDeref(c, nil)
+	}
+
+	matcher, err := selector.AsMatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	var out []E
+	for _, o := range c.index.List() {
+		ro, ok := o.(runtime.Object)
+		if !ok {
+			continue
+		}
+		acc, err := meta.Accessor(ro)
+		if err != nil {
+			continue
+		}
+
+		if matcher.Matches(acc.GetName(), acc.GetLabels()) {
+			if t, ok := o.(T); ok && t != nil {
+				out = append(out, *t)
 			}
 		}
 	}
@@ -304,8 +343,8 @@ func (c *AdmissionControlCache) GetBucket(namespace, name string) (*couchbasev2.
 	return bucket, ok, nil
 }
 
-func (c *AdmissionControlCache) GetBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error) {
-	items, err := listDeref(c.buckets, selector)
+func (c *AdmissionControlCache) GetBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseBucketList, error) {
+	items, err := listDerefByObjectSelector(c.buckets, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +377,8 @@ func (c *AdmissionControlCache) GetEphemeralBucket(namespace, name string) (*cou
 	return bucket, ok, nil
 }
 
-func (c *AdmissionControlCache) GetEphemeralBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
-	items, err := listDeref(c.ephemeralBuckets, selector)
+func (c *AdmissionControlCache) GetEphemeralBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
+	items, err := listDerefByObjectSelector(c.ephemeralBuckets, selector)
 	if err != nil {
 		return nil, err
 	}
@@ -372,8 +411,8 @@ func (c *AdmissionControlCache) GetMemcachedBucket(namespace, name string) (*cou
 	return bucket, ok, nil
 }
 
-func (c *AdmissionControlCache) GetMemcachedBuckets(namespace string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
-	items, err := listDeref(c.memcachedBuckets, selector)
+func (c *AdmissionControlCache) GetMemcachedBuckets(namespace string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
+	items, err := listDerefByObjectSelector(c.memcachedBuckets, selector)
 	if err != nil {
 		return nil, err
 	}

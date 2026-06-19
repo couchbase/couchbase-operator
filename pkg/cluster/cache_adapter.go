@@ -71,6 +71,52 @@ func newOperatorValidator(k8s *client.Client) *vtypes.Validator {
 	return vtypes.NewWithCache(k8s.KubeClient, k8s.CouchbaseClient, opts, newOperatorCacheAdapter(k8s))
 }
 
+// listFiltered filters a slice of pointer objects by our custom object selector and returns them dereferenced.
+// T must be a pointer to E.
+//
+//nolint:gocognit
+func listFilteredByObjectSelector[T interface {
+	*E
+	GetLabels() map[string]string
+	GetName() string
+}, E any](items []T, selector *couchbasev2.ObjectSelector) ([]E, error) {
+	if selector.IsNil() {
+		return returnAll(items), nil
+	}
+
+	matcher, err := selector.AsMatcher()
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]E, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+
+		if matcher.Matches(item.GetName(), item.GetLabels()) {
+			out = append(out, *item)
+		}
+	}
+
+	return out, nil
+}
+
+func returnAll[T interface {
+	*E
+	GetLabels() map[string]string
+	GetName() string
+}, E any](items []T) []E {
+	out := make([]E, 0, len(items))
+	for _, item := range items {
+		if item != nil {
+			out = append(out, *item)
+		}
+	}
+	return out
+}
+
 // listFiltered filters a slice of pointer objects by label selector and returns them dereferenced.
 // T must be a pointer to E, and E must have a GetLabels() method.
 func listFiltered[T interface {
@@ -146,8 +192,8 @@ func (a *operatorCacheAdapter) GetBucket(_ string, name string) (*couchbasev2.Co
 	return bucket, ok, nil
 }
 
-func (a *operatorCacheAdapter) GetBuckets(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseBucketList, error) {
-	items, err := listFiltered(a.buckets.List(), selector)
+func (a *operatorCacheAdapter) GetBuckets(_ string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseBucketList, error) {
+	items, err := listFilteredByObjectSelector(a.buckets.List(), selector)
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +205,8 @@ func (a *operatorCacheAdapter) GetEphemeralBucket(_ string, name string) (*couch
 	return bucket, ok, nil
 }
 
-func (a *operatorCacheAdapter) GetEphemeralBuckets(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
-	items, err := listFiltered(a.ephemeralBuckets.List(), selector)
+func (a *operatorCacheAdapter) GetEphemeralBuckets(_ string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseEphemeralBucketList, error) {
+	items, err := listFilteredByObjectSelector(a.ephemeralBuckets.List(), selector)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +223,8 @@ func (a *operatorCacheAdapter) GetMemcachedBucket(_ string, name string) (*couch
 	return bucket, ok, nil
 }
 
-func (a *operatorCacheAdapter) GetMemcachedBuckets(_ string, selector *metav1.LabelSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
-	items, err := listFiltered(a.memcachedBuckets.List(), selector)
+func (a *operatorCacheAdapter) GetMemcachedBuckets(_ string, selector *couchbasev2.ObjectSelector) (*couchbasev2.CouchbaseMemcachedBucketList, error) {
+	items, err := listFilteredByObjectSelector(a.memcachedBuckets.List(), selector)
 	if err != nil {
 		return nil, err
 	}

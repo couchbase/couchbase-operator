@@ -4827,7 +4827,7 @@ type Buckets struct {
 
 	// Selector is a label selector used to list buckets in the namespace
 	// that are managed by the Operator.
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	Selector *ObjectSelector `json:"selector,omitempty"`
 
 	// Defined the default storage backend to use if a backend is not specified for a bucket,
 	// if this isn't specified then the default will be Couchstore.
@@ -4849,6 +4849,25 @@ type Buckets struct {
 	// By default a migration will affect one pod at a time.
 	// This field must be greater than zero.
 	MaxConcurrentPodSwaps uint64 `json:"-" annotation:"maxConcurrentPodSwaps"`
+}
+
+type ObjectSelector struct {
+	// matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+	// map is equivalent to an element of matchExpressions, whose key field is "key", the
+	// operator is "In", and the values array contains only "value". The requirements are ANDed.
+	// +optional
+	MatchLabels map[string]string `json:"matchLabels,omitempty" protobuf:"bytes,1,rep,name=matchLabels"`
+	// matchExpressions is a list of label selector requirements. The requirements are ANDed.
+	// +optional
+	MatchExpressions []metav1.LabelSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
+
+	// matchNames is a list of exact strings or regular expressions used to select objects by
+	// their name. If an object's name matches any of the provided patterns, it will be selected.
+	// The patterns in this list are evaluated using OR logic. Furthermore, the overall evaluation
+	// of matchNames is ORed with the label selector (matchLabels and matchExpressions).
+	// +kubebuilder:validation:MaxItems=50
+	// +optional
+	MatchNames []string `json:"matchNames,omitempty" protobuf:"bytes,3,rep,name=matchNames"`
 }
 
 type RBAC struct {
