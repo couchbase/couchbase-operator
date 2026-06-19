@@ -1549,8 +1549,9 @@ func TestResilientDeltaRecovery(t *testing.T) {
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, index, false)
 
 	// Wait for graceful failover to fall over
-	e2eutil.MustWaitForClusterWithErrorMessage(t, kubernetes, "graceful failover failed:", cluster, 5*time.Minute)
+	e2eutil.MustObserveClusterEventIgnoringMessage(t, kubernetes, cluster, e2eutil.ReconcileFailedEvent(cluster), 5*time.Minute)
 
+	// Wait for the cluster to become healthy again
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	// Check the version and document counts are as we expect
@@ -1927,7 +1928,7 @@ func TestServicesUpgradeOrderWithArbiterNodes(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).Upgradable().AtLeastVersion("7.6.0")
+	framework.Requires(t, kubernetes).Upgradable().AtLeastUpgradeVersion("7.6.0")
 
 	classSize := constants.Size2
 
@@ -2124,7 +2125,7 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	framework.Requires(t, kubernetes).ServerGroups(2).AtLeastVersion("7.6.0")
+	framework.Requires(t, kubernetes).ServerGroups(2).Upgradable().AtLeastUpgradeVersion("7.6.0")
 
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
@@ -3500,8 +3501,8 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate tests that all upgrade candidates in a reconciliation loop are upgraded with SwapRebalance
-// when the override is set if any of those candidates contain the index service, even if InPlaceUpgrade is specified as the upgrade process.
+// TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate tests that index candidates are always SwapRebalanced after non index candidates
+// are InPlaceUpgraded if both members are candidates in the same reconcile loop due to maxUpgradable.
 // It also checks that index nodes that persist on pods that are also running the data service will continue to be upgraded via InPlaceUpgrade.
 func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing.T) {
 	f := framework.Global
@@ -3552,7 +3553,6 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing
 	// 0004 and 0005 = data-only
 	// Given maxUpgradable is 2, we want to configure the upgrade order
 	// so two candidate groups will contain one node that has the index service only,
-	// and therefore will trigger both members in that group to be upgraded via swap rebalance.
 	// The final 2 candidates should be upgraded via InPlaceUpgrade.
 	upgradeOrderIndexes := []int{3, 0, 2, 4, 1, 5}
 	upgradeOrder := make([]string, len(upgradeOrderIndexes))
@@ -3572,20 +3572,33 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing
 	e2eutil.MustCheckStatusVersionFor(t, kubernetes, cluster, upgradeVersion, time.Minute)
 
 	// Check the events match what we expect:
-	// - Cluster Created
-	// - Upgrade Started. MaxUpgradable set to 2, so we should see 3 upgrade sequences in total
-	// - Candidates 3 (index-only) and 0 (default) = swap rebalance due to index-only presence
-	// - Candidates 2 (index-only) and 4 (data-only) = swap rebalance due to index-only presence
-	// - Candidates 1 and 5 = InPlaceUpgrade as no index-only candidates. These cannot be
-	// upgraded together as the upgrade order is not by server group, so we expect two separate sequences here, one for each candidate.
-	// - Upgrade Finished
+	// - Cluster Created.
+	// - Upgrade Started. MaxUpgradable set to 2, so we should see 3 upgrade sequences in total.
+	// - Reconcile 1: Candidates 3 (index) and 0 (idx + data) = InPlaceUpgrade (0), then SwapRebalance (3).
+	// - Reconcile 2: Candidates 2 (index) and 4 (data) = InPlaceUpgrade (4), then SwapRebalance (2).
+	// - Reconcile 3: Candidates 1 (idx + data) and 5 (data) = InPlaceUpgrade(1), then InPlaceUpgrade(5) (Multiple InPlaceUpgrade only allowed on server group upgrade order type).
+	// - Upgrade Finished.
+	inPlaceUpgrade := eventschema.Sequence{Validators: []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+	}}
+
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(len(cluster.Spec.Servers) * serverClassSize),
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeStarted},
-		eventschema.Repeat{Times: 2, Validator: e2eutil.MultiNodeSwapRebalanceSequence(2)},
+		// Reconcile 1.
+		eventschema.Sequence{Validators: []eventschema.Validatable{
+			inPlaceUpgrade,
+			e2eutil.SwapRebalanceSequence,
+		}},
+		// Reconcile 2.
+		eventschema.Sequence{Validators: []eventschema.Validatable{
+			inPlaceUpgrade,
+			e2eutil.SwapRebalanceSequence,
+		}},
+		// Reconcile 3.
 		eventschema.Repeat{Times: 2, Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			inPlaceUpgrade,
 		}}},
 		eventschema.Event{Reason: k8sutil.EventReasonUpgradeFinished},
 	}
