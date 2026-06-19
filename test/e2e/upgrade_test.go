@@ -2283,6 +2283,7 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 
 	framework.Requires(t, kubernetes).Upgradable()
 
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	classSize := 2
@@ -2301,9 +2302,12 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	// When the cluster is ready, start the upgrade.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 
-	// Before upgrading the cluster, we need to fetch the orchestrator index. If the orchestrator is at index 0,
-	// we need to amend the expected upgrade order to initially skip this node. Once one node has been upgraded,
-	// this should then become a new orchestrator and we can continue with the expected upgrade order.
+	// Before upgrading the cluster, we need to fetch the orchestrator index. The expected upgrade
+	// order depends on whether this is a maintenance upgrade (same major.minor) or a cross-version
+	// upgrade. In a maintenance upgrade ns_server's MASTER_ADVERTISED_VERSION is identical on old
+	// and new nodes, so the orchestrator never migrates and is always upgraded last. In a
+	// cross-version upgrade the first upgraded node takes over orchestration, so the original
+	// orchestrator is freed up earlier.
 	oNode := e2eutil.MustGetOrchestratorNode(t, kubernetes, cluster)
 	oIndex, err := couchbaseutil.GetIndexFromMemberName(strings.Split(strings.Split(oNode, "@")[1], ".")[0])
 	if err != nil {
@@ -2331,7 +2335,17 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 
 	expectedUpgradeOrderIndexes := []int{0, 1, 2, 3}
 
-	if oIndex == 0 {
+	if e2eutil.MustCheckIsMaintenanceUpgrade(t, initialVersion, upgradeVersion) {
+		// First upgraded node won't become the orchestrator. We should therefore be upgrading it last.
+		expectedUpgradeOrderIndexes = make([]int, 0, clusterSize)
+		for i := 0; i < clusterSize; i++ {
+			if i != oIndex {
+				expectedUpgradeOrderIndexes = append(expectedUpgradeOrderIndexes, i)
+			}
+		}
+		expectedUpgradeOrderIndexes = append(expectedUpgradeOrderIndexes, oIndex)
+	} else if oIndex == 0 {
+		// First upgraded node will become the orchestrator, freeing the previous orchestrator to be part of the order.
 		expectedUpgradeOrderIndexes = []int{1, 0, 2, 3}
 	}
 

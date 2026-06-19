@@ -166,6 +166,19 @@ const (
 
 	AnnotationLastReconciledSpec = "operator.couchbase.com/lastReconciledSpec"
 
+	// AnnotationServerGroup records, on a member's persistent volume claim, the server
+	// group the volume belongs to. By default this is an availability zone; when
+	// serverGroupsLabelOverride is set it is a placement group. The operator reads it
+	// back to re-pin a recovered pod to the same server group.
+	AnnotationServerGroup = "pvc.couchbase.com/serverGroup"
+
+	// AnnotationAvailabilityZone records, on a member's persistent volume claim, the real
+	// availability zone the underlying volume lives in. Unlike the CSI topology annotations
+	// (which use platform-specific keys and are only written for known cloud platforms), this
+	// key is platform-neutral and always written, so recoverability can compare a volume's AZ
+	// to the server class's desired zone without depending on spec.platform or the live pod.
+	AnnotationAvailabilityZone = "pvc.couchbase.com/availabilityZone"
+
 	ServerGroupLabel    = corev1.LabelTopologyZone
 	TopologyRegionLabel = corev1.LabelTopologyRegion
 

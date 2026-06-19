@@ -86,6 +86,33 @@ type PodReadinessConfig struct {
 	PodReadinessPeriod time.Duration
 }
 
+// createPvcsForPod creates persistent volume claims for a pod with appropriate scheduling annotations.
+func createPvcsForPod(client *client.Client, cluster *couchbasev2.CouchbaseCluster, pvcState *PersistentVolumeClaimState, serverGroup string, pod *v1.Pod) error {
+	for _, pvc := range pvcState.create {
+		// If the pod was explicitly scheduled then we need to keep note of the
+		// availability zone in the persistent volume claim so it can be copied
+		// back to a reconstructed pod.
+		if serverGroup != "" {
+			// Under an override the server group is a placement group, not an AZ; the real AZ is the
+			// per-class zone selector from the pod template (required under an override). Without an
+			// override the group IS the AZ. CSI topology must pin to the AZ, never the placement group.
+			zone := serverGroup
+			if cluster.ServerGroupLabel() != constants.ServerGroupLabel {
+				zone = pod.Spec.NodeSelector[constants.ServerGroupLabel]
+			}
+
+			addServerGroupAnnotations(pvc, serverGroup, zone, cluster)
+		}
+
+		if _, err := createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
+			return err
+		}
+
+		metrics.VolumeExpansionMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pvc.Name})...).Add(0)
+	}
+	return nil
+}
+
 // Creates pods with any PersistentVolumeClaims (PVCs)
 // necessary for the Pod prior to creating the Pod.
 func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler scheduler.Scheduler, cluster *couchbasev2.CouchbaseCluster, m couchbaseutil.Member, config couchbasev2.ServerConfig, readinessConfig PodReadinessConfig) (*v1.Pod, error) {
@@ -108,7 +135,13 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	}
 
 	if pvcState != nil {
-		serverGroup = pvcState.AvailabilityZone
+		// RecordedServerGroup holds the PVC's scheduling key value at creation time. Without
+		// an override that is the AZ, so we can pin the replacement pod to the same slot.
+		// Under an override it is the placement group — don't pin it; let the scheduler pick
+		// any valid PG within the AZ (the AZ constraint is enforced via NodeSelector).
+		if cluster.ServerGroupLabel() == constants.ServerGroupLabel {
+			serverGroup = pvcState.RecordedServerGroup
+		}
 
 		if pvcState.Image != "" {
 			image = pvcState.Image
@@ -136,28 +169,15 @@ func CreateCouchbasePod(ctx context.Context, client *client.Client, scheduler sc
 	// If servergroups aren't set, but a server group node selector is, the NullScheduler.Create() will return "",
 	// but it's going to be scheduled on a node with the node selector, so we should add that annotation to the PVC.
 	if serverGroup == "" {
-		if group, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+		if group, ok := pod.Spec.NodeSelector[cluster.ServerGroupLabel()]; ok {
 			serverGroup = group
 		}
 	}
 
 	// Create PVCs if required.
 	if pvcState != nil {
-		for _, pvc := range pvcState.create {
-			// If the pod was explicitly scheduled then we need to keep note of the
-			// availability zone in the persistent volume claim so it can be copied
-			// back to a reconstructed pod.  For example A:0,3 B:1 C:2.  Killing pods
-			// 0 and 1 in A and B would result in the new pod for 0 being scheduled in
-			// B to keep things in balance, however its volumes are still in A.
-			if serverGroup != "" {
-				addServerGroupAnnotations(pvc, serverGroup, cluster)
-			}
-
-			if _, err = createPersistentVolumeClaim(client, pvc, cluster.Namespace, cluster.AsOwner()); err != nil {
-				return nil, err
-			}
-
-			metrics.VolumeExpansionMetric.WithLabelValues(addOptionalLabelsToPodMetric(cluster, []string{cluster.Name, pvc.Name})...).Add(0)
+		if err := createPvcsForPod(client, cluster, pvcState, serverGroup, pod); err != nil {
+			return nil, err
 		}
 	}
 
@@ -240,16 +260,41 @@ func EstablishCNGPrerequisites(client *client.Client, cluster *couchbasev2.Couch
 	return nil
 }
 
-func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup string, cluster *couchbasev2.CouchbaseCluster) {
-	pvc.Annotations[constants.ServerGroupLabel] = serverGroup
+// pvcServerGroup returns the server group recorded on a persistent volume claim, falling
+// back to the legacy ServerGroupLabel key for claims created before AnnotationServerGroup
+// existed. Returns "" when neither is set.
+func pvcServerGroup(pvc *v1.PersistentVolumeClaim) string {
+	if group, ok := pvc.Annotations[constants.AnnotationServerGroup]; ok {
+		return group
+	}
+
+	return pvc.Annotations[constants.ServerGroupLabel]
+}
+
+// addServerGroupAnnotations records scheduling hints on a persistent volume claim. serverGroup is
+// the striping dimension (the placement group under an override, else the AZ). zone is the real AZ
+// the volume lives in — the CSI topology keys must point at the AZ, never the placement group, or
+// the volume can't (re)bind. Without an override, zone equals serverGroup.
+func addServerGroupAnnotations(pvc *v1.PersistentVolumeClaim, serverGroup, zone string, cluster *couchbasev2.CouchbaseCluster) {
+	pvc.Annotations[constants.AnnotationServerGroup] = serverGroup
+
+	// No AZ to record when there is no server group at all (zone unset, e.g. NullScheduler). Under an
+	// override the zone is always set (the required per-class zone selector). Only record when known.
+	if zone == "" {
+		return
+	}
+
+	// Platform-neutral AZ key — what recoverability reads (durable, no spec.platform needed). The CSI
+	// keys below are platform-specific, for the volume driver.
+	pvc.Annotations[constants.AnnotationAvailabilityZone] = zone
 
 	switch cluster.Spec.Platform {
 	case couchbasev2.PlatformTypeAWS:
-		pvc.Annotations[constants.EKSTopologyLabel] = serverGroup
+		pvc.Annotations[constants.EKSTopologyLabel] = zone
 	case couchbasev2.PlatformTypeGCE:
-		pvc.Annotations[constants.GKETopologyLabel] = serverGroup
+		pvc.Annotations[constants.GKETopologyLabel] = zone
 	case couchbasev2.PlatformTypeAzure:
-		pvc.Annotations[constants.AzureTopologyLabel] = serverGroup
+		pvc.Annotations[constants.AzureTopologyLabel] = zone
 	}
 }
 
@@ -277,8 +322,12 @@ type PersistentVolumeClaimState struct {
 	// mounts is an ordered list of mounts to attach to the container.
 	volumeMounts []v1.VolumeMount
 
-	// AvailabilityZone is where any existing PVCs reside when using server groups.
-	AvailabilityZone string
+	// RecordedServerGroup is the value stored in pvcServerGroup() on the existing PVCs
+	// for this member — the scheduling key's value at PVC creation time. Without a label
+	// override this equals the availability zone (group == AZ). Under an override it is
+	// the placement group, so callers MUST guard on ServerGroupLabel() == ServerGroupLabel
+	// before using this to pin a new pod (pinning to a PG defeats scheduler freedom).
+	RecordedServerGroup string
 
 	// diff records any changes to the specification.
 	diff string
@@ -393,8 +442,8 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 	p.pvcs = append(p.pvcs, pvc)
 
 	// Set any scheduling hints.
-	if group, ok := pvc.Annotations[constants.ServerGroupLabel]; ok {
-		p.AvailabilityZone = group
+	if group := pvcServerGroup(pvc); group != "" {
+		p.RecordedServerGroup = group
 	}
 
 	if image, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {
@@ -419,6 +468,28 @@ func (p *PersistentVolumeClaimState) addVolume(client *client.Client, required *
 		updatedClaim := pvc.DeepCopy()
 		updatedClaim.Spec.Resources = required.Spec.Resources
 		updatedClaim.Annotations = required.Annotations
+
+		// addServerGroupAnnotations stamps these only on PVC creation; `required` (built fresh for
+		// the update) does not carry them, so blindly assigning required.Annotations would WIPE the
+		// recovery/scheduling bookkeeping on a resize. Preserve them from the existing claim so a
+		// volume expansion doesn't strand the pod's server-group / availability-zone pinning.
+		for _, key := range []string{
+			constants.AnnotationServerGroup,
+			constants.AnnotationAvailabilityZone,
+			constants.ServerGroupLabel,
+			constants.EKSTopologyLabel,
+			constants.GKETopologyLabel,
+			constants.AzureTopologyLabel,
+		} {
+			if v, ok := pvc.Annotations[key]; ok {
+				if updatedClaim.Annotations == nil {
+					updatedClaim.Annotations = map[string]string{}
+				}
+
+				updatedClaim.Annotations[key] = v
+			}
+		}
+
 		p.update = append(p.update, updatedClaim)
 
 		d := diff.PrettyDiff(existingSpec, required.Spec)
@@ -1162,9 +1233,11 @@ func applyPodScheduling(cluster *couchbasev2.CouchbaseCluster, pod *v1.Pod, serv
 		if pod.Spec.NodeSelector == nil {
 			pod.Spec.NodeSelector = map[string]string{}
 		}
-		// Adds or replaces here
-		pod.Spec.NodeSelector[constants.ServerGroupLabel] = serverGroupZone
+		pod.Spec.NodeSelector[cluster.ServerGroupLabel()] = serverGroupZone
 	}
+	// Under an override the pod's availability-zone selector (topology.kubernetes.io/zone) comes from
+	// the server class pod template, which is required and already applied to the pod — so pod and
+	// volume always land in the same AZ.
 }
 
 // applyPodNetworking adds any network specific hacks required to work.
@@ -2374,7 +2447,22 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 // persistentVolumeClaims.  The claims must also be bound to
 // backing volumes.  Every claim used by the pod must be bound
 // to an underlying PersistentVolume.
-func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool, restrictedServerGroups []string) error {
+// pvcAvailabilityZone returns the availability zone the volume lives in, recorded at creation by
+// addServerGroupAnnotations under a platform-neutral annotation. "" if not recorded (e.g. a PVC
+// created before this annotation existed). Durable across pod deletion and independent of
+// spec.platform.
+func pvcAvailabilityZone(pvc *v1.PersistentVolumeClaim) string {
+	if az, ok := pvc.Annotations[constants.AnnotationAvailabilityZone]; ok {
+		return az
+	}
+
+	// Legacy fallback: pre-override PVCs predate AnnotationAvailabilityZone, but without an override
+	// the server group IS the AZ (stored under ServerGroupLabel). Lets a volume migrating from an
+	// AZ-group to a placement group still report its real AZ, so a cross-AZ recovery is rejected.
+	return pvc.Annotations[constants.ServerGroupLabel]
+}
+
+func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerConfig, member couchbaseutil.Member, targetVersion *couchbaseutil.Version, checkForLPV bool, restrictedServerGroups []string, restrictedZone string) error {
 	mounts := config.GetVolumeMounts()
 	if mounts == nil || mounts.LogsOnly() {
 		return errors.NewStackTracedError(errors.ErrNoVolumeMounts)
@@ -2408,10 +2496,26 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 			return fmt.Errorf("%w: pvc is a LPV", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
 		}
 
-		// If the existing pod volumes already have an availability zone, we need to check that it's still available in the cluster spec.
-		// Otherwise, we can't recover this pod correctly and we should SwapRebalance/start full recovery instead.
-		if len(restrictedServerGroups) > 0 && pvc.Annotations[constants.ServerGroupLabel] != "" && !slices.Contains(restrictedServerGroups, pvc.Annotations[constants.ServerGroupLabel]) {
-			return fmt.Errorf("%w: pvc exists in server group %s. The server groups restricted by the cluster spec are %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), pvc.Annotations[constants.ServerGroupLabel], strings.Join(restrictedServerGroups, ", "))
+		// The existing volume can only be reused if it still belongs where the spec now wants the pod:
+		//   - restrictedZone set (override active → the per-class pod-template zone): constraint is the
+		//     AZ. Wrong AZ → swap/full-recover; a PG change within the same AZ recovers in place.
+		//   - restrictedZone empty (no override): constraint is the server group (== AZ).
+		if restrictedZone != "" {
+			pvcZone := pvcAvailabilityZone(pvc)
+			if pvcZone == "" {
+				// The PVC has no recorded AZ (e.g. a pre-existing NullScheduler PVC that was never
+				// annotated). We cannot verify it is in the declared zone without reading the PV's
+				// nodeAffinity (cluster-scoped). Force a swap migration so the
+				// new PVC is provisioned in the correct AZ.
+				return fmt.Errorf("%w: pvc has no recorded availability zone; cannot safely recover into declared zone %s — a swap migration is required", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), restrictedZone)
+			}
+			if pvcZone != restrictedZone {
+				return fmt.Errorf("%w: pvc exists in availability zone %s but server class requires zone %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), pvcZone, restrictedZone)
+			}
+		} else {
+			if pvcGroup := pvcServerGroup(pvc); len(restrictedServerGroups) > 0 && pvcGroup != "" && !slices.Contains(restrictedServerGroups, pvcGroup) {
+				return fmt.Errorf("%w: pvc exists in server group %s. The server groups restricted by the cluster spec are %s", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), pvcGroup, strings.Join(restrictedServerGroups, ", "))
+			}
 		}
 	}
 

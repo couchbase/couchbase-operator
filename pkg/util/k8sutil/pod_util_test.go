@@ -123,27 +123,90 @@ func TestAddServerGroupAnnotations(t *testing.T) {
 
 		pvc.Annotations = make(map[string]string)
 
-		addServerGroupAnnotations(pvc, serverGroup, cluster)
+		// No override: the zone equals the server group, so the CSI topology key gets the
+		// server group value.
+		addServerGroupAnnotations(pvc, serverGroup, serverGroup, cluster)
 
-		expectedAnnotations := map[string]string{constants.ServerGroupLabel: serverGroup, topologyLabel: serverGroup}
+		expectedAnnotations := map[string]string{constants.AnnotationServerGroup: serverGroup, constants.AnnotationAvailabilityZone: serverGroup, topologyLabel: serverGroup}
 
 		if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
 			t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
 		}
 	}
 
+	// With a server-group label override the server group is a placement group, so the CSI
+	// topology key and the platform-neutral AZ key must be pinned to the real availability zone,
+	// not the placement group.
+	for platformType, topologyLabel := range platformTopologyMap {
+		cluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{
+			Platform: platformType,
+		}}
+
+		pvc := &v1.PersistentVolumeClaim{}
+
+		pvc.Annotations = make(map[string]string)
+
+		zone := "us-east-1a"
+
+		addServerGroupAnnotations(pvc, serverGroup, zone, cluster)
+
+		expectedAnnotations := map[string]string{constants.AnnotationServerGroup: serverGroup, constants.AnnotationAvailabilityZone: zone, topologyLabel: zone}
+
+		if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
+			t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
+		}
+	}
+
+	// No platform: no CSI topology key is written, but the platform-neutral AZ key still is.
 	cluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{}}
 
 	pvc := &v1.PersistentVolumeClaim{}
 
 	pvc.Annotations = make(map[string]string)
 
-	addServerGroupAnnotations(pvc, serverGroup, cluster)
+	addServerGroupAnnotations(pvc, serverGroup, serverGroup, cluster)
 
-	expectedAnnotations := map[string]string{constants.ServerGroupLabel: serverGroup}
+	expectedAnnotations := map[string]string{constants.AnnotationServerGroup: serverGroup, constants.AnnotationAvailabilityZone: serverGroup}
 
 	if eq := reflect.DeepEqual(expectedAnnotations, pvc.Annotations); !eq {
 		t.Fatalf("Expected annotations: %v, but got: %v", expectedAnnotations, pvc.Annotations)
+	}
+
+	// No zone (zone == ""): only the server-group (PG) bookkeeping is written; no AZ / CSI topology
+	// annotations.
+	awsCluster := &couchbasev2.CouchbaseCluster{Spec: couchbasev2.ClusterSpec{Platform: couchbasev2.PlatformTypeAWS}}
+
+	pvcNoZone := &v1.PersistentVolumeClaim{}
+	pvcNoZone.Annotations = make(map[string]string)
+
+	addServerGroupAnnotations(pvcNoZone, serverGroup, "", awsCluster)
+
+	expectedNoZone := map[string]string{constants.AnnotationServerGroup: serverGroup}
+
+	if eq := reflect.DeepEqual(expectedNoZone, pvcNoZone.Annotations); !eq {
+		t.Fatalf("Expected annotations: %v, but got: %v", expectedNoZone, pvcNoZone.Annotations)
+	}
+}
+
+func TestPvcAvailabilityZone(t *testing.T) {
+	cases := []struct {
+		name        string
+		annotations map[string]string
+		expected    string
+	}{
+		{"new key", map[string]string{constants.AnnotationAvailabilityZone: "az-a"}, "az-a"},
+		{"legacy fallback (pre-override PVC: group == AZ under the zone key)", map[string]string{constants.ServerGroupLabel: "az-b"}, "az-b"},
+		{"new key wins over legacy", map[string]string{constants.AnnotationAvailabilityZone: "az-a", constants.ServerGroupLabel: "az-b"}, "az-a"},
+		{"neither", map[string]string{}, ""},
+	}
+
+	for _, tc := range cases {
+		pvc := &v1.PersistentVolumeClaim{}
+		pvc.Annotations = tc.annotations
+
+		if got := pvcAvailabilityZone(pvc); got != tc.expected {
+			t.Fatalf("%s: expected %q, got %q", tc.name, tc.expected, got)
+		}
 	}
 }
 

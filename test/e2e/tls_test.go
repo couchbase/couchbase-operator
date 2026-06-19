@@ -2868,3 +2868,77 @@ func TestTLSScriptCreateRestRotate(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 }
+
+// TestMandatoryMutualTLSNodeClientCert verifies the nodeClientSecretName fix (K8S-4770).
+// Under mandatory client-certificate auth + strict node-to-node encryption, Couchbase Server
+// (7.6+) pins its auto-generated CA via each node's generated internal client certificate, so
+// the operator's cleanCAs would otherwise loop forever on a 400 "CA is in use by node".  Supplying
+// a user-CA-signed internal client cert (referenced by the
+// cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName annotation) re-signs the
+// node's client identity with our CA so the auto-generated CA goes unused and cleanCAs can remove
+// it.  Without the fix this test times out waiting for a healthy status.
+//
+// Note: Couchbase Server requires the internal client certificate to carry the
+// SAN email "internal@internal.couchbase.com" (that is how it recognises the @internal identity),
+// so we mint a dedicated client cert with that email SAN rather than reusing the operator cert.
+func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
+	clusterSize := constants.Size3
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	policy := couchbasev2.ClientCertificatePolicyMandatory
+	strict := couchbasev2.NodeToNodeStrict
+
+	// Shadowed (cert-manager) source so the cluster genuinely uses secretSource TLS, which is
+	// what the nodeClientSecretName annotation hangs off.
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{
+		Source:      e2eutil.TLSSourceCertManagerSecret,
+		KeyEncoding: &keyEncoding,
+	})
+
+	// Mint the node internal client certificate: clientAuth, signed by the same CA, carrying the
+	// SAN email that Couchbase Server requires for the @internal identity.
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+	nodeClientReq := e2eutil.CreateCertReq("couchbase-internal")
+	nodeClientReq.EmailAddresses = []string{"internal@internal.couchbase.com"}
+	nodeClientKeyPair := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, keyEncoding, e2eutil.CertTypeClient, nodeClientReq)
+	_, nodeClientKey, nodeClientCert, err := nodeClientKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	nodeClientSecretName := ctx.ClusterName + "-node-client-tls"
+	e2eutil.MustCreateSecret(t, kubernetes, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nodeClientSecretName,
+			Namespace: ctx.Namespace,
+		},
+		Type: v1.SecretTypeTLS,
+		Data: map[string][]byte{
+			v1.TLSCertKey:       nodeClientCert,
+			v1.TLSPrivateKeyKey: nodeClientKey,
+		},
+	})
+
+	// Mandatory mTLS + strict N2N is the combination that arms the deadlock; the annotation
+	// points the operator at the node client certificate.
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(ctx, &policy).Generate(kubernetes)
+	cluster.Spec.Networking.TLS.NodeToNodeEncryption = &strict
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+	cluster.Annotations[annotations.AnnotationPrefix+"networking.tls.secretSource.nodeClientSecretName"] = nodeClientSecretName
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// With the fix the cluster reaches a healthy, error-free status (cleanCAs removes the
+	// auto-generated CA); without it, cleanCAs loops on the 400 and this never succeeds.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+}

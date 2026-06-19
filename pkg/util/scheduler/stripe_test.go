@@ -513,3 +513,57 @@ func TestStripeCreateGlobalMultipleWithAvoid(t *testing.T) {
 
 	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
 }
+
+// TestStripeCustomLabelKeyUsedForExistingPods verifies that when a cluster has a
+// serverGroupsLabelOverride annotation, the scheduler reads pods' server groups from
+// the custom label key rather than the default topology.kubernetes.io/zone key.
+func TestStripeCustomLabelKeyUsedForExistingPods(t *testing.T) {
+	const customLabel = "eks.amazonaws.com/nodegroup"
+
+	// Build a cluster with the label override set via the annotation-populated field.
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clusterName,
+			Namespace: namespace,
+		},
+		Spec: couchbasev2.ClusterSpec{
+			ServerGroupsLabelOverride: customLabel,
+			ServerGroups: []string{
+				serverGroup1,
+				serverGroup2,
+				serverGroup3,
+			},
+			Servers: []couchbasev2.ServerConfig{
+				{Name: serverClass1},
+			},
+		},
+	}
+
+	// Pre-existing pods use the custom label key.
+	podWithCustomLabel := func(name, group string) *v1.Pod {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: map[string]string{constants.LabelNodeConf: serverClass1},
+			},
+			Spec: v1.PodSpec{
+				NodeSelector: map[string]string{customLabel: group},
+			},
+			Status: v1.PodStatus{Phase: v1.PodRunning},
+		}
+		return pod
+	}
+
+	existingPods := []*v1.Pod{
+		podWithCustomLabel(podName1, serverGroup1),
+		podWithCustomLabel(podName2, serverGroup2),
+	}
+
+	s, err := NewStripeScheduler(existingPods, cluster, logr.Discard())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// With sg1 and sg2 already occupied, next pod should go to sg3.
+	checkCreateScheduling(t, mustCreate(t, s, serverClass1, "", ""), serverGroup3)
+}

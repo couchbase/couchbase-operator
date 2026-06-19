@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 )
 
 const (
@@ -116,6 +117,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintK8sSecurityContext,
 		checkConstraintMutuallyExclusiveUpgradeFields,
 		checkConstraintBucketsAnnotations,
+		checkConstraintServerGroupsLabelOverride,
+		checkConstraintServerGroupsResolvable,
 		checkAdminServiceConstraints,
 		checkClusterRBACConstraints,
 		checkClusterBackupConstraints,
@@ -362,6 +365,66 @@ func checkConstraintBucketsAnnotations(_ *types.Validator, cluster *couchbasev2.
 
 	if errs != nil {
 		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
+}
+
+func checkConstraintServerGroupsLabelOverride(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	// Annotations.Populate has already run atp.
+	override := cluster.Spec.ServerGroupsLabelOverride
+	if override == "" {
+		return nil
+	}
+
+	if errs := k8svalidation.IsQualifiedName(override); len(errs) > 0 {
+		return fmt.Errorf("serverGroupsLabelOverride value %q is not a valid Kubernetes label key: %s",
+			override, strings.Join(errs, "; "))
+	}
+
+	// When the override resolves to the canonical zone key it is a no-op.
+	if override == constants.ServerGroupLabel {
+		return nil
+	}
+
+	// A placement group is not an availability zone, so the operator can't infer a volume's AZ from
+	// its group. Require EVERY server class to declare its zone via a topology.kubernetes.io/zone node
+	// selector in its pod template.
+	for i := range cluster.Spec.Servers {
+		server := &cluster.Spec.Servers[i]
+
+		zone := ""
+		if server.Pod != nil && server.Pod.Spec.NodeSelector != nil {
+			zone = server.Pod.Spec.NodeSelector[constants.ServerGroupLabel]
+		}
+
+		if zone == "" {
+			return fmt.Errorf("server class %q must set the %q node selector in its pod template (spec.servers[].pod) when serverGroupsLabelOverride is set, so the Operator can pin volumes to an availability zone",
+				server.Name, constants.ServerGroupLabel)
+		}
+	}
+
+	return nil
+}
+
+// checkConstraintServerGroupsResolvable rejects clusters where server groups are enabled but a
+// server class resolves to no groups. This mirrors scheduler.GetServerGroupsForClass: a class
+// uses its own spec.servers[].serverGroups, falling back to the global spec.serverGroups. If a
+// class has neither (e.g. global serverGroups removed while only some classes define their own),
+// NewStripeScheduler errors and reconcile loops forever with no user-facing message. Fail at
+// admission with a clear error instead.
+func checkConstraintServerGroupsResolvable(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.ServerGroupsEnabled() {
+		return nil
+	}
+
+	for i := range cluster.Spec.Servers {
+		server := &cluster.Spec.Servers[i]
+
+		if len(server.ServerGroups) == 0 && len(cluster.Spec.ServerGroups) == 0 {
+			return fmt.Errorf("server groups are enabled but server class %q resolves to no server groups: set spec.servers[].serverGroups for it or define a global spec.serverGroups",
+				server.Name)
+		}
 	}
 
 	return nil
@@ -3507,6 +3570,40 @@ func getClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]
 	return key, chain, true, nil
 }
 
+// getNodeClientTLS reads the node internal client certificate/key from
+// secretSource.nodeClientSecretName (kubernetes.io/tls layout).  Returns ok=false when the
+// field is unset (the feature is optional).
+func getNodeClientTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]byte, []byte, bool, error) {
+	if cluster.Spec.Networking.TLS.SecretSource == nil ||
+		cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName == "" {
+		return nil, nil, false, nil
+	}
+
+	secretName := cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName
+	secretPath := "spec.networking.tls.secretSource.nodeClientSecretName"
+
+	secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	if !found {
+		return nil, nil, false, fmt.Errorf("secret %s referenced by %s must exist", secretName, secretPath)
+	}
+
+	key, ok := secret.Data["tls.key"]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain tls.key", secretName)
+	}
+
+	chain, ok := secret.Data["tls.crt"]
+	if !ok {
+		return nil, nil, false, fmt.Errorf("tls secret %s must contain tls.crt", secretName)
+	}
+
+	return key, chain, true, nil
+}
+
 // validateTLS checks TLS configuration exists and is valid
 // * correct secrets exist
 // * correct keys exist in the secrets
@@ -3555,6 +3652,14 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 		return []error{err}
 	}
 
+	// The reserved internal SAN email maps to a privileged @<name> internal admin identity in
+	// Couchbase Server; it must only ever appear on the node internal client certificate.
+	if has, err := util_x509.HasInternalClientEmailSAN(chain); err != nil {
+		return []error{err}
+	} else if has {
+		return []error{fmt.Errorf("server certificate (spec.networking.tls.secretSource.serverSecretName) must not contain the reserved internal SAN email <name>@%s; it is only valid on the node internal client certificate", util_x509.InternalClientCertEmailDomain)}
+	}
+
 	// Check the client certificates.
 	if !cluster.IsMutualTLSEnabled() {
 		return nil
@@ -3571,6 +3676,32 @@ func validateTLS(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, subj
 
 	if _, err := util_x509.Verify(rootCAs, chain, key, x509.ExtKeyUsageClientAuth, nil, false, !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
 		return []error{err}
+	}
+
+	// As above: the operator/external client cert must not carry the internal SAN email, which
+	// would silently grant it the internal admin identity, bypassing clientCertificatePaths RBAC.
+	if has, err := util_x509.HasInternalClientEmailSAN(chain); err != nil {
+		return []error{err}
+	} else if has {
+		return []error{fmt.Errorf("client certificate (spec.networking.tls.secretSource.clientSecretName) must not contain the reserved internal SAN email <name>@%s; that SAN grants the internal admin identity and is only valid on the node internal client certificate", util_x509.InternalClientCertEmailDomain)}
+	}
+
+	// Check the optional node internal client certificate (secretSource.nodeClientSecretName).
+	// Must be valid for client authentication and chain to a trusted CA, same as the operator
+	// client cert.
+	nodeKey, nodeChain, ok, err := getNodeClientTLS(v, cluster)
+	if err != nil {
+		return []error{err}
+	}
+
+	if ok {
+		if _, err := util_x509.Verify(rootCAs, nodeChain, nodeKey, x509.ExtKeyUsageClientAuth, nil, false, !cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
+			return []error{err}
+		}
+
+		if err := util_x509.VerifyInternalClientEmailSAN(nodeChain); err != nil {
+			return []error{err}
+		}
 	}
 
 	return nil

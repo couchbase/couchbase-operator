@@ -996,9 +996,10 @@ func (c *Cluster) verifyMemberVolumes(m couchbaseutil.Member) error {
 		return err
 	}
 
-	restrictedGroups := c.getRestrictedServerGroupsForConfig(config)
-
-	err = k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, false, restrictedGroups)
+	// Do not apply zone/group scheduling constraints here: the node already exists and its PVCs are
+	// wherever they are. Rejecting it ejects it from the cluster, which is more disruptive than
+	// recovering it and letting a subsequent reconcile handle any zone/group migration.
+	err = k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, false, nil, "")
 	if err != nil {
 		if goerrors.Is(err, errors.ErrNoVolumeMounts) {
 			// Pod is not configured for volumes

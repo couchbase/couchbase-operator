@@ -3013,6 +3013,8 @@ func TestBackupAndRestoreServices(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -3700,10 +3702,10 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 		e2eutil.Die(t, fmt.Errorf("expected --resume in ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable, got: %s", backupAdditionalArgsEnvVar.Value))
 	}
 
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
+
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithAnnotations(map[string]string{"cao.couchbase.com/additionalArgs": "--purge"}).UseBlankBackupName(false).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
-	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
 	container = e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
 	var restoreAdditionalArgsEnvVar *corev1.EnvVar
@@ -3719,6 +3721,9 @@ func TestBackupAndRestoreAdditionalArgs(t *testing.T) {
 	if !strings.Contains(restoreAdditionalArgsEnvVar.Value, "--purge") {
 		e2eutil.Die(t, fmt.Errorf("expected --purge in ADDITIONAL_CBBACKUPMGR_COMMANDS environment variable, got: %s", restoreAdditionalArgsEnvVar.Value))
 	}
+
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), 3*time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), 3*time.Minute, 5*time.Minute)
 }
 
 func TestRestoreDefaultRecoveryMethod(t *testing.T) {
@@ -3748,15 +3753,17 @@ func TestRestoreDefaultRecoveryMethod(t *testing.T) {
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
 
-	// Create a Backup object.
+	// Create a Backup object and wait for it to complete.
 	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
-	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 5*time.Minute)
 
+	// Start a restore and wait for it to complete.
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithDefaultRecoveryMethod(v2.DefaultRecoveryTypePurge).UseBlankBackupName(false).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, k8sutil.BackupRestoreCreateEvent(restore.Name, cluster), 2*time.Minute)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
+	// Check the restore container args.
 	container := e2eutil.MustGetRestoreContainer(t, kubernetes, restore)
 
 	found := false

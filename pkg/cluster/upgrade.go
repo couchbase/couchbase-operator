@@ -185,8 +185,10 @@ func (c *Cluster) categorizePodChange(result *ChangeSet, name string, member cou
 			"pod", name)
 	}
 
-	if info.needsSpecChange && detectZoneChange(info.actualSpec, info.preservedSpec, info.pvcState) {
-		result.ChangedZones[name] = member
+	if info.needsSpecChange {
+		if detectZoneChange(info.actualSpec, info.preservedSpec, info.pvcState) {
+			result.ChangedZones[name] = member
+		}
 	}
 	if info.needsSpecChange && info.pvcState != nil && info.pvcState.NeedsUpdate() {
 		result.ChangedPVCs[name] = member
@@ -302,7 +304,7 @@ func (c *Cluster) selectCandidatesByServerGroupsOrder(candidates couchbaseutil.M
 
 	for _, candidate := range candidates {
 		// The pod is likely down, so just skip it
-		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name())
+		scheduledServerGroup, err := k8sutil.GetServerGroup(c.k8s, candidate.Name(), c.cluster.ServerGroupLabel())
 		if err != nil {
 			c.log.Error(err, "failed to get server group for candidate", "cluster", c.namespacedName(), "candidate", candidate.Name())
 			continue
@@ -488,22 +490,31 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 	return nil
 }
 
-// detectZoneChange checks if the pod's server group zone has changed.
+// detectZoneChange reports whether a pod must be swap-rebalanced (its volume can't follow) rather
+// than upgraded in place. The volume's hard constraint is its availability zone (always under
+// constants.ServerGroupLabel); the placement group (override key) is only a striping dimension. So
+// only an AZ change forces a swap — a placement-group reshuffle within the same AZ is in-place.
+//
+// Under an override every server class declares its zone via a topology.kubernetes.io/zone node
+// selector (required; see the override validator), so the requested pod always carries the zone and
+// a plain zone comparison covers every case:
+//   - migrating in (no zone yet):  "" != "us-east-1a"  → swap
+//   - same AZ, PG reshuffle:       "az-a" != "az-a"    → in-place
+//   - cross-AZ (re-pinned class):  "az-b" != "az-a"    → swap
+//   - no server groups (both ""):  "" != ""            → in-place
 func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.PersistentVolumeClaimState) bool {
 	if pvcState == nil {
 		return false
 	}
 
-	actualZone := ""
-	requestedZone := ""
-	if actualSpec.NodeSelector != nil {
-		actualZone = actualSpec.NodeSelector[constants.ServerGroupLabel]
-	}
-	if requestedSpec.NodeSelector != nil {
-		requestedZone = requestedSpec.NodeSelector[constants.ServerGroupLabel]
+	// Guard only the nil pod-spec pointers (dereferencing them would panic). A nil NodeSelector is
+	// fine — reading a nil map returns "", which is exactly what we want for a pod with no zone (e.g.
+	// a NullScheduler pod): "" vs the requested class zone correctly reports a swap.
+	if actualSpec == nil || requestedSpec == nil {
+		return false
 	}
 
-	return actualZone != "" && requestedZone != "" && actualZone != requestedZone
+	return actualSpec.NodeSelector[constants.ServerGroupLabel] != requestedSpec.NodeSelector[constants.ServerGroupLabel]
 }
 
 // nolint:gocognit,gocyclo

@@ -2947,6 +2947,17 @@ type ClusterSpec struct {
 	// If all groups fail, a random group is chosen. Only affects pods without existing PVCs.
 	RescheduleDifferentServerGroup bool `json:"-" annotation:"rescheduleDifferentServerGroup"`
 
+	// ServerGroupsLabelOverride overrides the node label key used for server-group
+	// (rack-awareness) scheduling. By default the Operator uses the standard
+	// "topology.kubernetes.io/zone" label. Set this to a custom node label key
+	// (e.g. "eks.amazonaws.com/nodegroup") to distribute pods across EC2 Partition
+	// Placement Groups or GCE placement policies instead of availability zones.
+	// The values listed in serverGroups must be the values of this label on your nodes.
+	// When this is set, every server class must declare its availability zone via a
+	// topology.kubernetes.io/zone node selector in its pod template (spec.servers[].pod), so the
+	// Operator can pin volumes to an AZ and recover/upgrade in place without reading node labels.
+	ServerGroupsLabelOverride string `json:"-" annotation:"serverGroupsLabelOverride"`
+
 	// DEPRECATED - by spec.security.securityContext
 	// SecurityContext allows the configuration of the security context for all
 	// Couchbase server pods.  When using persistent volumes you may need to set
@@ -5057,7 +5068,7 @@ type TLSPolicy struct {
 	// "kubernetes.io/tls" with "tls.crt" and "tls.key". If the "tls.key" is an encrypted
 	// private key then the secret type can be the generic Opaque type since "kubernetes.io/tls"
 	// type secrets cannot verify encrypted keys.
-	SecretSource *TLSSecretSource `json:"secretSource,omitempty"`
+	SecretSource *TLSSecretSource `json:"secretSource,omitempty" annotation:"secretSource"`
 
 	// RootCAs defines a set of secrets that reside in this namespace that contain
 	// additional CA certificates that should be installed in Couchbase.  The CA
@@ -5210,6 +5221,20 @@ type TLSSecretSource struct {
 	// the contains client TLS data.  The secret is expected to contain "tls.crt" and
 	// "tls.key" as per the Kubernetes.io/tls secret type.
 	ClientSecretName string `json:"clientSecretName,omitempty"`
+
+	// NodeClientSecretName specifies the secret name, in the same namespace as the cluster,
+	// that contains the internal client certificate each Couchbase node presents when it
+	// acts as a client for node-to-node communication.  The secret is expected to contain
+	// "tls.crt" and "tls.key" as per the kubernetes.io/tls secret type.  The certificate
+	// must be valid for client authentication (clientAuth extended key usage) and chain to
+	// a trusted CA.
+	// When set, the Operator uploads this certificate to each node (inbox
+	// "client_chain.pem"/"client_pkey.key") and reloads it, so the node's internal client
+	// identity is signed by your CA rather than the server's auto-generated CA.  This lets
+	// the auto-generated CA be removed from the trust pool under mandatory client
+	// certificate authentication with strict node-to-node encryption.  Requires Couchbase
+	// Server 7.6 or greater. Configured via the annotation cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName only; not exposed in the CRD.
+	NodeClientSecretName string `json:"-" annotation:"nodeClientSecretName"`
 }
 
 // ClientCertificatePolicy defines the type of TLS policy to apply.  The default

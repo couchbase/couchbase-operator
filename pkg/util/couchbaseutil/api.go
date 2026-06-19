@@ -579,6 +579,41 @@ func ReloadNodeCert(settings *PrivateKeyPassphraseSettings) *Request {
 	return NewRequest((*Client).PostJSON, "/node/controller/reloadCertificate", data, nil)
 }
 
+// ReloadClientCert causes server to reload the internal client certificate chain and key
+// from disk (inbox client_chain.pem / client_pkey.key). Couchbase Server 7.6+ only
+// (introduced by MB-47905).
+func ReloadClientCert(settings *PrivateKeyPassphraseSettings) *Request {
+	data := []byte{}
+
+	if settings != nil {
+		var err error
+
+		data, err = json.Marshal(settings)
+		if err != nil {
+			return NewRequestError(err)
+		}
+	}
+
+	return NewRequest((*Client).PostJSON, "/node/controller/reloadClientCertificate", data, nil)
+}
+
+// NodeCertificate describes a node's certificate as returned by the per-node certificate
+// listing endpoints (e.g. /pools/default/certificates/client).
+type NodeCertificate struct {
+	Node    string `json:"node"`
+	Subject string `json:"subject"`
+	PEM     string `json:"pem"`
+}
+
+// NodeCertificateList is the response from the per-node certificate listing endpoints.
+type NodeCertificateList []NodeCertificate
+
+// GetClientCertificates lists the internal client certificate currently in use on each node
+// (7.1+). Used to decide whether an uploaded client certificate still needs reloading.
+func GetClientCertificates(certs *NodeCertificateList) *Request {
+	return NewRequest((*Client).Get, "/pools/default/certificates/client", nil, certs)
+}
+
 // GetClientCertAuth gets client certificate authentication settings.
 func GetClientCertAuth(cAuth *ClientCertAuth) *Request {
 	return NewRequest((*Client).Get, "/settings/clientCertAuth", nil, cAuth)

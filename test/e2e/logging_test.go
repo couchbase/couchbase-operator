@@ -466,7 +466,7 @@ func TestLoggingUpgrade(t *testing.T) {
 	e2eutil.MustCheckLogging(t, kubernetes, cluster, 5*time.Minute)
 
 	// Check that the image is the new version. This won't work if using the 'latest' tag.
-	if f.CouchbaseLoggingImage != "latest" {
+	if !strings.Contains(f.CouchbaseLoggingImage, "latest") {
 		targetVersion := strings.Split(f.CouchbaseLoggingImage, ":")[1]
 		targetVersion = strings.Split(targetVersion, "-")[0]
 		searchString := fmt.Sprintf(`"version":"%s (build `, targetVersion)

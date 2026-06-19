@@ -839,3 +839,155 @@ func TestCheckConstraintRestoreNameLength(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckConstraintServerGroupsLabelOverride(t *testing.T) {
+	testcases := []struct {
+		name        string
+		annotation  string
+		expectedErr string
+	}{
+		{
+			name:        "no annotation is valid",
+			annotation:  "",
+			expectedErr: "",
+		},
+		{
+			name:        "standard zone label is valid",
+			annotation:  "topology.kubernetes.io/zone",
+			expectedErr: "",
+		},
+		{
+			name:        "EKS nodegroup label is valid",
+			annotation:  "eks.amazonaws.com/nodegroup",
+			expectedErr: "",
+		},
+		{
+			name:        "simple label key is valid",
+			annotation:  "rack",
+			expectedErr: "",
+		},
+		{
+			name:        "label key with space is invalid",
+			annotation:  "eks.amazonaws.com/node group",
+			expectedErr: "not a valid Kubernetes label key",
+		},
+		{
+			name:        "empty annotation value is treated as absent",
+			annotation:  "",
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			// The check reads the populated spec field (annotations.Populate runs before it in the
+			// real path); set it directly here.
+			cluster := &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{ServerGroupsLabelOverride: testcase.annotation},
+			}
+
+			err := checkConstraintServerGroupsLabelOverride(nil, cluster)
+
+			if testcase.expectedErr == "" {
+				if err != nil {
+					t.Errorf("expected no error but got: %s", err.Error())
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+				} else if !strings.Contains(err.Error(), testcase.expectedErr) {
+					t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestCheckConstraintServerGroupsLabelOverrideTopologies(t *testing.T) {
+	zone := func(az string) *couchbasev2.PodTemplate {
+		return &couchbasev2.PodTemplate{Spec: v1.PodSpec{NodeSelector: map[string]string{"topology.kubernetes.io/zone": az}}}
+	}
+
+	testcases := []struct {
+		name        string
+		cluster     *couchbasev2.CouchbaseCluster
+		expectedErr string
+	}{
+		{
+			name: "override but a class declares no zone → rejected",
+			cluster: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					ServerGroups: []string{"pg1", "pg2", "pg3"},
+					Servers:      []couchbasev2.ServerConfig{{Name: "data"}},
+				},
+			},
+			expectedErr: "must set the",
+		},
+		{
+			name: "single AZ: every class declares the same zone + global serverGroups",
+			cluster: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					ServerGroups: []string{"pg1", "pg2", "pg3"},
+					Servers: []couchbasev2.ServerConfig{
+						{Name: "data", Pod: zone("us-east-1a")},
+						{Name: "query", Pod: zone("us-east-1a")},
+					},
+				},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "multi-AZ: per-class zone + per-class serverGroups",
+			cluster: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Servers: []couchbasev2.ServerConfig{
+						{Name: "data-a", ServerGroups: []string{"a1", "a2"}, Pod: zone("az-a")},
+						{Name: "data-b", ServerGroups: []string{"b1", "b2"}, Pod: zone("az-b")},
+					},
+				},
+			},
+			expectedErr: "",
+		},
+		{
+			name: "multi-AZ: a class missing its zone → rejected",
+			cluster: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					Servers: []couchbasev2.ServerConfig{
+						{Name: "data-a", ServerGroups: []string{"a1"}, Pod: zone("az-a")},
+						{Name: "data-b", ServerGroups: []string{"b1"}},
+					},
+				},
+			},
+			expectedErr: "must set the",
+		},
+		{
+			name: "global serverGroups with a per-class zone is allowed",
+			cluster: &couchbasev2.CouchbaseCluster{
+				Spec: couchbasev2.ClusterSpec{
+					ServerGroups: []string{"pg1", "pg2"},
+					Servers:      []couchbasev2.ServerConfig{{Name: "data", Pod: zone("az-a")}},
+				},
+			},
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			// The check reads the populated spec field (annotations.Populate maps the
+			// serverGroupsLabelOverride annotation here in the real path); set it directly.
+			testcase.cluster.Spec.ServerGroupsLabelOverride = "eks.amazonaws.com/nodegroup"
+
+			err := checkConstraintServerGroupsLabelOverride(nil, testcase.cluster)
+
+			switch {
+			case testcase.expectedErr == "" && err != nil:
+				t.Errorf("expected no error but got: %s", err.Error())
+			case testcase.expectedErr != "" && err == nil:
+				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+		})
+	}
+}

@@ -127,7 +127,7 @@ func GetHostIP(client *client.Client, name string) (string, error) {
 	return pod.Status.HostIP, nil
 }
 
-func GetServerGroup(client *client.Client, name string) (string, error) {
+func GetServerGroup(client *client.Client, name, labelKey string) (string, error) {
 	pod, found := client.Pods.Get(name)
 	if !found {
 		return "", fmt.Errorf("%w: pod %s not found", errors.NewStackTracedError(errors.ErrResourceRequired), name)
@@ -137,7 +137,7 @@ func GetServerGroup(client *client.Client, name string) (string, error) {
 		return "", fmt.Errorf("%w: pod %s has no node selector", errors.NewStackTracedError(errors.ErrResourceAttributeRequired), name)
 	}
 
-	serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	serverGroup, ok := pod.Spec.NodeSelector[labelKey]
 	if !ok {
 		// During an upgrade to 2.3 or higher, we need to fall back to the
 		// old beta label.

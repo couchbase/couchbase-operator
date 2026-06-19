@@ -256,11 +256,31 @@ func (c *Cluster) checkPodRecoverability(m couchbaseutil.Member, checkReschedula
 	}
 
 	restrictedGroups := c.getRestrictedServerGroupsForConfig(config)
-	if err := k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, checkReschedulability, restrictedGroups); err != nil {
+	restrictedZone := c.getRestrictedZoneForConfig(config)
+
+	if err := k8sutil.CheckIfPodIsRecoverable(c.k8s, *config, m, targetSemVersion, checkReschedulability, restrictedGroups, restrictedZone); err != nil {
 		return false, err
 	}
 
 	return true, nil
+}
+
+// getRestrictedZoneForConfig returns the availability zone a server class is pinned to, ONLY when a
+// server-group label override is active (placement groups). Under an override the server group is a
+// placement group, not an AZ, so the volume's recovery constraint is the zone: a PVC in a different
+// AZ cannot be recovered in place, whereas a PVC whose only change is its placement group can. The
+// zone is the per-class pod-template zone selector (required under an override; see the override
+// validator). Empty when no override is set.
+func (c *Cluster) getRestrictedZoneForConfig(config *couchbasev2.ServerConfig) string {
+	if c.cluster.ServerGroupLabel() == constants.ServerGroupLabel {
+		return ""
+	}
+
+	if config.Pod != nil && config.Pod.Spec.NodeSelector != nil {
+		return config.Pod.Spec.NodeSelector[constants.ServerGroupLabel]
+	}
+
+	return ""
 }
 
 // getRestrictedServerGroupsForConfig returns the server groups that are restricted for a given server config.
@@ -270,7 +290,7 @@ func (c *Cluster) getRestrictedServerGroupsForConfig(config *couchbasev2.ServerC
 	restrictedGroups, _ := scheduler.GetServerGroupsForClass(c.cluster, config)
 
 	if len(restrictedGroups) == 0 && config.Pod != nil {
-		if group, ok := config.Pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+		if group, ok := config.Pod.Spec.NodeSelector[c.cluster.ServerGroupLabel()]; ok {
 			restrictedGroups = append(restrictedGroups, group)
 		}
 	}
@@ -339,7 +359,7 @@ func (c *Cluster) reconcilePods() error {
 
 		// Checks existing NodeSelectors on the pod
 		if actual.Spec.NodeSelector != nil {
-			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			if group, ok := actual.Spec.NodeSelector[c.cluster.ServerGroupLabel()]; ok {
 				serverGroup = group
 			}
 		}
@@ -393,7 +413,7 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 	if c.cluster.Spec.ServerGroupsEnabled() {
 		// Keep the existing selector if one exists.
 		if actual.Spec.NodeSelector != nil {
-			if group, ok := actual.Spec.NodeSelector[constants.ServerGroupLabel]; ok {
+			if group, ok := actual.Spec.NodeSelector[c.cluster.ServerGroupLabel()]; ok {
 				serverGroup = group
 			}
 		}

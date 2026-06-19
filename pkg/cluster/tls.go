@@ -60,6 +60,13 @@ type tlsCache struct {
 	// clientKey is the operator client key (optional).
 	clientKey []byte
 
+	// nodeClientCert is the internal client certificate uploaded to each node, used by the
+	// node when it acts as a client for node-to-node communication (optional).
+	nodeClientCert []byte
+
+	// nodeClientKey is the private key for nodeClientCert (optional).
+	nodeClientKey []byte
+
 	// publicPassphraseKey is used to encrypt the passphrase before sending to server.
 	publicPassphraseKey *rsa.PublicKey
 
@@ -103,6 +110,17 @@ func (c *Cluster) initTLSCache() error {
 
 		cache.clientCert = clientCert
 		cache.clientKey = clientKey
+	}
+
+	if c.nodeClientCertConfigured() {
+		nodeClientCert, nodeClientKey, err := c.getVerifiedNodeClientTLSData(rootCAs)
+		if err != nil {
+			c.raiseEventCached(k8sutil.ClientTLSInvalidEvent(c.cluster))
+			return err
+		}
+
+		cache.nodeClientCert = nodeClientCert
+		cache.nodeClientKey = nodeClientKey
 	}
 
 	c.tlsCache = cache
@@ -280,6 +298,16 @@ func (c *Cluster) refreshTLSShadowSecret() error {
 			"pkey.key":  c.tlsCache.serverKey,
 		},
 	}
+
+	// If a per-node internal client certificate was supplied, project it into the inbox
+	// as client_chain.pem/client_pkey.key so the node can present it (and be reloaded via
+	// /node/controller/reloadClientCertificate). The shadow secret is mounted whole into
+	// the inbox, so each key becomes a file there.
+	if c.tlsCache.nodeClientCert != nil {
+		requestedShadowSecret.Data["client_chain.pem"] = c.tlsCache.nodeClientCert
+		requestedShadowSecret.Data["client_pkey.key"] = c.tlsCache.nodeClientKey
+	}
+
 	// Pa's special sauce!  Support PKCS#8 keys, because we can.
 	block, _ := pem.Decode(c.tlsCache.serverKey)
 	if block == nil {
@@ -797,6 +825,72 @@ func (c *Cluster) cleanCAs() error {
 	return nil
 }
 
+// reloadNodeClientCerts uploads the user-supplied internal client certificate to each node
+// and reloads it (/node/controller/reloadClientCertificate), so the node's client identity
+// chains to the user CA instead of the server's auto-generated CA.  No-op unless
+// secretSource.nodeClientSecretName is set.
+//
+// This must run before cleanCAs: until the node's client_cert is re-signed by the user CA,
+// the auto-generated CA is reported "in use by the following nodes" and DeleteCA returns 400.
+func (c *Cluster) reloadNodeClientCerts() error {
+	if !c.cluster.IsTLSEnabled() || c.tlsCache.nodeClientCert == nil {
+		return nil
+	}
+
+	if !c.SupportsVersionFeatures("7.6.0") {
+		return nil
+	}
+
+	settings, err := c.passphraseSettings()
+	if err != nil {
+		return err
+	}
+
+	// Fetch the client cert each node currently serves, keyed by member name, so we only
+	// reload members that are missing or out of date (rather than every member every reconcile).
+	served, err := c.servedNodeClientCerts()
+	if err != nil {
+		return err
+	}
+
+	for _, member := range c.members {
+		if pem, ok := served[member.GetHostName().GetMemberName()]; ok {
+			equal, err := certificatesEqual(c.tlsCache.nodeClientCert, []byte(pem))
+			if err != nil {
+				return err
+			}
+
+			if equal {
+				continue
+			}
+		}
+
+		log.Info("Reloading node client certificate", "cluster", c.namespacedName(), "name", member.Name())
+
+		if err := couchbaseutil.ReloadClientCert(settings).On(c.api, member); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// servedNodeClientCerts returns the internal client certificate each node currently serves,
+// keyed the same way (GetMemberName of the node address) so it matches whether nodes are addressed by pod FQDN or by node hostname (ImprovedHostNetwork).  Used to reload only out-of-date members.
+func (c *Cluster) servedNodeClientCerts() (map[string]string, error) {
+	var serverCerts couchbaseutil.NodeCertificateList
+	if err := couchbaseutil.GetClientCertificates(&serverCerts).On(c.api, c.members); err != nil {
+		return nil, err
+	}
+
+	served := make(map[string]string, len(serverCerts))
+	for _, sc := range serverCerts {
+		served[couchbaseutil.HostName(sc.Node).GetMemberName()] = sc.PEM
+	}
+
+	return served, nil
+}
+
 // reloadChain does a reload of the TLS certificates and keys.
 func (c *Cluster) reloadChain(member couchbaseutil.Member) error {
 	settings, err := c.passphraseSettings()
@@ -1121,6 +1215,56 @@ func (c *Cluster) getVerifiedTLSClientData(rootCAs [][]byte) (chain []byte, key 
 	}
 
 	return clientCert, clientKey, nil
+}
+
+// nodeClientCertConfigured reports whether the user has supplied a per-node internal client
+// certificate via secretSource.nodeClientSecretName.
+func (c *Cluster) nodeClientCertConfigured() bool {
+	return c.cluster.Spec.Networking.TLS != nil &&
+		c.cluster.Spec.Networking.TLS.SecretSource != nil &&
+		c.cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName != ""
+}
+
+// getNodeClientTLSData reads the node internal client certificate and key from the
+// nodeClientSecretName secret (kubernetes.io/tls layout).
+func (c *Cluster) getNodeClientTLSData() ([]byte, []byte, error) {
+	name := c.cluster.Spec.Networking.TLS.SecretSource.NodeClientSecretName
+
+	secret, ok := c.k8s.Secrets.Get(name)
+	if !ok {
+		return nil, nil, fmt.Errorf("%w: unable to get node client TLS secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+	}
+
+	cert, ok := secret.Data[corev1.TLSCertKey]
+	if !ok {
+		return nil, nil, fmt.Errorf("%w: node client TLS secret missing tls.crt", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	}
+
+	key, ok := secret.Data[corev1.TLSPrivateKeyKey]
+	if !ok {
+		return nil, nil, fmt.Errorf("%w: node client TLS secret missing tls.key", errors.NewStackTracedError(errors.ErrResourceAttributeRequired))
+	}
+
+	return cert, key, nil
+}
+
+// getVerifiedNodeClientTLSData returns the node internal client certificate/key pair after
+// verifying it validates for client authentication against the CA pool.
+func (c *Cluster) getVerifiedNodeClientTLSData(rootCAs [][]byte) (chain []byte, key []byte, err error) {
+	cert, clientKey, err := c.getNodeClientTLSData()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if _, err := util_x509.Verify(rootCAs, cert, clientKey, x509.ExtKeyUsageClientAuth, nil, false, !c.cluster.Spec.Networking.ImprovedHostNetwork); err != nil {
+		return nil, nil, err
+	}
+
+	if err := util_x509.VerifyInternalClientEmailSAN(cert); err != nil {
+		return nil, nil, err
+	}
+
+	return cert, clientKey, nil
 }
 
 // reconcileMemberTLS reconciles both the CA and certificate chain on Couchbase server.
@@ -1818,6 +1962,14 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 	// Security settings are updated independently of node-to-node due to ordering
 	// constraints of the latter.
 	if err := c.updateSecuritySettings(); err != nil {
+		return err
+	}
+
+	// If the user supplied a per-node internal client certificate, upload it to each node
+	// before cleaning CAs.  This re-signs the node's client identity with the user CA so the
+	// server's auto-generated CA is no longer "in use" and can be removed by cleanCAs (it
+	// otherwise stays pinned under mandatory client-cert auth + strict node-to-node).
+	if err := c.reloadNodeClientCerts(); err != nil {
 		return err
 	}
 
