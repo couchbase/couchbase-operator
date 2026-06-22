@@ -49,7 +49,7 @@ pipeline {
   }
 
   environment {
-    GOVERSION = "1.22.1"
+    GOVERSION = "1.26.4"
     GOBIN = "${env.WORKSPACE}/bin"
     GOROOT = "${env.WORKSPACE}/go"
     PATH = "${env.GOBIN}:${env.WORKSPACE}/go/bin:${env.WORKSPACE}/kind/bin:${env.WORKSPACE}/google-cloud-sdk/bin:$PATH"
@@ -61,7 +61,7 @@ pipeline {
     AZURE_CREDENTIALS = credentials('azure-alex')
     GCP_CREDENTIALS = credentials('gcp-operator')
     GCP_REFRESH_TOKEN = credentials('gcp-refresh-token')
-    KIND_VERSION = "0.21.0"
+    KIND_VERSION = "0.31.0"
   }
 
   stages {

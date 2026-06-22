@@ -3789,7 +3789,6 @@ func TestValidationDefaultCreate(t *testing.T) {
 					Test("/spec/memoryQuota", "100Mi").
 					Test("/spec/replicas", 1).
 					Test("/spec/ioPriority", couchbasev2.CouchbaseBucketIOPriorityLow).
-					Test("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyValueOnly).
 					Test("/spec/conflictResolution", couchbasev2.CouchbaseBucketConflictResolutionSequenceNumber).
 					Test("/spec/compressionMode", couchbasev2.CouchbaseBucketCompressionModePassive),
 			},
@@ -6305,8 +6304,8 @@ func TestBucketStorageBackendValidationApply(t *testing.T) {
 				"bucket1": jsonpatch.NewPatchSet().
 					Replace("/spec/storageBackend", "couchstore"),
 			},
-			shouldFail:     true,
-			expectedErrors: []string{`historyRetentionSettings can only be used with magma storage backend`},
+			shouldFail:       false,
+			expectedWarnings: []string{`spec.historyRetentionSettings can only be used with a magma storage backend; the operator will omit these settings`},
 		},
 		{
 			name: "TestUpgradeClusterTo80AllowedDueToImplicit",
