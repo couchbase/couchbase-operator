@@ -826,6 +826,35 @@ func MustWaitForClusterConditionsRemoved(t *testing.T, k8s *types.Cluster, cl *c
 	}
 }
 
+// MustWaitForConditionRemovedWithinPodLimit waits for clusterCondition to be removed, and on
+// every poll checks that the pod count stays at or below maxPods. If the operator keeps adding
+// replacement pods instead of just one, the count goes over the limit and the test fails.
+func MustWaitForConditionRemovedWithinPodLimit(t *testing.T, k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster, clusterCondition couchbasev2.ClusterConditionType, maxPods int, timeout time.Duration) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + cl.Name,
+	}
+
+	conditionGone := ResourceConstraints(k8s, cl, resourceConditionNotExists(string(clusterCondition)))
+
+	callback := func() error {
+		podList, err := k8s.KubeClient.CoreV1().Pods(cl.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		if len(podList.Items) > maxPods {
+			// Too many pods: the operator is adding extra replacements instead of one.
+			Die(t, fmt.Errorf("cluster has %d pods, more than the allowed %d while replacing the mismatched node", len(podList.Items), maxPods))
+		}
+
+		return conditionGone()
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustWaitForClusterWithErrorMessage waits until the cluster has a specific error message.
 func MustWaitForClusterWithErrorMessage(t *testing.T, k8s *types.Cluster, errMessage string, cl *couchbasev2.CouchbaseCluster, timeout time.Duration) {
 	if err := retryutil.RetryFor(timeout, ResourceConditionWithMessage(k8s, cl, string(couchbasev2.ClusterConditionError), string(v1.ConditionTrue), errMessage)); err != nil {

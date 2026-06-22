@@ -868,6 +868,47 @@ func TestServiceChangedOnNode(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestServiceMismatchNoExtraNodes changes a node's services from outside the operator (like a
+// user would from the UI) on a cluster that exposes a feature. Exposing a feature makes new pods
+// wait for their external address to be reachable before they're ready, so the replacement node
+// is still starting up while the old mismatched node is still around. The operator should add just
+// one replacement and remove the old node, it must not keep piling on new nodes while the old one
+// is still there.
+func TestServiceMismatchNoExtraNodes(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0")
+
+	serverClassSize := constants.Size2
+	clusterSize := serverClassSize * 2
+
+	// Exposing a feature makes new pods wait for their external address to be reachable before
+	// they're marked ready, which gives us the slow window the bug needs.
+	cluster := clusterOptions().WithMixedEphemeralTopology(serverClassSize).Generate(kubernetes)
+	cluster.Spec.Networking.ExposedFeatures = couchbasev2.ExposedFeatureList{
+		couchbasev2.FeatureClient,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	victimID := 3
+	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimID)
+
+	e2eutil.MustChangeServicesOnNode(t, kubernetes, cluster, victimName, couchbaseutil.SearchService)
+
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionServicesMismatch, v12.ConditionTrue, cluster, 5*time.Minute)
+
+	// While the operator fixes the mismatch there should only ever be one extra node, so the pod
+	// count must stay at or below clusterSize+1. If it keeps adding nodes, the count climbs and
+	// this fails.
+	e2eutil.MustWaitForConditionRemovedWithinPodLimit(t, kubernetes, cluster, couchbasev2.ClusterConditionServicesMismatch, clusterSize+1, 15*time.Minute)
+
+	// Once it's done the cluster should be healthy again, with the old node replaced and no extras.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
+}
+
 func TestScaleDownPrioritizesServiceMumatchedNodes(t *testing.T) {
 	f := framework.Global
 

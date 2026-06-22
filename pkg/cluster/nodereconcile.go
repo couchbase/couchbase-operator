@@ -2460,15 +2460,17 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 
 			return fmt.Errorf("failed to rebalance: %w", err)
 		}
-	}
 
-	// Clear PodPendingUpgradeBeforeEjectionCondition on members that were successfully ejected.
-	// This is done here (rather than in newReconcileMachine) so that if the FSM
-	// aborts before reaching handleRebalance, the durable condition survives and
-	// the ejection is retried on the next cycle.
-	for _, member := range r.ejectMembers {
-		if err := k8sutil.ClearPodPendingUpgradeBeforeEjection(c.k8s, member.Name()); err != nil {
-			c.log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
+		// The rebalance succeeded, so the ejectMembers have actually left the cluster, now it's
+		// safe to clear their ejection marker. Keep this inside the shouldRebalance block, if no
+		// rebalance ran (e.g. the replacement pod is still starting up), the marker must stay so
+		// the node is ejected on a later cycle. Clearing it outside this block would wipe the
+		// marker before the node was ejected, and the node would stay and keep getting swapped
+		// again
+		for _, member := range r.ejectMembers {
+			if err := k8sutil.ClearPodPendingUpgradeBeforeEjection(c.k8s, member.Name()); err != nil {
+				c.log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
+			}
 		}
 	}
 
