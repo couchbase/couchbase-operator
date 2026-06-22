@@ -1751,7 +1751,9 @@ func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
 	c.log.Info("Pod initialization timed out, removing", "cluster", c.namespacedName(), "pod", pod.Name)
 
 	if pod.Status.Phase != v1.PodRunning {
-		if serverGroup, ok := pod.Spec.NodeSelector[constants.ServerGroupLabel]; ok && serverGroup != "" {
+		// Read the group by the configured server-group label key — under serverGroupsLabelOverride
+		// the NodeSelector is keyed on the override (e.g. eks.amazonaws.com/nodegroup), not the zone label.
+		if serverGroup, ok := pod.Spec.NodeSelector[c.cluster.ServerGroupLabel()]; ok && serverGroup != "" {
 			if err := c.addFailedSchedulingServerGroups(serverGroup); err != nil {
 				c.log.Error(err, "Failed to record server group scheduling failure",
 					"cluster", c.namespacedName(), "pod", pod.Name, "serverGroup", serverGroup)
