@@ -84,13 +84,24 @@ func (m *MemberState) LogStatus(cluster string) {
 	sort.Strings(names)
 
 	// Collect all the node statuses, as we process check the string lengths for
-	// pretty tabulation
+	// pretty tabulation. Nodes that are not yet known to Couchbase Server (e.g.
+	// pods created asynchronously that have not finished initialising) have no
+	// state yet; collect their names separately so they are not logged with an
+	// empty status.
 	statuses := []nodeStatus{}
+	pendingInit := []string{}
 
 	for _, name := range names {
 		// All members are managed
 		// And they will exist in one state
 		state := m.NodeStateMap[name]
+
+		// A node with no state is not yet in the cluster, i.e. its pod has been
+		// created but initialisation has not completed.
+		if state == "" {
+			pendingInit = append(pendingInit, name)
+			continue
+		}
 
 		// Buffer up the status entry
 		class := m.managedNodes[name].Config()
@@ -108,6 +119,10 @@ func (m *MemberState) LogStatus(cluster string) {
 
 	for _, status := range statuses {
 		log.Info("Node status", "cluster", cluster, "name", status.name, "version", status.version, "class", status.class, "managed", status.managed, "status", status.state)
+	}
+
+	if len(pendingInit) > 0 {
+		log.Info("Nodes pending initialisation", "cluster", cluster, "names", pendingInit, "count", len(pendingInit))
 	}
 }
 
