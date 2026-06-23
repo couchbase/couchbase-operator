@@ -20,6 +20,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 )
 
 func upload(address string, fileName string, proxy string) error {
@@ -45,7 +47,11 @@ func upload(address string, fileName string, proxy string) error {
 
 	r.Header.Add("Content-Type", writer.FormDataContentType())
 
-	var client *http.Client
+	// The upload address comes from config, so guard against it
+	// pointing at a cloud metadata endpoint.
+	transport := &http.Transport{
+		DialContext: netutil.SafeDialer().DialContext,
+	}
 
 	if proxy != "" {
 		proxyURL, err := url.Parse(proxy)
@@ -53,10 +59,10 @@ func upload(address string, fileName string, proxy string) error {
 			return err
 		}
 
-		client = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}}
-	} else {
-		client = &http.Client{}
+		transport.Proxy = http.ProxyURL(proxyURL)
 	}
+
+	client := &http.Client{Transport: transport}
 
 	fmt.Println("Uploading " + fileName + " to " + address)
 

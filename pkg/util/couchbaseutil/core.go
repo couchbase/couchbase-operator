@@ -24,6 +24,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/util/netutil"
 	"github.com/couchbase/couchbase-operator/pkg/version"
 )
 
@@ -123,6 +124,7 @@ func (c *Client) makeClient() {
 			Timeout:   tcpConnectTimeout,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
+			Control:   netutil.BlockMetadataEndpoints,
 		}
 
 		conn, err := dialer.DialContext(ctx, network, addr)
@@ -149,6 +151,7 @@ func (c *Client) makeClient() {
 			Timeout:   tcpConnectTimeout,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
+			Control:   netutil.BlockMetadataEndpoints,
 		}
 
 		conn, err := tls.DialWithDialer(dialer, network, addr, tlsClientConfig)

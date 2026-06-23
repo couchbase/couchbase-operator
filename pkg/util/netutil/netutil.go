@@ -16,11 +16,60 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net"
+	"syscall"
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 )
+
+// Cloud providers expose instance credentials on these addresses, and
+// they're only meant to be reached from inside the VM. We never need to talk to
+// them, so we block them outright to stop a bad URL from being turned into a
+// credential stealing request.
+var metadataEndpoints = []net.IP{
+	net.ParseIP("169.254.169.254"), // AWS, Azure, GCP, OpenStack, Oracle.
+	net.ParseIP("100.100.100.200"), // Alibaba Cloud.
+	net.ParseIP("fd00:ec2::254"),   // AWS over IPv6.
+}
+
+// ErrBlockedMetadataEndpoint says we refused to dial a cloud metadata address.
+var ErrBlockedMetadataEndpoint = fmt.Errorf("refusing to connect to cloud metadata endpoint")
+
+// BlockMetadataEndpoints can be plugged into a net.Dialer to reject any
+// connection to a cloud metadata address. It checks the IP we're actually about
+// to dial, so it also catches a hostname that quietly resolves to one of them.
+func BlockMetadataEndpoints(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		// Not in host:port form, so treat the whole string as the host.
+		host = address
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil
+	}
+
+	for _, blocked := range metadataEndpoints {
+		if blocked.Equal(ip) {
+			return ErrBlockedMetadataEndpoint
+		}
+	}
+
+	return nil
+}
+
+// SafeDialer is a dialer that won't connect to cloud metadata endpoints. Use it
+// for HTTP clients whose target URL comes from config or user input.
+func SafeDialer() *net.Dialer {
+	return &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		Control:   BlockMetadataEndpoints,
+	}
+}
 
 // Wait for a TCP port to become available
 // Checks the port once a second until success or cancelled by the context.
