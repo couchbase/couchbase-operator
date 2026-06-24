@@ -392,6 +392,11 @@ func (s *Server) Start(tlsConfig *tls.Config) {
 	s.server = &http.Server{
 		Addr:      s.config.Addr,
 		TLSConfig: tlsConfig,
+		// ReadHeaderTimeout and IdleTimeout mitigate Slowloris DOS attacks by
+		// bounding the time spent reading request headers and the time a
+		// keep alive connection may sit idle between requests.
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	s.err = make(chan error)
