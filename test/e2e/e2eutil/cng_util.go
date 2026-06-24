@@ -194,8 +194,7 @@ func MustGetCNGClient(ctx context.Context, cluster *couchbasev2.CouchbaseCluster
 	var cngClient *gocbcoreps.RoutingClient
 
 	dialopts := gocbcoreps.DialOptions{
-		Username:           username,
-		Password:           password,
+		Authenticator:      gocbcoreps.NewBasicAuthenticator(username, password),
 		InsecureSkipVerify: true,
 		PoolSize:           1,
 	}
