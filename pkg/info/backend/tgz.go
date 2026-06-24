@@ -73,7 +73,10 @@ func (b *tgzBackend) Close() error {
 		path = filepath.Join(b.directory, path)
 	}
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
+	// We are only saving the archive to this file, we never read from it.
+	// So open it for writing only. This also means the file path can't be
+	// used to read other files on the system.
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

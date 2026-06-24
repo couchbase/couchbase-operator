@@ -411,7 +411,10 @@ func (o *saveOptions) save(flags *genericclioptions.ConfigFlags) error {
 		return fmt.Errorf("%w: no resources detected", errEnvironmentError)
 	}
 
-	// Dump out the resources now they have been collated and linked.
+	// Write out the resources now they have been collated and linked.
+	// We are only saving to this file, we never read from it, so open it for
+	// writing only. This also means the file path can't be used to read other
+	// files on the system.
 	out, err := os.OpenFile(o.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o640)
 	if err != nil {
 		return err
