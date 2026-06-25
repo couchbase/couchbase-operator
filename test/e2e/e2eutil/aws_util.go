@@ -20,10 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,11 +53,12 @@ type roleStatementEntry struct {
 	Condition map[string]map[string]string
 }
 type AWSUtil struct {
-	Sess     *session.Session
-	iam      *iam.IAM
+	cfg      aws.Config
+	endpoint string
+	iam      *iam.Client
 	cleanups []func() error
-	Policy   *iam.Policy
-	Role     *iam.Role
+	Policy   *iamtypes.Policy
+	Role     *iamtypes.Role
 }
 
 type AWSHelperOptions struct {
@@ -89,14 +92,9 @@ func (o *AWSHelperOptions) WithEndpointCert(cert []byte) *AWSHelperOptions {
 func (o *AWSHelperOptions) Create() *AWSUtil {
 	token := ""
 
-	config := &aws.Config{
-		Region:      aws.String(o.region),
-		Credentials: credentials.NewStaticCredentials(o.accessKey, o.secretID, token),
-	}
-
-	if o.endpoint != "" {
-		config.Endpoint = &o.endpoint
-		config.S3ForcePathStyle = aws.Bool(true)
+	loadOpts := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(o.region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(o.accessKey, o.secretID, token)),
 	}
 
 	if o.cert != nil {
@@ -108,14 +106,16 @@ func (o *AWSHelperOptions) Create() *AWSUtil {
 				RootCAs: caCertPool,
 			},
 		}
-		client := http.Client{Transport: t, Timeout: 15 * time.Second}
-		config.HTTPClient = &client
+		client := &http.Client{Transport: t, Timeout: 15 * time.Second}
+		loadOpts = append(loadOpts, awsconfig.WithHTTPClient(client))
 	}
 
-	helper := AWSUtil{}
-	helper.Sess = session.Must(session.NewSession(config))
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(), loadOpts...)
+	if err != nil {
+		panic(err)
+	}
 
-	return &helper
+	return &AWSUtil{cfg: cfg, endpoint: o.endpoint}
 }
 
 func (helper *AWSUtil) SetupBackupIAM(namespace, accountid, oidcProvider, s3Bucket string) error {
@@ -142,12 +142,14 @@ func MustSetupBackupIAM(t *testing.T, kubernetes *types.Cluster, aws *AWSUtil, a
 func (helper *AWSUtil) attachPolicyToRole() error {
 	svc := helper.getIAM()
 
-	_, err := svc.AttachRolePolicy(&iam.AttachRolePolicyInput{
+	ctx := context.Background()
+
+	_, err := svc.AttachRolePolicy(ctx, &iam.AttachRolePolicyInput{
 		PolicyArn: helper.Policy.Arn,
 		RoleName:  helper.Role.RoleName,
 	})
 	dettachPolicy := func() error {
-		_, err := svc.DetachRolePolicy(&iam.DetachRolePolicyInput{
+		_, err := svc.DetachRolePolicy(ctx, &iam.DetachRolePolicyInput{
 			PolicyArn: helper.Policy.Arn,
 			RoleName:  helper.Role.RoleName,
 		})
@@ -160,9 +162,25 @@ func (helper *AWSUtil) attachPolicyToRole() error {
 	return err
 }
 
-func (helper *AWSUtil) getIAM() *iam.IAM {
+// NewS3Client returns an S3 client. We use path style
+// addressing for the custom endpoint case since MinIO
+// needs it.
+func (helper *AWSUtil) NewS3Client() *s3.Client {
+	return s3.NewFromConfig(helper.cfg, func(o *s3.Options) {
+		if helper.endpoint != "" {
+			o.BaseEndpoint = aws.String(helper.endpoint)
+			o.UsePathStyle = true
+		}
+	})
+}
+
+func (helper *AWSUtil) getIAM() *iam.Client {
 	if helper.iam == nil {
-		helper.iam = iam.New(helper.Sess)
+		helper.iam = iam.NewFromConfig(helper.cfg, func(o *iam.Options) {
+			if helper.endpoint != "" {
+				o.BaseEndpoint = aws.String(helper.endpoint)
+			}
+		})
 	}
 
 	return helper.iam
@@ -192,7 +210,9 @@ func (helper *AWSUtil) createPolicy(s3Bucket string) error {
 		return err
 	}
 
-	result, err := svc.CreatePolicy(&iam.CreatePolicyInput{
+	ctx := context.Background()
+
+	result, err := svc.CreatePolicy(ctx, &iam.CreatePolicyInput{
 		PolicyDocument: aws.String(string(b)),
 		PolicyName:     aws.String("certification-test-policy-" + RandomString(6)),
 	})
@@ -201,7 +221,7 @@ func (helper *AWSUtil) createPolicy(s3Bucket string) error {
 	}
 
 	deletePolicy := func() error {
-		_, err := svc.DeletePolicy(&iam.DeletePolicyInput{
+		_, err := svc.DeletePolicy(ctx, &iam.DeletePolicyInput{
 			PolicyArn: result.Policy.Arn,
 		})
 
@@ -241,7 +261,9 @@ func (helper *AWSUtil) createRole(namespace string, accountid string, oidcProvid
 		return err
 	}
 
-	result, err := svc.CreateRole(&iam.CreateRoleInput{
+	ctx := context.Background()
+
+	result, err := svc.CreateRole(ctx, &iam.CreateRoleInput{
 		AssumeRolePolicyDocument: aws.String(string(b)),
 		RoleName:                 aws.String("certification-test-role-" + RandomString(6)),
 	})
@@ -250,7 +272,7 @@ func (helper *AWSUtil) createRole(namespace string, accountid string, oidcProvid
 	}
 
 	deleteRole := func() error {
-		_, err := svc.DeleteRole(&iam.DeleteRoleInput{
+		_, err := svc.DeleteRole(ctx, &iam.DeleteRoleInput{
 			RoleName: result.Role.RoleName,
 		})
 

@@ -15,10 +15,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
@@ -67,18 +68,19 @@ func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint 
 	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
 
 	// Create S3 service client
-	svc := s3.New(helper.Sess)
+	svc := helper.NewS3Client()
+	ctx := context.Background()
 
 	if MustGetS3Bucket(t, svc, bucket) {
 		return nil
 	}
 
 	// Create the S3 Bucket
-	_, err := svc.CreateBucket(&s3.CreateBucketInput{
-		ACL:    aws.String("private"),
+	_, err := svc.CreateBucket(ctx, &s3.CreateBucketInput{
+		ACL:    s3types.BucketCannedACLPrivate,
 		Bucket: aws.String(bucket),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(region),
+		CreateBucketConfiguration: &s3types.CreateBucketConfiguration{
+			LocationConstraint: s3types.BucketLocationConstraint(region),
 		},
 	})
 	if err != nil {
@@ -87,9 +89,9 @@ func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint 
 
 	// Make Objects of the bucket private
 	if !strings.Contains(endpoint, "minio") { // minio doesn't support this action.
-		_, err = svc.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
+		_, err = svc.PutPublicAccessBlock(ctx, &s3.PutPublicAccessBlockInput{
 			Bucket: aws.String(bucket),
-			PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
+			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
 				BlockPublicAcls:       aws.Bool(true),
 				IgnorePublicAcls:      aws.Bool(true),
 				BlockPublicPolicy:     aws.Bool(true),
@@ -102,9 +104,9 @@ func createS3Bucket(t *testing.T, bucket, accessKey, secretID, region, endpoint 
 		}
 	}
 
-	err = svc.WaitUntilBucketExists(&s3.HeadBucketInput{
+	err = s3.NewBucketExistsWaiter(svc).Wait(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
-	})
+	}, 5*time.Minute)
 
 	if err != nil {
 		return fmt.Errorf("Error occurred while waiting for bucket to be created, %w", err)
@@ -122,8 +124,8 @@ func MustCreateS3Bucket(t *testing.T, bucket, accessKey, secretID, region string
 }
 
 // Deprecated: Use Cloud provider methods instead.
-func getS3Bucket(svc *s3.S3, bucket string) (bool, error) {
-	result, err := svc.ListBuckets(&s3.ListBucketsInput{})
+func getS3Bucket(svc *s3.Client, bucket string) (bool, error) {
+	result, err := svc.ListBuckets(context.Background(), &s3.ListBucketsInput{})
 	if err != nil {
 		return false, err
 	}
@@ -141,7 +143,7 @@ func getS3Bucket(svc *s3.S3, bucket string) (bool, error) {
 }
 
 // Deprecated: Use Cloud provider methods instead.
-func MustGetS3Bucket(t *testing.T, svc *s3.S3, bucket string) bool {
+func MustGetS3Bucket(t *testing.T, svc *s3.Client, bucket string) bool {
 	bucketPresent, err := getS3Bucket(svc, bucket)
 	if err != nil {
 		e2eutil.Die(t, err)
@@ -156,35 +158,53 @@ func deleteS3Bucket(t *testing.T, bucket, accessKey, secretID, region string, en
 	helper := e2eutil.AwsHelper(accessKey, secretID, region).WithEndpoint(endpoint).WithEndpointCert(cert).Create()
 
 	// Create S3 service client
-	svc := s3.New(helper.Sess)
+	svc := helper.NewS3Client()
+	ctx := context.Background()
 
 	// Check if the bucket is present
 	if bucketPresent := MustGetS3Bucket(t, svc, bucket); bucketPresent == false {
 		return nil
 	}
 
-	// Empty the bucket before deleting it
-	// Setup BatchDeleteIterator to iterate through a list of objects.
-	iter := s3manager.NewDeleteListIterator(svc, &s3.ListObjectsInput{
+	// A bucket has to be empty before we can delete it, so page through its
+	// objects and delete each batch.
+	paginator := s3.NewListObjectsV2Paginator(svc, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("Unable to list objects in bucket %q, %w", bucket, err)
+		}
 
-	// Traverse iterator deleting each object
-	if err := s3manager.NewBatchDeleteWithClient(svc).Delete(aws.BackgroundContext(), iter); err != nil {
-		return fmt.Errorf("Unable to delete objects from bucket %q, %w", bucket, err)
+		if len(page.Contents) == 0 {
+			continue
+		}
+
+		objectIDs := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+		for _, obj := range page.Contents {
+			objectIDs = append(objectIDs, s3types.ObjectIdentifier{Key: obj.Key})
+		}
+
+		if _, err := svc.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &s3types.Delete{Objects: objectIDs},
+		}); err != nil {
+			return fmt.Errorf("Unable to delete objects from bucket %q, %w", bucket, err)
+		}
 	}
 
-	// Create the S3 Bucket
-	_, err := svc.DeleteBucket(&s3.DeleteBucketInput{
+	// Delete the S3 Bucket
+	_, err := svc.DeleteBucket(ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(bucket),
 	})
 	if err != nil {
 		return fmt.Errorf("Bucket can not be deleted %w", err)
 	}
 
-	err = svc.WaitUntilBucketNotExists(&s3.HeadBucketInput{
+	err = s3.NewBucketNotExistsWaiter(svc).Wait(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
-	})
+	}, 5*time.Minute)
 
 	if err != nil {
 		return fmt.Errorf("Error occurred while waiting for bucket to be deleted, %w", err)

@@ -14,12 +14,13 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	corev1 "k8s.io/api/core/v1"
@@ -32,8 +33,7 @@ type AWSCredentials struct {
 	region          string
 }
 type AWSProvider struct {
-	sess  *session.Session
-	s3    *s3.S3
+	s3    *s3.Client
 	creds *AWSCredentials
 }
 
@@ -45,24 +45,24 @@ func NewAWSProvider(creds ...string) (Provider, error) {
 	awsCreds := &AWSCredentials{
 		accessKeyID: accessKeyID, secretAccessKey: secretAccessKey, region: region,
 	}
-	config := &aws.Config{
-		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-	}
 
-	sess, err := session.NewSession(config)
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, "")),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	s3Svc := s3.New(sess)
-	provider := AWSProvider{sess: sess, s3: s3Svc, creds: awsCreds}
+	s3Svc := s3.NewFromConfig(cfg)
+	provider := AWSProvider{s3: s3Svc, creds: awsCreds}
 
 	return &provider, nil
 }
 
 func (provider *AWSProvider) CreateBucket(bucket string) error {
 	svc := provider.s3
+	ctx := context.Background()
 
 	found, err := provider.GetBucket(bucket)
 	if err != nil {
@@ -74,11 +74,11 @@ func (provider *AWSProvider) CreateBucket(bucket string) error {
 	}
 
 	// Create the S3 Bucket
-	_, err = svc.CreateBucket(&s3.CreateBucketInput{
-		ACL:    aws.String("private"),
+	_, err = svc.CreateBucket(ctx, &s3.CreateBucketInput{
+		ACL:    s3types.BucketCannedACLPrivate,
 		Bucket: aws.String(bucket),
-		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(provider.creds.region),
+		CreateBucketConfiguration: &s3types.CreateBucketConfiguration{
+			LocationConstraint: s3types.BucketLocationConstraint(provider.creds.region),
 		},
 	})
 
@@ -86,9 +86,9 @@ func (provider *AWSProvider) CreateBucket(bucket string) error {
 		return err
 	}
 
-	err = svc.WaitUntilBucketExists(&s3.HeadBucketInput{
+	err = s3.NewBucketExistsWaiter(svc).Wait(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
-	})
+	}, 5*time.Minute)
 
 	if err != nil {
 		return fmt.Errorf("error occurred while waiting for bucket to be created, %w", err)
@@ -98,7 +98,7 @@ func (provider *AWSProvider) CreateBucket(bucket string) error {
 }
 
 func (provider *AWSProvider) GetBucket(bucket string) (bool, error) {
-	result, err := provider.s3.ListBuckets(&s3.ListBucketsInput{})
+	result, err := provider.s3.ListBuckets(context.Background(), &s3.ListBucketsInput{})
 	if err != nil {
 		return false, err
 	}
@@ -127,19 +127,38 @@ func (provider *AWSProvider) DeleteBucket(bucket string) error {
 		return nil
 	}
 
-	// Empty the bucket before deleting it
-	// Setup BatchDeleteIterator to iterate through a list of objects.
-	iter := s3manager.NewDeleteListIterator(provider.s3, &s3.ListObjectsInput{
+	ctx := context.Background()
+
+	// A bucket has to be empty before we can delete it, so page through its
+	// objects and delete each batch.
+	paginator := s3.NewListObjectsV2Paginator(provider.s3, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to list objects in bucket %q, %w", bucket, err)
+		}
 
-	// Traverse iterator deleting each object
-	if err := s3manager.NewBatchDeleteWithClient(provider.s3).Delete(aws.BackgroundContext(), iter); err != nil {
-		return fmt.Errorf("unable to delete objects from bucket %q, %w", bucket, err)
+		if len(page.Contents) == 0 {
+			continue
+		}
+
+		objectIDs := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+		for _, obj := range page.Contents {
+			objectIDs = append(objectIDs, s3types.ObjectIdentifier{Key: obj.Key})
+		}
+
+		if _, err := provider.s3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &s3types.Delete{Objects: objectIDs},
+		}); err != nil {
+			return fmt.Errorf("unable to delete objects from bucket %q, %w", bucket, err)
+		}
 	}
 
-	// Create the S3 Bucket
-	_, err = provider.s3.DeleteBucket(&s3.DeleteBucketInput{
+	// Now delete the bucket itself
+	_, err = provider.s3.DeleteBucket(ctx, &s3.DeleteBucketInput{
 		Bucket: aws.String(bucket),
 	})
 
@@ -147,9 +166,9 @@ func (provider *AWSProvider) DeleteBucket(bucket string) error {
 		return fmt.Errorf("bucket can not be deleted %w", err)
 	}
 
-	err = provider.s3.WaitUntilBucketNotExists(&s3.HeadBucketInput{
+	err = s3.NewBucketNotExistsWaiter(provider.s3).Wait(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(bucket),
-	})
+	}, 5*time.Minute)
 
 	if err != nil {
 		return fmt.Errorf("error occurred while waiting for bucket to be deleted, %w", err)
