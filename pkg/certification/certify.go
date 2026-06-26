@@ -30,7 +30,7 @@ import (
 
 	"github.com/couchbase/couchbase-operator/pkg/certification/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/portforward"
-	"github.com/mholt/archiver/v4"
+	archiver "github.com/mholt/archives"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -1099,8 +1099,9 @@ func (o *certifyOptions) isParallelDefaulted() bool {
 func (o *certifyOptions) prepareOutput() {
 	util.PrintLine("Appending stdout to archive ...")
 
-	// get stdout lines and get ready
+	ctx := context.TODO()
 
+	// get stdout lines and get ready
 	lines := ""
 
 	for _, line := range util.GetStdout() {
@@ -1151,7 +1152,7 @@ func (o *certifyOptions) prepareOutput() {
 		Archival:    archiver.Tar{},
 	}
 
-	files, err := archiver.FilesFromDisk(nil, map[string]string{
+	files, err := archiver.FilesFromDisk(ctx, nil, map[string]string{
 		tempFile.Name():    "stdout.txt",
 		tempArchive.Name(): "results.tar.bz",
 	})
@@ -1183,9 +1184,8 @@ func (o *certifyOptions) prepareOutput() {
 	hash := sha256.New()
 	stdoutHash := sha256.New()
 	resultsHash := sha256.New()
-	ctx := context.TODO()
 
-	fsys, err := archiver.FileSystem(ctx, o.archiveName.archiveName())
+	fsys, err := archiver.FileSystem(ctx, o.archiveName.archiveName(), nil)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -1226,7 +1226,7 @@ func (o *certifyOptions) prepareOutput() {
 
 	fmt.Println("Results Checksum: " + base64.StdEncoding.EncodeToString(hash.Sum(nil)))
 
-	files, err = archiver.FilesFromDisk(nil, map[string]string{
+	files, err = archiver.FilesFromDisk(ctx, nil, map[string]string{
 		tempFile.Name():     "stdout.txt",
 		tempArchive.Name():  "results.tar.bz",
 		tempHashFile.Name(): "checksum.txt",
@@ -1269,7 +1269,7 @@ func (o *certifyOptions) verifyOutput() error {
 
 	ctx := context.TODO()
 
-	fsys, err := archiver.FileSystem(ctx, o.verifyFile)
+	fsys, err := archiver.FileSystem(ctx, o.verifyFile, nil)
 	if err != nil {
 		return err
 	}
