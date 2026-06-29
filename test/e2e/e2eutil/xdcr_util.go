@@ -297,6 +297,35 @@ func waitForReplicationRemovedEvent(srcK8s *types.Cluster, source *couchbasev2.C
 	return waitForResourceEventFromNow(ctx, nil, srcK8s, source, removedEvent)
 }
 
+func waitForRemoteClusterRemovedEvent(srcK8s *types.Cluster, source *couchbasev2.CouchbaseCluster, clusterName string) error {
+	removedEvent := RemoteClusterRemovedEvent(source, clusterName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	return waitForResourceEventFromNow(ctx, nil, srcK8s, source, removedEvent)
+}
+
+// MustRemoveXDCRRemoteCluster removes all remote clusters from the source
+// cluster's XDCR spec and waits for the operator to tear down the corresponding
+// remote cluster on the server. Removing the remote cluster from the spec also
+// drops the desired replication, so the operator must delete the replication
+// before it can delete the now orphaned remote cluster.
+func MustRemoveXDCRRemoteCluster(t *testing.T, srcK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	emptyRemoteClusters := []couchbasev2.RemoteCluster{}
+
+	src, err := patchCluster(srcK8s, source, jsonpatch.NewPatchSet().Replace("/spec/xdcr/remoteClusters", emptyRemoteClusters), timeout)
+	if err != nil {
+		Die(t, err)
+	}
+
+	*source = *src
+
+	if err := waitForRemoteClusterRemovedEvent(srcK8s, source, target.Name); err != nil {
+		Die(t, err)
+	}
+}
+
 // establishXDCRReplicationGeneric creates a remote cluster in the source and a replication from the source bucket to the destination
 // bucket. No TLS setup is configured for source/remote clusters.
 // If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
