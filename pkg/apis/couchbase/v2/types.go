@@ -299,6 +299,7 @@ type CouchbaseBackupSpec struct {
 
 	// DEPRECATED - by spec.objectStore.uri
 	// Name of S3 bucket to backup to. If non-empty this overrides local backup.
+	// +optional
 	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
 
 	// ObjectStore allows for backing up to a remote cloud storage.
@@ -505,18 +506,22 @@ type CouchbaseBackupStatus struct {
 
 	// DEPRECATED - field may no longer be populated.
 	// Output reports useful information from the backup_script.
+	// +optional
 	Output string `json:"output,omitempty"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Pod tells us which pod is running/ran last.
+	// +optional
 	Pod string `json:"pod,omitempty"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Job tells us which job is running/ran last.
+	// +optional
 	Job string `json:"job,omitempty"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Cronjob tells us which Cronjob the job belongs to.
+	// +optional
 	CronJob string `json:"cronjob,omitempty"`
 
 	// Duration tells us how long the last backup took.  More info:
@@ -633,6 +638,7 @@ type CouchbaseBackupRestoreSpec struct {
 
 	// DEPRECATED - by spec.objectStore.uri
 	// Name of S3 bucket to restore from. If non-empty this overrides local backup.
+	// +optional
 	S3Bucket S3BucketURI `json:"s3bucket,omitempty"`
 
 	// The remote destination for backup.
@@ -878,14 +884,17 @@ type CouchbaseBackupRestoreStatus struct {
 
 	// DEPRECATED - field may no longer be populated.
 	// Output reports useful information from the backup process.
+	// +optional
 	Output string `json:"output,omitempty"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Pod tells us which pod is running/ran last.
+	// +optional
 	Pod string `json:"pod,omitempty"`
 
 	// DEPRECATED - field may no longer be populated.
 	// Job tells us which job is running/ran last.
+	// +optional
 	Job string `json:"job,omitempty"`
 
 	// Duration tells us how long the last restore took.  More info:
@@ -3013,6 +3022,7 @@ type ClusterSpec struct {
 	// DEPRECATED - This option only exists for backwards compatibility and no longer
 	// restricts autoscaling to ephemeral services.
 	// EnablePreviewScaling enables autoscaling for stateful services and buckets.
+	// +optional
 	EnablePreviewScaling bool `json:"enablePreviewScaling,omitempty"`
 
 	// AutoscaleStabilizationPeriod defines how long after a rebalance the
@@ -3318,6 +3328,7 @@ type CouchbaseClusterLDAPSpec struct {
 	// DEPRECATED - Field is ignored, use tlsSecret.
 	// CA Certificate in PEM format to be used in LDAP server certificate validation.
 	// This cert is the string form of the secret provided to `spec.tls.tlsSecret`.
+	// +optional
 	CACert string `json:"cacert,omitempty"`
 
 	// LDAP query, to get the users' groups by username in RFC4516 format.  More info:
@@ -3575,7 +3586,7 @@ type CloudNativeGateway struct {
 	// DEPRECATED - field no longer has any effect.
 	// TerminationGracePeriodSeconds specifies the grace period for the container to
 	// terminate. Defaults to 75 seconds.
-	// +kubebuilder:default=75
+	// +optional
 	TerminationGracePeriodSeconds int64 `json:"terminationGracePeriodSeconds,omitempty"`
 
 	// DEVELOPER PREVIEW - This feature is in developer preview.
@@ -3641,7 +3652,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// AdminConsoleServiceType defines whether to create a node port or load balancer service.
 	// When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
 	// This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort".
-	// +kubebuilder:default="NodePort"
+	// +optional
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	AdminConsoleServiceType v1.ServiceType `json:"adminConsoleServiceType,omitempty"`
 
@@ -3669,7 +3680,7 @@ type CouchbaseClusterNetworkingSpec struct {
 	// ExposedFeatureServiceType defines whether to create a node port or load balancer service.
 	// When using a LoadBalancer service type, TLS and dynamic DNS must also be enabled.
 	// This field must be one of "NodePort" or "LoadBalancer", defaulting to "NodePort".
-	// +kubebuilder:default="NodePort"
+	// +optional
 	// +kubebuilder:validation:Enum=NodePort;LoadBalancer
 	ExposedFeatureServiceType v1.ServiceType `json:"exposedFeatureServiceType,omitempty"`
 
@@ -3897,7 +3908,7 @@ type ClusterConfig struct {
 	// "memory_optimized" or "plasma", defaulting to "memory_optimized".  This field is
 	// immutable and cannot be changed unless there are no server classes running the
 	// index service in the cluster.
-	// +kubebuilder:default="memory_optimized"
+	// +optional
 	IndexStorageSetting CouchbaseClusterIndexStorageSetting `json:"indexStorageSetting,omitempty"`
 
 	// Data allows the data service to be configured.
@@ -4977,6 +4988,7 @@ type ServerConfig struct {
 	// different Couchbase images. Updating this field to a value different than
 	// spec.image will cause an automatic upgrade of the server class. If it isn't
 	// specified then the cluster image will be used.
+	// +optional
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image,omitempty"`
 }

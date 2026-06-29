@@ -897,7 +897,13 @@ func (c *Cluster) reconcileIndexSettings() error {
 	// By default (the old way), just patch the storage mode on top of the
 	// current configuration.
 	requested := current
-	requested.StorageMode = couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.IndexStorageSetting)
+
+	indexStorageSetting := c.cluster.Spec.ClusterSettings.IndexStorageSetting
+	requested.StorageMode = couchbaseutil.IndexStorageMOI
+
+	if indexStorageSetting != "" {
+		requested.StorageMode = couchbaseutil.IndexStorageMode(c.cluster.Spec.ClusterSettings.IndexStorageSetting)
+	}
 
 	// However, if specified, give the user full control.
 	apiSettings := c.cluster.Spec.ClusterSettings.Indexer

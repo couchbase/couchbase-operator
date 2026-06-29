@@ -1267,7 +1267,12 @@ func generateExposedService(member couchbaseutil.Member, cluster *couchbasev2.Co
 			service.Spec = *serviceTemplate.Spec
 		}
 	} else {
-		service.Spec.Type = cluster.Spec.Networking.ExposedFeatureServiceType
+		exposedFeatureServiceType := cluster.Spec.Networking.ExposedFeatureServiceType
+		service.Spec.Type = v1.ServiceTypeNodePort
+
+		if exposedFeatureServiceType != "" {
+			service.Spec.Type = exposedFeatureServiceType
+		}
 	}
 
 	// Apply deprecated fields, these have precedence for backwards compatibility,

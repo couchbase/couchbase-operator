@@ -108,7 +108,7 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbaseclusters-spec-cluster-dataservicememoryquota,dataServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-eventingservicememoryquota,eventingServiceMemoryQuota>>: 256Mi
     <<couchbaseclusters-spec-cluster-indexservicememoryquota,indexServiceMemoryQuota>>: 256Mi
-    <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: memory_optimized
+    <<couchbaseclusters-spec-cluster-indexstoragesetting,indexStorageSetting>>: ""
     <<couchbaseclusters-spec-cluster-indexer,indexer>>:
       <<couchbaseclusters-spec-cluster-indexer-deferbuild,deferBuild>>: false
       <<couchbaseclusters-spec-cluster-indexer-enablepagebloomfilter,enablePageBloomFilter>>: false
@@ -216,7 +216,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-spec-networking,networking>>:
     <<couchbaseclusters-spec-networking-addressfamily,addressFamily>>: ""
     <<couchbaseclusters-spec-networking-adminconsoleservicetemplate,adminConsoleServiceTemplate>>: {}
-    <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: NodePort
+    <<couchbaseclusters-spec-networking-adminconsoleservicetype,adminConsoleServiceType>>: ""
     <<couchbaseclusters-spec-networking-adminconsoleservices,adminConsoleServices>>:
     - ""
     <<couchbaseclusters-spec-networking-allowexternallyunreachablepods,allowExternallyUnreachablePods>>: false
@@ -225,7 +225,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-networking-cloudnativegateway-loglevel,logLevel>>: info
       <<couchbaseclusters-spec-networking-cloudnativegateway-preservereadyinstances,preserveReadyInstances>>: 0
       <<couchbaseclusters-spec-networking-cloudnativegateway-servicetemplate,serviceTemplate>>: {}
-      <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 75
+      <<couchbaseclusters-spec-networking-cloudnativegateway-terminationgraceperiodseconds,terminationGracePeriodSeconds>>: 0
       <<couchbaseclusters-spec-networking-cloudnativegateway-tls,tls>>:
         <<couchbaseclusters-spec-networking-cloudnativegateway-tls-serversecretname,serverSecretName>>: ""
     <<couchbaseclusters-spec-networking-disableuioverhttp,disableUIOverHTTP>>: false
@@ -234,7 +234,7 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-networking-dns-domain,domain>>: ""
     <<couchbaseclusters-spec-networking-exposeadminconsole,exposeAdminConsole>>: false
     <<couchbaseclusters-spec-networking-exposedfeatureservicetemplate,exposedFeatureServiceTemplate>>: {}
-    <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: NodePort
+    <<couchbaseclusters-spec-networking-exposedfeatureservicetype,exposedFeatureServiceType>>: ""
     <<couchbaseclusters-spec-networking-exposedfeaturetrafficpolicy,exposedFeatureTrafficPolicy>>: ""
     <<couchbaseclusters-spec-networking-exposedfeatures,exposedFeatures>>:
     - ""
@@ -1843,8 +1843,6 @@ https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#r
 
 *Type*: `string`
 
-*Default*: `memory_optimized`
-
 *Enumerations*: `memory_optimized, plasma`
 
 ==== Description
@@ -3332,8 +3330,6 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-
 
 *Type*: `string`
 
-*Default*: `NodePort`
-
 *Enumerations*: `NodePort, LoadBalancer`
 
 ==== Description
@@ -3462,8 +3458,6 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-
 
 *Type*: `integer`
 
-*Default*: `75`
-
 ==== Description
 
 *DEPRECATED* - field no longer has any effect.
@@ -3591,8 +3585,6 @@ https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#service-v1-
 ==== Constraints
 
 *Type*: `string`
-
-*Default*: `NodePort`
 
 *Enumerations*: `NodePort, LoadBalancer`
 
