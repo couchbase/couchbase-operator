@@ -680,6 +680,7 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRResizedOutSourceClusterNodes).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRResizedOutTargetClusterNodes).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRDeleteReplication).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRRemoveRemoteClusterFromSpec).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRDeleteSourceBucketReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRFilterExp).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRMismatchedConflictResolutionReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),

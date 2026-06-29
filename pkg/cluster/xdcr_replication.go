@@ -601,10 +601,12 @@ Next:
 	return clusters
 }
 
-// updateCreateDeleteXDCRReplications handles the creation, update and removal of replications.
-// This must be called after new remotes are added, and before old remotes are removed.
-// Note: requestedReplications are now generated internally via BuildDesiredReplicationStates().
-func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchbaseutil.ReplicationList) error {
+// deleteUnwantedReplications removes replications that exist on the server
+// but are no longer in the desired state. It must run before remote cluster
+// deletion. Couchbase Server refuses to delete a remote cluster while a replication
+// still references it, so leaving the deletes until after the cluster delete step
+// would deadlock the reconcile.
+func (c *Cluster) deleteUnwantedReplications(currentReplications couchbaseutil.ReplicationList) error {
 	// Build desired state from CRDs
 	desiredStates, err := c.BuildDesiredReplicationStates()
 	if err != nil {
@@ -617,10 +619,9 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 		return err
 	}
 
-	// Diff and reconcile - handle all operations (create/update/delete)
-	toCreate, toUpdate, toDelete := c.diffReplicationStates(desiredStates, currentStates)
+	// We only care about replications present on the server but absent from the desired state.
+	_, _, toDelete := c.diffReplicationStates(desiredStates, currentStates)
 
-	// Handle deletions first (replications must be deleted before their remote clusters)
 	for _, current := range toDelete {
 		c.log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", current.Key)
 
@@ -635,6 +636,31 @@ func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchba
 
 		c.raiseEvent(k8sutil.ReplicationRemovedEvent(c.cluster, current.Key))
 	}
+
+	return nil
+}
+
+// updateCreateDeleteXDCRReplications handles the creation and updation
+// of replications. It must be called after new remotes are added.
+// Replication deletions are handled separately by deleteUnwantedReplications,
+// which runs before remote clusters are removed.
+// Note: requestedReplications are now generated internally via BuildDesiredReplicationStates().
+func (c *Cluster) updateCreateDeleteXDCRReplications(currentReplications couchbaseutil.ReplicationList) error {
+	// Build desired state from CRDs
+	desiredStates, err := c.BuildDesiredReplicationStates()
+	if err != nil {
+		return err
+	}
+
+	// Fetch current state from server (including settings)
+	currentStates, err := c.FetchCurrentReplicationStates(currentReplications)
+	if err != nil {
+		return err
+	}
+
+	// Diff and reconcile - deletions are handled by deleteUnwantedReplications
+	// before remote clusters are removed, so here we only apply creates and updates.
+	toCreate, toUpdate, _ := c.diffReplicationStates(desiredStates, currentStates)
 
 	// Handle updates (settings changes only)
 	for _, update := range toUpdate {
@@ -1351,10 +1377,16 @@ func (c *Cluster) reconcileXDCR() error {
 		return err
 	}
 
-	// Delete stuff first to remove any non-managed remote-clusters that could conflict with managed ones
-	// Note: We'll handle ALL replication operations (create/update/delete) after clusters are ready
+	// Delete unwanted replications first.
+	// Couchbase Server refuses to delete a remote cluster while a
+	// replication still references it, so replication deletes must happen
+	// before remote cluster deletes.
+	if err := c.deleteUnwantedReplications(currentReplications); err != nil {
+		return err
+	}
 
-	// Delete any orphaned clusters
+	// Then delete orphaned remote clusters. Cluster deletes run before cluster creates so
+	// a stale non-managed cluster can't block a managed create that reuses its name.
 	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
 	for i := range deletes {
 		cluster := &deletes[i]
@@ -1415,6 +1447,17 @@ func (c *Cluster) reconcileXDCR() error {
 		if err := c.updateXDCRPersistentState(cluster); err != nil {
 			return err
 		}
+	}
+
+	// Before handling creates/updates, list the replications again.
+	// deleteUnwantedReplications and the remote cluster deletions above may
+	// have removed replications and their clusters, so the list captured at
+	// the start of the reconcile is now stale. Reusing it would make
+	// FetchCurrentReplicationStates look up a remote cluster that no longer
+	// exists and fail.
+	currentReplications, err = c.ListReplications()
+	if err != nil {
+		return err
 	}
 
 	// Replications depend on remotes existing, so handle them AFTER clusters are ready

@@ -146,6 +146,12 @@ func ReplicationRemovedEvent(c *couchbasev2.CouchbaseCluster, remoteClusterName,
 	return k8sutil.ReplicationRemovedEvent(c, name)
 }
 
+func RemoteClusterRemovedEvent(c *couchbasev2.CouchbaseCluster, remoteClusterName string) *v1.Event {
+	remoteClusterName = applyXDCRRemoteClusterName(remoteClusterName)
+
+	return k8sutil.RemoteClusterRemovedEvent(c, remoteClusterName)
+}
+
 func BucketEditedEvent(c *couchbasev2.CouchbaseCluster, bucket string) *v1.Event {
 	return k8sutil.BucketEditEvent(bucket, c)
 }

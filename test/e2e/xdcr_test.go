@@ -765,6 +765,9 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		// On a single node cluster the bucket created event is not folded into the
+		// create sequence, so we allow it here between cluster create and XDCR setup.
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationRemoved},
@@ -772,6 +775,67 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+	}
+
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
+}
+
+// TestXDCRRemoveRemoteClusterFromSpec verifies that removing a remote cluster from the
+// XDCR spec while a replication still references it does not deadlock the reconcile.
+func TestXDCRRemoveRemoteClusterFromSpec(t *testing.T) {
+	// Platform configuration.
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
+
+	// Static configuration.
+	clusterSize := 1
+	numOfDocs := framework.Global.DocsCount
+
+	// Create the clusters.
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	// Establish the XDCR connection and verify documents replicate.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Remove the remote cluster from the spec while the replication is still live.
+	// The operator must delete the replication first, then the orphaned remote cluster,
+	// rather than failing the remote cluster delete and looping forever.
+	e2eutil.MustRemoveXDCRRemoteCluster(t, kubernetes1, sourceCluster, targetCluster, time.Minute)
+
+	// The source cluster must reconcile cleanly and stay healthy (no deadlock).
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Both clusters created
+	// * Source cluster establishes XDCR (remote cluster added + replication added)
+	// * Replication removed first, then the now orphaned remote cluster removed
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		// On a single node cluster the bucket created event is not folded into the
+		// create sequence, so we allow it here between cluster create and XDCR setup.
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationRemoved},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterRemoved},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
