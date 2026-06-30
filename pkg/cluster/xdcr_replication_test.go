@@ -11,10 +11,12 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
 var replicationSpec = couchbasev2.CouchbaseReplicationSpec{
@@ -362,5 +364,101 @@ func TestXDCRNegGenerateMigrationMappings(t *testing.T) {
 		} else if !strings.Contains(err.Error(), test.errorExpected.Error()) {
 			t.Errorf("failed test case %d with unexpected error (%q): %q", index, test.errorExpected, err.Error())
 		}
+	}
+}
+
+// TestXDCRComputeSettingsPatchExplicitMappingRemoval checks that removing
+// the mapping from the CR actually clears it on the server. When the CR has no
+// mapping the desired state is"off" (false + empty rules). The patch should differ
+// from a server that still has old rules (so we send an update), but match a server
+// that already has no mapping (so we don't keep sending the same update every loop).
+func TestXDCRComputeSettingsPatchExplicitMappingRemoval(t *testing.T) {
+	t.Parallel()
+
+	boolPtr := func(b bool) *bool { return &b }
+	rules := func(m couchbaseutil.ColMappingRules) *couchbaseutil.ColMappingRules { return &m }
+	strPtr := func(s string) *string { return &s }
+
+	// Server >= 7.0.0 so scopes/collections (and therefore mapping) are supported.
+	c := Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{
+			Spec: couchbasev2.ClusterSpec{
+				Image: "couchbase:7.6.0",
+			},
+		},
+	}
+
+	// Desired state for a replication whose CR has no explicit mapping, asserts "off".
+	desiredOff := DesiredReplicationState{
+		Spec:                       &couchbasev2.CouchbaseReplicationSpec{},
+		CollectionsExplicitMapping: boolPtr(false),
+		ColMappingRules:            rules(couchbaseutil.ColMappingRules{}),
+	}
+
+	tests := []struct {
+		name         string
+		current      couchbaseutil.ReplicationSettings
+		desired      DesiredReplicationState
+		expectUpdate bool
+	}{
+		{
+			// mapping was configured, then removed from the CR.
+			name: "mapping removed, server still has stale rules",
+			current: couchbaseutil.ReplicationSettings{
+				CollectionsExplicitMapping: boolPtr(true),
+				ColMappingRules:            rules(couchbaseutil.ColMappingRules{"source-scope-1": strPtr("source-scope-2")}),
+			},
+			desired:      desiredOff,
+			expectUpdate: true,
+		},
+		{
+			// Replication that never had a mapping, server omits the fields.
+			// Must be a no-op.
+			name:         "never set, server omits mapping fields",
+			current:      couchbaseutil.ReplicationSettings{},
+			desired:      desiredOff,
+			expectUpdate: false,
+		},
+		{
+			// Steady state after a previous clear, server reports off + empty.
+			// Must be a no-op.
+			name: "steady off, server reports false and empty rules",
+			current: couchbaseutil.ReplicationSettings{
+				CollectionsExplicitMapping: boolPtr(false),
+				ColMappingRules:            rules(couchbaseutil.ColMappingRules{}),
+			},
+			desired:      desiredOff,
+			expectUpdate: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			current := test.current
+			patch := c.computeSettingsPatch(&test.desired, &current)
+
+			// This mirrors the decision made in diffReplicationStates, an update
+			// is issued only when the patch differs from the (normalized) current
+			// server state.
+			gotUpdate := !reflect.DeepEqual(patch, &current)
+			if gotUpdate != test.expectUpdate {
+				t.Fatalf("expectUpdate=%v, got=%v\npatch.CollectionsExplicitMapping=%v patch.ColMappingRules=%v",
+					test.expectUpdate, gotUpdate, patch.CollectionsExplicitMapping, patch.ColMappingRules)
+			}
+
+			// When an update is issued to clear mapping, the payload must actually
+			// carry the "off" assertion (non-nil) or omitempty would drop it and the
+			// server would never clear.
+			if test.expectUpdate {
+				if patch.CollectionsExplicitMapping == nil || *patch.CollectionsExplicitMapping {
+					t.Errorf("expected patch to assert collectionsExplicitMapping=false, got %v", patch.CollectionsExplicitMapping)
+				}
+				if patch.ColMappingRules == nil || len(*patch.ColMappingRules) != 0 {
+					t.Errorf("expected patch to assert an empty colMappingRules, got %v", patch.ColMappingRules)
+				}
+			}
+		})
 	}
 }

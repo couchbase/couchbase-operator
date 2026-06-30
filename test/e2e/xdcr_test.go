@@ -1307,6 +1307,103 @@ func TestXDCRReplicateLocalScopesAndCollectionsWithDeny(t *testing.T) {
 	ValidateEvents(t, kubernetes, targetCluster, expectedEvents2)
 }
 
+// TestXDCRRemoveExplicitMapping verifies that removing the
+// explicitMapping section from a CouchbaseReplication propagates to XDCR
+// API. A collection that is denied replication while the mapping is
+// in place must start replicating once the mapping is removed from the CR,
+// proving the old mapping rules are actually cleared on the server.
+func TestXDCRRemoveExplicitMapping(t *testing.T) {
+	kubernetes, cleanup := framework.Global.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.0").CouchbaseBucket().IstioDisabled()
+
+	// Static configuration.
+	numOfDocs := framework.Global.DocsCount
+	clusterSize := 1
+	scopeName := "scope1"
+	allowedCollectionName := "collection1"
+	deniedCollectionName := "collection2"
+
+	// Create two collections, one is denied replication to begin with.
+	allowedCollection := e2eutil.NewCollection(allowedCollectionName).MustCreate(t, kubernetes)
+	deniedCollection := e2eutil.NewCollection(deniedCollectionName).MustCreate(t, kubernetes)
+
+	// Create a scope holding both collections.
+	scope := e2eutil.NewScope(scopeName).WithCollections(allowedCollection, deniedCollection).MustCreate(t, kubernetes)
+
+	// Create the buckets & clusters.
+	bucket := mustCreateXDCRBucketsWithScopes(t, kubernetes, kubernetes, scope)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, targetCluster, bucket, time.Minute)
+
+	// Establish replication with explicit mapping,
+	// allow one collection, deny the other.
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+	replication.ExplicitMapping = couchbasev2.CouchbaseExplicitMappingSpec{
+		AllowRules: []couchbasev2.CouchbaseAllowReplicationMapping{
+			{
+				SourceKeyspace: couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(allowedCollectionName),
+				},
+				TargetKeyspace: couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(allowedCollectionName),
+				},
+			},
+		},
+		DenyRules: []couchbasev2.CouchbaseDenyReplicationMapping{
+			{
+				SourceKeyspace: couchbasev2.CouchbaseReplicationKeyspace{
+					Scope:      couchbasev2.ScopeOrCollectionNameIncludingDefault(scopeName),
+					Collection: couchbasev2.ScopeOrCollectionNameIncludingDefault(deniedCollectionName),
+				},
+			},
+		},
+	}
+
+	// Wait for the scope and collections to be created on both clusters.
+	expected := e2eutil.NewExpectedScopesAndCollections().WithIgnoreSystemScope().WithDefaultScopeAndCollection()
+	expected.WithScope(scopeName).WithCollections(allowedCollectionName, deniedCollectionName)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, sourceCluster, bucket, expected, time.Minute)
+	e2eutil.MustWaitForScopesAndCollections(t, kubernetes, targetCluster, bucket, expected, time.Minute)
+
+	// Set up replication and keep the created CR so we can patch it later.
+	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes, kubernetes, sourceCluster, targetCluster, replication)
+	replication = info.Replication
+
+	// Add docs to both collections on the source bucket.
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, allowedCollectionName).MustCreate(t, kubernetes, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).IntoScopeAndCollection(scopeName, deniedCollectionName).MustCreate(t, kubernetes, sourceCluster)
+
+	// The allowed collection replicates
+	// The denied collection stays empty on the target.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, allowedCollectionName, numOfDocs, 5*time.Minute)
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, deniedCollectionName, 0, time.Minute)
+
+	// Remove the explicitMapping from the CR.
+	e2eutil.MustPatchReplication(t, kubernetes, replication, jsonpatch.NewPatchSet().Remove("/spec/explicitMapping"), time.Minute)
+
+	// With the mapping cleared the replication reverts to replicating everything,
+	// so the previously denied collection now replicates across.
+	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, deniedCollectionName, numOfDocs, 5*time.Minute)
+
+	// Events: clusters created, remote cluster + replication added, then a
+	// settings edit when the mapping is removed.
+	expectedEvents := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+	}
+	ValidateEvents(t, kubernetes, sourceCluster, expectedEvents)
+}
+
 // TestXDCRReplicateLocalScopesAndCollectionsReuseSpec is much the same as ...WithDeny, but
 // reuses the replication mapping for 2 separate replications.
 func TestXDCRReplicateLocalScopesAndCollectionsReuseSpec(t *testing.T) {

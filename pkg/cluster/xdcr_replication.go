@@ -887,20 +887,37 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 			Key:                        key,
 		}
 
-		// Handle explicit mapping rules from CouchbaseReplication.ExplicitMapping
-		// Explicit mapping allows replicating specific collections to specific target collections,
-		// with allow rules (replicate A->B) and deny rules (don't replicate C)
-		if xdcrScopesAndCollectionsSupported && (len(replication.ExplicitMapping.AllowRules) > 0 || len(replication.ExplicitMapping.DenyRules) > 0) {
-			rules, err := generateExplicitMappingRules(replication)
-			if err != nil {
-				return fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), key)
+		// Explicit mapping lets us replicate specific collections to specific targets
+		// (allow rules) or skip them (deny rules).
+
+		// If the CR has rules, turn it on and set them. If it doesn't, we still have to
+		// say "off" with empty rules instead of leaving things nil. If we leave them nil
+		// and someone removes the mapping from the CR, we never tell the server to clear
+		// it, because nil means "don't touch" later in computeSettingsPatch.
+		if xdcrScopesAndCollectionsSupported {
+			var colRules *couchbaseutil.ColMappingRules
+
+			if len(replication.ExplicitMapping.AllowRules) > 0 || len(replication.ExplicitMapping.DenyRules) > 0 {
+				rules, err := generateExplicitMappingRules(replication)
+				if err != nil {
+					return fmt.Errorf("%w: invalid replication for %s", errors.NewStackTracedError(err), key)
+				}
+
+				if rules != "{}" {
+					colRules = convertColMappingRulesFromJSON(rules)
+				}
 			}
 
-			if rules != "{}" {
-				// Enable explicit mapping mode and set the mapping rules
-				explicitTrue := true
-				state.CollectionsExplicitMapping = &explicitTrue
-				state.ColMappingRules = convertColMappingRulesFromJSON(rules)
+			explicitEnabled := colRules != nil
+			state.CollectionsExplicitMapping = &explicitEnabled
+
+			if explicitEnabled {
+				state.ColMappingRules = colRules
+			} else {
+				// No rules in the CR, so send empty rules to clear anything
+				// left on the server.
+				emptyRules := couchbaseutil.ColMappingRules{}
+				state.ColMappingRules = &emptyRules
 			}
 		}
 
@@ -1105,6 +1122,22 @@ func (c *Cluster) computeSettingsPatch(desired *DesiredReplicationState, current
 		patch.HlvPruningWindowSec = c.useSpecIfSetInt32(spec.HlvPruningWindowSec, current.HlvPruningWindowSec)
 	}
 
+	// Apply the desired mapping intent onto the patch and normalize so "off" lines up
+	// with a server that has no mapping configured.
+	reconcileMappingFields(desired, current, &patch)
+
+	return &patch
+}
+
+// reconcileMappingFields copies the desired explicit mapping intent onto patch,
+// then normalizes the mapping fields so the diff behaves.
+//
+// When we want mapping off, the desired state says false + empty rules, but the server just
+// leaves these fields out when nothing is set. So DeepEqual would always see a difference and
+// keep sending the same update every loop, even when there's nothing to do. To avoid that, if
+// the server already has no mapping, treat it the same as our "off". If the server still has
+// real rules, leave it different so we actually clear them.
+func reconcileMappingFields(desired *DesiredReplicationState, current, patch *couchbaseutil.ReplicationSettings) {
 	// Only override mapping-related fields when desired state explicitly sets them.
 	// Otherwise, keep current value (already in patch from copying current).
 	if desired.ColMappingRules != nil {
@@ -1117,7 +1150,17 @@ func (c *Cluster) computeSettingsPatch(desired *DesiredReplicationState, current
 		patch.CollectionsMigrationMode = desired.CollectionsMigrationMode
 	}
 
-	return &patch
+	mappingOff := patch.ColMappingRules != nil && len(*patch.ColMappingRules) == 0
+	currentNoRules := current.ColMappingRules == nil || len(*current.ColMappingRules) == 0
+	if mappingOff && currentNoRules {
+		current.ColMappingRules = patch.ColMappingRules
+	}
+
+	explicitOff := patch.CollectionsExplicitMapping != nil && !*patch.CollectionsExplicitMapping
+	currentNotExplicit := current.CollectionsExplicitMapping == nil || !*current.CollectionsExplicitMapping
+	if explicitOff && currentNotExplicit {
+		current.CollectionsExplicitMapping = patch.CollectionsExplicitMapping
+	}
 }
 
 // ReplicationUpdate represents a replication that needs settings updated.
