@@ -14,6 +14,8 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,6 +32,9 @@ type tgzBackend struct {
 	writer *tar.Writer
 	// directory is an optional directory to write files to
 	directory string
+	// manifest is the rolling list of file hashes and they're being
+	// written to this backend
+	manifest bytes.Buffer
 }
 
 // NewTGZ returns a new initialized TGZ backend.
@@ -53,6 +58,11 @@ func (b *tgzBackend) WriteFile(path, data string) error {
 		return err
 	}
 
+	hasher := sha256.New()
+	hasher.Write([]byte(data))
+
+	fmt.Fprintf(&b.manifest, "%x %s\n", hasher.Sum(nil), path)
+
 	_, err := b.writer.Write([]byte(data))
 
 	return err
@@ -61,6 +71,9 @@ func (b *tgzBackend) WriteFile(path, data string) error {
 // Close closes TGZ resources, compresses the output and writes it
 // to a file.
 func (b *tgzBackend) Close() error {
+	if err := b.WriteMasterHash(); err != nil {
+		return fmt.Errorf("error writing checksum file to the archive: %w", err)
+	}
 	// Stop buffering new files
 	if err := b.writer.Close(); err != nil {
 		return err
@@ -96,5 +109,27 @@ func (b *tgzBackend) Close() error {
 	// Notify the user
 	fmt.Println("Wrote cluster information to", path)
 
+	return nil
+}
+
+func (b *tgzBackend) WriteMasterHash() error {
+	masterHasher := sha256.New()
+	masterHasher.Write(b.manifest.Bytes())
+	checksumStr := base64.StdEncoding.EncodeToString(masterHasher.Sum(nil))
+
+	checksumPath := util.ArchiveName() + "/checksum.txt"
+	header := &tar.Header{
+		Name: checksumPath,
+		Mode: 0o644,
+		Size: int64(len(checksumStr)),
+	}
+	if err := b.writer.WriteHeader(header); err != nil {
+		return err
+	}
+	if _, err := b.writer.Write([]byte(checksumStr)); err != nil {
+		return err
+	}
+
+	fmt.Println("Results Checksum:", checksumStr)
 	return nil
 }

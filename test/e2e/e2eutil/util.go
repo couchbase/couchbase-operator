@@ -1885,6 +1885,13 @@ func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
 	return exec.Command(path, args...).CombinedOutput()
 }
 
+func CbopinfoVerify(path string, cmdArgs []string) ([]byte, error) {
+	args := []string{"verify"}
+	args = append(args, cmdArgs...)
+
+	return exec.Command(path, args...).CombinedOutput()
+}
+
 func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool, logLevel int) {
 	// Create and move to the log directory.
 	if err := os.MkdirAll(logDir, 0o755); err != nil {

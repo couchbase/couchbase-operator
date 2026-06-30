@@ -272,6 +272,10 @@ func mustVerifyArchiveContents(t *testing.T, archive string, expected []string) 
 			continue
 		}
 
+		if strings.HasSuffix(a, "checksum.txt") {
+			continue
+		}
+
 		found := false
 
 		for _, e := range expected {
@@ -1177,6 +1181,29 @@ func TestLogCollect(t *testing.T) {
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
+	})
+
+	t.Run("TestLogCollectVerificationSubcommand", func(t *testing.T) {
+		cleanup := f.SetupSubTest(t)
+		defer cleanup()
+
+		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
+		defer cleanCbopinfo()
+
+		dir := filepath.Dir(archive)
+		baseName := filepath.Base(archive)
+		targetArchive := filepath.Join(dir, baseName)
+
+		verifyArgs := []string{"--file", targetArchive}
+		stdout, err := e2eutil.CbopinfoVerify(framework.Global.CbopinfoPath, verifyArgs)
+
+		if err != nil {
+			e2eutil.Die(t, fmt.Errorf("verify subcommand failed on a valid archive: %w: %s", err, string(stdout)))
+		}
+
+		if !strings.Contains(string(stdout), "Archive checksum is valid") {
+			e2eutil.Die(t, fmt.Errorf("verification succeeded but lacked the expected success terminal output string"))
+		}
 	})
 }
 

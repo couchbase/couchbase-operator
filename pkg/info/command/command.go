@@ -96,6 +96,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 	c.AddFlags(collect.Flags())
 
 	root.AddCommand(collect)
+	root.AddCommand(GenerateArchiveVerifyCommand())
 }
 
 func GenerateCommand() *cobra.Command {
@@ -156,9 +157,30 @@ func GenerateCommand() *cobra.Command {
 	}
 
 	root.AddCommand(version)
-
 	c.AddFlags(root.Flags())
 	c.ConfigFlags.AddFlags(root.Flags())
 
 	return root
+}
+
+func GenerateArchiveVerifyCommand() *cobra.Command {
+	var verifyFilePath string
+	verify := &cobra.Command{
+		Use:   "verify",
+		Short: "Verifies the integrity of the collected cbopinfo archive collected using cbopinfo or cao collect-logs",
+		Long:  "Verifies the integrity of the collected cbopinfo archive collected using cbopinfo or cao collect-logs",
+		Example: normalize(`
+                        # Using cao
+                        cao verify --file cbopinfo-20260630T150424+0530.tar.gz
+                `),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if verifyFilePath == "" {
+				return fmt.Errorf("missing required argument: --file")
+			}
+			return verifyArchive(verifyFilePath)
+		},
+	}
+	verify.Flags().StringVar(&verifyFilePath, "file", "", "Path to the target .tar.gz archive file")
+
+	return verify
 }
