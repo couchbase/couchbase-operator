@@ -641,7 +641,11 @@ func (c *CouchbaseCluster) IndexStorageMode() CouchbaseClusterIndexStorageSettin
 		return c.Spec.ClusterSettings.Indexer.StorageMode
 	}
 
-	return c.Spec.ClusterSettings.IndexStorageSetting
+	indexStorageSetting := CouchbaseClusterIndexStorageSettingMemoryOptimized
+	if c.Spec.ClusterSettings.IndexStorageSetting != "" {
+		indexStorageSetting = c.Spec.ClusterSettings.IndexStorageSetting
+	}
+	return indexStorageSetting
 }
 
 // GetDefaultBucketStorageBackend gets the default storage backend if it is set,
