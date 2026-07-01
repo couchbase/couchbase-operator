@@ -2754,7 +2754,15 @@ func (r *ReconcileMachine) swapRebalanceMembers(c *Cluster, members couchbaseuti
 	toCreate := make([]couchbasev2.ServerConfig, 0, len(members))
 
 	for _, candidate := range members {
-		c.log.Info("Swap-Rebalancing pod ", "cluster", c.namespacedName(), "name", candidate.Name(), "source-version", candidate.Version())
+		// The source version is only meaningful for version driven swaps (like upgrades)
+		// and is unpopulated for others where Version() falls back to "unknown".
+		// we only include it when we actually know it.
+		keysAndValues := []interface{}{"cluster", c.namespacedName(), "name", candidate.Name()}
+		if version := candidate.Version(); version != "" && version != "unknown" {
+			keysAndValues = append(keysAndValues, "source-version", version)
+		}
+
+		c.log.Info("Swap-Rebalancing pod", keysAndValues...)
 
 		// Remove the candidate from the scheduler.
 		if err := c.scheduler.Upgrade(candidate.Config(), candidate.Name()); err != nil {
