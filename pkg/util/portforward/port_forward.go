@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -54,13 +55,10 @@ func (pf *PortForwarder) ForwardPorts() error {
 		Name(pf.Pod).
 		SubResource("portforward")
 
-	// Setup the SPDY (HTTP/2.0) transport
-	transport, upgrader, err := spdy.RoundTripperFor(pf.Config)
+	dialer, err := pf.createPortForwardDialer(req)
 	if err != nil {
 		return err
 	}
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport, Timeout: 10 * time.Second}, "POST", req.URL())
 
 	// Finally do the actual work
 	pf.stopChan = make(chan struct{})
@@ -85,6 +83,33 @@ func (pf *PortForwarder) ForwardPorts() error {
 	case <-pf.readyChan:
 		return nil
 	}
+}
+
+// createPortForwardDialer creates a http stream dialer using websockets and falls back to SPDY if websocket support is not available.
+// Mostly copied from https://github.com/kubernetes/kubectl/blob/e1fe5406cffb25c0b563e53194fd12d02e5940eb/pkg/cmd/portforward/portforward.go#L139
+func (pf *PortForwarder) createPortForwardDialer(req *rest.Request) (httpstream.Dialer, error) {
+	wsDialer, err := portforward.NewSPDYOverWebsocketDialer(req.URL(), pf.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	// Setup the SPDY (HTTP/2.0) transport - secondary incase customer still runs <1.30 kube version
+	transport, upgrader, err := spdy.RoundTripperFor(pf.Config)
+	if err != nil {
+		return nil, err
+	}
+	spdyDialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport, Timeout: 10 * time.Second}, "POST", req.URL())
+
+	// Create a fallback dialer configuration which will use websockets by default
+	// and fallback to spdy incase websockets dialing isn't available
+	// Ideally we should never fallback since we're not supposed to support <1.30 clusters anyway
+	// but keeping in case customer has explicitly turned it off.
+	// Also it helps to be good people and try to be backwards compatible as much as possible.
+	dialer := portforward.NewFallbackDialer(wsDialer, spdyDialer, func(err error) bool {
+		return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+	})
+
+	return dialer, nil
 }
 
 // Close cleanly terminates a port forward.

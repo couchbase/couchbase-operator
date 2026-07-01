@@ -409,9 +409,15 @@ The key to select.
 
 *Type*: `string`
 
+*Default*: ``
+
 ==== Description
 
 Name of the referent.
+This field is effectively required, but due to backwards compatibility is
+allowed to be empty.
+Instances of this type with an empty value here are
+almost certainly wrong.
 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names.
 
 === couchbasebackups.spec.env.valueFrom.configMapKeyRef.optional
@@ -529,9 +535,15 @@ Must be a valid secret key.
 
 *Type*: `string`
 
+*Default*: ``
+
 ==== Description
 
 Name of the referent.
+This field is effectively required, but due to backwards compatibility is
+allowed to be empty.
+Instances of this type with an empty value here are
+almost certainly wrong.
 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names.
 
 === couchbasebackups.spec.env.valueFrom.secretKeyRef.optional

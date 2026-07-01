@@ -341,8 +341,12 @@ func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Co
 	}
 
 	// Register Cluster controller to handle cluster reconciliation
-	src := source.Kind(mgr.GetCache(), &couchbasev2.CouchbaseCluster{})
-	if err := c.Watch(src, &handler.EnqueueRequestForObject{}); err != nil {
+	src := source.Kind(
+		mgr.GetCache(),
+		&couchbasev2.CouchbaseCluster{},
+		&handler.TypedEnqueueRequestForObject[*couchbasev2.CouchbaseCluster]{},
+	)
+	if err := c.Watch(src); err != nil {
 		return err
 	}
 
@@ -358,7 +362,11 @@ func AddToManager(mgr manager.Manager, concurrency int, clusterConfig cluster.Co
 		return err
 	}
 
-	ekSrc := source.Kind(mgr.GetCache(), &couchbasev2.CouchbaseEncryptionKey{})
+	ekSrc := source.Kind(
+		mgr.GetCache(),
+		&couchbasev2.CouchbaseEncryptionKey{},
+		&handler.TypedEnqueueRequestForObject[*couchbasev2.CouchbaseEncryptionKey]{},
+	)
 
-	return ekController.Watch(ekSrc, &handler.EnqueueRequestForObject{})
+	return ekController.Watch(ekSrc)
 }

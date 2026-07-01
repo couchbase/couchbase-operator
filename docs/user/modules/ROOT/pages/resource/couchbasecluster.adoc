@@ -339,6 +339,9 @@ The following is an example resource, depicting the overall structure and any de
       - ""
       <<couchbaseclusters-spec-security-passwordpolicy-requirepasswordresetonpolicychange,requirePasswordResetOnPolicyChange>>: false
     <<couchbaseclusters-spec-security-podsecuritycontext,podSecurityContext>>:
+      <<couchbaseclusters-spec-security-podsecuritycontext-apparmorprofile,appArmorProfile>>:
+        <<couchbaseclusters-spec-security-podsecuritycontext-apparmorprofile-localhostprofile,localhostProfile>>: ""
+        <<couchbaseclusters-spec-security-podsecuritycontext-apparmorprofile-type,type>>: ""
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroup,fsGroup>>: 0
       <<couchbaseclusters-spec-security-podsecuritycontext-fsgroupchangepolicy,fsGroupChangePolicy>>: ""
       <<couchbaseclusters-spec-security-podsecuritycontext-runasgroup,runAsGroup>>: 0
@@ -367,6 +370,9 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-security-rbac-selector,selector>>: {}
     <<couchbaseclusters-spec-security-securitycontext,securityContext>>:
       <<couchbaseclusters-spec-security-securitycontext-allowprivilegeescalation,allowPrivilegeEscalation>>: false
+      <<couchbaseclusters-spec-security-securitycontext-apparmorprofile,appArmorProfile>>:
+        <<couchbaseclusters-spec-security-securitycontext-apparmorprofile-localhostprofile,localhostProfile>>: ""
+        <<couchbaseclusters-spec-security-securitycontext-apparmorprofile-type,type>>: ""
       <<couchbaseclusters-spec-security-securitycontext-capabilities,capabilities>>:
         <<couchbaseclusters-spec-security-securitycontext-capabilities-add,add>>:
         - ""
@@ -771,9 +777,15 @@ repositories and non-dockerhub ones.
 
 *Type*: `string`
 
+*Default*: ``
+
 ==== Description
 
 Name of the referent.
+This field is effectively required, but due to backwards compatibility is
+allowed to be empty.
+Instances of this type with an empty value here are
+almost certainly wrong.
 More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names.
 
 === couchbaseclusters.spec.backup.labels
@@ -4990,6 +5002,46 @@ in official container images.
 More info:
 https://kubernetes.io/docs/tasks/configure-pod-container/security-context/.
 
+=== couchbaseclusters.spec.security.podSecurityContext.appArmorProfile
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+appArmorProfile is the AppArmor options to use by the containers in this pod.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.podSecurityContext.appArmorProfile.localhostProfile
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+localhostProfile indicates a profile loaded on the node that should be used.
+The profile must be preconfigured on the node to work.
+Must match the loaded name of the profile.
+Must be set if and only if type is "Localhost".
+
+=== couchbaseclusters.spec.security.podSecurityContext.appArmorProfile.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+type indicates which kind of AppArmor profile will be applied.
+Valid options are:
+  Localhost - a profile pre-loaded on the node.
+RuntimeDefault - the container runtime's default profile.
+Unconfined - no AppArmor enforcement.
+
 === couchbaseclusters.spec.security.podSecurityContext.fsGroup
 
 ==== Constraints
@@ -5354,6 +5406,48 @@ AllowPrivilegeEscalation is true always when the container is:
 1) run as Privileged
 2) has CAP_SYS_ADMIN
 Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.appArmorProfile
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+appArmorProfile is the AppArmor options to use by this container.
+If set, this profile
+overrides the pod's appArmorProfile.
+Note that this field cannot be set when spec.os.name is windows.
+
+=== couchbaseclusters.spec.security.securityContext.appArmorProfile.localhostProfile
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+localhostProfile indicates a profile loaded on the node that should be used.
+The profile must be preconfigured on the node to work.
+Must match the loaded name of the profile.
+Must be set if and only if type is "Localhost".
+
+=== couchbaseclusters.spec.security.securityContext.appArmorProfile.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+type indicates which kind of AppArmor profile will be applied.
+Valid options are:
+  Localhost - a profile pre-loaded on the node.
+RuntimeDefault - the container runtime's default profile.
+Unconfined - no AppArmor enforcement.
 
 === couchbaseclusters.spec.security.securityContext.capabilities
 

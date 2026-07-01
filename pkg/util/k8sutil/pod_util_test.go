@@ -289,14 +289,14 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "equal specs, different format for resource fields",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1Gi")},
 					Limits:   map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2Gi")},
 				},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1024Mi")},
 					Limits:   map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2048Mi")},
 				},
@@ -307,14 +307,14 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "equal specs, different parsing methods",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					// 1024 * 1024 * 1024 = 1Gi
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: *resource.NewQuantity(1024*1024*1024, resource.BinarySI)},
 				},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					// 1Gi in decimal SI = "1073741824m"
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: *resource.NewQuantity(1073741824, resource.DecimalSI)},
 				},
@@ -325,13 +325,13 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "different specs for resource requests",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("1Gi")},
 				},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("5Gi")},
 				},
 			},
@@ -341,13 +341,13 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "different specs for resource limits",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Limits: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2Gi")},
 				},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Limits: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("10Gi")},
 				},
 			},
@@ -358,7 +358,7 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("100Mi")},
 				},
 				StorageClassName: strPtr("static-local-path"),
@@ -370,7 +370,7 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("2.8Ti")},
 				},
 				StorageClassName: strPtr("static-local-path"),
@@ -381,11 +381,11 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "equal specs, empty resources",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources:   v1.ResourceRequirements{},
+				Resources:   v1.VolumeResourceRequirements{},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources:   v1.ResourceRequirements{},
+				Resources:   v1.VolumeResourceRequirements{},
 			},
 			expected: false,
 		},
@@ -393,11 +393,11 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			name: "equal specs, different access mode",
 			existingSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources:   v1.ResourceRequirements{},
+				Resources:   v1.VolumeResourceRequirements{},
 			},
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany},
-				Resources:   v1.ResourceRequirements{},
+				Resources:   v1.VolumeResourceRequirements{},
 			},
 			expected: true,
 		},
@@ -406,7 +406,7 @@ func TestCheckIfPVCRequiresUpdate(t *testing.T) {
 			existingSpec: pvcClaimFromJSON(`{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"3078632557772800m"}},"storageClassName":"static-local-path"}`, t),
 			requiredSpec: v1.PersistentVolumeClaimSpec{
 				AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
-				Resources: v1.ResourceRequirements{
+				Resources: v1.VolumeResourceRequirements{
 					Requests: map[v1.ResourceName]resource.Quantity{v1.ResourceStorage: resource.MustParse("3078632557772800m")},
 				},
 				StorageClassName: strPtr("dynamic-local-path"),

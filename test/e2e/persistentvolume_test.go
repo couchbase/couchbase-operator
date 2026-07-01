@@ -47,7 +47,7 @@ func createPersistentVolumeClaimSpec(storageClass string, pvcName string, lpv bo
 			Name: pvcName,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					"storage": *resourceQuantity,
 				},

@@ -1651,7 +1651,7 @@ func (c *Cluster) generateBackupPVC(backup *couchbasev2.CouchbaseBackup) *corev1
 			Labels: k8sutil.LabelsForCluster(c.cluster),
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			Resources: corev1.ResourceRequirements{
+			Resources: corev1.VolumeResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: *backup.Spec.Size,
 				},
@@ -1973,7 +1973,7 @@ func generateEphemeralBackupVolume(volumeName string, storageClass *string, size
 							corev1.ReadWriteOnce,
 						},
 						StorageClassName: storageClass,
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
 								"storage": *size,
 							},
