@@ -5340,7 +5340,6 @@ const (
 	ClusterConditionMigrating                  ClusterConditionType = "Migrating"
 	ClusterConditionRebalancing                ClusterConditionType = "Rebalancing"
 	ClusterConditionExpandingVolume            ClusterConditionType = "ExpandingVolume"
-	ClusterLastUpdateTime                      ClusterConditionType = "LastUpdateTime"
 	ClusterConditionBucketMigration            ClusterConditionType = "BucketMigrating"
 	ClusterConditionBucketEvictionMigration    ClusterConditionType = "BucketEvictionMigrating"
 	ClusterUnreconcilable                      ClusterConditionType = "Unreconcilable"
