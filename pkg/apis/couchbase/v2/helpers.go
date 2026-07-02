@@ -853,11 +853,6 @@ func (cs *ClusterStatus) SetReadyCondition() {
 	cs.setClusterCondition(c)
 }
 
-func (cs *ClusterStatus) SetConfigRejectedCondition(message string) {
-	c := newClusterCondition(ClusterConditionManageConfig, v1.ConditionFalse, "ConfigRejected", message)
-	cs.setClusterCondition(c)
-}
-
 func (cs *ClusterStatus) SetUpgradingCondition(status *UpgradeStatus) {
 	c := newClusterCondition(ClusterConditionUpgrading, v1.ConditionTrue, "Upgrading", status.Format())
 	cs.setClusterCondition(c)
@@ -2077,6 +2072,7 @@ func (c *CouchbaseCluster) ShouldRevertCandidateToSwapRebalance(candidate couchb
 }
 
 // +kubebuilder:object:generate=false
+// +k8s:deepcopy-gen=false
 type ObjectSelectorAsSelector struct {
 	LabelSelector labels.Selector
 	nameMatchers  []*regexp.Regexp

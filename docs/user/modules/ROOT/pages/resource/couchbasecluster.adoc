@@ -7537,7 +7537,7 @@ Can be one of True, False, Unknown.
 
 *Type*: `string`
 
-*Enumerations*: `Available, Balanced, ManageConfig, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, BucketEvictionMigrating, Unreconcilable, WaitingBetweenUpgrades, MixedMode, ManualInterventionRequired, ServicesMismatch`
+*Enumerations*: `Available, Balanced, Scaling, ScalingUp, ScalingDown, Upgrading, Hibernating, Error, AutoscaleReady, Synchronized, WaitingBetweenMigrations, Migrating, Rebalancing, ExpandingVolume, BucketMigrating, BucketEvictionMigrating, Unreconcilable, WaitingBetweenUpgrades, MixedMode, ManualInterventionRequired, ServicesMismatch`
 
 ==== Description
 

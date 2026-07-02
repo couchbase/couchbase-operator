@@ -13,7 +13,6 @@ package cluster
 import (
 	"context"
 	goerrors "errors"
-	"fmt"
 	"reflect"
 	"sort"
 	"strconv"
@@ -491,8 +490,6 @@ func (c *Cluster) reconcileClusterSettings() error {
 		return err
 	}
 
-	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionManageConfig)
-
 	return nil
 }
 
@@ -581,8 +578,6 @@ func (c *Cluster) reconcileAutoFailoverSettings() error {
 	if !reflect.DeepEqual(failoverSettings, specFailoverSettings) {
 		if err := couchbaseutil.SetAutoFailoverSettings(specFailoverSettings).On(c.api, c.readyMembers()); err != nil {
 			c.log.Error(err, "Auto-failover settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Failed to update autofailover settings: `%v`", err)
-			c.cluster.Status.SetConfigRejectedCondition(message)
 
 			return err
 		}
@@ -621,8 +616,6 @@ func (c *Cluster) reconcileMemoryQuotaSettings() error {
 	if !reflect.DeepEqual(current, requested) {
 		if err := couchbaseutil.SetPoolsDefault(requested).On(c.api, c.readyMembers()); err != nil {
 			c.log.Error(err, "Cluster settings update failed", "cluster", c.namespacedName())
-			message := fmt.Sprintf("Unable update memory quota's [data:%v, index:%v, search:%v]: `%s`", config.DataServiceMemQuota, config.IndexServiceMemQuota, config.SearchServiceMemQuota, err.Error())
-			c.cluster.Status.SetConfigRejectedCondition(message)
 
 			return err
 		}
@@ -655,8 +648,6 @@ func (c *Cluster) reconcileSoftwareUpdateNotificationSettings() error {
 
 	if err := couchbaseutil.SetSettingsStats(&requested).On(c.api, c.readyMembers()); err != nil {
 		c.log.Error(err, "Software notification settings update failed", "cluster", c.namespacedName())
-		message := fmt.Sprintf("Unable update software notification settings: `%v`", err)
-		c.cluster.Status.SetConfigRejectedCondition(message)
 
 		return err
 	}
@@ -941,7 +932,6 @@ func (c *Cluster) reconcileIndexSettings() error {
 
 	if err := couchbaseutil.SetIndexSettings(&requested).On(c.api, c.readyMembers()); err != nil {
 		c.log.Error(err, "Index storage settings update failed", "cluster", c.namespacedName())
-		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable set index settings: %v", err.Error()))
 
 		return err
 	}
@@ -1208,7 +1198,6 @@ func (c *Cluster) reconcileAuditSettings() error {
 
 	if err := couchbaseutil.SetAuditSettings(requested).On(c.api, c.readyMembers()); err != nil {
 		c.log.Error(err, "Audit settings update failed", "cluster", c.namespacedName(), "old", current, "new", requested)
-		c.cluster.Status.SetConfigRejectedCondition(fmt.Sprintf("Unable to set audit settings: %v", err.Error()))
 
 		return err
 	}
