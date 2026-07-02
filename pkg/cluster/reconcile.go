@@ -255,7 +255,7 @@ func (c *Cluster) reconcile() error {
 		(*Cluster).reconcileXDCRGlobalSettings,
 		(*Cluster).reconcileXDCR,
 		(*Cluster).reconcilePDB,
-		(*Cluster).reconcileAdminService,
+		(*Cluster).reconcileAdminServiceFinalize,
 		(*Cluster).reconcilePodServices,
 		(*Cluster).reconcileUnmanagedBucketsBackends,
 		(*Cluster).reconcilePasswordPolicy,
@@ -358,6 +358,15 @@ func (c *Cluster) reconcileMembers(rm *ReconcileMachine) (bool, error) {
 // reconcileAdminService changes to selected pod labels for
 // the nodePort service exposing admin console.
 func (c *Cluster) reconcileAdminService() error {
+	return c.reconcileAdminServiceWithFinalize(false)
+}
+
+// reconcileAdminServiceFinalize prunes outdated address families after network migration.
+func (c *Cluster) reconcileAdminServiceFinalize() error {
+	return c.reconcileAdminServiceWithFinalize(true)
+}
+
+func (c *Cluster) reconcileAdminServiceWithFinalize(finalize bool) error {
 	serviceName := k8sutil.ConsoleServiceName(c.cluster.Name)
 
 	_, ok := c.k8s.Services.Get(serviceName)
@@ -369,23 +378,19 @@ func (c *Cluster) reconcileAdminService() error {
 		}
 
 		c.log.Info("UI service deleted", "cluster", c.namespacedName(), "name", serviceName)
-
 		c.raiseEvent(k8sutil.AdminConsoleSvcDeleteEvent(serviceName, c.cluster))
-
 		return nil
 	}
 
 	if c.cluster.Spec.Networking.ExposeAdminConsole {
-		if err := k8sutil.ReconcileAdminConsole(c.k8s, c.cluster); err != nil {
+		if err := k8sutil.ReconcileAdminConsole(c.k8s, c.cluster, finalize); err != nil {
 			return err
 		}
 
 		// Service didn't exist, notify that it now does!
 		if !ok {
 			c.log.Info("UI service created", "cluster", c.namespacedName(), "name", serviceName)
-
 			c.raiseEvent(k8sutil.AdminConsoleSvcCreateEvent(serviceName, c.cluster))
-
 			return nil
 		}
 	}
@@ -403,7 +408,7 @@ func (c *Cluster) reconcilePodServices() error {
 		for _, member := range c.members {
 			_, ok := c.k8s.Services.Get(member.Name())
 
-			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member); err != nil {
+			if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, member, true); err != nil {
 				if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
 					c.log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
 					continue
@@ -446,7 +451,7 @@ func (c *Cluster) reconcileCloudNativeGatewayService() error {
 		return nil
 	}
 
-	return k8sutil.ReconcileCloudNativeGatewayService(c.k8s, c.cluster)
+	return k8sutil.ReconcileCloudNativeGatewayService(c.k8s, c.cluster, true)
 }
 
 func (c *Cluster) reconcileClusterSettings() error {

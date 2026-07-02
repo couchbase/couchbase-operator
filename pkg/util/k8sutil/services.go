@@ -615,44 +615,30 @@ func ReconcilePeerServices(c *client.Client, cluster *couchbasev2.CouchbaseClust
 		return err
 	}
 
-	current, _ := c.Services.Get(requested.Name)
-	if ipFamiliesRestricted(current, requested) {
-		families := append([]v1.IPFamily(nil), current.Spec.IPFamilies...)
-		for _, reqFamily := range requested.Spec.IPFamilies {
-			found := false
-			for _, f := range families {
-				if f == reqFamily {
-					found = true
-					break
-				}
-			}
-			if !found {
-				families = append(families, reqFamily)
-			}
-		}
-		requested.Spec.IPFamilies = families
-		requested.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
-	}
-
-	if err := reconcileService(c, cluster, requested); err != nil {
+	if err := reconcileService(c, cluster, requested, false); err != nil {
 		return err
 	}
 
 	requested = generateDiscoveryService(cluster)
 
-	return reconcileService(c, cluster, requested)
+	return reconcileService(c, cluster, requested, false)
 }
 
 // ReconcilePeerServicesFinalize applies the final desired IP family policy to the
 // peer service. This must be called after reconcileClusterNetworking so that CBS
 // nodes have already been migrated off any address family being removed.
 func ReconcilePeerServicesFinalize(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
-	requested, err := generatePeerService(cluster)
+	requestedPeerService, err := generatePeerService(cluster)
 	if err != nil {
 		return err
 	}
 
-	return reconcileService(c, cluster, requested)
+	if err := reconcileService(c, cluster, requestedPeerService, true); err != nil {
+		return err
+	}
+
+	requestedDiscoveryService := generateDiscoveryService(cluster)
+	return reconcileService(c, cluster, requestedDiscoveryService, true)
 }
 
 // adminConsoleSelector generates a selector matching pods running all the requested services.
@@ -746,10 +732,10 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 // ReconcileAdminConsole looks for the cluster's admin console service, creates it if not
 // present but requested, deletes it if present but unrequested and performs udpdates
 // to the configurable service parameters.
-func ReconcileAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+func ReconcileAdminConsole(c *client.Client, cluster *couchbasev2.CouchbaseCluster, finalize bool) error {
 	requested := generateConsoleService(cluster)
 
-	return reconcileService(c, cluster, requested)
+	return reconcileService(c, cluster, requested, finalize)
 }
 
 // depthFirstPrune takes a current object and recursively removes any scalars
@@ -872,22 +858,45 @@ func generateCloudNativeGatewayService(cluster *couchbasev2.CouchbaseCluster) *v
 
 // ReconcileCloudNativeGatewayService creates/updates k8s services for exposing the data and service discovery services
 // on the gRPC based Cloud Native Gateway proxying to the couchbase cluster.
-func ReconcileCloudNativeGatewayService(c *client.Client, cluster *couchbasev2.CouchbaseCluster) error {
+func ReconcileCloudNativeGatewayService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, finalize bool) error {
 	requested := generateCloudNativeGatewayService(cluster)
 
-	return reconcileService(c, cluster, requested)
+	return reconcileService(c, cluster, requested, finalize)
 }
 
 // reconcileService creates or updates a service.
-func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, requested *v1.Service) error {
+//
+//nolint:gocognit
+func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, requested *v1.Service, finalize bool) error {
+	// Check to see if the service exists.
+	current, ok := c.Services.Get(requested.Name)
+
+	// If the service already exists and we are not ready to finalize, prevent the IP family config
+	// from becoming more restrictive until cluster network reconciliation finishes.
+	if ok && !finalize && ipFamiliesRestricted(current, requested) {
+		families := append([]v1.IPFamily(nil), current.Spec.IPFamilies...)
+		for _, reqFamily := range requested.Spec.IPFamilies {
+			found := false
+			for _, f := range families {
+				if f == reqFamily {
+					found = true
+					break
+				}
+			}
+			if !found {
+				families = append(families, reqFamily)
+			}
+		}
+		requested.Spec.IPFamilies = families
+		requested.Spec.IPFamilyPolicy = &[]v1.IPFamilyPolicy{v1.IPFamilyPolicyPreferDualStack}[0]
+	}
+
 	requestedJSON, err := json.Marshal(requested)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	// Check to see if the console service exists.
-	// If it doesn't and its being managed, then create it.
-	current, ok := c.Services.Get(requested.Name)
+	// If the service doesn't exist and its being managed, then create it.
 	if !ok {
 		log.V(2).Info("Creating service", "cluster", cluster.NamespacedName(), "name", requested.Name, "requested", string(requestedJSON))
 
@@ -951,9 +960,9 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 	// First pass merges the requested specification on top of the current
 	// specification, this will add new struct and map fields, and update
 	// any ones that have been modified either by the specification or an
-	// external third party.  Third party modification to unamanged attributes
+	// external third party. Third party modification to unmanaged attributes
 	// are preserved by this operation. Lists (i.e. the ports) cannot be merged
-	// as they preserve ordering, and are just copied over verbatim.  This will
+	// as they preserve ordering, and are just copied over verbatim. This will
 	// be handled specially later, it does however delete any ports that are
 	// undefined by the required resource.
 	merged := current.DeepCopy()
@@ -961,13 +970,13 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 		return errors.NewStackTracedError(err)
 	}
 
-	// Mergo dosn't like the meta/v1.Time type, it overwrites with null even though
+	// Mergo doesn't like the meta/v1.Time type, it overwrites with null even though
 	// it's a zero value.
 	merged.CreationTimestamp = current.CreationTimestamp
 
 	// Second pass prunes values that were managed, but are now not defined.
 	// To do this we use the original resource annotation to identify things
-	// that were managed but are now not when compared to the requesed resource.
+	// that were managed but are now not when compared to the requested resource.
 	mergedJSON, err := json.Marshal(merged)
 	if err != nil {
 		return errors.NewStackTracedError(err)
@@ -987,7 +996,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 
 	// Third pass should be unnecessary, but too many people insist on using
 	// node port addressing, so preserve port numbers, lest people's clients
-	// stop working.  To be frank, I consider this their own fault for not
+	// stop working. To be frank, I consider this their own fault for not
 	// using stable and highly-available network addressing in the first place.
 	for i, port := range pruned.Spec.Ports {
 		for _, old := range current.Spec.Ports {
@@ -1017,7 +1026,7 @@ func reconcileService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, r
 		return err
 	}
 
-	// Deep equal isn't 100% accurate, and defines an nil list and
+	// Deep equal isn't 100% accurate, and defines a nil list and
 	// an empty list as different.
 	if d == "" {
 		return nil
@@ -1328,13 +1337,13 @@ func servicesToN2NPorts(services couchbasev2.ServiceList) []v1.ServicePort {
 	return ports
 }
 
-func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member) error {
+func ReconcilePodService(c *client.Client, cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Member, finalize bool) error {
 	requested, err := generateExposedService(member, cluster)
 	if err != nil {
 		return err
 	}
 
-	return reconcileService(c, cluster, requested)
+	return reconcileService(c, cluster, requested, finalize)
 }
 
 // GetAlternateAddressExternalPorts polls the pod service for any alternate ports

@@ -1602,3 +1602,64 @@ func TestPodUpgradesWaitForDNSAvailableBeforeEjection(t *testing.T) {
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
+
+// TestNetworkAddressFamilyRestrictiveMigrationStrict ensures that moving from a dual-stack/priority
+// configuration to a restrictive single-stack configuration while Strict node-to-node encryption
+// is active does not cause lookup failures or break the service reconciliation workflow.
+func TestNetworkAddressFamilyRestrictiveMigrationStrict(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	clusterSize := 1
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.0.2")
+
+	// Set up dual-stack priority baseline and target restrictive single-stack family
+	aFamilyBaseline := couchbasev2.IPv4Priority
+	aFamilyRestrictive := couchbasev2.IPv4Only
+	aFamilyListener := couchbaseutil.AddressFamilyIPV4
+	if kubernetes.IPv6 {
+		aFamilyBaseline = couchbasev2.IPv6Priority
+		aFamilyRestrictive = couchbasev2.IPv6Only
+		aFamilyListener = couchbaseutil.AddressFamilyIPV6
+	}
+
+	nodeToNode := couchbasev2.NodeToNodeStrict
+
+	// Create the cluster with TLS and Strict N2N encryption enabled under the dual-stack priority baseline
+	cluster, ctx := MustInitClusterWithTLSAndNodeToNode(t, kubernetes, clusterSize, &nodeToNode)
+
+	// Verify initial dual-stack exposure and encryption listener settings
+	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamilyBaseline, ctx, time.Minute)
+	e2eutil.MustHaveListenerSettingsTLS(t, kubernetes, cluster, ctx, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyListener,
+			NodeEncryption: couchbaseutil.On,
+		},
+	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
+
+	// Patch the address family to the restrictive single-stack setting.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/networking/addressFamily", aFamilyRestrictive), time.Minute)
+
+	// Verify that the cluster completes the transition successfully without timing out or lookups failing
+	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamilyRestrictive, ctx, 5*time.Minute)
+	e2eutil.MustHaveListenerSettingsTLS(t, kubernetes, cluster, ctx, []*couchbaseutil.ListenerConfiguration{
+		{
+			AddressFamily:  aFamilyListener,
+			NodeEncryption: couchbaseutil.On,
+		},
+	}, time.Minute)
+	e2eutil.MustWaitForClusterPodsReady(t, kubernetes, cluster, 2*time.Minute)
+
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, nodeToNode, kubernetes.IPv6),
+		e2eutil.DisableN2NEncryptionSequence(&nodeToNode),
+		eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified},
+		e2eutil.EnableN2NEncryptionSequence(&nodeToNode),
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

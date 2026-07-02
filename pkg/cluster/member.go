@@ -460,7 +460,7 @@ func (c *Cluster) addMigrationMember(memberResult *couchbaseutil.PodCreationResu
 	// so that it can be accessed by the outside world. It also needs a longer retry period
 	// to wait for DNS propagation to the source cluster.
 	if c.cluster.IsExternalMigrationCluster() && c.cluster.Spec.HasExposedFeatures() {
-		if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member); err != nil {
+		if err := k8sutil.ReconcilePodService(c.k8s, c.cluster, memberResult.Member, false); err != nil {
 			if goerrors.Is(err, errors.ErrResourceAttributeRequired) {
 				c.log.Info("Unable to generate service for pod", "cluster", c.namespacedName(), "error", err)
 				return nil

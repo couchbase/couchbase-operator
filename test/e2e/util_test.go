@@ -404,6 +404,7 @@ func registerTests() {
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeAll).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeEnabledControlPlaneOnly).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeEnabledAll).WithTags(TagFeatureNetwork, TagFeatureTLS),
+		framework.NewTestDef(TestNetworkAddressFamilyRestrictiveMigrationStrict).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeEnabledStrict).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeDisabledControlPlaneOnly).WithTags(TagFeatureNetwork, TagFeatureTLS),
 		framework.NewTestDef(TestNetworkAddressFamilyAndNodeToNodeDisabledStrict).WithTags(TagFeatureNetwork, TagFeatureTLS),
