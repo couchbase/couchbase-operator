@@ -25,7 +25,7 @@ pipeline {
   }
 
   parameters {
-    string(name: 'refspec', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree')
+    string(name: 'GERRIT_REFSPEC', defaultValue: 'refs/heads/master', description: 'Gerrit ref spec of your source tree (auto filled for comment triggered builds)')
     string(name: 'server_image', defaultValue: 'couchbase/server:8.0.0', , description: 'Version of Couchbase to test')
     string(name: 'server_image_version', defaultValue: '', , description: 'Override the version of Couchbase to test')
     string(name: 'server_image_upgrade', defaultValue: 'couchbase/server:7.6.11', description: 'Version of Couchbase to upgrade from')
@@ -46,6 +46,23 @@ pipeline {
     booleanParam(name: 'platform', defaultValue: false, description: 'Run the platform test suite')
     string(name: 'features', defaultValue: '', description: 'Much like a suite, these feature sets allow functional area testing e.g. "backup"')
     string(name: 'tests', defaultValue: '', description: 'Any custom tests to run, this is a space delimited list of tests names e.g. "TestCreateCluster TestCreateBucketCluster"')
+  }
+
+  triggers {
+    // Lets you start this pipeline straight from a Gerrit review, just by leaving a
+    // comment. Comment "CI tls cng p0" and it runs the tls and cng tests plus the p0
+    // suite on your change. Any comment that starts with "CI" (case-insensitive) kicks
+    // off a build. The words after "CI" are read in the 'Resolve Suites' stage below, and
+    // your patchset is checked out automatically via the GERRIT_REFSPEC parameter.
+    gerrit(
+      serverName: 'review.couchbase.org',
+      gerritProjects: [[
+        compareType: 'PLAIN',
+        pattern: 'couchbase-operator',
+        branches: [[compareType: 'ANT', pattern: '**']],
+      ]],
+      triggerOnEvents: [commentAddedContains(commentAddedCommentContains: '(?im)^\\s*CI\\s+\\S+')],
+    )
   }
 
   environment {
@@ -69,7 +86,35 @@ pipeline {
       steps {
         // The build name must be unique, or the JUnit trend will crap out.
         buildName "#${BUILD_NUMBER} ${sh(script: 'git log --oneline --format=%B HEAD | head -n 1', returnStdout: true)}"
-        buildDescription "Patchset: ${params.refspec.split('/').last()}"
+        buildDescription "Patchset: ${params.GERRIT_REFSPEC.split('/').last()}"
+      }
+    }
+
+    stage('Resolve Suites') {
+      steps {
+        script {
+          // Figure out which suites to run. If the build came from a Gerrit comment like
+          // "CI tls cng p0", we use those words, each one becomes a "-suite <word>" flag
+          // (cao certify treats suites and feature sets the same, so you can mix them).
+          // If someone started the build manually instead, we read the checkboxes and the
+          // features field. Either way the validation suite still runs on its own, in the
+          // 'Validation Test' stage further down.
+          def tokens = parseCiComment(env.GERRIT_EVENT_COMMENT_TEXT ?: '')
+          def suites = []
+          if (tokens) {
+            echo "Triggered by Gerrit comment, running: ${tokens.join(' ')}"
+            suites = tokens.collect { "-suite ${it}" }
+          } else {
+            if (params.sanity)   { suites << '-suite sanity' }
+            if (params.p0)       { suites << '-suite p0' }
+            if (params.p1)       { suites << '-suite p1' }
+            if (params.system)   { suites << '-suite system' }
+            if (params.platform) { suites << '-suite platform' }
+            suites += params.features.split().collect { "-suite ${it}" }
+          }
+          env.SUITE_ARGS = suites.join(' ')
+          env.TEST_ARGS  = params.tests.split().collect { "-test ${it}" }.join(' ')
+        }
       }
     }
 
@@ -177,13 +222,8 @@ pipeline {
                 --profile \
                 --profile-dir profile \
                 -- \
-                ${params.sanity ? '-suite sanity' : ''} \
-                ${params.p0 ? '-suite p0' : ''} \
-                ${params.p1 ? '-suite p1' : ''} \
-                ${params['system'] ? '-suite system' : ''} \
-                ${params.platform ? '-suite platform' : ''} \
-                ${params.features.split().collect{s -> '-suite ' + s}.join(' ')} \
-                ${params.tests.split().collect{s -> '-test ' + s}.join(' ')} \
+                ${env.SUITE_ARGS} \
+                ${env.TEST_ARGS} \
                 -platform-type kubernetes \
                 -operator-image \${DOCKER_CREDENTIALS_USR}/couchbase-operator:\${GIT_COMMIT} \
                 -admission-image \${DOCKER_CREDENTIALS_USR}/couchbase-admission-controller:\${GIT_COMMIT} \
@@ -255,4 +295,35 @@ pipeline {
       cleanWs()
     }
   }
+}
+
+// parseCiComment pulls the suite/feature tokens out of a Gerrit "CI ..." comment and returns
+// them back as a list, e.g. "CI tls cng p0" -> ['tls', 'cng', 'p0']. If it isn't a CI comment
+// (or the build was manually done), it returns null and the pipeline just uses its build parameters
+// instead.
+
+// Gerrit doesn't hand us the comment as plain text, it base64 encodes it and sticks a
+// "Patch Set N:" line on the front. So we try to decode it first, fall back to the raw text
+// if that fails, and then let the regex pick out the "CI ..." line from whichever we've got.
+// It's marked @NonCPS because the regex matcher can't be saved to disk, so it has to run in
+// one shot and not survive across pipeline steps.
+@NonCPS
+def parseCiComment(String raw) {
+  if (!raw?.trim()) {
+    return null
+  }
+  def candidates = []
+  try {
+    candidates << new String(raw.decodeBase64(), 'UTF-8')
+  } catch (ignored) {
+    // not valid base64 -> fall through to the raw value
+  }
+  candidates << raw
+  for (comment in candidates) {
+    def matcher = (comment =~ /(?im)^\s*CI\s+(.+?)\s*$/)
+    if (matcher.find()) {
+      return matcher.group(1).trim().split(/\s+/) as List
+    }
+  }
+  return null
 }
