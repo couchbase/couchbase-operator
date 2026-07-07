@@ -11,7 +11,6 @@ licenses/APL2.txt.
 package cluster
 
 import (
-	"context"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -26,11 +25,16 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	fakeClusterName      = "cb-example"
+	fakeClusterNamespace = "default"
+)
+
 // newStatusTestCluster builds a Cluster backed by a fake client. The server
 // holds a cluster with storedSize, and the in-memory copy has desiredSize, so
 // updateCRStatus() sees a difference and tries to write it.
 func newStatusTestCluster(storedSize, desiredSize int) (*Cluster, *cbfake.Clientset) {
-	name, namespace := "cb-example", "default"
+	name, namespace := fakeClusterName, fakeClusterNamespace
 
 	stored := &couchbasev2.CouchbaseCluster{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
@@ -51,7 +55,7 @@ func newStatusTestCluster(storedSize, desiredSize int) (*Cluster, *cbfake.Client
 func getStoredSize(t *testing.T, cbClient *cbfake.Clientset) int {
 	t.Helper()
 
-	got, err := cbClient.CouchbaseV2().CouchbaseClusters("default").Get(context.Background(), "cb-example", metav1.GetOptions{})
+	got, err := cbClient.CouchbaseV2().CouchbaseClusters(fakeClusterNamespace).Get(t.Context(), fakeClusterName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to fetch cluster: %v", err)
 	}
