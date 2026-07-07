@@ -40,6 +40,7 @@ import (
 	"github.com/golang/groupcache/lru"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -949,7 +950,21 @@ func (c *Cluster) updateCRStatus() error {
 	// Copy the updated status to our cluster object and try update it
 	cluster.Status = c.cluster.Status
 
-	newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
+	// Write status through the /status subresource. The DAC only checks the main
+	// resource, so this skips it. We update status on almost every reconcile, so
+	// this saves a lot of DAC calls.
+	// The /status endpoint only exists if the CRD has the status subresource.
+	// An old CRD (e.g. mid-upgrade) doesn't have it, so UpdateStatus() returns
+	// NotFound. In that case fall back to a normal Update().
+	client := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace)
+
+	newCluster, err := client.UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
+	if apierrors.IsNotFound(err) {
+		c.log.Info("Status subresource not available, falling back to full update, CRD may need upgrading")
+
+		newCluster, err = client.Update(context.Background(), cluster, metav1.UpdateOptions{})
+	}
+
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}

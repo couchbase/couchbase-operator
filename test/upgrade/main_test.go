@@ -254,6 +254,13 @@ func TestUpgradePiecemeal(t *testing.T) {
 
 	// Expect not to see an error condition.  Note this will only be relevant on
 	// an upgrade from 2.2 as it has the requisite condition.
+
+	// We only check the old operator doesn't error here, not that status keeps
+	// updating. The new CRD has a status subresource, so a plain Update() no
+	// longer writes status. The old operator still uses Update(), so here (new
+	// CRD + old operator) its status writes are dropped and status goes stale
+	// until the operator is upgraded too. That's expected and doesn't break the
+	// cluster.
 	util.MustCheckFor(t, util.NoResourceCondition(c, "couchbase.com", "v2", "CouchbaseCluster", util.Namespace, "cb-example", "Error"), time.Minute)
 
 	logrus.Info("Test complete.")

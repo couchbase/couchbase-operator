@@ -267,6 +267,7 @@ func registerTests() {
 		framework.NewTestDef(TestAntiAffinityOnCannotBePlaced).WithTags(TagSuiteP0, TagFeatureScheduling),
 		framework.NewTestDef(TestKillOperator).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestKillOperatorAndUpdateClusterConfig).WithTags(TagSuiteP0, TagSuitePlatform),
+		framework.NewTestDef(TestClusterStatusSubresource).WithTags(TagSuiteSanity, TagSuitePlatform),
 		framework.NewTestDef(TestImageVersionDefaultPrecedence).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestImageVersionEnvPrecedence).WithTags(TagSuiteP0, TagSuitePlatform),
 		framework.NewTestDef(TestTLSKillClusterNode).WithTags(TagSuiteP0, TagFeatureTLS),

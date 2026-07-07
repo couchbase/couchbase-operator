@@ -322,3 +322,35 @@ func TestPodDeleteDelayRespected(t *testing.T) {
 		e2eutil.Die(t, err)
 	}
 }
+
+// TestClusterStatusSubresource checks the deployed CouchbaseCluster CRD has the
+// status subresource.
+// The operator writes status via UpdateStatus() (the couchbaseclusters/status
+// endpoint), which skips the DAC. If the CRD lost its status subresource, that
+// endpoint would be gone, the operator would fall back to a normal Update(),
+// and status would still work, so no other test would fail, but every
+// status write would hit the DAC again. This test catches that.
+func TestClusterStatusSubresource(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	const groupVersion = "couchbase.com/v2"
+
+	resources, err := kubernetes.KubeClient.Discovery().ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		e2eutil.Die(t, fmt.Errorf("failed to discover %s resources: %w", groupVersion, err))
+	}
+
+	const want = "couchbaseclusters/status"
+
+	for _, resource := range resources.APIResources {
+		if resource.Name == want {
+			return
+		}
+	}
+
+	t.Errorf("the %q subresource is not served: the CouchbaseCluster CRD is missing its status subresource, "+
+		"so the operator cannot use UpdateStatus() and will fall back to full updates that hit the DAC", want)
+}
