@@ -1386,6 +1386,38 @@ func (r *TestRequirement) AtLeastVersion(v string) *TestRequirement {
 	return r
 }
 
+// AtLeastUpgradeVersion skips the test for upgrade-from Couchbase versions before this threshold.
+func (r *TestRequirement) AtLeastUpgradeVersion(v string) *TestRequirement {
+	if Global.CouchbaseServerImageUpgrade == "" {
+		r.t.Skip("Upgrade version not specified")
+	}
+
+	version := getVersionFromImage(Global.CouchbaseServerImageUpgrade)
+	if version == "" {
+		r.t.Skipf("malformed image: %v", Global.CouchbaseServerImageUpgrade)
+	}
+
+	if Global.CouchbaseServerImageUpgradeVersion != "" {
+		version = Global.CouchbaseServerImageUpgradeVersion
+	}
+
+	v1, err := couchbaseutil.NewVersion(version)
+	if err != nil {
+		r.t.Skipf("malformed version: %s: %v", version, err)
+	}
+
+	v2, err := couchbaseutil.NewVersion(v)
+	if err != nil {
+		r.t.Skipf("malformed version: %s: %v", v, err)
+	}
+
+	if v1.Less(v2) {
+		r.t.Skip("Upgrade Couchbase Server Image version not supported (too old)")
+	}
+
+	return r
+}
+
 func (r *TestRequirement) BeforeVersion(v string) *TestRequirement {
 	version := getVersionFromImage(Global.CouchbaseServerImage)
 	if version == "" {

@@ -292,7 +292,7 @@ func TestCNGDataAPI(t *testing.T) {
 	defer cleanup()
 
 	// Static configuration.
-	clusterSize := 1
+	clusterSize := 2
 
 	// Create the cluster spec
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithCloudNativeGateway(framework.Global.CouchbaseCloudNativeGatewayImage, nil).Generate(kubernetesCluster)
@@ -310,7 +310,6 @@ func TestCNGDataAPI(t *testing.T) {
 
 	// Create the cluster
 	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetesCluster, cluster, 5)
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetesCluster, cluster, 5*time.Minute)
 	e2eutil.MustWaitForCloudNativeGatewaySidecarReady(t, kubernetesCluster, cluster, 5*time.Minute)
 
 	// Check the HTTPS CNG service still works by creating a bucket

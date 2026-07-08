@@ -797,23 +797,23 @@ func MustVerifyMagmaBucketBlockSizeSettings(t *testing.T, k8s *types.Cluster, cl
 
 // verifyReplicaCount polls the Couchbase API for the named bucket and checks whether the
 // Replica number matches the expected replicaNumber.
-func verifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) error {
+func verifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, replicas int, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		info, err := getBucketInfo(t, k8s, cluster, bucket)
 		if err != nil {
 			return err
 		}
 
-		if info.ReplicaNumber != 1 {
-			return fmt.Errorf("replica Number %d, expected %d", info.ReplicaNumber, 1)
+		if info.ReplicaNumber != replicas {
+			return fmt.Errorf("replica Number %d, expected %d", info.ReplicaNumber, replicas)
 		}
 
 		return nil
 	})
 }
 
-func MustVerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, timeout time.Duration) {
-	if err := verifyReplicaCount(t, k8s, cluster, bucket, timeout); err != nil {
+func MustVerifyReplicaCount(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucket string, replicas int, timeout time.Duration) {
+	if err := verifyReplicaCount(t, k8s, cluster, bucket, replicas, timeout); err != nil {
 		Die(t, err)
 	}
 }

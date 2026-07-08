@@ -907,7 +907,9 @@ func TestUpdateSampleBucket(t *testing.T) {
 	// TODO: Remove this and fix the test once we implement magma vbucket config support.
 	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0").BeforeVersion("8.0.0")
 
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// Static configuration
 	bucket := &couchbasev2.CouchbaseBucket{

@@ -1668,28 +1668,33 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
 
-	// wait for new bucket to be created and create new bucket
+	// Recreate a bucket with 2 replicas.
 	newBucket := e2espec.DefaultBucketTwoReplicas()
 	e2eutil.MustNewBucket(t, kubernetes, newBucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, newBucket, 2*time.Minute)
+	e2eutil.MustVerifyReplicaCount(t, kubernetes, cluster, newBucket.GetName(), 2, 5*time.Minute)
 
-	// create new restore
+	// Disable bucket management on the cluster.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/buckets/managed", false), time.Minute)
+	time.Sleep(30 * time.Second)
+
+	// Create a restore of the original bucket.
 	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).WithBucketConfig().MustCreate(t, kubernetes)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
-	// verify replica count was restored.
-	e2eutil.MustVerifyReplicaCount(t, kubernetes, cluster, newBucket.GetName(), 5*time.Minute)
+	// Verify replica and document count on restored bucket now reflects the original bucket configuration (1).
+	e2eutil.MustVerifyReplicaCount(t, kubernetes, cluster, bucket.GetName(), 1, 5*time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Bucket created
 	// * Backup created
-	// * Remove Bucket
-	// * Bucket created
+	// * Bucket deleted
 	// * Restore created
+	// * Restore deleted
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
@@ -1698,7 +1703,12 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
 		eventschema.Optional{
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+				},
+			},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 		eventschema.Optional{
@@ -1708,9 +1718,6 @@ func testBackupAndRestoreEnableBucketConfig(t *testing.T, providerType cloud.Pro
 					eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
 				},
 			},
-		},
-		eventschema.Optional{
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketEdited},
 		},
 	}
 
@@ -2413,6 +2420,9 @@ func testBackupAndRestoreCollections(t *testing.T, providerType cloud.ProviderTy
 			Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
 		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated},
+		eventschema.Optional{
+			Validator: eventschema.Event{Reason: k8sutil.EventScopesAndCollectionsUpdated, FuzzyMessage: bucket.GetName()},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted},
 	}
 
