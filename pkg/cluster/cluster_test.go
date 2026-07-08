@@ -11,6 +11,7 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"errors"
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -123,6 +124,46 @@ func TestUpdateCRStatusFallsBackWhenSubresourceMissing(t *testing.T) {
 
 	if !sawFullUpdate {
 		t.Error("expected a fallback to a full Update() after the subresource returned NotFound")
+	}
+
+	if got := getStoredSize(t, cbClient); got != 3 {
+		t.Errorf("expected persisted status size 3 after fallback, got %d", got)
+	}
+}
+
+// TestUpdateCRStatusFallsBackWhenForbidden checks the missing RBAC case, when
+// the operator lacks permission on couchbaseclusters/status, UpdateStatus()
+// returns Forbidden and we fall back to a normal Update() so status still gets
+// written and reconcile keeps working.
+func TestUpdateCRStatusFallsBackWhenForbidden(t *testing.T) {
+	c, cbClient := newStatusTestCluster(1, 3)
+
+	var sawStatusUpdate, sawFullUpdate bool
+
+	cbClient.PrependReactor("update", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		if action.GetSubresource() == "status" {
+			// Simulate the operator lacking couchbaseclusters/status RBAC.
+			sawStatusUpdate = true
+
+			return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "couchbase.com", Resource: "couchbaseclusters/status"}, fakeClusterName, errors.New("forbidden"))
+		}
+
+		sawFullUpdate = true
+
+		// Fall through to the default tracker for the full update.
+		return false, nil, nil
+	})
+
+	if err := c.updateCRStatus(); err != nil {
+		t.Fatalf("updateCRStatus returned an error: %v", err)
+	}
+
+	if !sawStatusUpdate {
+		t.Error("expected an attempt on the /status subresource")
+	}
+
+	if !sawFullUpdate {
+		t.Error("expected a fallback to a full Update() after the subresource returned Forbidden")
 	}
 
 	if got := getStoredSize(t, cbClient); got != 3 {

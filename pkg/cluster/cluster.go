@@ -953,14 +953,16 @@ func (c *Cluster) updateCRStatus() error {
 	// Write status through the /status subresource. The DAC only checks the main
 	// resource, so this skips it. We update status on almost every reconcile, so
 	// this saves a lot of DAC calls.
-	// The /status endpoint only exists if the CRD has the status subresource.
-	// An old CRD (e.g. mid-upgrade) doesn't have it, so UpdateStatus() returns
-	// NotFound. In that case fall back to a normal Update().
+	// We fall back to a normal Update() in two cases:
+	// NotFound: the CRD has no status subresource (e.g. an old CRD mid-upgrade).
+	// Forbidden: the operator's RBAC doesn't grant couchbaseclusters/status.
+	// The fallback keeps reconcile working, but Forbidden means a missing RBAC
+	// grant, so we log it loudly rather than let it slip by silently.
 	client := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace)
 
 	newCluster, err := client.UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
-	if apierrors.IsNotFound(err) {
-		c.log.Info("Status subresource not available, falling back to full update, CRD may need upgrading")
+	if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+		c.log.Error(err, "Status subresource write failed, falling back to a full update, if this is Forbidden the operator is missing couchbaseclusters/status RBAC")
 
 		newCluster, err = client.Update(context.Background(), cluster, metav1.UpdateOptions{})
 	}
