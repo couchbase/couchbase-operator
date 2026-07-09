@@ -56,6 +56,9 @@ pipeline {
     // your patchset is checked out automatically via the GERRIT_REFSPEC parameter.
     gerrit(
       serverName: 'review.couchbase.org',
+      // silentMode stops the plugin posting its own "Build Started/Successful/..." comments and
+      // votes for this job, so the only feedback on the review is our own [CI] result comment.
+      silentMode: true,
       gerritProjects: [[
         compareType: 'PLAIN',
         pattern: 'couchbase-operator',
@@ -273,8 +276,30 @@ pipeline {
 
   post {
     always {
-      // Save JUnit results, this is what we will review.
-      junit 'artifacts/*.xml'
+      // Save JUnit results. allowEmptyResults so a run with no results doesn't fail here,
+      // and grab the summary to post back to Gerrit.
+      script {
+        def summary = junit testResults: 'artifacts/*.xml', allowEmptyResults: true
+
+        // If a Gerrit comment triggered this, post the result back on the review. We do it
+        // over ssh with the same ns-codereview key the Gerrit Trigger plugin uses. Just a
+        // comment, no vote, a human still reviews and votes. Wrapped in try/catch so a problem
+        // posting the comment can never fail the build itself.
+        if (env.GERRIT_CHANGE_NUMBER) {
+          try {
+            // gerrit re-parses the ssh command on the server, so the message has to reach it
+            // quoted, double quotes for gerrit, wrapped in single quotes for the local shell.
+            def msg = buildResultComment(summary)
+            sh """
+              ssh -i /var/lib/jenkins/.ssh/id_rsa -p 29418 -o StrictHostKeyChecking=no \
+                ns-codereview@review.couchbase.org \
+                gerrit review ${env.GERRIT_PATCHSET_REVISION} --message '"${msg}"'
+            """
+          } catch (err) {
+            echo "Could not post result to Gerrit: ${err}"
+          }
+        }
+      }
 
       // Archive any logs as an artifact, these may be needed to debug an issue.
       sh 'tar czf logs.tar.gz artifacts/logs'
@@ -326,4 +351,56 @@ def parseCiComment(String raw) {
     }
   }
   return null
+}
+
+// buildResultComment builds the message we post back on the Gerrit review: the result, the
+// suites that ran, pass/fail counts and a link to the run. The message must NOT start with
+// "CI " or it would match the trigger regex and the comment would trigger another build.
+def buildResultComment(summary) {
+  def suites = (env.SUITE_ARGS ?: '').replaceAll('-suite ', '').trim()
+  def header = "[CI] ${currentBuild.currentResult}" + (suites ? " (${suites})" : "")
+
+  if (summary == null || summary.totalCount == 0) {
+    return "${header} - no test results were produced (the run may have failed before tests ran). ${env.BUILD_URL}"
+  }
+
+  def line = "${header} - ${summary.passCount}/${summary.totalCount} passed, ${summary.failCount} failed. ${env.BUILD_URL}"
+  if (summary.failCount == 0) {
+    return line
+  }
+
+  def names = failingTestNames()
+  if (names.isEmpty()) {
+    return line
+  }
+
+  def shown = names.take(20)
+  def more  = names.size() > 20 ? " (+${names.size() - 20} more)" : ""
+  return line + " Failing: " + shown.join(", ") + more
+}
+
+// failingTestNames returns the names of the failed tests, read from the JUnit XML.
+// If anything goes wrong it just returns an empty list so the comment still posts.
+def failingTestNames() {
+  try {
+    def names = []
+    for (f in findFiles(glob: 'artifacts/*.xml')) {
+      names.addAll(parseFailedTestNames(readFile(f.path)))
+    }
+    return names
+  } catch (err) {
+    echo "Could not extract failing test names: ${err}"
+    return []
+  }
+}
+
+// parseFailedTestNames returns the failed/errored testcase names from one JUnit XML file
+// using XmlParser. @NonCPS because the parsed Nodes can't cross pipeline steps.
+@NonCPS
+def parseFailedTestNames(String xml) {
+  def root = new groovy.util.XmlParser(false, false).parseText(xml)
+  return root.depthFirst().findAll { node ->
+    node instanceof groovy.util.Node && node.name() == 'testcase' &&
+      node.children().any { c -> c instanceof groovy.util.Node && (c.name() == 'failure' || c.name() == 'error') }
+  }.collect { it.attribute('name') }
 }
