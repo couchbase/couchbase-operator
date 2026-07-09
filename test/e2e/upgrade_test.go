@@ -3504,7 +3504,7 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride(t *testing.T) {
 // TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate tests that index candidates are always SwapRebalanced after non index candidates
 // are InPlaceUpgraded if both members are candidates in the same reconcile loop due to maxUpgradable.
 // It also checks that index nodes that persist on pods that are also running the data service will continue to be upgraded via InPlaceUpgrade.
-func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing.T) {
+func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)

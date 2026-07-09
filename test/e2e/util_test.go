@@ -215,7 +215,7 @@ func registerTests() {
 		framework.NewTestDef(TestInPlaceUpgradeNodeSelectorZoneRemovedWithPV).WithTags(TagSuiteSanity, TagFeatureUpgrade, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestInPlaceUpgradeServerGroupZoneAddedWithPV).WithTags(TagSuiteSanity, TagFeatureUpgrade, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride).WithTags(TagSuiteSanity, TagFeatureUpgrade),
-		framework.NewTestDef(TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate).WithTags(TagSuiteSanity, TagFeatureUpgrade),
+		framework.NewTestDef(TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate).WithTags(TagSuiteSanity, TagFeatureUpgrade),
 		framework.NewTestDef(TestInPlaceUpgradePVCResourceChangeWithOnlineExpansionDisabled).WithTags(TagSuiteSanity, TagFeatureUpgrade),
 
 		// High priority tests.
