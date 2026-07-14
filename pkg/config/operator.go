@@ -360,6 +360,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator-sdk to discover couchbase clusters.
 				"watch",  // used by the operator-sdk to monitor changes.
 				"update", // used by the operator to update status.
+				"patch",  // used to patch specific fields in the spec.
 			},
 		},
 		{

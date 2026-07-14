@@ -43,6 +43,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -365,25 +366,34 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 // Means that a quick delete/recreate doesn't run aground on resource conflicts.
 // Does however mean things can get stuck more easily...
 func (c *Cluster) addForegroundDeleteFinalizer() error {
-	var hasForegroundDeleteFinalizer bool
-
 	for _, finalizer := range c.cluster.Finalizers {
 		if finalizer == metav1.FinalizerDeleteDependents {
-			hasForegroundDeleteFinalizer = true
-			break
+			return nil
 		}
 	}
 
-	if !hasForegroundDeleteFinalizer {
-		c.cluster.Finalizers = append(c.cluster.Finalizers, metav1.FinalizerDeleteDependents)
+	newFinalizers := append(c.cluster.Finalizers, metav1.FinalizerDeleteDependents)
 
-		newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), c.cluster, metav1.UpdateOptions{})
-		if err != nil {
-			return err
-		}
-
-		c.cluster = newCluster
+	// We will patch only the finalizers field to avoid taking ownership
+	// of all the other fields in the cluster resource.
+	// This is important otherwise and helm and other clients can complain
+	// and fail to update the resource.
+	patch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"finalizers": newFinalizers,
+		},
+	})
+	if err != nil {
+		return errors.NewStackTracedError(err)
 	}
+
+	newCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).
+		Patch(context.Background(), c.cluster.Name, types.MergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		return err
+	}
+
+	c.cluster = newCluster
 
 	return nil
 }
@@ -953,18 +963,43 @@ func (c *Cluster) updateCRStatus() error {
 	// Write status through the /status subresource. The DAC only checks the main
 	// resource, so this skips it. We update status on almost every reconcile, so
 	// this saves a lot of DAC calls.
-	// We fall back to a normal Update() in two cases:
-	// NotFound: the CRD has no status subresource (e.g. an old CRD mid-upgrade).
-	// Forbidden: the operator's RBAC doesn't grant couchbaseclusters/status.
-	// The fallback keeps reconcile working, but Forbidden means a missing RBAC
-	// grant, so we log it loudly rather than let it slip by silently.
+	//
+	// UpdateStatus() can fail in two distinct ways, and only one of them has a
+	// usable fallback:
+	//
+	// NotFound where status subresource doesn't exist so we patch the main resource using JSON Patch
+	// instead of Merge Patch since it replaces the entire resource whereas merge patch simply
+	// ignores fields which may not be set in the desired fields. So we won't be able to clear conditions
+	// or other fields
+	//
+	// Forbiddent where the subresource exists but we don't the permissions
+	// In that case, we can't fall back since API server doesn't accept a patch to main endpoint with status field
+	// So we scream and move on accepting our fate that we won't be able to update status until the RBAC is fixed.
 	client := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace)
 
 	newCluster, err := client.UpdateStatus(context.Background(), cluster, metav1.UpdateOptions{})
-	if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
-		c.log.Error(err, "Status subresource write failed, falling back to a full update, if this is Forbidden the operator is missing couchbaseclusters/status RBAC")
 
-		newCluster, err = client.Update(context.Background(), cluster, metav1.UpdateOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		c.log.Error(err, "Status subresource not found, falling back to a status-only patch of the main resource; this CRD version has no status subresource")
+
+		patch, marshalErr := json.Marshal([]map[string]interface{}{
+			{
+				"op":    "add",
+				"path":  "/status",
+				"value": cluster.Status,
+			},
+		})
+		if marshalErr != nil {
+			return errors.NewStackTracedError(marshalErr)
+		}
+
+		newCluster, err = client.Patch(context.Background(), cluster.Name, types.JSONPatchType, patch, metav1.PatchOptions{})
+		if err != nil {
+			return errors.NewStackTracedError(err)
+		}
+	case apierrors.IsForbidden(err):
+		c.log.Error(err, "Missing couchbaseclusters/status RBAC: status cannot be written until this permission is granted to the operator's Role/ClusterRole.")
 	}
 
 	if err != nil {
@@ -1009,9 +1044,21 @@ func (c *Cluster) UpdateCRSpecAnnotation() error {
 		return errors.NewStackTracedError(err)
 	}
 
-	couchbaseutil.AddAnnotation(&cluster.ObjectMeta, constants.AnnotationLastReconciledSpec, string(specJSON))
+	// Merge patch to update the lastReconciledSpec annotation with the current spec JSON.
+	// This merges with existing annotations so they're not getting nuked here.
+	patch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]interface{}{
+				constants.AnnotationLastReconciledSpec: string(specJSON),
+			},
+		},
+	})
+	if err != nil {
+		return errors.NewStackTracedError(err)
+	}
 
-	_, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
+	_, err = c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).
+		Patch(context.Background(), cluster.Name, types.MergePatchType, patch, metav1.PatchOptions{})
 
 	return err
 }

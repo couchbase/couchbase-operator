@@ -40,3 +40,6 @@ package-lock.json
 # These are for CAO-Testrunner
 tmp/
 results/
+
+# AI Agent files
+CLAUDE.md

@@ -94,11 +94,12 @@ func TestUpdateCRStatusUsesStatusSubresource(t *testing.T) {
 
 // TestUpdateCRStatusFallsBackWhenSubresourceMissing checks the upgrade case,
 // when an old CRD has no /status endpoint, UpdateStatus() returns NotFound and
-// we fall back to a normal Update() so status still gets written.
+// we fall back to a status-only JSON Patch of the main resource so status
+// still gets written.
 func TestUpdateCRStatusFallsBackWhenSubresourceMissing(t *testing.T) {
 	c, cbClient := newStatusTestCluster(1, 3)
 
-	var sawStatusUpdate, sawFullUpdate bool
+	var sawStatusUpdate, sawFallbackPatch bool
 
 	cbClient.PrependReactor("update", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		if action.GetSubresource() == "status" {
@@ -108,9 +109,13 @@ func TestUpdateCRStatusFallsBackWhenSubresourceMissing(t *testing.T) {
 			return true, nil, apierrors.NewNotFound(schema.GroupResource{Group: "couchbase.com", Resource: "couchbaseclusters"}, "cb-example")
 		}
 
-		sawFullUpdate = true
+		return false, nil, nil
+	})
 
-		// Fall through to the default tracker for the full update.
+	cbClient.PrependReactor("patch", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		sawFallbackPatch = true
+
+		// Fall through to the default tracker so the patch is actually applied.
 		return false, nil, nil
 	})
 
@@ -122,8 +127,8 @@ func TestUpdateCRStatusFallsBackWhenSubresourceMissing(t *testing.T) {
 		t.Error("expected an attempt on the /status subresource")
 	}
 
-	if !sawFullUpdate {
-		t.Error("expected a fallback to a full Update() after the subresource returned NotFound")
+	if !sawFallbackPatch {
+		t.Error("expected a fallback status-only patch after the subresource returned NotFound")
 	}
 
 	if got := getStoredSize(t, cbClient); got != 3 {
@@ -131,14 +136,18 @@ func TestUpdateCRStatusFallsBackWhenSubresourceMissing(t *testing.T) {
 	}
 }
 
-// TestUpdateCRStatusFallsBackWhenForbidden checks the missing RBAC case, when
-// the operator lacks permission on couchbaseclusters/status, UpdateStatus()
-// returns Forbidden and we fall back to a normal Update() so status still gets
-// written and reconcile keeps working.
-func TestUpdateCRStatusFallsBackWhenForbidden(t *testing.T) {
+// TestUpdateCRStatusReturnsErrorWhenForbidden checks the missing RBAC case.
+// When the operator lacks permission on couchbaseclusters/status,
+// UpdateStatus() returns Forbidden. Forbidden (as opposed to NotFound) is
+// only possible when this CRD version has a status subresource declared, in
+// which case the API server strips `.status` out of any write sent to the
+// main resource via Update, any Patch type, or Server-Side Apply. so a
+// main-resource fallback could never actually persist the status write, it
+// would just silently no-op.
+func TestUpdateCRStatusReturnsErrorWhenForbidden(t *testing.T) {
 	c, cbClient := newStatusTestCluster(1, 3)
 
-	var sawStatusUpdate, sawFullUpdate bool
+	var sawStatusUpdate, sawFallbackPatch bool
 
 	cbClient.PrependReactor("update", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		if action.GetSubresource() == "status" {
@@ -148,26 +157,30 @@ func TestUpdateCRStatusFallsBackWhenForbidden(t *testing.T) {
 			return true, nil, apierrors.NewForbidden(schema.GroupResource{Group: "couchbase.com", Resource: "couchbaseclusters/status"}, fakeClusterName, errors.New("forbidden"))
 		}
 
-		sawFullUpdate = true
-
-		// Fall through to the default tracker for the full update.
 		return false, nil, nil
 	})
 
-	if err := c.updateCRStatus(); err != nil {
-		t.Fatalf("updateCRStatus returned an error: %v", err)
+	cbClient.PrependReactor("patch", "couchbaseclusters", func(action k8stesting.Action) (bool, runtime.Object, error) {
+		sawFallbackPatch = true
+
+		return false, nil, nil
+	})
+
+	err := c.updateCRStatus()
+	if err == nil {
+		t.Fatal("expected updateCRStatus to return an error when couchbaseclusters/status is forbidden, got nil")
 	}
 
 	if !sawStatusUpdate {
 		t.Error("expected an attempt on the /status subresource")
 	}
 
-	if !sawFullUpdate {
-		t.Error("expected a fallback to a full Update() after the subresource returned Forbidden")
+	if sawFallbackPatch {
+		t.Error("expected no fallback patch of the main resource when forbidden, since it could never persist status and would silently no-op")
 	}
 
-	if got := getStoredSize(t, cbClient); got != 3 {
-		t.Errorf("expected persisted status size 3 after fallback, got %d", got)
+	if got := getStoredSize(t, cbClient); got != 1 {
+		t.Errorf("expected status to remain unchanged at 1 when forbidden, got %d", got)
 	}
 }
 

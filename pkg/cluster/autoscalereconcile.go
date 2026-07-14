@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -24,7 +25,26 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
+
+// autoscaleSizeApply is a minimal, hand-built Server-Side Apply configuration
+// for setting a single server class's size. Only the fields present here are
+// ever claimed by constants.FieldManagerAutoscaler.
+type autoscaleSizeApply struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+	Spec              autoscaleSizeApplySpec `json:"spec"`
+}
+
+type autoscaleSizeApplySpec struct {
+	Servers []autoscaleSizeApplyServer `json:"servers"`
+}
+
+type autoscaleSizeApplyServer struct {
+	Name string `json:"name"`
+	Size int    `json:"size"`
+}
 
 // Reconcile Autoscaler ensures all server configs have
 // associated Autoscaler CR. Applies changes when sizing
@@ -193,19 +213,40 @@ func (c *Cluster) autoscalingReady() bool {
 // When size values differ the cluster is put into
 // maintenance mode since scaling will occur as a result.
 func (c *Cluster) applyAutoscaleSize(configName string, requestedSize int) error {
-	// Fetching most recent version of the cluster spec
-	cluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Get(context.Background(), c.cluster.Name, metav1.GetOptions{})
+	apply := autoscaleSizeApply{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: couchbasev2.SchemeGroupVersion.String(),
+			Kind:       couchbasev2.ClusterCRDResourceKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.cluster.GetName(),
+			Namespace: c.cluster.GetNamespace(),
+		},
+		Spec: autoscaleSizeApplySpec{
+			Servers: []autoscaleSizeApplyServer{
+				{
+					Name: configName,
+					Size: requestedSize,
+				},
+			},
+		},
+	}
+
+	patch, err := json.Marshal(apply)
 	if err != nil {
 		return errors.NewStackTracedError(err)
 	}
 
-	for i := range c.cluster.Spec.Servers {
-		if cluster.Spec.Servers[i].Name == configName {
-			cluster.Spec.Servers[i].Size = requestedSize
-		}
-	}
+	// Server-Side Apply: spec.servers is declared listType=map/listMapKey=name,
+	// so this merges by "name" and only claims ownership of "size" within that
+	// entry unlike a full Update(), it never touches any other field on this or other server classes.
+	force := true
 
-	updatedCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).Update(context.Background(), cluster, metav1.UpdateOptions{})
+	updatedCluster, err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseClusters(c.cluster.Namespace).
+		Patch(context.Background(), c.cluster.Name, types.ApplyPatchType, patch, metav1.PatchOptions{
+			FieldManager: constants.FieldManagerAutoscaler,
+			Force:        &force,
+		})
 	if err != nil {
 		return fmt.Errorf("failed to update cluster size: %w", errors.NewStackTracedError(err))
 	}

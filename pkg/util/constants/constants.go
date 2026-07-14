@@ -31,6 +31,16 @@ const (
 	CloudNativeGatewayOtlpFlag = "--otlp-endpoint"
 )
 
+// Server-Side Apply field managers used by the operator.  Each distinct Apply
+// call-site should use its own dedicated manager name, so that the set of
+// fields it owns can never be expanded or pruned by any other Apply call
+// sharing that identity.
+const (
+	// FieldManagerAutoscaler is used when the autoscaler reconciler patches
+	// spec.servers[<name>].size via Server-Side Apply.
+	FieldManagerAutoscaler = "couchbase-operator-autoscaler"
+)
+
 const (
 	IntMax = int(^uint(0) >> 1)
 )
