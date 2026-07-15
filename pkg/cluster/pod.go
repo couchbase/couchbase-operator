@@ -487,6 +487,70 @@ func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version strin
 	return nil
 }
 
+// pvcImageToStamp returns the image to write onto a PVC's image annotation, or
+// "" when there is nothing to do. The image annotation was added after the
+// version annotation, so PVCs created by older operators carry a version but no
+// image, recovering such a member from its PVC would give it an empty image and
+// an invalid pod. The image is taken from the member's running pod, not the
+// spec, so it stays correct during mixed mode PVPC upgrades where a member can still
+// run the old image while the spec already points at the new one.
+func pvcImageToStamp(pvc *v1.PersistentVolumeClaim, pod *v1.Pod) string {
+	// Already has an image, nothing to do.
+	if _, ok := pvc.Annotations[constants.PVCImageAnnotation]; ok {
+		return ""
+	}
+
+	// No running pod to read the real image from, so try again on a later reconcile.
+	if pod == nil || pod.DeletionTimestamp != nil {
+		return ""
+	}
+
+	return extractCouchbaseImage(pod)
+}
+
+// reconcilePVCImages adds the image annotation to PVCs that don't have it, using
+// the image from each member's running pod. Old PVCs made before this annotation
+// existed would otherwise recover with an empty image and an invalid pod.
+// A PVC is only fixed while its pod is running. If all pods are lost before that
+// happens, those PVCs still recover with an empty image, but they get fixed on any
+// later reconcile that sees a running pod.
+func (c *Cluster) reconcilePVCImages() error {
+	for _, pvc := range c.k8s.PersistentVolumeClaims.List() {
+		// log volumes are never recovered into members, so don't bother.
+		if k8sutil.IsLogPVC(pvc) {
+			continue
+		}
+
+		name, ok := pvc.Labels[constants.LabelNode]
+		if !ok {
+			continue
+		}
+
+		pod, _ := c.k8s.Pods.Get(name)
+
+		image := pvcImageToStamp(pvc, pod)
+		if image == "" {
+			continue
+		}
+
+		// List() hands back pointers into the shared cache, so copy before mutating.
+		updated := pvc.DeepCopy()
+		if updated.Annotations == nil {
+			updated.Annotations = map[string]string{}
+		}
+		updated.Annotations[constants.PVCImageAnnotation] = image
+
+		if _, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(context.Background(),
+			updated, metav1.UpdateOptions{}); err != nil {
+			return err
+		}
+
+		c.log.Info("stamped missing image annotation on PVC", "pvc", pvc.Name, "member", name, "image", image)
+	}
+
+	return nil
+}
+
 // Updates the internal digest map, based on running pods.
 // This is mostly used for when operator is recovering from a restart
 // and has lost it's internal map.

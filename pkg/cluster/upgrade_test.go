@@ -16,6 +16,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestDetectZoneChange covers the swap-vs-in-place decision. Under an override every server class
@@ -69,5 +70,65 @@ func TestDetectZoneChange(t *testing.T) {
 	// No volume → never a zone-driven swap.
 	if detectZoneChange(sel(map[string]string{zoneKey: "az-a"}), sel(map[string]string{zoneKey: "az-b"}), nil) {
 		t.Errorf("nil pvcState: detectZoneChange = true, want false")
+	}
+}
+
+// TestPvcImageToStamp checks we only add the image to a PVC that is missing it,
+// and only when a running pod is there to read the real image from.
+func TestPvcImageToStamp(t *testing.T) {
+	couchbasePod := func(image string) *v1.Pod {
+		return &v1.Pod{
+			Spec: v1.PodSpec{Containers: []v1.Container{{Name: constants.CouchbaseContainerName, Image: image}}},
+		}
+	}
+
+	cases := []struct {
+		name string
+		pvc  *v1.PersistentVolumeClaim
+		pod  *v1.Pod
+		want string
+	}{
+		{
+			name: "missing annotation with running pod is stamped from the pod image",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  couchbasePod("couchbase/server:7.2.4"),
+			want: "couchbase/server:7.2.4",
+		},
+		{
+			name: "annotation already set is left alone",
+			pvc: &v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{constants.PVCImageAnnotation: "couchbase/server:7.2.4"}}},
+			pod:  couchbasePod("couchbase/server:7.6.0"),
+			want: "",
+		},
+		{
+			name: "no running pod means nothing to stamp yet",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  nil,
+			want: "",
+		},
+		{
+			name: "pod being deleted is not used",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{DeletionTimestamp: &metav1.Time{Time: metav1.Now().Time}},
+				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: constants.CouchbaseContainerName, Image: "couchbase/server:7.2.4"}}},
+			},
+			want: "",
+		},
+		{
+			name: "pod without a couchbase container yields no image",
+			pvc:  &v1.PersistentVolumeClaim{},
+			pod:  &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "sidecar", Image: "other:1.0"}}}},
+			want: "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := pvcImageToStamp(tc.pvc, tc.pod); got != tc.want {
+				t.Errorf("pvcImageToStamp = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

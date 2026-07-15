@@ -2398,7 +2398,7 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 
 		// claim must be bound to a volume
 		if pvc.Status.Phase != v1.ClaimBound {
-			// BUG: tell me why you are ignoring it in the logs!
+			log.V(1).Info("Ignoring PVC for member recovery: claim not bound", "cluster", cluster, "pvc", pvc.Name, "phase", pvc.Status.Phase)
 			continue
 		}
 
@@ -2409,25 +2409,25 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 
 		// require members to have path
 		if _, ok := pvc.Annotations[constants.AnnotationVolumeMountPath]; !ok {
-			// BUG: tell me why you are ignoring it in the logs!
+			log.Info("Ignoring PVC for member recovery: missing mount path annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.AnnotationVolumeMountPath)
 			continue
 		}
 
 		name, ok := pvc.Labels[constants.LabelNode]
 		if !ok {
-			// BUG: tell me why you are ignoring it in the logs!
+			log.Info("Ignoring PVC for member recovery: missing node label", "cluster", cluster, "pvc", pvc.Name, "label", constants.LabelNode)
 			continue
 		}
 
 		config, ok := pvc.Annotations[constants.AnnotationVolumeNodeConf]
 		if !ok {
-			// BUG: tell me why you are ignoring it in the logs!
+			log.Info("Ignoring PVC for member recovery: missing server config annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.AnnotationVolumeNodeConf)
 			continue
 		}
 
 		version, ok := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
 		if !ok {
-			// BUG: tell me why you are ignoring it in the logs!
+			log.Info("Ignoring PVC for member recovery: missing version annotation", "cluster", cluster, "pvc", pvc.Name, "annotation", constants.CouchbaseVersionAnnotationKey)
 			continue
 		}
 
