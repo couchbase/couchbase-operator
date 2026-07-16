@@ -2055,11 +2055,17 @@ func applyCPURequestsAndLimits(cluster *couchbasev2.CouchbaseCluster, c *v1.Cont
 // shared with with the Pod's main container.
 func couchbaseInitContainer(cluster *couchbasev2.CouchbaseCluster, claimName string, config couchbasev2.ServerConfig, image string) v1.Container {
 	initContainer := couchbaseContainer(cluster, &config, image)
-	initContainer.Resources = v1.ResourceRequirements{
-		Limits: v1.ResourceList{
-			v1.ResourceMemory: resource.MustParse("128Mi"),
-			v1.ResourceCPU:    resource.MustParse("500m"),
-		},
+
+	// Deep Copying the resources from the config to the init container to avoid aliasing issues with maps.
+	if config.InitContainer != nil && config.InitContainer.Resources != nil {
+		config.InitContainer.Resources.DeepCopyInto(&initContainer.Resources)
+	} else {
+		initContainer.Resources = v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceMemory: resource.MustParse("128Mi"),
+				v1.ResourceCPU:    resource.MustParse("500m"),
+			},
+		}
 	}
 
 	initContainer.Ports = []v1.ContainerPort{}
@@ -2160,6 +2166,15 @@ func createCloudNativeGatewayContainer(cluster *couchbasev2.CouchbaseCluster, po
 
 	if otlp := cluster.Spec.Networking.CloudNativeGateway.OTLP; otlp != nil && otlp.Endpoint != "" {
 		container.Args = append(container.Args, constants.CloudNativeGatewayOtlpFlag, otlp.Endpoint)
+	}
+
+	// Optional resource requirements - either left as the zero value (best-effort
+	// QoS, matching prior behavior) or set to what is provided. Use DeepCopyInto
+	// rather than a struct dereference so container.Resources.Limits/Requests
+	// (maps, hence reference types) don't end up aliasing the CRD spec's own
+	// map objects.
+	if resources := cluster.Spec.Networking.CloudNativeGateway.Resources; resources != nil {
+		resources.DeepCopyInto(&container.Resources)
 	}
 
 	return container

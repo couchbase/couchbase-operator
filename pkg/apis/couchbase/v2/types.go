@@ -3615,6 +3615,10 @@ type CloudNativeGateway struct {
 	// This field defaults to 1 and must be < than the desired size of the cluster.
 	// The Operator will continue to remove members if the number of ready CNG containers is 0.
 	PreserveReadyInstances *int `json:"preserveReadyInstances,omitempty"`
+
+	// Resources is the resource requirements for the Cloud Native Gateway sidecar
+	// container. Will be populated by Kubernetes defaults if not specified.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type CloudNativeGatewayOTLP struct {
@@ -4970,6 +4974,10 @@ type ServerConfig struct {
 	// `spec.autoResourceAllocation`.
 	Resources v1.ResourceRequirements `json:"resources,omitempty"`
 
+	// InitContainer configures the init container that copies the default
+	// configuration directory onto the pod's persistent volume.
+	InitContainer *InitContainerSpec `json:"initContainer,omitempty"`
+
 	// Env allows the setting of environment variables in the Couchbase server container.
 	Env []v1.EnvVar `json:"env,omitempty"`
 
@@ -4992,6 +5000,14 @@ type ServerConfig struct {
 	// +optional
 	// +kubebuilder:validation:Pattern="^(.*?(:\\d+)?/)?.*?/.*?(:.*?\\d+\\.\\d+\\.\\d+.*|@sha256:[0-9a-f]{64})$"
 	Image string `json:"image,omitempty"`
+}
+
+// InitContainerSpec configures the init container that copies the default
+// configuration directory onto the pod's persistent volume.
+type InitContainerSpec struct {
+	// Resources are the resource requirements for the init container. If not
+	// specified, the Operator adds a sensible default.
+	Resources *v1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 type VolumeMountName string
