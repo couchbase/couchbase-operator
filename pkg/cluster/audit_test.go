@@ -14,11 +14,19 @@ import (
 	"reflect"
 	"testing"
 
+	"golang.org/x/text/unicode/norm"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 )
 
 func TestExpandDisabledUsers(t *testing.T) {
+	// "müller-app1" with the accented "ü" decomposed (NFD): "u" plus a combining
+	// accent mark. The unicode case below uses a pattern with the composed (NFC)
+	// form of the same name, so it only matches if both are normalized first.
+	nfdName := norm.NFD.String("müller-app1")
+	nfcPattern := couchbasev2.AuditDisabledUser(norm.NFC.String("müller-*") + "/local")
+
 	// A fake cluster user list. In production reconcile also injects
 	// the internal users into this list, we include a couple
 	// here directly so we can test glob matching against them.
@@ -29,6 +37,7 @@ func TestExpandDisabledUsers(t *testing.T) {
 		{ID: "fwws-svc", Domain: "external"},
 		{ID: "@eventing", Domain: "local"},
 		{ID: "@cbq-engine", Domain: "local"},
+		{ID: nfdName, Domain: "local"},
 	}
 
 	cases := []struct {
@@ -72,6 +81,13 @@ func TestExpandDisabledUsers(t *testing.T) {
 				{Name: "@cbq-engine", Domain: "local"},
 				{Name: "@eventing", Domain: "local"},
 			},
+		},
+		{
+			// A username stored in one Unicode form must still match a pattern
+			// written in another form for the same visible name.
+			name:    "glob matches a unicode username in a different normalization form",
+			entries: []couchbasev2.AuditDisabledUser{nfcPattern},
+			want:    []couchbaseutil.AuditUser{{Name: nfdName, Domain: "local"}},
 		},
 		{
 			name:    "literal and glob hitting the same user are de-duplicated",

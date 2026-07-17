@@ -17,6 +17,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/text/unicode/norm"
+
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -100,18 +102,25 @@ func expandDisabledUsers(entries []couchbasev2.AuditDisabledUser, users couchbas
 			continue
 		}
 
-		// A glob is expanded against every user sharing its domain.
+		// A glob is expanded against every user sharing its domain. Usernames may
+		// be stored in a different Unicode normalization form than the pattern
+		// (e.g. NFC vs NFD), so normalize both to NFC before matching, otherwise
+		// visually identical names would fail to match.
+		normalizedName := norm.NFC.String(name)
+
 		for _, user := range users {
 			if string(user.Domain) != domain {
 				continue
 			}
 
-			matched, err := path.Match(name, user.ID)
+			matched, err := path.Match(normalizedName, norm.NFC.String(user.ID))
 			if err != nil {
 				return nil, fmt.Errorf("%w: audit disabled user has an invalid glob pattern %q: %s",
 					errors.NewStackTracedError(errors.ErrConfigurationInvalid), name, err.Error())
 			}
 
+			// Emit the server's original ID, not the normalized form, so what we
+			// send back matches what the server stores.
 			if matched {
 				add(user.ID, domain)
 			}
