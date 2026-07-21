@@ -1712,6 +1712,38 @@ func MustVerifyMemcachedMagmaFlusherThreadPercentage(t *testing.T, k8s *types.Cl
 	}
 }
 
+// MustVerifyKVThrottleSettings checks that the cluster level KV rate limiting settings
+// (throttle_enabled and node_capacity) are set correctly on the server via the memcached global
+// settings endpoint.
+func MustVerifyKVThrottleSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedEnabled bool, expectedNodeCapacity int64, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.MemcachedGlobals{}
+
+		if err := couchbaseutil.GetMemcachedGlobalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.ThrottleEnabled == nil || *current.ThrottleEnabled != expectedEnabled {
+			return fmt.Errorf("expected throttle_enabled=%t, got %v", expectedEnabled, current.ThrottleEnabled)
+		}
+
+		if current.NodeCapacity == nil || *current.NodeCapacity != expectedNodeCapacity {
+			return fmt.Errorf("expected node_capacity=%d, got %v", expectedNodeCapacity, current.NodeCapacity)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustVerifyDataServerSettingsMemcachedThreads checks memcached's reader, writer, auxIo, nonIo thread settings.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
 func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads *intstr.IntOrString, nonIOThreads, auxIOThreads *int, timeout time.Duration) {

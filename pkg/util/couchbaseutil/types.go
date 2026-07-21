@@ -536,6 +536,8 @@ type Bucket struct {
 	EncryptionAtRestKeyID               *int                         `json:"encryptionAtRestKeyId,omitempty"`
 	EncryptionAtRestDekRotationInterval *int                         `json:"encryptionAtRestDekRotationInterval,omitempty"`
 	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
+	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
+	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
 }
 
 type BucketList []Bucket
@@ -603,6 +605,8 @@ type BucketStatus struct {
 	EncryptionAtRestKeyID               *int                         `json:"encryptionAtRestKeyId,omitempty"`
 	EncryptionAtRestDekRotationInterval *int                         `json:"encryptionAtRestDekRotationInterval,omitempty"`
 	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
+	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
+	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -952,6 +956,8 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.MemoryLowWatermark = status.MemoryLowWatermark
 	b.MemoryHighWatermark = status.MemoryHighWatermark
 	b.NumVBuckets = status.NumVBuckets
+	b.ThrottleReserved = status.ThrottleReserved
+	b.ThrottleHardLimit = status.ThrottleHardLimit
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -1127,6 +1133,14 @@ func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 
 	if b.NumVBuckets != nil {
 		data.Set("numVBuckets", strconv.Itoa(*b.NumVBuckets))
+	}
+
+	if b.ThrottleReserved != nil {
+		data.Set("throttleReserved", strconv.FormatUint(*b.ThrottleReserved, 10))
+	}
+
+	if b.ThrottleHardLimit != nil {
+		data.Set("throttleHardLimit", strconv.FormatUint(*b.ThrottleHardLimit, 10))
 	}
 
 	return []byte(data.Encode())
@@ -2064,6 +2078,8 @@ type MemcachedGlobals struct {
 	TCPKeepAliveProbes           *int               `json:"tcp_keepalive_probes,omitempty" url:"tcp_keepalive_probes,omitempty"`
 	TCPUserTimeout               *int               `json:"tcp_user_timeout,omitempty" url:"tcp_user_timeout,omitempty"`
 	MagmaFlusherThreadPercentage *int               `json:"magma_flusher_thread_percentage,omitempty" url:"magma_flusher_thread_percentage,omitempty"`
+	ThrottleEnabled              *bool              `json:"throttle_enabled,omitempty" url:"throttle_enabled,omitempty"`
+	NodeCapacity                 *int64             `json:"node_capacity,omitempty" url:"node_capacity,omitempty"`
 }
 
 type AnalyticsSettings struct {

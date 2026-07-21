@@ -12,6 +12,7 @@ package cluster
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -41,6 +42,7 @@ const (
 	SupportedBlockSize
 	SupportedCrossClusterVersioning
 	Additional80Settings
+	SupportedKVThrottle
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -57,6 +59,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	supportedBlockSize := supportedFeatures[SupportedBlockSize]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
+	supportedKVThrottle := supportedFeatures[SupportedKVThrottle]
 
 	for _, bucket := range k8sBuckets {
 		if client != nil {
@@ -232,6 +235,10 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 			}
 		}
 
+		if supportedKVThrottle {
+			setBucketThrottleSettings(&b, bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit)
+		}
+
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
 		b.AutoCompactionSettings = autoCompactionSettings
 		b.PurgeInterval = purgeInterval
@@ -240,6 +247,33 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	}
 
 	return outputBuckets
+}
+
+// setBucketThrottleSettings copies the bucket's KV rate limiting values from the CR onto the
+// bucket we send to the server. When the user omits a value we fill in the same default the
+// server uses, so that what we send matches what the server reports back. If we left it unset
+// instead, our value would never match the server's default and the reconciler would keep seeing
+// a difference and updating the bucket on every loop.
+func setBucketThrottleSettings(b *couchbaseutil.Bucket, reserved, hardLimit *int64) {
+	// Reserved defaults to 0, the reservation is a bucket's guaranteed minimum share of node
+	// capacity, so 0 means reserve nothing and the bucket simply competes for whatever capacity
+	// is free. This is also the server's own default.
+	throttleReserved := uint64(0)
+	if reserved != nil {
+		throttleReserved = uint64(*reserved)
+	}
+
+	b.ThrottleReserved = &throttleReserved
+
+	// Hard limit defaults to the maximum uint64, which the server treats as unlimited, the hard
+	// limit is a bucket's maximum allowed throughput, so the largest possible value means the
+	// bucket has no upper cap of its own. This is also the server's own default.
+	throttleHardLimit := uint64(math.MaxUint64)
+	if hardLimit != nil {
+		throttleHardLimit = uint64(*hardLimit)
+	}
+
+	b.ThrottleHardLimit = &throttleHardLimit
 }
 
 func notNilOrDefault(val *uint64, defaultVal uint64) *uint64 {
@@ -254,16 +288,28 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 	b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(k8sutil.GetBucketStorageBackend(bucket, storageBackendCouchstoreSupported, storageBackendMagmaSupported, cluster))
 }
 
+// shouldSkipEphemeralBucket skips a bucket whose cached copy has reconciliation turned off via
+// annotation. A nil client (used in unit tests) never skips.
+func shouldSkipEphemeralBucket(client *client.Client, name string) bool {
+	if client == nil {
+		return false
+	}
+
+	bucketA, found := client.CouchbaseEphemeralBuckets.Get(name)
+
+	return found && !couchbaseutil.ShouldReconcile(bucketA.Annotations)
+}
+
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
 func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
+	supportedKVThrottle := supportedFeatures[SupportedKVThrottle]
 
 	for _, bucket := range k8sEphemeralBuckets {
-		bucketA, found := client.CouchbaseEphemeralBuckets.Get(bucket.Name)
-		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
+		if shouldSkipEphemeralBucket(client, bucket.Name) {
 			continue
 		}
 
@@ -333,6 +379,10 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 			b.NumVBuckets = util.IntPtr(1024)
 
 			apply80Settings(&b, bucket)
+		}
+
+		if supportedKVThrottle {
+			setBucketThrottleSettings(&b, bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit)
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -444,6 +494,9 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	supportedFeatures[SupportedCrossClusterVersioning] = atleast76
 
 	supportedFeatures[Additional80Settings] = atleast80
+
+	// KV rate limiting (per bucket throttleReserved and throttleHardLimit) is available in 8.1.0+.
+	supportedFeatures[SupportedKVThrottle] = c.SupportsVersionFeatures("8.1.0")
 
 	allBuckets := []couchbaseutil.Bucket{}
 

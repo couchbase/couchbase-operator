@@ -1591,6 +1591,30 @@ type CouchbaseBucketSpec struct {
 	// +optional
 	// +couchbase:version:minimum=8.0.0
 	EncryptionAtRest *BucketEncryptionAtRestConfiguration `json:"encryptionAtRest,omitempty"`
+
+	// ThrottleReserved is the guaranteed minimum KV throughput, in units per second, reserved
+	// for this bucket. Throughput is measured in units, where a unit is a fixed amount of data
+	// (a unit definition is given in spec.cluster.data.kvThrottle). This reserved amount is
+	// always available to the bucket, even when other buckets are busy. It must be less than or
+	// equal to spec.throttleHardLimit, and the sum of throttleReserved across all buckets must
+	// not exceed the cluster's nodeCapacity. Leaving it unset defaults to 0, which means the
+	// bucket has no guaranteed minimum and instead competes for whatever throughput is free in
+	// the shared node capacity. Rate limiting only takes effect when it is enabled at the
+	// cluster level via spec.cluster.data.kvThrottle.enabled.
+	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=8.1.0
+	ThrottleReserved *int64 `json:"throttleReserved,omitempty"`
+
+	// ThrottleHardLimit is the maximum KV throughput, in units per second, that this bucket may
+	// consume, beyond it the bucket is always throttled, regardless of any free node capacity.
+	// It must be greater than or equal to spec.throttleReserved. Leaving it unset defaults to
+	// unlimited, which means the bucket has no ceiling of its own and may use as much throughput
+	// as is available at the time (still bounded by the cluster's nodeCapacity, if one is set).
+	// Rate limiting only takes effect when it is enabled at the cluster level via
+	// spec.cluster.data.kvThrottle.enabled.
+	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=8.1.0
+	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
 }
 
 type BucketEncryptionAtRestConfiguration struct {
@@ -1799,6 +1823,30 @@ type CouchbaseEphemeralBucketSpec struct {
 	// Defaults to disabled.
 	// +couchbase:version:minimum=8.0.0
 	DurabilityImpossibleFallback DurabilityImpossibleFallback `json:"durabilityImpossibleFallback,omitempty"`
+
+	// ThrottleReserved is the guaranteed minimum KV throughput, in units per second, reserved
+	// for this bucket. Throughput is measured in units, where a unit is a fixed amount of data
+	// (a unit definition is given in spec.cluster.data.kvThrottle). This reserved amount is
+	// always available to the bucket, even when other buckets are busy. It must be less than or
+	// equal to spec.throttleHardLimit, and the sum of throttleReserved across all buckets must
+	// not exceed the cluster's nodeCapacity. Leaving it unset defaults to 0, which means the
+	// bucket has no guaranteed minimum and instead competes for whatever throughput is free in
+	// the shared node capacity. Rate limiting only takes effect when it is enabled at the
+	// cluster level via spec.cluster.data.kvThrottle.enabled.
+	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=8.1.0
+	ThrottleReserved *int64 `json:"throttleReserved,omitempty"`
+
+	// ThrottleHardLimit is the maximum KV throughput, in units per second, that this bucket may
+	// consume; beyond it the bucket is always throttled, regardless of any free node capacity.
+	// It must be greater than or equal to spec.throttleReserved. Leaving it unset defaults to
+	// unlimited, which means the bucket has no ceiling of its own and may use as much throughput
+	// as is available at the time (still bounded by the cluster's nodeCapacity, if one is set).
+	// Rate limiting only takes effect when it is enabled at the cluster level via
+	// spec.cluster.data.kvThrottle.enabled.
+	// +kubebuilder:validation:Minimum=0
+	// +couchbase:version:minimum=8.1.0
+	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
 }
 
 type CouchbaseBucketWarmupBehavior string
@@ -4433,6 +4481,17 @@ type CouchbaseClusterDataSettings struct {
 	// +couchbase:version:minimum=7.6.10
 	// +optional
 	MagmaFlusherThreadPercentage *int `json:"magmaFlusherThreadPercentage,omitempty"`
+
+	// KVThrottle enables KV rate limiting across the cluster, it caps how much read/write
+	// throughput (units per second) each bucket may use. This protects against a "noisy
+	// neighbour", where one bucket suddenly spikes in traffic (for example due to a bad query,
+	// an application bug, or a load surge) and consumes so much of the data node's resources
+	// that the other buckets sharing the cluster suffer degraded performance. It is most useful
+	// in multi-tenant clusters where each bucket serves a different tenant or application.
+	// Per bucket limits are set via spec.throttleReserved and spec.throttleHardLimit.
+	// +couchbase:version:minimum=8.1.0
+	// +optional
+	KVThrottle *KVThrottleSettings `json:"kvThrottle,omitempty"`
 }
 
 type DiskUsageLimit struct {
@@ -4445,6 +4504,25 @@ type DiskUsageLimit struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=100
 	Percent *int `json:"percent,omitempty"`
+}
+
+// KVThrottleSettings configures cluster wide KV throughput rate limiting. Throughput is measured
+// in "units" per second, a unit is 4096 bytes for a read and 1024 bytes for a write, and a durable
+// write counts double. Per bucket reservations and hard limits are configured with
+// spec.throttleReserved and spec.throttleHardLimit on the bucket resources.
+type KVThrottleSettings struct {
+	// Enabled turns KV throughput throttling on for the whole cluster. Per bucket reserved and
+	// hard limit values, as well as nodeCapacity, can be configured while this is false, but they
+	// only take effect once it is true. Defaults to false.
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// NodeCapacity is the total KV throughput, in units per second, available on each data node.
+	// It is the shared pool that buckets draw from once they exceed their reservation. It must be
+	// greater than or equal to the sum of all bucket's throttleReserved values. Leaving it unset
+	// means unlimited (no cluster wide cap), which matches the behaviour when the feature is off.
+	// +kubebuilder:validation:Minimum=1
+	NodeCapacity *int64 `json:"nodeCapacity,omitempty"`
 }
 
 // DatabaseFragmentationThreshold lists triggers for when database compaction should start.

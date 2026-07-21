@@ -445,6 +445,23 @@ func TestEditBucket(t *testing.T) {
 		patchCycles += 6
 	}
 
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if isAtleast81 {
+		// KV rate limiting per bucket settings. Set throttleReserved and throttleHardLimit on the
+		// bucket, then check the server reports the same values back. This proves the operator both
+		// sends these fields and reads them back under the names the reconciler expects.
+		throttleReserved := uint64(3000)
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/throttleReserved", throttleReserved), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleReserved", &throttleReserved), time.Minute)
+
+		throttleHardLimit := uint64(6000)
+		bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/throttleHardLimit", throttleHardLimit), time.Minute)
+		e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleHardLimit", &throttleHardLimit), time.Minute)
+
+		patchCycles += 2
+	}
+
 	// Avoid a race where Couchbase has been updated but the event not raise yet.
 	time.Sleep(10 * time.Second)
 
@@ -459,6 +476,42 @@ func TestEditBucket(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestEditEphemeralBucketKVThrottle sets throttleReserved/throttleHardLimit on an ephemeral bucket
+// and checks the server reports the same values back. TestEditBucket covers couchbase buckets, this
+// covers the separate ephemeral path. Skipped below Couchbase Server 8.1.0.
+func TestEditEphemeralBucketKVThrottle(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).CouchbaseBucket()
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if !isAtleast81 {
+		t.Skip("KV rate limiting requires Couchbase Server 8.1.0 or later")
+	}
+
+	bucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "throttle-ephemeral"},
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota: e2espec.NewResourceQuantityMi(256),
+		},
+	})
+	cluster := clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	throttleReserved := uint64(3000)
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/throttleReserved", throttleReserved), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleReserved", &throttleReserved), time.Minute)
+
+	throttleHardLimit := uint64(6000)
+	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/throttleHardLimit", throttleHardLimit), time.Minute)
+	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleHardLimit", &throttleHardLimit), time.Minute)
 }
 
 // Tests that the operator reverts bucket edits not made by the operator

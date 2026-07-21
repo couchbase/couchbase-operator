@@ -991,3 +991,76 @@ func TestCheckConstraintServerGroupsLabelOverrideTopologies(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckBucketThrottleSettings checks the per bucket KV rate limiting validation, a bucket's
+// reserved throughput must never be greater than its hard limit, otherwise the bucket would be
+// guaranteed more than it is ever allowed to use. This validation runs on the raw CR values
+// before any defaulting (the 0 / max-uint64 defaults are applied later, during reconcile, not
+// here), so an omitted field is nil at this point and there is nothing to compare, so no error
+// is expected.
+func TestCheckBucketThrottleSettings(t *testing.T) {
+	// The throttle fields are pointers so that nil can mean "the user did not set this". int64Ptr
+	// is a small helper to build those pointers inline in the test cases below.
+	int64Ptr := func(v int64) *int64 { return &v }
+
+	testcases := []struct {
+		name        string
+		reserved    *int64
+		hardLimit   *int64
+		expectedErr string
+	}{
+		{
+			name:        "reserved below hard limit is allowed",
+			reserved:    int64Ptr(3000),
+			hardLimit:   int64Ptr(6000),
+			expectedErr: "",
+		},
+		{
+			name:        "reserved equal to hard limit is allowed",
+			reserved:    int64Ptr(6000),
+			hardLimit:   int64Ptr(6000),
+			expectedErr: "",
+		},
+		{
+			name:        "reserved above hard limit is rejected",
+			reserved:    int64Ptr(7000),
+			hardLimit:   int64Ptr(6000),
+			expectedErr: "spec.throttleReserved (7000) must be less than or equal to spec.throttleHardLimit (6000)",
+		},
+		{
+			name:        "only reserved set is allowed",
+			reserved:    int64Ptr(3000),
+			hardLimit:   nil,
+			expectedErr: "",
+		},
+		{
+			name:        "only hard limit set is allowed",
+			reserved:    nil,
+			hardLimit:   int64Ptr(6000),
+			expectedErr: "",
+		},
+		{
+			name:        "neither set is allowed",
+			reserved:    nil,
+			hardLimit:   nil,
+			expectedErr: "",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			err := checkBucketThrottleSettings(testcase.reserved, testcase.hardLimit)
+
+			// An empty expectedErr means we expect success, otherwise the returned error must
+			// contain the expected message.
+			switch {
+			case testcase.expectedErr == "" && err != nil:
+				t.Errorf("expected no error but got: %s", err.Error())
+			case testcase.expectedErr != "" && err == nil:
+				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+		})
+	}
+}

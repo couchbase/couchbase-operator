@@ -96,6 +96,9 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-data-diskusagelimit,diskUsageLimit>>:
         <<couchbaseclusters-spec-cluster-data-diskusagelimit-enabled,enabled>>: false
         <<couchbaseclusters-spec-cluster-data-diskusagelimit-percent,percent>>: 85
+      <<couchbaseclusters-spec-cluster-data-kvthrottle,kvThrottle>>:
+        <<couchbaseclusters-spec-cluster-data-kvthrottle-enabled,enabled>>: false
+        <<couchbaseclusters-spec-cluster-data-kvthrottle-nodecapacity,nodeCapacity>>: 0
       <<couchbaseclusters-spec-cluster-data-magmaflusherthreadpercentage,magmaFlusherThreadPercentage>>: 0
       <<couchbaseclusters-spec-cluster-data-minreplicascount,minReplicasCount>>: 0
       <<couchbaseclusters-spec-cluster-data-noniothreads,nonIOThreads>>: 0
@@ -1651,6 +1654,58 @@ Enabled specifies whether the disk usage limit is enabled, defaulting to false.
 
 Percent is the percentage of disk space that can be used before bucket writes are prevented.
 This field must be in the range 1-100, defaulting to 85.
+
+=== couchbaseclusters.spec.cluster.data.kvThrottle
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+KVThrottle enables KV rate limiting across the cluster, it caps how much read/write
+throughput (units per second) each bucket may use.
+This protects against a "noisy
+neighbour", where one bucket suddenly spikes in traffic (for example due to a bad query,
+an application bug, or a load surge) and consumes so much of the data node's resources
+that the other buckets sharing the cluster suffer degraded performance.
+It is most useful
+in multi-tenant clusters where each bucket serves a different tenant or application.
+Per bucket limits are set via spec.throttleReserved and spec.throttleHardLimit.
+This field is available in Couchbase Server 8.1.0 and later.
+
+=== couchbaseclusters.spec.cluster.data.kvThrottle.enabled
+
+==== Constraints
+
+*Type*: `boolean`
+
+*Default*: `False`
+
+==== Description
+
+Enabled turns KV throughput throttling on for the whole cluster.
+Per bucket reserved and
+hard limit values, as well as nodeCapacity, can be configured while this is false, but they
+only take effect once it is true.
+Defaults to false.
+
+=== couchbaseclusters.spec.cluster.data.kvThrottle.nodeCapacity
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+==== Description
+
+NodeCapacity is the total KV throughput, in units per second, available on each data node.
+It is the shared pool that buckets draw from once they exceed their reservation.
+It must be
+greater than or equal to the sum of all bucket's throttleReserved values.
+Leaving it unset
+means unlimited (no cluster wide cap), which matches the behaviour when the feature is off.
 
 === couchbaseclusters.spec.cluster.data.magmaFlusherThreadPercentage
 

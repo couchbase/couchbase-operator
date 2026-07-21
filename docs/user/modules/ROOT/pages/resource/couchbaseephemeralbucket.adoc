@@ -42,6 +42,8 @@ The following is an example resource, depicting the overall structure and any de
     - <<couchbaseephemeralbuckets-spec-scopes-resources-kind,kind>>: CouchbaseScope
       <<couchbaseephemeralbuckets-spec-scopes-resources-name,name>>: ""
     <<couchbaseephemeralbuckets-spec-scopes-selector,selector>>: {}
+  <<couchbaseephemeralbuckets-spec-throttlehardlimit,throttleHardLimit>>: 0
+  <<couchbaseephemeralbuckets-spec-throttlereserved,throttleReserved>>: 0
   <<couchbaseephemeralbuckets-spec-versionpruningwindowhrs,versionPruningWindowHrs>>: 0
   <<couchbaseephemeralbuckets-spec-warmupbehavior,warmupBehavior>>: background
 ----
@@ -496,6 +498,52 @@ Selector allows resources to be implicitly considered for inclusion in this
 bucket.
 More info:
 https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#labelselector-v1-meta.
+
+=== couchbaseephemeralbuckets.spec.throttleHardLimit
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+ThrottleHardLimit is the maximum KV throughput, in units per second, that this bucket may
+consume; beyond it the bucket is always throttled, regardless of any free node capacity.
+It must be greater than or equal to spec.throttleReserved.
+Leaving it unset defaults to
+unlimited, which means the bucket has no ceiling of its own and may use as much throughput
+as is available at the time (still bounded by the cluster's nodeCapacity, if one is set).
+Rate limiting only takes effect when it is enabled at the cluster level via
+spec.cluster.data.kvThrottle.enabled.
+This field is available in Couchbase Server 8.1.0 and later.
+
+=== couchbaseephemeralbuckets.spec.throttleReserved
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+ThrottleReserved is the guaranteed minimum KV throughput, in units per second, reserved
+for this bucket.
+Throughput is measured in units, where a unit is a fixed amount of data
+(a unit definition is given in spec.cluster.data.kvThrottle).
+This reserved amount is
+always available to the bucket, even when other buckets are busy.
+It must be less than or
+equal to spec.throttleHardLimit, and the sum of throttleReserved across all buckets must
+not exceed the cluster's nodeCapacity.
+Leaving it unset defaults to 0, which means the
+bucket has no guaranteed minimum and instead competes for whatever throughput is free in
+the shared node capacity.
+Rate limiting only takes effect when it is enabled at the
+cluster level via spec.cluster.data.kvThrottle.enabled.
+This field is available in Couchbase Server 8.1.0 and later.
 
 === couchbaseephemeralbuckets.spec.versionPruningWindowHrs
 

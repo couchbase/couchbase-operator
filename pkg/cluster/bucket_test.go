@@ -11,6 +11,7 @@ licenses/APL2.txt.
 package cluster
 
 import (
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -119,6 +120,152 @@ func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 
 	if newBuckets[0].MagmaKeyTreeDataBlockSize != nil && *(newBuckets[0].MagmaKeyTreeDataBlockSize) != 6666 {
 		t.Fatalf("expected MagmaKeyTreeDataBlockSize=6666, found %d", *(newBuckets[0].MagmaKeyTreeDataBlockSize))
+	}
+}
+
+// TestGatherCouchbaseBucketsKVThrottle checks how a bucket's throttle values are gathered
+// values the user set are copied through unchanged, values the user left out fall back to the
+// server's defaults (0 reserved, max uint64 hard limit), which is what lets the reconciler
+// settle instead of updating every loop, nothing is set at all on server versions that don't
+// support the feature.
+func TestGatherCouchbaseBucketsKVThrottle(t *testing.T) {
+	reserved := int64(3000)
+	hardLimit := int64(6000)
+
+	testcases := []struct {
+		name            string
+		supported       bool
+		specReserved    *int64
+		specHardLimit   *int64
+		expectReserved  *uint64
+		expectHardLimit *uint64
+	}{
+		{
+			name:            "values set are passed through",
+			supported:       true,
+			specReserved:    &reserved,
+			specHardLimit:   &hardLimit,
+			expectReserved:  uint64Ptr(3000),
+			expectHardLimit: uint64Ptr(6000),
+		},
+		{
+			name:            "omitted values default to server defaults so the reconciler settles",
+			supported:       true,
+			specReserved:    nil,
+			specHardLimit:   nil,
+			expectReserved:  uint64Ptr(0),
+			expectHardLimit: uint64Ptr(math.MaxUint64),
+		},
+		{
+			name:            "not set when feature unsupported",
+			supported:       false,
+			specReserved:    &reserved,
+			specHardLimit:   &hardLimit,
+			expectReserved:  nil,
+			expectHardLimit: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			k8sBucket := []*couchbasev2.CouchbaseBucket{{
+				Spec: couchbasev2.CouchbaseBucketSpec{
+					Name:              "test",
+					MemoryQuota:       resource.NewQuantity(100, resource.BinarySI),
+					ThrottleReserved:  tc.specReserved,
+					ThrottleHardLimit: tc.specHardLimit,
+				},
+			}}
+
+			features := SupportedFeatureMap{SupportedKVThrottle: tc.supported}
+
+			newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+
+			if !reflect.DeepEqual(newBuckets[0].ThrottleReserved, tc.expectReserved) {
+				t.Errorf("ThrottleReserved: expected %v, got %v", derefUint64(tc.expectReserved), derefUint64(newBuckets[0].ThrottleReserved))
+			}
+
+			if !reflect.DeepEqual(newBuckets[0].ThrottleHardLimit, tc.expectHardLimit) {
+				t.Errorf("ThrottleHardLimit: expected %v, got %v", derefUint64(tc.expectHardLimit), derefUint64(newBuckets[0].ThrottleHardLimit))
+			}
+		})
+	}
+}
+
+func uint64Ptr(v uint64) *uint64 { return &v }
+
+func derefUint64(v *uint64) interface{} {
+	if v == nil {
+		return "nil"
+	}
+
+	return *v
+}
+
+// TestGatherEphemeralBucketsKVThrottle is the ephemeral bucket version of
+// TestGatherCouchbaseBucketsKVThrottle, values the user set are kept, omitted values fall back to
+// the server defaults (0 reserved, max uint64 hard limit), and nothing is set below 8.1.
+func TestGatherEphemeralBucketsKVThrottle(t *testing.T) {
+	reserved := int64(3000)
+	hardLimit := int64(6000)
+
+	testcases := []struct {
+		name            string
+		supported       bool
+		specReserved    *int64
+		specHardLimit   *int64
+		expectReserved  *uint64
+		expectHardLimit *uint64
+	}{
+		{
+			name:            "values set are passed through",
+			supported:       true,
+			specReserved:    &reserved,
+			specHardLimit:   &hardLimit,
+			expectReserved:  uint64Ptr(3000),
+			expectHardLimit: uint64Ptr(6000),
+		},
+		{
+			name:            "omitted values default to server defaults so the reconciler settles",
+			supported:       true,
+			specReserved:    nil,
+			specHardLimit:   nil,
+			expectReserved:  uint64Ptr(0),
+			expectHardLimit: uint64Ptr(math.MaxUint64),
+		},
+		{
+			name:            "not set when feature unsupported",
+			supported:       false,
+			specReserved:    &reserved,
+			specHardLimit:   &hardLimit,
+			expectReserved:  nil,
+			expectHardLimit: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			k8sBucket := []*couchbasev2.CouchbaseEphemeralBucket{{
+				Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+					Name:              "test",
+					MemoryQuota:       resource.NewQuantity(100, resource.BinarySI),
+					ThrottleReserved:  tc.specReserved,
+					ThrottleHardLimit: tc.specHardLimit,
+				},
+			}}
+
+			features := SupportedFeatureMap{SupportedKVThrottle: tc.supported}
+
+			newBuckets := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, nil, &couchbasev2.CouchbaseCluster{})
+
+			if !reflect.DeepEqual(newBuckets[0].ThrottleReserved, tc.expectReserved) {
+				t.Errorf("ThrottleReserved: expected %v, got %v", derefUint64(tc.expectReserved), derefUint64(newBuckets[0].ThrottleReserved))
+			}
+
+			if !reflect.DeepEqual(newBuckets[0].ThrottleHardLimit, tc.expectHardLimit) {
+				t.Errorf("ThrottleHardLimit: expected %v, got %v", derefUint64(tc.expectHardLimit), derefUint64(newBuckets[0].ThrottleHardLimit))
+			}
+		})
 	}
 }
 

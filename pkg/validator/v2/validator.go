@@ -140,6 +140,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintDeprecatedAnnotations,
 		checkConstraintDeprecatedRBACRoles,
 		checkConstraintBucketsMeetMinReplicasCount,
+		checkConstraintBucketsThrottleReservedWithinNodeCapacity,
 	}
 
 	var errs []error
@@ -2351,6 +2352,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
+	if err := checkBucketThrottleSettings(bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit); err != nil {
+		errs = append(errs, err)
+	}
+
 	if err := checkBucketEncryptionAtRestSettings(v, bucket); err != nil {
 		errs = append(errs, err)
 	}
@@ -2391,6 +2396,17 @@ func checkBucketMemoryWatermarkSettings(bucket *couchbasev2.CouchbaseBucket) err
 		if low >= high {
 			return fmt.Errorf("spec.memoryLowWatermark (%d) must be less than spec.memoryHighWatermark (%d)", low, high)
 		}
+	}
+
+	return nil
+}
+
+// checkBucketThrottleSettings validates a bucket's KV rate limiting values, the reserved
+// throughput cannot be greater than the hard limit, otherwise the bucket could be guaranteed more
+// than it is ever allowed to use.
+func checkBucketThrottleSettings(reserved, hardLimit *int64) error {
+	if reserved != nil && hardLimit != nil && *reserved > *hardLimit {
+		return fmt.Errorf("spec.throttleReserved (%d) must be less than or equal to spec.throttleHardLimit (%d)", *reserved, *hardLimit)
 	}
 
 	return nil
@@ -2669,6 +2685,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if err := checkEphemeralBucketCrossClusterVersioning(v, bucket); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketThrottleSettings(bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -6401,6 +6421,48 @@ func checkConstraintBucketsMeetMinReplicasCount(v *types.Validator, cluster *cou
 	}
 
 	return warnings, nil
+}
+
+// checkConstraintBucketsThrottleReservedWithinNodeCapacity warns when the sum of all bucket's
+// spec.throttleReserved exceeds the cluster's KV rate limiting nodeCapacity. The reserved values
+// are guaranteed portions of the per node capacity, so their total cannot exceed it. This is a
+// warning rather than an error because bucket's are separate resources that may be applied in any
+// order (so the totals can be temporarily inconsistent). The server rejects the bucket create/update
+// REST call at reconcile time if the total reserved would exceed node capacity, and the operator surfaces
+// that rejection as a reconcile error.
+func checkConstraintBucketsThrottleReservedWithinNodeCapacity(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	data := cluster.Spec.ClusterSettings.Data
+	if data == nil || data.KVThrottle == nil || data.KVThrottle.NodeCapacity == nil {
+		return nil, nil
+	}
+
+	nodeCapacity := *data.KVThrottle.NodeCapacity
+
+	buckets, ephemeralBuckets, err := getClusterBucketsByType(v, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalReserved int64
+
+	for _, bucket := range buckets {
+		if bucket.Spec.ThrottleReserved != nil {
+			totalReserved += *bucket.Spec.ThrottleReserved
+		}
+	}
+
+	for _, bucket := range ephemeralBuckets {
+		if bucket.Spec.ThrottleReserved != nil {
+			totalReserved += *bucket.Spec.ThrottleReserved
+		}
+	}
+
+	if totalReserved > nodeCapacity {
+		return []string{fmt.Sprintf("the sum of all bucket's spec.throttleReserved (%d units/sec) exceeds spec.cluster.data.kvThrottle.nodeCapacity (%d units/sec), Couchbase Server will reject bucket changes until the total reserved fits within the node capacity",
+			totalReserved, nodeCapacity)}, nil
+	}
+
+	return nil, nil
 }
 
 func checkConstraintsDeprecatedNetworkingOptions(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {

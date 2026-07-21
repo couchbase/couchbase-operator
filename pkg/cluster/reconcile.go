@@ -797,6 +797,8 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 				requested.MagmaFlusherThreadPercentage = c.cluster.Spec.ClusterSettings.Data.MagmaFlusherThreadPercentage
 			}
 		}
+
+		c.applyKVThrottleSettings(&requested)
 	}
 
 	if reflect.DeepEqual(current, requested) {
@@ -811,6 +813,29 @@ func (c *Cluster) reconcileMemcachedDataSettings() error {
 	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("memcached settings", c.cluster))
 
 	return nil
+}
+
+// applyKVThrottleSettings overlays the cluster level KV rate limiting settings (throttle_enabled,
+// node_capacity) onto the requested memcached globals. These are supported by Couchbase Server from
+// 8.1.0. We only write them when the user has set kvThrottle; if the block is absent we leave the
+// server's current values as they are, so to turn throttling off the user must explicitly set
+// enabled to false.
+func (c *Cluster) applyKVThrottleSettings(requested *couchbaseutil.MemcachedGlobals) {
+	if !c.SupportsVersionFeatures("8.1.0") {
+		return
+	}
+
+	kv := c.cluster.Spec.ClusterSettings.Data.KVThrottle
+	if kv == nil {
+		return
+	}
+
+	requested.ThrottleEnabled = kv.Enabled
+
+	if kv.NodeCapacity != nil {
+		nodeCapacity := *kv.NodeCapacity
+		requested.NodeCapacity = &nodeCapacity
+	}
 }
 
 func (c *Cluster) reconcileResourceManagementSettings() error {

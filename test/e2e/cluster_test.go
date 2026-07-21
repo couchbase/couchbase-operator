@@ -1272,6 +1272,19 @@ func TestModifyDataServiceSettings(t *testing.T) {
 		numPatches += 4
 	}
 
+	if after81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if after81 {
+		// KV rate limiting cluster level settings. Enable throttling and set a node capacity, then
+		// check the server reports the same values back via the memcached global settings endpoint.
+		nodeCapacity := int64(10000)
+		e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/data", &couchbasev2.CouchbaseClusterDataSettings{
+			KVThrottle: &couchbasev2.KVThrottleSettings{Enabled: util.BoolPtr(true), NodeCapacity: &nodeCapacity},
+		}), time.Minute)
+		e2eutil.MustVerifyKVThrottleSettings(t, kubernetes, cluster, true, 10000, 2*time.Minute)
+		numPatches++
+	}
+
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings updated
