@@ -263,8 +263,15 @@ func (c *Cluster) reconcileMemberAlternateAddresses() error {
 	// has no way of addressing individual cluster nodes).
 	for _, member := range c.members {
 		// Skip if the member doesn't have a pod (external member)
-		_, exists := c.k8s.Pods.Get(member.Name())
+		pod, exists := c.k8s.Pods.Get(member.Name())
 		if !exists {
+			continue
+		}
+
+		// Skip pods that have not joined the cluster yet. Alternate addresses can
+		// only be set once the node is in the cluster, and their DNS is already
+		// handled by the pre join check (canAddNodeToCluster).
+		if k8sutil.HasPendingInitializationCondition(pod) {
 			continue
 		}
 
@@ -588,4 +595,62 @@ func (c *Cluster) hasDNSCheckTimeoutElapsed(pod *v1.Pod) bool {
 	}
 
 	return false
+}
+
+// canAddNodeToCluster reports whether a new member can be added to the cluster
+// now. We run this check before adding the node so one that is not yet reachable
+// is kept out (left in the pending-init state and retried), and so can never
+// block rebalances of the existing members.
+// It returns true when there is nothing to wait for (external addressing is not
+// configured), when the user has chosen to allow externally unreachable pods, or
+// when the external address is reachable. Otherwise it marks the pod with the
+// pending-external-DNS condition and returns false. The pod keeps its
+// pending-init condition, so it is not added and the join is retried next cycle.
+func (c *Cluster) canAddNodeToCluster(pod *v1.Pod, member couchbaseutil.Member) (bool, error) {
+	// No external addressing is configured, so there is no DNS to wait for.
+	if !c.cluster.Spec.HasExposedFeatures() {
+		return true, nil
+	}
+
+	// User allows unreachable pods, so add the node now without waiting on DNS.
+	// canRebalance still holds the rebalance back until the delay has passed.
+	if c.cluster.Spec.Networking.AllowExternallyUnreachablePods != nil &&
+		*c.cluster.Spec.Networking.AllowExternallyUnreachablePods {
+		return true, nil
+	}
+
+	// Build the external address that clients will use to reach this node.
+	addresses, err := c.createAlternateAddressesExternal(member)
+	if err != nil {
+		return false, err
+	}
+
+	// The address may not be known yet (for example the load balancer has not
+	// been assigned one). We wait for it before going any further.
+	if addresses == nil || addresses.Hostname == "" {
+		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Waiting for external address")
+	}
+
+	// Give DNS time to propagate before the first reachability check.
+	if !c.hasDNSCheckDelayElapsed(pod) {
+		c.log.Info("Delaying external DNS check before adding node",
+			"cluster", c.namespacedName(), "pod", pod.Name, "waitUntil", c.getPodDNSCheckExpiry(pod))
+		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Delaying DNS Check")
+	}
+
+	// Try to reach the external address. If it is not reachable yet, keep the
+	// node out of the cluster and try again on the next cycle.
+	if err := waitAlternateAddressReachable(5*time.Second, addresses); err != nil {
+		c.log.Info("Waiting on external DNS propagation before adding node",
+			"cluster", c.namespacedName(), "member", member.Name(), "error", err)
+		return false, k8sutil.FlagPodPendingExternalDNS(c.k8s, pod, "Waiting on DNS Propagation")
+	}
+
+	// The address is reachable, so the node can safely join. Its alternate
+	// addresses are set on the server after the join, by
+	// reconcileMemberAlternateAddresses.
+	c.log.Info("External DNS is reachable, node can be added",
+		"cluster", c.namespacedName(), "member", member.Name())
+
+	return true, nil
 }

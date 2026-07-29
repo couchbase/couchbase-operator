@@ -356,7 +356,11 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 
 		pendingInitPods: pendingInit,
 
-		pendingDNSMembers: c.members.Intersect(podsToMemberSet(c.getPendingDNSPods())),
+		// pendingDNSMembers are members waiting on external DNS. We exclude pods
+		// still pending init, those have not joined the cluster yet (we hold them
+		// out until their DNS is reachable), so they must not count towards the
+		// rebalance and block rebalances of the existing members.
+		pendingDNSMembers: c.members.Intersect(podsToMemberSet(c.getPendingDNSPods())).Diff(pendingInit),
 	}
 
 	// Reset any timeout counters if nodes have recovered.
@@ -2334,8 +2338,10 @@ func (r *ReconcileMachine) handleNodeServices(c *Cluster) error {
 		return err
 	}
 
-	// Update the DNS-pending members after reconciling alternative addresses.
-	r.pendingDNSMembers = c.members.Intersect(podsToMemberSet(c.getPendingDNSPods()))
+	// Rebuild the DNS waiting list, as more pods may have been flagged just
+	// above. Leave out pods not yet joined (still pending init) so a new node
+	// waiting on DNS does not block the existing members from rebalancing.
+	r.pendingDNSMembers = c.members.Intersect(podsToMemberSet(c.getPendingDNSPods())).Diff(podsToMemberSet(c.getPendingInitPods()))
 
 	// If at this point a pod is still pending DNS propagation and the timeout
 	// has elapsed, we should remove the member if it has not been rebalanced (activated) into the cluster
@@ -2380,13 +2386,28 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 //nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	if shouldRebalance(c, r) {
-		// Defer rebalance while any pod is still pending CBS initialization (not yet
-		// addNode'd). Waiting ensures all replacement pods are known to CBS before
-		// rebalancing, which batches add+eject operations into a single rebalance and
-		// avoids a follow-up rebalance after each pod initializes individually.
-		if r.pendingInitPods.Size() > 0 {
-			c.log.V(1).Info("Deferring rebalance until pending pods are CBS-initialized",
-				"cluster", c.namespacedName(), "pending", r.pendingInitPods.Names())
+		// Wait for pods that are about to join the cluster before rebalancing, so
+		// all of them are added in a single rebalance instead of one per pod.
+		// Pods only waiting on external DNS are skipped, they may wait a long
+		// time, and waiting for them would block rebalances the existing members
+		// need (such as recovering a failed node). The exception is a swap
+		// rebalance replacement (it carries the upgrade tracking annotation), we
+		// must still wait for it to join before its old node is ejected, else the
+		// swap would remove the old node while the replacement is still outside
+		// the cluster and briefly drop below the requested size.
+		pendingDNSPods := c.getPendingDNSPods()
+		skippable := podsToMemberSet(pendingDNSPods)
+
+		for _, pod := range pendingDNSPods {
+			if k8sutil.GetPodUpgradeTracking(pod) != "" {
+				skippable.Remove(pod.Name)
+			}
+		}
+
+		mustWaitFor := r.pendingInitPods.Diff(skippable)
+		if mustWaitFor.Size() > 0 {
+			c.log.V(1).Info("Waiting for pods to join the cluster before rebalancing",
+				"cluster", c.namespacedName(), "pending", mustWaitFor.Names())
 			return nil
 		}
 

@@ -205,3 +205,58 @@ func TestUpdateCRStatusNoChangeSkipsWrite(t *testing.T) {
 		t.Error("expected no update to be issued when status is unchanged")
 	}
 }
+
+// TestCanAddNodeToClusterNoExposedFeatures checks that a cluster without
+// external addressing is never held back by the external DNS pre check, the
+// node is always allowed to join.
+func TestCanAddNodeToClusterNoExposedFeatures(t *testing.T) {
+	c := &Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace},
+			// No ExposedFeatures set, so HasExposedFeatures() is false.
+		},
+		log: logf.Log.WithName("test"),
+	}
+
+	// The pod and member are not looked at on this path, so nil is fine.
+	canAddNode, err := c.canAddNodeToCluster(nil, nil)
+	if err != nil {
+		t.Fatalf("canAddNodeToCluster returned an error: %v", err)
+	}
+
+	if !canAddNode {
+		t.Error("expected the node to be allowed to join when the cluster has no exposed features")
+	}
+}
+
+// TestCanAddNodeToClusterAllowUnreachable checks that with
+// allowExternallyUnreachablePods set, the join is not gated on DNS at all, the
+// node is allowed to join straight away, The rebalance is still held back
+// separately by canRebalance.
+func TestCanAddNodeToClusterAllowUnreachable(t *testing.T) {
+	allow := true
+
+	c := &Cluster{
+		cluster: &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: fakeClusterName, Namespace: fakeClusterNamespace},
+			Spec: couchbasev2.ClusterSpec{
+				Networking: couchbasev2.CouchbaseClusterNetworkingSpec{
+					// Exposed features are on, so the DNS check would normally run.
+					ExposedFeatures:                []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+					AllowExternallyUnreachablePods: &allow,
+				},
+			},
+		},
+		log: logf.Log.WithName("test"),
+	}
+
+	// The pod and member are not looked at on this path, so nil is fine.
+	canAddNode, err := c.canAddNodeToCluster(nil, nil)
+	if err != nil {
+		t.Fatalf("canAddNodeToCluster returned an error: %v", err)
+	}
+
+	if !canAddNode {
+		t.Error("expected the node to be allowed to join when allowExternallyUnreachablePods is set")
+	}
+}

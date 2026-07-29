@@ -1802,6 +1802,44 @@ func MustWaitForClusterPods(t *testing.T, k8s *types.Cluster, couchbase *couchba
 	return pods
 }
 
+// MustWaitForScheduledClusterPods waits until the cluster has `size` pods and
+// each pod has a host IP. Used before adding external DNS entries, as each entry
+// points to the pod's host IP.
+func MustWaitForScheduledClusterPods(t *testing.T, k8s *types.Cluster, couchbase *couchbasev2.CouchbaseCluster, size int, timeout time.Duration) []v1.Pod {
+	var pods []v1.Pod
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: constants.CouchbaseServerClusterKey + "=" + couchbase.Name,
+	}
+
+	callback := func() error {
+		podList, err := k8s.KubeClient.CoreV1().Pods(couchbase.Namespace).List(context.Background(), listOptions)
+		if err != nil {
+			return err
+		}
+
+		if len(podList.Items) != size {
+			return fmt.Errorf("cluster size is %d, want %d", len(podList.Items), size)
+		}
+
+		for _, pod := range podList.Items {
+			if pod.Status.HostIP == "" {
+				return fmt.Errorf("pod %s is not scheduled yet", pod.Name)
+			}
+		}
+
+		pods = podList.Items
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+
+	return pods
+}
+
 func MustWaitForPodWithCondition(t *testing.T, k8s *types.Cluster, podName string, conditionType v1.PodConditionType, expectedStatus v1.ConditionStatus, expectedMessage string, timeout time.Duration) *v1.Pod {
 	var pod *v1.Pod
 

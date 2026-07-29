@@ -1674,8 +1674,25 @@ func (c *Cluster) handleReadyPendingPod(pod *v1.Pod) {
 }
 
 // handlePendingPodForExistingCluster initializes a pod being added to an existing cluster:
-// CBS hostname/TLS/storage init, then addNode. On success: set initialized + clear condition.
+// First it waits for the node's external DNS to be reachable, then CBS hostname/TLS/storage
+// init, then addNode. On success, set initialized + clear condition.
 func (c *Cluster) handlePendingPodForExistingCluster(pod *v1.Pod, member couchbaseutil.Member, config *couchbasev2.ServerConfig) {
+	// Wait for the node's external address to be reachable before adding it to
+	// the cluster. A node that still cannot be reached is left in the pending-init
+	// state and retried next cycle, so it never enters the cluster and never
+	// blocks rebalances of the existing members. Giving up on a node that never
+	// becomes reachable is handled by updatePendingInitializationConditions.
+	canAddNode, err := c.canAddNodeToCluster(pod, member)
+	if err != nil {
+		c.log.Error(err, "External DNS check failed, will retry next cycle",
+			"cluster", c.namespacedName(), "pod", pod.Name)
+		return
+	}
+
+	if !canAddNode {
+		return
+	}
+
 	if err := c.initMember(c.ctx, member, *config, false); err != nil {
 		c.log.Error(err, "Pod initialization failed, will retry next cycle",
 			"cluster", c.namespacedName(), "pod", pod.Name)
@@ -1833,8 +1850,9 @@ func (c *Cluster) handleTimedOutPendingPod(pod *v1.Pod) {
 		return
 	}
 
-	// Condition cleared only after successful removal.
-	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil {
+	// Condition cleared only after successful removal. If the pod is already gone
+	// there is nothing left to clear, so ignore a not found error.
+	if err := k8sutil.ClearPodPendingInitialization(c.k8s, pod); err != nil && !apierrors.IsNotFound(err) {
 		c.log.Error(err, "Failed to clear pending initialization condition", "pod", pod.Name)
 	}
 
@@ -1853,6 +1871,19 @@ func (c *Cluster) updatePendingInitializationConditions() {
 	for _, pod := range pendingPods {
 		condition := k8sutil.GetPodCondition(pod, k8sutil.PodPendingInitializationCondition)
 		if condition == nil {
+			continue
+		}
+
+		// Remove a pod that has been waiting on external DNS for too long, so a
+		// fresh one can be created to try again. waitForAddressReachable is its
+		// own timeout, kept separate from PodCreateTimeout, if DNS times out
+		// first, remove the pod now rather than waiting out the pod creation
+		// timeout. IsPendingDNSMember confirms the pod is actually marked as
+		// waiting on DNS before we measure how long it has waited.
+		if k8sutil.IsPendingDNSMember(pod) && c.hasDNSCheckTimeoutElapsed(pod) {
+			c.log.Info("Gave up waiting for external DNS, removing pod so it can be recreated",
+				"cluster", c.namespacedName(), "pod", pod.Name)
+			c.handleTimedOutPendingPod(pod)
 			continue
 		}
 

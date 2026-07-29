@@ -1350,9 +1350,11 @@ func TestUpdatingAlternateAddressExternalDNSCheckDoesNotEjectActivatedNodes(t *t
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
-// TestAlternateAddressExternalDNSCheckEjectsNewPods tests that new pods that have not been
-// activated in the cluster are ejected if the DNS check timeout is reached.
-func TestAlternateAddressExternalDNSCheckEjectsNewPods(t *testing.T) {
+// TestAlternateAddressExternalDNSCheckHoldsOutUnreachableNewPods tests that a new pod
+// whose external DNS never becomes reachable is never added to the cluster. It is held
+// out until the reachable timeout, then removed, and a replacement (with valid DNS) is
+// added in its place.
+func TestAlternateAddressExternalDNSCheckHoldsOutUnreachableNewPods(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global
 
@@ -1383,57 +1385,59 @@ func TestAlternateAddressExternalDNSCheckEjectsNewPods(t *testing.T) {
 		DNS: &couchbasev2.DNS{
 			Domain: testDomain,
 		},
-		WaitForAddressReachableDelay: &metav1.Duration{Duration: time.Minute},
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 10 * time.Second},
 		WaitForAddressReachable:      &metav1.Duration{Duration: 90 * time.Second},
 		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
 	}
 
-	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+	// Create the cluster without waiting for it to become healthy, the second member's
+	// DNS is never resolved, so it is held out and the cluster never reaches full size
+	// on its own. Waiting for healthy here would deadlock.
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, cluster, -1)
 
-	// Wait until all the cluster pods have been created
-	pods := e2eutil.MustWaitForClusterPods(t, kubernetes, cluster, clusterSize, time.Minute)
+	// Wait until both pods are scheduled (needed for the DNS entries below).
+	pods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, clusterSize, 5*time.Minute)
 
-	// Initially only add a single pod to the mocked dns.
+	// Resolve DNS for the first pod only. The second is deliberately left unresolved.
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, pods[:1])
 
-	// Only the pod with the dns entry will be marked as ready. This may take a moment as coredns will need to reload.
+	// The first pod joins and becomes ready.
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[0].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", 2*time.Minute)
 
-	// The other pod will be waiting for readiness.
+	// The second pod is held out on DNS, it waits for propagation and is never marked ready.
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
 	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[1].Name, k8sutil.PodReadinessCondition, time.Minute)
 
-	// Wait until the second pod is waiting for propagation, then wait for propagation to hit the timeout and the pod to be ejected as it was never activated.
-	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[1].Name, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 1*time.Minute)
-	e2eutil.MustWaitForRebalanceEjectingNode(t, kubernetes, cluster, pods[1].Name, 10*time.Minute)
+	// It is never added to the cluster. Once the reachable timeout elapses the operator
+	// gives up and removes it, raising a member creation failed event.
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberCreationFailedEvent(cluster, 1), 5*time.Minute)
 
-	// Fetch the new pod created by the operator and add it to the dns forwarding list.
+	// The operator creates a replacement. Resolve its DNS so it can join.
 	newMemberName := couchbaseutil.CreateMemberName(cluster.Name, 2)
-	pod3 := e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMemberName, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Delaying DNS Check", 1*time.Minute)
+	pod3 := e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMemberName, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 3*time.Minute)
 	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, []corev1.Pod{*pod3})
 
-	// We expect the cluster to enter a healthy state once all the pods' external addresses can be reached.
+	// With the replacement reachable, the cluster reaches a healthy two node state.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
 
 	// Check that the alternate addresses have been added to the cluster.
 	e2eutil.MustCheckForDNSAlternateAddresses(t, cluster, testDomain, 2*time.Minute)
 	e2eutil.MustCheckForDNSServiceAnnotations(t, kubernetes, cluster, testDomain, time.Minute)
 
-	// Make sure neither of the pods have the pending external DNS condition.
+	// Make sure the two active members do not have the pending external DNS condition.
 	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, pods[0].Name, k8sutil.PodPendingExternalDNSCondition, time.Minute)
 	e2eutil.MustWaitForPodWithoutCondition(t, kubernetes, newMemberName, k8sutil.PodPendingExternalDNSCondition, time.Minute)
 
-	// Check that both of the pods are marked as ready.
+	// Check that both active members are marked as ready.
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, pods[0].Name, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
 	e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMemberName, k8sutil.PodReadinessCondition, corev1.ConditionTrue, "", time.Minute)
 
-	// We expect the first two members to be added, the latter of which should be ejected as the DNS check
-	// will fail given we didn't add it to the dns forwarding list. Once the third member is added, we expect
-	// the cluster rebalance to complete as the DNS check will now pass.
+	// We expect the first member to be added, the second to never be added (its creation
+	// fails as its DNS is never reachable), and the replacement to be added and rebalanced
+	// in once its DNS is resolved.
 	expectedEvents := []eventschema.Validatable{
-		eventschema.Repeat{Times: 2, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved, FuzzyMessage: pods[1].Name},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonMemberCreationFailed, FuzzyMessage: pods[1].Name},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded, FuzzyMessage: newMemberName},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -1520,6 +1524,84 @@ func TestAllowExternallyUnreachablePodsActivatesUnreachablePods(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// TestExternalDNSDoesNotBlockRebalance checks that new nodes still waiting on
+// external DNS are held out of the cluster, so they do not block rebalances of
+// the existing members. It scales the cluster up while leaving the new node's
+// DNS unresolved, then recovers an existing member and confirms that recovery
+// still rebalances even though the new nodes are stuck waiting on DNS.
+func TestExternalDNSDoesNotBlockRebalance(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+
+	defer cleanup()
+
+	testDomain := "dnstest.com"
+
+	// Provision a mock external DNS. It starts with no entries, so a pod's
+	// external address only becomes reachable once we add it. This lets us
+	// control exactly when DNS propagates for each pod.
+	dns := e2eutil.MustProvisionCoreDNSForExternalDNSCheck(t, kubernetes, testDomain)
+	e2eutil.MustUpdateOperatorDeploymentDNSConfig(t, kubernetes, dns)
+
+	initialSize := constants.Size3
+	scaledSize := constants.Size5
+
+	cluster := clusterOptions().WithEphemeralTopology(initialSize).WithDNS(dns).Generate(kubernetes)
+	cluster.Name = "test-couchbase-" + e2eutil.RandomSuffix()
+	cluster.Spec.Networking = couchbasev2.CouchbaseClusterNetworkingSpec{
+		DNS: &couchbasev2.DNS{
+			Domain: testDomain,
+		},
+		// Short delay so the reachability check starts quickly, and a generous
+		// timeout so the unresolved new nodes keep waiting (rather than being
+		// removed) for the duration of the test.
+		WaitForAddressReachableDelay: &metav1.Duration{Duration: 10 * time.Second},
+		WaitForAddressReachable:      &metav1.Duration{Duration: 30 * time.Minute},
+		ExposedFeatures:              []couchbasev2.ExposedFeature{couchbasev2.FeatureClient},
+	}
+
+	// Create the cluster but do not wait for it to become healthy yet. Only the
+	// first pod (0000) creates the cluster without a DNS check, the other initial
+	// pods (0001, 0002) join an existing cluster and so must pass the external
+	// DNS pre check first. They cannot join until we resolve their DNS on the
+	// next lines, so waiting for healthy inside this call would deadlock.
+	cluster = e2eutil.CreateNewClusterFromSpec(t, kubernetes, cluster, -1)
+
+	// Resolve DNS for the initial members so the cluster can come up healthy.
+	initialPods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, initialSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, initialPods)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionBalanced, corev1.ConditionTrue, cluster, 5*time.Minute)
+
+	// Scale up, but deliberately leave the new member's DNS unresolved. They
+	// should be held out of the cluster, waiting on external DNS.
+	cluster = e2eutil.MustScaleServices(t, kubernetes, cluster, map[string]int{"default": scaledSize}, time.Minute)
+
+	newMember1 := couchbaseutil.CreateMemberName(cluster.Name, 3)
+	newMember2 := couchbaseutil.CreateMemberName(cluster.Name, 4)
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMember1, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 3*time.Minute)
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMember2, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", 3*time.Minute)
+
+	// While the new members wait on DNS, recover an existing member by killing
+	// its pod but keeping its volume. The recovered pod rejoins from its PVC
+	// (which does not need external DNS) and the operator rebalances it back in,
+	// which must not be blocked by the new members still waiting on DNS.
+	victim := 1
+	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victim, false)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+
+	// The new members should still be waiting on DNS, recovering another member
+	// must not have pulled them into the cluster.
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMember1, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", time.Minute)
+	e2eutil.MustWaitForPodWithCondition(t, kubernetes, newMember2, k8sutil.PodPendingExternalDNSCondition, corev1.ConditionTrue, "Waiting on DNS Propagation", time.Minute)
+
+	// Finally, resolve the new member's DNS. They should now join and the
+	// cluster should scale to the requested size and return to balanced.
+	allPods := e2eutil.MustWaitForScheduledClusterPods(t, kubernetes, cluster, scaledSize, 5*time.Minute)
+	e2eutil.MustAddPodsForDNSCheck(t, kubernetes, dns.GetName(), testDomain, allPods)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionBalanced, corev1.ConditionTrue, cluster, 10*time.Minute)
 }
 
 // TestPodUpgradesWaitForDNSAvailableBeforeEjection tests that ejected pods are not destroyed if we aren't able to rebalance the cluster, such
