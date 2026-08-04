@@ -12,6 +12,7 @@ package couchbaseutil
 
 import (
 	"encoding/json"
+	"net/url"
 	"reflect"
 	"testing"
 
@@ -853,5 +854,84 @@ func TestMarshalEncryptionKeys(t *testing.T) {
 	expected = `{"type":"kmip-aes-key-256","name":"testKMIPKey","usage":["KEK-encryption","bucket-encryption","config-encryption","log-encryption","audit-encryption"],"data":{"host":"testHost","port":1111,"reqTimeoutMs":1900,"activeKey":{"kmipId":"testKmipId"},"keyPath":"testKeyPath","certPath":"testCertPath","keyPassphrase":"testKeyPassphrase"}}`
 	if string(encoded) != expected {
 		t.Errorf("Expected: %s - Got: %s", expected, string(encoded))
+	}
+}
+
+// TestFormEncodeDataServiceRebalanceType checks that the per bucket Data Service rebalance type is
+// form encoded for the server.
+func TestFormEncodeDataServiceRebalanceType(t *testing.T) {
+	testcases := []struct {
+		name             string
+		rebalanceType    string
+		update           bool
+		duringMigration  bool
+		expectedPresent  bool
+		expectedEncoding string
+	}{
+		{
+			name:             "auto is encoded on create",
+			rebalanceType:    "auto",
+			expectedPresent:  true,
+			expectedEncoding: "auto",
+		},
+		{
+			name:             "preferFileBased is encoded on create",
+			rebalanceType:    "preferFileBased",
+			expectedPresent:  true,
+			expectedEncoding: "preferFileBased",
+		},
+		{
+			name:             "preferDcp is encoded on create",
+			rebalanceType:    "preferDcp",
+			expectedPresent:  true,
+			expectedEncoding: "preferDcp",
+		},
+		{
+			name:             "the field is valid on update too, not just create",
+			rebalanceType:    "preferDcp",
+			update:           true,
+			expectedPresent:  true,
+			expectedEncoding: "preferDcp",
+		},
+		{
+			name:            "an unset value is omitted entirely",
+			rebalanceType:   "",
+			expectedPresent: false,
+		},
+		{
+			// A storage migration forces DCP moves regardless of the bucket's preference, and the
+			// server only accepts a small whitelist of fields while one is in flight.
+			name:            "the field is not sent during a bucket migration",
+			rebalanceType:   "preferDcp",
+			update:          true,
+			duringMigration: true,
+			expectedPresent: false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			bucket := &Bucket{
+				BucketName:               "test",
+				BucketType:               "couchbase",
+				DataServiceRebalanceType: tc.rebalanceType,
+			}
+
+			values, err := url.ParseQuery(string(bucket.FormEncode(tc.update, tc.duringMigration)))
+			if err != nil {
+				t.Fatalf("failed to parse the encoded form: %v", err)
+			}
+
+			encoded, present := values["dataServiceRebalanceType"]
+
+			if present != tc.expectedPresent {
+				t.Fatalf("expected dataServiceRebalanceType present=%v, got present=%v (form: %v)",
+					tc.expectedPresent, present, values)
+			}
+
+			if tc.expectedPresent && encoded[0] != tc.expectedEncoding {
+				t.Errorf("expected dataServiceRebalanceType=%q, got %q", tc.expectedEncoding, encoded[0])
+			}
+		})
 	}
 }

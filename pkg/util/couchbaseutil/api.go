@@ -1102,6 +1102,37 @@ func SetDataServiceSettings(settings *DataServiceSettings) *Request {
 	return NewRequest((*Client).Post, "/settings/dataService", data, nil)
 }
 
+// GetInternalSettings gets the subset of /internalSettings that the operator manages.
+func GetInternalSettings(settings *InternalSettings) *Request {
+	return NewRequest((*Client).Get, "/internalSettings", nil, settings)
+}
+
+// SetInternalSettings sets the subset of /internalSettings that the operator manages. POST to this
+// endpoint is a partial update, so only the fields modelled by InternalSettings are affected.
+func SetInternalSettings(settings *InternalSettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/internalSettings", data, nil)
+}
+
+// GetRebalanceSettings gets the cluster's vBucket move concurrency settings.
+func GetRebalanceSettings(settings *RebalanceSettings) *Request {
+	return NewRequest((*Client).Get, "/settings/rebalance", nil, settings)
+}
+
+// SetRebalanceSettings sets the cluster's vBucket move concurrency settings.
+func SetRebalanceSettings(settings *RebalanceSettings) *Request {
+	data, err := urlencoding.Marshal(settings)
+	if err != nil {
+		return NewRequestError(err)
+	}
+
+	return NewRequest((*Client).Post, "/settings/rebalance", data, nil)
+}
+
 func GetResourceManagementSettings(settings *ResourceManagementSettings) *Request {
 	return NewRequest((*Client).Get, "/settings/resourceManagement", nil, settings)
 }

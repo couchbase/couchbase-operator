@@ -152,6 +152,7 @@ func registerTests() {
 		framework.NewTestDef(TestBucketCRDFieldsForNonDefaultUnsupportedFieldsValidatioCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketSelectorInvalidNameRegexCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketSelectorInvalidNameRegexApply).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationRebalanceSettings).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -537,6 +538,8 @@ func registerTests() {
 		framework.NewTestDef(TestBackupLegacyCustomObjEndpointWithCert).WithTags(TagSuiteP0, TagFeatureBackup),
 		framework.NewTestDef(TestCreateInitNodeHostNameCluster).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
 		framework.NewTestDef(TestCreateInitNodeHostNameClusterServerGroups).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
+		framework.NewTestDef(TestModifyRebalanceEnabledAndSettings).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestBucketDataServiceRebalanceType).WithTags(TagSuiteP0, TagFeatureReconcile),
 
 		// Old P0s now P1s
 		framework.NewTestDef(TestAutoscaleUpMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling, TagSuitePlatform),

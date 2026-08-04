@@ -514,6 +514,73 @@ func TestEditEphemeralBucketKVThrottle(t *testing.T) {
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleHardLimit", &throttleHardLimit), time.Minute)
 }
 
+// TestBucketDataServiceRebalanceType tests that the operator sends the correct rebalance type to the server for both couchbase and ephemeral buckets.
+func TestBucketDataServiceRebalanceType(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).CouchbaseBucket()
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if !isAtleast81 {
+		t.Skip("per bucket Data Service rebalance type requires Couchbase Server 8.1.0 or later")
+	}
+
+	// The values a user can explicitly ask for but "auto" since it's the default behaviour.
+	rebalanceTypes := []couchbasev2.DataServiceRebalanceType{
+		couchbasev2.DataServiceRebalanceTypePreferDcp,
+		couchbasev2.DataServiceRebalanceTypePreferFileBased,
+	}
+
+	couchbaseBucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "rebalance-type-couchbase"},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota: e2espec.NewResourceQuantityMi(100),
+		},
+	})
+
+	ephemeralBucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "rebalance-type-ephemeral"},
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota: e2espec.NewResourceQuantityMi(100),
+		},
+	})
+
+	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, couchbaseBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, ephemeralBucket, time.Minute)
+
+	for _, testcase := range []struct {
+		name   string
+		bucket metav1.Object
+	}{
+		{name: "couchbase", bucket: couchbaseBucket},
+		{name: "ephemeral", bucket: ephemeralBucket},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			bucket := testcase.bucket
+
+			e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(),
+				jsonpatch.NewPatchSet().Test("/DataServiceRebalanceType", string(couchbasev2.DataServiceRebalanceTypeAuto)), time.Minute)
+
+			// 4. Patch each explicit value onto the bucket and check the server reports it back.
+			for _, rebalanceType := range rebalanceTypes {
+				bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket,
+					jsonpatch.NewPatchSet().Replace("/spec/dataServiceRebalanceType", rebalanceType), time.Minute)
+				e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(),
+					jsonpatch.NewPatchSet().Test("/DataServiceRebalanceType", string(rebalanceType)), time.Minute)
+			}
+		})
+	}
+}
+
 // Tests that the operator reverts bucket edits not made by the operator
 // 1. Create a one node cluster with one bucket
 // 2. Create a node port service so we can access the cluster externally

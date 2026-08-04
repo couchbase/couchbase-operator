@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -495,6 +496,91 @@ func (c *Cluster) reconcileClusterSettings() error {
 	if err := c.reconcileAppTelemetrySettings(); err != nil {
 		return err
 	}
+
+	if err := c.reconcileFileBasedRebalanceEnabled(); err != nil {
+		return err
+	}
+
+	if err := c.reconcileRebalanceSettings(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reconcileFileBasedRebalanceEnabled reconciles the cluster wide Data Service file based rebalance
+// switch, which users set with the cao.couchbase.com/dataServiceFileBasedRebalanceEnabled
+// annotation. Available in Couchbase Server 8.1.0+.
+//
+// The setting lives on /internalSettings, and InternalSettings struct models only that one key, so the other
+// internal settings are dropped on read and never sent on write. POST to /internalSettings is a
+// partial update, so this cannot clobber values the operator does not manage.
+func (c *Cluster) reconcileFileBasedRebalanceEnabled() error {
+	if !c.SupportsVersionFeatures("8.1.0") {
+		c.log.V(1).Info("File based rebalance setting not supported on this version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	current := couchbaseutil.InternalSettings{}
+	if err := couchbaseutil.GetInternalSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	// An absent annotation means "leave the server alone". The server default is enabled, so absent
+	// and true are equivalent, and there is no default to synthesize to keep DeepEqual stable.
+	// This also has a second order effect where if the annotation was set to false
+	// and then removed, the operator will not revert the setting to true, which is what we want.
+	if enabled := c.cluster.Spec.ClusterSettings.FileBasedRebalanceEnabled; enabled != nil {
+		requested.DataServiceFileBasedRebalanceEnabled = enabled
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetInternalSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.log.V(2).Info("File based rebalance setting updated", "cluster", c.namespacedName(), "enabled", requested.DataServiceFileBasedRebalanceEnabled)
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("file based rebalance", c.cluster))
+
+	return nil
+}
+
+// reconcileRebalanceSettings reconciles vBucket move concurrency against /settings/rebalance.
+func (c *Cluster) reconcileRebalanceSettings() error {
+	current := couchbaseutil.RebalanceSettings{}
+	if err := couchbaseutil.GetRebalanceSettings(&current).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	requested := current
+
+	// A present block makes the CR authoritative: an unset field reverts to the server's default
+	// rather than keeping whatever happened to be configured before. An absent block leaves the
+	// cluster alone entirely, so the operator does not take ownership of settings the user has not
+	// asked it to manage.
+	if rebalance := c.cluster.Spec.ClusterSettings.Rebalance; rebalance != nil {
+		requested.RebalanceMovesPerNode = ptr.To(ptr.Deref(rebalance.MovesPerNode, constants.RebalanceMovesPerNodeDefault))
+
+		if c.SupportsVersionFeatures("8.1.0") {
+			requested.DataServiceFileBasedRebalanceMovesPerNode = ptr.To(ptr.Deref(rebalance.FileBasedMovesPerNode, constants.RebalanceMovesPerNodeDefault))
+		}
+	}
+
+	if reflect.DeepEqual(current, requested) {
+		return nil
+	}
+
+	if err := couchbaseutil.SetRebalanceSettings(&requested).On(c.api, c.readyMembers()); err != nil {
+		return err
+	}
+
+	c.log.V(2).Info("Rebalance settings updated", "cluster", c.namespacedName(), "requested", requested)
+	c.raiseEvent(k8sutil.ClusterSettingsEditedEvent("rebalance settings", c.cluster))
 
 	return nil
 }

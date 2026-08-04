@@ -127,6 +127,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintEncryptionKeys,
 		checkConstraintsPasswordPolicy,
 		checkConstraintsUpgrade,
+		checkConstraintsRebalanceSettings,
 	}
 
 	warningChecks := []func(*types.Validator, *couchbasev2.CouchbaseCluster) ([]string, error){
@@ -141,6 +142,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintDeprecatedRBACRoles,
 		checkConstraintBucketsMeetMinReplicasCount,
 		checkConstraintBucketsThrottleReservedWithinNodeCapacity,
+		checkConstraintFileBasedRebalanceSupported,
 	}
 
 	var errs []error
@@ -2689,6 +2691,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if err := checkBucketThrottleSettings(bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkEphemeralBucketUnsupportedFields(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -6327,6 +6333,51 @@ func checkConstraintsDataSettings(v *types.Validator, cluster *couchbasev2.Couch
 	return nil
 }
 
+// checkConstraintsRebalanceSettings gates the parts of spec.cluster.rebalance that require a newer
+// Couchbase Server release..
+//
+// spec.cluster.rebalance.movesPerNode is intentionally not checked here it predates file based rebalance
+// and is not dependent on 8.1.0+. The 1 to 64 range for both fields is enforced by the CRD schema, so it does not need repeating here.
+func checkConstraintsRebalanceSettings(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	rebalance := cluster.Spec.ClusterSettings.Rebalance
+	if rebalance == nil || rebalance.FileBasedMovesPerNode == nil {
+		return nil
+	}
+
+	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	if err != nil {
+		return err
+	}
+
+	if !atLeast81 {
+		return fmt.Errorf("spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.1.0+")
+	}
+
+	return nil
+}
+
+// checkConstraintFileBasedRebalanceSupported warns when the file based rebalance annotation is set on
+// a cluster running a Couchbase Server release older than 8.1.0, where the setting does not exist.
+func checkConstraintFileBasedRebalanceSupported(_ *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	if cluster.Spec.ClusterSettings.FileBasedRebalanceEnabled == nil {
+		return nil, nil
+	}
+
+	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	if err != nil {
+		return nil, err
+	}
+
+	if atLeast81 {
+		return nil, nil
+	}
+
+	return []string{
+		"Annotation 'cao.couchbase.com/dataServiceFileBasedRebalanceEnabled' has no effect on Couchbase " +
+			"Server releases before 8.1.0 and will be ignored.",
+	}, nil
+}
+
 // checkConstraintsPasswordPolicy validates passwordPolicy fields that are only supported on 8.0.0+.
 func checkConstraintsPasswordPolicy(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
 	if cluster.Spec.Security.PasswordPolicy == nil {
@@ -7204,13 +7255,75 @@ func checkBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.Couchb
 			return err
 		}
 
-		if atLeast80 {
-			continue
-		}
-
-		if bucket.Spec.DurabilityImpossibleFallback != "" {
+		// Each server version restriction needs its own guard. This deliberately does not `continue`
+		// when the cluster is at least 8.0.0, because a check for a field introduced in a later
+		// release would then never run against an 8.0.x cluster, which is precisely the case it
+		// needs to reject.
+		if !atLeast80 && bucket.Spec.DurabilityImpossibleFallback != "" {
 			return fmt.Errorf("spec.durabilityImpossibleFallback can only be set for Couchbase Server 8.0.0+")
 		}
+
+		if err := checkBucketDataServiceRebalanceType(c, bucket.Spec.DataServiceRebalanceType); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkEphemeralBucketUnsupportedFields is the ephemeral bucket counterpart of
+// checkBucketUnsupportedFields.
+//
+// It intentionally does not carry the 8.0.0 spec.durabilityImpossibleFallback check that the
+// couchbase bucket variant does. Ephemeral buckets have never been validated for that field, and
+// adding it here would start rejecting manifests that are accepted today.
+func checkEphemeralBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+	// Nothing version restricted is set, so there is no need to resolve the bucket's clusters. This
+	// keeps the common case free of the cluster lookup, which can itself fail.
+	if bucket.Spec.DataServiceRebalanceType == "" {
+		return nil
+	}
+
+	clusters := []*couchbasev2.CouchbaseCluster{}
+	if cluster != nil {
+		clusters = []*couchbasev2.CouchbaseCluster{cluster}
+	} else {
+		bClusters, err := getEphemeralBucketsRelatedClusters(v, bucket)
+		if err != nil {
+			return err
+		}
+
+		clusters = append(clusters, bClusters...)
+	}
+
+	for _, c := range clusters {
+		if err := annotations.Populate(&c.Spec, c.Annotations); err != nil {
+			return err
+		}
+
+		if err := checkBucketDataServiceRebalanceType(c, bucket.Spec.DataServiceRebalanceType); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkBucketDataServiceRebalanceType rejects spec.dataServiceRebalanceType on clusters running a
+// Couchbase Server release older than 8.1.0, which is when the field was introduced. Shared by the
+// couchbase and ephemeral bucket paths, both of which support the setting.
+func checkBucketDataServiceRebalanceType(cluster *couchbasev2.CouchbaseCluster, rebalanceType couchbasev2.DataServiceRebalanceType) error {
+	if rebalanceType == "" {
+		return nil
+	}
+
+	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	if err != nil {
+		return err
+	}
+
+	if !atLeast81 {
+		return fmt.Errorf("spec.dataServiceRebalanceType can only be set for Couchbase Server 8.1.0+")
 	}
 
 	return nil

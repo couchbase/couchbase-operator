@@ -538,6 +538,7 @@ type Bucket struct {
 	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
 	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
 	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
+	DataServiceRebalanceType            string                       `json:"dataServiceRebalanceType,omitempty"`
 }
 
 type BucketList []Bucket
@@ -607,6 +608,7 @@ type BucketStatus struct {
 	EncryptionAtRestDekLifetime         *int                         `json:"encryptionAtRestDekLifetime,omitempty"`
 	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
 	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
+	DataServiceRebalanceType            string                       `json:"dataServiceRebalanceType,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -958,6 +960,7 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 	b.NumVBuckets = status.NumVBuckets
 	b.ThrottleReserved = status.ThrottleReserved
 	b.ThrottleHardLimit = status.ThrottleHardLimit
+	b.DataServiceRebalanceType = status.DataServiceRebalanceType
 
 	if b.BucketType == "ephemeral" {
 		return nil
@@ -988,6 +991,10 @@ func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 
 	// During migration, only send fields that the server allows to be modified.
 	// Couchbase Server allows: storageBackend, evictionPolicy (with noRestart=true), and ramQuota.
+	//
+	// Note this deliberately excludes dataServiceRebalanceType. A storage migration forces DCP
+	// vBucket moves regardless of the bucket's preference, so there is nothing to gain by sending
+	// it here, and it is applied on the next normal reconcile once the migration completes.
 	if duringMigration {
 		if b.BucketStorageBackend != "" {
 			data.Set("storageBackend", string(b.BucketStorageBackend))
@@ -1141,6 +1148,12 @@ func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 
 	if b.ThrottleHardLimit != nil {
 		data.Set("throttleHardLimit", strconv.FormatUint(*b.ThrottleHardLimit, 10))
+	}
+
+	// Valid on both create and update, for couchbase and ephemeral buckets alike. The accepted
+	// values are enumerated by couchbasev2.DataServiceRebalanceType.
+	if b.DataServiceRebalanceType != "" {
+		data.Set("dataServiceRebalanceType", b.DataServiceRebalanceType)
 	}
 
 	return []byte(data.Encode())
@@ -2395,6 +2408,24 @@ type DataServiceSettings struct {
 
 type RebalanceProgress struct {
 	Status RebalanceStatus `json:"status"`
+}
+
+// InternalSettings models the subset of /internalSettings that the operator manages.
+//
+// We're purposely not modeling the entire payload and just this field
+// since these are critical settings and should be handled with care! So only tinker if you know what you're doing.
+type InternalSettings struct {
+	DataServiceFileBasedRebalanceEnabled *bool `json:"dataServiceFileBasedRebalanceEnabled,omitempty" url:"dataServiceFileBasedRebalanceEnabled,omitempty"`
+}
+
+// RebalanceSettings models /settings/rebalance, which controls how many vBucket moves the cluster
+// performs concurrently during a rebalance.
+//
+// The fields are pointers so that urlencoding's omitempty distinguishes "not set" from a genuine
+// value. A plain int would be indistinguishable from zero and would be silently dropped.
+type RebalanceSettings struct {
+	RebalanceMovesPerNode                     *int `json:"rebalanceMovesPerNode,omitempty" url:"rebalanceMovesPerNode,omitempty"`
+	DataServiceFileBasedRebalanceMovesPerNode *int `json:"dataServiceFileBasedRebalanceMovesPerNode,omitempty" url:"dataServiceFileBasedRebalanceMovesPerNode,omitempty"`
 }
 
 type ResourceManagementSettings struct {

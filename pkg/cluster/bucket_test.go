@@ -507,3 +507,154 @@ func floatPtr(f float64) *float64 {
 func intPtr(i int) *int {
 	return &i
 }
+
+// TestGatherBucketsDataServiceRebalanceType checks the per bucket Data Service rebalance type for
+// both couchbase and ephemeral buckets, which support the setting identically: values the user set
+// are passed through, an omitted value falls back to the server's own default of "auto", and nothing
+// is set below 8.1.0 where the field does not exist.
+//
+// The defaulting is the important part. See TestGatherBucketsRebalanceTypeIsIdempotent for why.
+func TestGatherBucketsDataServiceRebalanceType(t *testing.T) {
+	// gatherCouchbaseBuckets and gatherEphemeralBuckets take different bucket types and argument
+	// lists, so each kind supplies a closure that gathers a single bucket carrying the given spec
+	// value and returns the rebalance type the operator would send to the server. Every case below
+	// then runs against both kinds, which is what keeps the two paths from drifting apart.
+	bucketKinds := []struct {
+		name   string
+		gather func(SupportedFeatureMap, couchbasev2.DataServiceRebalanceType) string
+	}{
+		{
+			name: "couchbase",
+			gather: func(features SupportedFeatureMap, specValue couchbasev2.DataServiceRebalanceType) string {
+				k8sBuckets := []*couchbasev2.CouchbaseBucket{{
+					Spec: couchbasev2.CouchbaseBucketSpec{
+						Name:                     "test",
+						MemoryQuota:              resource.NewQuantity(100, resource.BinarySI),
+						DataServiceRebalanceType: specValue,
+					},
+				}}
+
+				gathered := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+
+				return gathered[0].DataServiceRebalanceType
+			},
+		},
+		{
+			name: "ephemeral",
+			gather: func(features SupportedFeatureMap, specValue couchbasev2.DataServiceRebalanceType) string {
+				k8sBuckets := []*couchbasev2.CouchbaseEphemeralBucket{{
+					Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+						Name:                     "test",
+						MemoryQuota:              resource.NewQuantity(100, resource.BinarySI),
+						DataServiceRebalanceType: specValue,
+					},
+				}}
+
+				gathered := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, nil, &couchbasev2.CouchbaseCluster{})
+
+				return gathered[0].DataServiceRebalanceType
+			},
+		},
+	}
+
+	testcases := []struct {
+		name          string
+		supported     bool
+		specValue     couchbasev2.DataServiceRebalanceType
+		expectedValue string
+	}{
+		{
+			name:          "auto is passed through",
+			supported:     true,
+			specValue:     couchbasev2.DataServiceRebalanceTypeAuto,
+			expectedValue: "auto",
+		},
+		{
+			name:          "preferFileBased is passed through",
+			supported:     true,
+			specValue:     couchbasev2.DataServiceRebalanceTypePreferFileBased,
+			expectedValue: "preferFileBased",
+		},
+		{
+			name:          "preferDcp is passed through",
+			supported:     true,
+			specValue:     couchbasev2.DataServiceRebalanceTypePreferDcp,
+			expectedValue: "preferDcp",
+		},
+		{
+			name:          "an omitted value defaults to auto so the reconciler settles",
+			supported:     true,
+			specValue:     "",
+			expectedValue: "auto",
+		},
+		{
+			// Below 8.1.0 the field must stay empty so that FormEncode omits it entirely, rather
+			// than sending a key the server does not understand.
+			name:          "not set when the feature is unsupported",
+			supported:     false,
+			specValue:     couchbasev2.DataServiceRebalanceTypePreferDcp,
+			expectedValue: "",
+		},
+	}
+
+	for _, kind := range bucketKinds {
+		t.Run(kind.name, func(t *testing.T) {
+			for _, tc := range testcases {
+				t.Run(tc.name, func(t *testing.T) {
+					features := SupportedFeatureMap{SupportedFileBasedRebalance: tc.supported}
+
+					if gathered := kind.gather(features, tc.specValue); gathered != tc.expectedValue {
+						t.Errorf("DataServiceRebalanceType: expected %q, got %q", tc.expectedValue, gathered)
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestGatherBucketsRebalanceTypeIsIdempotent guards against a reconcile hot loop.
+//
+// inspectBuckets compares the whole requested bucket against the bucket the server reports with
+// reflect.DeepEqual, and updates it on any difference. The server always reports
+// dataServiceRebalanceType, defaulting it to "auto". If the operator left the field empty when the
+// user omits it, requested ("") would never equal actual ("auto"), so every reconcile would POST
+// every bucket forever. This asserts the gathered value matches what a server would report for a
+// bucket the user has not configured.
+func TestGatherBucketsRebalanceTypeIsIdempotent(t *testing.T) {
+	// What the server reports back for a bucket where the user never set the field.
+	const serverReportedDefault = "auto"
+
+	features := SupportedFeatureMap{SupportedFileBasedRebalance: true}
+
+	couchbaseBucket := []*couchbasev2.CouchbaseBucket{{
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			Name:        "test",
+			MemoryQuota: resource.NewQuantity(100, resource.BinarySI),
+		},
+	}}
+
+	ephemeralBucket := []*couchbasev2.CouchbaseEphemeralBucket{{
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			Name:        "test",
+			MemoryQuota: resource.NewQuantity(100, resource.BinarySI),
+		},
+	}}
+
+	gathered := map[string]string{
+		"couchbase": gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)[0].DataServiceRebalanceType,
+		"ephemeral": gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, ephemeralBucket, nil, nil, &couchbasev2.CouchbaseCluster{})[0].DataServiceRebalanceType,
+	}
+
+	for bucketType, value := range gathered {
+		if value != serverReportedDefault {
+			t.Errorf("%s bucket: gathered %q but the server reports %q, so the reconciler would update the bucket on every loop",
+				bucketType, value, serverReportedDefault)
+		}
+	}
+
+	// Gathering twice must produce the same value, a second pass must not drift.
+	second := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	if second[0].DataServiceRebalanceType != gathered["couchbase"] {
+		t.Errorf("gathering twice was not stable: first %q, second %q", gathered["couchbase"], second[0].DataServiceRebalanceType)
+	}
+}

@@ -1298,6 +1298,80 @@ func TestModifyDataServiceSettings(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestModifyRebalanceEnabledAndSettings covers the two cluster wide rebalance controls added for Couchbase
+// Server 8.1.0: the file based rebalance switch, set with an annotation and written to
+// /internalSettings, and vBucket move concurrency, set in spec.cluster.rebalance and written to
+// /settings/rebalance.
+//
+// The whole test requires 8.1.0+, because these settings do not exist before then. The
+// behaviour of movesPerNode on an older cluster, which is deliberately not version gated, belongs
+// with the upgrade tests instead.
+func TestModifyRebalanceEnabledAndSettings(t *testing.T) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.1.0")
+
+	// Static configuration.
+	clusterSize := 1
+
+	const fileBasedRebalanceAnnotation = "cao.couchbase.com/dataServiceFileBasedRebalanceEnabled"
+	// The server default for both concurrency knobs, and what an unset subfield reverts to.
+	const defaultMovesPerNode = 4
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+
+	// Ensure defaults are set
+	e2eutil.MustVerifyFileBasedRebalanceEnabled(t, kubernetes, cluster, true, time.Minute)
+	e2eutil.MustVerifyRebalanceSettings(t, kubernetes, cluster, defaultMovesPerNode, defaultMovesPerNode, time.Minute)
+
+	// Disable file rebalance and confirm it's disabled
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Add("/metadata/annotations", withAnnotation(cluster, fileBasedRebalanceAnnotation, "false")), time.Minute)
+
+	e2eutil.MustVerifyFileBasedRebalanceEnabled(t, kubernetes, cluster, false, time.Minute)
+
+	// Turning it back on must work too, so that the annotation is a real switch rather than a
+	// one way door.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster,
+		jsonpatch.NewPatchSet().Add("/metadata/annotations", withAnnotation(cluster, fileBasedRebalanceAnnotation, "true")), time.Minute)
+
+	e2eutil.MustVerifyFileBasedRebalanceEnabled(t, kubernetes, cluster, true, time.Minute)
+
+	// Now the concurrency knobs. Set both and check the server reports them back.
+	movesPerNode := 8
+	fileBasedMovesPerNode := 16
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Add("/spec/cluster/rebalance",
+		&couchbasev2.ClusterRebalanceSettings{
+			MovesPerNode:          &movesPerNode,
+			FileBasedMovesPerNode: &fileBasedMovesPerNode,
+		}), time.Minute)
+
+	e2eutil.MustVerifyRebalanceSettings(t, kubernetes, cluster, movesPerNode, fileBasedMovesPerNode, time.Minute)
+}
+
+// withAnnotation returns the cluster's annotations with key set to value, leaving any other
+// annotations intact.
+//
+// Patching /metadata/annotations replaces the whole map, and clusterOptions may have set annotations
+// of its own, so building the full map is safer than adding a single child path. It also avoids
+// having to JSON Pointer escape the slash in the annotation name.
+func withAnnotation(cluster *couchbasev2.CouchbaseCluster, key, value string) map[string]string {
+	merged := map[string]string{}
+
+	for existing, existingValue := range cluster.Annotations {
+		merged[existing] = existingValue
+	}
+
+	merged[key] = value
+
+	return merged
+}
+
 func TestAppTelemetrySettings(t *testing.T) {
 	// Platform configuration.
 	f := framework.Global

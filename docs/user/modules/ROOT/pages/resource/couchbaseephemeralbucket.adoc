@@ -22,6 +22,7 @@ The following is an example resource, depicting the overall structure and any de
 <<couchbaseephemeralbuckets-spec,spec>>:
   <<couchbaseephemeralbuckets-spec-compressionmode,compressionMode>>: passive
   <<couchbaseephemeralbuckets-spec-conflictresolution,conflictResolution>>: seqno
+  <<couchbaseephemeralbuckets-spec-dataservicerebalancetype,dataServiceRebalanceType>>: ""
   <<couchbaseephemeralbuckets-spec-durabilityimpossiblefallback,durabilityImpossibleFallback>>: ""
   <<couchbaseephemeralbuckets-spec-enablecrossclusterversioning,enableCrossClusterVersioning>>: false
   <<couchbaseephemeralbuckets-spec-enableflush,enableFlush>>: false
@@ -133,6 +134,39 @@ Timestamp based resolution selects the document that was written to most recentl
 most recent.
 This field must be "seqno" (sequence based), or "lww" (timestamp based),
 defaulting to "seqno".
+
+=== couchbaseephemeralbuckets.spec.dataServiceRebalanceType
+
+==== Constraints
+
+*Type*: `string`
+
+*Enumerations*: `auto, preferFileBased, preferDcp`
+
+==== Description
+
+DataServiceRebalanceType controls how the Data Service moves this bucket's vBuckets during a
+rebalance.
+During the backfill phase of a vBucket move the server can either copy the vBucket
+files directly from the source node to the destination node, which is significantly faster and
+uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
+Server 8.1.0.
+- "auto" lets the cluster manager choose for each move.
+In most cases, this is the right choice
+- "preferFileBased" asks it to favour file based moves wherever possible
+- "preferDcp" asks it to favour DCP.
+These are preferences rather than guarantees: the cluster manager still selects the method for
+each individual move, and always uses DCP while a storage migration or an eviction policy
+change is pending.
+This setting only biases a choice the cluster is already allowed to make.
+If file based
+rebalance is turned off for the whole cluster with the
+cao.couchbase.com/dataServiceFileBasedRebalanceEnabled annotation, every move uses DCP no matter
+what this is set to.
+The value is still accepted and stored in that case, and takes effect if
+the cluster level switch is turned back on.
+Defaults to "auto".
+This field is available in Couchbase Server 8.1.0 and later.
 
 === couchbaseephemeralbuckets.spec.durabilityImpossibleFallback
 

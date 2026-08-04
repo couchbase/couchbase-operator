@@ -43,6 +43,7 @@ const (
 	SupportedCrossClusterVersioning
 	Additional80Settings
 	SupportedKVThrottle
+	SupportedFileBasedRebalance
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -60,6 +61,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
 	supportedKVThrottle := supportedFeatures[SupportedKVThrottle]
+	supportedFileBasedRebalance := supportedFeatures[SupportedFileBasedRebalance]
 
 	for _, bucket := range k8sBuckets {
 		if client != nil {
@@ -239,6 +241,10 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 			setBucketThrottleSettings(&b, bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit)
 		}
 
+		if supportedFileBasedRebalance {
+			setBucketRebalanceType(&b, bucket.Spec.DataServiceRebalanceType)
+		}
+
 		autoCompactionSettings, purgeInterval := gatherBucketAutoCompactionSettings(bucket.Spec.AutoCompaction, b.BucketStorageBackend, cluster.Spec.ClusterSettings.AutoCompaction)
 		b.AutoCompactionSettings = autoCompactionSettings
 		b.PurgeInterval = purgeInterval
@@ -247,6 +253,16 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	}
 
 	return outputBuckets
+}
+
+// setBucketRebalanceType sets the bucket's Data Service rebalance type to the value from the CR
+// or to the server default if the CR omits it.
+func setBucketRebalanceType(b *couchbaseutil.Bucket, rebalanceType couchbasev2.DataServiceRebalanceType) {
+	if rebalanceType != "" {
+		b.DataServiceRebalanceType = string(rebalanceType)
+	} else {
+		b.DataServiceRebalanceType = constants.BucketDataServiceRebalanceTypeDefault
+	}
 }
 
 // setBucketThrottleSettings copies the bucket's KV rate limiting values from the CR onto the
@@ -301,12 +317,15 @@ func shouldSkipEphemeralBucket(client *client.Client, name string) bool {
 }
 
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
+//
+//nolint:gocognit
 func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
 	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
 	supportedKVThrottle := supportedFeatures[SupportedKVThrottle]
+	supportedFileBasedRebalance := supportedFeatures[SupportedFileBasedRebalance]
 
 	for _, bucket := range k8sEphemeralBuckets {
 		if shouldSkipEphemeralBucket(client, bucket.Name) {
@@ -383,6 +402,10 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 
 		if supportedKVThrottle {
 			setBucketThrottleSettings(&b, bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit)
+		}
+
+		if supportedFileBasedRebalance {
+			setBucketRebalanceType(&b, bucket.Spec.DataServiceRebalanceType)
 		}
 
 		outputBuckets = append(outputBuckets, b)
@@ -497,6 +520,9 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	// KV rate limiting (per bucket throttleReserved and throttleHardLimit) is available in 8.1.0+.
 	supportedFeatures[SupportedKVThrottle] = c.SupportsVersionFeatures("8.1.0")
+
+	// Per bucket Data Service rebalance type (dataServiceRebalanceType) is available in 8.1.0+.
+	supportedFeatures[SupportedFileBasedRebalance] = c.SupportsVersionFeatures("8.1.0")
 
 	allBuckets := []couchbaseutil.Bucket{}
 

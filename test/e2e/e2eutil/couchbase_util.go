@@ -1744,6 +1744,70 @@ func MustVerifyKVThrottleSettings(t *testing.T, k8s *types.Cluster, cluster *cou
 	}
 }
 
+// MustVerifyFileBasedRebalanceEnabled checks that the cluster wide Data Service file based rebalance
+// switch, which users set with the cao.couchbase.com/dataServiceFileBasedRebalanceEnabled annotation,
+// has reached the server.
+func MustVerifyFileBasedRebalanceEnabled(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedEnabled bool, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.InternalSettings{}
+
+		if err := couchbaseutil.GetInternalSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.DataServiceFileBasedRebalanceEnabled == nil {
+			return fmt.Errorf("expected dataServiceFileBasedRebalanceEnabled=%t, but the server did not report it at all", expectedEnabled)
+		}
+
+		if *current.DataServiceFileBasedRebalanceEnabled != expectedEnabled {
+			return fmt.Errorf("expected dataServiceFileBasedRebalanceEnabled=%t, got %t", expectedEnabled, *current.DataServiceFileBasedRebalanceEnabled)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustVerifyRebalanceSettings checks the cluster's vBucket move concurrency settings on
+// /settings/rebalance.
+func MustVerifyRebalanceSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expectedMovesPerNode, expectedFileBasedMovesPerNode int, timeout time.Duration) {
+	callback := func() error {
+		client, err := CreateAdminConsoleClient(k8s, cluster)
+		if err != nil {
+			return err
+		}
+
+		current := couchbaseutil.RebalanceSettings{}
+
+		if err := couchbaseutil.GetRebalanceSettings(&current).On(client.client, client.host); err != nil {
+			return err
+		}
+
+		if current.RebalanceMovesPerNode == nil || *current.RebalanceMovesPerNode != expectedMovesPerNode {
+			return fmt.Errorf("expected rebalanceMovesPerNode=%d, got %v", expectedMovesPerNode, current.RebalanceMovesPerNode)
+		}
+
+		if current.DataServiceFileBasedRebalanceMovesPerNode == nil || *current.DataServiceFileBasedRebalanceMovesPerNode != expectedFileBasedMovesPerNode {
+			return fmt.Errorf("expected dataServiceFileBasedRebalanceMovesPerNode=%d, got %v",
+				expectedFileBasedMovesPerNode, current.DataServiceFileBasedRebalanceMovesPerNode)
+		}
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustVerifyDataServerSettingsMemcachedThreads checks memcached's reader, writer, auxIo, nonIo thread settings.
 // Due to some (yet more) whackiness of Couchbase's API design, 0 means unset.
 func MustVerifyDataServerSettingsMemcachedThreads(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, readerThreads, writerThreads *intstr.IntOrString, nonIOThreads, auxIOThreads *int, timeout time.Duration) {

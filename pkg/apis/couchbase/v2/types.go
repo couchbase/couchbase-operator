@@ -47,6 +47,15 @@ const (
 	DurabilityImpossibleFallbackActive   DurabilityImpossibleFallback = "fallbackToActiveAck"
 )
 
+// +kubebuilder:validation:Enum=auto;preferFileBased;preferDcp
+type DataServiceRebalanceType string
+
+const (
+	DataServiceRebalanceTypeAuto            DataServiceRebalanceType = "auto"
+	DataServiceRebalanceTypePreferFileBased DataServiceRebalanceType = "preferFileBased"
+	DataServiceRebalanceTypePreferDcp       DataServiceRebalanceType = "preferDcp"
+)
+
 // BucketScopeOrCollectionName is the name of a fully qualifed bucket, scope or collection.
 // The _default scope or collection are not valid for this type.
 // As these names are period separated, and buckets can contain periods, the latter need
@@ -1615,6 +1624,27 @@ type CouchbaseBucketSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +couchbase:version:minimum=8.1.0
 	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
+
+	// DataServiceRebalanceType controls how the Data Service moves this bucket's vBuckets during a
+	// rebalance. During the backfill phase of a vBucket move the server can either copy the vBucket
+	// files directly from the source node to the destination node, which is significantly faster and
+	// uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
+	// Server 8.1.0.
+	// - "auto" lets the cluster manager choose for each move. In most cases, this is the right choice
+	// - "preferFileBased" asks it to favour file based moves wherever possible
+	// - "preferDcp" asks it to favour DCP.
+	// These are preferences rather than guarantees: the cluster manager still selects the method for
+	// each individual move, and always uses DCP while a storage migration or an eviction policy
+	// change is pending.
+	// This setting only biases a choice the cluster is already allowed to make. If file based
+	// rebalance is turned off for the whole cluster with the
+	// cao.couchbase.com/dataServiceFileBasedRebalanceEnabled annotation, every move uses DCP no matter
+	// what this is set to. The value is still accepted and stored in that case, and takes effect if
+	// the cluster level switch is turned back on.
+	// Defaults to "auto".
+	// +couchbase:version:minimum=8.1.0
+	// +optional
+	DataServiceRebalanceType DataServiceRebalanceType `json:"dataServiceRebalanceType,omitempty"`
 }
 
 type BucketEncryptionAtRestConfiguration struct {
@@ -1847,6 +1877,27 @@ type CouchbaseEphemeralBucketSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +couchbase:version:minimum=8.1.0
 	ThrottleHardLimit *int64 `json:"throttleHardLimit,omitempty"`
+
+	// DataServiceRebalanceType controls how the Data Service moves this bucket's vBuckets during a
+	// rebalance. During the backfill phase of a vBucket move the server can either copy the vBucket
+	// files directly from the source node to the destination node, which is significantly faster and
+	// uses less CPU, memory and network, or stream the data over DCP as it did before Couchbase
+	// Server 8.1.0.
+	// - "auto" lets the cluster manager choose for each move. In most cases, this is the right choice
+	// - "preferFileBased" asks it to favour file based moves wherever possible
+	// - "preferDcp" asks it to favour DCP.
+	// These are preferences rather than guarantees: the cluster manager still selects the method for
+	// each individual move, and always uses DCP while a storage migration or an eviction policy
+	// change is pending.
+	// This setting only biases a choice the cluster is already allowed to make. If file based
+	// rebalance is turned off for the whole cluster with the
+	// cao.couchbase.com/dataServiceFileBasedRebalanceEnabled annotation, every move uses DCP no matter
+	// what this is set to. The value is still accepted and stored in that case, and takes effect if
+	// the cluster level switch is turned back on.
+	// Defaults to "auto".
+	// +couchbase:version:minimum=8.1.0
+	// +optional
+	DataServiceRebalanceType DataServiceRebalanceType `json:"dataServiceRebalanceType,omitempty"`
 }
 
 type CouchbaseBucketWarmupBehavior string
@@ -3976,6 +4027,26 @@ type ClusterConfig struct {
 	// Query allows the query service to be configured.
 	Query *CouchbaseClusterQuerySettings `json:"query,omitempty"`
 
+	// Rebalance allows the configuration related to rebalancing settings for the cluster.
+	// +optional
+	Rebalance *ClusterRebalanceSettings `json:"rebalance,omitempty"`
+
+	// FileBasedRebalanceEnabled controls whether the Data Service may copy vBucket files directly
+	// from the source node to the destination node during the backfill phase of a vBucket move,
+	// instead of streaming the data over DCP. File based moves are significantly faster and use less
+	// CPU, memory and network.
+	// The cluster manager still chooses the method for each move: backfill generally uses file based
+	// transfer while takeover uses DCP, and DCP is used unconditionally while a storage migration or
+	// an eviction policy change is pending.
+	// This is a master switch. Setting it to false makes every move use DCP, which is the pre-8.1.0
+	// behaviour, and no bucket can opt back in: a bucket's spec.dataServiceRebalanceType of
+	// "preferFileBased" is still accepted and stored, but has no effect until this is true again.
+	// Individual buckets can only narrow the choice within an enabled cluster, by asking for DCP with
+	// "preferDcp".
+	// Defaults to true on the server. Leaving the annotation off leaves the cluster's current value
+	// untouched, so removing it after setting false does not re-enable the feature.
+	FileBasedRebalanceEnabled *bool `json:"-" annotation:"dataServiceFileBasedRebalanceEnabled"`
+
 	// AutoFailoverTimeout defines how long Couchbase server will wait between a pod
 	// being witnessed as down, until when it will failover the pod.  Couchbase server
 	// will only failover pods if it deems it safe to do so, and not result in data
@@ -4387,6 +4458,37 @@ func (q *CouchbaseClusterQuerySettings) MarshalJSON() ([]byte, error) {
 	}
 
 	return json, nil
+}
+
+// ClusterRebalanceSettings configures how many vBucket moves the cluster performs concurrently
+// during a rebalance. Higher values can shorten a rebalance at the cost of CPU, memory, disk and
+// network, and may degrade the performance of the Data Service while the rebalance runs.
+//
+// Note the two fields have different minimum server versions: movesPerNode has existed for many
+// releases, while fileBasedMovesPerNode is new in Couchbase Server 8.1.0.
+type ClusterRebalanceSettings struct {
+	// MovesPerNode is the number of concurrent vBucket moves per node during a DCP rebalance.
+	// A higher setting may improve rebalance performance at the cost of higher resource consumption,
+	// and may degrade the performance of other systems including the Data Service. Conversely a lower
+	// setting may degrade rebalance performance while freeing up those resources.
+	// Defaults to 4 on the server. Leaving it unset while spec.cluster.rebalance is present resets it
+	// to that default.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=64
+	// +optional
+	MovesPerNode *int `json:"movesPerNode,omitempty"`
+
+	// FileBasedMovesPerNode is the number of concurrent vBucket moves per node during a file based
+	// rebalance, where the Data Service copies vBucket files directly between nodes rather than
+	// streaming the data over DCP. It applies only to the file based portion of a rebalance, DCP
+	// moves are governed by spec.cluster.rebalance.movesPerNode.
+	// Defaults to 4 on the server. Leaving it unset while spec.cluster.rebalance is present resets it
+	// to that default.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=64
+	// +couchbase:version:minimum=8.1.0
+	// +optional
+	FileBasedMovesPerNode *int `json:"fileBasedMovesPerNode,omitempty"`
 }
 
 // CouchbaseClusterAnalyticSettings allow analytic service tweaks.

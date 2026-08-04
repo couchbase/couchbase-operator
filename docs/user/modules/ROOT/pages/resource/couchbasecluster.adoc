@@ -153,6 +153,9 @@ The following is an example resource, depicting the overall structure and any de
       <<couchbaseclusters-spec-cluster-query-txtimeout,txTimeout>>: 0ms
       <<couchbaseclusters-spec-cluster-query-usereplica,useReplica>>: false
     <<couchbaseclusters-spec-cluster-queryservicememoryquota,queryServiceMemoryQuota>>: ""
+    <<couchbaseclusters-spec-cluster-rebalance,rebalance>>:
+      <<couchbaseclusters-spec-cluster-rebalance-filebasedmovespernode,fileBasedMovesPerNode>>: 0
+      <<couchbaseclusters-spec-cluster-rebalance-movespernode,movesPerNode>>: 0
     <<couchbaseclusters-spec-cluster-searchservicememoryquota,searchServiceMemoryQuota>>: 256Mi
   <<couchbaseclusters-spec-enableonlinevolumeexpansion,enableOnlineVolumeExpansion>>: false
   <<couchbaseclusters-spec-enablepreviewscaling,enablePreviewScaling>>: false
@@ -2592,6 +2595,59 @@ In CB Server 7.6.0+ QueryServiceMemQuota also sets a soft memory limit for every
 The garbage collector tries to keep below this target.
 It is not a hard, absolute limit, and memory
 usage may exceed this value.
+
+=== couchbaseclusters.spec.cluster.rebalance
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+Rebalance allows the configuration related to rebalancing settings for the cluster.
+
+=== couchbaseclusters.spec.cluster.rebalance.fileBasedMovesPerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `64`
+
+==== Description
+
+FileBasedMovesPerNode is the number of concurrent vBucket moves per node during a file based
+rebalance, where the Data Service copies vBucket files directly between nodes rather than
+streaming the data over DCP.
+It applies only to the file based portion of a rebalance, DCP
+moves are governed by spec.cluster.rebalance.movesPerNode.
+Defaults to 4 on the server.
+Leaving it unset while spec.cluster.rebalance is present resets it
+to that default.
+This field is available in Couchbase Server 8.1.0 and later.
+
+=== couchbaseclusters.spec.cluster.rebalance.movesPerNode
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `1`
+
+*Maximum*: `64`
+
+==== Description
+
+MovesPerNode is the number of concurrent vBucket moves per node during a DCP rebalance.
+A higher setting may improve rebalance performance at the cost of higher resource consumption,
+and may degrade the performance of other systems including the Data Service.
+Conversely a lower
+setting may degrade rebalance performance while freeing up those resources.
+Defaults to 4 on the server.
+Leaving it unset while spec.cluster.rebalance is present resets it
+to that default.
 
 === couchbaseclusters.spec.cluster.searchServiceMemoryQuota
 

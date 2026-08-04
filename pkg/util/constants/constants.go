@@ -422,6 +422,16 @@ const (
 	// DurabilityImpossibleFallbackDefault default durability impossible fallback for a bucket.
 	DurabilityImpossibleFallbackDefault = "disabled"
 
+	// BucketDataServiceRebalanceTypeDefault default Data Service rebalance type for a bucket. This
+	// must match the server's own default, so that a bucket which omits the field compares equal to
+	// what the server reports back and does not get updated on every reconcile.
+	BucketDataServiceRebalanceTypeDefault = "auto"
+
+	// RebalanceMovesPerNodeDefault default number of concurrent vBucket moves per node during a
+	// rebalance, used for both the DCP and the file based knobs on /settings/rebalance. This is the
+	// server's own default, and is what an unset field in spec.cluster.rebalance reverts to.
+	RebalanceMovesPerNodeDefault = 4
+
 	// DefaultEncryptionAtRestRotationInterval default rotation interval for a bucket.
 	DefaultEncryptionAtRestRotationInterval = 0
 

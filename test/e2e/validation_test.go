@@ -1950,6 +1950,73 @@ func TestNegValidationCreateCouchbaseClusterSettings(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
 }
 
+// TestValidationRebalanceSettings covers the admission time validation for the file based rebalance
+// controls added in Couchbase Server 8.1.0, at both the cluster and the bucket level.
+func TestValidationRebalanceSettings(t *testing.T) {
+	const (
+		fileBasedMovesErr  = `spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.1.0\+`
+		rebalanceTypeErr   = `spec.dataServiceRebalanceType can only be set for Couchbase Server 8.1.0\+`
+		annotationWarning  = `dataServiceFileBasedRebalanceEnabled.*has no effect on Couchbase Server releases before 8.1.0`
+		fileBasedRebalance = "cao.couchbase.com/dataServiceFileBasedRebalanceEnabled"
+	)
+
+	testDefs := []testDef{
+		{
+			name: "TestValidateRebalanceFileBasedMovesPerNodeRejectedBefore81",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Add("/spec/cluster/rebalance", &couchbasev2.ClusterRebalanceSettings{
+					FileBasedMovesPerNode: util.IntPtr(16),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{fileBasedMovesErr},
+		},
+		{
+			name: "TestValidateRebalanceBothMovesPerNodeRejectedBefore81",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Add("/spec/cluster/rebalance", &couchbasev2.ClusterRebalanceSettings{
+					MovesPerNode:          util.IntPtr(8),
+					FileBasedMovesPerNode: util.IntPtr(16),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{fileBasedMovesErr},
+		},
+		{
+			// movesPerNode is not an 8.1 feature and must be accepted on this 8.0.0 cluster.
+			name: "TestValidateRebalanceMovesPerNodeAcceptedBefore81",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Add("/spec/cluster/rebalance", &couchbasev2.ClusterRebalanceSettings{
+					MovesPerNode: util.IntPtr(8),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRebalanceFileBasedEnabledAnnotationWarnsBefore81",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Add("/metadata/annotations", map[string]string{fileBasedRebalance: "false"})},
+			shouldFail:       false,
+			expectedWarnings: []string{annotationWarning},
+		},
+		{
+			name: "TestValidateBucketDataServiceRebalanceTypeRejectedBefore81",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/dataServiceRebalanceType", couchbasev2.DataServiceRebalanceTypePreferDcp)},
+			shouldFail:     true,
+			expectedErrors: []string{rebalanceTypeErr},
+		},
+		{
+			name: "TestValidateEphemeralBucketDataServiceRebalanceTypeRejectedBefore81",
+			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Add("/spec", map[string]interface{}{
+					"dataServiceRebalanceType": couchbasev2.DataServiceRebalanceTypePreferFileBased,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{rebalanceTypeErr},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
+}
+
 func TestCBVersionSpecificPosValidationsCreateCouchbaseClusterSettings(t *testing.T) {
 	testDefs := []testDef{
 		{
