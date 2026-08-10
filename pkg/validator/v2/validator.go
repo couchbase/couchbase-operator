@@ -40,11 +40,37 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/utils/ptr"
 )
 
 const (
 	bucketTTLMax       = (1 << 31) - 1 // Puny 32 bit signed integers
 	pruneAgeMaxSeconds = 35791394
+
+	// continuousBackupHistoryMinimumSeconds is the shortest change history window, in seconds,
+	// that Couchbase Server accepts alongside continuous backup. A time limited history must
+	// cover at least this long regardless of how short the backup interval is.
+	continuousBackupHistoryMinimumSeconds uint64 = 15 * 60
+
+	// continuousBackupHistoryIntervalMultiple is how many backup intervals a time limited change
+	// history must cover. Continuous backup replays change history, so the history has to outlive
+	// the gap between two backups or a backup can find that the changes it needed are gone.
+	continuousBackupHistoryIntervalMultiple uint64 = 2
+
+	// continuousBackupMinimumServerVersion is the Couchbase Server release continuous backup, and
+	// therefore recovering from it, arrived in.
+	continuousBackupMinimumServerVersion = "8.1.0"
+
+	// continuousBackupMinimumBackupImageVersion is the backup image release that first carried
+	// cbcontbk, the tool a point in time recovery runs.
+	continuousBackupMinimumBackupImageVersion = "1.7.0"
+)
+
+var (
+	// continuousBackupObjectStorageSchemes are the URI prefixes that make a continuous backup
+	// location object storage rather than a path on a volume. A location carrying one of these
+	// needs a cloud credential to authenticate with.
+	continuousBackupObjectStorageSchemes = []string{"s3://", "az://", "gs://"}
 )
 
 // CheckConstraints does domain specific validation for a Couchbase cluster.
@@ -2304,6 +2330,135 @@ func checkBucketHistoryRetentionSettings(bucket *couchbasev2.CouchbaseBucket, st
 	return "", nil
 }
 
+// checkBucketContinuousBackupStorageBackend rejects continuous backup on a bucket whose resolved
+// storage backend is couchstore.
+func checkBucketContinuousBackupStorageBackend(bucket *couchbasev2.CouchbaseBucket, storageBackend couchbasev2.CouchbaseStorageBackend) error {
+	if bucket.Spec.ContinuousBackup == nil {
+		return nil
+	}
+
+	if storageBackend == couchbasev2.CouchbaseStorageBackendCouchstore {
+		return fmt.Errorf("spec.continuousBackup can only be used with a magma storage backend")
+	}
+
+	return nil
+}
+
+// checkBucketContinuousBackupSettings validates the parts of continuous backup that do not depend
+// on the cluster the bucket belongs to.
+func checkBucketContinuousBackupSettings(bucket *couchbasev2.CouchbaseBucket) error {
+	config := bucket.Spec.ContinuousBackup
+	if config == nil {
+		return nil
+	}
+
+	// The credential rules describe whether the settings are coherent with each other rather than
+	// whether the feature is running, so they are checked whenever the user has written them down.
+	// Telling somebody their object storage location has no credential only once they get around to
+	// switching continuous backup on would be needlessly late.
+	if err := checkBucketContinuousBackupCloudCredential(config); err != nil {
+		return err
+	}
+
+	if err := checkBucketContinuousBackupKeyManagement(config); err != nil {
+		return err
+	}
+
+	if config.Enabled == nil || !*config.Enabled {
+		return nil
+	}
+
+	if config.Location == nil || *config.Location == "" {
+		return fmt.Errorf("spec.continuousBackup.location must be set when spec.continuousBackup.enabled is true")
+	}
+
+	// Continuous backup is built on change history, so the server refuses to enable it unless the
+	// bucket retains some. Annotation supplied history retention has already been folded into the
+	// spec by annotations.Populate before this runs, so this sees the effective value.
+	history := bucket.Spec.HistoryRetentionSettings
+	if history == nil || (history.Seconds == 0 && history.Bytes == 0) {
+		return fmt.Errorf("spec.continuousBackup cannot be enabled without also enabling change history, set spec.historyRetention.seconds and/or spec.historyRetention.bytes to a non-zero value")
+	}
+
+	// A size limited history (bytes only) has no window to check, the constraint below only
+	// applies once the user has put a time limit on how far back the history goes.
+	if history.Seconds == 0 {
+		return nil
+	}
+
+	// Fall back to the same interval default the operator sends to the server, so that omitting
+	// the field validates against the value that will actually be in force.
+	interval := uint64(constants.ContinuousBackupIntervalDefault)
+	if config.Interval != nil {
+		interval = uint64(*config.Interval)
+	}
+
+	minimumSeconds := interval * continuousBackupHistoryIntervalMultiple * 60
+	if minimumSeconds < continuousBackupHistoryMinimumSeconds {
+		minimumSeconds = continuousBackupHistoryMinimumSeconds
+	}
+
+	if history.Seconds < minimumSeconds {
+		return fmt.Errorf("spec.historyRetention.seconds (%d) must be at least %d when spec.continuousBackup is enabled, a time limited change history must cover at least %d minutes and at least %d times spec.continuousBackup.interval (%d minutes)",
+			history.Seconds, minimumSeconds, continuousBackupHistoryMinimumSeconds/60, continuousBackupHistoryIntervalMultiple, interval)
+	}
+
+	return nil
+}
+
+// checkBucketContinuousBackupCloudCredential ties spec.continuousBackup.cloudCredentialId to the
+// kind of location the backups are written to.
+func checkBucketContinuousBackupCloudCredential(config *couchbasev2.ContinuousBackupSettings) error {
+	location := ptr.Deref(config.Location, "")
+	credential := ptr.Deref(config.CloudCredentialID, "")
+
+	objectStorage := util.HasAnyPrefix(location, continuousBackupObjectStorageSchemes)
+
+	if objectStorage && credential == "" {
+		return fmt.Errorf("spec.continuousBackup.cloudCredentialId must be set when spec.continuousBackup.location is an object storage URI (%q is prefixed with one of %s)",
+			location, strings.Join(continuousBackupObjectStorageSchemes, ", "))
+	}
+
+	if credential != "" && !objectStorage {
+		return fmt.Errorf("spec.continuousBackup.cloudCredentialId can only be set when spec.continuousBackup.location is an object storage URI, prefixed with one of %s",
+			strings.Join(continuousBackupObjectStorageSchemes, ", "))
+	}
+
+	return nil
+}
+
+// checkBucketContinuousBackupKeyManagement validates the pair of settings that encrypt continuous backups using cloud KMS keys.
+func checkBucketContinuousBackupKeyManagement(config *couchbasev2.ContinuousBackupSettings) error {
+	keyURL := ptr.Deref(config.KmsKeyURL, "")
+	credential := ptr.Deref(config.KmsCredentialID, "")
+
+	// The two settings must be set together or not at all. Think about the condition a bit
+	if (keyURL == "") != (credential == "") {
+		return fmt.Errorf("spec.continuousBackup.kmsKeyUrl and spec.continuousBackup.kmsCredentialId must be set together, neither is usable on its own")
+	}
+
+	return nil
+}
+
+// checkBucketContinuousBackupVersion rejects spec.continuousBackup on clusters running a Couchbase
+// Server release older than 8.1.0, which is when the feature was introduced.
+func checkBucketContinuousBackupVersion(cluster *couchbasev2.CouchbaseCluster, config *couchbasev2.ContinuousBackupSettings) error {
+	if config == nil {
+		return nil
+	}
+
+	atLeast81, err := cluster.IsAtLeastVersion("8.1.0")
+	if err != nil {
+		return err
+	}
+
+	if !atLeast81 {
+		return fmt.Errorf("spec.continuousBackup can only be set for Couchbase Server 8.1.0+")
+	}
+
+	return nil
+}
+
 func checkMagmaDataBlockSize(val string) error {
 	bytes, err := strconv.ParseUint(val, 10, 64)
 	if err != nil {
@@ -2415,6 +2570,10 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketThrottleSettings(bucket.Spec.ThrottleReserved, bucket.Spec.ThrottleHardLimit); err != nil {
+		errs = append(errs, err)
+	}
+
+	if err := checkBucketContinuousBackupSettings(bucket); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -3491,6 +3650,10 @@ func CheckConstraintsBackupRestore(v *types.Validator, restore *couchbasev2.Couc
 		checkConstraintBackupRestoreObjStoreSecret,
 		checkConstraintRestoreAdditionalArgs,
 		checkConstraintRestoreNameLength,
+		checkConstraintRestoreContinuousBackupTarget,
+		checkConstraintRestoreContinuousBackupUnsupportedFields,
+		checkConstraintRestoreContinuousBackupKMS,
+		checkConstraintRestoreContinuousBackupSupported,
 	}
 
 	var errs []error
@@ -3562,6 +3725,208 @@ func checkConstraintBackupObjectEndpointSecret(v *types.Validator, cluster *couc
 
 	if _, ok := secret.Data["tls.crt"]; !ok {
 		return fmt.Errorf("custom object endpoint secret %s must contain key 'tls.crt'", secretName)
+	}
+
+	return nil
+}
+
+// checkConstraintRestoreContinuousBackupTarget validates the point in time a recovery stops at.
+//
+// A recovery needs somewhere to read continuous backups from and a point to stop at. Exactly one
+// of a timestamp and restoreAll says where to stop: neither leaves the recovery undefined, and
+// both would mean the two contradict each other.
+func checkConstraintRestoreContinuousBackupTarget(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	config := restore.Spec.ContinuousBackup
+	if config == nil {
+		return nil
+	}
+
+	if config.Location == "" {
+		return fmt.Errorf("spec.continuousBackup.location must be set")
+	}
+
+	if !util.HasAnyPrefix(config.Location, continuousBackupObjectStorageSchemes) &&
+		!strings.HasPrefix(config.Location, "/") {
+		return fmt.Errorf("spec.continuousBackup.location (%q) must be an absolute path or an object storage URI prefixed with one of %s",
+			config.Location, strings.Join(continuousBackupObjectStorageSchemes, ", "))
+	}
+
+	if config.RestoreAll && config.Timestamp != nil {
+		return fmt.Errorf("spec.continuousBackup.timestamp and spec.continuousBackup.restoreAll cannot both be set, they describe different points to recover to")
+	}
+
+	if !config.RestoreAll && config.Timestamp == nil {
+		return fmt.Errorf("one of spec.continuousBackup.timestamp or spec.continuousBackup.restoreAll must be set")
+	}
+
+	return nil
+}
+
+// checkConstraintRestoreContinuousBackupUnsupportedFields rejects a recovery asking for anything
+// the recovery tool cannot do.
+//
+// A point in time recovery runs cbcontbk rather than cbbackupmgr, and cbcontbk accepts a smaller
+// set of options. Rather than quietly dropping the ones it does not understand, which would give
+// a restore that looks like it honoured the request but did not, the whole resource is refused.
+func checkConstraintRestoreContinuousBackupUnsupportedFields(_ *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	spec := restore.Spec
+	if spec.ContinuousBackup == nil {
+		return nil
+	}
+
+	// The point to recover to comes from spec.continuousBackup, so a backup range is both
+	// unsupported and contradictory.
+	if spec.Start != nil {
+		return fmt.Errorf("spec.start cannot be used with spec.continuousBackup, the point to recover to is given by spec.continuousBackup.timestamp")
+	}
+
+	if spec.End != nil {
+		return fmt.Errorf("spec.end cannot be used with spec.continuousBackup, the point to recover to is given by spec.continuousBackup.timestamp")
+	}
+
+	if spec.OverwriteUsers {
+		return fmt.Errorf("spec.overwriteUsers cannot be used with spec.continuousBackup, a point in time recovery does not restore users")
+	}
+
+	// Every one of these carries a kubebuilder default of true, so they are never nil and an
+	// explicit false is the user asking for that service to be left alone.
+	services := map[string]*bool{
+		"spec.services.views":            spec.Services.Views,
+		"spec.services.gsiIndex":         spec.Services.GSIIndex,
+		"spec.services.ftIndex":          spec.Services.FTIndex,
+		"spec.services.ftAlias":          spec.Services.FTAlias,
+		"spec.services.data":             spec.Services.Data,
+		"spec.services.analytics":        spec.Services.Analytics,
+		"spec.services.eventing":         spec.Services.Eventing,
+		"spec.services.clusterAnalytics": spec.Services.ClusterAnalytics,
+		"spec.services.bucketQuery":      spec.Services.BucketQuery,
+		"spec.services.clusterQuery":     spec.Services.ClusterQuery,
+	}
+
+	// Sorted so that a resource disabling several services always reports the same one, rather
+	// than a different field each time the map is walked.
+	fields := make([]string, 0, len(services))
+
+	for field := range services {
+		fields = append(fields, field)
+	}
+
+	slices.Sort(fields)
+
+	for _, field := range fields {
+		if value := services[field]; value != nil && !*value {
+			return fmt.Errorf("%s cannot be disabled with spec.continuousBackup, a point in time recovery has no way to leave a service out", field)
+		}
+	}
+
+	if spec.Services.Users != nil && *spec.Services.Users {
+		return fmt.Errorf("spec.services.users cannot be used with spec.continuousBackup, a point in time recovery does not restore users")
+	}
+
+	return nil
+}
+
+// checkConstraintRestoreContinuousBackupKMS validates the key management details used to decrypt
+// encrypted continuous backups.
+//
+// Nothing about the key URL is checked here. It is a required field carrying a kubebuilder
+// pattern, so the API server has already established that it is present and well formed.
+func checkConstraintRestoreContinuousBackupKMS(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if restore.Spec.ContinuousBackup == nil || restore.Spec.ContinuousBackup.KMS == nil {
+		return nil
+	}
+
+	kms := restore.Spec.ContinuousBackup.KMS
+
+	usingIAM := kms.UseIAM != nil && *kms.UseIAM
+
+	if usingIAM && kms.Secret != "" {
+		return fmt.Errorf("spec.continuousBackup.kms.secret and spec.continuousBackup.kms.useIAM cannot both be set, they are alternative ways to authenticate")
+	}
+
+	if !usingIAM && kms.Secret == "" {
+		return fmt.Errorf("one of spec.continuousBackup.kms.secret or spec.continuousBackup.kms.useIAM must be set, the key cannot be reached without credentials")
+	}
+
+	if kms.Secret == "" || !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	_, found, err := v.Abstraction.GetSecret(restore.Namespace, kms.Secret)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("secret %s referenced by spec.continuousBackup.kms.secret must exist", kms.Secret)
+	}
+
+	return nil
+}
+
+// checkConstraintRestoreContinuousBackupSupported rejects a recovery the environment cannot run.
+//
+// Continuous backup arrived in Couchbase Server 8.1.0, and the tool that recovers from it arrived
+// in the 1.7.0 backup image. Without these checks a mismatch shows up as a container that exits
+// with "command not found", or a server rejecting settings it has never heard of, neither of
+// which points at the real problem.
+func checkConstraintRestoreContinuousBackupSupported(v *types.Validator, restore *couchbasev2.CouchbaseBackupRestore) error {
+	if restore.Spec.ContinuousBackup == nil {
+		return nil
+	}
+
+	clusters, err := v.Abstraction.GetCouchbaseClusters(restore.Namespace)
+	if err != nil {
+		return err
+	}
+
+	for i := range clusters.Items {
+		cluster := &clusters.Items[i]
+
+		atLeast81, err := cluster.IsAtLeastVersion(continuousBackupMinimumServerVersion)
+		if err != nil {
+			// A version we cannot read is not a version we can reject on.
+			continue
+		}
+
+		if !atLeast81 {
+			return fmt.Errorf("spec.continuousBackup can only be used with Couchbase Server %s+, cluster %s is older",
+				continuousBackupMinimumServerVersion, cluster.NamespacedName())
+		}
+
+		if err := checkRestoreBackupImageSupportsContinuousBackup(cluster); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkRestoreBackupImageSupportsContinuousBackup rejects a backup image too old to hold the
+// recovery tool.
+//
+// An image whose tag cannot be read as a version is left alone. Custom builds and floating tags
+// are legitimate, and refusing everything unrecognised would block them for no good reason, so
+// this only rejects an image it can positively identify as too old.
+func checkRestoreBackupImageSupportsContinuousBackup(cluster *couchbasev2.CouchbaseCluster) error {
+	image := cluster.Spec.BackupImage()
+	if image == "" {
+		return nil
+	}
+
+	tag, err := couchbaseutil.CouchbaseImageVersion(image)
+	if err != nil {
+		return nil
+	}
+
+	supported, err := couchbaseutil.VersionAfter(tag, continuousBackupMinimumBackupImageVersion)
+	if err != nil {
+		return nil
+	}
+
+	if !supported {
+		return fmt.Errorf("spec.continuousBackup requires a backup image of %s or later, cluster %s uses %s",
+			continuousBackupMinimumBackupImageVersion, cluster.NamespacedName(), image)
 	}
 
 	return nil
@@ -7387,6 +7752,10 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		if w != "" && warnings != nil {
 			*warnings = append(*warnings, w)
 		}
+
+		if err := checkBucketContinuousBackupStorageBackend(bucket, couchbasev2.CouchbaseStorageBackendCouchstore); err != nil {
+			return err
+		}
 	}
 
 	for _, c := range clusters {
@@ -7408,6 +7777,10 @@ func validateBucketStorageBackendAndOnlineEvictionPolicyConstraints(v *types.Val
 		}
 		if w != "" && warnings != nil {
 			*warnings = append(*warnings, w)
+		}
+
+		if err := checkBucketContinuousBackupStorageBackend(bucket, storageBackend); err != nil {
+			return err
 		}
 
 		if storageBackend == couchbasev2.CouchbaseStorageBackendMagma || bucket.Spec.StorageBackend == couchbasev2.CouchbaseStorageBackendMagma {
@@ -7579,6 +7952,10 @@ func checkBucketUnsupportedFields(v *types.Validator, bucket *couchbasev2.Couchb
 		}
 
 		if err := checkBucketDataServiceRebalanceType(c, bucket.Spec.DataServiceRebalanceType); err != nil {
+			return err
+		}
+
+		if err := checkBucketContinuousBackupVersion(c, bucket.Spec.ContinuousBackup); err != nil {
 			return err
 		}
 	}

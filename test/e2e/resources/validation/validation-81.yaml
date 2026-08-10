@@ -1,0 +1,86 @@
+# Copyright 2026-Present Couchbase, Inc.
+#
+# Use of this software is governed by the Business Source License included in
+# the file licenses/BSL-Couchbase.txt.  As of the Change Date specified in that
+# file, in accordance with the Business Source License, use of this software
+# will be governed by the Apache License, Version 2.0, included in the file
+# licenses/APL2.txt.
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket1
+spec:
+  memoryQuota: 100Mi
+  storageBackend: magma
+  historyRetention:
+    seconds: 3600
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket2
+spec:
+  memoryQuota: 100Mi
+  storageBackend: magma
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket3
+spec:
+  memoryQuota: 100Mi
+  storageBackend: couchstore
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBucket
+metadata:
+  name: bucket4
+spec:
+  memoryQuota: 100Mi
+  storageBackend: magma
+  historyRetention:
+    bytes: 2147483648
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cluster1
+spec:
+  image: couchbase/server:8.1.0
+  security:
+    adminSecret: cb-example-auth
+    rbac:
+      managed: true
+  buckets:
+    managed: true
+  backup:
+    managed: false
+    image: couchbase/operator-backup:1.7.0
+  servers:
+    - size: 1
+      name: all_services
+      services:
+        - data
+        - index
+        - query
+  cluster:
+    dataServiceMemoryQuota: 4048Mi
+status:
+  currentVersion: 8.1.0
+  size: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kms-credentials
+type: Opaque
+data:
+  credentials: ZHVtbXkta21zLWNyZWRlbnRpYWxzCg==
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: restore0
+spec:
+  backup: backup0
+  repo: cb-example-2020-01-21T11_08_04

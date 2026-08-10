@@ -820,6 +820,27 @@ func ListUsers(users *UserList) *Request {
 	return NewRequest((*Client).Get, "/settings/rbac/users", nil, users)
 }
 
+// backupServiceRolesPath is where the roles granted to the backup service are read and written.
+// Unlike a user's roles these belong to the service itself, which is what continuous backup runs
+// as when it reaches object storage.
+const backupServiceRolesPath = "/settings/rbac/services/backup/roles"
+
+// GetBackupServiceRoles reads the roles granted to the backup service.
+func GetBackupServiceRoles(roles *ServiceRoles) *Request {
+	return NewRequest((*Client).Get, backupServiceRolesPath, nil, roles)
+}
+
+// SetBackupServiceRoles replaces the roles granted to the backup service.
+//
+// This is a replacement rather than an addition: whatever is sent becomes the whole list, so the
+// caller has to include every role it wants the service to keep.
+func SetBackupServiceRoles(roles []string) *Request {
+	data := url.Values{}
+	data.Set("roles", strings.Join(roles, ","))
+
+	return NewRequest((*Client).Put, backupServiceRolesPath, []byte(data.Encode()), nil)
+}
+
 // CreateUser creates a new user.
 func CreateUser(user *User) *Request {
 	params := user.FormEncode()

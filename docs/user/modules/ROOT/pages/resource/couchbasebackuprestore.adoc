@@ -20,6 +20,17 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasebackuprestores-spec-backofflimit,backoffLimit>>: 2
   <<couchbasebackuprestores-spec-backup,backup>>: ""
   <<couchbasebackuprestores-spec-buckets,buckets>>:
+  <<couchbasebackuprestores-spec-continuousbackup,continuousBackup>>:
+    <<couchbasebackuprestores-spec-continuousbackup-autoresolveconflicts,autoResolveConflicts>>: false
+    <<couchbasebackuprestores-spec-continuousbackup-kms,kms>>:
+      <<couchbasebackuprestores-spec-continuousbackup-kms-endpoint,endpoint>>: ""
+      <<couchbasebackuprestores-spec-continuousbackup-kms-keyurl,keyUrl>>: ""
+      <<couchbasebackuprestores-spec-continuousbackup-kms-region,region>>: ""
+      <<couchbasebackuprestores-spec-continuousbackup-kms-secret,secret>>: ""
+      <<couchbasebackuprestores-spec-continuousbackup-kms-useiam,useIAM>>: false
+    <<couchbasebackuprestores-spec-continuousbackup-location,location>>: ""
+    <<couchbasebackuprestores-spec-continuousbackup-restoreall,restoreAll>>: false
+    <<couchbasebackuprestores-spec-continuousbackup-timestamp,timestamp>>: ""
   <<couchbasebackuprestores-spec-data,data>>:
     <<couchbasebackuprestores-spec-data-exclude,exclude>>:
     - ""
@@ -195,6 +206,161 @@ name to restore from.
 Specific buckets can be explicitly included or excluded in the restore,
 as well as bucket mappings.
 This field is now ignored.
+
+=== couchbasebackuprestores.spec.continuousBackup
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+ContinuousBackup recovers the bucket to a point in time by replaying the continuous
+backups written by spec.continuousBackup on a CouchbaseBucket, on top of the traditional
+backups in spec.repo.
+This changes which tool performs the restore, from cbbackupmgr to cbcontbk, and cbcontbk
+accepts a smaller set of options.
+Setting this alongside spec.start, spec.end,
+spec.overwriteUsers, or a disabled service in spec.services is rejected, because those
+have no equivalent and would otherwise be silently dropped.
+This field is available in Couchbase Server 8.1.0 and later.
+
+=== couchbasebackuprestores.spec.continuousBackup.autoResolveConflicts
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+AutoResolveConflicts maps all scopes and collections by name, ignoring identifier
+conflicts.
+This is needed when a collection being recovered was dropped and recreated
+before the restore, as it is given a new identifier and would otherwise not be matched
+with the one in the backup.
+Only use this when every scope and collection being recovered
+serves the same purpose as the one it shares a name with.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms
+
+==== Constraints
+
+*Type*: `object`
+
+==== Description
+
+KMS supplies the key management system details needed to decrypt continuous backups that
+were written with spec.continuousBackup.kmsKeyUrl set on the bucket.
+Recovering encrypted
+backups without it is not possible.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms.endpoint
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Endpoint overrides the default endpoint used to reach the key management system.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms.keyUrl
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Pattern (Regular Expression)*: `^(awskms|gcpkms|azurekeyvault)://.+$`
+
+==== Description
+
+KeyURL identifies the key, and must be prefixed with "awskms://", "gcpkms://" or
+"azurekeyvault://".
+The prefix is what selects which key management system to talk to.
+This field is required, since a kms block that names no key means nothing, so unlike the
+bucket's equivalent the pattern does not permit the empty string.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms.region
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Region is the region the key resides in.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms.secret
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Secret is the name of a Kubernetes Secret holding the credentials used to authenticate
+with the key management system.
+It is mounted into the restore pod and its path handed to
+the tool, rather than being passed on the command line, so that the credentials are not
+readable from the pod specification.
+The Secret must hold a single key, whose contents
+are the credentials in the form the key management system expects.
+This field cannot be used at the same time as spec.continuousBackup.kms.useIAM.
+
+=== couchbasebackuprestores.spec.continuousBackup.kms.useIAM
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+UseIAM authenticates with the key management system using the instance metadata service
+rather than supplied credentials.
+This field cannot be used at the same time as spec.continuousBackup.kms.secret.
+
+=== couchbasebackuprestores.spec.continuousBackup.location
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+Location is the continuous backup storage location to recover from, matching the
+spec.continuousBackup.location of the bucket that wrote them.
+This is either a path on a
+volume accessible to the restore, or an object storage URI prefixed with "s3://", "az://"
+or "gs://".
+
+=== couchbasebackuprestores.spec.continuousBackup.restoreAll
+
+==== Constraints
+
+*Type*: `boolean`
+
+==== Description
+
+RestoreAll recovers everything held in the continuous backup location rather than
+stopping at a point in time.
+Exactly one of spec.continuousBackup.timestamp or
+spec.continuousBackup.restoreAll must be set.
+
+=== couchbasebackuprestores.spec.continuousBackup.timestamp
+
+==== Constraints
+
+*Type*: `string`
+
+==== Description
+
+Timestamp is the point in time to recover to.
+Exactly one of
+spec.continuousBackup.timestamp or spec.continuousBackup.restoreAll must be set.
 
 === couchbasebackuprestores.spec.data
 

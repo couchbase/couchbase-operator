@@ -539,6 +539,13 @@ type Bucket struct {
 	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
 	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
 	DataServiceRebalanceType            string                       `json:"dataServiceRebalanceType,omitempty"`
+	ContinuousBackupEnabled             *bool                        `json:"continuousBackupEnabled,omitempty"`
+	ContinuousBackupLocation            *string                      `json:"continuousBackupLocation,omitempty"`
+	ContinuousBackupInterval            *uint32                      `json:"continuousBackupInterval,omitempty"`
+	ContinuousBackupRetentionPeriod     *uint32                      `json:"continuousBackupRetentionPeriod,omitempty"`
+	ContinuousBackupKmKeyURL            *string                      `json:"continuousBackupKmKeyUrl,omitempty"`
+	ContinuousBackupKmCredID            *string                      `json:"continuousBackupKmCredId,omitempty"`
+	ContinuousBackupCloudStorageCredID  *string                      `json:"continuousBackupCloudStorageCredId,omitempty"`
 }
 
 type BucketList []Bucket
@@ -609,6 +616,13 @@ type BucketStatus struct {
 	ThrottleReserved                    *uint64                      `json:"throttleReserved,omitempty"`
 	ThrottleHardLimit                   *uint64                      `json:"throttleHardLimit,omitempty"`
 	DataServiceRebalanceType            string                       `json:"dataServiceRebalanceType,omitempty"`
+	ContinuousBackupEnabled             *bool                        `json:"continuousBackupEnabled,omitempty"`
+	ContinuousBackupLocation            *string                      `json:"continuousBackupLocation,omitempty"`
+	ContinuousBackupInterval            *uint32                      `json:"continuousBackupInterval,omitempty"`
+	ContinuousBackupRetentionPeriod     *uint32                      `json:"continuousBackupRetentionPeriod,omitempty"`
+	ContinuousBackupKmKeyURL            *string                      `json:"continuousBackupKmKeyUrl,omitempty"`
+	ContinuousBackupKmCredID            *string                      `json:"continuousBackupKmCredId,omitempty"`
+	ContinuousBackupCloudStorageCredID  *string                      `json:"continuousBackupCloudStorageCredId,omitempty"`
 }
 
 type BucketAutoCompactionSettings struct {
@@ -675,6 +689,55 @@ func (u *User) GetPasswordChangeDate() (time.Time, error) {
 }
 
 type UserList []User
+
+// RoleCredentialConsumer lets its holder read a credential out of the cluster's credential store.
+// Continuous backup to object storage needs it: the bucket names a credential and the backup
+// service is what resolves it, so without this the server refuses the bucket with "insufficient
+// permissions to retrieve credential".
+const RoleCredentialConsumer = "credential_consumer"
+
+// ServiceRoles is the set of roles granted to a Couchbase Server service, as returned by
+// /settings/rbac/services/<service>/roles.
+type ServiceRoles struct {
+	Roles []ServiceRole `json:"roles"`
+}
+
+// ServiceRole is one role granted to a service.  Roles are read back as a name and its parameters
+// but written as the single bracketed string String produces.
+type ServiceRole struct {
+	Role string `json:"role"`
+
+	// CredentialID is the credential a credential_consumer role applies to.  Roles that take no
+	// credential leave it empty.
+	CredentialID string `json:"credential_id,omitempty"`
+}
+
+// String renders the role in the bracketed form the API accepts on write.
+func (r ServiceRole) String() string {
+	if r.CredentialID == "" {
+		return r.Role
+	}
+
+	return fmt.Sprintf("%s[%s]", r.Role, r.CredentialID)
+}
+
+// NewCredentialConsumerRole grants its holder access to one credential in the store.
+func NewCredentialConsumerRole(credentialID string) ServiceRole {
+	return ServiceRole{Role: RoleCredentialConsumer, CredentialID: credentialID}
+}
+
+// CredentialIDs returns the set of credentials the roles grant access to.
+func (r *ServiceRoles) CredentialIDs() map[string]bool {
+	ids := map[string]bool{}
+
+	for _, role := range r.Roles {
+		if role.Role == RoleCredentialConsumer && role.CredentialID != "" {
+			ids[role.CredentialID] = true
+		}
+	}
+
+	return ids
+}
 
 type Group struct {
 	ID           string     `json:"id"`
@@ -914,6 +977,26 @@ func (b *Bucket) unmarshalFromStatus(data []byte) error {
 		b.HistoryRetentionCollectionDefault = status.HistoryRetentionCollectionDefault
 		b.MagmaSeqTreeDataBlockSize = status.MagmaSeqTreeDataBlockSize
 		b.MagmaKeyTreeDataBlockSize = status.MagmaKeyTreeDataBlockSize
+
+		// Continuous backup is magma only, so it is read back here alongside the other magma
+		// settings. A nil enabled means the server predates the feature rather than that it is
+		// turned off.
+		//
+		// The rest are only read back while the feature is on, mirroring what the operator puts on
+		// the requested side of the comparison. The server keeps reporting a location and a
+		// schedule after continuous backup is switched off, and carrying those here would leave a
+		// disabled bucket permanently unequal to a CR that no longer says anything about them, so
+		// the operator would rewrite it on every reconcile.
+		b.ContinuousBackupEnabled = status.ContinuousBackupEnabled
+
+		if status.ContinuousBackupEnabled != nil && *status.ContinuousBackupEnabled {
+			b.ContinuousBackupLocation = status.ContinuousBackupLocation
+			b.ContinuousBackupInterval = status.ContinuousBackupInterval
+			b.ContinuousBackupRetentionPeriod = status.ContinuousBackupRetentionPeriod
+			b.ContinuousBackupKmKeyURL = status.ContinuousBackupKmKeyURL
+			b.ContinuousBackupKmCredID = status.ContinuousBackupKmCredID
+			b.ContinuousBackupCloudStorageCredID = status.ContinuousBackupCloudStorageCredID
+		}
 	}
 
 	if ramQuotaBytes, ok := status.Quota["rawRAM"]; ok {
@@ -1090,6 +1173,46 @@ func (b *Bucket) FormEncode(update bool, duringMigration bool) []byte {
 
 		if b.MagmaKeyTreeDataBlockSize != nil {
 			data.Set("magmaKeyTreeDataBlockSize", strconv.FormatUint(*b.MagmaKeyTreeDataBlockSize, 10))
+		}
+
+		// Continuous backup is magma only, and the parameter names match the keys the server
+		// reports on a bucket GET. Note "KmKeyUrl" rather than "KmsKeyUrl", which is how the
+		// server spells it.
+		//
+		// Whether the feature is on is always sent, so that it can be turned off again. The
+		// settings that configure it are only sent while it is on, because the server rejects the
+		// empty location it reports for a bucket that has never had one, with "Must be a valid path
+		// or uri writable by 'couchbase' user". Sending them only when they mean something keeps a
+		// bucket that wants no continuous backup creatable, and leaves whatever the server is
+		// holding untouched.
+		if b.ContinuousBackupEnabled != nil {
+			data.Set("continuousBackupEnabled", BoolAsStr(*b.ContinuousBackupEnabled))
+		}
+
+		if b.ContinuousBackupEnabled != nil && *b.ContinuousBackupEnabled {
+			if b.ContinuousBackupLocation != nil {
+				data.Set("continuousBackupLocation", *b.ContinuousBackupLocation)
+			}
+
+			if b.ContinuousBackupInterval != nil {
+				data.Set("continuousBackupInterval", strconv.FormatUint(uint64(*b.ContinuousBackupInterval), 10))
+			}
+
+			if b.ContinuousBackupRetentionPeriod != nil {
+				data.Set("continuousBackupRetentionPeriod", strconv.FormatUint(uint64(*b.ContinuousBackupRetentionPeriod), 10))
+			}
+
+			if b.ContinuousBackupKmKeyURL != nil {
+				data.Set("continuousBackupKmKeyUrl", *b.ContinuousBackupKmKeyURL)
+			}
+
+			if b.ContinuousBackupKmCredID != nil {
+				data.Set("continuousBackupKmCredId", *b.ContinuousBackupKmCredID)
+			}
+
+			if b.ContinuousBackupCloudStorageCredID != nil {
+				data.Set("continuousBackupCloudStorageCredId", *b.ContinuousBackupCloudStorageCredID)
+			}
 		}
 	}
 

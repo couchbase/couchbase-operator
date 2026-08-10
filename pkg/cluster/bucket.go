@@ -53,6 +53,7 @@ const (
 	Additional80Settings
 	SupportedKVThrottle
 	SupportedFileBasedRebalance
+	SupportedContinuousBackup
 )
 
 type SupportedFeatureMap map[SupportedFeature]bool
@@ -71,6 +72,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	supportedAdditional80Settings := supportedFeatures[Additional80Settings]
 	supportedKVThrottle := supportedFeatures[SupportedKVThrottle]
 	supportedFileBasedRebalance := supportedFeatures[SupportedFileBasedRebalance]
+	supportedContinuousBackup := supportedFeatures[SupportedContinuousBackup]
 
 	for _, bucket := range k8sBuckets {
 		// There is deliberately no skip here. Gather builds the desired set, and
@@ -158,6 +160,11 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 				}
 				b.HistoryRetentionBytes = bucket.Spec.HistoryRetentionSettings.Bytes
 				b.HistoryRetentionSeconds = bucket.Spec.HistoryRetentionSettings.Seconds
+			}
+
+			// Continuous backup is only supported on Magma
+			if supportedContinuousBackup {
+				setBucketContinuousBackupSettings(&b, bucket.Spec.ContinuousBackup)
 			}
 		}
 
@@ -272,6 +279,61 @@ func setBucketRebalanceType(b *couchbaseutil.Bucket, rebalanceType couchbasev2.D
 	} else {
 		b.DataServiceRebalanceType = constants.BucketDataServiceRebalanceTypeDefault
 	}
+}
+
+// setBucketContinuousBackupSettings copies the bucket's continuous backup values from the CR onto
+// the bucket we send to the server.
+// The caller is responsible for only invoking this for magma buckets on a server that supports
+// continuous backup, since the settings do not exist elsewhere.
+func setBucketContinuousBackupSettings(b *couchbaseutil.Bucket, settings *couchbasev2.ContinuousBackupSettings) {
+	enabled := false
+	if settings != nil && settings.Enabled != nil {
+		enabled = *settings.Enabled
+	}
+
+	b.ContinuousBackupEnabled = &enabled
+
+	if !enabled {
+		return
+	}
+
+	location := ""
+	interval := uint32(constants.ContinuousBackupIntervalDefault)
+	retentionPeriod := uint32(constants.ContinuousBackupRetentionPeriodDefault)
+	kmKeyURL := ""
+	kmCredID := ""
+	cloudStorageCredID := ""
+
+	if settings.Location != nil {
+		location = *settings.Location
+	}
+
+	if settings.Interval != nil {
+		interval = *settings.Interval
+	}
+
+	if settings.RetentionPeriod != nil {
+		retentionPeriod = *settings.RetentionPeriod
+	}
+
+	if settings.KmsKeyURL != nil {
+		kmKeyURL = *settings.KmsKeyURL
+	}
+
+	if settings.KmsCredentialID != nil {
+		kmCredID = *settings.KmsCredentialID
+	}
+
+	if settings.CloudCredentialID != nil {
+		cloudStorageCredID = *settings.CloudCredentialID
+	}
+
+	b.ContinuousBackupLocation = &location
+	b.ContinuousBackupInterval = &interval
+	b.ContinuousBackupRetentionPeriod = &retentionPeriod
+	b.ContinuousBackupKmKeyURL = &kmKeyURL
+	b.ContinuousBackupKmCredID = &kmCredID
+	b.ContinuousBackupCloudStorageCredID = &cloudStorageCredID
 }
 
 // setBucketThrottleSettings copies the bucket's KV rate limiting values from the CR onto the
@@ -515,6 +577,9 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 
 	// Per bucket Data Service rebalance type (dataServiceRebalanceType) is available in 8.1.0+.
 	supportedFeatures[SupportedFileBasedRebalance] = c.SupportsVersionFeatures("8.1.0")
+
+	// Per bucket continuous backup is available in 8.1.0+, and only for magma buckets.
+	supportedFeatures[SupportedContinuousBackup] = c.SupportsVersionFeatures("8.1.0")
 
 	allBuckets := []couchbaseutil.Bucket{}
 
@@ -902,6 +967,160 @@ func (c *Cluster) applyBucketUpdates(updates []bucketUpdate) error {
 	return nil
 }
 
+// continuousBackupCredentialIDs collects the stored credentials the given buckets ask continuous
+// backup to authenticate with.
+func continuousBackupCredentialIDs(buckets []couchbaseutil.Bucket) map[string]bool {
+	ids := map[string]bool{}
+
+	for i := range buckets {
+		bucket := &buckets[i]
+
+		if bucket.ContinuousBackupEnabled == nil || !*bucket.ContinuousBackupEnabled {
+			continue
+		}
+
+		for _, credential := range []*string{
+			bucket.ContinuousBackupCloudStorageCredID,
+			bucket.ContinuousBackupKmCredID,
+		} {
+			if credential == nil || *credential == "" {
+				continue
+			}
+
+			ids[*credential] = true
+		}
+	}
+
+	return ids
+}
+
+// The backup service's access to the credential store is what makes continuous backup to object
+// storage work, and it is reconciled in two halves around the bucket changes themselves.
+//
+// The store is guarded by its own role.  Storing a credential is not enough to make it usable:
+// whoever resolves it needs credential_consumer for that credential, and for continuous backup that
+// is the backup service rather than any user.  Without the grant the server rejects the bucket with
+// "insufficient permissions to retrieve credential", which says nothing about where the missing
+// permission belongs.
+//
+// Neither half runs unless RBAC is managed, since that is the user telling us to own the cluster's
+// roles.  When it is not, granting and revoking are the user's job, as creating users is.
+//
+// setBackupServiceCredentialGrants makes the granted credentials exactly the given set.  The write
+// replaces the whole list, so this is how both halves work: each decides the set it wants and sends
+// all of it, an empty set included.  Sorting keeps the request identical for a given set, which is
+// what makes the comparison against the next read stable rather than reordering forever.
+func (c *Cluster) setBackupServiceCredentialGrants(ids map[string]bool) ([]string, error) {
+	sorted := make([]string, 0, len(ids))
+	for id := range ids {
+		sorted = append(sorted, id)
+	}
+	sort.Strings(sorted)
+
+	roles := make([]string, 0, len(sorted))
+	for _, id := range sorted {
+		roles = append(roles, couchbaseutil.NewCredentialConsumerRole(id).String())
+	}
+
+	if err := couchbaseutil.SetBackupServiceRoles(roles).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	return sorted, nil
+}
+
+// grantBackupServiceCredentialRoles gives the backup service access to every credential the buckets
+// name, and returns the full set it can resolve once that is done.
+//
+// This has to run before a bucket is created or updated, since a bucket naming a credential the
+// backup service cannot read is rejected outright.  It only ever adds: a credential belonging to a
+// bucket that is about to be deleted is still in use at this point, so taking it away here would
+// break that bucket for as long as it survived.  Removing is revokeBackupServiceCredentialRoles's
+// job, once the buckets have settled.
+//
+// The returned set is what the server holds afterwards, so that the revoke half does not have to
+// read it a second time.  Nothing else writes these roles, so it stays accurate in between.
+func (c *Cluster) grantBackupServiceCredentialRoles(buckets []couchbaseutil.Bucket) (map[string]bool, error) {
+	if !c.cluster.Spec.Security.RBAC.Managed {
+		return nil, nil
+	}
+
+	actual := &couchbaseutil.ServiceRoles{}
+	if err := couchbaseutil.GetBackupServiceRoles(actual).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	granted := actual.CredentialIDs()
+	desired := continuousBackupCredentialIDs(buckets)
+
+	missing := false
+
+	for id := range desired {
+		if !granted[id] {
+			granted[id] = true
+			missing = true
+		}
+	}
+
+	if !missing {
+		return granted, nil
+	}
+
+	ids, err := c.setBackupServiceCredentialGrants(granted)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Info("Backup service granted access to continuous backup credentials",
+		"cluster", c.namespacedName(), "credentials", ids)
+
+	return granted, nil
+}
+
+// revokeBackupServiceCredentialRoles takes away access to credentials no bucket names any more,
+// leaving the granted set exactly equal to the set in use.
+//
+// This has to run after the buckets have been created, updated and deleted.  Revoking while a
+// bucket still names the credential would leave it unable to reach its storage for as long as it
+// survived.
+//
+// granted is what grantBackupServiceCredentialRoles saw, so that the roles are read once per
+// reconcile rather than twice.
+//
+// The set in use can be empty, and then so is the write: a cluster whose last continuous backup
+// bucket has gone ends up with no credential_consumer roles at all rather than a set of grants for
+// credentials nothing reads.
+func (c *Cluster) revokeBackupServiceCredentialRoles(granted map[string]bool, buckets []couchbaseutil.Bucket) error {
+	if !c.cluster.Spec.Security.RBAC.Managed {
+		return nil
+	}
+
+	desired := continuousBackupCredentialIDs(buckets)
+
+	surplus := []string{}
+
+	for id := range granted {
+		if !desired[id] {
+			surplus = append(surplus, id)
+		}
+	}
+
+	if len(surplus) == 0 {
+		return nil
+	}
+
+	sort.Strings(surplus)
+
+	if _, err := c.setBackupServiceCredentialGrants(desired); err != nil {
+		return err
+	}
+
+	log.Info("Backup service access revoked for continuous backup credentials no bucket uses",
+		"cluster", c.namespacedName(), "credentials", surplus)
+
+	return nil
+}
+
 // reconcile buckets by adding or removing
 // buckets one at a time based on comparison
 // of existing buckets to cluster spec.
@@ -918,6 +1137,14 @@ func (c *Cluster) reconcileBuckets() error {
 	}
 
 	create, updates, updateDuringMigration, remove, requested, err := c.inspectBuckets()
+	if err != nil {
+		return err
+	}
+
+	// Before any bucket is created or updated, because a bucket naming a credential the backup
+	// service cannot read is rejected outright. The matching revoke runs once the buckets have
+	// settled, further down.
+	grantedCredentials, err := c.grantBackupServiceCredentialRoles(requested)
 	if err != nil {
 		return err
 	}
@@ -965,6 +1192,12 @@ func (c *Cluster) reconcileBuckets() error {
 
 		log.Info("Bucket updated during migration", "cluster", c.namespacedName(), "name", bucket.BucketName)
 		c.raiseEvent(k8sutil.BucketEditEvent(bucket.BucketName, c.cluster))
+	}
+
+	// Now that the buckets have settled, hand back access to credentials none of them names any
+	// more, which is what leaves the granted set equal to the set in use.
+	if err := c.revokeBackupServiceCredentialRoles(grantedCredentials, requested); err != nil {
+		return err
 	}
 
 	// To avoid API updates, we record the name of each bucket on the system (this will

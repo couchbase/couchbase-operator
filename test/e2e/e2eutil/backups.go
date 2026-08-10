@@ -478,6 +478,9 @@ type Restore struct {
 
 	// defaultRecoveryMethod specifies the default recovery method.
 	defaultRecoveryMethod couchbasev2.DefaultRecoveryType
+
+	// continuousBackup turns the restore into a recovery from continuous backups.
+	continuousBackup *couchbasev2.CouchbaseBackupRestoreContinuousBackup
 }
 
 // NewRestore create a new restore with all the required parameters.
@@ -630,6 +633,27 @@ func (r *Restore) WithAnnotations(annotations map[string]string) *Restore {
 	return r
 }
 
+func (r *Restore) WithContinuousBackupAll(location string) *Restore {
+	r.continuousBackup = &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+		Location:   location,
+		RestoreAll: true, // It's hard to test PITR since it's diffcult to assert on number of records since it is indeterministic.
+	}
+
+	return r
+}
+
+// WithContinuousBackupKMS names the key management system key the continuous backups being
+// recovered were encrypted with, and the secret holding the credentials that reach it.
+func (r *Restore) WithContinuousBackupKMS(keyURL, region string, secret *v1.Secret) *Restore {
+	r.continuousBackup.KMS = &couchbasev2.CouchbaseBackupRestoreKMS{
+		KeyURL: keyURL,
+		Region: region,
+		Secret: secret.Name,
+	}
+
+	return r
+}
+
 // MustCreate generates the requested restore and creates it in Kubernetes.
 func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbasev2.CouchbaseBackupRestore {
 	generateName := "restore-"
@@ -676,6 +700,10 @@ func (r *Restore) MustCreate(t *testing.T, kubernetes *types.Cluster) *couchbase
 
 	if r.useIAM {
 		restore.Spec.ObjectStore.UseIAM = &r.useIAM
+	}
+
+	if r.continuousBackup != nil {
+		restore.Spec.ContinuousBackup = r.continuousBackup
 	}
 
 	if r.withBucketConfig {

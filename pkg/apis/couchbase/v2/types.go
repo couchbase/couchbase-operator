@@ -733,6 +733,96 @@ type CouchbaseBackupRestoreSpec struct {
 	// ForceDeleteLockFile is used to force delete the lock file.
 	// This should be used with caution and will force delete the current lockfile if it exists.
 	ForceDeleteLockfile bool `json:"-" annotation:"forceDeleteLockfile"`
+
+	// ContinuousBackup recovers the bucket to a point in time by replaying the continuous
+	// backups written by spec.continuousBackup on a CouchbaseBucket, on top of the traditional
+	// backups in spec.repo.
+	//
+	// This changes which tool performs the restore, from cbbackupmgr to cbcontbk, and cbcontbk
+	// accepts a smaller set of options.  Setting this alongside spec.start, spec.end,
+	// spec.overwriteUsers, or a disabled service in spec.services is rejected, because those
+	// have no equivalent and would otherwise be silently dropped.
+	// +optional
+	// +couchbase:version:minimum=8.1.0
+	ContinuousBackup *CouchbaseBackupRestoreContinuousBackup `json:"continuousBackup,omitempty" annotation:"continuousBackup"`
+}
+
+// ContinuousBackupRestoreTargetEverything is the value the recovery tool accepts to mean "all
+// of the data in the continuous backup location" rather than a point in time.  Users ask for it
+// through spec.continuousBackup.restoreAll, so that they cannot mistype it.
+const ContinuousBackupRestoreTargetEverything = "everything"
+
+// CouchbaseBackupRestoreContinuousBackup configures a point in time recovery from continuous
+// backups.  It is only available with Couchbase Server 8.1.0 and later.
+type CouchbaseBackupRestoreContinuousBackup struct {
+	// Location is the continuous backup storage location to recover from, matching the
+	// spec.continuousBackup.location of the bucket that wrote them.  This is either a path on a
+	// volume accessible to the restore, or an object storage URI prefixed with "s3://", "az://"
+	// or "gs://".
+	Location string `json:"location"`
+
+	// Timestamp is the point in time to recover to.  Exactly one of
+	// spec.continuousBackup.timestamp or spec.continuousBackup.restoreAll must be set.
+	// +optional
+	Timestamp *metav1.Time `json:"timestamp,omitempty"`
+
+	// RestoreAll recovers everything held in the continuous backup location rather than
+	// stopping at a point in time.  Exactly one of spec.continuousBackup.timestamp or
+	// spec.continuousBackup.restoreAll must be set.
+	// +optional
+	RestoreAll bool `json:"restoreAll,omitempty"`
+
+	// AutoResolveConflicts maps all scopes and collections by name, ignoring identifier
+	// conflicts.  This is needed when a collection being recovered was dropped and recreated
+	// before the restore, as it is given a new identifier and would otherwise not be matched
+	// with the one in the backup.  Only use this when every scope and collection being recovered
+	// serves the same purpose as the one it shares a name with.
+	// +optional
+	AutoResolveConflicts bool `json:"autoResolveConflicts,omitempty"`
+
+	// KMS supplies the key management system details needed to decrypt continuous backups that
+	// were written with spec.continuousBackup.kmsKeyUrl set on the bucket.  Recovering encrypted
+	// backups without it is not possible.
+	// +optional
+	KMS *CouchbaseBackupRestoreKMS `json:"kms,omitempty"`
+
+	// AdditionalArgs passes extra arguments to the recovery tool, set with the
+	// "cao.couchbase.com/continuousBackup.additionalArgs" annotation.
+	AdditionalArgs string `json:"-" annotation:"additionalArgs"`
+}
+
+// CouchbaseBackupRestoreKMS describes how to reach the key management system that holds the key
+// encrypted continuous backups were written with.
+type CouchbaseBackupRestoreKMS struct {
+	// KeyURL identifies the key, and must be prefixed with "awskms://", "gcpkms://" or
+	// "azurekeyvault://".  The prefix is what selects which key management system to talk to.
+	// This field is required, since a kms block that names no key means nothing, so unlike the
+	// bucket's equivalent the pattern does not permit the empty string.
+	// +kubebuilder:validation:Pattern=`^(awskms|gcpkms|azurekeyvault)://.+$`
+	KeyURL string `json:"keyUrl"`
+
+	// Endpoint overrides the default endpoint used to reach the key management system.
+	// +optional
+	Endpoint string `json:"endpoint,omitempty"`
+
+	// Region is the region the key resides in.
+	// +optional
+	Region string `json:"region,omitempty"`
+
+	// Secret is the name of a Kubernetes Secret holding the credentials used to authenticate
+	// with the key management system.  It is mounted into the restore pod and its path handed to
+	// the tool, rather than being passed on the command line, so that the credentials are not
+	// readable from the pod specification.  The Secret must hold a single key, whose contents
+	// are the credentials in the form the key management system expects.
+	// This field cannot be used at the same time as spec.continuousBackup.kms.useIAM.
+	// +optional
+	Secret string `json:"secret,omitempty"`
+
+	// UseIAM authenticates with the key management system using the instance metadata service
+	// rather than supplied credentials.
+	// This field cannot be used at the same time as spec.continuousBackup.kms.secret.
+	// +optional
+	UseIAM *bool `json:"useIAM,omitempty"`
 }
 
 type CouchbaseBackupStagingVolume struct {
@@ -1608,6 +1698,15 @@ type CouchbaseBucketSpec struct {
 	// HistoryRetention configures settings for bucket history retention and default values for associated collections.
 	HistoryRetentionSettings *HistoryRetentionSettings `json:"historyRetention,omitempty" annotation:"historyRetention"`
 
+	// ContinuousBackup configures continuous backup settings for the bucket. This is configured
+	// to enable features like PITR. If unspecified, continuous backup will be disabled.
+	// This is only supported on buckets with storageBackend=magma, and cannot be enabled unless
+	// change history is also enabled for the bucket, meaning spec.historyRetention.seconds and/or
+	// spec.historyRetention.bytes must be set to a non-zero value.
+	// +optional
+	// +couchbase:version:minimum=8.1.0
+	ContinuousBackup *ContinuousBackupSettings `json:"continuousBackup,omitempty"`
+
 	// MagmaSeqTreeDataBlockSize is the block size, in bytes, for Magma seqIndex blocks.
 	MagmaSeqTreeDataBlockSize *uint64 `json:"-" annotation:"magmaSeqTreeDataBlockSize"`
 
@@ -1771,6 +1870,63 @@ type CouchbaseBucketStatus struct {
 	// +optional
 	// +listType=atomic
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// ContinuousBackupSettings configures continuous backup for a bucket. Continuous backup is only
+// available on Couchbase Server 8.1.0 and later, and only for buckets using the magma storage
+// backend.
+type ContinuousBackupSettings struct {
+	// Enabled turns continuous backup on or off. This field defaults to false.
+	// Continuous backup cannot be enabled unless change history is also enabled for the bucket,
+	// meaning spec.historyRetention.seconds and/or spec.historyRetention.bytes must be set to a
+	// non-zero value. Where change history is given a time limit, spec.historyRetention.seconds
+	// must be at least 15 minutes and at least twice spec.continuousBackup.interval. When this is
+	// true, spec.continuousBackup.location must also be set.
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Location is the storage target backups are written to.  This is either a path on a volume
+	// that is accessible to, and writable by, the 'couchbase' user on every data pod, or an object
+	// storage URI prefixed with "s3://", "az://" or "gs://".  This field is required when
+	// spec.continuousBackup.enabled is true.  When an object storage URI is used,
+	// spec.continuousBackup.cloudCredentialId must also be set.
+	Location *string `json:"location,omitempty"`
+
+	// CloudCredentialID names the stored credential Couchbase Server uses to authenticate against
+	// the object storage holding the backups.  It may only be set when
+	// spec.continuousBackup.location is an object storage URI, prefixed with "s3://", "az://" or
+	// "gs://", and is required in that case.  Couchbase Server names the equivalent bucket setting
+	// "continuousBackupCloudStorageCredId".
+	CloudCredentialID *string `json:"cloudCredentialId,omitempty"`
+
+	// Interval defines how frequently, in minutes, a backup is taken.  This field must be in the
+	// range 2-2147483647, defaulting to 2.  When continuous backup is enabled and change history
+	// is configured with a time limit (spec.historyRetention.seconds), that limit must be at least
+	// twice this interval.
+	// +kubebuilder:validation:Minimum=2
+	// +kubebuilder:validation:Maximum=2147483647
+	// +kubebuilder:default=2
+	Interval *uint32 `json:"interval,omitempty"`
+
+	// RetentionPeriod defines how long, in hours, backups are kept for before they are eligible
+	// for removal.  This field must be in the range 1-1440 (60 days), defaulting to 1.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1440
+	// +kubebuilder:default=1
+	RetentionPeriod *uint32 `json:"retentionPeriod,omitempty"`
+
+	// KmsKeyURL specifies an optional key management system key used to encrypt backups.  When left
+	// unset, backups are not encrypted.  It must be prefixed with "awskms://", "gcpkms://" or
+	// "azurekeyvault://", and must be set together with spec.continuousBackup.kmsCredentialId,
+	// neither being usable on its own.
+	// +kubebuilder:validation:Pattern=`^$|^(awskms|gcpkms|azurekeyvault)://.+$`
+	KmsKeyURL *string `json:"kmsKeyUrl,omitempty"`
+
+	// KmsCredentialID names the stored credential Couchbase Server uses to authenticate against the
+	// key management system identified by spec.continuousBackup.kmsKeyUrl.  It must be set together
+	// with that field, neither being usable on its own.  Couchbase Server names the equivalent
+	// bucket setting "continuousBackupKmCredId".
+	KmsCredentialID *string `json:"kmsCredentialId,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

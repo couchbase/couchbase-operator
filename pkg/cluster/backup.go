@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
@@ -48,6 +49,28 @@ const (
 	StoreSecretRefreshToken string            = "refresh-token"
 	BackupVolumeName        string            = "couchbase-cluster-backup-volume"
 	CouchbaseAdminVolume    string            = "couchbase-admin"
+)
+
+// Where a point in time recovery finds the credentials for the key management system holding the
+// key its continuous backups were encrypted with. They are mounted from a secret and handed to
+// the tool as a path, rather than passed as arguments, because anything in a container's
+// arguments can be read back from the pod specification by anyone able to list pods.
+const (
+	// KMSCredentialsDir is the directory the secret is mounted at.
+	KMSCredentialsDir string = "/var/run/secrets/kms"
+
+	// KMSSecretCredentials is the key within the secret holding the credentials, and therefore
+	// the name of the file the tool is pointed at.
+	KMSSecretCredentials string = "credentials"
+
+	// AdditionalContinuousBackupCommandsEnvVar carries extra cbcontbk arguments to the restore
+	// container. Named for the tool it feeds, so that it is never confused with the cbbackupmgr
+	// equivalent, which accepts a different set of flags.
+	AdditionalContinuousBackupCommandsEnvVar string = "ADDITIONAL_CBCONTBK_COMMANDS"
+
+	// KMSVolumeName names the volume. It is fixed rather than taken from the secret's name,
+	// because a restore mounts at most one of these.
+	KMSVolumeName string = "couchbase-restore-kms"
 )
 
 // backupResources contains all the resources required to create and manage a backup.
@@ -1268,13 +1291,76 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 
 	c.applyObjEndpointCertToJob(&restorejob.Spec, endpoint)
 
+	if restore.Spec.ContinuousBackup != nil {
+		applyKMSSecretToJob(&restorejob.Spec, restore.Spec.ContinuousBackup.KMS)
+	}
+
 	return restorejob, nil
+}
+
+// applyKMSSecretToJob makes a point in time recovery's key management credentials available to
+// the job as a volume. The matching mount and argument are added by applyKMSConfiguration.
+func applyKMSSecretToJob(spec *batchv1.JobSpec, kms *couchbasev2.CouchbaseBackupRestoreKMS) {
+	if kms == nil || kms.Secret == "" {
+		return
+	}
+
+	volume := corev1.Volume{
+		Name: KMSVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName: kms.Secret,
+			},
+		},
+	}
+
+	spec.Template.Spec.Volumes = append(spec.Template.Spec.Volumes, volume)
+}
+
+// applyKMSConfiguration tells a point in time recovery how to reach the key management system
+// holding the key that encrypted the continuous backups it is replaying.
+func applyKMSConfiguration(container *corev1.Container, kms *couchbasev2.CouchbaseBackupRestoreKMS) {
+	if kms == nil {
+		return
+	}
+
+	if kms.KeyURL != "" {
+		container.Args = append(container.Args, "--km-key-url", kms.KeyURL)
+	}
+
+	if kms.Endpoint != "" {
+		container.Args = append(container.Args, "--km-endpoint", kms.Endpoint)
+	}
+
+	if kms.Region != "" {
+		container.Args = append(container.Args, "--km-region", kms.Region)
+	}
+
+	// Instance metadata replaces the credentials entirely, so there is no secret to mount.
+	if kms.UseIAM != nil && *kms.UseIAM {
+		container.Args = append(container.Args, "--km-auth-by-instance-metadata")
+
+		return
+	}
+
+	if kms.Secret == "" {
+		return
+	}
+
+	container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
+		Name:      KMSVolumeName,
+		ReadOnly:  true,
+		MountPath: KMSCredentialsDir,
+	})
+
+	container.Args = append(container.Args, "--km-auth-file",
+		fmt.Sprintf("%s/%s", KMSCredentialsDir, KMSSecretCredentials))
 }
 
 // generateRestoreContainer returns a container that uses the operator-backup image
 // but specifies the restore mode to the backup_script instead of the backup mode.
 //
-//nolint:gocognit
+//nolint:gocognit,gocyclo
 func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupRestore, start, end string) corev1.Container {
 	var resources corev1.ResourceRequirements
 
@@ -1294,12 +1380,21 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--repo", spec.Repo)
 	}
 
-	if start != "" {
-		args = append(args, "--start", start)
-	}
+	// A point in time recovery runs cbcontbk rather than cbbackupmgr, and cbcontbk accepts a
+	// smaller set of options. The blocks guarded by this build arguments it would reject as
+	// unknown, failing the whole recovery. Setting any of them alongside a recovery is refused
+	// at admission, so reaching one here means an older resource written before that check
+	// existed.
+	continuousBackup := spec.ContinuousBackup
 
-	if end != "" {
-		args = append(args, "--end", end)
+	if continuousBackup == nil {
+		if start != "" {
+			args = append(args, "--start", start)
+		}
+
+		if end != "" {
+			args = append(args, "--end", end)
+		}
 	}
 
 	if spec.ForceUpdates {
@@ -1362,7 +1457,7 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		"--enable-users": spec.Services.Users,
 	}
 
-	if spec.OverwriteUsers && spec.Services.Users != nil && *spec.Services.Users {
+	if continuousBackup == nil && spec.OverwriteUsers && spec.Services.Users != nil && *spec.Services.Users {
 		args = append(args, "--overwrite-users")
 	}
 
@@ -1370,9 +1465,11 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--auto-create-buckets")
 	}
 
-	for flag, value := range disableFlags {
-		if !*value {
-			args = append(args, flag)
+	if continuousBackup == nil {
+		for flag, value := range disableFlags {
+			if !*value {
+				args = append(args, flag)
+			}
 		}
 	}
 
@@ -1380,11 +1477,15 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		args = append(args, "--force-delete-lockfile")
 	}
 
-	for flag, value := range enableFlags {
-		if *value {
-			args = append(args, flag)
+	if continuousBackup == nil {
+		for flag, value := range enableFlags {
+			if *value {
+				args = append(args, flag)
+			}
 		}
 	}
+
+	args = append(args, continuousBackupRestoreArgs(continuousBackup)...)
 
 	if spec.DefaultRecoveryMethod != couchbasev2.DefaultRecoveryTypeNone {
 		args = append(args, "--default-recovery", string(spec.DefaultRecoveryMethod))
@@ -1403,6 +1504,16 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 	if spec.AdditionalArgs != "" {
 		additionalArgsEnvVar.Value = spec.AdditionalArgs
 		spec.Env = append(spec.Env, additionalArgsEnvVar)
+	}
+
+	// The recovery tool's own hatch, kept separate from cbbackupmgr's because the two accept
+	// different flags. Only set when this is a recovery, so that an annotation left on an ordinary
+	// restore cannot reach a tool that will not run.
+	if continuousBackup != nil && continuousBackup.AdditionalArgs != "" {
+		spec.Env = append(spec.Env, corev1.EnvVar{
+			Name:  AdditionalContinuousBackupCommandsEnvVar,
+			Value: continuousBackup.AdditionalArgs,
+		})
 	}
 
 	container := corev1.Container{
@@ -1436,7 +1547,36 @@ func (c *Cluster) generateRestoreContainer(restore *couchbasev2.CouchbaseBackupR
 		c.applyObjEndpointToContainer(&container, c.cluster.GetBackupStoreEndpoint())
 	}
 
+	if continuousBackup != nil {
+		applyKMSConfiguration(&container, continuousBackup.KMS)
+	}
+
 	return container
+}
+
+// continuousBackupRestoreArgs returns the arguments that turn a restore into a point in time
+// recovery. It returns nothing when no recovery was asked for, leaving an ordinary restore
+// exactly as it was.
+func continuousBackupRestoreArgs(continuousBackup *couchbasev2.CouchbaseBackupRestoreContinuousBackup) []string {
+	if continuousBackup == nil {
+		return nil
+	}
+
+	args := []string{"--continuous-backup-location", continuousBackup.Location}
+
+	// Exactly one of these is set, which admission enforces. Preferring restoreAll here means
+	// an older resource carrying both recovers everything rather than silently stopping early.
+	if continuousBackup.RestoreAll {
+		args = append(args, "--restore-target", couchbasev2.ContinuousBackupRestoreTargetEverything)
+	} else if continuousBackup.Timestamp != nil {
+		args = append(args, "--restore-target", continuousBackup.Timestamp.UTC().Format(time.RFC3339))
+	}
+
+	if continuousBackup.AutoResolveConflicts {
+		args = append(args, "--auto-resolve-conflicts")
+	}
+
+	return args
 }
 
 func (c *Cluster) applyObjEndpointCertToJob(spec *batchv1.JobSpec, objectEndpoint *couchbasev2.ObjectEndpoint) {

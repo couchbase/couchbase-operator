@@ -770,6 +770,112 @@ func MustVerifyBucketHistoryRetentionSettings(t *testing.T, k8s *types.Cluster, 
 	}
 }
 
+// ContinuousBackupExpectation is the set of continuous backup values a bucket is expected to have
+// according to Couchbase Server.
+//
+// This is a struct rather than five positional parameters because the two uint32 fields and the two
+// string fields are trivially transposable at a call site, and a transposed assertion would still
+// compile and would then fail for the wrong reason.
+type ContinuousBackupExpectation struct {
+	Enabled         bool
+	Location        string
+	Interval        uint32
+	RetentionPeriod uint32
+	KmsKeyURL       string
+
+	CloudCredentialID string
+	KmsCredentialID   string
+}
+
+// verifyBucketContinuousBackupSettings checks that the bucket's continuous backup settings, as
+// Couchbase Server reports them, match what is expected.
+//
+// While the feature is on every field is checked, including ones the test did not explicitly set,
+// because the operator fills those in with the server's own defaults and a mismatch on one of them
+// is exactly the bug that would make the operator rewrite the bucket on every reconcile.
+//
+// While it is off only Enabled is checked. The operator does not manage the other settings then,
+// and deliberately drops what the server reports for them, so there is nothing here to assert
+// against. The Expectation's other fields are ignored in that case.
+func verifyBucketContinuousBackupSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, expected ContinuousBackupExpectation, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		info, err := getBucketInfo(t, k8s, cluster, name)
+		if err != nil {
+			return err
+		}
+
+		// A nil here means the server did not report the setting at all, which is a different
+		// failure from reporting the wrong value, so say so rather than panicking on the deref.
+		if info.ContinuousBackupEnabled == nil {
+			return fmt.Errorf("continuous backup expected enabled=%t but the server did not report it", expected.Enabled)
+		}
+
+		if *info.ContinuousBackupEnabled != expected.Enabled {
+			return fmt.Errorf("continuous backup expected enabled=%t but found %t", expected.Enabled, *info.ContinuousBackupEnabled)
+		}
+
+		if !expected.Enabled {
+			return nil
+		}
+
+		if info.ContinuousBackupLocation == nil {
+			return fmt.Errorf("continuous backup expected location=%q but the server did not report it", expected.Location)
+		}
+
+		if *info.ContinuousBackupLocation != expected.Location {
+			return fmt.Errorf("continuous backup expected location=%q but found %q", expected.Location, *info.ContinuousBackupLocation)
+		}
+
+		if info.ContinuousBackupInterval == nil {
+			return fmt.Errorf("continuous backup expected interval=%d but the server did not report it", expected.Interval)
+		}
+
+		if *info.ContinuousBackupInterval != expected.Interval {
+			return fmt.Errorf("continuous backup expected interval=%d minutes but found %d", expected.Interval, *info.ContinuousBackupInterval)
+		}
+
+		if info.ContinuousBackupRetentionPeriod == nil {
+			return fmt.Errorf("continuous backup expected retention period=%d but the server did not report it", expected.RetentionPeriod)
+		}
+
+		if *info.ContinuousBackupRetentionPeriod != expected.RetentionPeriod {
+			return fmt.Errorf("continuous backup expected retention period=%d hours but found %d", expected.RetentionPeriod, *info.ContinuousBackupRetentionPeriod)
+		}
+
+		if info.ContinuousBackupKmKeyURL == nil {
+			return fmt.Errorf("continuous backup expected KMS key URL=%q but the server did not report it", expected.KmsKeyURL)
+		}
+
+		if *info.ContinuousBackupKmKeyURL != expected.KmsKeyURL {
+			return fmt.Errorf("continuous backup expected KMS key URL=%q but found %q", expected.KmsKeyURL, *info.ContinuousBackupKmKeyURL)
+		}
+
+		if info.ContinuousBackupCloudStorageCredID == nil {
+			return fmt.Errorf("continuous backup expected cloud credential=%q but the server did not report it", expected.CloudCredentialID)
+		}
+
+		if *info.ContinuousBackupCloudStorageCredID != expected.CloudCredentialID {
+			return fmt.Errorf("continuous backup expected cloud credential=%q but found %q", expected.CloudCredentialID, *info.ContinuousBackupCloudStorageCredID)
+		}
+
+		if info.ContinuousBackupKmCredID == nil {
+			return fmt.Errorf("continuous backup expected KMS credential=%q but the server did not report it", expected.KmsCredentialID)
+		}
+
+		if *info.ContinuousBackupKmCredID != expected.KmsCredentialID {
+			return fmt.Errorf("continuous backup expected KMS credential=%q but found %q", expected.KmsCredentialID, *info.ContinuousBackupKmCredID)
+		}
+
+		return nil
+	})
+}
+
+func MustVerifyBucketContinuousBackupSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, name string, expected ContinuousBackupExpectation, timeout time.Duration) {
+	if err := verifyBucketContinuousBackupSettings(t, k8s, cluster, name, expected, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 func verifyMagmaBucketBlockSizeSettings(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, bucketName string, seqTreeDataBlockSizeBytes, keyTreeDataBlockSize uint64, timeout time.Duration) error {
 	return retryutil.RetryFor(timeout, func() error {
 		info, err := getBucketInfo(t, k8s, cluster, bucketName)

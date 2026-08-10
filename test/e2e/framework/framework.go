@@ -420,6 +420,14 @@ func configure() (err error) {
 	flag.StringVar(&params.S3SecretID, "s3-secret-id",
 		"",
 		"S3 secret ID to use for backup.")
+	flag.StringVar(&params.S3SessionToken, "s3-session-token",
+		"",
+		"S3 session token, needed only when the access key and secret are temporary credentials.")
+	flag.StringVar(&params.KmsKeyURL, "kms-key-url",
+		"",
+		"Key management system key continuous backups are encrypted with, prefixed with "+
+			"awskms://, gcpkms:// or azurekeyvault://. Tests that encrypt their backups skip "+
+			"when this is unset.")
 	flag.StringVar(&params.AWSAccountID, "aws-account-id",
 		"",
 		"AWS Account ID of the running cluster.")
@@ -1330,6 +1338,15 @@ func (r *TestRequirement) NotVersion(v ...string) *TestRequirement {
 func (r *TestRequirement) HasS3Parameters() *TestRequirement {
 	if Global.S3AccessKey == "" || Global.S3SecretID == "" {
 		r.t.Skip("S3 Config parameters are not provided")
+	}
+
+	return r
+}
+
+// HasKmsKey skips tests that require a KMS Key.
+func (r *TestRequirement) HasKmsKey() *TestRequirement {
+	if Global.KmsKeyURL == "" {
+		r.t.Skip("KMS key is not provided")
 	}
 
 	return r

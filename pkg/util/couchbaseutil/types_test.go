@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/urlencoding"
@@ -931,6 +932,112 @@ func TestFormEncodeDataServiceRebalanceType(t *testing.T) {
 
 			if tc.expectedPresent && encoded[0] != tc.expectedEncoding {
 				t.Errorf("expected dataServiceRebalanceType=%q, got %q", tc.expectedEncoding, encoded[0])
+			}
+		})
+	}
+}
+
+// TestServiceRoleString covers the bracketed form a service role is written in, which has to match
+// what the same role is read back as or the reconcile would never settle.
+func TestServiceRoleString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		role     ServiceRole
+		expected string
+	}{
+		{
+			name:     "credential consumer",
+			role:     ServiceRole{Role: RoleCredentialConsumer, CredentialID: "cloud-1"},
+			expected: "credential_consumer[cloud-1]",
+		},
+		{
+			name:     "built by the constructor",
+			role:     NewCredentialConsumerRole("kms-1"),
+			expected: "credential_consumer[kms-1]",
+		},
+		{
+			name:     "role without a credential",
+			role:     ServiceRole{Role: "some_other_role"},
+			expected: "some_other_role",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := test.role.String(); got != test.expected {
+				t.Fatalf("expected %q, got %q", test.expected, got)
+			}
+		})
+	}
+}
+
+// TestServiceRolesCredentialIDs covers reducing what the server reports to the set of credentials
+// the backup service can resolve, which is the value the reconcile compares against.
+func TestServiceRolesCredentialIDs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		roles    ServiceRoles
+		expected []string
+	}{
+		{
+			name:     "no roles",
+			roles:    ServiceRoles{},
+			expected: []string{},
+		},
+		{
+			name: "one credential",
+			roles: ServiceRoles{Roles: []ServiceRole{
+				{Role: RoleCredentialConsumer, CredentialID: "cloud-1"},
+			}},
+			expected: []string{"cloud-1"},
+		},
+		{
+			name: "other roles ignored",
+			roles: ServiceRoles{Roles: []ServiceRole{
+				{Role: "some_other_role"},
+				{Role: RoleCredentialConsumer, CredentialID: "cloud-1"},
+			}},
+			expected: []string{"cloud-1"},
+		},
+		{
+			name: "credential consumer without an id",
+			roles: ServiceRoles{Roles: []ServiceRole{
+				{Role: RoleCredentialConsumer, CredentialID: ""},
+			}},
+			expected: []string{},
+		},
+		{
+			name: "several credentials",
+			roles: ServiceRoles{Roles: []ServiceRole{
+				{Role: RoleCredentialConsumer, CredentialID: "kms-1"},
+				{Role: RoleCredentialConsumer, CredentialID: "cloud-1"},
+				{Role: RoleCredentialConsumer, CredentialID: "cloud-1"},
+			}},
+			expected: []string{"cloud-1", "kms-1"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ids := test.roles.CredentialIDs()
+
+			got := make([]string, 0, len(ids))
+			for id := range ids {
+				got = append(got, id)
+			}
+
+			sort.Strings(got)
+
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Fatalf("expected %v, got %v", test.expected, got)
 			}
 		})
 	}

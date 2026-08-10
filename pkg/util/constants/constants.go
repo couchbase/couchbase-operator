@@ -430,6 +430,14 @@ const (
 	// what the server reports back and does not get updated on every reconcile.
 	BucketDataServiceRebalanceTypeDefault = "auto"
 
+	// ContinuousBackupIntervalDefault default interval, in minutes, between continuous backups for
+	// a bucket. This is also the smallest value the server accepts.
+	ContinuousBackupIntervalDefault = 2
+
+	// ContinuousBackupRetentionPeriodDefault default period, in hours, that continuous backups are
+	// retained for.
+	ContinuousBackupRetentionPeriodDefault = 1
+
 	// RebalanceMovesPerNodeDefault default number of concurrent vBucket moves per node during a
 	// rebalance, used for both the DCP and the file based knobs on /settings/rebalance. This is the
 	// server's own default, and is what an unset field in spec.cluster.rebalance reverts to.

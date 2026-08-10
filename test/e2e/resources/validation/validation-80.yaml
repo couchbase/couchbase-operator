@@ -204,3 +204,10 @@ kind: CouchbaseBucket
 metadata:
   name: bucket3
 ---
+apiVersion: couchbase.com/v2
+kind: CouchbaseBackupRestore
+metadata:
+  name: restore0
+spec:
+  backup: backup0
+  repo: cb-example-2020-01-21T11_08_04

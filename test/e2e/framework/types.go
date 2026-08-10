@@ -58,6 +58,9 @@ type Framework struct {
 	S3Region        string
 	S3AccessKey     string
 	S3SecretID      string
+	S3SessionToken  string
+	// Tests which may require a KMS Key
+	KmsKeyURL string
 	// Azure Access
 	AZAccountName string
 	AZAccountKey  string

@@ -39,7 +39,7 @@ func MustNewProvider(t *testing.T, kubernetes *types.Cluster, providerType cloud
 	case cloud.CloudProviderAWS:
 		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasS3Parameters()
 
-		creds = []string{f.S3AccessKey, f.S3SecretID, f.S3Region}
+		creds = []string{f.S3AccessKey, f.S3SecretID, f.S3Region, f.S3SessionToken}
 
 	case cloud.CloudProviderAzure:
 		framework.Requires(t, kubernetes).AtLeastVersion("6.6.0").HasAzureParameters()

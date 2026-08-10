@@ -13,6 +13,7 @@ package cluster
 import (
 	"math"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -657,5 +658,245 @@ func TestGatherBucketsRebalanceTypeIsIdempotent(t *testing.T) {
 	second := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 	if second[0].DataServiceRebalanceType != gathered["couchbase"] {
 		t.Errorf("gathering twice was not stable: first %q, second %q", gathered["couchbase"], second[0].DataServiceRebalanceType)
+	}
+}
+
+// TestContinuousBackupCredentialIDs covers which stored credentials a set of buckets is considered
+// to be using, which is what the backup service's credential_consumer roles are reconciled against.
+func TestContinuousBackupCredentialIDs(t *testing.T) {
+	t.Parallel()
+
+	strPtr := func(s string) *string { return &s }
+	enabled := func(b bool) *bool { return &b }
+
+	tests := []struct {
+		name     string
+		buckets  []couchbaseutil.Bucket
+		expected []string
+	}{
+		{
+			name:     "no buckets",
+			buckets:  nil,
+			expected: []string{},
+		},
+		{
+			name:     "bucket without continuous backup",
+			buckets:  []couchbaseutil.Bucket{{BucketName: "b1"}},
+			expected: []string{},
+		},
+		{
+			name: "disabled bucket keeping its credential",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:                         "b1",
+				ContinuousBackupEnabled:            enabled(false),
+				ContinuousBackupCloudStorageCredID: strPtr("cloud-1"),
+			}},
+			expected: []string{},
+		},
+		{
+			name: "enabled with empty credentials",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:                         "b1",
+				ContinuousBackupEnabled:            enabled(true),
+				ContinuousBackupCloudStorageCredID: strPtr(""),
+				ContinuousBackupKmCredID:           strPtr(""),
+			}},
+			expected: []string{},
+		},
+		{
+			name: "object storage only",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:                         "b1",
+				ContinuousBackupEnabled:            enabled(true),
+				ContinuousBackupCloudStorageCredID: strPtr("cloud-1"),
+			}},
+			expected: []string{"cloud-1"},
+		},
+		{
+			name: "key management only",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:               "b1",
+				ContinuousBackupEnabled:  enabled(true),
+				ContinuousBackupKmCredID: strPtr("kms-1"),
+			}},
+			expected: []string{"kms-1"},
+		},
+		{
+			name: "both credentials on one bucket",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:                         "b1",
+				ContinuousBackupEnabled:            enabled(true),
+				ContinuousBackupCloudStorageCredID: strPtr("cloud-1"),
+				ContinuousBackupKmCredID:           strPtr("kms-1"),
+			}},
+			expected: []string{"cloud-1", "kms-1"},
+		},
+		{
+			name: "credential shared between buckets",
+			buckets: []couchbaseutil.Bucket{
+				{
+					BucketName:                         "b1",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("shared"),
+				},
+				{
+					BucketName:                         "b2",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("shared"),
+				},
+			},
+			expected: []string{"shared"},
+		},
+		{
+			name: "one credential used for both purposes",
+			buckets: []couchbaseutil.Bucket{{
+				BucketName:                         "b1",
+				ContinuousBackupEnabled:            enabled(true),
+				ContinuousBackupCloudStorageCredID: strPtr("shared"),
+				ContinuousBackupKmCredID:           strPtr("shared"),
+			}},
+			expected: []string{"shared"},
+		},
+		{
+			name: "mixed cluster",
+			buckets: []couchbaseutil.Bucket{
+				{
+					BucketName:                         "b1",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("cloud-1"),
+				},
+				{
+					BucketName:                         "b2",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("cloud-2"),
+				},
+				{
+					BucketName:                         "b3",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("cloud-3"),
+					ContinuousBackupKmCredID:           strPtr("kms-3"),
+				},
+				{
+					BucketName:                         "b4",
+					ContinuousBackupEnabled:            enabled(true),
+					ContinuousBackupCloudStorageCredID: strPtr("cloud-4"),
+					ContinuousBackupKmCredID:           strPtr("kms-4"),
+				},
+				{BucketName: "b5", ContinuousBackupEnabled: enabled(false)},
+				{BucketName: "b6"},
+			},
+			expected: []string{"cloud-1", "cloud-2", "cloud-3", "cloud-4", "kms-3", "kms-4"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ids := continuousBackupCredentialIDs(test.buckets)
+
+			got := make([]string, 0, len(ids))
+			for id := range ids {
+				got = append(got, id)
+			}
+
+			sort.Strings(got)
+
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Fatalf("expected credentials %v, got %v", test.expected, got)
+			}
+		})
+	}
+}
+
+// TestSetBucketContinuousBackupSettings covers the mapping from the CR's continuous backup settings
+// onto the bucket the operator sends to the server.
+//
+// The disabled cases matter as much as the enabled ones. The operator stops managing the other
+// settings once the feature is off, and stops reading them back, so anything set here while
+// disabled would be compared against a value never read and rewrite the bucket every reconcile.
+func TestSetBucketContinuousBackupSettings(t *testing.T) {
+	t.Parallel()
+
+	strPtr := func(s string) *string { return &s }
+	boolValue := func(b bool) *bool { return &b }
+	uint32Ptr := func(i uint32) *uint32 { return &i }
+
+	tests := []struct {
+		name     string
+		settings *couchbasev2.ContinuousBackupSettings
+		expected couchbaseutil.Bucket
+	}{
+		{
+			name:     "no settings at all",
+			settings: nil,
+			expected: couchbaseutil.Bucket{ContinuousBackupEnabled: boolValue(false)},
+		},
+		{
+			name:     "settings without enabled",
+			settings: &couchbasev2.ContinuousBackupSettings{Location: strPtr("s3://a-bucket")},
+			expected: couchbaseutil.Bucket{ContinuousBackupEnabled: boolValue(false)},
+		},
+		{
+			name: "explicitly disabled with everything else set",
+			settings: &couchbasev2.ContinuousBackupSettings{
+				Enabled:           boolValue(false),
+				Location:          strPtr("s3://a-bucket"),
+				Interval:          uint32Ptr(10),
+				RetentionPeriod:   uint32Ptr(24),
+				CloudCredentialID: strPtr("cloud-1"),
+			},
+			expected: couchbaseutil.Bucket{ContinuousBackupEnabled: boolValue(false)},
+		},
+		{
+			name: "enabled with only a location",
+			settings: &couchbasev2.ContinuousBackupSettings{
+				Enabled:  boolValue(true),
+				Location: strPtr("/mnt/backups"),
+			},
+			expected: couchbaseutil.Bucket{
+				ContinuousBackupEnabled:            boolValue(true),
+				ContinuousBackupLocation:           strPtr("/mnt/backups"),
+				ContinuousBackupInterval:           uint32Ptr(2),
+				ContinuousBackupRetentionPeriod:    uint32Ptr(1),
+				ContinuousBackupKmKeyURL:           strPtr(""),
+				ContinuousBackupKmCredID:           strPtr(""),
+				ContinuousBackupCloudStorageCredID: strPtr(""),
+			},
+		},
+		{
+			name: "enabled with every field set",
+			settings: &couchbasev2.ContinuousBackupSettings{
+				Enabled:           boolValue(true),
+				Location:          strPtr("s3://a-bucket/prefix"),
+				Interval:          uint32Ptr(10),
+				RetentionPeriod:   uint32Ptr(24),
+				KmsKeyURL:         strPtr("awskms://a-key"),
+				KmsCredentialID:   strPtr("kms-1"),
+				CloudCredentialID: strPtr("cloud-1"),
+			},
+			expected: couchbaseutil.Bucket{
+				ContinuousBackupEnabled:            boolValue(true),
+				ContinuousBackupLocation:           strPtr("s3://a-bucket/prefix"),
+				ContinuousBackupInterval:           uint32Ptr(10),
+				ContinuousBackupRetentionPeriod:    uint32Ptr(24),
+				ContinuousBackupKmKeyURL:           strPtr("awskms://a-key"),
+				ContinuousBackupKmCredID:           strPtr("kms-1"),
+				ContinuousBackupCloudStorageCredID: strPtr("cloud-1"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			bucket := couchbaseutil.Bucket{}
+			setBucketContinuousBackupSettings(&bucket, test.settings)
+
+			if !reflect.DeepEqual(bucket, test.expected) {
+				t.Fatalf("expected %+v, got %+v", test.expected, bucket)
+			}
+		})
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/constants"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
+	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil/cloud"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -513,6 +514,489 @@ func TestEditEphemeralBucketKVThrottle(t *testing.T) {
 	throttleHardLimit := uint64(6000)
 	e2eutil.MustPatchBucket(t, kubernetes, bucket, jsonpatch.NewPatchSet().Replace("/spec/throttleHardLimit", throttleHardLimit), time.Minute)
 	e2eutil.MustPatchBucketInfo(t, kubernetes, cluster, bucket.GetName(), jsonpatch.NewPatchSet().Test("/ThrottleHardLimit", &throttleHardLimit), time.Minute)
+}
+
+// TestBucketContinuousBackup tests that the operator sends per bucket continuous backup settings to
+// the server, and keeps sending the right thing when the user changes them.
+func TestBucketContinuousBackup(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).CouchbaseBucket()
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if !isAtleast81 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	}
+
+	const (
+		clusterSize    = 1
+		backupLocation = "/opt/couchbase/var/lib/couchbase/backup"
+
+		defaultInterval        = uint32(2)
+		defaultRetentionPeriod = uint32(1)
+
+		updatedInterval        = uint32(10)
+		updatedRetentionPeriod = uint32(24)
+
+		changeHistorySeconds = uint64(1200)
+	)
+
+	configured := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "continuous-backup-configured"},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    e2espec.NewResourceQuantityMi(100),
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+			HistoryRetentionSettings: &couchbasev2.HistoryRetentionSettings{
+				Seconds: changeHistorySeconds,
+			},
+			ContinuousBackup: &couchbasev2.ContinuousBackupSettings{
+				Enabled:  to.Ptr(true),
+				Location: to.Ptr(backupLocation),
+			},
+		},
+	})
+
+	omitted := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "continuous-backup-omitted"},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    e2espec.NewResourceQuantityMi(100),
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+		},
+	})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, configured, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, omitted, 2*time.Minute)
+
+	omittedExpectation := e2eutil.ContinuousBackupExpectation{
+		Enabled: false,
+	}
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, omitted.GetName(), omittedExpectation, 2*time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, configured.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled:         true,
+		Location:        backupLocation,
+		Interval:        defaultInterval,
+		RetentionPeriod: defaultRetentionPeriod,
+	}, 2*time.Minute)
+
+	// Changing the schedule must reach the server.
+	configuredBucket := e2eutil.MustPatchBucket(t, kubernetes, configured, jsonpatch.NewPatchSet().
+		Replace("/spec/continuousBackup/interval", updatedInterval).
+		Replace("/spec/continuousBackup/retentionPeriod", updatedRetentionPeriod), time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, configuredBucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled:         true,
+		Location:        backupLocation,
+		Interval:        updatedInterval,
+		RetentionPeriod: updatedRetentionPeriod,
+	}, 2*time.Minute)
+
+	configuredBucket = e2eutil.MustPatchBucket(t, kubernetes, configuredBucket, jsonpatch.NewPatchSet().
+		Replace("/spec/continuousBackup/enabled", false), time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, configuredBucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled: false,
+	}, 2*time.Minute)
+
+	// Editing one bucket must not have disturbed the other.
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, omitted.GetName(), omittedExpectation, 2*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+}
+
+// TestBucketContinuousBackupS3 checks that a bucket configured for continuous backup to object
+// storage actually writes there.
+func TestBucketContinuousBackupS3(t *testing.T) {
+	testBucketContinuousBackupS3(t, false)
+}
+
+// TestBucketContinuousBackupS3KMS is TestBucketContinuousBackupS3 with the backups encrypted
+// using a key management system key.
+func TestBucketContinuousBackupS3KMS(t *testing.T) {
+	testBucketContinuousBackupS3(t, true)
+}
+
+func testBucketContinuousBackupS3(t *testing.T, withKMS bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	requirements := framework.Requires(t, kubernetes).CouchbaseBucket().HasS3Parameters()
+
+	kmsKeyURL := ""
+
+	if withKMS {
+		// KMS keys are not straightforward to create and delete for the test since they're usually scheduled for deletion
+		// So multiple test runs can leave a lot of them behind eventually costing money and consuming quota.
+		// So this is "one key to rule them all". KMS keys are also safe for use concurrently, so one key is enough for all the test runs.
+		// The key is present in cao-qe aws account.
+		requirements.HasKmsKey()
+
+		kmsKeyURL = f.KmsKeyURL
+	}
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if !isAtleast81 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	}
+
+	const (
+		clusterSize = 1
+
+		bucketName = "continuous-backup-s3"
+
+		s3BucketPrefix = "cao-continuous-backup-e2e-tests"
+
+		credentialID = "continuous-backup-s3"
+
+		kmsCredentialID = "continuous-backup-s3-kms"
+
+		backupInterval = uint32(2)
+
+		retentionPeriod = uint32(1)
+
+		changeHistorySeconds = uint64(1200)
+
+		docCount = 500
+
+		backupTimeout = 10 * time.Minute
+	)
+
+	// Node to node encryption is what makes the server willing to hold a credential, so the
+	// cluster has to have it on before the credential is stored.
+	encryption := couchbasev2.NodeToNodeControlPlaneOnly
+
+	store, err := cloud.NewAWSObjectStore(f.S3AccessKey, f.S3SecretID, f.S3Region, f.S3SessionToken)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	s3Bucket := s3BucketPrefix + "-" + e2eutil.RandomString(8)
+	location := "s3://" + s3Bucket
+
+	if err := store.CreateBucket(s3Bucket); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	// obviously delete the bucket so it doesn't keep piling up in the account and consume the
+	// quota.
+	defer func() {
+		if err := store.DeleteBucket(s3Bucket); err != nil {
+			t.Logf("unable to delete S3 bucket %q, it may need removing by hand: %v", s3Bucket, err)
+		}
+	}()
+
+	tlsCtx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = tlsCtx.ClusterName
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   tlsCtx.ClusterSecretName,
+			OperatorSecret: tlsCtx.OperatorSecretName,
+		},
+		NodeToNodeEncryption: &encryption,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryption, tlsCtx, 5*time.Minute)
+
+	credential := e2eutil.NewAWSServerCredential(f.S3AccessKey, f.S3SecretID, f.S3Region, f.S3SessionToken)
+
+	deleteCredential := e2eutil.MustCreateServerCredential(t, kubernetes, cluster, credentialID, credential)
+	defer deleteCredential()
+
+	continuousBackup := &couchbasev2.ContinuousBackupSettings{
+		Enabled:           to.Ptr(true),
+		Location:          to.Ptr(location),
+		Interval:          to.Ptr(backupInterval),
+		RetentionPeriod:   to.Ptr(retentionPeriod),
+		CloudCredentialID: to.Ptr(credentialID),
+	}
+
+	expectedKmsCredentialID := ""
+
+	if withKMS {
+		deleteKmsCredential := e2eutil.MustCreateServerCredential(t, kubernetes, cluster, kmsCredentialID, credential)
+		defer deleteKmsCredential()
+
+		continuousBackup.KmsKeyURL = to.Ptr(kmsKeyURL)
+		continuousBackup.KmsCredentialID = to.Ptr(kmsCredentialID)
+
+		expectedKmsCredentialID = kmsCredentialID
+	}
+
+	bucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: bucketName},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    e2espec.NewResourceQuantityMi(100),
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+			HistoryRetentionSettings: &couchbasev2.HistoryRetentionSettings{
+				Seconds: changeHistorySeconds,
+			},
+			ContinuousBackup: continuousBackup,
+		},
+	})
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// The key management fields are asserted in both cases. Unencrypted, the server reports them
+	// as the empty string, so passing them through checks that no key was sent just as much as it
+	// checks the right one was.
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, bucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled:           true,
+		Location:          location,
+		Interval:          backupInterval,
+		RetentionPeriod:   retentionPeriod,
+		KmsKeyURL:         kmsKeyURL,
+		CloudCredentialID: credentialID,
+		KmsCredentialID:   expectedKmsCredentialID,
+	}, 2*time.Minute)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), docCount).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), docCount, time.Minute)
+
+	store.MustWaitForObjects(t, s3Bucket, backupTimeout)
+
+	// Stop the backups before returning, so that emptying and deleting the S3 bucket is not racing
+	// the next scheduled write.
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket,
+		jsonpatch.NewPatchSet().Replace("/spec/continuousBackup/enabled", false), time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, bucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled: false,
+	}, 2*time.Minute)
+}
+
+// TestBucketContinuousBackupS3RestoreAll writes documents to a bucket backing up continuously to
+// object storage, empties the bucket, and recovers everything the backup location holds.
+func TestBucketContinuousBackupS3RestoreAll(t *testing.T) {
+	testBucketContinuousBackupS3RestoreAll(t, false)
+}
+
+func TestBucketContinuousBackupS3RestoreAllWithKMS(t *testing.T) {
+	testBucketContinuousBackupS3RestoreAll(t, true)
+}
+
+func testBucketContinuousBackupS3RestoreAll(t *testing.T, withKMS bool) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	requirements := framework.Requires(t, kubernetes).CouchbaseBucket().HasS3Parameters()
+
+	kmsKeyURL := ""
+
+	if withKMS {
+		requirements.HasKmsKey()
+
+		kmsKeyURL = f.KmsKeyURL
+	}
+
+	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
+	if isAtleast81, err := couchbaseutil.VersionAfter(cbVersion, "8.1.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if !isAtleast81 {
+		t.Skip("per bucket continuous backup requires Couchbase Server 8.1.0 or later")
+	}
+
+	const (
+		clusterSize = 1
+
+		bucketName = "continuous-backup-restore"
+
+		s3BucketPrefix = "cao-continuous-backup-e2e-tests"
+
+		continuousPrefix = "continuous"
+
+		credentialID = "continuous-backup-restore"
+
+		kmsCredentialID = "continuous-backup-restore-kms"
+
+		kmsSecretName = "continuous-backup-restore-kms-creds"
+
+		backupInterval = uint32(2)
+
+		retentionPeriod = uint32(1)
+
+		changeHistorySeconds = uint64(1200)
+
+		docCount = 500
+
+		backupTimeout = 10 * time.Minute
+
+		continuousBackupSettleIntervals = 3
+	)
+
+	encryption := couchbasev2.NodeToNodeControlPlaneOnly
+
+	store, err := cloud.NewAWSObjectStore(f.S3AccessKey, f.S3SecretID, f.S3Region, f.S3SessionToken)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	s3Bucket := s3BucketPrefix + "-" + e2eutil.RandomString(8)
+	archive := store.PrefixBucket(s3Bucket)
+	location := archive + "/" + continuousPrefix
+
+	if err := store.CreateBucket(s3Bucket); err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	defer func() {
+		if err := store.DeleteBucket(s3Bucket); err != nil {
+			t.Logf("unable to delete S3 bucket %q, it may need removing by hand: %v", s3Bucket, err)
+		}
+	}()
+
+	objStoreSecret, err := store.CreateSecret(kubernetes)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	tlsCtx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{})
+
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
+	cluster.Name = tlsCtx.ClusterName
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
+	cluster.Spec.Networking.TLS = &couchbasev2.TLSPolicy{
+		Static: &couchbasev2.StaticTLS{
+			ServerSecret:   tlsCtx.ClusterSecretName,
+			OperatorSecret: tlsCtx.OperatorSecretName,
+		},
+		NodeToNodeEncryption: &encryption,
+	}
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustCheckN2NEnabled(t, kubernetes, cluster, encryption, tlsCtx, 5*time.Minute)
+
+	credential := e2eutil.NewAWSServerCredential(f.S3AccessKey, f.S3SecretID, f.S3Region, f.S3SessionToken)
+
+	deleteCredential := e2eutil.MustCreateServerCredential(t, kubernetes, cluster, credentialID, credential)
+	defer deleteCredential()
+
+	continuousBackup := &couchbasev2.ContinuousBackupSettings{
+		Enabled:           to.Ptr(true),
+		Location:          to.Ptr(location),
+		Interval:          to.Ptr(backupInterval),
+		RetentionPeriod:   to.Ptr(retentionPeriod),
+		CloudCredentialID: to.Ptr(credentialID),
+	}
+
+	expectedKmsCredentialID := ""
+
+	// The key URL and the credential that reaches it have to be set together or not at all, which
+	// the admission controller enforces, so neither is set when the backups are unencrypted.
+	if withKMS {
+		deleteKmsCredential := e2eutil.MustCreateServerCredential(t, kubernetes, cluster, kmsCredentialID, credential)
+		defer deleteKmsCredential()
+
+		continuousBackup.KmsKeyURL = to.Ptr(kmsKeyURL)
+		continuousBackup.KmsCredentialID = to.Ptr(kmsCredentialID)
+
+		expectedKmsCredentialID = kmsCredentialID
+	}
+
+	bucket := e2eutil.MustNewBucket(t, kubernetes, &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: bucketName},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota:    e2espec.NewResourceQuantityMi(100),
+			StorageBackend: couchbasev2.CouchbaseStorageBackendMagma,
+			EnableFlush:    true,
+			HistoryRetentionSettings: &couchbasev2.HistoryRetentionSettings{
+				Seconds: changeHistorySeconds,
+			},
+			ContinuousBackup: continuousBackup,
+		},
+	})
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, bucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled:           true,
+		Location:          location,
+		Interval:          backupInterval,
+		RetentionPeriod:   retentionPeriod,
+		KmsKeyURL:         kmsKeyURL,
+		CloudCredentialID: credentialID,
+		KmsCredentialID:   expectedKmsCredentialID,
+	}, 2*time.Minute)
+
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).
+		ToObjStore(archive).
+		WithObjStoreSecret(objStoreSecret).
+		WithStorageClass(f.StorageClassName).
+		MustCreate(t, kubernetes)
+
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupStartedEvent(cluster, backup.Name), 5*time.Minute)
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 10*time.Minute)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), docCount).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), docCount, time.Minute)
+
+	store.MustWaitForObjects(t, s3Bucket+"/"+continuousPrefix, backupTimeout)
+
+	// An object appearing only shows that an interval fired, and that interval may well have fired
+	// part way through the writes above. Turning the backups off now would strand whatever it did
+	// not cover, and the count at the end would come up short.
+	//
+	// So wait out a few more intervals, by which point one of them has certainly both begun and
+	// ended after the last document was written, and so covered all of them. This is a guess
+	// dressed up as arithmetic: if the server reports how far its continuous backup has got, that
+	// reading should replace this.
+	time.Sleep(continuousBackupSettleIntervals * time.Duration(backupInterval) * time.Minute)
+
+	bucket = e2eutil.MustPatchBucket(t, kubernetes, bucket,
+		jsonpatch.NewPatchSet().Replace("/spec/continuousBackup/enabled", false), time.Minute)
+
+	e2eutil.MustVerifyBucketContinuousBackupSettings(t, kubernetes, cluster, bucket.GetName(), e2eutil.ContinuousBackupExpectation{
+		Enabled: false,
+	}, 2*time.Minute)
+
+	e2eutil.MustFlushBucket(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, time.Minute)
+
+	restoreBuilder := e2eutil.NewRestore(backup).
+		FromObjStore(archive).
+		WithObjStoreSecret(objStoreSecret).
+		WithContinuousBackupAll(location)
+
+	if withKMS {
+		kmsSecret, err := store.CreateKMSSecret(kubernetes, kmsSecretName)
+		if err != nil {
+			e2eutil.Die(t, err)
+		}
+
+		// The key is assumed to live in the same region as the object storage, which is all the one
+		// set of framework credentials can describe. A key somewhere else would need its own flag.
+		restoreBuilder = restoreBuilder.WithContinuousBackupKMS(kmsKeyURL, f.S3Region, kmsSecret)
+	}
+
+	restore := restoreBuilder.MustCreate(t, kubernetes)
+
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 15*time.Minute)
+
+	// 5. Everything written before the backups were turned off is back.
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), docCount, 5*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 }
 
 // TestBucketDataServiceRebalanceType tests that the operator sends the correct rebalance type to the server for both couchbase and ephemeral buckets.

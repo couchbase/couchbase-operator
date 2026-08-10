@@ -98,6 +98,24 @@ func convertCouchbaseBucketToAPIBucket(bucket *couchbaseutil.Bucket, namer Bucke
 			Seconds:           bucket.HistoryRetentionSeconds,
 			Bytes:             bucket.HistoryRetentionBytes,
 		}
+
+		// Only build the block when the server actually reported continuous backup. A server older
+		// than 8.1.0 does not know the feature, and synthesising an all nil block there would make
+		// the resulting resource fail the 8.1.0+ version check for a field the user never set.
+		//
+		// Enabled alone is enough to test for. It is the one setting carried whatever the state of
+		// the feature, so the rest are non nil only when it is, and are left nil here otherwise.
+		if bucket.ContinuousBackupEnabled != nil {
+			cbBucket.Spec.ContinuousBackup = &couchbasev2.ContinuousBackupSettings{
+				Enabled:           bucket.ContinuousBackupEnabled,
+				Location:          bucket.ContinuousBackupLocation,
+				Interval:          bucket.ContinuousBackupInterval,
+				RetentionPeriod:   bucket.ContinuousBackupRetentionPeriod,
+				KmsKeyURL:         bucket.ContinuousBackupKmKeyURL,
+				KmsCredentialID:   bucket.ContinuousBackupKmCredID,
+				CloudCredentialID: bucket.ContinuousBackupCloudStorageCredID,
+			}
+		}
 	}
 
 	return cbBucket

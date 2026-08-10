@@ -13,6 +13,7 @@ package util
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	v2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
@@ -58,6 +59,17 @@ func StringArrayCompare(a1, a2 []string) bool {
 	}
 
 	return true
+}
+
+// HasAnyPrefix reports whether value starts with any of the given prefixes.
+func HasAnyPrefix(value string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(value, prefix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 type UpdateError struct {

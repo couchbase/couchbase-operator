@@ -71,6 +71,10 @@ func BoolPtr(b bool) *bool {
 	return &b
 }
 
+func Uint32Ptr(i uint32) *uint32 {
+	return &i
+}
+
 func IntOrStringPtr(s string) *intstr.IntOrString {
 	val := intstr.Parse(s)
 	return &val

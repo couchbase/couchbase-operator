@@ -2093,6 +2093,722 @@ func TestValidationRebalanceSettings(t *testing.T) {
 	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
 }
 
+// TestValidationContinuousBackup covers the admission time validation for per bucket continuous
+// backup, which is a Couchbase Server 8.1.0 magma only feature.
+func TestValidationContinuousBackup(t *testing.T) {
+	const (
+		locationErr   = `spec.continuousBackup.location must be set when spec.continuousBackup.enabled is true`
+		noHistoryErr  = `spec.continuousBackup cannot be enabled without also enabling change history`
+		historyMinErr = `spec.historyRetention.seconds \(\d+\) must be at least \d+ when spec.continuousBackup is enabled`
+		couchstoreErr = `spec.continuousBackup can only be used with a magma storage backend`
+
+		cloudCredentialMissingErr = `spec.continuousBackup.cloudCredentialId must be set when spec.continuousBackup.location is an object storage URI`
+		cloudCredentialUnusedErr  = `spec.continuousBackup.cloudCredentialId can only be set when spec.continuousBackup.location is an object storage URI`
+		// The scheme is enforced by a pattern in the CRD rather than by the admission
+		// controller, so this is the API server's wording rather than ours.
+		kmsSchemeErr = `spec.continuousBackup.kmsKeyUrl in body should match`
+		kmsPairErr   = `spec.continuousBackup.kmsKeyUrl and spec.continuousBackup.kmsCredentialId must be set together`
+
+		location      = "/mnt/continuous-backup"
+		cloudLocation = "s3://a-bucket/backups"
+		cloudCredID   = "cloud-credential-1"
+		kmsKeyURL     = "awskms://arn:aws:kms:us-west-2:123456789012:key/abcd"
+		kmsCredID     = "kms-credential-1"
+	)
+
+	testDefs := []testDef{
+		{
+			// Enabled with nowhere to write to.
+			name: "TestValidateContinuousBackupEnabledWithoutLocation",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled: util.BoolPtr(true),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{locationErr},
+		},
+		{
+			// bucket2 is magma but has no change history at all, which continuous backup is built on.
+			name: "TestValidateContinuousBackupEnabledWithoutChangeHistory",
+			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{noHistoryErr},
+		},
+		{
+			// bucket4's history is bounded by size rather than time, so there is no window to
+			// measure and the minimum window rule must not fire.
+			name: "TestValidateContinuousBackupEnabledWithByteOnlyChangeHistory",
+			mutations: patchMap{"bucket4": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+				})},
+			shouldFail: false,
+		},
+		{
+			// 600 seconds is below the 15 minute floor, and the floor is what binds here because
+			// the defaulted interval of 2 minutes only demands 240 seconds.
+			name: "TestValidateContinuousBackupChangeHistoryBelowMinimumWindow",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/historyRetention/seconds", 600).
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{historyMinErr},
+		},
+		{
+			// Exactly the 15 minute floor, with the defaulted interval, is enough.
+			name: "TestValidateContinuousBackupChangeHistoryAtMinimumWindow",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/historyRetention/seconds", 900).
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+				})},
+			shouldFail: false,
+		},
+		{
+			// With a 10 minute interval the history must cover 1200 seconds, so 900 is no longer
+			// enough even though it clears the 15 minute floor. This is the case that proves the
+			// interval multiple is applied and not just the floor.
+			name: "TestValidateContinuousBackupChangeHistoryBelowTwiceInterval",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/historyRetention/seconds", 900).
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+					Interval: util.Uint32Ptr(10),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{historyMinErr},
+		},
+		{
+			name: "TestValidateContinuousBackupChangeHistoryAtTwiceInterval",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Replace("/spec/historyRetention/seconds", 1200).
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(location),
+					Interval: util.Uint32Ptr(10),
+				})},
+			shouldFail: false,
+		},
+		{
+			// enabled is deliberately left to default to false. The backend check fires on the
+			// presence of the block rather than on it being turned on, so this isolates the
+			// couchstore rejection from the change history rules bucket3 would also trip.
+			name: "TestValidateContinuousBackupRejectedOnCouchstoreBucket",
+			mutations: patchMap{"bucket3": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Location: util.StrPtr(location),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{couchstoreErr},
+		},
+		{
+			// Writing the block out with enabled false is a legitimate way to say "off", and must
+			// not require a location or any change history. bucket2 has neither.
+			name: "TestValidateContinuousBackupDisabledNeedsNothingElse",
+			mutations: patchMap{"bucket2": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled: util.BoolPtr(false),
+				})},
+			shouldFail: false,
+		},
+
+		// Object storage locations and the credentials that reach them. These rules do not depend
+		// on the feature being switched on, so several of the cases below leave enabled to default
+		// to false and are still rejected.
+		{
+			name: "TestValidateContinuousBackupObjectStorageWithoutCloudCredential",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr(cloudLocation),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{cloudCredentialMissingErr},
+		},
+		{
+			name: "TestValidateContinuousBackupObjectStorageWithCloudCredential",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:           util.BoolPtr(true),
+					Location:          util.StrPtr(cloudLocation),
+					CloudCredentialID: util.StrPtr(cloudCredID),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateContinuousBackupCloudCredentialWithLocalPath",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:           util.BoolPtr(true),
+					Location:          util.StrPtr(location),
+					CloudCredentialID: util.StrPtr(cloudCredID),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{cloudCredentialUnusedErr},
+		},
+		{
+			name: "TestValidateContinuousBackupAzureObjectStorageAccepted",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:           util.BoolPtr(true),
+					Location:          util.StrPtr("az://a-container/backups"),
+					CloudCredentialID: util.StrPtr(cloudCredID),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateContinuousBackupGoogleObjectStorageAccepted",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:           util.BoolPtr(true),
+					Location:          util.StrPtr("gs://a-bucket/backups"),
+					CloudCredentialID: util.StrPtr(cloudCredID),
+				})},
+			shouldFail: false,
+		},
+
+		{
+			name: "TestValidateContinuousBackupKmsKeyUrlUnknownScheme",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:         util.BoolPtr(true),
+					Location:        util.StrPtr(location),
+					KmsKeyURL:       util.StrPtr("vault://a-key"),
+					KmsCredentialID: util.StrPtr(kmsCredID),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsSchemeErr},
+		},
+		{
+			name: "TestValidateContinuousBackupKmsKeyUrlWithoutCredential",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:   util.BoolPtr(true),
+					Location:  util.StrPtr(location),
+					KmsKeyURL: util.StrPtr(kmsKeyURL),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsPairErr},
+		},
+		{
+			name: "TestValidateContinuousBackupKmsCredentialWithoutKeyUrl",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:         util.BoolPtr(true),
+					Location:        util.StrPtr(location),
+					KmsCredentialID: util.StrPtr(kmsCredID),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsPairErr},
+		},
+		{
+			name: "TestValidateContinuousBackupKmsKeyUrlWithCredential",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:         util.BoolPtr(true),
+					Location:        util.StrPtr(location),
+					KmsKeyURL:       util.StrPtr(kmsKeyURL),
+					KmsCredentialID: util.StrPtr(kmsCredID),
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateContinuousBackupObjectStorageAndKmsTogether",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:           util.BoolPtr(true),
+					Location:          util.StrPtr(cloudLocation),
+					CloudCredentialID: util.StrPtr(cloudCredID),
+					KmsKeyURL:         util.StrPtr("gcpkms://projects/p/locations/l/keyRings/r/cryptoKeys/k"),
+					KmsCredentialID:   util.StrPtr(kmsCredID),
+				})},
+			shouldFail: false,
+		},
+
+		{
+			name: "TestValidateContinuousBackupIntervalBelowMinimum",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Interval: util.Uint32Ptr(1),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.continuousBackup.interval in body should be greater than or equal to 2`},
+		},
+		{
+			name: "TestValidateContinuousBackupRetentionPeriodBelowMinimum",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					RetentionPeriod: util.Uint32Ptr(0),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.continuousBackup.retentionPeriod in body should be greater than or equal to 1`},
+		},
+		{
+			name: "TestValidateContinuousBackupRetentionPeriodAboveMaximum",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					RetentionPeriod: util.Uint32Ptr(1441),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{`spec.continuousBackup.retentionPeriod in body should be less than or equal to 1440`},
+		},
+		{
+			// The bounds themselves must be accepted, otherwise an off by one in the markers would
+			// pass the three rejection cases above unnoticed.
+			name: "TestValidateContinuousBackupRangeBoundsAccepted",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Interval:        util.Uint32Ptr(2),
+					RetentionPeriod: util.Uint32Ptr(1440),
+				})},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-81.yaml"})
+}
+
+// TestValidationContinuousBackupUnsupportedVersion checks that continuous backup is rejected
+// outright on a cluster older than Couchbase Server 8.1.0, which is where the feature was
+// introduced. It runs against the 8.0.0 fixture for that reason.
+func TestValidationContinuousBackupUnsupportedVersion(t *testing.T) {
+	const (
+		versionErr = `spec.continuousBackup can only be set for Couchbase Server 8.1.0\+`
+
+		// A recovery is refused by a different check, which names the cluster it found too old,
+		// so it reads differently from the bucket's.
+		restoreVersionErr = `spec.continuousBackup can only be used with Couchbase Server 8.1.0\+, cluster .* is older`
+	)
+
+	testDefs := []testDef{
+		{
+			name: "TestValidateContinuousBackupEnabledRejectedBefore81",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled:  util.BoolPtr(true),
+					Location: util.StrPtr("/mnt/continuous-backup"),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{versionErr},
+		},
+		{
+			name: "TestValidateContinuousBackupDisabledRejectedBefore81",
+			mutations: patchMap{"bucket1": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.ContinuousBackupSettings{
+					Enabled: util.BoolPtr(false),
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{versionErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupRejectedBefore81",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:   "/mnt/continuous-backup",
+					RestoreAll: true,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{restoreVersionErr},
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-80.yaml"})
+}
+
+// TestValidationRestoreContinuousBackup covers admission of spec.continuousBackup on a
+// CouchbaseBackupRestore, which turns an ordinary restore into a point in time recovery.
+func TestValidationRestoreContinuousBackup(t *testing.T) {
+	const (
+		locationMissingErr = `spec.continuousBackup.location must be set`
+		locationSchemeErr  = `spec.continuousBackup.location \(".*"\) must be an absolute path or an object storage URI prefixed with one of`
+		targetBothErr      = `spec.continuousBackup.timestamp and spec.continuousBackup.restoreAll cannot both be set`
+		targetNeitherErr   = `one of spec.continuousBackup.timestamp or spec.continuousBackup.restoreAll must be set`
+
+		startErr          = `spec.start cannot be used with spec.continuousBackup`
+		endErr            = `spec.end cannot be used with spec.continuousBackup`
+		overwriteUsersErr = `spec.overwriteUsers cannot be used with spec.continuousBackup`
+		dataServiceErr    = `spec.services.data cannot be disabled with spec.continuousBackup`
+		analyticsErr      = `spec.services.analytics cannot be disabled with spec.continuousBackup`
+		usersServiceErr   = `spec.services.users cannot be used with spec.continuousBackup`
+
+		kmsBothErr    = `spec.continuousBackup.kms.secret and spec.continuousBackup.kms.useIAM cannot both be set`
+		kmsNeitherErr = `one of spec.continuousBackup.kms.secret or spec.continuousBackup.kms.useIAM must be set`
+		kmsMissingErr = `secret no-such-secret referenced by spec.continuousBackup.kms.secret must exist`
+		// The key URL scheme is enforced by a pattern in the CRD, so this is the API server's
+		// wording rather than ours.
+		kmsKeyURLErr = `spec.continuousBackup.kms.keyUrl in body should match`
+
+		imageErr = `spec.continuousBackup requires a backup image of 1.7.0 or later`
+
+		location      = "/mnt/continuous-backup"
+		cloudLocation = "s3://a-bucket/backups"
+		kmsKeyURL     = "awskms://arn:aws:kms:us-west-2:123456789012:key/abcd"
+		kmsSecret     = "kms-credentials"
+	)
+
+	// A fixed point rather than time.Now(), so that a failure is reproducible and the test does
+	// not depend on the clock.
+	timestamp := &metav1.Time{Time: time.Date(2026, time.January, 2, 3, 4, 5, 0, time.UTC)}
+
+	testDefs := []testDef{
+		{
+			name: "TestValidateRestoreContinuousBackupToTimestamp",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupRestoreAll",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:   location,
+					RestoreAll: true,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupObjectStorageLocation",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  cloudLocation,
+					Timestamp: timestamp,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupAutoResolveConflicts",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:             location,
+					Timestamp:            timestamp,
+					AutoResolveConflicts: true,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithoutLocation",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{locationMissingErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupRelativeLocation",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  "backups/here",
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{locationSchemeErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupUnknownLocationScheme",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  "ftp://a-host/backups",
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{locationSchemeErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupTimestampAndRestoreAll",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:   location,
+					Timestamp:  timestamp,
+					RestoreAll: true,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{targetBothErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithoutTarget",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location: location,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{targetNeitherErr},
+		},
+
+		{
+			name: "TestValidateRestoreContinuousBackupWithStart",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/start", &couchbasev2.StrOrInt{Int: util.IntPtr(1)}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{startErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithEnd",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/end", &couchbasev2.StrOrInt{Str: util.StrPtr("latest")}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{endErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithOverwriteUsers",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/overwriteUsers", true).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{overwriteUsersErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithDisabledService",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/services", &couchbasev2.CouchbaseBackupRestoreServices{
+					Data: util.BoolPtr(false),
+				}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{dataServiceErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupDisabledServiceReportedDeterministically",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/services", &couchbasev2.CouchbaseBackupRestoreServices{
+					Views:     util.BoolPtr(false),
+					Analytics: util.BoolPtr(false),
+				}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{analyticsErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithUsersService",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/services", &couchbasev2.CouchbaseBackupRestoreServices{
+					Users: util.BoolPtr(true),
+				}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{usersServiceErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithExplicitDefaultServices",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/services", &couchbasev2.CouchbaseBackupRestoreServices{
+					Data:  util.BoolPtr(true),
+					Views: util.BoolPtr(true),
+					Users: util.BoolPtr(false),
+				}).
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreWithoutContinuousBackupKeepsItsOptions",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/start", &couchbasev2.StrOrInt{Int: util.IntPtr(1)}).
+				Add("/spec/overwriteUsers", true).
+				Add("/spec/services", &couchbasev2.CouchbaseBackupRestoreServices{
+					Data:  util.BoolPtr(false),
+					Users: util.BoolPtr(true),
+				})},
+			shouldFail: false,
+		},
+
+		{
+			name: "TestValidateRestoreContinuousBackupKmsWithSecret",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: kmsKeyURL,
+						Region: "us-west-2",
+						Secret: kmsSecret,
+					},
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsWithIAM",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: kmsKeyURL,
+						UseIAM: util.BoolPtr(true),
+					},
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsWithSecretAndIAM",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: kmsKeyURL,
+						Secret: kmsSecret,
+						UseIAM: util.BoolPtr(true),
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsBothErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsWithoutCredentials",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: kmsKeyURL,
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsNeitherErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsSecretMustExist",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: kmsKeyURL,
+						Secret: "no-such-secret",
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsMissingErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsKeyUrlUnknownScheme",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: "vault://a-key",
+						Secret: kmsSecret,
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsKeyURLErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupKmsKeyUrlEmpty",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						Secret: kmsSecret,
+					},
+				})},
+			shouldFail:     true,
+			expectedErrors: []string{kmsKeyURLErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupGoogleKmsKeyUrl",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL: "gcpkms://projects/p/locations/l/keyRings/r/cryptoKeys/k",
+						Secret: kmsSecret,
+					},
+				})},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupAzureKmsKeyUrl",
+			mutations: patchMap{"restore0": jsonpatch.NewPatchSet().
+				Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+					Location:  location,
+					Timestamp: timestamp,
+					KMS: &couchbasev2.CouchbaseBackupRestoreKMS{
+						KeyURL:   "azurekeyvault://a-vault.vault.azure.net/keys/a-key",
+						Endpoint: "https://a-vault.vault.azure.net",
+						Secret:   kmsSecret,
+					},
+				})},
+			shouldFail: false,
+		},
+
+		{
+			name: "TestValidateRestoreContinuousBackupWithOldBackupImage",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/backup/image", "couchbase/operator-backup:1.6.0"),
+				"restore0": jsonpatch.NewPatchSet().
+					Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+						Location:  location,
+						Timestamp: timestamp,
+					}),
+			},
+			shouldFail:     true,
+			expectedErrors: []string{imageErr},
+		},
+		{
+			name: "TestValidateRestoreContinuousBackupWithUnversionedBackupImage",
+			mutations: patchMap{
+				"cluster1": jsonpatch.NewPatchSet().
+					Replace("/spec/backup/image", "couchbase/operator-backup:latest"),
+				"restore0": jsonpatch.NewPatchSet().
+					Add("/spec/continuousBackup", &couchbasev2.CouchbaseBackupRestoreContinuousBackup{
+						Location:  location,
+						Timestamp: timestamp,
+					}),
+			},
+			shouldFail: false,
+		},
+		{
+			name: "TestValidateRestoreWithoutContinuousBackupAcceptsOldBackupImage",
+			mutations: patchMap{"cluster1": jsonpatch.NewPatchSet().
+				Replace("/spec/backup/image", "couchbase/operator-backup:1.6.0")},
+			shouldFail: false,
+		},
+	}
+
+	runValidationTest(t, testDefs, validationContext{operation: operationApply, validationFile: "validation-81.yaml"})
+}
+
 func TestCBVersionSpecificPosValidationsCreateCouchbaseClusterSettings(t *testing.T) {
 	testDefs := []testDef{
 		{

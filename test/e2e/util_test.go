@@ -153,6 +153,9 @@ func registerTests() {
 		framework.NewTestDef(TestBucketSelectorInvalidNameRegexCreate).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestBucketSelectorInvalidNameRegexApply).WithTags(TagSuiteValidation, TagSuitePlatform),
 		framework.NewTestDef(TestValidationRebalanceSettings).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationContinuousBackup).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationContinuousBackupUnsupportedVersion).WithTags(TagSuiteValidation, TagSuitePlatform),
+		framework.NewTestDef(TestValidationRestoreContinuousBackup).WithTags(TagSuiteValidation, TagSuitePlatform),
 
 		// Smoke tests.
 		framework.NewTestDef(TestCreateCNG).WithTags(TagSuiteSanity, TagSuitePlatform, TagFeatureCNG),
@@ -549,6 +552,11 @@ func registerTests() {
 		framework.NewTestDef(TestUnreconcilableXDCRReplicationDependencyMissing).WithTags(TagSuiteP0, TagFeatureReconcile),
 
 		// Old P0s now P1s
+		framework.NewTestDef(TestBucketContinuousBackup).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),
+		framework.NewTestDef(TestBucketContinuousBackupS3).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),
+		framework.NewTestDef(TestBucketContinuousBackupS3KMS).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),
+		framework.NewTestDef(TestBucketContinuousBackupS3RestoreAll).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),
+		framework.NewTestDef(TestBucketContinuousBackupS3RestoreAllWithKMS).WithTags(TagSuiteP1, TagFeatureBackup, TagFeatureReconcile),
 		framework.NewTestDef(TestAutoscaleUpMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling, TagSuitePlatform),
 		framework.NewTestDef(TestAutoscaleDownMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling),
 		framework.NewTestDef(TestBackupFullOnlyOverMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureBackup),
