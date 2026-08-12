@@ -6,7 +6,7 @@
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
 
-FROM golang:1.26.2-trixie
+FROM golang:1.26.5-trixie
 
 WORKDIR /tmp/src/github.com/couchbase/couchbase-operator
 ADD go.mod go.sum ./

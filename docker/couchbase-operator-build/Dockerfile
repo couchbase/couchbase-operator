@@ -8,7 +8,7 @@
 
 # This must be kept in lockstep with any non-static images due to library
 # dependencies.
-ARG GO_VERSION=1.26.2
+ARG GO_VERSION=1.26.5
 FROM golang:${GO_VERSION} as build
 
 # Create the working directory to build in.
