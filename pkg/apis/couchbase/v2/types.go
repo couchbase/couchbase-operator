@@ -2680,6 +2680,29 @@ const (
 	InPlaceUpgrade UpgradeProcess = "InPlaceUpgrade"
 )
 
+// RollbackMethod selects how a rollback replaces nodes.  The default creates the
+// replacement first and so needs room for an extra pod; the Constrained methods remove
+// first and never exceed the requested cluster size.
+type RollbackMethod string
+
+const (
+	// RollbackMethodSwapRebalance adds the replacement before ejecting the old node.
+	// Keeps the cluster at full strength, but peaks at size + maxUpgradable pods and
+	// so needs spare capacity to schedule them.  The default.
+	RollbackMethodSwapRebalance RollbackMethod = "SwapRebalance"
+
+	// RollbackMethodConstrainedFailover gracefully fails the node over before creating
+	// its replacement.  Moves no data, so it is the fastest and needs no spare disk,
+	// but replica coverage is reduced until the replacement rebalances in.  Requires
+	// at least one replica.
+	RollbackMethodConstrainedFailover RollbackMethod = "ConstrainedFailover"
+
+	// RollbackMethodConstrainedRebalanceOut rebalances the node's data off before
+	// creating its replacement.  Replica coverage is never reduced, but the survivors
+	// must have room for the data.  The only method that works with zero replicas.
+	RollbackMethodConstrainedRebalanceOut RollbackMethod = "ConstrainedRebalanceOut"
+)
+
 // This controls how aggressive to be with upgrades.
 // +kubebuilder:validation:Enum=RollingUpgrade;ImmediateUpgrade
 type UpgradeStrategy string
@@ -2796,6 +2819,12 @@ type UpgradeSpec struct {
 	// always be swap rebalanced, regardless of the specified upgrade process. This is only used when a node does not also
 	// have the data service.
 	SwapRebalanceIndexServiceUpgrades *bool `json:"-" annotation:"swapRebalanceIndexServiceUpgrades"`
+
+	// RollbackMethod selects how a rollback replaces nodes.  A rollback cannot be done
+	// in place, so by default it swap rebalances, peaking at cluster size +
+	// maxUpgradable pods and stalling where there is no room to schedule them.  The
+	// Constrained methods remove the node first instead.
+	RollbackMethod RollbackMethod `json:"-" annotation:"rollbackMethod"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows

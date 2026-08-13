@@ -99,6 +99,13 @@ func NewMemberFailedOverEvent(cl *couchbasev2.CouchbaseCluster, memberID int) *v
 	return k8sutil.MemberFailedOverEvent(name, cl)
 }
 
+// RollbackBelowSizeEvent is raised when a constrained rollback removes members before
+// creating their replacements. The message names them, which depends on how far the
+// upgrade got, so pair this with MustObserveClusterEventIgnoringMessage.
+func RollbackBelowSizeEvent(cl *couchbasev2.CouchbaseCluster, method couchbasev2.RollbackMethod) *v1.Event {
+	return k8sutil.ClusterRollbackBelowSizeEvent(cl, string(method), nil)
+}
+
 func ServicesMismatchEvent(cl *couchbasev2.CouchbaseCluster) *v1.Event {
 	return k8sutil.EventReasonServicesMismatchEvent(cl)
 }

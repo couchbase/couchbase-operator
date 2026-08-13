@@ -166,6 +166,10 @@ type ReconcileMachine struct {
 
 	// rebalanceRetries is the number of times to retry rebalance operations when handling rebalances.
 	rebalanceRetries uint
+
+	// holdNodeAdditions suppresses node creation for the rest of this cycle, for a
+	// ConstrainedRebalanceOut rollback whose pods live until handleDeadMembers.
+	holdNodeAdditions bool
 }
 
 func (r *ReconcileMachine) logState() {
@@ -1169,6 +1173,12 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 }
 
 func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
+	// A ConstrainedRebalanceOut rollback marked slots earlier this cycle, but those pods
+	// live until handleDeadMembers, so replacements wait until next cycle.
+	if r.holdNodeAdditions {
+		return nil
+	}
+
 	// Accumulate the server classes that need scaling up...
 	var additions []couchbasev2.ServerConfig
 
@@ -1981,6 +1991,17 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 		return err
 	}
 
+	rollback, err := c.isRollback()
+	if err != nil {
+		return err
+	}
+
+	if rollback {
+		if handled, err := r.tryRollbackWithoutSpareCapacity(c, constrainedCandidates); err != nil || handled {
+			return err
+		}
+	}
+
 	if c.cluster.GetUpgradeProcess() == couchbasev2.InPlaceUpgrade {
 		if handled, err := r.tryInPlaceUpgrade(c, constrainedCandidates, zoneChangeDetected, pvcChangeDetected, targetVersion); err != nil || handled {
 			return err
@@ -2064,6 +2085,247 @@ func (r *ReconcileMachine) handleUpgradeStabilizationPeriod(c *Cluster) error {
 	}
 
 	return nil
+}
+
+const rollbackPodDeleteTimeoutSeconds = 120
+
+// rollbackMethod returns the rollback method for this cluster, defaulting to
+// SwapRebalance. An unrecognised value warns and falls back rather than erroring: it is
+// unvalidated while annotation-only, and a typo must not wedge a cluster mid-rollback.
+func (c *Cluster) rollbackMethod() couchbasev2.RollbackMethod {
+	if c.cluster.Spec.Upgrade == nil {
+		return couchbasev2.RollbackMethodSwapRebalance
+	}
+
+	switch method := c.cluster.Spec.Upgrade.RollbackMethod; method {
+	case "", couchbasev2.RollbackMethodSwapRebalance:
+		return couchbasev2.RollbackMethodSwapRebalance
+	case couchbasev2.RollbackMethodConstrainedFailover, couchbasev2.RollbackMethodConstrainedRebalanceOut:
+		return method
+	default:
+		log.Info("[WARN] Unrecognised rollback method, using SwapRebalance",
+			"cluster", c.namespacedName(), "rollbackMethod", method,
+			"supported", []couchbasev2.RollbackMethod{
+				couchbasev2.RollbackMethodSwapRebalance,
+				couchbasev2.RollbackMethodConstrainedFailover,
+				couchbasev2.RollbackMethodConstrainedRebalanceOut,
+			})
+
+		return couchbasev2.RollbackMethodSwapRebalance
+	}
+}
+
+// minActualBucketReplicas returns the smallest replica count across all buckets, and
+// whether there were any. Read from Couchbase, not the bucket CRDs: the guards exist to
+// avoid issuing a call the server would reject, so they must agree with the server.
+func (c *Cluster) minActualBucketReplicas() (int, bool, error) {
+	buckets := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&buckets).On(c.api, c.readyMembers()); err != nil {
+		return 0, false, err
+	}
+
+	minReplicas := 0
+	found := false
+
+	for _, bucket := range buckets {
+		if !found || bucket.BucketReplicas < minReplicas {
+			minReplicas = bucket.BucketReplicas
+			found = true
+		}
+	}
+
+	return minReplicas, found, nil
+}
+
+// clusteredDataMembers counts clustered members running the data service. The caller's
+// entry gate rules out failed-over and add-back nodes, so this equals Couchbase's count
+// of active KV nodes.
+func (r *ReconcileMachine) clusteredDataMembers(c *Cluster) int {
+	count := 0
+
+	for _, member := range r.clusteredMembers {
+		class := c.cluster.Spec.GetServerConfigByName(member.Config())
+		if class == nil {
+			continue
+		}
+
+		if couchbasev2.ServiceList(class.Services).Contains(couchbasev2.DataService) {
+			count++
+		}
+	}
+
+	return count
+}
+
+// clampRollbackBatch returns how many nodes may be removed in one rollback batch, or
+// zero when no batch is safe on this topology and the caller must revert to swap.
+func clampRollbackBatch(method couchbasev2.RollbackMethod, candidates, replicas int, haveBuckets bool, dataNodes, callableMembers int) int {
+	// Already clamped to maxUpgradable by selectUpgradeCandidatesIgnoringOrchestrator.
+	batch := candidates
+
+	switch method {
+	case couchbasev2.RollbackMethodConstrainedFailover:
+		if haveBuckets {
+			// Couchbase refuses a graceful failover that would lose vBuckets.
+			if replicas < 1 {
+				return 0
+			}
+
+			// Leave a replica serving, as multipleInPlaceUpgradesSupported does.
+			batch = min(batch, replicas-1)
+		}
+
+		// Failing over half the cluster loses the orchestrator quorum.
+		batch = min(batch, (callableMembers/2)-1)
+
+		// Both clamps above only ration redundancy, so a cluster with none to spare
+		// still gets a batch of one, exactly as an in-place upgrade does.
+		batch = max(batch, 1)
+
+		// Not negotiable: Couchbase refuses to fail over the last KV node.
+		batch = min(batch, dataNodes-1)
+	case couchbasev2.RollbackMethodConstrainedRebalanceOut:
+		// Survivors must still place a full chain: replicas+1 distinct data nodes.
+		// Subsumes keeping one data node, including at zero replicas.
+		if haveBuckets {
+			batch = min(batch, dataNodes-replicas-1)
+		} else {
+			batch = min(batch, dataNodes-1)
+		}
+	default:
+		return 0
+	}
+
+	return max(batch, 0)
+}
+
+// rollbackBatchSize gathers the cluster state clampRollbackBatch needs and reports
+// what it decided.
+func (r *ReconcileMachine) rollbackBatchSize(c *Cluster, method couchbasev2.RollbackMethod, candidates int) (int, error) {
+	replicas, haveBuckets, err := c.minActualBucketReplicas()
+	if err != nil {
+		return 0, err
+	}
+
+	dataNodes := r.clusteredDataMembers(c)
+
+	batch := clampRollbackBatch(method, candidates, replicas, haveBuckets, dataNodes, len(c.callableMembers))
+	if batch == 0 {
+		log.Info("[WARN] No safe rollback batch for this topology, reverting to SwapRebalance",
+			"cluster", c.namespacedName(), "rollbackMethod", method, "candidates", candidates,
+			"replicas", replicas, "dataNodes", dataNodes, "callableMembers", len(c.callableMembers))
+
+		return 0, nil
+	}
+
+	if batch < candidates {
+		log.Info("Reducing rollback batch to stay within safety limits",
+			"cluster", c.namespacedName(), "rollbackMethod", method, "candidates", candidates,
+			"batch", batch, "replicas", replicas, "dataNodes", dataNodes, "callableMembers", len(c.callableMembers))
+	}
+
+	return batch, nil
+}
+
+// tryRollbackWithoutSpareCapacity removes rollback candidates instead of swap rebalancing
+// them, so the pod count never exceeds spec size. Returns true when the rollback was
+// handled and the caller must not fall through to swap rebalance.
+//
+// The methods free the slot differently: ConstrainedFailover moves no data, so the pod
+// goes at once and handleAddNode refills this cycle, costing one rebalance.
+// ConstrainedRebalanceOut must move the data off first, so the pod lives until
+// handleDeadMembers, additions are held, and replacements land next cycle, costing
+// two. handleUpgradeNode's entry gate serialises the batches either way.
+func (r *ReconcileMachine) tryRollbackWithoutSpareCapacity(c *Cluster, candidates couchbaseutil.MemberSet) (bool, error) {
+	method := c.rollbackMethod()
+	if method == couchbasev2.RollbackMethodSwapRebalance {
+		return false, nil
+	}
+
+	// Never start a batch on an unsettled topology. Accumulating batches is the only
+	// route to failing over every data node.
+	if !r.couchbase.FailedNodes.Empty() || !r.couchbase.AddBackNodes.Empty() {
+		log.Info("Deferring rollback while nodes are recovering", "cluster", c.namespacedName(),
+			"failed", r.couchbase.FailedNodes.Names(), "addBack", r.couchbase.AddBackNodes.Names())
+
+		return true, nil
+	}
+
+	batch, err := r.rollbackBatchSize(c, method, len(candidates))
+	if err != nil {
+		return false, err
+	}
+
+	if batch == 0 {
+		return false, nil
+	}
+
+	log.Info("Rolling back pods without spare capacity", "cluster", c.namespacedName(),
+		"rollbackMethod", method, "names", candidates.Names(), "batch", batch, "candidates", len(candidates))
+
+	c.raiseEvent(k8sutil.ClusterRollbackBelowSizeEvent(c.cluster, string(method), candidates.Names()))
+
+	r.log()
+
+	removed := make([]string, 0, batch)
+
+	for _, candidate := range candidates {
+		if len(removed) == batch {
+			break
+		}
+
+		// Candidates are clones stamped with the target version, so operate on the
+		// real member for anything beyond the name.
+		member, ok := c.members[candidate.Name()]
+		if !ok {
+			continue
+		}
+
+		if err := c.scheduler.Upgrade(member.Config(), member.Name()); err != nil {
+			return false, err
+		}
+
+		if method == couchbasev2.RollbackMethodConstrainedFailover {
+			if _, err := r.failoverNodeForInPlaceUpgrade(member, c); err != nil {
+				return false, err
+			}
+
+			if err := c.removePod(member.Name(), true); err != nil {
+				return false, err
+			}
+
+			timeout := rollbackPodDeleteTimeoutSeconds + int64(c.config.PodDeleteDelay/time.Second)
+			if err := c.waitForDeletePod(member.Name(), timeout); err != nil {
+				return false, err
+			}
+
+			// Stop offering an unreachable node as a REST target.
+			c.callableMembers.Remove(member.Name())
+
+			// Frees the slot for handleAddNode, and handlePodHostname errors on a
+			// clustered member with no pod. No ejection: handleAddNode aborts this
+			// cycle before handleRebalance would consume it, and next cycle Couchbase
+			// still reports the node failed over so handleFailedNodes re-establishes it.
+			r.removeMemberNoEject(member)
+		} else {
+			// Data has to move off first, so keep the pod and let handleRebalance eject
+			// it later this cycle, exactly as swapRebalanceMembers ejects the node it
+			// replaces. handleDeadMembers then destroys it.
+			r.removeMemberUser(member)
+		}
+
+		removed = append(removed, member.Name())
+	}
+
+	if len(removed) == 0 {
+		return false, nil
+	}
+
+	// Failover already destroyed the pods, so those slots can refill now. Rebalance-out
+	// has not, and replacements alongside them would exceed spec size.
+	r.holdNodeAdditions = method == couchbasev2.RollbackMethodConstrainedRebalanceOut
+
+	return true, nil
 }
 
 // CheckNodesToCreate checks if any nodes need to be created based on the desired and existing node counts.

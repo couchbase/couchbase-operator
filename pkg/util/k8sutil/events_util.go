@@ -36,6 +36,7 @@ const (
 	EventReasonMemberDown            = "MemberDown"
 	EventReasonMemberRecovered       = "MemberRecovered"
 	EventReasonMemberFailedOver      = "MemberFailedOver"
+	EventReasonRollbackBelowSize     = "RollbackBelowSize"
 	EventReasonRebalanceStarted      = "RebalanceStarted"
 	EventReasonRebalanceIncomplete   = "RebalanceIncomplete"
 	EventReasonRebalanceCompleted    = "RebalanceCompleted"
@@ -205,6 +206,24 @@ func MemberFailedOverEvent(memberName string, cl *couchbasev2.CouchbaseCluster) 
 	event.Type = v1.EventTypeWarning
 	event.Reason = EventReasonMemberFailedOver
 	event.Message = fmt.Sprintf("Existing member %s failed over", memberName)
+
+	return event
+}
+
+// ClusterRollbackBelowSizeEvent reports a rollback taking the cluster below spec size to
+// avoid needing spare capacity. A warning: with ConstrainedFailover replica coverage is
+// reduced until the replacements rebalance in, and stays that way if they cannot be
+// scheduled.
+func ClusterRollbackBelowSizeEvent(cl *couchbasev2.CouchbaseCluster, method string, memberNames []string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeWarning
+	event.Reason = EventReasonRollbackBelowSize
+	plural := "s"
+	if len(memberNames) == 1 {
+		plural = ""
+	}
+
+	event.Message = fmt.Sprintf("Rollback removing %d member%s %v using %s before creating replacements; cluster is temporarily below its requested size", len(memberNames), plural, memberNames, method)
 
 	return event
 }

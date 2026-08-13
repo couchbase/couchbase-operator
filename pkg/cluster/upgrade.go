@@ -517,6 +517,31 @@ func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.P
 	return actualSpec.NodeSelector[constants.ServerGroupLabel] != requestedSpec.NodeSelector[constants.ServerGroupLabel]
 }
 
+// rollbackDetected reports whether spec has been reverted mid-upgrade.
+func rollbackDetected(targetVersion, baselineVersion, highestMemberVersion string) bool {
+	if highestMemberVersion == "" {
+		return false
+	}
+
+	return targetVersion == baselineVersion && highestMemberVersion != targetVersion
+}
+
+// isRollback reports whether spec.image takes the cluster back to the version it was
+// running before the in-flight upgrade started.
+func (c *Cluster) isRollback() (bool, error) {
+	baselineVersion, err := c.state.Get(persistence.Version)
+	if err != nil {
+		return false, err
+	}
+
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return false, err
+	}
+
+	return rollbackDetected(targetVersion, baselineVersion, c.GetHighestMemberVersion()), nil
+}
+
 // nolint:gocognit,gocyclo
 func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.MemberList, map[string]couchbaseutil.Member, map[string]couchbaseutil.Member, error) {
 	// Detect the three sets: VOS, SOS, IS
