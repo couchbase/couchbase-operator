@@ -433,6 +433,7 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseclusters-spec-softwareupdatenotifications,softwareUpdateNotifications>>: false
   <<couchbaseclusters-spec-upgrade,upgrade>>:
     <<couchbaseclusters-spec-upgrade-previousversionpodcount,previousVersionPodCount>>: 0
+    <<couchbaseclusters-spec-upgrade-rollbackmethod,rollbackMethod>>: SwapRebalance
     <<couchbaseclusters-spec-upgrade-rollingupgrade,rollingUpgrade>>:
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradable,maxUpgradable>>: 0
       <<couchbaseclusters-spec-upgrade-rollingupgrade-maxupgradablepercent,maxUpgradablePercent>>: ""
@@ -6266,6 +6267,25 @@ Upgrade defines the upgrade configuration for a Couchbase cluster.
 PreviousVersionPodCount is the number of pods that will be left running at the existing version.
 NOTE: The cluster will not be fully upgraded until all pods are at the new version.
 The default is 0.
+
+=== couchbaseclusters.spec.upgrade.rollbackMethod
+
+==== Constraints
+
+*Type*: `string`
+
+*Default*: `SwapRebalance`
+
+*Enumerations*: `SwapRebalance, ConstrainedFailover, ConstrainedRebalanceOut`
+
+==== Description
+
+RollbackMethod selects how a rollback replaces nodes.
+A rollback cannot be done
+in place, so by default it swap rebalances, peaking at cluster size +
+maxUpgradable pods and stalling where there is no room to schedule them.
+The
+Constrained methods remove the node first instead.
 
 === couchbaseclusters.spec.upgrade.rollingUpgrade
 

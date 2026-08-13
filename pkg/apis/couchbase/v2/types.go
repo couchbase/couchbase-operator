@@ -3166,6 +3166,7 @@ const (
 // RollbackMethod selects how a rollback replaces nodes.  The default creates the
 // replacement first and so needs room for an extra pod; the Constrained methods remove
 // first and never exceed the requested cluster size.
+// +kubebuilder:validation:Enum=SwapRebalance;ConstrainedFailover;ConstrainedRebalanceOut
 type RollbackMethod string
 
 const (
@@ -3307,7 +3308,8 @@ type UpgradeSpec struct {
 	// in place, so by default it swap rebalances, peaking at cluster size +
 	// maxUpgradable pods and stalling where there is no room to schedule them.  The
 	// Constrained methods remove the node first instead.
-	RollbackMethod RollbackMethod `json:"-" annotation:"rollbackMethod"`
+	// +kubebuilder:default="SwapRebalance"
+	RollbackMethod RollbackMethod `json:"rollbackMethod,omitempty" annotation:"rollbackMethod"`
 }
 
 // ClusterSpec is the specification for a CouchbaseCluster resources, and allows
