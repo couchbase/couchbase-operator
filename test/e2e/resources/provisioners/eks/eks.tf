@@ -10,6 +10,10 @@ locals {
   tags = {
     "Owner" = "cao"
   }
+  # QE engineers who need to kubectl into these ephemeral clusters directly for debugging.
+  admin_role_arns = [
+    "arn:aws:iam::516524556673:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_Admin_36b8925c53f50bad",
+  ]
 }
 # VPC
 resource "aws_vpc" "main" {
@@ -90,8 +94,28 @@ resource "aws_eks_cluster" "this" {
     subnet_ids = aws_subnet.public[*].id
     security_group_ids = [aws_security_group.eks.id]
   }
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
   tags = merge(local.tags, { Name = var.name })
   depends_on = [aws_iam_role_policy_attachment.eks_cluster_AmazonEKSClusterPolicy]
+}
+# Grants the QE admin IAM roles cluster-admin access via kubectl, so debugging
+# a running test cluster doesn't require the CAO_AWS credentials.
+resource "aws_eks_access_entry" "admin" {
+  for_each      = toset(local.admin_role_arns)
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = each.value
+}
+resource "aws_eks_access_policy_association" "admin" {
+  for_each      = toset(local.admin_role_arns)
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = each.value
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  access_scope {
+    type = "cluster"
+  }
+  depends_on = [aws_eks_access_entry.admin]
 }
 # EKS Cluster Role
 resource "aws_iam_role" "eks_cluster" {
