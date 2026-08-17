@@ -2853,9 +2853,9 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 }
 
 // getBucketMigrationCandidates returns nodes that have in-progress backend or
-// eviction-policy migrations, and whether any of those nodes actually require a
-// swap-rebalance to converge to spec.
-func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, swapsNeeded bool, hasStorageBackendOverrides bool, hasEvictionOverrides bool, err error) {
+// eviction policy migrations, and whether any of those nodes actually need
+// cycling to converge to spec.
+func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, cyclesNeeded bool, hasStorageBackendOverrides bool, hasEvictionOverrides bool, err error) {
 	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
 	if err != nil {
 		return nil, false, false, false, err
@@ -2911,23 +2911,23 @@ func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.Membe
 				hasEvictionOverrides = true
 			}
 
-			// If not managing buckets, any ongoing migration requires a swap.
+			// If not managing buckets, any ongoing migration requires a cycle.
 			if !managedBuckets {
-				swapsNeeded = true
+				cyclesNeeded = true
 				continue
 			}
 
-			// If managing buckets, check if the ongoing migration mismatches the spec and therefore requires a swap to align.
+			// If managing buckets, check if the ongoing migration mismatches the spec and therefore requires a cycle to align.
 			backendMismatch := storageBackendMigrating && node.StorageBackend != string(spec.BucketStorageBackend)
 			evictionMismatch := evictionPolicyMigrating && node.EvictionPolicy != spec.EvictionPolicy
 
 			if backendMismatch || evictionMismatch {
-				swapsNeeded = true
+				cyclesNeeded = true
 			}
 		}
 	}
 
-	return candidates, swapsNeeded, hasStorageBackendOverrides, hasEvictionOverrides, nil
+	return candidates, cyclesNeeded, hasStorageBackendOverrides, hasEvictionOverrides, nil
 }
 
 // handleBucketMigration detects and manages per-node storage backend and eviction policy overrides.
@@ -2961,7 +2961,7 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 		return nil
 	}
 
-	candidates, swapsNeeded, hasStorageBackendOverrides, hasEvictionOverrides, err := c.getBucketMigrationCandidates()
+	candidates, cyclesNeeded, hasStorageBackendOverrides, hasEvictionOverrides, err := c.getBucketMigrationCandidates()
 	if err != nil {
 		return err
 	}
@@ -3007,7 +3007,7 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 	// * Every overridden node already carries the vBucket format spec desires
 	//   (the bucket setting drifted then was reverted before any data movement —
 	//   reconcileBuckets will push the corrective REST update this tick).
-	if !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines || !swapsNeeded {
+	if !c.cluster.Spec.Buckets.EnableBucketMigrationRoutines || !cyclesNeeded {
 		return nil
 	}
 
@@ -3024,11 +3024,89 @@ func (r *ReconcileMachine) handleBucketMigration(c *Cluster) error {
 		migrationCandidates.Add(orchestrator)
 	}
 
-	if migrationCandidates.Size() > 0 {
+	if migrationCandidates.Size() == 0 {
+		return nil
+	}
+
+	inPlace, fullRecovery := migrationCycleStrategy(c.cluster.GetUpgradeProcess(), hasStorageBackendOverrides, len(c.members))
+	if !inPlace {
 		return r.swapRebalanceMembers(c, migrationCandidates)
 	}
 
+	return r.failoverMigrateMembers(c, migrationCandidates, fullRecovery)
+}
+
+// failoverMigrateMembers clears a migration override without a swap rebalance.
+// Each node is gracefully failed over and marked for recovery, and the rebalance
+// step adds it back. The pod stays up throughout, so the node keeps the data on
+// its volume instead of having all of it copied onto a replacement pod.
+func (r *ReconcileMachine) failoverMigrateMembers(c *Cluster, members couchbaseutil.MemberSet, fullRecovery bool) error {
+	recoveryType := couchbaseutil.RecoveryTypeDelta
+	if fullRecovery {
+		recoveryType = couchbaseutil.RecoveryTypeFull
+	}
+
+	// Taking more than one node out at a time is only safe when the buckets hold
+	// enough replicas to cover them, so fall back to one node per reconcile.
+	if members.Size() > 1 {
+		multiple, err := c.multipleInPlaceUpgradesSupported(members)
+		if err != nil {
+			return err
+		}
+
+		if !multiple {
+			members = couchbaseutil.NewMemberSet(members.ToList()[0])
+		}
+	}
+
+	ready := c.readyMembers()
+	if ready.Empty() {
+		c.log.Info("No ready members to set recovery type, yielding", "cluster", c.namespacedName())
+		return fmt.Errorf("%w: no ready members to set recovery type", errors.NewStackTracedError(ErrReconcileInhibited))
+	}
+
+	for _, candidate := range members {
+		c.log.Info("Migrating pod with failover and recovery", "cluster", c.namespacedName(),
+			"name", candidate.Name(), "recovery", recoveryType)
+
+		if err := r.gracefullyFailoverNode(candidate, c); err != nil {
+			return err
+		}
+
+		if err := couchbaseutil.SetRecoveryType(candidate.GetOTPNode(), recoveryType).On(c.api, ready); err != nil {
+			return err
+		}
+
+		r.needsRebalance = true
+	}
+
 	return nil
+}
+
+// migrationCycleStrategy decides how we cycle a node to finish a bucket migration,
+// and which recovery type that node needs.
+// A swap rebalance copies everything the node holds onto a brand new pod, so it
+// needs a spare machine and moves all of the data across the network. When the
+// user has asked for in place upgrades we fail the node over and recover it
+// instead, which reuses the data already sitting on its volume.
+// Server only drops a node's override once it has rewritten that node's vBuckets.
+// An eviction policy change doesn't touch the files on disk, so delta recovery is
+// enough and is far cheaper. A storage backend change does rewrite them, and delta
+// recovery keeps the existing files, so the node would come back still carrying its
+// override. Anything with a backend override therefore needs full recovery, which
+// covers a bucket changing both settings at once.
+func migrationCycleStrategy(upgradeProcess couchbasev2.UpgradeProcess, hasStorageBackendOverrides bool, members int) (inPlace, fullRecovery bool) {
+	if upgradeProcess != couchbasev2.InPlaceUpgrade && upgradeProcess != couchbasev2.DeltaRecovery {
+		return false, false
+	}
+
+	// Failing a node over needs somewhere for its data to go, so a single node
+	// cluster has to take the swap rebalance.
+	if members < 2 {
+		return false, false
+	}
+
+	return true, hasStorageBackendOverrides
 }
 
 // nolint:gocognit

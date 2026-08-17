@@ -11,6 +11,9 @@ licenses/APL2.txt.
 package e2e
 
 import (
+	"context"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -24,6 +27,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2espec"
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/framework"
+	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -442,4 +446,111 @@ func TestEvictionPolicyOnlineChangeMigrationDisabled(t *testing.T) {
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}
+
+// mustGetSortedPodNames returns the names of the cluster's pods, sorted so two
+// calls can be compared directly. A swap rebalance replaces a pod with a newly
+// named one, so an unchanged list is how we tell a migration cycled its nodes in
+// place rather than swapping them.
+func mustGetSortedPodNames(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster) []string {
+	pods, err := k8s.KubeClient.CoreV1().Pods(cluster.Namespace).List(context.Background(), e2eutil.ClusterListOpt(cluster))
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	names := make([]string, 0, len(pods.Items))
+	for i := range pods.Items {
+		names = append(names, pods.Items[i].Name)
+	}
+
+	sort.Strings(names)
+
+	return names
+}
+
+// TestEvictionPolicyOnlineChangeInPlace covers an eviction policy migration on a
+// cluster asking for InPlaceUpgrade. The operator should gracefully fail each
+// node over and recover it instead of swap rebalancing, so the overrides clear
+// without any pod being replaced.
+func TestEvictionPolicyOnlineChangeInPlace(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("8.0.0").CouchbaseBucket()
+
+	clusterSize := 3
+
+	// Persistent volumes so the node keeps its data while it is failed over.
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := testCouchstoreBucket(e2e_constants.DefaultBucket)
+
+	bucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(int64(100))
+	bucket.Spec.OnlineEvictionPolicyChange = true
+	bucket.Spec.EvictionPolicy = couchbasev2.CouchbaseBucketEvictionPolicyValueOnly
+
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	podsBefore := mustGetSortedPodNames(t, kubernetes, cluster)
+
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/spec/evictionPolicy", couchbasev2.CouchbaseBucketEvictionPolicyFullEviction),
+		time.Minute)
+
+	e2eutil.MustWaitUntilAllNodeEvictionPolicyMatch(t, kubernetes, cluster, 10*time.Minute, string(couchbasev2.CouchbaseBucketEvictionPolicyFullEviction))
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	if podsAfter := mustGetSortedPodNames(t, kubernetes, cluster); !reflect.DeepEqual(podsBefore, podsAfter) {
+		t.Errorf("pods were replaced during the migration, so it swap-rebalanced instead of recovering in place: before %v, after %v", podsBefore, podsAfter)
+	}
+}
+
+// TestCouchstoreBucketToMagmaMigrationInPlace covers a storage backend migration
+// on a cluster asking for InPlaceUpgrade. This one only passes if the nodes are
+// recovered fully, delta recovery keeps the files already on disk, which is what
+// the backend change needs rewritten, so the overrides would never clear.
+func TestCouchstoreBucketToMagmaMigrationInPlace(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0").CouchbaseBucket()
+
+	clusterSize := 3
+
+	cluster := clusterOptions().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(int64(2048))
+	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	bucket := testCouchstoreBucket(e2e_constants.DefaultBucket)
+	bucketObj := e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+
+	podsBefore := mustGetSortedPodNames(t, kubernetes, cluster)
+
+	e2eutil.MustPatchBucket(t, kubernetes, bucketObj, jsonpatch.NewPatchSet().
+		Replace("/spec/storageBackend", couchbasev2.CouchbaseStorageBackendMagma),
+		time.Minute)
+
+	e2eutil.MustWaitUntilAllNodeStorageBackendMagma(t, kubernetes, cluster, 10*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+
+	if podsAfter := mustGetSortedPodNames(t, kubernetes, cluster); !reflect.DeepEqual(podsBefore, podsAfter) {
+		t.Errorf("pods were replaced during the migration, so it swap rebalanced instead of recovering in place: before %v, after %v", podsBefore, podsAfter)
+	}
 }

@@ -772,6 +772,8 @@ func registerTests() {
 		framework.NewTestDef(TestCouchstoreBucketsToMagmaMigrationWithMultiMigration).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestEvictionPolicyOnlineChange).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
 		framework.NewTestDef(TestEvictionPolicyOnlineChangeMigrationDisabled).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration),
+		framework.NewTestDef(TestEvictionPolicyOnlineChangeInPlace).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration, TagFeaturePersistentVolumes),
+		framework.NewTestDef(TestCouchstoreBucketToMagmaMigrationInPlace).WithTags(TagSuiteP1, TagFeatureUpgrade, TagFeatureBucketMigration, TagFeaturePersistentVolumes),
 		framework.NewTestDef(TestPodDisruptionBudgets).WithTags(TagSuiteP1),
 		framework.NewTestDef(TestSecuritySettings).WithTags(TagSuiteP1, TagSuitePlatform),
 		framework.NewTestDef(TestDynamicOperatorLoggingUsingClusterAnnotations).WithTags(TagSuiteP1, TagFeatureLogging),

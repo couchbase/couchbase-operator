@@ -13,6 +13,8 @@ package cluster
 import (
 	"testing"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
@@ -134,5 +136,51 @@ func TestPvcImageToStamp(t *testing.T) {
 				t.Errorf("pvcImageToStamp = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// TestMigrationCycleStrategy covers how we cycle a node to finish a bucket migration.
+// Two things come out of it, whether we fail the node over in place instead of
+// swap rebalancing it, and whether that node needs full recovery.
+// Server only drops a node's override once it has rewritten that node's vBuckets,
+// and delta recovery keeps the files that are already there. That is fine for an
+// eviction policy change, which doesn't touch those files, but a storage backend
+// change rewrites them, so delta recovery leaves the override in place and the
+// migration silently never finishes.
+func TestMigrationCycleStrategy(t *testing.T) {
+	cases := []struct {
+		name                       string
+		upgradeProcess             couchbasev2.UpgradeProcess
+		hasStorageBackendOverrides bool
+		members                    int
+		wantInPlace                bool
+		wantFullRecovery           bool
+	}{
+		// Default. Nothing changes for users who haven't asked for inPlace upgrades.
+		{"swap rebalance, eviction only", couchbasev2.SwapRebalance, false, 3, false, false},
+		{"swap rebalance, backend", couchbasev2.SwapRebalance, true, 3, false, false},
+		// Unset behaves as SwapRebalance, matching GetUpgradeProcess.
+		{"unset", couchbasev2.UpgradeProcess(""), true, 3, false, false},
+
+		// Eviction policy only, nothing on disk needs rewriting, so delta will do.
+		{"inPlace, eviction only", couchbasev2.InPlaceUpgrade, false, 3, true, false},
+		// Backend override present, on its own or alongside an eviction change, the
+		// vBucket files have to be written out again, so we must not use delta.
+		{"inPlace, backend", couchbasev2.InPlaceUpgrade, true, 3, true, true},
+		{"deltaRecovery, eviction only", couchbasev2.DeltaRecovery, false, 3, true, false},
+		{"deltaRecovery, backend", couchbasev2.DeltaRecovery, true, 3, true, true},
+
+		// A single node has nowhere to move its data, so it takes the swap rebalance.
+		{"inPlace, one member", couchbasev2.InPlaceUpgrade, false, 1, false, false},
+		{"inPlace, one member, backend", couchbasev2.InPlaceUpgrade, true, 1, false, false},
+		{"inPlace, two members", couchbasev2.InPlaceUpgrade, false, 2, true, false},
+	}
+
+	for _, tc := range cases {
+		inPlace, fullRecovery := migrationCycleStrategy(tc.upgradeProcess, tc.hasStorageBackendOverrides, tc.members)
+		if inPlace != tc.wantInPlace || fullRecovery != tc.wantFullRecovery {
+			t.Errorf("%s: migrationCycleStrategy = (inPlace %v, fullRecovery %v), want (%v, %v)",
+				tc.name, inPlace, fullRecovery, tc.wantInPlace, tc.wantFullRecovery)
+		}
 	}
 }
