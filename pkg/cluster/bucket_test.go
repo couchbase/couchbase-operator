@@ -17,6 +17,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -50,7 +51,7 @@ func TestHistoryRetention(t *testing.T) {
 		SupportedHistoryRetention:  true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 	if newBuckets[0].HistoryRetentionBytes != 50 {
 		t.Fatalf("expected HistoryRetentionBytes=50, found %d", newBuckets[0].HistoryRetentionBytes)
 	}
@@ -82,7 +83,7 @@ func TestMagmaNoDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 4096 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=4096, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}
@@ -113,7 +114,7 @@ func TestMagmaDataBlockSizeSettingsViaAnnotations(t *testing.T) {
 		SupportedBackendMagma: true,
 	}
 
-	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 	if newBuckets[0].MagmaSeqTreeDataBlockSize != nil && *(newBuckets[0].MagmaSeqTreeDataBlockSize) != 5555 {
 		t.Fatalf("expected MagmaSeqTreeDataBlockSize=5555, found %d", *(newBuckets[0].MagmaSeqTreeDataBlockSize))
 	}
@@ -179,7 +180,7 @@ func TestGatherCouchbaseBucketsKVThrottle(t *testing.T) {
 
 			features := SupportedFeatureMap{SupportedKVThrottle: tc.supported}
 
-			newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+			newBuckets := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 
 			if !reflect.DeepEqual(newBuckets[0].ThrottleReserved, tc.expectReserved) {
 				t.Errorf("ThrottleReserved: expected %v, got %v", derefUint64(tc.expectReserved), derefUint64(newBuckets[0].ThrottleReserved))
@@ -256,7 +257,7 @@ func TestGatherEphemeralBucketsKVThrottle(t *testing.T) {
 
 			features := SupportedFeatureMap{SupportedKVThrottle: tc.supported}
 
-			newBuckets := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, nil, &couchbasev2.CouchbaseCluster{})
+			newBuckets := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBucket, nil, nil, &couchbasev2.CouchbaseCluster{}, unreconcilable.New(fakeClusterName))
 
 			if !reflect.DeepEqual(newBuckets[0].ThrottleReserved, tc.expectReserved) {
 				t.Errorf("ThrottleReserved: expected %v, got %v", derefUint64(tc.expectReserved), derefUint64(newBuckets[0].ThrottleReserved))
@@ -534,7 +535,7 @@ func TestGatherBucketsDataServiceRebalanceType(t *testing.T) {
 					},
 				}}
 
-				gathered := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+				gathered := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 
 				return gathered[0].DataServiceRebalanceType
 			},
@@ -550,7 +551,7 @@ func TestGatherBucketsDataServiceRebalanceType(t *testing.T) {
 					},
 				}}
 
-				gathered := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, nil, &couchbasev2.CouchbaseCluster{})
+				gathered := gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, k8sBuckets, nil, nil, &couchbasev2.CouchbaseCluster{}, unreconcilable.New(fakeClusterName))
 
 				return gathered[0].DataServiceRebalanceType
 			},
@@ -641,8 +642,8 @@ func TestGatherBucketsRebalanceTypeIsIdempotent(t *testing.T) {
 	}}
 
 	gathered := map[string]string{
-		"couchbase": gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)[0].DataServiceRebalanceType,
-		"ephemeral": gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, ephemeralBucket, nil, nil, &couchbasev2.CouchbaseCluster{})[0].DataServiceRebalanceType,
+		"couchbase": gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))[0].DataServiceRebalanceType,
+		"ephemeral": gatherEphemeralBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, ephemeralBucket, nil, nil, &couchbasev2.CouchbaseCluster{}, unreconcilable.New(fakeClusterName))[0].DataServiceRebalanceType,
 	}
 
 	for bucketType, value := range gathered {
@@ -653,7 +654,7 @@ func TestGatherBucketsRebalanceTypeIsIdempotent(t *testing.T) {
 	}
 
 	// Gathering twice must produce the same value, a second pass must not drift.
-	second := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil)
+	second := gatherCouchbaseBuckets(features, &couchbasev2.ObjectSelectorAsSelector{}, couchbaseBucket, nil, &couchbasev2.CouchbaseCluster{}, nil, nil, unreconcilable.New(fakeClusterName))
 	if second[0].DataServiceRebalanceType != gathered["couchbase"] {
 		t.Errorf("gathering twice was not stable: first %q, second %q", gathered["couchbase"], second[0].DataServiceRebalanceType)
 	}

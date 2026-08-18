@@ -220,6 +220,8 @@ type ObjectStoreSpec struct {
 // +kubebuilder:printcolumn:name="last success",type="string",JSONPath=".status.lastSuccess"
 // +kubebuilder:printcolumn:name="running",type="boolean",JSONPath=".status.running"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -545,6 +547,13 @@ type CouchbaseBackupStatus struct {
 
 	// LastRun tells us the time the last backup job started.
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
+
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=full_incremental;full_only;immediate_incremental;immediate_full;periodic_merge
@@ -605,6 +614,8 @@ type BackupStatus struct {
 // +kubebuilder:printcolumn:name="duration",type="string",JSONPath=".status.duration"
 // +kubebuilder:printcolumn:name="running",type="boolean",JSONPath=".status.running"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseBackupRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -918,6 +929,13 @@ type CouchbaseBackupRestoreStatus struct {
 
 	// LastRun tells us the time the last restore job started.
 	LastRun *metav1.Time `json:"lastRun,omitempty"`
+
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -956,6 +974,8 @@ const SystemScope = "_system"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseCollection struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -963,6 +983,10 @@ type CouchbaseCollection struct {
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseCollectionSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseCollectionStatus `json:"status,omitempty"`
 }
 
 // CouchbaseCollectionSpecCommon is a set of common parameters for all collections,
@@ -1076,6 +1100,16 @@ func (p *CouchbaseCollectionSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(temp)
 }
 
+// CouchbaseCollectionStatus is the observed state of a CouchbaseCollection.
+type CouchbaseCollectionStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseCollectionList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1096,11 +1130,17 @@ type CouchbaseCollectionList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseCollectionGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec defines the desired state of the resource.
 	Spec CouchbaseCollectionGroupSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseCollectionGroupStatus `json:"status,omitempty"`
 }
 
 type CouchbaseCollectionGroupSpec struct {
@@ -1158,6 +1198,16 @@ func (p *CouchbaseCollectionGroupSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(temp)
 }
 
+// CouchbaseCollectionGroupStatus is the observed state of a CouchbaseCollectionGroup.
+type CouchbaseCollectionGroupStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseCollectionGroupList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1176,6 +1226,8 @@ type CouchbaseCollectionGroupList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseScope struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -1183,6 +1235,10 @@ type CouchbaseScope struct {
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseScopeSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseScopeStatus `json:"status,omitempty"`
 }
 
 // CouchbaseScopeSpecCommon contains common configuration shared across single scopes
@@ -1268,6 +1324,16 @@ type CollectionSelector struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+// CouchbaseScopeStatus is the observed state of a CouchbaseScope.
+type CouchbaseScopeStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseScopeList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1290,11 +1356,17 @@ type CouchbaseScopeList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseScopeGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// Spec defines the desired state of the resource.
 	Spec CouchbaseScopeGroupSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseScopeGroupStatus `json:"status,omitempty"`
 }
 
 type CouchbaseScopeGroupSpec struct {
@@ -1309,6 +1381,16 @@ type CouchbaseScopeGroupSpec struct {
 	// +kubebuilder:validation:MinimumItems=1
 	// +listType=set
 	Names []ScopeOrCollectionName `json:"names"`
+}
+
+// CouchbaseScopeGroupStatus is the observed state of a CouchbaseScopeGroup.
+type CouchbaseScopeGroupStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -1379,12 +1461,18 @@ type ScopeSelector struct {
 // +kubebuilder:printcolumn:name="eviction policy",type="string",JSONPath=".spec.evictionPolicy"
 // +kubebuilder:printcolumn:name="conflict resolution",type="string",JSONPath=".spec.conflictResolution"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseBucketSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseBucketStatus `json:"status,omitempty"`
 }
 
 // CouchbaseBucketSpec is the specification for a Couchbase bucket resource, and
@@ -1675,6 +1763,16 @@ type HistoryRetentionSettings struct {
 	CollectionDefault *bool `json:"collectionHistoryDefault,omitempty" annotation:"collectionHistoryDefault"`
 }
 
+// CouchbaseBucketStatus is the observed state of a CouchbaseBucket.
+type CouchbaseBucketStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseBucketList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1697,12 +1795,18 @@ type CouchbaseBucketList struct {
 // +kubebuilder:printcolumn:name="eviction policy",type="string",JSONPath=".spec.evictionPolicy"
 // +kubebuilder:printcolumn:name="conflict resolution",type="string",JSONPath=".spec.conflictResolution"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseEphemeralBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseEphemeralBucketSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseEphemeralBucketStatus `json:"status,omitempty"`
 }
 
 // CouchbaseEphemeralBucketSpec is the specification for an ephemeral Couchbase bucket
@@ -1908,6 +2012,16 @@ const (
 	CouchbaseBucketWarmupBehaviorBlocking   CouchbaseBucketWarmupBehavior = "blocking"
 )
 
+// CouchbaseEphemeralBucketStatus is the observed state of a CouchbaseEphemeralBucket.
+type CouchbaseEphemeralBucketStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseEphemeralBucketList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1926,12 +2040,18 @@ type CouchbaseEphemeralBucketList struct {
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:printcolumn:name="memory quota",type="string",JSONPath=".spec.memoryQuota"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseMemcachedBucket struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional
 	// +kubebuilder:default="x-couchbase-object"
 	Spec CouchbaseMemcachedBucketSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseMemcachedBucketStatus `json:"status,omitempty"`
 }
 
 // CouchbaseMemcachedBucketSpec is the specification for a Memcached bucket
@@ -1963,6 +2083,16 @@ type CouchbaseMemcachedBucketSpec struct {
 	EnableFlush bool `json:"enableFlush,omitempty"`
 }
 
+// CouchbaseMemcachedBucketStatus is the observed state of a CouchbaseMemcachedBucket.
+type CouchbaseMemcachedBucketStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseMemcachedBucketList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -1981,6 +2111,8 @@ type CouchbaseMemcachedBucketList struct {
 // +kubebuilder:printcolumn:name="remote bucket",type="string",JSONPath=".spec.remoteBucket"
 // +kubebuilder:printcolumn:name="paused",type="boolean",JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseReplication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -1991,6 +2123,10 @@ type CouchbaseReplication struct {
 	// bucket level replication.
 	// https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-with-scopes-and-collections.html#explicit-mapping
 	ExplicitMapping CouchbaseExplicitMappingSpec `json:"explicitMapping,omitempty"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseReplicationStatus `json:"status,omitempty"`
 }
 
 // The CouchbaseScopeMigration resource represents the use of the special migration mapping
@@ -2007,12 +2143,18 @@ type CouchbaseReplication struct {
 // +kubebuilder:printcolumn:name="remote bucket",type="string",JSONPath=".spec.remoteBucket"
 // +kubebuilder:printcolumn:name="paused",type="boolean",JSONPath=".spec.paused"
 // +kubebuilder:printcolumn:name="age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseMigrationReplication struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseReplicationSpec `json:"spec"`
 	// The migration mappings to use, should never be empty as that is just an implicit bucket-to-bucket replication then.
 	MigrationMapping CouchbaseMigrationMappingSpec `json:"migrationMapping"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseMigrationReplicationStatus `json:"status,omitempty"`
 }
 
 // CompressionType represents all allowable XDCR compression modes.
@@ -2316,11 +2458,31 @@ type CouchbaseConflictCustomCollectionRule struct {
 	LogCollection CouchbaseConflictLogCollection `json:"logCollection"`
 }
 
+// CouchbaseReplicationStatus is the observed state of a CouchbaseReplication.
+type CouchbaseReplicationStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseReplicationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CouchbaseReplication `json:"items"`
+}
+
+// CouchbaseMigrationReplicationStatus is the observed state of a CouchbaseMigrationReplication.
+type CouchbaseMigrationReplicationStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -2335,10 +2497,16 @@ type CouchbaseMigrationReplicationList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseUserSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseUserStatus `json:"status,omitempty"`
 }
 
 type AuthDomain string
@@ -2397,6 +2565,16 @@ type CouchbaseUserPasswordSpec struct {
 	ExpiresAfter *metav1.Duration `json:"expiresAfter,omitempty"`
 }
 
+// CouchbaseUserStatus is the observed state of a CouchbaseUser.
+type CouchbaseUserStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // CouchbaseUserList is a list of Couchbase users.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseUserList struct {
@@ -2410,10 +2588,16 @@ type CouchbaseUserList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:categories=all;couchbase
 // +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Spec              CouchbaseGroupSpec `json:"spec"`
+
+	// Status defines the observed state of the resource.
+	// +optional
+	Status CouchbaseGroupStatus `json:"status,omitempty"`
 }
 
 // CouchbaseGroupSpec allows the specification of Couchbase group configuration.
@@ -2573,6 +2757,16 @@ type CollectionRoleSpec struct {
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
+// CouchbaseGroupStatus is the observed state of a CouchbaseGroup.
+type CouchbaseGroupStatus struct {
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
 // CouchbaseGroupList is a list of Couchbase users.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type CouchbaseGroupList struct {
@@ -2656,6 +2850,7 @@ type CouchbaseRoleBindingList struct {
 // +kubebuilder:printcolumn:name="servers",type="string",JSONPath=".spec.servers"
 // +kubebuilder:subresource:status
 // +kubebuilder:subresource:scale:specpath=.spec.size,statuspath=.status.size,selectorpath=.status.labelSelector
+// +kubebuilder:printcolumn:name="unreconcilable",type="string",JSONPath=`.status.conditions[?(@.type=="Unreconcilable")].status`
 type CouchbaseAutoscaler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -2684,6 +2879,13 @@ type CouchbaseAutoscalerStatus struct {
 	// Size is the current size of the server group.
 	// +kubebuilder:validation:Minimum=1
 	Size int `json:"size"`
+
+	// Conditions is the set of status conditions for this resource. A resource
+	// selected by more than one CouchbaseCluster carries one entry per cluster,
+	// each identified by a prefix on the condition message.
+	// +optional
+	// +listType=atomic
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

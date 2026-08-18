@@ -21,6 +21,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/client"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
@@ -30,6 +31,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 )
+
+// recordBucketRef ties a Couchbase-side bucket name back to the CR that declares
+// it. The gather functions are the one place that can see both names at once,
+// since they part ways whenever spec.name is set and the bucket validators only
+// ever get told the Couchbase-side one.
+func recordBucketRef(tracker *unreconcilable.Tracker, kind, bucketName, crName string) {
+	tracker.SetBucketRef(bucketName, unreconcilable.Ref{Kind: kind, Name: crName})
+}
 
 type SupportedFeature int
 
@@ -51,7 +60,7 @@ type SupportedFeatureMap map[SupportedFeature]bool
 // gatherCouchbaseBuckets gathers all K8s CB buckets and marshalls them into canonical form.
 //
 //nolint:gocognit,gocyclo
-func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client, encryptionKeys couchbaseutil.EncryptionKeyList) []couchbaseutil.Bucket {
+func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sBuckets []*couchbasev2.CouchbaseBucket, outputBuckets []couchbaseutil.Bucket, cluster *couchbasev2.CouchbaseCluster, client *client.Client, encryptionKeys couchbaseutil.EncryptionKeyList, tracker *unreconcilable.Tracker) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	storageBackendSupported := supportedFeatures[SupportedBackendCouchstore]
 	magmaStorageBackendSupported := supportedFeatures[SupportedBackendMagma]
@@ -64,13 +73,11 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	supportedFileBasedRebalance := supportedFeatures[SupportedFileBasedRebalance]
 
 	for _, bucket := range k8sBuckets {
-		if client != nil {
-			bucketA, found := client.CouchbaseBuckets.Get(bucket.Name)
-			if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
-				continue
-			}
-		}
-
+		// There is deliberately no skip here. Gather builds the desired set, and
+		// anything missing from that set reads further down as "the user no
+		// longer wants this", which deletes the bucket from Couchbase Server.
+		// Unreconcilable buckets get skipped at the create and update decision
+		// instead, where the stakes are much lower.
 		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 		if err != nil {
 			// we failed but its not worth stopping. log the error and continue
@@ -86,6 +93,8 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 		if bucket.Spec.Name != "" {
 			name = string(bucket.Spec.Name)
 		}
+
+		recordBucketRef(tracker, couchbasev2.BucketCRDResourceKind, name, bucket.Name)
 
 		b := couchbaseutil.Bucket{
 			BucketName:         name,
@@ -304,22 +313,10 @@ func applyBucketStorageBackend(b *couchbaseutil.Bucket, bucket *couchbasev2.Couc
 	b.BucketStorageBackend = couchbaseutil.CouchbaseStorageBackend(k8sutil.GetBucketStorageBackend(bucket, storageBackendCouchstoreSupported, storageBackendMagmaSupported, cluster))
 }
 
-// shouldSkipEphemeralBucket skips a bucket whose cached copy has reconciliation turned off via
-// annotation. A nil client (used in unit tests) never skips.
-func shouldSkipEphemeralBucket(client *client.Client, name string) bool {
-	if client == nil {
-		return false
-	}
-
-	bucketA, found := client.CouchbaseEphemeralBuckets.Get(name)
-
-	return found && !couchbaseutil.ShouldReconcile(bucketA.Annotations)
-}
-
 // gatherEphemeralBuckets gathers all K8s CB Ephemeral buckets and marshalls them into canonical form.
 //
 //nolint:gocognit
-func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster) []couchbaseutil.Bucket {
+func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *couchbasev2.ObjectSelectorAsSelector, k8sEphemeralBuckets []*couchbasev2.CouchbaseEphemeralBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, cluster *couchbasev2.CouchbaseCluster, tracker *unreconcilable.Tracker) []couchbaseutil.Bucket {
 	durablitySupported := supportedFeatures[SupportedDurability]
 	supportedRank := supportedFeatures[SupportedRank]
 	supportedCrossClusterVersioning := supportedFeatures[SupportedCrossClusterVersioning]
@@ -328,10 +325,6 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 	supportedFileBasedRebalance := supportedFeatures[SupportedFileBasedRebalance]
 
 	for _, bucket := range k8sEphemeralBuckets {
-		if shouldSkipEphemeralBucket(client, bucket.Name) {
-			continue
-		}
-
 		err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 		if err != nil {
 			// we failed but its not worth stopping. log the error and continue
@@ -347,6 +340,8 @@ func gatherEphemeralBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 		if bucket.Spec.Name != "" {
 			name = string(bucket.Spec.Name)
 		}
+
+		recordBucketRef(tracker, couchbasev2.EphemeralBucketCRDResourceKind, name, bucket.Name)
 
 		b := couchbaseutil.Bucket{
 			BucketName:         name,
@@ -449,13 +444,8 @@ func apply80Settings(b *couchbaseutil.Bucket, bucket *couchbasev2.CouchbaseEphem
 }
 
 // gatherMemcachedBuckets gathers all K8s CB Memcached buckets and marshalls them into canonical form.
-func gatherMemcachedBuckets(selector *couchbasev2.ObjectSelectorAsSelector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client) []couchbaseutil.Bucket {
+func gatherMemcachedBuckets(selector *couchbasev2.ObjectSelectorAsSelector, k8sMemcachedBuckets []*couchbasev2.CouchbaseMemcachedBucket, outputBuckets []couchbaseutil.Bucket, client *client.Client, tracker *unreconcilable.Tracker) []couchbaseutil.Bucket {
 	for _, bucket := range k8sMemcachedBuckets {
-		bucketA, found := client.CouchbaseMemcachedBuckets.Get(bucket.Name)
-		if found && !couchbaseutil.ShouldReconcile(bucketA.Annotations) {
-			continue
-		}
-
 		if !selector.Matches(bucket.GetName(), labels.Set(bucket.Labels)) {
 			continue
 		}
@@ -465,6 +455,8 @@ func gatherMemcachedBuckets(selector *couchbasev2.ObjectSelectorAsSelector, k8sM
 		if bucket.Spec.Name != "" {
 			name = string(bucket.Spec.Name)
 		}
+
+		recordBucketRef(tracker, couchbasev2.MemcachedBucketCRDResourceKind, name, bucket.Name)
 
 		b := couchbaseutil.Bucket{
 			BucketName:        name,
@@ -537,9 +529,9 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 		}
 	}
 
-	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s, encryptionKeys)
-	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s, c.cluster)
-	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s)
+	allBuckets = gatherCouchbaseBuckets(supportedFeatures, selector, couchbaseBuckets, allBuckets, c.cluster, c.k8s, encryptionKeys, c.unreconcilable)
+	allBuckets = gatherEphemeralBuckets(supportedFeatures, selector, ephemeralBuckets, allBuckets, c.k8s, c.cluster, c.unreconcilable)
+	allBuckets = gatherMemcachedBuckets(selector, c.k8s.CouchbaseMemcachedBuckets.List(), allBuckets, c.k8s, c.unreconcilable)
 
 	return allBuckets, nil
 }
@@ -650,7 +642,7 @@ func (c *Cluster) inspectBuckets() ([]couchbaseutil.Bucket, []bucketUpdate, []co
 
 		// Skip buckets that failed change-constraint validation — they must
 		// not be created, updated, or deleted until the user fixes the CRD.
-		if c.IsFailedValidation("bucket", r.BucketName) {
+		if c.unreconcilable.IsSkipped(unreconcilable.KindBucketName, r.BucketName) {
 			continue
 		}
 
@@ -927,7 +919,7 @@ func (c *Cluster) reconcileBuckets() error {
 	for i, bucket := range requested {
 		names[i] = bucket.BucketName
 
-		if c.IsFailedValidation("bucket", bucket.BucketName) {
+		if c.unreconcilable.IsSkipped(unreconcilable.KindBucketName, bucket.BucketName) {
 			if existing, ok := existingStatuses[bucket.BucketName]; ok {
 				statuses[bucket.BucketName] = existing
 

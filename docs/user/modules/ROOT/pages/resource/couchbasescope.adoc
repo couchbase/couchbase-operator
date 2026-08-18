@@ -34,6 +34,14 @@ The following is an example resource, depicting the overall structure and any de
     <<couchbasescopes-spec-collections-selector,selector>>: {}
   <<couchbasescopes-spec-defaultscope,defaultScope>>: false
   <<couchbasescopes-spec-name,name>>: ""
+<<couchbasescopes-status,status>>:
+  <<couchbasescopes-status-conditions,conditions>>:
+  - <<couchbasescopes-status-conditions-lasttransitiontime,lastTransitionTime>>: ""
+    <<couchbasescopes-status-conditions-message,message>>: ""
+    <<couchbasescopes-status-conditions-observedgeneration,observedGeneration>>: 0
+    <<couchbasescopes-status-conditions-reason,reason>>: ""
+    <<couchbasescopes-status-conditions-status,status>>: ""
+    <<couchbasescopes-status-conditions-type,type>>: ""
 ----
 
 == couchbasescopes.apiVersion
@@ -232,3 +240,121 @@ Additionally the `metadata.name` field is a DNS label, and thus limited to 63
 characters, this field must be used if the name is longer than this limit.
 Scope names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 and not start with either _ or %.
+
+== couchbasescopes.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+Status defines the observed state of the resource.
+
+=== couchbasescopes.status.conditions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Conditions is the set of status conditions for this resource.
+A resource
+selected by more than one CouchbaseCluster carries one entry per cluster,
+each identified by a prefix on the condition message.
+
+=== couchbasescopes.status.conditions.lastTransitionTime
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+lastTransitionTime is the last time the condition transitioned from one status to another.
+This should be when the underlying condition changed.
+If that is not known, then using the time when the API field changed is acceptable.
+
+=== couchbasescopes.status.conditions.message
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `32768`
+
+==== Description
+
+message is a human readable message indicating details about the transition.
+This may be an empty string.
+
+=== couchbasescopes.status.conditions.observedGeneration
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+observedGeneration represents the .metadata.generation that the condition was set based upon.
+For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+with respect to the current state of the instance.
+
+=== couchbasescopes.status.conditions.reason
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `1024`
+
+*Pattern (Regular Expression)*: `^[A-Za-z]([A-Za-z0-9_,:]\*[A-Za-z0-9_])?$`
+
+==== Description
+
+reason contains a programmatic identifier indicating the reason for the condition's last transition.
+Producers of specific condition types may define expected values and meanings for this field,
+and whether the values are considered a guaranteed API.
+The value should be a CamelCase string.
+This field may not be empty.
+
+=== couchbasescopes.status.conditions.status
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `True, False, Unknown`
+
+==== Description
+
+status of the condition, one of True, False, Unknown.
+
+=== couchbasescopes.status.conditions.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `316`
+
+*Pattern (Regular Expression)*: `^([a-z0-9]([-a-z0-9]\*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]\*[a-z0-9])?)\*/)?(([A-Za-z0-9][-A-Za-z0-9_.]\*)?[A-Za-z0-9])$`
+
+==== Description
+
+type of condition in CamelCase or in foo.example.com/CamelCase.

@@ -540,6 +540,13 @@ func registerTests() {
 		framework.NewTestDef(TestCreateInitNodeHostNameClusterServerGroups).WithTags(TagSuiteP0, TagFeatureInitNodeHostName),
 		framework.NewTestDef(TestModifyRebalanceEnabledAndSettings).WithTags(TagSuiteP0, TagFeatureReconcile),
 		framework.NewTestDef(TestBucketDataServiceRebalanceType).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableHealthyResourcesReportFalse).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableImmutableFieldChange).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableSelfHealsWhenSpecFixed).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableUserGoesInvalidMidLifetime).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableStaysSkippedAcrossCycles).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableCausesNoGitOpsChurn).WithTags(TagSuiteP0, TagFeatureReconcile),
+		framework.NewTestDef(TestUnreconcilableXDCRReplicationDependencyMissing).WithTags(TagSuiteP0, TagFeatureReconcile),
 
 		// Old P0s now P1s
 		framework.NewTestDef(TestAutoscaleUpMandatoryMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureAutoScaling, TagSuitePlatform),

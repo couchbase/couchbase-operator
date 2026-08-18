@@ -472,8 +472,7 @@ func (c *Cluster) generateGroups() (map[string]couchbaseutil.Group, error) {
 	groups := map[string]couchbaseutil.Group{}
 
 	for _, g := range c.k8s.CouchbaseGroups.List() {
-		apiGroup, found := c.k8s.CouchbaseGroups.Get(g.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiGroup.GetAnnotations()) {
+		if c.unreconcilable.IsSkipped(couchbasev2.GroupCRDResourceKind, g.Name) {
 			continue
 		}
 
@@ -542,8 +541,7 @@ func (c *Cluster) reconcileGroups() ([]string, error) {
 	for _, group := range *existingGroups {
 		e := group
 
-		apiGroup, found := c.k8s.CouchbaseGroups.Get(e.ID)
-		if found && !couchbaseutil.ShouldReconcile(apiGroup.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.GroupCRDResourceKind, e.ID) {
 			continue
 		}
 
@@ -683,13 +681,14 @@ func (c *Cluster) generateUsers(groups []string) (map[string]couchbaseutil.User,
 		// internal user we have cached, or create a new one, then append the
 		// group (thus accumulating multiple groups for a specific user).
 		for _, subject := range subjects {
-			apiUser, found := c.k8s.CouchbaseUsers.Get(subject.Name)
-
 			if subject.Spec.Name == "" {
 				subject.Spec.Name = subject.Name
 			}
 
-			if found && !couchbaseutil.ShouldReconcile(apiUser.GetAnnotations()) {
+			// This local map guards Couchbase-side user deletion, which is a
+			// separate concern from the skip itself, so it stays. It is just
+			// populated from the tracker now rather than from annotations.
+			if c.unreconcilable.IsSkipped(couchbasev2.UserCRDResourceKind, subject.Name) {
 				unReconcilableUsers[subject.Name] = true
 				continue
 			}

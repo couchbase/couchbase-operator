@@ -1335,13 +1335,28 @@ func checkConstraintXDCRReplicationScopesAndCollectionsSupported(v *types.Valida
 // CheckConstraintXDCRReplicationBucketsForReconcile validates that buckets referenced by XDCR
 // replications exist. Called during reconcile, returns failed replication names so they can be
 // skipped without blocking the entire cluster.
-func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+// UnreconcilableReplication identifies one XDCR replication that cannot be
+// reconciled. It carries the kind because CouchbaseReplication and
+// CouchbaseMigrationReplication are quite entitled to share a name.
+type UnreconcilableReplication struct {
+	// Kind is either couchbasev2.ReplicationCRDResourceKind or
+	// couchbasev2.MigrationReplicationCRDResourceKind.
+	Kind string
+
+	// Name is the resource's metadata.name.
+	Name string
+
+	// Message is why the resource cannot be reconciled.
+	Message string
+}
+
+func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]UnreconcilableReplication, error) {
 	if !cluster.Spec.XDCR.Managed {
 		return nil, nil
 	}
 
 	var errs []error
-	var failedNames []string
+	var failed []UnreconcilableReplication
 
 	for _, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
 		replications, err := v.Abstraction.GetCouchbaseReplications(cluster.Namespace, remoteCluster.Replications.Selector)
@@ -1356,8 +1371,13 @@ func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, clust
 			}
 
 			if err := validateReplicationBucketValid(v, cluster, &replication.Spec); err != nil {
-				failedNames = append(failedNames, replication.Name)
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err))
+				wrapped := fmt.Errorf("bucket %s referenced by spec.bucket in couchbasereplications.couchbase.com/%s must be valid: %w", replication.Spec.Bucket, replication.Name, err)
+				failed = append(failed, UnreconcilableReplication{
+					Kind:    couchbasev2.ReplicationCRDResourceKind,
+					Name:    replication.Name,
+					Message: wrapped.Error(),
+				})
+				errs = append(errs, wrapped)
 			}
 		}
 
@@ -1373,17 +1393,22 @@ func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, clust
 			}
 
 			if err := validateReplicationBucketValid(v, cluster, &migration.Spec); err != nil {
-				failedNames = append(failedNames, migration.Name)
-				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err))
+				wrapped := fmt.Errorf("bucket %s referenced by spec.bucket in couchbasemigrationreplications.couchbase.com/%s must be valid: %w", migration.Spec.Bucket, migration.Name, err)
+				failed = append(failed, UnreconcilableReplication{
+					Kind:    couchbasev2.MigrationReplicationCRDResourceKind,
+					Name:    migration.Name,
+					Message: wrapped.Error(),
+				})
+				errs = append(errs, wrapped)
 			}
 		}
 	}
 
 	if errs != nil {
-		return failedNames, errors.CompositeValidationError(errs...)
+		return failed, errors.CompositeValidationError(errs...)
 	}
 
-	return failedNames, nil
+	return failed, nil
 }
 
 // checkConstraintXDCRReplicationConflictLogging validates conflict logging configuration

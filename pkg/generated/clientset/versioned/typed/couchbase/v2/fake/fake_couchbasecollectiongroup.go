@@ -94,6 +94,18 @@ func (c *FakeCouchbaseCollectionGroups) Update(ctx context.Context, couchbaseCol
 	return obj.(*v2.CouchbaseCollectionGroup), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCouchbaseCollectionGroups) UpdateStatus(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (*v2.CouchbaseCollectionGroup, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(couchbasecollectiongroupsResource, "status", c.ns, couchbaseCollectionGroup), &v2.CouchbaseCollectionGroup{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2.CouchbaseCollectionGroup), err
+}
+
 // Delete takes name of the couchbaseCollectionGroup and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseCollectionGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

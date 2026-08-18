@@ -379,6 +379,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"get",   // used by the operator for Validation
 				"list",  // used by the operator for caching
 				"watch", // used by the operator for caching
+				"patch", // used to strip the legacy unreconcilable annotation
 			},
 		},
 		{
@@ -399,7 +400,8 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"create", // used by my "favourite" synchronization feature
-				"update", // used for adding the unreconcilable annotation
+				"update", // used by the bucket synchronization feature
+				"patch",  // used to strip the legacy unreconcilable annotation
 			},
 		},
 		{
@@ -414,6 +416,7 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 				"list",   // used by the operator for caching
 				"watch",  // used by the operator for caching
 				"delete", // used by the operator to cleanup restores
+				"patch",  // used to strip the legacy unreconcilable annotation
 			},
 		},
 		{
@@ -433,14 +436,34 @@ func (o *generateOperatorOptions) getOperatorRole() runtime.Object {
 			},
 		},
 		{
+			// Status subresources for every kind that carries an Unreconcilable
+			// condition.  The Operator projects its in-memory judgement onto
+			// these, and a status write is never intercepted by the admission
+			// controller, so it cannot be rejected by the very validation that
+			// produced the condition.
 			APIGroups: []string{
 				couchbasev2.GroupName,
 			},
 			Resources: []string{
-				couchbasev2.AutoscalerCRDResourcePlural + "/status",
+				fmt.Sprintf("%s/status", couchbasev2.BucketCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.EphemeralBucketCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.MemcachedBucketCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.ScopeCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.ScopeGroupCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.CollectionCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.CollectionGroupCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.UserCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.GroupCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.ReplicationCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.MigrationReplicationCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.BackupCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.BackupRestoreCRDResourcePlural),
+				fmt.Sprintf("%s/status", couchbasev2.AutoscalerCRDResourcePlural),
 			},
 			Verbs: []string{
+				"get",    // used by the operator to read back status
 				"update", // used by the operator to update status subresource
+				"patch",  // used by the operator to update status subresource
 			},
 		},
 		{

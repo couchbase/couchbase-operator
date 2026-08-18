@@ -46,3 +46,18 @@ func MustAssertFor(t *testing.T, timeout time.Duration, callback func() error) {
 		Die(t, err)
 	}
 }
+
+// MustHoldFor fails if the check ever stops passing within the duration.
+func MustHoldFor(t *testing.T, duration time.Duration, check func() error) {
+	t.Helper()
+
+	deadline := time.Now().Add(duration)
+
+	for time.Now().Before(deadline) {
+		if err := check(); err != nil {
+			Die(t, fmt.Errorf("condition stopped holding after %v: %w", duration-time.Until(deadline), err))
+		}
+
+		time.Sleep(time.Second)
+	}
+}

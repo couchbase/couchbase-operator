@@ -33,6 +33,7 @@ type CouchbaseScopesGetter interface {
 type CouchbaseScopeInterface interface {
 	Create(ctx context.Context, couchbaseScope *v2.CouchbaseScope, opts v1.CreateOptions) (*v2.CouchbaseScope, error)
 	Update(ctx context.Context, couchbaseScope *v2.CouchbaseScope, opts v1.UpdateOptions) (*v2.CouchbaseScope, error)
+	UpdateStatus(ctx context.Context, couchbaseScope *v2.CouchbaseScope, opts v1.UpdateOptions) (*v2.CouchbaseScope, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseScope, error)
@@ -121,6 +122,22 @@ func (c *couchbaseScopes) Update(ctx context.Context, couchbaseScope *v2.Couchba
 		Namespace(c.ns).
 		Resource("couchbasescopes").
 		Name(couchbaseScope.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(couchbaseScope).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *couchbaseScopes) UpdateStatus(ctx context.Context, couchbaseScope *v2.CouchbaseScope, opts v1.UpdateOptions) (result *v2.CouchbaseScope, err error) {
+	result = &v2.CouchbaseScope{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("couchbasescopes").
+		Name(couchbaseScope.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseScope).
 		Do(ctx).

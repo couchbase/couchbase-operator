@@ -195,7 +195,8 @@ BINARY := undefined
 # These files define the V2 Kubernetes API.
 APISRC_V2 := \
 	pkg/apis/couchbase/v2/doc.go \
-  pkg/apis/couchbase/v2/types.go
+  pkg/apis/couchbase/v2/types.go \
+  pkg/apis/couchbase/v2/conditions.go
 
 # Modifying these files triggers a rebuild of kubernetes clients and informers.
 APISRC := $(APISRC_V2)
@@ -462,6 +463,13 @@ touch-generated:
 .PHONY: crd
 crd: $(CRD_FILE)
 
+# Build targets for the generated API code.
+.PHONY: deepcopy
+deepcopy: pkg/apis/couchbase/v2/zz_generated.deepcopy.go
+
+.PHONY: client
+client: pkg/generated/clientset pkg/generated/listers pkg/generated/informers
+
 .PHONY: dockerized-lint
 dockerized-lint: $(GENERATED_FILES)
 	docker build -f ./docker/couchbase-operator-lite-build/Dockerfile . -t couchbase/build-a-bear:v1
@@ -500,8 +508,8 @@ images-public: images
 	$(foreach image,$(IMAGES),docker push ${DOCKER_USER}/$(image):${DOCKER_TAG};)
 
 # Run any Go unit tests that exist.
-.PHONY: unit-test
-test-unit:
+.PHONY: unit-test test-unit
+unit-test test-unit:
 	go test $(BUILDFLAGS) -v ./pkg/...
 
 # Docs are partially auto-generated from the CRD.

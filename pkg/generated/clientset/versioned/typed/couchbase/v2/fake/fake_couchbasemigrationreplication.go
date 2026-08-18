@@ -94,6 +94,18 @@ func (c *FakeCouchbaseMigrationReplications) Update(ctx context.Context, couchba
 	return obj.(*v2.CouchbaseMigrationReplication), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCouchbaseMigrationReplications) UpdateStatus(ctx context.Context, couchbaseMigrationReplication *v2.CouchbaseMigrationReplication, opts v1.UpdateOptions) (*v2.CouchbaseMigrationReplication, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(couchbasemigrationreplicationsResource, "status", c.ns, couchbaseMigrationReplication), &v2.CouchbaseMigrationReplication{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2.CouchbaseMigrationReplication), err
+}
+
 // Delete takes name of the couchbaseMigrationReplication and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseMigrationReplications) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

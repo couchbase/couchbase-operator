@@ -26,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
@@ -177,12 +178,9 @@ type Cluster struct {
 	// is in spec but not yet on the server.
 	deferredEncryptionKeys map[string]struct{}
 
-	// failedValidation holds the names of resources that failed change-
-	// constraint validation in this reconcile cycle, keyed by resource kind
-	// (e.g. "bucket").  Resources in this map are skipped during reconciliation
-	// so other reconcilers and valid resources are not blocked.  The map is
-	// rebuilt every cycle, so it is naturally restart-safe.
-	failedValidation map[string]map[string]bool
+	// unreconcilable records which dependent resources are being skipped this
+	// reconcile cycle, and reports them on their status conditions.
+	unreconcilable *unreconcilable.Tracker
 
 	// validator is the validator instance for this cluster, backed by the operator's
 	// watch-backed informer caches. Created once alongside k8s in New.
@@ -193,25 +191,17 @@ type Cluster struct {
 	log logr.Logger
 }
 
-// SetFailedValidation stores the set of resource names that failed
-// change-constraint validation for the given kind.  Called once per
-// reconcile cycle, before RunReconcile.
-func (c *Cluster) SetFailedValidation(kind string, names map[string]bool) {
-	if c.failedValidation == nil {
-		c.failedValidation = make(map[string]map[string]bool)
-	}
-
-	c.failedValidation[kind] = names
+// FlushUnreconcilable writes the tracker's judgements onto the status
+// conditions of the resources they concern. Failures are logged rather than
+// returned, because reporting is never allowed to break reconciling.
+func (c *Cluster) FlushUnreconcilable(ctx context.Context) {
+	c.unreconcilable.Flush(ctx, c.k8s, c.log)
 }
 
-// IsFailedValidation returns true if the named resource of the given kind
-// failed change-constraint validation in this reconcile cycle.
-func (c *Cluster) IsFailedValidation(kind, name string) bool {
-	if c.failedValidation == nil {
-		return false
-	}
-
-	return c.failedValidation[kind][name]
+// Unreconcilable returns the cluster's unreconcilable-resource tracker, the one
+// and only source of truth for whether a dependent resource is being skipped.
+func (c *Cluster) Unreconcilable() *unreconcilable.Tracker {
+	return c.unreconcilable
 }
 
 // namespacedName returns a unique identifier for a cluster within Kubernetes.
@@ -310,6 +300,7 @@ func New(config Config, cluster *couchbasev2.CouchbaseCluster) (*Cluster, error)
 		members:                    couchbaseutil.MemberSet{},
 		callableMembers:            couchbaseutil.MemberSet{},
 		generation:                 cluster.Generation,
+		unreconcilable:             unreconcilable.New(cluster.Name),
 	}
 
 	if err := annotations.Populate(&c.cluster.Spec, c.cluster.Annotations); err != nil {

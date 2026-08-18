@@ -33,6 +33,7 @@ type CouchbaseEphemeralBucketsGetter interface {
 type CouchbaseEphemeralBucketInterface interface {
 	Create(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.CreateOptions) (*v2.CouchbaseEphemeralBucket, error)
 	Update(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*v2.CouchbaseEphemeralBucket, error)
+	UpdateStatus(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (*v2.CouchbaseEphemeralBucket, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseEphemeralBucket, error)
@@ -121,6 +122,22 @@ func (c *couchbaseEphemeralBuckets) Update(ctx context.Context, couchbaseEphemer
 		Namespace(c.ns).
 		Resource("couchbaseephemeralbuckets").
 		Name(couchbaseEphemeralBucket.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(couchbaseEphemeralBucket).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *couchbaseEphemeralBuckets) UpdateStatus(ctx context.Context, couchbaseEphemeralBucket *v2.CouchbaseEphemeralBucket, opts v1.UpdateOptions) (result *v2.CouchbaseEphemeralBucket, err error) {
+	result = &v2.CouchbaseEphemeralBucket{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("couchbaseephemeralbuckets").
+		Name(couchbaseEphemeralBucket.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseEphemeralBucket).
 		Do(ctx).

@@ -111,6 +111,29 @@ spec:
           - couchbaseclusters
           verbs:
           - "*"
+        # Status subresources for every kind that carries an Unreconcilable
+        # condition.  Mirrors the operator RBAC in pkg/config/operator.go.
+        - apiGroups:
+          - couchbase.com
+          resources:
+          - couchbasebuckets/status
+          - couchbaseephemeralbuckets/status
+          - couchbasememcachedbuckets/status
+          - couchbasescopes/status
+          - couchbasescopegroups/status
+          - couchbasecollections/status
+          - couchbasecollectiongroups/status
+          - couchbaseusers/status
+          - couchbasegroups/status
+          - couchbasereplications/status
+          - couchbasemigrationreplications/status
+          - couchbasebackups/status
+          - couchbasebackuprestores/status
+          - couchbaseautoscalers/status
+          verbs:
+          - get
+          - update
+          - patch
         - apiGroups:
           - storage.k8s.io
           resources:

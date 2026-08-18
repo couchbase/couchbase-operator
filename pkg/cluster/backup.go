@@ -23,7 +23,6 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
-	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/go-logr/logr"
 
@@ -197,8 +196,7 @@ func (c *Cluster) generateBackupResources() (backupResourcesList, error) {
 	for i := range backups {
 		backup := &backups[i]
 
-		apiBackup, found := c.k8s.CouchbaseBackups.Get(backup.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiBackup.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, backup.Name) {
 			continue
 		}
 
@@ -1682,8 +1680,7 @@ func (c *Cluster) gatherBackups() ([]couchbasev2.CouchbaseBackup, error) {
 	backups := []couchbasev2.CouchbaseBackup{}
 
 	for _, backup := range couchbaseBackups {
-		apiBackup, found := c.k8s.CouchbaseBackups.Get(backup.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiBackup.GetAnnotations()) {
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, backup.Name) {
 			continue
 		}
 
@@ -1717,8 +1714,7 @@ func (c *Cluster) gatherBackupRestores() ([]couchbasev2.CouchbaseBackupRestore, 
 	restores := []couchbasev2.CouchbaseBackupRestore{}
 
 	for _, restore := range couchbaseBackupRestores {
-		apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(restore.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiRestore.GetAnnotations()) {
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupRestoreCRDResourceKind, restore.Name) {
 			continue
 		}
 
@@ -1778,8 +1774,7 @@ func (c *Cluster) reconcileBackup() error {
 	}
 
 	for _, req := range requested {
-		apiReq, found := c.k8s.CouchbaseBackups.Get(req.name)
-		if found && !couchbaseutil.ShouldReconcile(apiReq.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, req.name) {
 			continue
 		}
 		// Requested resource doesn't exist (as best we know...), so create it.
@@ -1798,8 +1793,7 @@ func (c *Cluster) reconcileBackup() error {
 	}
 
 	for _, cur := range current {
-		apiCur, found := c.k8s.CouchbaseBackups.Get(cur.name)
-		if found && !couchbaseutil.ShouldReconcile(apiCur.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupCRDResourceKind, cur.name) {
 			continue
 		}
 
@@ -1845,8 +1839,7 @@ func (c *Cluster) reconcileBackupRestore() error {
 }
 
 func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.CouchbaseBackupRestore) error {
-	apiRestore, found := c.k8s.CouchbaseBackupRestores.Get(currentRestore.Name)
-	if found && !couchbaseutil.ShouldReconcile(apiRestore.Annotations) {
+	if c.unreconcilable.IsSkipped(couchbasev2.BackupRestoreCRDResourceKind, currentRestore.Name) {
 		return nil
 	}
 

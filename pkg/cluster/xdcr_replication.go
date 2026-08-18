@@ -805,7 +805,7 @@ func (c *Cluster) processMigrationReplications(selector labels.Selector, generat
 		}
 
 		// Skip replications whose source bucket no longer exists.
-		if c.IsFailedValidation("replication", migration.Name) {
+		if c.unreconcilable.IsSkipped(couchbasev2.MigrationReplicationCRDResourceKind, migration.Name) {
 			c.log.Info("Skipping migration replication with missing source bucket", "cluster", c.namespacedName(), "replication", migration.Name)
 			continue
 		}
@@ -859,7 +859,7 @@ func (c *Cluster) processRegularReplications(selector labels.Selector, generated
 		}
 
 		// Skip replications whose source bucket no longer exists.
-		if c.IsFailedValidation("replication", replication.Name) {
+		if c.unreconcilable.IsSkipped(couchbasev2.ReplicationCRDResourceKind, replication.Name) {
 			c.log.Info("Skipping replication with missing source bucket", "cluster", c.namespacedName(), "replication", replication.Name)
 			continue
 		}

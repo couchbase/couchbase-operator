@@ -94,6 +94,18 @@ func (c *FakeCouchbaseBuckets) Update(ctx context.Context, couchbaseBucket *v2.C
 	return obj.(*v2.CouchbaseBucket), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCouchbaseBuckets) UpdateStatus(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (*v2.CouchbaseBucket, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(couchbasebucketsResource, "status", c.ns, couchbaseBucket), &v2.CouchbaseBucket{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2.CouchbaseBucket), err
+}
+
 // Delete takes name of the couchbaseBucket and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseBuckets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

@@ -94,6 +94,18 @@ func (c *FakeCouchbaseScopeGroups) Update(ctx context.Context, couchbaseScopeGro
 	return obj.(*v2.CouchbaseScopeGroup), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeCouchbaseScopeGroups) UpdateStatus(ctx context.Context, couchbaseScopeGroup *v2.CouchbaseScopeGroup, opts v1.UpdateOptions) (*v2.CouchbaseScopeGroup, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(couchbasescopegroupsResource, "status", c.ns, couchbaseScopeGroup), &v2.CouchbaseScopeGroup{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v2.CouchbaseScopeGroup), err
+}
+
 // Delete takes name of the couchbaseScopeGroup and deletes it. Returns an error if one occurs.
 func (c *FakeCouchbaseScopeGroups) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

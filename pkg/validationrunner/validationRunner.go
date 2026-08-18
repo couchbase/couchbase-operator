@@ -13,7 +13,7 @@ package validationrunner
 import (
 	ctx "context"
 	"crypto/sha256"
-	"errors"
+	goerrors "errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -22,6 +22,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/client"
 	"github.com/couchbase/couchbase-operator/pkg/cluster"
 	"github.com/couchbase/couchbase-operator/pkg/conversion"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
@@ -29,6 +30,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
 	validationv2 "github.com/couchbase/couchbase-operator/pkg/validator/v2"
 
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,11 +40,39 @@ type bucketNamer struct {
 	c *cluster.Cluster
 }
 
-func isValidationError(err error) bool {
-	// This is a hack to stop scenarios where resources are created simultaneously or before
-	// operator and its roles.  This can lead to the K8S API rejecting the cache requests.
-	// This is really only been seen in E2E, not a common customer issue.
-	return err != nil && !strings.Contains(err.Error(), "forbidden")
+// isSpecInvalid reports whether err is a verdict that the resource's spec is
+// invalid, as opposed to a failure to determine whether it is valid.
+func isSpecInvalid(err error) bool {
+	return err != nil && !isIndeterminateError(err)
+}
+
+// isIndeterminateError reports whether err means "I could not tell" rather than
+// "the spec is wrong". These validators run every reconcile cycle and do live
+// reads, so mistaking a transient blip for a verdict would brand a perfectly
+// healthy resource unreconcilable every ten seconds.
+func isIndeterminateError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if checkIsMemberError(err) {
+		return true
+	}
+
+	if goerrors.Is(err, ctx.Canceled) || goerrors.Is(err, ctx.DeadlineExceeded) {
+		return true
+	}
+
+	if k8serrors.IsForbidden(err) || k8serrors.IsUnauthorized(err) ||
+		k8serrors.IsTimeout(err) || k8serrors.IsServerTimeout(err) ||
+		k8serrors.IsTooManyRequests(err) || k8serrors.IsInternalError(err) ||
+		k8serrors.IsServiceUnavailable(err) || k8serrors.IsUnexpectedServerError(err) {
+		return true
+	}
+
+	// The validators aggregate into composite errors that never implement
+	// Unwrap, so the typed checks above cannot always see through them.
+	return strings.Contains(err.Error(), "forbidden")
 }
 
 // generateSuffix generates a unique fixed length, and DNS compatible, suffix.
@@ -87,20 +117,22 @@ func (n *bucketNamer) GenerateCollectionName(bucket *couchbaseutil.Bucket, scope
 	return fmt.Sprintf("collection-%s", n.generateSuffix(input))
 }
 
-func CheckManagedResourceImmutableConstraints(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+// CheckManagedResourceImmutableConstraints validates that no immutable field has
+// been changed on a dependent resource, marking every offender into the
+// cluster's unreconcilable tracker.
+func CheckManagedResourceImmutableConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
 	if currentCluster.GetCouchbaseCluster().Spec.Paused {
-		return nil, nil
+		return nil
 	}
 
-	bucketErrs, failedBuckets := validateBucketsImmutableFields(currentCluster)
-	errs = append(errs, bucketErrs...)
+	errs = append(errs, validateBucketsImmutableFields(currentCluster)...)
 	errs = append(errs, validateReplicationsImmutableFields(currentCluster)...)
 	errs = append(errs, validateBackupsImmutableFields(currentCluster)...)
 	errs = append(errs, validateAutoscalersImmutableField(currentCluster)...)
 
-	return errs, failedBuckets
+	return errs
 }
 
 func validateAutoscalersImmutableField(currentCluster *cluster.Cluster) []error {
@@ -116,12 +148,10 @@ func validateAutoscalersImmutableField(currentCluster *cluster.Cluster) []error 
 	}
 
 	for current, update := range autoscalerUpdates {
-		if err := validationv2.CheckImmutableFieldsAutoscaler(current, update); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseAutoscalers(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), update, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := validationv2.CheckImmutableFieldsAutoscaler(current, update); isSpecInvalid(err) {
+			currentCluster.Unreconcilable().Mark(
+				unreconcilable.Ref{Kind: couchbasev2.AutoscalerCRDResourceKind, Name: update.Name},
+				unreconcilable.ReasonImmutableFieldChanged, err.Error())
 
 			errs = append(errs, err)
 		}
@@ -143,12 +173,10 @@ func validateBackupsImmutableFields(currentCluster *cluster.Cluster) []error {
 	}
 
 	for actual, update := range backupUpdates {
-		if err := validationv2.CheckImmutableFieldsBackup(actual, update); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&update.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := currentCluster.GetK8sClient().CouchbaseClient.CouchbaseV2().CouchbaseBackups(currentCluster.GetCouchbaseCluster().Namespace).Update(ctx.Background(), update, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := validationv2.CheckImmutableFieldsBackup(actual, update); isSpecInvalid(err) {
+			currentCluster.Unreconcilable().Mark(
+				unreconcilable.Ref{Kind: couchbasev2.BackupCRDResourceKind, Name: update.Name},
+				unreconcilable.ReasonImmutableFieldChanged, err.Error())
 
 			errs = append(errs, err)
 		}
@@ -213,18 +241,16 @@ func validateReplicationsImmutableFields(currentCluster *cluster.Cluster) []erro
 	return errs
 }
 
-func validateBucketsImmutableFields(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+func validateBucketsImmutableFields(currentCluster *cluster.Cluster) []error {
 	var errs []error
-
-	failedBuckets := make(map[string]bool)
 
 	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
 		if checkIsMemberError(err) {
-			return nil, failedBuckets
+			return nil
 		}
 
-		return append(errs, err), failedBuckets
+		return append(errs, err)
 	}
 
 	namer := &bucketNamer{
@@ -244,28 +270,31 @@ func validateBucketsImmutableFields(currentCluster *cluster.Cluster) ([]error, m
 			continue
 		}
 
-		if err := validator.CheckImmutableFields(oldBucket, newBucket); isValidationError(err) {
+		if err := validator.CheckImmutableFields(oldBucket, newBucket); isSpecInvalid(err) {
 			errs = append(errs, err)
-			failedBuckets[update.BucketName] = true
+			currentCluster.Unreconcilable().MarkBucket(update.BucketName,
+				unreconcilable.ReasonImmutableFieldChanged, err.Error())
 		}
 	}
 
-	return errs, failedBuckets
+	return errs
 }
 
-func CheckManagedResourceChangeConstraints(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+// CheckManagedResourceChangeConstraints validates dependent-resource updates
+// against the current state, marking every offender into the cluster's
+// unreconcilable tracker.
+func CheckManagedResourceChangeConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error
 
 	if currentCluster.GetCouchbaseCluster().Spec.Paused {
-		return nil, nil
+		return nil
 	}
 
-	rv := &reconcileValidator{v: currentCluster.GetValidator(), k8s: currentCluster.GetK8sClient()}
+	rv := &reconcileValidator{v: currentCluster.GetValidator(), k8s: currentCluster.GetK8sClient(), tracker: currentCluster.Unreconcilable()}
 
-	bucketErrs, failedBuckets := rv.validateBucketsChangeConstraints(currentCluster)
-	errs = append(errs, bucketErrs...)
+	errs = append(errs, rv.validateBucketsChangeConstraints(currentCluster)...)
 
-	return errs, failedBuckets
+	return errs
 }
 
 func (rv *reconcileValidator) CheckClusterChangeConstraints(currentCluster, updatedCluster *couchbasev2.CouchbaseCluster) error {
@@ -281,10 +310,8 @@ func (rv *reconcileValidator) CheckClusterChangeConstraints(currentCluster, upda
 }
 
 //nolint:gocognit
-func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *cluster.Cluster) []error {
 	var errs []error
-
-	failedBuckets := make(map[string]bool)
 
 	namer := &bucketNamer{
 		c: currentCluster,
@@ -293,10 +320,10 @@ func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *c
 	updateBuckets, err := currentCluster.GetBucketsToUpdate()
 	if err != nil {
 		if checkIsMemberError(err) {
-			return nil, failedBuckets
+			return nil
 		}
 
-		return append(errs, err), failedBuckets
+		return append(errs, err)
 	}
 
 	for actual, update := range updateBuckets {
@@ -321,16 +348,18 @@ func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *c
 				ns := currentCluster.GetCouchbaseCluster().Namespace
 				t1.Namespace = ns
 				t2.Namespace = ns
-				if _, err := validationv2.CheckChangeConstraintsBucket(rv.v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
+				if _, err := validationv2.CheckChangeConstraintsBucket(rv.v, t1, t2, currentCluster.GetCouchbaseCluster()); isSpecInvalid(err) {
 					errs = append(errs, err)
-					failedBuckets[update.BucketName] = true
+					currentCluster.Unreconcilable().MarkBucket(update.BucketName,
+						unreconcilable.ReasonValidationFailed, err.Error())
 				}
 			}
 		case *couchbasev2.CouchbaseEphemeralBucket:
 			if t2, ok := newBucket.(*couchbasev2.CouchbaseEphemeralBucket); ok {
-				if err := validationv2.CheckChangeConstraintsEphemeralBucket(rv.v, t1, t2, currentCluster.GetCouchbaseCluster()); isValidationError(err) {
+				if err := validationv2.CheckChangeConstraintsEphemeralBucket(rv.v, t1, t2, currentCluster.GetCouchbaseCluster()); isSpecInvalid(err) {
 					errs = append(errs, err)
-					failedBuckets[update.BucketName] = true
+					currentCluster.Unreconcilable().MarkBucket(update.BucketName,
+						unreconcilable.ReasonValidationFailed, err.Error())
 				}
 			}
 
@@ -340,7 +369,7 @@ func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *c
 		}
 	}
 
-	return errs, failedBuckets
+	return errs
 }
 
 // reconcileValidator bundles the cluster's pre-initialised validator with its k8s
@@ -350,6 +379,18 @@ func (rv *reconcileValidator) validateBucketsChangeConstraints(currentCluster *c
 type reconcileValidator struct {
 	v   *types.Validator
 	k8s *client.Client
+
+	// tracker is the owning cluster's unreconcilable tracker. It is nil on the
+	// paths that validate the CouchbaseCluster itself rather than its dependent
+	// resources, and the tracker's methods are happy to be called anyway.
+	tracker *unreconcilable.Tracker
+}
+
+// markUnreconcilable records a constraint-validation failure against the
+// resource that caused it, and suppresses that resource for the rest of the
+// cycle.
+func (rv *reconcileValidator) markUnreconcilable(kind, name string, err error) {
+	rv.tracker.Mark(unreconcilable.Ref{Kind: kind, Name: name}, unreconcilable.ReasonValidationFailed, err.Error())
 }
 
 func CheckCouchbaseClusterResource(v *types.Validator, c *client.Client, couchbase *couchbasev2.CouchbaseCluster) ([]string, error) {
@@ -362,6 +403,15 @@ func CheckClusterChangeConstraints(v *types.Validator, c *client.Client, current
 	return rv.CheckClusterChangeConstraints(current, updated)
 }
 
+// CheckManagedResourceConstraints validates each dependent resource's spec and
+// marks the offenders into the cluster's unreconcilable tracker.
+//
+// Buckets are deliberately reported but not marked. A bucket failing these
+// checks has never been skipped before, and marking it here would newly stop
+// reconciling buckets that work perfectly well today. Buckets get marked only
+// from the change-constraint and immutable-field entry points.
+//
+// The returned errors are for logging only. See validateManagedResources.
 func CheckManagedResourceConstraints(c *cluster.Cluster) []error {
 	var errs []error
 
@@ -369,7 +419,7 @@ func CheckManagedResourceConstraints(c *cluster.Cluster) []error {
 		return nil
 	}
 
-	rv := &reconcileValidator{v: c.GetValidator(), k8s: c.GetK8sClient()}
+	rv := &reconcileValidator{v: c.GetValidator(), k8s: c.GetK8sClient(), tracker: c.Unreconcilable()}
 
 	errs = append(errs, rv.validateBuckets(c)...)
 	errs = append(errs, rv.validateCouchbaseUsers()...)
@@ -392,14 +442,8 @@ func (rv *reconcileValidator) validateScopeGroups() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&scopeGroup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseScopeGroupResourceConstraints(scopeGroup); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&scopeGroup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseScopeGroups(scopeGroup.Namespace).Update(ctx.Background(), scopeGroup, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseScopeGroupResourceConstraints(validatable(scopeGroup)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -416,14 +460,8 @@ func (rv *reconcileValidator) validateScopes() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&scope.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseScopeResourceConstraints(scope); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&scope.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseScopes(scope.Namespace).Update(ctx.Background(), scope, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseScopeResourceConstraints(validatable(scope)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.ScopeCRDResourceKind, scope.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -440,14 +478,8 @@ func (rv *reconcileValidator) validateCollectionGroups() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&collectionGroup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseCollectionGroupResourceConstraints(collectionGroup); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&collectionGroup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseCollectionGroups(collectionGroup.Namespace).Update(ctx.Background(), collectionGroup, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseCollectionGroupResourceConstraints(validatable(collectionGroup)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -464,14 +496,8 @@ func (rv *reconcileValidator) validateCollections() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&collection.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseCollectionResourceConstraints(collection); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&collection.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseCollections(collection.Namespace).Update(ctx.Background(), collection, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseCollectionResourceConstraints(validatable(collection)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.CollectionCRDResourceKind, collection.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -488,14 +514,8 @@ func (rv *reconcileValidator) validateBackupRestores() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&backupRestore.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseBackupRestoreResourceConstraints(backupRestore); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&backupRestore.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(backupRestore.Namespace).Update(ctx.Background(), backupRestore, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseBackupRestoreResourceConstraints(validatable(backupRestore)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.BackupRestoreCRDResourceKind, backupRestore.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -532,14 +552,8 @@ func (rv *reconcileValidator) validateCouchbaseGroupsConstraints() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&group.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseGroupResourceConstraints(group); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&group.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseGroups(group.Namespace).Update(ctx.Background(), group, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseGroupResourceConstraints(validatable(group)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.GroupCRDResourceKind, group.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -556,14 +570,8 @@ func (rv *reconcileValidator) validateCouchbaseBackupsConstraints() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&backup.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseBackupResourceConstraints(backup); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&backup.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackups(backup.Namespace).Update(ctx.Background(), backup, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseBackupResourceConstraints(validatable(backup)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.BackupCRDResourceKind, backup.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -580,14 +588,8 @@ func (rv *reconcileValidator) validateCouchbaseUsers() []error {
 			continue
 		}
 
-		couchbaseutil.AddAnnotation(&user.ObjectMeta, constants.AnnotationDisableAdmissionController, "false")
-
-		if err := rv.checkCouchbaseUserResourceConstraints(user); isValidationError(err) {
-			couchbaseutil.AddAnnotation(&user.ObjectMeta, constants.AnnotationUnreconcilable, "true")
-
-			if _, updateErr := rv.k8s.CouchbaseClient.CouchbaseV2().CouchbaseUsers(user.Namespace).Update(ctx.Background(), user, metav1.UpdateOptions{}); updateErr != nil {
-				errs = append(errs, updateErr)
-			}
+		if err := rv.checkCouchbaseUserResourceConstraints(validatable(user)); isSpecInvalid(err) {
+			rv.markUnreconcilable(couchbasev2.UserCRDResourceKind, user.Name, err)
 
 			errs = append(errs, err)
 		}
@@ -604,7 +606,7 @@ func (rv *reconcileValidator) validateCouchbaseBuckets(buckets []*couchbasev2.Co
 			continue
 		}
 
-		if err := rv.checkCouchbaseBucketsConstraints(bucket, cluster); isValidationError(err) {
+		if err := rv.checkCouchbaseBucketsConstraints(bucket, cluster); isSpecInvalid(err) {
 			errs = append(errs, err)
 		}
 	}
@@ -620,7 +622,7 @@ func (rv *reconcileValidator) validateMemcachedBuckets(buckets []*couchbasev2.Co
 			continue
 		}
 
-		if err := rv.checkMemcachedBucketsConstraints(bucket, cluster); isValidationError(err) {
+		if err := rv.checkMemcachedBucketsConstraints(bucket, cluster); isSpecInvalid(err) {
 			errs = append(errs, err)
 		}
 	}
@@ -636,7 +638,7 @@ func (rv *reconcileValidator) validateEphemeralBuckets(buckets []*couchbasev2.Co
 			continue
 		}
 
-		if err := rv.checkEphemeralBucketConstraints(bucket, cluster); isValidationError(err) {
+		if err := rv.checkEphemeralBucketConstraints(bucket, cluster); isSpecInvalid(err) {
 			errs = append(errs, err)
 		}
 	}
@@ -742,39 +744,65 @@ func (rv *reconcileValidator) checkCouchbaseScopeGroupResourceConstraints(scopeG
 	return validationv2.CheckConstraintsScopeGroup(rv.v, scopeGroup)
 }
 
+// validatable returns a copy of a cached resource with the admission-controller
+// bypass annotation forced off.
+//
+// The constraint validators read the same annotation the admission controller
+// does. Without this, someone who set it merely to get a resource admitted
+// would quietly switch off the Operator's own judgement of that resource too.
+// Copying first keeps the override well away from the shared informer cache.
+func validatable[T interface{ DeepCopy() T }](resource T) T {
+	copied := resource.DeepCopy()
+
+	object, ok := any(copied).(metav1.Object)
+	if !ok {
+		return copied
+	}
+
+	annotations := object.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+
+	annotations[constants.AnnotationDisableAdmissionController] = "false"
+	object.SetAnnotations(annotations)
+
+	return copied
+}
+
 func shouldSkipValidation(annotations map[string]string) bool {
 	skipValidation, found := annotations[constants.AnnotationSkipDACValidation]
 	return found && strings.EqualFold(skipValidation, "true")
 }
 
 func checkIsMemberError(err error) bool {
-	return errors.Is(err, couchbaseutil.ErrMemberError)
+	return goerrors.Is(err, couchbaseutil.ErrMemberError)
 }
 
-// validateXDCRReplicationBuckets checks bucket existence for all XDCR replications during
-// the reconcile cycle. Instead of blocking the entire cluster, it returns a set of failed
-// replication names so only those replications are skipped during reconciliation.
-func ValidateXDCRReplicationBuckets(currentCluster *cluster.Cluster) ([]error, map[string]bool) {
+// ValidateXDCRReplicationBuckets checks that every XDCR replication's source
+// bucket exists, marking the ones that fail so that only they get skipped. Its
+// errors are for logging only.
+func ValidateXDCRReplicationBuckets(currentCluster *cluster.Cluster) []error {
 	cbCluster := currentCluster.GetCouchbaseCluster()
 
 	if !cbCluster.Spec.XDCR.Managed {
-		return nil, nil
+		return nil
 	}
 
-	rv := &reconcileValidator{v: currentCluster.GetValidator(), k8s: currentCluster.GetK8sClient()}
+	rv := &reconcileValidator{v: currentCluster.GetValidator(), k8s: currentCluster.GetK8sClient(), tracker: currentCluster.Unreconcilable()}
 
 	var errs []error
 
-	failedReplications := make(map[string]bool)
-
-	failedNames, err := validationv2.CheckConstraintXDCRReplicationBucketsForReconcile(rv.v, cbCluster)
+	failed, err := validationv2.CheckConstraintXDCRReplicationBucketsForReconcile(rv.v, cbCluster)
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	for _, name := range failedNames {
-		failedReplications[name] = true
+	for _, replication := range failed {
+		rv.tracker.Mark(
+			unreconcilable.Ref{Kind: replication.Kind, Name: replication.Name},
+			unreconcilable.ReasonDependencyMissing, replication.Message)
 	}
 
-	return errs, failedReplications
+	return errs
 }

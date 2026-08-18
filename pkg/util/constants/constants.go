@@ -158,7 +158,6 @@ const (
 	AnnotationPrometheusPort                  = "prometheus.io/port"
 	AnnotationPrometheusScheme                = "prometheus.io/scheme"
 	AnnotationReschedule                      = "cao.couchbase.com/reschedule"
-	AnnotationUnreconcilable                  = "dac.couchbase.com/unreconcilable"
 	AnnotationSkipDACValidation               = "dac.couchbase.com/skipvalidation"
 	AnnotationDisableAdmissionController      = "dac.couchbase.com/skipDAC"
 	AnnotationSkipClusterNameLengthValidation = "dac.couchbase.com/skipClusterNameLengthValidation"

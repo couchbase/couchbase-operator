@@ -15,7 +15,6 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 
@@ -135,8 +134,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		apiScope, found := c.k8s.CouchbaseScopes.Get(scope.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiScope.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.ScopeCRDResourceKind, scope.Name) {
 			continue
 		}
 
@@ -155,8 +153,7 @@ func (c *Cluster) reconcileScopes(bucket couchbasev2.AbstractBucket) error {
 			continue
 		}
 
-		apiScope, found := c.k8s.CouchbaseScopes.Get(scope)
-		if found && !couchbaseutil.ShouldReconcile(apiScope.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.ScopeCRDResourceKind, scope) {
 			continue
 		}
 
@@ -262,7 +259,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 				break
 			}
 
-			if !couchbaseutil.ShouldReconcile(scope.Annotations) {
+			if c.unreconcilable.IsSkipped(couchbasev2.ScopeCRDResourceKind, scope.Name) {
 				continue
 			}
 
@@ -280,7 +277,7 @@ func (c *Cluster) gatherScopesExplicit(bucket couchbasev2.AbstractBucket, scopes
 				break
 			}
 
-			if !couchbaseutil.ShouldReconcile(scopeGroup.Annotations) {
+			if c.unreconcilable.IsSkipped(couchbasev2.ScopeGroupCRDResourceKind, scopeGroup.Name) {
 				continue
 			}
 
@@ -331,10 +328,6 @@ func (c *Cluster) gatherScopesImplicit(bucket couchbasev2.AbstractBucket, scopes
 		}
 
 		var annotations = make(map[string]string)
-		if value, ok := scopeGroup.Annotations[constants.AnnotationUnreconcilable]; ok {
-			annotations[constants.AnnotationUnreconcilable] = value
-		}
-
 		for _, name := range scopeGroup.Spec.Names {
 			*scopes = append(*scopes, &couchbasev2.CouchbaseScope{
 				ObjectMeta: metav1.ObjectMeta{
@@ -447,8 +440,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 	// Delete collections using an exhaustive search.
 	for _, collection := range current.GetScope(scope.CouchbaseName()).Collections {
-		apiCollection, found := c.k8s.CouchbaseCollections.Get(collection.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiCollection.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.CollectionCRDResourceKind, collection.Name) {
 			continue
 		}
 
@@ -467,8 +459,7 @@ func (c *Cluster) reconcileCollections(bucket couchbasev2.AbstractBucket, scope 
 
 	// Create collections using an exhaustive search.
 	for _, collection := range collections {
-		apiCollectionSpec, found := c.k8s.CouchbaseCollections.Get(collection.Name)
-		if found && !couchbaseutil.ShouldReconcile(apiCollectionSpec.Annotations) {
+		if c.unreconcilable.IsSkipped(couchbasev2.CollectionCRDResourceKind, collection.Name) {
 			continue
 		}
 
@@ -583,7 +574,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 				continue
 			}
 
-			if !couchbaseutil.ShouldReconcile(collection.Annotations) {
+			if c.unreconcilable.IsSkipped(couchbasev2.CollectionCRDResourceKind, collection.Name) {
 				continue
 			}
 
@@ -597,7 +588,7 @@ func (c *Cluster) gatherCollectionsExplicit(scope *couchbasev2.CouchbaseScope, c
 				continue
 			}
 
-			if !couchbaseutil.ShouldReconcile(collectionGroup.Annotations) {
+			if c.unreconcilable.IsSkipped(couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name) {
 				continue
 			}
 
@@ -630,7 +621,7 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 	}
 
 	for _, collection := range c.k8s.CouchbaseCollections.List() {
-		if !couchbaseutil.ShouldReconcile(collection.GetAnnotations()) {
+		if c.unreconcilable.IsSkipped(couchbasev2.CollectionCRDResourceKind, collection.Name) {
 			continue
 		}
 
@@ -642,7 +633,7 @@ func (c *Cluster) gatherCollectionsImplicit(scope *couchbasev2.CouchbaseScope, c
 	}
 
 	for _, collectionGroup := range c.k8s.CouchbaseCollectionGroups.List() {
-		if !couchbaseutil.ShouldReconcile(collectionGroup.GetAnnotations()) {
+		if c.unreconcilable.IsSkipped(couchbasev2.CollectionGroupCRDResourceKind, collectionGroup.Name) {
 			continue
 		}
 

@@ -32,6 +32,14 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbasecollectiongroups-spec-maxttl,maxTTL>>: ""
   <<couchbasecollectiongroups-spec-names,names>>:
   - ""
+<<couchbasecollectiongroups-status,status>>:
+  <<couchbasecollectiongroups-status-conditions,conditions>>:
+  - <<couchbasecollectiongroups-status-conditions-lasttransitiontime,lastTransitionTime>>: ""
+    <<couchbasecollectiongroups-status-conditions-message,message>>: ""
+    <<couchbasecollectiongroups-status-conditions-observedgeneration,observedGeneration>>: 0
+    <<couchbasecollectiongroups-status-conditions-reason,reason>>: ""
+    <<couchbasecollectiongroups-status-conditions-status,status>>: ""
+    <<couchbasecollectiongroups-status-conditions-type,type>>: ""
 ----
 
 == couchbasecollectiongroups.apiVersion
@@ -139,3 +147,121 @@ collection group must specify at least one collection name.
 Any collection names specified must be unique.
 Collection names must be 1-251 characters in length, contain only [a-zA-Z0-9_-%]
 and not start with either _ or %.
+
+== couchbasecollectiongroups.status
+
+=== Constraints
+
+*Type*: `object`
+
+=== Description
+
+Status defines the observed state of the resource.
+
+=== couchbasecollectiongroups.status.conditions
+
+==== Constraints
+
+*Type*: `[]object`
+
+==== Description
+
+Conditions is the set of status conditions for this resource.
+A resource
+selected by more than one CouchbaseCluster carries one entry per cluster,
+each identified by a prefix on the condition message.
+
+=== couchbasecollectiongroups.status.conditions.lastTransitionTime
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+==== Description
+
+lastTransitionTime is the last time the condition transitioned from one status to another.
+This should be when the underlying condition changed.
+If that is not known, then using the time when the API field changed is acceptable.
+
+=== couchbasecollectiongroups.status.conditions.message
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `32768`
+
+==== Description
+
+message is a human readable message indicating details about the transition.
+This may be an empty string.
+
+=== couchbasecollectiongroups.status.conditions.observedGeneration
+
+==== Constraints
+
+*Type*: `integer`
+
+*Minimum*: `0`
+
+==== Description
+
+observedGeneration represents the .metadata.generation that the condition was set based upon.
+For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+with respect to the current state of the instance.
+
+=== couchbasecollectiongroups.status.conditions.reason
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Minimum Length*: `1`
+
+*Maximum Length*: `1024`
+
+*Pattern (Regular Expression)*: `^[A-Za-z]([A-Za-z0-9_,:]\*[A-Za-z0-9_])?$`
+
+==== Description
+
+reason contains a programmatic identifier indicating the reason for the condition's last transition.
+Producers of specific condition types may define expected values and meanings for this field,
+and whether the values are considered a guaranteed API.
+The value should be a CamelCase string.
+This field may not be empty.
+
+=== couchbasecollectiongroups.status.conditions.status
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Enumerations*: `True, False, Unknown`
+
+==== Description
+
+status of the condition, one of True, False, Unknown.
+
+=== couchbasecollectiongroups.status.conditions.type
+
+==== Constraints
+
+*Required*
+
+*Type*: `string`
+
+*Maximum Length*: `316`
+
+*Pattern (Regular Expression)*: `^([a-z0-9]([-a-z0-9]\*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]\*[a-z0-9])?)\*/)?(([A-Za-z0-9][-A-Za-z0-9_.]\*)?[A-Za-z0-9])$`
+
+==== Description
+
+type of condition in CamelCase or in foo.example.com/CamelCase.

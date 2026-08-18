@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/couchbase/couchbase-operator/pkg/metrics"
-	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -121,16 +120,6 @@ func MemberOnVersion(clusterMembers MemberSet, targetMemberName, targetVersion s
 	}
 
 	return false
-}
-
-func ShouldReconcile(annotations map[string]string) bool {
-	if v, ok := annotations[constants.AnnotationUnreconcilable]; ok {
-		if v == "true" {
-			return false
-		}
-	}
-
-	return true
 }
 
 func AddAnnotation(meta *metav1.ObjectMeta, key, value string) {

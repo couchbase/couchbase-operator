@@ -33,6 +33,7 @@ type CouchbaseBucketsGetter interface {
 type CouchbaseBucketInterface interface {
 	Create(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.CreateOptions) (*v2.CouchbaseBucket, error)
 	Update(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (*v2.CouchbaseBucket, error)
+	UpdateStatus(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (*v2.CouchbaseBucket, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseBucket, error)
@@ -121,6 +122,22 @@ func (c *couchbaseBuckets) Update(ctx context.Context, couchbaseBucket *v2.Couch
 		Namespace(c.ns).
 		Resource("couchbasebuckets").
 		Name(couchbaseBucket.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(couchbaseBucket).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *couchbaseBuckets) UpdateStatus(ctx context.Context, couchbaseBucket *v2.CouchbaseBucket, opts v1.UpdateOptions) (result *v2.CouchbaseBucket, err error) {
+	result = &v2.CouchbaseBucket{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("couchbasebuckets").
+		Name(couchbaseBucket.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseBucket).
 		Do(ctx).

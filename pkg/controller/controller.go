@@ -194,11 +194,9 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 			log.V(1).Info("Validation warnings.", "cluster", request.NamespacedName, "warnings", warnings)
 		}
 
-		errs := validationrunner.CheckManagedResourceConstraints(c)
-		for _, err := range errs {
-			log.Error(err, "Validation failed", "cluster", request.NamespacedName)
-			validationErrors = append(validationErrors, err.Error())
-		}
+		// Cluster-level errors are dropped on this path, since it returns below
+		// without ever reaching the code that projects them onto the condition.
+		validateManagedResources(c, request.NamespacedName.String())
 
 		// We should check change constraints if this is an existing cluster but the operator has restarted and therefore doesn't have an in-memory
 		// representation of the last state of the cluster. We will only validate the spec here.
@@ -237,42 +235,7 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 		validationFailed = true
 	}
 
-	changeErrs, failedBuckets := validationrunner.CheckManagedResourceChangeConstraints(c)
-	for _, err := range changeErrs {
-		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
-
-		validationErrors = append(validationErrors, err.Error())
-	}
-
-	immutableErrs, immutableFailedBuckets := validationrunner.CheckManagedResourceImmutableConstraints(c)
-	for _, err := range immutableErrs {
-		log.Error(err, "Validation failed.", "cluster", c.GetCouchbaseCluster().NamespacedName())
-
-		validationErrors = append(validationErrors, err.Error())
-	}
-
-	// Merge failed buckets from both validators into a single set.
-	if failedBuckets == nil {
-		failedBuckets = immutableFailedBuckets
-	} else {
-		for name := range immutableFailedBuckets {
-			failedBuckets[name] = true
-		}
-	}
-
-	c.SetFailedValidation("bucket", failedBuckets)
-
-	// Validate XDCR replication buckets, mark broken replications as failed
-	// so they are skipped during reconciliation without blocking the cluster.
-	// Errors are logged only, we do not append to validationErrors, otherwise the
-	// cluster's ClusterConditionError would be set and the cluster would be
-	// treated as failed even though the rest of it is healthy.
-	xdcrErrs, failedReplications := validationrunner.ValidateXDCRReplicationBuckets(c)
-	for _, err := range xdcrErrs {
-		log.Error(err, "XDCR validation failed; skipping affected replication, cluster reconciliation continues.", "cluster", c.GetCouchbaseCluster().NamespacedName())
-	}
-
-	c.SetFailedValidation("replication", failedReplications)
+	validationErrors = append(validationErrors, validateManagedResources(c, c.GetCouchbaseCluster().NamespacedName())...)
 
 	// Existing cluster updated
 	// TODO: We should just reload the cluster and aggregate other resources in
@@ -307,6 +270,48 @@ func (r *CouchbaseClusterReconciler) Reconcile(_ context.Context, request reconc
 	}
 
 	return requeueResult, nil
+}
+
+// validateManagedResources runs every dependent-resource validator, records the
+// failures against the cluster's unreconcilable tracker, and returns the subset
+// of errors that belong on the CouchbaseCluster's own error condition.
+//
+// Constraint-validation and XDCR errors are deliberately left out of that
+// subset. Their proper home is the per-resource condition, and aggregating them
+// would let a single invalid dependent resource drag down an otherwise
+// perfectly healthy cluster.
+func validateManagedResources(c *cluster.Cluster, clusterName string) []string {
+	tracker := c.Unreconcilable()
+
+	tracker.BeginCycle()
+
+	var clusterErrors []string
+
+	for _, err := range validationrunner.CheckManagedResourceConstraints(c) {
+		log.Error(err, "Resource validation failed; skipping affected resource, cluster reconciliation continues.", "cluster", clusterName)
+	}
+
+	for _, err := range validationrunner.CheckManagedResourceChangeConstraints(c) {
+		log.Error(err, "Validation failed.", "cluster", clusterName)
+
+		clusterErrors = append(clusterErrors, err.Error())
+	}
+
+	for _, err := range validationrunner.CheckManagedResourceImmutableConstraints(c) {
+		log.Error(err, "Validation failed.", "cluster", clusterName)
+
+		clusterErrors = append(clusterErrors, err.Error())
+	}
+
+	for _, err := range validationrunner.ValidateXDCRReplicationBuckets(c) {
+		log.Error(err, "XDCR validation failed; skipping affected replication, cluster reconciliation continues.", "cluster", clusterName)
+	}
+
+	// This runs before RunReconcile, so a resource marked during this cycle is
+	// also skipped during this cycle.
+	c.FlushUnreconcilable(context.Background())
+
+	return clusterErrors
 }
 
 func (r *CouchbaseClusterReconciler) reconcileFailedValidationCluster(c *cluster.Cluster, validationErr error) (reconcile.Result, error) {

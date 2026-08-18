@@ -33,6 +33,7 @@ type CouchbaseCollectionGroupsGetter interface {
 type CouchbaseCollectionGroupInterface interface {
 	Create(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.CreateOptions) (*v2.CouchbaseCollectionGroup, error)
 	Update(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (*v2.CouchbaseCollectionGroup, error)
+	UpdateStatus(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (*v2.CouchbaseCollectionGroup, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v2.CouchbaseCollectionGroup, error)
@@ -121,6 +122,22 @@ func (c *couchbaseCollectionGroups) Update(ctx context.Context, couchbaseCollect
 		Namespace(c.ns).
 		Resource("couchbasecollectiongroups").
 		Name(couchbaseCollectionGroup.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(couchbaseCollectionGroup).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *couchbaseCollectionGroups) UpdateStatus(ctx context.Context, couchbaseCollectionGroup *v2.CouchbaseCollectionGroup, opts v1.UpdateOptions) (result *v2.CouchbaseCollectionGroup, err error) {
+	result = &v2.CouchbaseCollectionGroup{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("couchbasecollectiongroups").
+		Name(couchbaseCollectionGroup.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(couchbaseCollectionGroup).
 		Do(ctx).
