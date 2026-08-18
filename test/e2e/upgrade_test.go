@@ -2312,7 +2312,7 @@ func TestNodeUpgradeOrder(t *testing.T) {
 	clusterSize := classSize * 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	// Create the cluster
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -2385,7 +2385,7 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	clusterSize := classSize * 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
 		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
