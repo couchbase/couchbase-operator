@@ -607,7 +607,7 @@ func TestUpgradeSupportable(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// When the cluster is ready, start the upgrade.  We expect the upgrading condition to exist,
 	// then the cluster to become healthy after upgrade has completed.
@@ -659,7 +659,7 @@ func TestUpgradeSupportableKillStatefulPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -795,7 +795,7 @@ func TestUpgradeSupportableKillStatelessPodOnCreate(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
@@ -856,7 +856,7 @@ func TestUpgradeSupportableKillStatelessPodOnRebalance(t *testing.T) {
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	cluster := clusterOptionsUpgrade().WithMixedTopology(mdsGroupSize).MustCreate(t, kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(mdsGroupSize).MustCreate(t, kubernetes)
 
 	// Runtime configuration.
 	victimName := couchbaseutil.CreateMemberName(cluster.Name, victimIndex)
