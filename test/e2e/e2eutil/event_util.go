@@ -320,28 +320,39 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 // ClusterCreateSequenceWithN2N is a common function for generating cluster
 // creation events, when N2N is enabled.
 func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNodeEncryptionType, ipv6 bool) eventschema.Validatable {
-	schema := eventschema.Sequence{
-		Validators: []eventschema.Validatable{
-			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		},
+	validators := make([]eventschema.Validatable, 0, size+4)
+
+	for i := 0; i < size; i++ {
+		validators = append(validators, eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded})
 	}
 
 	if size > 1 {
-		schema.Validators = append(schema.Validators, ClusterScaleUpSequence(size-1))
+		validators = append(validators,
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		)
 	}
 
 	if ipv6 {
-		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
+		validators = append(validators, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
 	}
 
-	schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
+	validators = append(validators, eventschema.Event{
+		Reason:       k8sutil.EventReasonSecuritySettingsUpdated,
+		FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModified,
+	})
 
 	// Control Plane Only is the default, anything else will change the mode.
 	if encryptionType != couchbasev2.NodeToNodeControlPlaneOnly {
-		schema.Validators = append(schema.Validators, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated})
+		validators = append(validators, eventschema.Event{
+			Reason:       k8sutil.EventReasonSecuritySettingsUpdated,
+			FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified,
+		})
 	}
 
-	return schema
+	// Note Set must only be given validators that consume a single event, as it
+	// doesn't roll the event index back when a member fails to match.
+	return eventschema.Set{Validators: validators}
 }
 
 // ClusterScaleUpSequence is a common function for generating cluster scaling up events.

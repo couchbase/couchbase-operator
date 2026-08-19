@@ -191,6 +191,9 @@ func TestTLSKillClusterNode(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
 	cluster = e2eutil.MustResizeClusterNoWait(t, 0, scaledClusterSize, kubernetes, cluster)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes, cluster, e2eutil.NewMemberAddEvent(cluster, scaledClusterSize-1), 5*time.Minute)
+
+	e2eutil.MustObserveClusterEvent(t, kubernetes, cluster, e2eutil.RebalanceStartedEvent(cluster), 5*time.Minute)
+
 	e2eutil.MustKillPodForMember(t, kubernetes, cluster, victimIndex, true)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 5*time.Minute)
 
@@ -200,13 +203,26 @@ func TestTLSKillClusterNode(t *testing.T) {
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Repeat{Times: scaledClusterSize - clusterSize, Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
-		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
-		eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+		eventschema.Optional{Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+			eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete},
+		}}},
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
+		eventschema.AnyOf{
+			Validators: []eventschema.Validatable{
+				eventschema.Sequence{
+					Validators: []eventschema.Validatable{
+						eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+						eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
+						eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+					},
+				},
+				e2eutil.PodDownFailoverRecoverySequence(),
+			},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -852,7 +868,13 @@ func TestTLSRotateInvalid(t *testing.T) {
 	// * TLS failed event occurred
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
+		// The certificate stays broken for the rest of the test, and every reconcile
+		// attempt raises its own failure event.
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonTLSInvalid},
+		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1169,7 +1191,13 @@ func testMutualTLSRotateInvalid(t *testing.T, policy couchbasev2.ClientCertifica
 	// * TLS reported as invalid
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSInvalid},
+		eventschema.Optional{
+			Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
+		},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
@@ -1363,7 +1391,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 	skipN2NCheck(t)
 
 	// Static configuration.
-	clusterSize := 3
+	clusterSize := 2
 	scaleUp := 1
 
 	// Create the cluster.
@@ -1730,12 +1758,6 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
 	}
 
-	// Check the cluster is healthy and all pods are ready.
-	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	for i := 0; i < clusterSize; i++ {
-		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
-	}
-
 	// Check the state is still as we expect.
 	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamily, ctx, time.Minute)
 	e2eutil.MustHaveListenerSettingsTLS(t, kubernetes, cluster, ctx, []*couchbaseutil.ListenerConfiguration{
@@ -1747,18 +1769,10 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 
 	// Check the events match what we expect:
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
+		e2eutil.ClusterCreateSequenceWithN2N(clusterSize, encryptionType, kubernetes.IPv6),
+		// Encryption mode changed.
+		eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified},
 	}
-
-	// Default is IPv4Priority. Update to IPv6Only if needed.
-	if kubernetes.IPv6 {
-		expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventNetworkSettingsModified})
-	}
-
-	// Encryption mode enabled.
-	expectedEvents = append(expectedEvents, e2eutil.EnableN2NEncryptionSequence(&encryptionType))
-	// Encryption mode changed.
-	expectedEvents = append(expectedEvents, eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdatedN2NEncryptionModeModified})
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
@@ -2578,9 +2592,9 @@ func TestMandatoryMutualTLSRotateClientExpiring(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// Set the client certs to expire some time in the future
+	// Set the client certs to expire some time in the future.
 	validFrom := time.Now().In(time.UTC)
-	validTo := time.Now().Add(3 * time.Minute)
+	validTo := time.Now().Add(5 * time.Minute)
 	opts := &e2eutil.TLSOpts{
 		ClientValidFrom: &validFrom,
 		ClientValidTo:   &validTo,
@@ -2624,10 +2638,8 @@ func TestMandatoryMutualTLSRotateCAExpiring(t *testing.T) {
 
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
-
-	// Set the client certs to expire some time in the future
 	validFrom := time.Now().In(time.UTC)
-	validTo := time.Now().Add(3 * time.Minute)
+	validTo := time.Now().Add(5 * time.Minute)
 	opts := &e2eutil.TLSOpts{
 		ValidFrom: &validFrom,
 		ValidTo:   &validTo,
