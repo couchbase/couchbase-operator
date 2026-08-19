@@ -673,7 +673,12 @@ func generateConsoleService(cluster *couchbasev2.CouchbaseCluster) *v1.Service {
 			service.Spec = *cluster.Spec.Networking.AdminConsoleServiceTemplate.Spec
 		}
 	} else {
-		service.Spec.Type = cluster.Spec.Networking.AdminConsoleServiceType
+		adminConsoleServiceType := cluster.Spec.Networking.AdminConsoleServiceType
+		service.Spec.Type = v1.ServiceTypeNodePort
+
+		if adminConsoleServiceType != "" {
+			service.Spec.Type = adminConsoleServiceType
+		}
 	}
 
 	// Apply deprecated fields, these have precedence for backwards compatibility,

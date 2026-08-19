@@ -569,7 +569,7 @@ func TestXDCRSourceNodeDown(t *testing.T) {
 	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 	e2eutil.MustKillPodForMember(t, kubernetes1, sourceCluster, nodeToKill, true)
-	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreateWithRetry(t, kubernetes1, sourceCluster, 5*time.Minute)
 	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, e2eutil.RebalanceStartedEvent(sourceCluster), 2*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 5*time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
@@ -765,9 +765,6 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		// On a single node cluster the bucket created event is not folded into the
-		// create sequence, so we allow it here between cluster create and XDCR setup.
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationRemoved},
@@ -775,7 +772,6 @@ func TestXDCRDeleteReplication(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
@@ -824,9 +820,6 @@ func TestXDCRRemoveRemoteClusterFromSpec(t *testing.T) {
 	expectedEvents1 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		// On a single node cluster the bucket created event is not folded into the
-		// create sequence, so we allow it here between cluster create and XDCR setup.
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationRemoved},
@@ -835,7 +828,6 @@ func TestXDCRRemoveRemoteClusterFromSpec(t *testing.T) {
 	expectedEvents2 := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)

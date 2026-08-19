@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 )
 
@@ -255,5 +256,53 @@ func TestGetTotalPVCMemoryByApp(t *testing.T) {
 		if result != testcase.expected {
 			t.Errorf("expected total PVC memory in use by %s to be %d, got %d", testcase.appLabel, testcase.expected, result)
 		}
+	}
+}
+
+// TestGenerateConsoleServiceType checks the admin console service type resolution.
+// An unset adminConsoleServiceType must fall back to NodePort, an explicit type must
+// be followed, and adminConsoleServiceTemplate must take precedence over both.
+func TestGenerateConsoleServiceType(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     couchbasev2.CouchbaseClusterNetworkingSpec
+		expected v1.ServiceType
+	}{
+		{
+			name:     "unset defaults to NodePort",
+			spec:     couchbasev2.CouchbaseClusterNetworkingSpec{ExposeAdminConsole: true},
+			expected: v1.ServiceTypeNodePort,
+		},
+		{
+			name: "explicit LoadBalancer is honoured",
+			spec: couchbasev2.CouchbaseClusterNetworkingSpec{
+				ExposeAdminConsole:      true,
+				AdminConsoleServiceType: v1.ServiceTypeLoadBalancer,
+			},
+			expected: v1.ServiceTypeLoadBalancer,
+		},
+		{
+			name: "template takes precedence over the default",
+			spec: couchbasev2.CouchbaseClusterNetworkingSpec{
+				ExposeAdminConsole: true,
+				AdminConsoleServiceTemplate: &couchbasev2.ServiceTemplateSpec{
+					Spec: &v1.ServiceSpec{Type: v1.ServiceTypeClusterIP},
+				},
+			},
+			expected: v1.ServiceTypeClusterIP,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				ObjectMeta: v12.ObjectMeta{Name: "test", Namespace: "default"},
+				Spec:       couchbasev2.ClusterSpec{Networking: tc.spec},
+			}
+
+			if got := generateConsoleService(cluster).Spec.Type; got != tc.expected {
+				t.Errorf("expected admin console service type %q, got %q", tc.expected, got)
+			}
+		})
 	}
 }

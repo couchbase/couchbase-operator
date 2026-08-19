@@ -84,6 +84,13 @@ func getRemoteUUIDAndHostGeneric(kubernetes *types.Cluster, cluster *couchbasev2
 		return "", "", fmt.Errorf("admin service port not exposed")
 	}
 
+	// A ClusterIP service reports a zero NodePort. Catch it here rather than
+	// building a ":0" hostname, which the remote cluster accepts but can never
+	// connect to, turning this into a XDCR pre-check timeout.
+	if nodePort == 0 {
+		return "", "", fmt.Errorf("admin service %s is not a NodePort service, cannot derive an external address", svc.Name)
+	}
+
 	nodes, err := kubernetes.KubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return "", "", err

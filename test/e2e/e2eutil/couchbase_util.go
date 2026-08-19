@@ -281,6 +281,23 @@ func (d *DocumentSet) MustCreate(t *testing.T, kubernetes *types.Cluster, cluste
 	}
 }
 
+// MustCreateWithRetry creates the documents, retrying until the timeout expires.
+// A write issued just after a member has been taken down can fail with a dropped
+// connection while the SDK is still learning the new topology.  Document IDs are
+// fixed for the lifetime of a DocumentSet, so a retry re-upserts the same keys and
+// leaves the resulting document count unchanged.
+func (d *DocumentSet) MustCreateWithRetry(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) {
+	d.test = t
+	d.kubernetes = kubernetes
+	d.cluster = cluster
+
+	if err := retryutil.RetryFor(timeout, func() error {
+		return addDocs(d)
+	}); err != nil {
+		Die(d.test, err)
+	}
+}
+
 // Validates the contents of the bucket from the doc set
 // against the expected contents.
 // This assumes that the data has been add via the addDocs function

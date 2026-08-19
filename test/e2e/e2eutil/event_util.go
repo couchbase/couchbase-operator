@@ -268,9 +268,16 @@ func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.Exposed
 			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
-			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 		)
 	}
+
+	// A single node cluster never rebalances on creation, so the bucket is created
+	// straight after the member is added rather than around a rebalance. Callers
+	// that pre create a bucket see the event here either way, so allow it for every
+	// size.
+	schema.Validators = append(schema.Validators,
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+	)
 
 	return schema
 }
