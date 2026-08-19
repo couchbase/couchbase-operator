@@ -1350,20 +1350,29 @@ func TestDeltaRecovery(t *testing.T) {
 	clusterSize := 3
 	numOfDocs := f.DocsCount
 
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
 
 	// This config triggers unexpected counter errors during upgrade
 	kubernetes.DisableResourceAllocation = true
-	cluster.Spec.Servers[0].Services = []couchbasev2.Service{
+	services := []couchbasev2.Service{
 		couchbasev2.DataService,
 		couchbasev2.IndexService,
 		couchbasev2.QueryService,
 		couchbasev2.SearchService,
 		couchbasev2.AnalyticsService,
-		couchbasev2.EventingService,
 	}
+
+	// While the cluster is in mixed mode the eventing nodes do not agree on which nodes are active, so
+	// the server keeps reporting that eventing needs a rebalance and the rebalance check fails. Only
+	// upgrades that cross 8.0.1 see this, so those run without eventing.
+	if !e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.1") {
+		services = append(services, couchbasev2.EventingService)
+	}
+
+	cluster.Spec.Servers[0].Services = services
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

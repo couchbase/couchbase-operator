@@ -497,11 +497,15 @@ func (c *Cluster) normalizePodSpecsForComparison(actualSpec, requestedSpec *v1.P
 //
 // Under an override every server class declares its zone via a topology.kubernetes.io/zone node
 // selector (required; see the override validator), so the requested pod always carries the zone and
-// a plain zone comparison covers every case:
+// a zone comparison covers every case:
 //   - migrating in (no zone yet):  "" != "us-east-1a"  → swap
 //   - same AZ, PG reshuffle:       "az-a" != "az-a"    → in-place
 //   - cross-AZ (re-pinned class):  "az-b" != "az-a"    → swap
 //   - no server groups (both ""):  "" != ""            → in-place
+//   - zone selector removed:       "az-a" vs ""        → in-place
+//
+// The last case is not a plain comparison, an empty requested zone means the spec no longer asks for
+// a zone, which is not the same as asking the pod to move.
 func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.PersistentVolumeClaimState) bool {
 	if pvcState == nil {
 		return false
@@ -514,7 +518,14 @@ func detectZoneChange(actualSpec, requestedSpec *v1.PodSpec, pvcState *k8sutil.P
 		return false
 	}
 
-	return actualSpec.NodeSelector[constants.ServerGroupLabel] != requestedSpec.NodeSelector[constants.ServerGroupLabel]
+	// The spec asks for no zone, so the pod may run anywhere and the zone it is already in is fine.
+	// Keep the pod and its volume where they are. Only a different zone means it has to move.
+	requestedZone := requestedSpec.NodeSelector[constants.ServerGroupLabel]
+	if requestedZone == "" {
+		return false
+	}
+
+	return actualSpec.NodeSelector[constants.ServerGroupLabel] != requestedZone
 }
 
 // rollbackDetected reports whether spec has been reverted mid-upgrade.
