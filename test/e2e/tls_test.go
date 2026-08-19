@@ -1930,11 +1930,22 @@ func TestTLSEditSettings(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Settings edited
+	// Each setting restarts the server's TLS listeners, so the next call the operator makes can fail
+	// while a pod is still coming back up. It retries and succeeds, so allow a failed reconcile after
+	// each update instead of expecting five clean ones in a row.
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{
-			Times:     5,
-			Validator: eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdated},
+			Times: 5,
+			Validator: eventschema.Sequence{
+				Validators: []eventschema.Validatable{
+					eventschema.Event{Reason: k8sutil.EventReasonSecuritySettingsUpdated, FuzzyMessage: k8sutil.SecuritySettingUpdated},
+					eventschema.Optional{Validator: eventschema.RepeatAtLeast{
+						Times:     1,
+						Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed},
+					}},
+				},
+			},
 		},
 	}
 

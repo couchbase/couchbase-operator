@@ -457,6 +457,20 @@ func (o *ClusterOptions) WithMixedTopology(size int) *ClusterOptions {
 	return o
 }
 
+// WithMixedTopology defines a cluster as having persistent volumes for
+// data, where pertinent, and logs elsewhere.  It has two server classes --
+// stateful and stateless -- with data/index and query enabled
+// respectively.  Each server class is of the specified size.
+func (o *ClusterOptions) WithMixedTopologyNoEventing(size int) *ClusterOptions {
+	topology := e2espec.MixedTopologyNoEventing.DeepCopy()
+	topology[0].Size = size
+	topology[1].Size = size
+
+	o.Options.Topology = topology
+
+	return o
+}
+
 // WithSplitEphemeralTopology is intended to split the data, index and query
 // services across separate server classes. Primarily to test data in isolation
 // from index which none of the other topologies do.

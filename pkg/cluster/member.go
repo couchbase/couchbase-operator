@@ -546,17 +546,18 @@ func (c *Cluster) waitForPodMainContainerReady(member couchbaseutil.Member, time
 	}
 }
 
-// checkTargetPodsExist checks if target pod(s) still exist and are not terminating.
-// Returns an error if any target pod is missing or being deleted.
-func (c *Cluster) checkTargetPodsExist(target interface{}) error {
+// checkTargetPodAvailable checks that there is still a target pod to make the call
+// against. Returns an error when nothing callable is left.
+func (c *Cluster) checkTargetPodAvailable(target interface{}) error {
 	switch t := target.(type) {
 	case couchbaseutil.MemberSet:
 		for name := range t {
-			pod, exists := c.k8s.Pods.Get(name)
-			if !exists || pod.DeletionTimestamp != nil {
-				return fmt.Errorf("%w: target pod %s no longer exists or terminating", errors.ErrPodNotFound, name)
+			if pod, exists := c.k8s.Pods.Get(name); exists && pod.DeletionTimestamp == nil {
+				return nil
 			}
 		}
+
+		return fmt.Errorf("%w: no target pod out of %v still exists", errors.ErrPodNotFound, t.Names())
 	case couchbaseutil.Member:
 		pod, exists := c.k8s.Pods.Get(t.Name())
 		if !exists || pod.DeletionTimestamp != nil {
@@ -615,10 +616,9 @@ func (c *Cluster) AddNodeWithPodReadyCheck(member couchbaseutil.Member, url stri
 
 	// Try immediately first, then on each tick
 	for {
-		// Check if target pod(s) still exist
-		// Target pods are existing cluster nodes that won't be recreated automatically.
-		// If user manually deletes them, fail immediately to unblock reconciler.
-		if err := c.checkTargetPodsExist(target); err != nil {
+		// Targets are existing cluster nodes that won't be recreated automatically, so
+		// if the user deletes all of them fail fast rather than spin.
+		if err := c.checkTargetPodAvailable(target); err != nil {
 			return err
 		}
 

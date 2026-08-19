@@ -13,6 +13,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,6 +97,24 @@ func labelNodes(t *testing.T, k8s *types.Cluster, nodes []*corev1.Node, key stri
 	}
 }
 
+// isEKS returns true if the cluster infrastructure matches AWS EKS. This is used in tests
+// where the test behavior is different on EKS vs kind.
+func isEKS(nodes []*corev1.Node) bool {
+	for _, node := range nodes {
+		// EKS nodes use the "aws://" provider scheme (e.g., aws:///us-east-1a/i-xxxxxx)
+		if strings.HasPrefix(node.Spec.ProviderID, "aws://") {
+			return true
+		}
+		// Alternatively, inspect well-known EKS node group labels
+		for labelKey := range node.Labels {
+			if strings.HasPrefix(labelKey, "eks.amazonaws.com") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // addDefaultPersistentVolume gives the first server class a default persistent volume claim, so PVCs
 // exist. detectZoneChange short-circuits to in-place when there is no volume (pvcState == nil), so a
 // swap-vs-in-place test MUST use persistent storage.
@@ -173,6 +192,94 @@ func memberNames(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Couchbas
 	return names
 }
 
+// setupSingleAZTopology prepares the environment for single-AZ tests, returning filtered nodes,
+// the active zone string, and a cleanup function to restore labels.
+func setupSingleAZTopology(t *testing.T, k8s *types.Cluster, nodes []*corev1.Node) ([]*corev1.Node, string, func()) {
+	var zone string
+	var cleanups []func()
+
+	if isEKS(nodes) {
+		if len(nodes) > 0 {
+			zone = nodes[0].Labels[constants.FailureDomainZoneLabel]
+		}
+		var zoneNodes []*corev1.Node
+		for _, n := range nodes {
+			if n.Labels[constants.FailureDomainZoneLabel] == zone {
+				zoneNodes = append(zoneNodes, n)
+			}
+		}
+		nodes = zoneNodes
+	} else {
+		zone = overrideZone
+		cleanups = append(cleanups, labelNodes(t, k8s, nodes, constants.FailureDomainZoneLabel, []string{zone}))
+	}
+
+	cleanup := func() {
+		for i := len(cleanups) - 1; i >= 0; i-- {
+			cleanups[i]()
+		}
+	}
+
+	return nodes, zone, cleanup
+}
+
+// setupMultiAZTopology prepares the cluster for multi-AZ swap testing, validating zone counts
+// and returning target zones alongside a labeling cleanup function.
+func setupMultiAZTopology(t *testing.T, k8s *types.Cluster, nodes []*corev1.Node) (string, string, func()) {
+	var zoneA, zoneB string
+	var cleanups []func()
+
+	if isEKS(nodes) {
+		zoneMap := map[string]bool{}
+		for _, n := range nodes {
+			if z := n.Labels[constants.FailureDomainZoneLabel]; z != "" {
+				zoneMap[z] = true
+			}
+		}
+		var actualZones []string
+		for z := range zoneMap {
+			actualZones = append(actualZones, z)
+		}
+
+		if len(actualZones) < 2 {
+			t.Skip("Multi-AZ swap test requires an EKS cluster provisioned across at least 2 Availability Zones")
+		}
+		zoneA, zoneB = actualZones[0], actualZones[1]
+
+		var nodesA, nodesB []*corev1.Node
+		for _, n := range nodes {
+			switch n.Labels[constants.FailureDomainZoneLabel] {
+			case zoneA:
+				nodesA = append(nodesA, n)
+			case zoneB:
+				nodesB = append(nodesB, n)
+			}
+		}
+
+		if len(nodesA) == 0 || len(nodesB) == 0 {
+			t.Skip("Need at least one node in each AWS AZ to perform multi-AZ swap testing")
+		}
+
+		cleanups = append(cleanups, labelNodes(t, k8s, nodesA, overrideLabelKey, []string{"pg-a"}))
+		cleanups = append(cleanups, labelNodes(t, k8s, nodesB, overrideLabelKey, []string{"pg-b"}))
+	} else {
+		if len(nodes) < 2 {
+			t.Skipf("need >=2 schedulable nodes (one per simulated zone), have %d", len(nodes))
+		}
+		zoneA, zoneB = "za", "zb"
+		cleanups = append(cleanups, labelNodes(t, k8s, nodes, constants.FailureDomainZoneLabel, []string{zoneA, zoneB}))
+		cleanups = append(cleanups, labelNodes(t, k8s, nodes, overrideLabelKey, []string{"pg-a", "pg-b"}))
+	}
+
+	cleanup := func() {
+		for i := len(cleanups) - 1; i >= 0; i-- {
+			cleanups[i]()
+		}
+	}
+
+	return zoneA, zoneB, cleanup
+}
+
 // TestServerGroupOverrideSchedulesByCustomLabel verifies that, with serverGroupsLabelOverride set,
 // the operator stripes pods across the override label (placement groups) instead of the default
 // topology.kubernetes.io/zone label (single AZ — every class declares the same zone).
@@ -183,8 +290,11 @@ func TestServerGroupOverrideSchedulesByCustomLabel(t *testing.T) {
 	defer cleanup()
 
 	nodes := schedulableNodes(t, kubernetes)
+	nodes, zone, topoCleanup := setupSingleAZTopology(t, kubernetes, nodes)
+	defer topoCleanup()
+
 	if len(nodes) < 2 {
-		t.Skipf("need >=2 schedulable nodes to stripe across placement groups, have %d", len(nodes))
+		t.Skipf("need >=2 nodes in zone %s to stripe across placement groups, have %d", zone, len(nodes))
 	}
 
 	groupCount := 3
@@ -198,9 +308,6 @@ func TestServerGroupOverrideSchedulesByCustomLabel(t *testing.T) {
 	}
 
 	defer labelNodes(t, kubernetes, nodes, overrideLabelKey, groups)()
-	// The override pins the pod to its declared zone, so the nodes must carry it (cloud sets this
-	// automatically; in kind we label it ourselves).
-	defer labelNodes(t, kubernetes, nodes, constants.FailureDomainZoneLabel, []string{overrideZone})()
 
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -213,7 +320,7 @@ func TestServerGroupOverrideSchedulesByCustomLabel(t *testing.T) {
 	cluster.Spec.ServerGroups = groups
 	// The override requires every server class to declare its zone in the pod template.
 	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{Spec: corev1.PodSpec{
-		NodeSelector: map[string]string{constants.FailureDomainZoneLabel: overrideZone},
+		NodeSelector: map[string]string{constants.FailureDomainZoneLabel: zone},
 	}}
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -236,15 +343,24 @@ func TestServerGroupOverrideUpgradeIsInPlace(t *testing.T) {
 	framework.Requires(t, kubernetes).InplaceUpgradeable()
 
 	nodes := schedulableNodes(t, kubernetes)
-	if len(nodes) < 3 {
-		t.Skipf("need >=3 schedulable nodes to stripe across placement groups, have %d", len(nodes))
+	nodes, zone, topoCleanup := setupSingleAZTopology(t, kubernetes, nodes)
+	defer topoCleanup()
+
+	// Lower the baseline constraint to require at least 2 nodes for custom label striping
+	if len(nodes) < 2 {
+		t.Skipf("need >=2 nodes in zone %s to stripe across placement groups, have %d", zone, len(nodes))
 	}
 
-	groups := []string{"pg-0", "pg-1", "pg-2"}
+	groupCount := 3
+	if len(nodes) < groupCount {
+		groupCount = len(nodes)
+	}
+
+	groups := make([]string, groupCount)
+	for i := range groups {
+		groups[i] = fmt.Sprintf("pg-%d", i)
+	}
 	defer labelNodes(t, kubernetes, nodes, overrideLabelKey, groups)()
-	// The override pins the pod to its declared zone, so the nodes must carry it (cloud sets this
-	// automatically; in kind we label it ourselves).
-	defer labelNodes(t, kubernetes, nodes, constants.FailureDomainZoneLabel, []string{overrideZone})()
 
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
@@ -258,7 +374,7 @@ func TestServerGroupOverrideUpgradeIsInPlace(t *testing.T) {
 	cluster.Spec.ServerGroups = groups
 	// The override requires every server class to declare its zone in the pod template.
 	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{Spec: corev1.PodSpec{
-		NodeSelector: map[string]string{constants.FailureDomainZoneLabel: overrideZone},
+		NodeSelector: map[string]string{constants.FailureDomainZoneLabel: zone},
 	}}
 	addDefaultPersistentVolume(cluster)
 	useInPlaceUpgrade(cluster)
@@ -299,18 +415,14 @@ func TestServerGroupOverrideClassZoneChangeSwaps(t *testing.T) {
 	defer cleanup()
 
 	nodes := schedulableNodes(t, kubernetes)
-	if len(nodes) < 2 {
-		t.Skipf("need >=2 schedulable nodes (one per simulated zone), have %d", len(nodes))
-	}
 
-	// Round-robin both labels so node[0]=za/pg-a, node[1]=zb/pg-b, ... — aligned zone + PG.
-	defer labelNodes(t, kubernetes, nodes, constants.FailureDomainZoneLabel, []string{"za", "zb"})()
-	defer labelNodes(t, kubernetes, nodes, overrideLabelKey, []string{"pg-a", "pg-b"})()
+	// Dynamic topology extraction/setup (multi-AZ)
+	zoneA, zoneB, topoCleanup := setupMultiAZTopology(t, kubernetes, nodes)
+	defer topoCleanup()
 
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 
-	// Multi-AZ: per-class zone declared, per-class serverGroups.
 	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
@@ -319,27 +431,28 @@ func TestServerGroupOverrideClassZoneChangeSwaps(t *testing.T) {
 	cluster.Spec.ServerGroups = nil
 	cluster.Spec.Servers[0].ServerGroups = []string{"pg-a"}
 	cluster.Spec.Servers[0].Pod = &couchbasev2.PodTemplate{}
-	cluster.Spec.Servers[0].Pod.Spec.NodeSelector = map[string]string{constants.FailureDomainZoneLabel: "za"}
+
+	// Assigns the dynamic zone identifier discovered for zone A
+	cluster.Spec.Servers[0].Pod.Spec.NodeSelector = map[string]string{constants.FailureDomainZoneLabel: zoneA}
 	addDefaultPersistentVolume(cluster)
 	useInPlaceUpgrade(cluster)
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 	validateOverrideScheduling(t, kubernetes, cluster, []string{"pg-a"})
-	mustAllPodsInZone(t, kubernetes, cluster, "za")
+	mustAllPodsInZone(t, kubernetes, cluster, zoneA)
 
 	before := memberNames(t, kubernetes, cluster)
 
-	// Re-pin the class to zb / pg-b. The za volume can't follow → must swap-rebalance.
+	// Re-pin the class to zoneB / pg-b. The zoneA volume can't follow → must swap-rebalance.
 	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().
-		Replace("/spec/servers/0/pod/spec/nodeSelector", map[string]string{constants.FailureDomainZoneLabel: "zb"}).
+		Replace("/spec/servers/0/pod/spec/nodeSelector", map[string]string{constants.FailureDomainZoneLabel: zoneB}).
 		Replace("/spec/servers/0/serverGroups", []string{"pg-b"}), time.Minute)
 	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, corev1.ConditionTrue, cluster, 5*time.Minute)
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
 
 	validateOverrideScheduling(t, kubernetes, cluster, []string{"pg-b"})
-	mustAllPodsInZone(t, kubernetes, cluster, "zb")
+	mustAllPodsInZone(t, kubernetes, cluster, zoneB)
 
-	// Swap: old member ejected, new one created in zb — no overlap with the prior set.
 	after := memberNames(t, kubernetes, cluster)
 	for name := range after {
 		if before[name] {

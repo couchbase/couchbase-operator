@@ -164,6 +164,28 @@ var (
 		},
 	}
 
+	// MixedTopologyNoEventing is a more complex (aka we messed up) topology
+	// that allows recoverable data nodes, but ephemeral query ones.
+	MixedTopologyNoEventing = ClusterTopology{
+		{
+			Name: "stateful",
+			Services: []couchbasev2.Service{
+				couchbasev2.DataService,
+				couchbasev2.IndexService,
+			},
+			Persistence: PersistData,
+			VolumeSize:  "1Gi",
+		},
+		{
+			Name: "stateless",
+			Services: []couchbasev2.Service{
+				couchbasev2.QueryService,
+			},
+			Persistence: PersistLogs,
+			VolumeSize:  "1Gi",
+		},
+	}
+
 	// SplitEphemeralTopology is for testing where we want to cover the services split into
 	// separate server groups.
 	SplitEphemeralTopology = ClusterTopology{

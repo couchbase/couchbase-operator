@@ -343,6 +343,87 @@ func TestUpgradeRollback(t *testing.T) {
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)
 }
 
+// TestUpgradeRollbackConstrainedFailover rolls back an upgrade with the node failed
+// over to free its slot.
+func TestUpgradeRollbackConstrainedFailover(t *testing.T) {
+	testUpgradeRollbackConstrained(t, couchbasev2.RollbackMethodConstrainedFailover)
+}
+
+// TestUpgradeRollbackConstrainedRebalanceOut rolls back an upgrade with the node
+// rebalanced out to free its slot.
+func TestUpgradeRollbackConstrainedRebalanceOut(t *testing.T) {
+	testUpgradeRollbackConstrained(t, couchbasev2.RollbackMethodConstrainedRebalanceOut)
+}
+
+// testUpgradeRollbackConstrained upgrades part of a cluster, reverts the image, and
+// checks the cluster never grows beyond its requested size while rolling back.  A
+// default rollback swap rebalances, which needs room for an extra pod.
+func testUpgradeRollbackConstrained(t *testing.T, method couchbasev2.RollbackMethod) {
+	// Platform configuration.
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).Upgradable()
+
+	// Static configuration.
+	clusterSize := constants.Size3
+	numOldPods := 1
+	numOfDocs := 100
+
+	// The default bucket has a replica.  Without one, ConstrainedFailover cannot fail a
+	// node over gracefully and ConstrainedRebalanceOut cannot place a full vBucket chain
+	// on the survivors, so both would find no safe batch and revert to swap.
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+
+	// Create the cluster, checking the version is as we expect, we need an upgrade path.
+	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
+	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
+		PreviousVersionPodCount: numOldPods,
+	}
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+
+	cluster.Annotations["cao.couchbase.com/upgrade.rollbackMethod"] = string(method)
+
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, time.Minute)
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+
+	// Upgrade until previousVersionPodCount stops it, leaving the cluster settled in
+	// mixed mode with nothing in flight.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImage), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionMixedMode, v1.ConditionTrue, cluster, time.Minute)
+	e2eutil.MustCheckPodImageCountMap(t, kubernetes, cluster, map[string]int{
+		f.CouchbaseServerImageUpgrade: numOldPods,
+		f.CouchbaseServerImage:        clusterSize - numOldPods,
+	})
+
+	// Rollback.
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, jsonpatch.NewPatchSet().Replace("/spec/image", f.CouchbaseServerImageUpgrade), time.Minute)
+	e2eutil.MustWaitForClusterCondition(t, kubernetes, couchbasev2.ClusterConditionUpgrading, v1.ConditionTrue, cluster, 5*time.Minute)
+	e2eutil.MustWaitForConditionRemovedWithinPodLimit(t, kubernetes, cluster, couchbasev2.ClusterConditionUpgrading, clusterSize, 20*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 20*time.Minute)
+
+	// Every pod is back on the version it started from, the constrained path did it, and
+	// the data moved rather than being lost.
+	startingVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
+
+	e2eutil.MustObserveClusterEventIgnoringMessage(t, kubernetes, cluster, e2eutil.RollbackBelowSizeEvent(cluster, method), time.Minute)
+	e2eutil.MustWaitForClusterConditionsRemoved(t, kubernetes, cluster, time.Minute, couchbasev2.ClusterConditionMixedMode)
+	e2eutil.MustCheckPodsForVersion(t, kubernetes, cluster, f.CouchbaseServerImageUpgrade, startingVersion)
+	e2eutil.MustCheckStatusVersion(t, kubernetes, cluster, startingVersion, time.Minute)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+}
+
 // TestUpgradeKillPodOnCreate begins an upgrade then kills a pod to be added to the
 // cluster before a rebalance has occurred.
 func TestUpgradeKillPodOnCreate(t *testing.T) {
@@ -1241,20 +1322,29 @@ func TestDeltaRecovery(t *testing.T) {
 	clusterSize := 3
 	numOfDocs := f.DocsCount
 
+	initialVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImageUpgrade, f.CouchbaseServerImageUpgradeVersion)
 	upgradeVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 	cluster := clusterOptionsUpgrade().WithPersistentTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{UpgradeProcess: couchbasev2.InPlaceUpgrade}
 
 	// This config triggers unexpected counter errors during upgrade
 	kubernetes.DisableResourceAllocation = true
-	cluster.Spec.Servers[0].Services = []couchbasev2.Service{
+	services := []couchbasev2.Service{
 		couchbasev2.DataService,
 		couchbasev2.IndexService,
 		couchbasev2.QueryService,
 		couchbasev2.SearchService,
 		couchbasev2.AnalyticsService,
-		couchbasev2.EventingService,
 	}
+
+	// While the cluster is in mixed mode the eventing nodes do not agree on which nodes are active, so
+	// the server keeps reporting that eventing needs a rebalance and the rebalance check fails. Only
+	// upgrades that cross 8.0.1 see this, so those run without eventing.
+	if !e2eutil.MustCheckIfUpgradeOverVersion(t, initialVersion, upgradeVersion, "8.0.1") {
+		services = append(services, couchbasev2.EventingService)
+	}
+
+	cluster.Spec.Servers[0].Services = services
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
@@ -2218,7 +2308,7 @@ func TestNodeUpgradeOrder(t *testing.T) {
 	clusterSize := classSize * 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	// Create the cluster
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
@@ -2291,7 +2381,7 @@ func TestNodeUpgradeDefaultOrder(t *testing.T) {
 	clusterSize := classSize * 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	cluster.Spec.Upgrade = &couchbasev2.UpgradeSpec{
 		UpgradeOrderType: couchbasev2.UpgradeOrderTypeNodes,
@@ -3491,7 +3581,7 @@ func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverride(t *testing.T) {
 // TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate tests that index candidates are always SwapRebalanced after non index candidates
 // are InPlaceUpgraded if both members are candidates in the same reconcile loop due to maxUpgradable.
 // It also checks that index nodes that persist on pods that are also running the data service will continue to be upgraded via InPlaceUpgrade.
-func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCanidate(t *testing.T) {
+func TestInPlaceUpgradeIndexNodesWithSwapRebalanceOverrideAnyCandidate(t *testing.T) {
 	f := framework.Global
 
 	kubernetes, cleanup := f.SetupTest(t)

@@ -59,6 +59,10 @@ func TestDetectZoneChange(t *testing.T) {
 		{"no override, same zone", sel(map[string]string{zoneKey: "az-a"}), sel(map[string]string{zoneKey: "az-a"}), false},
 		// No server groups at all — both zone selectors empty/nil → in-place.
 		{"no server groups", sel(nil), sel(nil), false},
+		// The zone was removed from the spec, so nothing asks the pod to move, meaning in place, which keeps the volume.
+		{"zone selector removed (nil NodeSelector)", sel(map[string]string{zoneKey: "az-a"}), sel(nil), false},
+		{"zone selector removed (empty NodeSelector)", sel(map[string]string{zoneKey: "az-a"}), sel(map[string]string{}), false},
+		{"zone selector removed, override kept", sel(map[string]string{override: "a1", zoneKey: "az-a"}), sel(map[string]string{override: "a1"}), false},
 	}
 
 	for _, tc := range cases {

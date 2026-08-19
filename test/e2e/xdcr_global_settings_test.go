@@ -174,9 +174,16 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 		validationPatch = validationPatch.Test("/HlvPruningWindowSec", &hlvPruningWindowSec)
 	}
 
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.1"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
+		// 8.0.1+ reports unconfigured conflict logging as absent (nil).
+		var conflictLogging *couchbaseutil.ConflictLoggingSettings
+		validationPatch = validationPatch.Test("/ConflictLogging", conflictLogging)
+	} else if ok, err := couchbaseutil.VersionAfter(cbVersion, "8.0.0"); err != nil {
+		e2eutil.Die(t, err)
+	} else if ok {
+		// 8.0.0 reports unconfigured conflict logging as an empty struct.
 		conflictLogging := &couchbaseutil.ConflictLoggingSettings{}
 		validationPatch = validationPatch.Test("/ConflictLogging", conflictLogging)
 	}

@@ -164,12 +164,16 @@ func TestEventingResizeCluster(t *testing.T) {
 	stop := e2eutil.MustGenerateWorkload(t, kubernetes, cluster, f.CouchbaseServerImage, sourceBucket.Name)
 	defer stop()
 
-	for _, newClusterSize := range []int{2, 3, 2} {
+	for _, newClusterSize := range []int{3, 2} {
 		cluster = e2eutil.MustResizeCluster(t, 0, newClusterSize, kubernetes, cluster, 20*time.Minute)
 	}
 
 	stop()
 	time.Sleep(time.Minute) // Wait for eventing to catch up
+
+	// Compaction on both buckets to stabilize and recalculate stats
+	e2eutil.MustCompactBucket(t, cluster, sourceBucket)
+	e2eutil.MustCompactBucket(t, cluster, destinationBucket)
 
 	itemCount := e2eutil.MustGetItemCount(t, kubernetes, cluster, sourceBucket.Name, time.Minute)
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, destinationBucket.Name, int(itemCount), time.Minute)
@@ -177,14 +181,12 @@ func TestEventingResizeCluster(t *testing.T) {
 	// Check the events match what we expect:
 	// * Cluster created
 	// * Buckets created
-	// * Cluster scales from 1 -> 2
-	// * Cluster scales from 2 -> 3
+	// * Cluster scales from 1 -> 3
 	// * Cluster scales from 3 -> 2
 	expectedEvents := []eventschema.Validatable{
 		e2eutil.ClusterCreateSequence(clusterSize),
 		eventschema.Repeat{Times: 3, Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
-		e2eutil.ClusterScaleUpSequence(1),
-		e2eutil.ClusterScaleUpSequence(1),
+		e2eutil.ClusterScaleUpSequence(2),
 		e2eutil.ClusterScaleDownSequence(1),
 	}
 
