@@ -166,6 +166,43 @@ func getResource(k8s *types.Cluster, object *unstructured.Unstructured) (*schema
 	return &mapping.Resource, nil
 }
 
+// copyStatus copies status between objects. Create returns an object
+// without status, so this puts the fixture's status back on it for
+// later patches to find.
+func copyStatus(from, to *unstructured.Unstructured) error {
+	status, found, err := unstructured.NestedMap(from.Object, "status")
+	if err != nil || !found {
+		return err
+	}
+
+	return unstructured.SetNestedMap(to.Object, status, "status")
+}
+
+// writeStatus stores an object's status and returns the stored object.
+// Only the status subresource accepts status writes, so a create or update
+// drops it. Writing it here is what makes a fixture's status visible to the DAC.
+func writeStatus(k8s *types.Cluster, groupVersion *schema.GroupVersionResource, object *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	status, found, err := unstructured.NestedMap(object.Object, "status")
+	if err != nil {
+		return nil, err
+	}
+
+	if !found || len(status) == 0 {
+		return object, nil
+	}
+
+	res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).UpdateStatus(context.Background(), object, metav1.UpdateOptions{})
+	if errors.IsNotFound(err) {
+		return object, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // createResources iterates over every resource and creates them in the requested namespace.
 func createResources(k8s *types.Cluster, resources resourceList, wc *types.KubeWarningCollector) error {
 	for i, resource := range resources {
@@ -184,6 +221,15 @@ func createResources(k8s *types.Cluster, resources resourceList, wc *types.KubeW
 		}
 
 		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Create(context.Background(), object, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+
+		if err := copyStatus(object, res); err != nil {
+			return err
+		}
+
+		res, err = writeStatus(k8s, groupVersion, res)
 		if err != nil {
 			return err
 		}
@@ -220,6 +266,15 @@ func updateResources(k8s *types.Cluster, resources resourceList, wc *types.KubeW
 		if err != nil {
 			return err
 		}
+
+		// Store status first so the spec change is judged against the state the
+		// test set up, then carry over the resource version the status write left.
+		stored, err := writeStatus(k8s, groupVersion, object)
+		if err != nil {
+			return err
+		}
+
+		object.SetResourceVersion(stored.GetResourceVersion())
 
 		res, err := k8s.DynamicClient.Resource(*groupVersion).Namespace(k8s.Namespace).Update(context.Background(), object, metav1.UpdateOptions{})
 		if err != nil {
@@ -3812,6 +3867,7 @@ func TestValidationDefaultCreate(t *testing.T) {
 					Remove("/spec/cluster/eventingServiceMemoryQuota").
 					Remove("/spec/cluster/analyticsServiceMemoryQuota").
 					Remove("/spec/cluster/indexStorageSetting").
+					Add("/spec/cluster/indexer", emptyObject).
 					Remove("/spec/cluster/autoFailoverTimeout").
 					Remove("/spec/cluster/autoFailoverMaxCount").
 					Remove("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod"),
@@ -3822,7 +3878,9 @@ func TestValidationDefaultCreate(t *testing.T) {
 					Test("/spec/cluster/searchServiceMemoryQuota", "256Mi").
 					Test("/spec/cluster/eventingServiceMemoryQuota", "256Mi").
 					Test("/spec/cluster/analyticsServiceMemoryQuota", "1Gi").
-					Test("/spec/cluster/indexStorageSetting", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
+					// The deprecated setting is left unset, its replacement is defaulted.
+					Test("/spec/cluster/indexStorageSetting", nil).
+					Test("/spec/cluster/indexer/storageMode", couchbasev2.CouchbaseClusterIndexStorageSettingMemoryOptimized).
 					Test("/spec/cluster/autoFailoverTimeout", "120s").
 					Test("/spec/cluster/autoFailoverMaxCount", 1).
 					Test("/spec/cluster/autoFailoverOnDataDiskIssuesTimePeriod", "120s"),

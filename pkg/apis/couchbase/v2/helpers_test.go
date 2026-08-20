@@ -422,3 +422,51 @@ func TestGetBucketObjectSelector(t *testing.T) {
 		})
 	}
 }
+
+// TestIndexStorageMode checks the index storage mode a cluster resolves to.
+// The deprecated spec.cluster.indexStorageSetting is not defaulted by the CRD,
+// so an unset mode has to fall back to memory optimized here instead.
+func TestIndexStorageMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		settings ClusterConfig
+		expected CouchbaseClusterIndexStorageSetting
+	}{
+		{
+			name:     "Nothing set falls back to memory optimized",
+			settings: ClusterConfig{},
+			expected: CouchbaseClusterIndexStorageSettingMemoryOptimized,
+		},
+		{
+			name: "Deprecated field is used when set",
+			settings: ClusterConfig{
+				IndexStorageSetting: CouchbaseClusterIndexStorageSettingStandard,
+			},
+			expected: CouchbaseClusterIndexStorageSettingStandard,
+		},
+		{
+			name: "Indexer takes precedence over the deprecated field",
+			settings: ClusterConfig{
+				IndexStorageSetting: CouchbaseClusterIndexStorageSettingMemoryOptimized,
+				Indexer: &CouchbaseClusterIndexerSettings{
+					StorageMode: CouchbaseClusterIndexStorageSettingStandard,
+				},
+			},
+			expected: CouchbaseClusterIndexStorageSettingStandard,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cluster := &CouchbaseCluster{
+				Spec: ClusterSpec{
+					ClusterSettings: tt.settings,
+				},
+			}
+
+			if mode := cluster.IndexStorageMode(); mode != tt.expected {
+				t.Errorf("expected storage mode %v, got %v", tt.expected, mode)
+			}
+		})
+	}
+}
