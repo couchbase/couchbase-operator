@@ -106,6 +106,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLoggingPermissible,
 		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
+		checkConstraintXDCRRemoteClusterAuthMethod,
 		checkConstraintXDCRReplicationConflictLogging,
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
@@ -1093,6 +1094,56 @@ func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchb
 	}
 
 	return warnings, nil
+}
+
+// checkConstraintXDCRRemoteClusterAuthMethod rejects a remote cluster with zero or two
+// authentication methods (username vs client certificate).  Adding a secret to a certificate
+// reference is allowed: staging validates the request rather than the resulting reference.
+func checkConstraintXDCRRemoteClusterAuthMethod(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+	if !cluster.Spec.XDCR.Managed || !v.Options.ValidateSecrets {
+		return nil
+	}
+
+	var errs []error
+
+	for i, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
+		var clientCertificate bool
+
+		if remoteCluster.TLS != nil && remoteCluster.TLS.Secret != nil {
+			secret, found, err := v.Abstraction.GetSecret(cluster.Namespace, *remoteCluster.TLS.Secret)
+			if err != nil {
+				return err
+			}
+
+			if !found {
+				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].tls.secret must exist", *remoteCluster.TLS.Secret, i))
+
+				continue
+			}
+
+			var clientKey bool
+
+			_, clientCertificate = secret.Data[couchbasev2.RemoteClusterTLSCertificate]
+			_, clientKey = secret.Data[couchbasev2.RemoteClusterTLSKey]
+
+			if clientCertificate != clientKey {
+				errs = append(errs, fmt.Errorf("spec.xdcr.remoteClusters[%d].tls.secret must contain %q and %q together, Couchbase Server needs both to use a client certificate", i, couchbasev2.RemoteClusterTLSCertificate, couchbasev2.RemoteClusterTLSKey))
+			}
+		}
+
+		switch {
+		case remoteCluster.AuthenticationSecret != nil && clientCertificate:
+			errs = append(errs, fmt.Errorf("spec.xdcr.remoteClusters[%d] must not set authenticationSecret and a %q key in tls.secret together, Couchbase Server accepts one or the other", i, couchbasev2.RemoteClusterTLSCertificate))
+		case remoteCluster.AuthenticationSecret == nil && !clientCertificate:
+			errs = append(errs, fmt.Errorf("spec.xdcr.remoteClusters[%d] must set either authenticationSecret or a %q key in tls.secret", i, couchbasev2.RemoteClusterTLSCertificate))
+		}
+	}
+
+	if errs != nil {
+		return errors.CompositeValidationError(errs...)
+	}
+
+	return nil
 }
 
 func areKeyspacesValid(allowRule couchbasev2.CouchbaseAllowReplicationMapping) error {

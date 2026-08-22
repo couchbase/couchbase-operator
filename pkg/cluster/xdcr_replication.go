@@ -473,6 +473,21 @@ func (c *Cluster) setOptionalPersistentXDCRData(cluster *couchbaseutil.RemoteClu
 	return c.setPersistentXDCRData(cluster, key, value)
 }
 
+// upsertPersistentXDCRData sets a persistent data string whether or not the key already exists,
+// unlike setPersistentXDCRData which only succeeds the first time.
+func (c *Cluster) upsertPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value string) error {
+	return c.state.Upsert(persistence.GetPersistentKindXDCR(cluster.Name, key), value)
+}
+
+// upsertOptionalPersistentXDCRData upserts a persistent data string, but only if there's something to store.
+func (c *Cluster) upsertOptionalPersistentXDCRData(cluster *couchbaseutil.RemoteCluster, key persistence.PersistentKindXDCR, value string) error {
+	if value == "" {
+		return nil
+	}
+
+	return c.upsertPersistentXDCRData(cluster, key, value)
+}
+
 // listRemoteClusters does what it says fom Couchbase.  The XDCR API doesn't even attempt to
 // support read/modify/write, and in some cases it's acceptable, such as not giving out
 // credentials.  We, however, do need RMW, so we need to get what the API provides and then
@@ -509,16 +524,13 @@ func (c *Cluster) listRemoteClusters() (couchbaseutil.RemoteClusters, error) {
 			return nil, err
 		}
 
-		// Load up configuration that is written to the API but not returned.
+		// Load up configuration that is written to the API but not returned.  XDCRPassword is
+		// the password in use, so it pairs with the username the GET returned.
 		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRPassword, &cluster.Password); err != nil {
 			return nil, err
 		}
 
 		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRClientKey, &cluster.Key); err != nil {
-			return nil, err
-		}
-
-		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, &cluster.Certificate); err != nil {
 			return nil, err
 		}
 	}
@@ -538,15 +550,13 @@ func (c *Cluster) updateXDCRPersistentState(cluster *couchbaseutil.RemoteCluster
 		return err
 	}
 
+	// An update applies its credentials, so these are now the ones in use.  DeleteXDCR above
+	// dropped the staged records, matching the server discarding its stage.
 	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRPassword, cluster.Password); err != nil {
 		return err
 	}
 
-	if err := c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientKey, cluster.Key); err != nil {
-		return err
-	}
-
-	return c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientCertificate, cluster.Certificate)
+	return c.setOptionalPersistentXDCRData(cluster, persistence.XDCRClientKey, cluster.Key)
 }
 
 // remoteClusterCreations is a generator that returns clusters that need to be created.
@@ -567,10 +577,9 @@ Next:
 	return clusters
 }
 
-// remoteClusterUpdates is a generator that returns clusters that need to be updated.
-func (c *Cluster) remoteClusterUpdates(current, requested couchbaseutil.RemoteClusters) couchbaseutil.RemoteClusters {
-	var clusters couchbaseutil.RemoteClusters
-
+// remoteClusterUpdates is a generator that returns clusters that need to be updated, and those
+// whose credentials should be staged rather than applied (K8S-4312).
+func (c *Cluster) remoteClusterUpdates(current, requested couchbaseutil.RemoteClusters, supportsStaging bool) (updates, staging couchbaseutil.RemoteClusters) {
 Next:
 	for _, req := range requested {
 		for _, cur := range current {
@@ -583,17 +592,161 @@ Next:
 			// here.
 			req.Network = cur.Network
 
-			if !reflect.DeepEqual(req, cur) {
-				c.log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", req, "current", cur)
+			// Staged credentials are server state we never send, so they must not read as a
+			// difference, or a pending rotation would update on every reconcile.
+			req.Stage = cur.Stage
 
-				clusters = append(clusters, req)
+			// RemoteCluster is comparable, so == is exact.
+			if req == cur {
+				continue Next
 			}
+
+			// The request on the credentials in use: equal to cur when only the credentials
+			// changed, equal to req when they didn't.
+			reqWithOldCreds := req
+			reqWithOldCreds.Username, reqWithOldCreds.Password = cur.Username, cur.Password
+
+			// Never stage onto a client certificate reference: promotion would leave both a
+			// username and a certificate set, which every later edit rejects.
+			if supportsStaging && cur.Certificate == "" {
+				switch {
+				case reqWithOldCreds == cur:
+					// Stage, so the server promotes once the current credentials stop working.
+					staging = append(staging, req)
+
+					continue Next
+				case reqWithOldCreds != req && cur.Password != "":
+					// Credentials plus something else.  Apply the rest on the credentials in
+					// use, which restarts nothing, and stage the new ones.
+					c.log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", reqWithOldCreds, "current", cur)
+
+					updates = append(updates, reqWithOldCreds)
+					staging = append(staging, req)
+
+					continue Next
+				}
+			}
+
+			c.log.V(2).Info("XDCR connection state", "cluster", c.namespacedName(), "requested", req, "current", cur)
+
+			updates = append(updates, req)
 
 			continue Next
 		}
 	}
 
-	return clusters
+	return updates, staging
+}
+
+// stageRemoteClusterCredentials stages credential-only changes, so the server can promote them
+// when the credentials in use stop working (K8S-4312).
+func (c *Cluster) stageRemoteClusterCredentials(staging couchbaseutil.RemoteClusters) error {
+	for i := range staging {
+		cluster := &staging[i]
+
+		// Compare against the staged records: the API never reports a staged password, so it
+		// can't tell us about a password-only rotation.
+		var stagedUsername, stagedPassword string
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRStagedUsername, &stagedUsername); err != nil {
+			return err
+		}
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRStagedPassword, &stagedPassword); err != nil {
+			return err
+		}
+
+		if stagedUsername == cluster.Username && stagedPassword == cluster.Password {
+			continue
+		}
+
+		c.log.Info("Staging XDCR remote cluster credentials", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+		if err := couchbaseutil.StageRemoteClusterCredentials(cluster).On(c.api, c.readyMembers()); err != nil {
+			return err
+		}
+
+		c.raiseEvent(k8sutil.RemoteClusterCredentialsStagedEvent(c.cluster, cluster.Name))
+
+		// Record what was staged, leaving XDCRPassword on the credentials in use.  Password
+		// first, so a failure in between re-stages rather than skips.
+		if err := c.upsertOptionalPersistentXDCRData(cluster, persistence.XDCRStagedPassword, cluster.Password); err != nil {
+			return err
+		}
+
+		if err := c.upsertPersistentXDCRData(cluster, persistence.XDCRStagedUsername, cluster.Username); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// promoteStagedXDCRCredentials catches XDCRPassword up once the server stops reporting a stage,
+// having either promoted or discarded it.  Left behind, the record would pair the promoted
+// username with the old password and authenticate as neither set (K8S-4312).
+func (c *Cluster) promoteStagedXDCRCredentials(clusters couchbaseutil.RemoteClusters, supportsStaging bool) error {
+	if !supportsStaging {
+		return nil
+	}
+
+	for i := range clusters {
+		cluster := &clusters[i]
+
+		var stagedUsername, stagedPassword string
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRStagedUsername, &stagedUsername); err != nil {
+			return err
+		}
+
+		// Still staged, or nothing of ours outstanding.
+		if cluster.Stage != nil || stagedUsername == "" {
+			continue
+		}
+
+		// The staged username never made it into use, so the server discarded the stage rather
+		// than promoting it.  Drop our records and leave the password in use alone.
+		if cluster.Username != stagedUsername {
+			c.log.Info("Discarding staged XDCR remote cluster credentials", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+			if err := c.clearStagedXDCRCredentials(cluster); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if err := c.getOptionalPersistentXDCRData(cluster, persistence.XDCRStagedPassword, &stagedPassword); err != nil {
+			return err
+		}
+
+		c.log.Info("Promoting staged XDCR remote cluster credentials", "cluster", c.namespacedName(), "remote", cluster.Name)
+
+		if err := c.upsertOptionalPersistentXDCRData(cluster, persistence.XDCRPassword, stagedPassword); err != nil {
+			return err
+		}
+
+		if err := c.clearStagedXDCRCredentials(cluster); err != nil {
+			return err
+		}
+
+		// Keep this cycle's diff honest, or it stages the same credentials once more.
+		cluster.Password = stagedPassword
+	}
+
+	return nil
+}
+
+// clearStagedXDCRCredentials drops both staged records together.  Delete tolerates a missing
+// key, so this is safe whether or not anything was staged.
+func (c *Cluster) clearStagedXDCRCredentials(cluster *couchbaseutil.RemoteCluster) error {
+	for _, key := range []persistence.PersistentKindXDCR{persistence.XDCRStagedUsername, persistence.XDCRStagedPassword} {
+		if err := c.state.Delete(persistence.GetPersistentKindXDCR(cluster.Name, key)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // remoteClusterDeletions is a generator that returns clusters that need deleting.
@@ -1430,6 +1583,10 @@ func (c *Cluster) reconcileXDCR() error {
 		return err
 	}
 
+	// Staging needs 8.5+ on the running nodes, not just in the spec: goxdcr rejects a stage in
+	// mixed mode with a 500, which looks retryable.
+	supportsStaging := c.SupportsVersionFeatures("8.5.0")
+
 	requestedClusters, err := c.generateXDCR()
 	if err != nil {
 		return err
@@ -1440,6 +1597,10 @@ func (c *Cluster) reconcileXDCR() error {
 
 	currentClusters, err := c.listRemoteClusters()
 	if err != nil {
+		return err
+	}
+
+	if err := c.promoteStagedXDCRCredentials(currentClusters, supportsStaging); err != nil {
 		return err
 	}
 
@@ -1483,7 +1644,8 @@ func (c *Cluster) reconcileXDCR() error {
 	}
 
 	// Create/update any new clusters...
-	updates := c.remoteClusterUpdates(currentClusters, requestedClusters)
+	updates, staging := c.remoteClusterUpdates(currentClusters, requestedClusters, supportsStaging)
+
 	for i := range updates {
 		cluster := &updates[i]
 
@@ -1502,6 +1664,12 @@ func (c *Cluster) reconcileXDCR() error {
 		if err := c.updateXDCRPersistentState(cluster); err != nil {
 			return err
 		}
+	}
+
+	// After the updates, never before: a plain edit discards whatever is staged, and a split
+	// change is in both lists.
+	if err := c.stageRemoteClusterCredentials(staging); err != nil {
+		return err
 	}
 
 	creates := remoteClusterCreations(currentClusters, requestedClusters)

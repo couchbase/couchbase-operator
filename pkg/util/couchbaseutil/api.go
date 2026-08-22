@@ -736,6 +736,18 @@ func UpdateRemoteCluster(r *RemoteCluster) *Request {
 	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), data, nil)
 }
 
+// StageRemoteClusterCredentials stages credentials rather than applying them, so the server
+// promotes them once the ones in use stop authenticating.  Couchbase Server 8.5+.
+func StageRemoteClusterCredentials(r *RemoteCluster) *Request {
+	data := url.Values{
+		"stage":    []string{"true"},
+		"username": []string{r.Username},
+		"password": []string{r.Password},
+	}
+
+	return NewRequest((*Client).Post, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), []byte(data.Encode()), nil)
+}
+
 // DeleteRemoteCluster deletes an XDCR remote cluster.
 func DeleteRemoteCluster(r *RemoteCluster) *Request {
 	return NewRequest((*Client).Delete, fmt.Sprintf("/pools/default/remoteClusters/%s", r.Name), nil, nil)

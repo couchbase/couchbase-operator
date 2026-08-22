@@ -1467,3 +1467,95 @@ func TestCheckConstraintXDCRRemoteAuthenticationMissingSecret(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckConstraintXDCRRemoteClusterAuthMethod(t *testing.T) {
+	authSecret := "xdcr-auth"
+	mutualTLS := "xdcr-tls"
+	serverTLS := "xdcr-tls-ca-only"
+	halfTLS := "xdcr-tls-no-key"
+
+	// One TLS secret carries a client certificate, the other only a CA, so a case picks its
+	// authentication method by which one it references.
+	client := k8sfake.NewSimpleClientset(
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: mutualTLS},
+			Data: map[string][]byte{
+				couchbasev2.RemoteClusterTLSCA:          []byte("ca"),
+				couchbasev2.RemoteClusterTLSCertificate: []byte("cert"),
+				couchbasev2.RemoteClusterTLSKey:         []byte("key"),
+			},
+		},
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: serverTLS},
+			Data:       map[string][]byte{couchbasev2.RemoteClusterTLSCA: []byte("ca")},
+		},
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: halfTLS},
+			Data: map[string][]byte{
+				couchbasev2.RemoteClusterTLSCA:          []byte("ca"),
+				couchbasev2.RemoteClusterTLSCertificate: []byte("cert"),
+			},
+		},
+	)
+
+	validator := types.New(client, couchbasefake.NewSimpleClientset(), &types.ValidatorOptions{ValidateSecrets: true})
+
+	testcases := []struct {
+		name        string
+		remote      couchbasev2.RemoteCluster
+		expectedErr string
+	}{
+		{
+			name:   "password auth over TLS",
+			remote: couchbasev2.RemoteCluster{AuthenticationSecret: &authSecret, TLS: &couchbasev2.RemoteClusterTLS{Secret: &serverTLS}},
+		},
+		{
+			name:   "password auth without TLS",
+			remote: couchbasev2.RemoteCluster{AuthenticationSecret: &authSecret},
+		},
+		{
+			name:   "client certificate auth",
+			remote: couchbasev2.RemoteCluster{TLS: &couchbasev2.RemoteClusterTLS{Secret: &mutualTLS}},
+		},
+		{
+			name:        "both, which the server rejects on every reconcile",
+			remote:      couchbasev2.RemoteCluster{AuthenticationSecret: &authSecret, TLS: &couchbasev2.RemoteClusterTLS{Secret: &mutualTLS}},
+			expectedErr: "must not set authenticationSecret and a \"certificate\" key in tls.secret together",
+		},
+		{
+			name:        "client certificate without its key",
+			remote:      couchbasev2.RemoteCluster{TLS: &couchbasev2.RemoteClusterTLS{Secret: &halfTLS}},
+			expectedErr: "must contain \"certificate\" and \"key\" together",
+		},
+		{
+			name:        "neither, so the reference cannot authenticate at all",
+			remote:      couchbasev2.RemoteCluster{TLS: &couchbasev2.RemoteClusterTLS{Secret: &serverTLS}},
+			expectedErr: "must set either authenticationSecret or a \"certificate\" key in tls.secret",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			cluster := &couchbasev2.CouchbaseCluster{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "default"},
+				Spec: couchbasev2.ClusterSpec{
+					XDCR: couchbasev2.XDCR{
+						Managed:        true,
+						RemoteClusters: []couchbasev2.RemoteCluster{testcase.remote},
+					},
+				},
+			}
+
+			err := checkConstraintXDCRRemoteClusterAuthMethod(validator, cluster)
+
+			switch {
+			case testcase.expectedErr == "" && err != nil:
+				t.Errorf("expected no error but got: %s", err.Error())
+			case testcase.expectedErr != "" && err == nil:
+				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+		})
+	}
+}

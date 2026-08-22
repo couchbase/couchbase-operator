@@ -495,39 +495,46 @@ func MustEstablishXDCRReplicationGenericWithoutUUID(t *testing.T, srcK8s, dstK8s
 // establishXDCRReplicationWithTLS creates a remote cluster in the source, and a replication from the source bucket to the destination
 // bucket. TLS setup is configured for source/remote clusters.
 // If the function was successful (did not return an error) then the client is responsible for defered secret cleanup.
-func establishXDCRReplicationWithTLS(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, serverTLS, clientTLS *TLSContext) (err error) {
+func establishXDCRReplicationWithTLS(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, serverTLS, clientTLS *TLSContext) (string, error) {
 	// Populate the namespace manually as we don't return the API object.
 	replication.Namespace = srcK8s.Namespace
 
 	// Create the remote cb cluster secret.
 	xdcrRemoteClusterSecretName, err := createRemoteClusterSecret(srcK8s, dstK8s, source, target)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// Create the CouchbaseReplication in the source namepsace.
 	if _, err = srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{}); err != nil {
-		return err
+		return "", err
 	}
 
 	remoteClusterName, err := createRemoteClusterTLS(srcK8s, dstK8s, source, target, xdcrRemoteClusterSecretName, serverTLS, clientTLS)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return waitForReplicationAddedEvent(srcK8s, source, remoteClusterName, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket))
+	if err := waitForReplicationAddedEvent(srcK8s, source, remoteClusterName, string(replication.Spec.Bucket), string(replication.Spec.RemoteBucket)); err != nil {
+		return "", err
+	}
+
+	return xdcrRemoteClusterSecretName, nil
 }
 
-func MustEstablishXDCRReplicationWithTLS(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, serverTLS *TLSContext) {
-	err := establishXDCRReplicationWithTLS(srcK8s, dstK8s, source, target, replication, serverTLS, serverTLS)
+// MustEstablishXDCRReplicationWithTLS returns the generated authentication secret's name, empty if
+// the reference authenticates with a client certificate instead.
+func MustEstablishXDCRReplicationWithTLS(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, serverTLS *TLSContext) string {
+	secretName, err := establishXDCRReplicationWithTLS(srcK8s, dstK8s, source, target, replication, serverTLS, serverTLS)
 	if err != nil {
 		Die(t, err)
 	}
+
+	return secretName
 }
 
 func MustEstablishXDCRReplicationWithMultipleCAs(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication, serverTLS, clientTLS *TLSContext) {
-	err := establishXDCRReplicationWithTLS(srcK8s, dstK8s, source, target, replication, serverTLS, clientTLS)
-	if err != nil {
+	if _, err := establishXDCRReplicationWithTLS(srcK8s, dstK8s, source, target, replication, serverTLS, clientTLS); err != nil {
 		Die(t, err)
 	}
 }
@@ -607,6 +614,24 @@ func MustRotateXDCRReplicationPassword(t *testing.T, src *types.Cluster, dst *ty
 	}
 }
 
+// MustSetXDCRReplicationCredentials points a remote cluster's authentication secret at an
+// explicit username and password.
+func MustSetXDCRReplicationCredentials(t *testing.T, src *types.Cluster, secretName, username, password string) {
+	secret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	secret.Data = map[string][]byte{
+		"username": []byte(username),
+		"password": []byte(password),
+	}
+
+	if _, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Update(context.Background(), secret, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
 func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, target *couchbasev2.CouchbaseCluster, tls *TLSContext) {
 	xdcrSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
 
@@ -618,6 +643,24 @@ func MustRotateXDCRReplicationTLS(t *testing.T, src *types.Cluster, target *couc
 	srcSecret.Data[couchbasev2.RemoteClusterTLSCA] = tls.CA.Certificate
 	srcSecret.Data[couchbasev2.RemoteClusterTLSCertificate] = tls.ClientCert
 	srcSecret.Data[couchbasev2.RemoteClusterTLSKey] = tls.ClientKey
+
+	if _, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Update(context.Background(), srcSecret, metav1.UpdateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
+// MustRotateXDCRReplicationCA rotates only the CA, leaving the reference on username/password
+// auth.  MustRotateXDCRReplicationTLS also writes a client certificate, which Couchbase Server
+// refuses alongside a username.
+func MustRotateXDCRReplicationCA(t *testing.T, src *types.Cluster, target *couchbasev2.CouchbaseCluster, tls *TLSContext) {
+	xdcrSecret := fmt.Sprintf("%s-xdcr-tls", target.Name)
+
+	srcSecret, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Get(context.Background(), xdcrSecret, metav1.GetOptions{})
+	if err != nil {
+		Die(t, err)
+	}
+
+	srcSecret.Data[couchbasev2.RemoteClusterTLSCA] = tls.CA.Certificate
 
 	if _, err := src.KubeClient.CoreV1().Secrets(src.Namespace).Update(context.Background(), srcSecret, metav1.UpdateOptions{}); err != nil {
 		Die(t, err)

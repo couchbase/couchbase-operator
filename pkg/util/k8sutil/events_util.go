@@ -614,6 +614,17 @@ func RemoteClusterUpdatedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v
 	return event
 }
 
+// RemoteClusterCredentialsStagedEvent keeps the RemoteClusterUpdated reason, so anything
+// filtering on it still sees credential rotations, and distinguishes itself by message.
+func RemoteClusterCredentialsStagedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
+	event := newClusterEvent(cl)
+	event.Type = v1.EventTypeNormal
+	event.Reason = EventReasonRemoteClusterUpdated
+	event.Message = fmt.Sprintf("XDCR remote cluster %s credentials staged, pending promotion by Couchbase Server", name)
+
+	return event
+}
+
 func RemoteClusterRemovedEvent(cl *couchbasev2.CouchbaseCluster, name string) *v1.Event {
 	event := newClusterEvent(cl)
 	event.Type = v1.EventTypeNormal

@@ -1512,6 +1512,13 @@ type AutoCompactionSettings struct {
 // RemoteClusters is returned by /pools/default/remoteClusters.
 type RemoteClusters []RemoteCluster
 
+// RemoteClusterStagedCredentials is what a HTTP GET reports about staged credentials, never the
+// password.  Couchbase Server only reports it while something is staged, so its absence means
+// the stage was either promoted or discarded.
+type RemoteClusterStagedCredentials struct {
+	Username string `json:"username"`
+}
+
 // RemoteClusterSecurity indicates the authentication method.
 // There is a 'half', but we don't do half-arsed here.
 type RemoteClusterSecurity string
@@ -1536,10 +1543,14 @@ type RemoteCluster struct {
 	Network    string                `json:"network_type" url:"network_type,omitempty"`
 	CA         string                `json:"certificate" url:"certificate,omitempty"`
 
-	// These are here for convenience and should only be populated
-	// after comparison as they are not supplied by the API.
-	Certificate string `json:"-" url:"clientCertificate,omitempty"`
+	// The API returns the client certificate, like the CA above; the key is not, so it is
+	// populated from persistence after a read.
+	Certificate string `json:"clientCertificate" url:"clientCertificate,omitempty"`
 	Key         string `json:"-" url:"clientKey,omitempty"`
+
+	// Stage is read back only, never sent, so it carries no url tag.  Normalised onto the
+	// requested reference before any comparison, like Network below.
+	Stage *RemoteClusterStagedCredentials `json:"stage"`
 }
 
 type ReplicationType string

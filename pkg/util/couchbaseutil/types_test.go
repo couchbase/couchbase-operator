@@ -1042,3 +1042,71 @@ func TestServiceRolesCredentialIDs(t *testing.T) {
 		})
 	}
 }
+
+// TestRemoteClusterClientCertificateRoundTrip pins which credential fields a GET can repopulate:
+// goxdcr echoes the client certificate back but never the password or client key.
+func TestRemoteClusterClientCertificateRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	const (
+		clientCert = "-----BEGIN CERTIFICATE-----\nclient\n-----END CERTIFICATE-----\n"
+		caCert     = "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----\n"
+	)
+
+	// Shaped like the real response: goxdcr omits password and clientKey entirely.
+	body, err := json.Marshal(map[string]interface{}{
+		"name":              "west-operator-managed",
+		"uuid":              "f00d",
+		"hostname":          "couchbases://cb-west.example.com",
+		"username":          "xdcr_user",
+		"deleted":           false,
+		"secureType":        "full",
+		"certificate":       caCert,
+		"clientCertificate": clientCert,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	remoteCluster := &RemoteCluster{}
+	if err := json.Unmarshal(body, remoteCluster); err != nil {
+		t.Fatal(err)
+	}
+
+	// Returned by the API, so it must survive a read and take part in the comparison.
+	if remoteCluster.Certificate != clientCert {
+		t.Errorf("clientCertificate: got %q, want %q", remoteCluster.Certificate, clientCert)
+	}
+
+	if remoteCluster.CA != caCert {
+		t.Errorf("certificate: got %q, want %q", remoteCluster.CA, caCert)
+	}
+
+	// Withheld by the API, so these must stay empty for persistence to fill in.
+	if remoteCluster.Password != "" {
+		t.Errorf("password: got %q, want empty", remoteCluster.Password)
+	}
+
+	if remoteCluster.Key != "" {
+		t.Errorf("clientKey: got %q, want empty", remoteCluster.Key)
+	}
+
+	// Both halves still have to go back out on a write, whatever the read gives us.
+	data, err := urlencoding.Marshal(&RemoteCluster{Certificate: clientCert, Key: "key"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	values, err := url.ParseQuery(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if values.Get("clientCertificate") != clientCert {
+		t.Errorf("encoded clientCertificate: got %q, want %q", values.Get("clientCertificate"), clientCert)
+	}
+
+	if values.Get("clientKey") != "key" {
+		t.Errorf("encoded clientKey: got %q, want %q", values.Get("clientKey"), "key")
+	}
+}

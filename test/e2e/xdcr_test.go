@@ -1089,6 +1089,216 @@ func TestXDCRRotatePassword(t *testing.T) {
 	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
 }
 
+// TestXDCRStageCredentialRotation covers K8S-4312: a credential change is staged, then promoted
+// once the credentials in use stop authenticating.  Rotates username and password together, then
+// the password alone.
+func TestXDCRStageCredentialRotation(t *testing.T) {
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().AtLeastVersion("8.5.0").IstioDisabled()
+
+	clusterSize := 1
+
+	const (
+		xdcrUser  = "xdcruser"
+		password1 = "Password123!"
+		password2 = "Password456!"
+	)
+
+	targetUser := &couchbaseutil.User{
+		Name:     xdcrUser,
+		ID:       xdcrUser,
+		Domain:   couchbaseutil.InternalAuthDomain,
+		Password: password1,
+		Roles:    []couchbaseutil.UserRole{{Role: string(couchbasev2.RoleFullAdmin)}},
+	}
+
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+
+	// Disable managed RBAC on the target so the operator does not prune xdcruser, which this
+	// test creates directly (managed RBAC deletes any user not backed by a CouchbaseUser).
+	target := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().Generate(kubernetes2)
+	target.Spec.Security.RBAC.Managed = false
+	targetCluster := e2eutil.MustNewClusterFromSpec(t, kubernetes2, target)
+
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
+	info := e2eutil.MustEstablishXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	numOfDocs := framework.Global.DocsCount
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	e2eutil.MustSetXDCRReplicationCredentials(t, kubernetes1, info.SecretName, xdcrUser, password1)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+
+	e2eutil.MustCreateUsers(t, kubernetes2, targetCluster, targetUser)
+	e2eutil.MustWaitUntilUsersExist(t, kubernetes2, targetCluster, []*couchbaseutil.User{targetUser}, 2*time.Minute)
+	e2eutil.MustRotateClusterPassword(t, kubernetes2)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 3*numOfDocs, 10*time.Minute)
+
+	e2eutil.MustSetXDCRReplicationCredentials(t, kubernetes1, info.SecretName, xdcrUser, password2)
+
+	targetUser.Password = password2
+	e2eutil.MustCreateUsers(t, kubernetes2, targetCluster, targetUser)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 4*numOfDocs, 10*time.Minute)
+
+	expectedEvents1 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		// On a single node cluster the bucket created event is not folded into the
+		// create sequence, so we allow it here between cluster create and XDCR setup.
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		// Two rather than more proves the skip guard stops it re-staging every reconcile.
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "credentials staged"},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "credentials staged"},
+	}
+	expectedEvents2 := []eventschema.Validatable{
+		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonAdminPasswordChanged},
+	}
+
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+	ValidateEvents(t, kubernetes2, targetCluster, expectedEvents2)
+}
+
+// TestXDCRStageCredentialRotationTLS is the same over a TLS reference, where the CA travels in
+// the same POST body.  No client certificate: goxdcr rejects one alongside a username.
+func TestXDCRStageCredentialRotationTLS(t *testing.T) {
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().AtLeastVersion("8.5.0")
+
+	clusterSize := 1
+
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
+
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, nil).MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
+	secretName := e2eutil.MustEstablishXDCRReplicationWithTLS(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
+
+	numOfDocs := framework.Global.DocsCount
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	username := string(kubernetes2.DefaultSecret.Data["username"])
+	newPassword := e2eutil.RandomString(32)
+
+	e2eutil.MustSetXDCRReplicationCredentials(t, kubernetes1, secretName, username, newPassword)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+
+	e2eutil.MustRotateClusterPasswordToValue(t, kubernetes2, newPassword)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 3*numOfDocs, 10*time.Minute)
+
+	expectedEvents1 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		// On a single node cluster the bucket created event is not folded into the
+		// create sequence, so we allow it here between cluster create and XDCR setup.
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "credentials staged"},
+	}
+
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+}
+
+// TestXDCRStageCredentialRotationThenUpdate covers a setting change landing while a rotation is
+// still staged.  The update has to carry the credentials in use: paired with the staged password
+// they authenticate as neither set, failing the update and stalling every reconciler after XDCR.
+func TestXDCRStageCredentialRotationThenUpdate(t *testing.T) {
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().AtLeastVersion("8.5.0")
+
+	clusterSize := 1
+
+	tls := e2eutil.MustInitClusterTLS(t, kubernetes2, &e2eutil.TLSOpts{})
+	dns := e2eutil.MustProvisionCoreDNS(t, kubernetes1, kubernetes2)
+
+	bucket := mustCreateXDCRBuckets(t, kubernetes1, kubernetes2)
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithDNS(dns).MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithMutualTLS(tls, nil).MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, bucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, bucket, time.Minute)
+
+	replication := e2espec.GetReplication(bucket.GetName(), bucket.GetName())
+
+	secretName := e2eutil.MustEstablishXDCRReplicationWithTLS(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication, tls)
+
+	// Prechecks dial the target while its certificates are being replaced, which times out.
+	sourceCluster = e2eutil.MustPatchCluster(t, kubernetes1, sourceCluster, jsonpatch.NewPatchSet().Add("/metadata/annotations", map[string]string{
+		"cao.couchbase.com/xdcr.disablePrechecks": "true",
+	}), time.Minute)
+
+	numOfDocs := framework.Global.DocsCount
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
+
+	username := string(kubernetes2.DefaultSecret.Data["username"])
+	newPassword := e2eutil.RandomString(32)
+
+	e2eutil.MustSetXDCRReplicationCredentials(t, kubernetes1, secretName, username, newPassword)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 2*numOfDocs, 10*time.Minute)
+
+	// CA only: a client certificate here would trip the staging guard and skip the split.
+	e2eutil.MustRotateServerCertificateClientCertificateAndCA(t, tls)
+	e2eutil.MustObserveClusterEvent(t, kubernetes2, targetCluster, k8sutil.ClientTLSUpdatedEvent(targetCluster, k8sutil.ClientTLSUpdateReasonUpdateCA), 5*time.Minute)
+	e2eutil.MustRotateXDCRReplicationCA(t, kubernetes1, targetCluster, tls)
+
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes1, sourceCluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), 3*numOfDocs, 10*time.Minute)
+
+	expectedEvents1 := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "credentials staged"},
+		// One or more splits, since certificate rotation drives more than one reconcile.  Both
+		// halves of each: an update alone, or a stage alone, is not a split.
+		eventschema.RepeatAtLeast{
+			Times: 1,
+			Validator: eventschema.Sequence{Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "updated$"},
+				eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated, FuzzyMessage: "credentials staged"},
+			}},
+		},
+	}
+
+	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents1)
+}
+
 func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns *corev1.Service, tls *e2eutil.TLSContext, policy *couchbasev2.ClientCertificatePolicy) {
 	clusterSize := 1
 

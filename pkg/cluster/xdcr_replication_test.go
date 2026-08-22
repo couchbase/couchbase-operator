@@ -462,3 +462,220 @@ func TestXDCRComputeSettingsPatchExplicitMappingRemoval(t *testing.T) {
 		})
 	}
 }
+
+// TestXDCRRemoteClusterUpdatesStaging checks which side of the update/staging split a given
+// desired-vs-actual pair lands on.  A credential-only change is staged; anything else takes the
+// existing update path.
+func TestXDCRRemoteClusterUpdatesStaging(t *testing.T) {
+	t.Parallel()
+
+	current := couchbaseutil.RemoteCluster{
+		Name:       "west-operator-managed",
+		Hostname:   "couchbases://cb-west.example.com",
+		Username:   "xdcr_user",
+		Password:   "pass1",
+		UUID:       "uuid",
+		SecureType: couchbaseutil.RemoteClusterSecurityTLS,
+		CA:         "ca-cert",
+	}
+
+	// The same reference on client certificate auth - no credentials to rotate.
+	mutualTLS := couchbaseutil.RemoteCluster{
+		Name:        "west-operator-managed",
+		Hostname:    "couchbases://cb-west.example.com",
+		UUID:        "uuid",
+		SecureType:  couchbaseutil.RemoteClusterSecurityTLS,
+		CA:          "ca-cert",
+		Certificate: "client-cert",
+		Key:         "client-key",
+	}
+
+	plaintext := couchbaseutil.RemoteCluster{
+		Name:     "west-operator-managed",
+		Hostname: "couchbase://cb-west.example.com",
+		Username: "xdcr_user",
+		Password: "pass1",
+		UUID:     "uuid",
+	}
+
+	// No password recorded in persistence, so there is nothing to update on behalf of.
+	noPassword := couchbaseutil.RemoteCluster{
+		Name:       "west-operator-managed",
+		Hostname:   "couchbases://cb-west.example.com",
+		Username:   "xdcr_user",
+		UUID:       "uuid",
+		SecureType: couchbaseutil.RemoteClusterSecurityTLS,
+		CA:         "ca-cert",
+	}
+
+	with := func(base couchbaseutil.RemoteCluster, mutate func(*couchbaseutil.RemoteCluster)) couchbaseutil.RemoteCluster {
+		mutate(&base)
+
+		return base
+	}
+
+	// The same reference with a rotation staged on the server, which a HTTP GET reports and the
+	// spec never does.
+	stagePending := with(current, func(r *couchbaseutil.RemoteCluster) {
+		r.Stage = &couchbaseutil.RemoteClusterStagedCredentials{Username: "xdcr_user2"}
+	})
+
+	tests := []struct {
+		name            string
+		current         *couchbaseutil.RemoteCluster // defaults to the TLS reference above
+		requested       couchbaseutil.RemoteCluster
+		supportsStaging bool
+		wantUpdate      bool
+		wantStage       bool
+	}{
+		{
+			name:      "no change",
+			requested: current,
+		},
+		{
+			// The server reports a stage, the spec never does.  Without normalising it, a
+			// pending rotation would look like a difference and update every reconcile.
+			name:            "no change, but a stage is pending",
+			current:         &stagePending,
+			requested:       current,
+			supportsStaging: true,
+		},
+		{
+			name:            "credentials changed while a stage is pending",
+			current:         &stagePending,
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
+			supportsStaging: true,
+			wantStage:       true,
+		},
+		{
+			name:            "username and password changed",
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
+			supportsStaging: true,
+			wantStage:       true,
+		},
+		{
+			name:            "password only changed",
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Password = "pass2" }),
+			supportsStaging: true,
+			wantStage:       true,
+		},
+		{
+			name:            "username only changed",
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Username = "xdcr_user2" }),
+			supportsStaging: true,
+			wantStage:       true,
+		},
+		{
+			// Split: the hostname is applied on the old credentials, the new ones are staged.
+			name: "hostname and credentials changed together",
+			requested: with(current, func(r *couchbaseutil.RemoteCluster) {
+				r.Hostname, r.Username = "couchbases://cb-west-2.example.com", "xdcr_user2"
+			}),
+			supportsStaging: true,
+			wantUpdate:      true,
+			wantStage:       true,
+		},
+		{
+			// Nothing to update on behalf of, so apply the new credentials as before.
+			name:    "hostname and credentials changed, no recorded password",
+			current: &noPassword,
+			requested: with(noPassword, func(r *couchbaseutil.RemoteCluster) {
+				r.Hostname, r.Password = "couchbases://cb-west-2.example.com", "pass2"
+			}),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			// A client certificate rotation must not be mistaken for a credential-only change.
+			name:            "client certificate only changed",
+			current:         &mutualTLS,
+			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Certificate = "new-client-cert" }),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			name:            "client key only changed",
+			current:         &mutualTLS,
+			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Key = "new-client-key" }),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			// Staging this would leave a username and a client certificate on one reference.
+			name:            "credentials added to a client certificate reference",
+			current:         &mutualTLS,
+			requested:       with(mutualTLS, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user", "pass1" }),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			name:            "CA only changed",
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.CA = "new-ca" }),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			// Same rotation on a plaintext reference, to prove TLS material isn't what makes it work.
+			name:            "password changed on a plaintext reference",
+			current:         &plaintext,
+			requested:       with(plaintext, func(r *couchbaseutil.RemoteCluster) { r.Password = "pass2" }),
+			supportsStaging: true,
+			wantStage:       true,
+		},
+		{
+			name:            "hostname only changed",
+			requested:       with(current, func(r *couchbaseutil.RemoteCluster) { r.Hostname = "couchbases://cb-west-2.example.com" }),
+			supportsStaging: true,
+			wantUpdate:      true,
+		},
+		{
+			// Below 8.5 there is nothing to stage onto, so credentials are applied as before.
+			name:       "credentials changed, server below 8.5",
+			requested:  with(current, func(r *couchbaseutil.RemoteCluster) { r.Username, r.Password = "xdcr_user2", "pass2" }),
+			wantUpdate: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := Cluster{
+				cluster: &couchbasev2.CouchbaseCluster{},
+			}
+
+			actual := current
+			if test.current != nil {
+				actual = *test.current
+			}
+
+			updates, staging := c.remoteClusterUpdates(
+				couchbaseutil.RemoteClusters{actual},
+				couchbaseutil.RemoteClusters{test.requested},
+				test.supportsStaging,
+			)
+
+			if got := len(updates) == 1; got != test.wantUpdate {
+				t.Errorf("update: got %v, want %v", got, test.wantUpdate)
+			}
+
+			if got := len(staging) == 1; got != test.wantStage {
+				t.Errorf("staging: got %v, want %v", got, test.wantStage)
+			}
+
+			// A split change must update on the current credentials, or it restarts the pipelines
+			// it was meant to spare, and stage the requested ones.
+			if len(updates) == 1 && len(staging) == 1 {
+				if updates[0].Username != actual.Username || updates[0].Password != actual.Password {
+					t.Errorf("split update credentials: got %v/%v, want %v/%v",
+						updates[0].Username, updates[0].Password, actual.Username, actual.Password)
+				}
+
+				if staging[0].Username != test.requested.Username || staging[0].Password != test.requested.Password {
+					t.Errorf("split staged credentials: got %v/%v, want %v/%v",
+						staging[0].Username, staging[0].Password, test.requested.Username, test.requested.Password)
+				}
+			}
+		})
+	}
+}

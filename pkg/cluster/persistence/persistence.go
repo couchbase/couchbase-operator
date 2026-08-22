@@ -117,17 +117,20 @@ const (
 	// it and breaks the read/modify/write contract.
 	XDCRHostname PersistentKindXDCR = "hostname"
 
-	// XDCRPassword records the password so we can compare it against the secret
-	// in Kubernetes.  This is not returned by a HTTP GET.
+	// XDCRPassword records the password in use, so it pairs with the username a HTTP GET
+	// returns.  Written when a create or update applies credentials, and on promotion.
 	XDCRPassword PersistentKindXDCR = "password"
 
-	// XDCRClientKey records the client key so we can compare it against the secret
-	// in Kubernetes.  This is not returned by a HTTP GET.
-	XDCRClientKey PersistentKindXDCR = "clientKey"
+	// XDCRStagedUsername and XDCRStagedPassword record what we last staged, to tell an
+	// already-staged rotation from a new one.  A HTTP GET reports the staged username under
+	// "stage", but only while it is still staged: once it resolves the field goes, and these
+	// are the only way left to tell a promotion from a discarded stage.  Cleared together then.
+	XDCRStagedUsername PersistentKindXDCR = "stagedUsername"
+	XDCRStagedPassword PersistentKindXDCR = "stagedPassword"
 
-	// XDCRClientCertificate records the client cert so we can compare it against the secret
-	// in Kubernetes.  This is not returned by a HTTP GET.
-	XDCRClientCertificate PersistentKindXDCR = "clientCertificate"
+	// XDCRClientKey records the client key so we can compare it against the secret
+	// in Kubernetes.  Not returned by a HTTP GET; the client certificate is, so it needs no record.
+	XDCRClientKey PersistentKindXDCR = "clientKey"
 )
 
 func getPersistentKindPrefixXDCR(connectionName string) string {
