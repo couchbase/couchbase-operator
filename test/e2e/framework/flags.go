@@ -19,6 +19,7 @@ import (
 	"github.com/couchbase/couchbase-operator/test/e2e/e2eutil"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 // RegistryConfigValue allows multiple container image registries to be passed on the command
@@ -151,6 +152,63 @@ func (b *bucketType) Set(s string) error {
 
 func (b *bucketType) String() string {
 	return string(b.value)
+}
+
+type RebalanceMode string
+
+const (
+	// RebalanceModeDefault does not touch the cluster at all, so Couchbase Server's own default
+	// applies.
+	RebalanceModeDefault RebalanceMode = "default"
+
+	// RebalanceModeFileBased pins the master switch on, so the Data Service may use file based
+	// moves.
+	RebalanceModeFileBased RebalanceMode = "file-based"
+
+	// RebalanceModeDCP pins the master switch off, so every vBucket move streams over DCP, which
+	// is the pre-8.1.0 behaviour.
+	RebalanceModeDCP RebalanceMode = "dcp"
+)
+
+// Enabled converts the mode into the value of the dataServiceFileBasedRebalanceEnabled
+// annotation.
+func (r RebalanceMode) Enabled() *bool {
+	switch r {
+	case RebalanceModeFileBased:
+		return ptr.To(true)
+	case RebalanceModeDCP:
+		return ptr.To(false)
+	default:
+		return nil
+	}
+}
+
+// rebalanceModeFlag allows the rebalance mode to be given on the command line.
+type rebalanceModeFlag struct {
+	value RebalanceMode
+}
+
+func newRebalanceModeFlag() rebalanceModeFlag {
+	return rebalanceModeFlag{value: RebalanceModeDefault}
+}
+
+func (r *rebalanceModeFlag) Set(s string) error {
+	switch mode := RebalanceMode(strings.ToLower(s)); mode {
+	case RebalanceModeDefault, RebalanceModeFileBased, RebalanceModeDCP:
+		r.value = mode
+		return nil
+	}
+
+	return fmt.Errorf("rebalance mode must be one of %v, %v or %v",
+		RebalanceModeDefault, RebalanceModeFileBased, RebalanceModeDCP)
+}
+
+func (r *rebalanceModeFlag) Type() string {
+	return "string"
+}
+
+func (r *rebalanceModeFlag) String() string {
+	return string(r.value)
 }
 
 // istioMTLSMode is an Istio MTLS mode, either permissive or strict.

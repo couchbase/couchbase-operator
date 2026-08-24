@@ -1318,11 +1318,13 @@ func TestModifyRebalanceEnabledAndSettings(t *testing.T) {
 	// Static configuration.
 	clusterSize := 1
 
-	const fileBasedRebalanceAnnotation = "cao.couchbase.com/dataServiceFileBasedRebalanceEnabled"
+	const fileBasedRebalanceAnnotation = pkgconstants.AnnotationDataServiceFileBasedRebalanceEnabled
 	// The server default for both concurrency knobs, and what an unset subfield reverts to.
 	const defaultMovesPerNode = 4
-
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	cluster := clusterOptions().
+		WithClusterAnnotations(map[string]string{fileBasedRebalanceAnnotation: "true"}).
+		WithEphemeralTopology(clusterSize).
+		MustCreate(t, kubernetes)
 
 	// Ensure defaults are set
 	e2eutil.MustVerifyFileBasedRebalanceEnabled(t, kubernetes, cluster, true, time.Minute)

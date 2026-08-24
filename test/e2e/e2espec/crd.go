@@ -661,3 +661,21 @@ func ApplySecurityContext(cluster *couchbasev2.CouchbaseCluster, platformType st
 		cluster.Spec.SecurityContext.FSGroup = &fsGroup
 	}
 }
+
+// ApplyFileBasedRebalance sets the cluster wide Data Service file based rebalance master switch,
+// so that a whole test run uses either file based or DCP rebalance.
+func ApplyFileBasedRebalance(cluster *couchbasev2.CouchbaseCluster, enabled *bool) {
+	if enabled == nil {
+		return
+	}
+
+	if _, ok := cluster.Annotations[constants.AnnotationDataServiceFileBasedRebalanceEnabled]; ok {
+		return
+	}
+
+	if cluster.Annotations == nil {
+		cluster.Annotations = map[string]string{}
+	}
+
+	cluster.Annotations[constants.AnnotationDataServiceFileBasedRebalanceEnabled] = strconv.FormatBool(*enabled)
+}

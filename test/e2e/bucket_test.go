@@ -18,6 +18,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
@@ -550,7 +551,10 @@ func TestBucketDataServiceRebalanceType(t *testing.T) {
 		},
 	})
 
-	cluster := clusterOptions().WithEphemeralTopology(1).Generate(kubernetes)
+	cluster := clusterOptions().
+		WithClusterAnnotations(map[string]string{pkgconstants.AnnotationDataServiceFileBasedRebalanceEnabled: "true"}).
+		WithEphemeralTopology(1).
+		Generate(kubernetes)
 	cluster.Spec.ClusterSettings.DataServiceMemQuota = e2espec.NewResourceQuantityMi(300)
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 

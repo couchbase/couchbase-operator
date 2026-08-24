@@ -74,6 +74,7 @@ type Framework struct {
 	PodImagePullPolicy PullPolicyFlag
 	CollectedLogLevel  int
 	TLSVersion         couchbasev2.TLSVersion
+	RebalanceMode      RebalanceMode
 
 	// TestClusters is the current set of clusters to use for a test. This
 	// list is derived from the TestCaseGroup and used by individual

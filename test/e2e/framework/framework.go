@@ -353,9 +353,9 @@ func configure() (err error) {
 	}
 
 	istioMode := newIstioMTLSModeFlag()
+	rebalanceMode := newRebalanceModeFlag()
 
 	tlsVersion := &TLSVer{}
-
 	// CLI based configuration (CI/computer friendly)
 	flag.StringVar(&params.KubeType, "platform-type",
 		"kubernetes",
@@ -482,6 +482,10 @@ func configure() (err error) {
 		"How many tests to run in parallel, must match -test.parallel exactly.")
 	flag.Var(tlsVersion, "tls-version",
 		"TLS version to use.  Either 1.0, 1.1, 1.2, or 1.3. 1.3 requires at least Couchbase Server 7.1")
+	flag.Var(&rebalanceMode, "rebalance-mode",
+		"Data Service rebalance method to use for every cluster.  Either 'default' (leave the server "+
+			"default alone), 'file-based' or 'dcp'.  Requires at least Couchbase Server 8.1.0, and is "+
+			"ignored otherwise.")
 	flag.StringVar(&params.BackupStorageClassName, "backup-storage-class",
 		"",
 		"Storage class to use for backup volumes. Falls back to the storage-class flag value if not specified. If neither are set, the platform default storage class is used.")
@@ -510,6 +514,7 @@ func configure() (err error) {
 	params.BucketType = bucket.value
 	params.IstioTLSMode = istioMode.String()
 	params.TLSVersion = tlsVersion.version
+	params.RebalanceMode = rebalanceMode.value
 
 	// Hack... if nothing is specified then it's likely the user will
 	// want platform certification.
@@ -593,6 +598,7 @@ func setup() error {
 	logrus.Info(" →  Documents: " + strconv.Itoa(Global.DocsCount))
 	logrus.Info(" →  Logging Level: " + Global.LogLevel)
 	logrus.Info(" →  TLS Version: " + Global.TLSVersion)
+	logrus.Info(" →  Rebalance Mode: " + string(Global.RebalanceMode))
 
 	logrus.Info(util.PrettyHeading("Kubernetes"))
 	logrus.Info(" →  storage class: " + Global.SharedTestFlags.StorageClassName)
@@ -671,6 +677,8 @@ func createKubeClusterObject() (*types.Cluster, error) {
 		IPv6:            Global.SharedTestFlags.IPv6,
 		TLSVersion:      &Global.TLSVersion,
 		DynamicPlatform: Global.DynamicPlatform,
+
+		FileBasedRebalanceEnabled: Global.RebalanceMode.Enabled(),
 	}
 
 	return cluster, nil

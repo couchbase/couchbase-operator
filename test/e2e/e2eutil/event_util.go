@@ -233,17 +233,27 @@ func NewEncryptionKeyUpdatedEvent(cl *couchbasev2.CouchbaseCluster, keyName stri
 // ClusterCreateSequence is a common function for generating cluster creation events.
 func ClusterCreateSequence(size int) eventschema.Validatable {
 	if size == 1 {
-		return eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded}
+		return eventschema.Sequence{
+			Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+				eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+			},
+		}
 	}
 
 	return eventschema.Sequence{
 		Validators: []eventschema.Validatable{
+			// The first pod is CBS-initialized, then the post topology reconcilers run, so a
+			// rebalance mode write lands here before the remaining pods are CBS-added.
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 			eventschema.Repeat{
-				Times:     size,
+				Times:     size - 1,
 				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		},
 	}
 }
@@ -256,15 +266,17 @@ func ClusterCreateSequence(size int) eventschema.Validatable {
 func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.ExposedFeature) eventschema.Validatable {
 	schema := eventschema.Sequence{
 		Validators: []eventschema.Validatable{
-			eventschema.Repeat{
-				Times:     size,
-				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
-			},
+			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		},
 	}
 
 	if size > 1 {
 		schema.Validators = append(schema.Validators,
+			eventschema.Repeat{
+				Times:     size - 1,
+				Validator: eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+			},
 			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
@@ -277,6 +289,7 @@ func ClusterCreateSequenceWithExposedFeatures(size int, _ ...couchbasev2.Exposed
 	// size.
 	schema.Validators = append(schema.Validators,
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonBucketCreated}},
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 	)
 
 	return schema
@@ -297,6 +310,8 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 			Validators: []eventschema.Validatable{
 				eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 				eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+				// A rebalance mode write is a second settings edit, either side of the mTLS one.
+				eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 			},
 		}
 	}
@@ -306,6 +321,8 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 			// First pod is CBS-initialized; enableMutualTLS fires on that reconcile cycle.
 			eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 			eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+			// A rebalance mode write is a second settings edit, either side of the mTLS one.
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 			// Remaining pods are created and CBS-added asynchronously.
 			eventschema.Repeat{
 				Times:     size - 1,
@@ -313,6 +330,7 @@ func ClusterCreateSequenceWithMutualTLS(size int) eventschema.Validatable {
 			},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 			eventschema.Event{Reason: k8sutil.EventReasonRebalanceCompleted},
+			eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		},
 	}
 }
@@ -350,8 +368,18 @@ func ClusterCreateSequenceWithN2N(size int, encryptionType couchbasev2.NodeToNod
 		})
 	}
 
+	// The Operator raises a ClusterSettingsEdited event when it applies the run's -rebalance-mode
+	// to a new cluster, and where that lands relative to these events depends on how the reconcile
+	// cycles fall.  It is optional because the write only happens when the requested mode differs
+	// from what the server is already doing, and it goes last so that it is only tried once no
+	// other member matches the event under the cursor, i.e. only for an event nothing else claims.
+	validators = append(validators,
+		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+	)
+
 	// Note Set must only be given validators that consume a single event, as it
-	// doesn't roll the event index back when a member fails to match.
+	// doesn't roll the event index back when a member fails to match.  Optional satisfies that:
+	// it consumes exactly one event or none, rolling the index back itself on a miss.
 	return eventschema.Set{Validators: validators}
 }
 

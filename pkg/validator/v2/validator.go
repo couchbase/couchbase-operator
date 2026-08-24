@@ -6432,8 +6432,8 @@ func checkConstraintFileBasedRebalanceSupported(_ *types.Validator, cluster *cou
 	}
 
 	return []string{
-		"Annotation 'cao.couchbase.com/dataServiceFileBasedRebalanceEnabled' has no effect on Couchbase " +
-			"Server releases before 8.1.0 and will be ignored.",
+		fmt.Sprintf("Annotation '%s' has no effect on Couchbase "+
+			"Server releases before 8.1.0 and will be ignored.", constants.AnnotationDataServiceFileBasedRebalanceEnabled),
 	}, nil
 }
 

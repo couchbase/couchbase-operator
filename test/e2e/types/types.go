@@ -86,6 +86,8 @@ type Cluster struct {
 	// TLSVersion is the Version of TLS we are testing with.
 	TLSVersion *couchbasev2.TLSVersion
 
+	FileBasedRebalanceEnabled *bool
+
 	// Dynamic configuration.
 
 	// Namespace is the namespace to use

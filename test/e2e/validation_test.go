@@ -22,6 +22,7 @@ import (
 	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	pkgconstants "github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	util_x509 "github.com/couchbase/couchbase-operator/pkg/util/x509"
@@ -2012,7 +2013,7 @@ func TestValidationRebalanceSettings(t *testing.T) {
 		fileBasedMovesErr  = `spec.cluster.rebalance.fileBasedMovesPerNode can only be set for Couchbase Server 8.1.0\+`
 		rebalanceTypeErr   = `spec.dataServiceRebalanceType can only be set for Couchbase Server 8.1.0\+`
 		annotationWarning  = `dataServiceFileBasedRebalanceEnabled.*has no effect on Couchbase Server releases before 8.1.0`
-		fileBasedRebalance = "cao.couchbase.com/dataServiceFileBasedRebalanceEnabled"
+		fileBasedRebalance = pkgconstants.AnnotationDataServiceFileBasedRebalanceEnabled
 	)
 
 	testDefs := []testDef{

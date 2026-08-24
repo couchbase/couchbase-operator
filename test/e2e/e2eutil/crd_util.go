@@ -47,6 +47,10 @@ func CreateCluster(k8s *types.Cluster, cl *couchbasev2.CouchbaseCluster) (*couch
 
 	e2espec.ApplySecurityContext(cl, k8s.PlatformType)
 
+	// Pin the Data Service rebalance method if the run asked for a specific one, so every cluster
+	// in the run rebalances the same way.
+	e2espec.ApplyFileBasedRebalance(cl, k8s.FileBasedRebalanceEnabled)
+
 	// If we left the CPU requests as default, that would have some nasty side effects
 	// e.g. things failing more frequently, so set it low enough not to interfere :D
 	if !k8s.DynamicPlatform && !k8s.DisableResourceAllocation {

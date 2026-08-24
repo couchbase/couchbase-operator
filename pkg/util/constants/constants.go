@@ -173,6 +173,10 @@ const (
 	// such as audit, configuration, or logs.
 	AnnotationDropDEKSystem = "cao.couchbase.com/dropDEKSystem"
 
+	// AnnotationDataServiceFileBasedRebalanceEnabled is the cluster wide Data Service file based
+	// rebalance master switch.
+	AnnotationDataServiceFileBasedRebalanceEnabled = "cao.couchbase.com/dataServiceFileBasedRebalanceEnabled"
+
 	AnnotationLastReconciledSpec = "operator.couchbase.com/lastReconciledSpec"
 
 	// AnnotationServerGroup records, on a member's persistent volume claim, the server
