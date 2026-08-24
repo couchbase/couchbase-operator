@@ -830,8 +830,10 @@ func (c *Cluster) cleanCAs() error {
 // chains to the user CA instead of the server's auto-generated CA.  No-op unless
 // secretSource.nodeClientSecretName is set.
 //
-// This must run before cleanCAs: until the node's client_cert is re-signed by the user CA,
-// the auto-generated CA is reported "in use by the following nodes" and DeleteCA returns 400.
+// This must run before any client certificate policy change to mandatory/hybrid, as the server
+// validates every node's client certificate inside POST /settings/clientCertAuth, and before
+// cleanCAs, as the auto-generated CA is otherwise reported "in use by the following nodes" and
+// DeleteCA returns 400.  It is idempotent, so it can run on every reconcile.
 func (c *Cluster) reloadNodeClientCerts() error {
 	if !c.cluster.IsTLSEnabled() || c.tlsCache.nodeClientCert == nil {
 		return nil
@@ -1527,6 +1529,14 @@ func (c *Cluster) updateMutualTLS() error {
 		return nil
 	}
 
+	// Install the node client certificates before anything reconciles the client certificate
+	// policy.  This has to be before the ClientAuth check below: when mTLS is enabled from
+	// "disable" the client is not populated yet, so we return early and enableMutualTLS does
+	// the POST.  updateMutualTLS runs first, so here covers both paths.
+	if err := c.reloadNodeClientCerts(); err != nil {
+		return err
+	}
+
 	// If not enabled yet, then ignore this update.
 	clientTLS := c.api.GetTLS()
 	if clientTLS.ClientAuth == nil {
@@ -1958,16 +1968,6 @@ func (c *Cluster) reconcileTLSPostTopologyChange() error {
 		return err
 	}
 
-	// If the user supplied a per-node internal client certificate, upload it to each node
-	// before cleaning CAs.  This re-signs the node's client identity with the user CA so the
-	// server's auto-generated CA is no longer "in use" and can be removed by cleanCAs (it
-	// otherwise stays pinned under mandatory client-cert auth + strict node-to-node).
-	if err := c.reloadNodeClientCerts(); err != nil {
-		return err
-	}
-
-	// Remove any unused CAs after everything else is successful, we risk locking
-	// ourselves out otherwise.
 	return c.cleanCAs()
 }
 

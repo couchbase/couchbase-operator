@@ -540,6 +540,8 @@ func registerTests() {
 		framework.NewTestDef(TestMandatoryMutualTLSWithMultipleCAsAndRotateClientPKIWithOperatorDown).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSCreateCluster).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSNodeClientCert).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSNodeClientCertEnableToMandatory).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
+		framework.NewTestDef(TestMandatoryMutualTLSNodeClientCertPlainToMandatory).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSEnable).WithTags(TagSuiteP1, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSDisable).WithTags(TagSuiteP1, TagSuitePlatform, TagFeatureTLS),
 		framework.NewTestDef(TestMandatoryMutualTLSRotateClient).WithTags(TagSuiteP1, TagFeatureTLS),

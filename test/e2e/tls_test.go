@@ -2869,6 +2869,43 @@ func TestTLSScriptCreateRestRotate(t *testing.T) {
 	e2eutil.MustCheckClusterTLS(t, kubernetes, cluster, ctx, 5*time.Minute)
 }
 
+// nodeClientSecretAnnotation points the operator at the node internal client certificate secret.
+const nodeClientSecretAnnotation = annotations.AnnotationPrefix + "networking.tls.secretSource.nodeClientSecretName"
+
+// mustCreateNodeClientCertSecret mints the node internal client certificate -- clientAuth, signed by
+// the cluster CA, carrying the SAN email Couchbase Server requires for the @internal identity -- and
+// stores it in a kubernetes.io/tls secret, returning the secret name.
+func mustCreateNodeClientCertSecret(t *testing.T, kubernetes *types.Cluster, ctx *e2eutil.TLSContext, keyEncoding e2eutil.KeyEncodingType) string {
+	validFrom := time.Now().In(time.UTC)
+	validTo := validFrom.AddDate(10, 0, 0)
+
+	nodeClientReq := e2eutil.CreateCertReq("couchbase-internal")
+	nodeClientReq.EmailAddresses = []string{"internal@internal.couchbase.com"}
+
+	nodeClientKeyPair := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, keyEncoding, e2eutil.CertTypeClient, nodeClientReq)
+
+	_, nodeClientKey, nodeClientCert, err := nodeClientKeyPair.Generate(ctx.CA, validFrom, validTo)
+	if err != nil {
+		e2eutil.Die(t, err)
+	}
+
+	name := ctx.ClusterName + "-node-client-tls"
+
+	e2eutil.MustCreateSecret(t, kubernetes, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ctx.Namespace,
+		},
+		Type: v1.SecretTypeTLS,
+		Data: map[string][]byte{
+			v1.TLSCertKey:       nodeClientCert,
+			v1.TLSPrivateKeyKey: nodeClientKey,
+		},
+	})
+
+	return name
+}
+
 // TestMandatoryMutualTLSNodeClientCert verifies the nodeClientSecretName fix (K8S-4770).
 // Under mandatory client-certificate auth + strict node-to-node encryption, Couchbase Server
 // (7.6+) pins its auto-generated CA via each node's generated internal client certificate, so
@@ -2877,10 +2914,6 @@ func TestTLSScriptCreateRestRotate(t *testing.T) {
 // cao.couchbase.com/networking.tls.secretSource.nodeClientSecretName annotation) re-signs the
 // node's client identity with our CA so the auto-generated CA goes unused and cleanCAs can remove
 // it.  Without the fix this test times out waiting for a healthy status.
-//
-// Note: Couchbase Server requires the internal client certificate to carry the
-// SAN email "internal@internal.couchbase.com" (that is how it recognises the @internal identity),
-// so we mint a dedicated client cert with that email SAN rather than reusing the operator cert.
 func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 	f := framework.Global
 
@@ -2901,30 +2934,7 @@ func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 		KeyEncoding: &keyEncoding,
 	})
 
-	// Mint the node internal client certificate: clientAuth, signed by the same CA, carrying the
-	// SAN email that Couchbase Server requires for the @internal identity.
-	validFrom := time.Now().In(time.UTC)
-	validTo := validFrom.AddDate(10, 0, 0)
-	nodeClientReq := e2eutil.CreateCertReq("couchbase-internal")
-	nodeClientReq.EmailAddresses = []string{"internal@internal.couchbase.com"}
-	nodeClientKeyPair := e2eutil.CreateKeyPairReqData(e2eutil.KeyTypeRSA, keyEncoding, e2eutil.CertTypeClient, nodeClientReq)
-	_, nodeClientKey, nodeClientCert, err := nodeClientKeyPair.Generate(ctx.CA, validFrom, validTo)
-	if err != nil {
-		e2eutil.Die(t, err)
-	}
-
-	nodeClientSecretName := ctx.ClusterName + "-node-client-tls"
-	e2eutil.MustCreateSecret(t, kubernetes, &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      nodeClientSecretName,
-			Namespace: ctx.Namespace,
-		},
-		Type: v1.SecretTypeTLS,
-		Data: map[string][]byte{
-			v1.TLSCertKey:       nodeClientCert,
-			v1.TLSPrivateKeyKey: nodeClientKey,
-		},
-	})
+	nodeClientSecretName := mustCreateNodeClientCertSecret(t, kubernetes, ctx, keyEncoding)
 
 	// Mandatory mTLS + strict N2N is the combination that arms the deadlock; the annotation
 	// points the operator at the node client certificate.
@@ -2934,11 +2944,94 @@ func TestMandatoryMutualTLSNodeClientCert(t *testing.T) {
 	if cluster.Annotations == nil {
 		cluster.Annotations = map[string]string{}
 	}
-	cluster.Annotations[annotations.AnnotationPrefix+"networking.tls.secretSource.nodeClientSecretName"] = nodeClientSecretName
+	cluster.Annotations[nodeClientSecretAnnotation] = nodeClientSecretName
 
 	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
 
 	// With the fix the cluster reaches a healthy, error-free status (cleanCAs removes the
 	// auto-generated CA); without it, cleanCAs loops on the 400 and this never succeeds.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+}
+
+// testMandatoryMutualTLSNodeClientCertTransition switches a settled cluster to mandatory client
+// certificate auth, adding the nodeClientSecretName annotation in the same update.  While the policy
+// is unset or "enable" nothing pins the auto-generated CA, so cleanCAs deletes it and every node is
+// left serving a generated client certificate signed by an untrusted CA, which the policy change is
+// then rejected for.  TestMandatoryMutualTLSNodeClientCert creates the cluster already mandatory, so
+// it cannot catch this.
+func testMandatoryMutualTLSNodeClientCertTransition(t *testing.T, initialPolicy *couchbasev2.ClientCertificatePolicy) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
+
+	clusterSize := constants.Size3
+	keyEncoding := e2eutil.KeyEncodingPKCS8
+	mandatory := couchbasev2.ClientCertificatePolicyMandatory
+	strict := couchbasev2.NodeToNodeStrict
+
+	ctx := e2eutil.MustInitClusterTLS(t, kubernetes, &e2eutil.TLSOpts{
+		Source:      e2eutil.TLSSourceCertManagerSecret,
+		KeyEncoding: &keyEncoding,
+	})
+
+	nodeClientSecretName := mustCreateNodeClientCertSecret(t, kubernetes, ctx, keyEncoding)
+
+	options := clusterOptions().WithEphemeralTopology(clusterSize)
+	if initialPolicy != nil {
+		options = options.WithMutualTLS(ctx, initialPolicy)
+	} else {
+		options = options.WithTLS(ctx)
+	}
+
+	cluster := options.Generate(kubernetes)
+	cluster.Spec.Networking.TLS.NodeToNodeEncryption = &strict
+	cluster = e2eutil.MustNewClusterFromSpec(t, kubernetes, cluster)
+
+	// Settling is what arms the bug: cleanCAs removes the auto-generated CA.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	// Policy and annotation in a single update.
+	patchset := jsonpatch.NewPatchSet().
+		Add("/metadata/annotations", map[string]string{
+			nodeClientSecretAnnotation: nodeClientSecretName,
+		}).
+		Add("/spec/networking/tls/clientCertificatePolicy", mandatory)
+
+	// With no initial policy there is no client certificate configuration at all, so the operator
+	// client secret and the paths arrive with the policy.  The validator fetches clientSecretName as
+	// soon as a policy is set, so it cannot be left out.
+	if initialPolicy == nil {
+		patchset = patchset.
+			Add("/spec/networking/tls/secretSource/clientSecretName", ctx.OperatorSecretName).
+			Add("/spec/networking/tls/clientCertificatePaths", []couchbasev2.ClientCertificatePath{
+				{
+					Path: "subject.cn",
+				},
+			})
+	}
+
+	cluster = e2eutil.MustPatchCluster(t, kubernetes, cluster, patchset, time.Minute)
+
+	// The node client certificates must be installed before the policy is set, or the request 400s
+	// on every reconcile and this times out.
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 15*time.Minute)
+
+	// Strict N2N closes the plaintext admin port, so the check has to go over TLS.
+	e2eutil.MustCheckClusterTLSStrict(t, kubernetes, cluster, ctx, 5*time.Minute)
+}
+
+// TestMandatoryMutualTLSNodeClientCertEnableToMandatory switches a cluster at "enable" to mandatory,
+// which goes through updateMutualTLS.
+func TestMandatoryMutualTLSNodeClientCertEnableToMandatory(t *testing.T) {
+	policy := couchbasev2.ClientCertificatePolicyEnable
+	testMandatoryMutualTLSNodeClientCertTransition(t, &policy)
+}
+
+// TestMandatoryMutualTLSNodeClientCertPlainToMandatory switches a TLS cluster with no client
+// certificate policy to mandatory, which goes through enableMutualTLS instead.
+func TestMandatoryMutualTLSNodeClientCertPlainToMandatory(t *testing.T) {
+	testMandatoryMutualTLSNodeClientCertTransition(t, nil)
 }
