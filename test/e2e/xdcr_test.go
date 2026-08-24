@@ -917,6 +917,65 @@ func TestXDCRReplicationBeforeSourceBucket(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
 }
 
+// TestXDCRRemoteClusterBeforeAuthSecret tests that a remote cluster can reference an
+// authentication secret that doesn't exist yet. Resources applied together have no
+// ordering, so a missing secret must not fail the cluster reconcile. The operator
+// holds the remote cluster and its replication back until the secret is created.
+func TestXDCRRemoteClusterBeforeAuthSecret(t *testing.T) {
+	// Platform configuration.
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// Both buckets exist throughout, only the authentication secret is missing.
+	sourceBucket := e2espec.DefaultBucket()
+	sourceBucket.Name = "source"
+	sourceBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+
+	targetBucket := e2espec.DefaultBucket()
+	targetBucket.Name = "target"
+	targetBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+
+	e2eutil.MustNewBucket(t, kubernetes1, sourceBucket)
+	e2eutil.MustNewBucket(t, kubernetes2, targetBucket)
+
+	// Create the clusters.
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, sourceBucket, time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, targetBucket, time.Minute)
+
+	// Point the source cluster at a remote cluster with a secret that doesn't exist.
+	// If the operator treats this as a hard error the whole reconcile stops and the
+	// cluster never goes healthy again.
+	replication := e2espec.GetReplication(sourceBucket.GetName(), targetBucket.GetName())
+
+	remoteClusterName, secretName := e2eutil.MustSetupXDCRRemoteClusterMissingSecret(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	remoteAddedEvent := e2eutil.RemoteClusterAddedEvent(sourceCluster, remoteClusterName)
+	replicationAddedEvent := e2eutil.ReplicationAddedEvent(sourceCluster, remoteClusterName, sourceBucket.GetName(), targetBucket.GetName())
+
+	// Nothing should be created while the secret is missing, and the cluster must
+	// keep reconciling.
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes1, sourceCluster, remoteAddedEvent, time.Minute)
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes1, sourceCluster, replicationAddedEvent, 10*time.Second)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+
+	// Create the secret, the remote cluster and its replication should come up on
+	// their own.
+	e2eutil.MustCreateXDCRRemoteClusterSecret(t, kubernetes1, kubernetes2, sourceCluster, secretName)
+
+	defer e2eutil.MustDeleteSecret(t, kubernetes1, secretName)
+
+	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, remoteAddedEvent, 5*time.Minute)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, replicationAddedEvent, 5*time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+}
+
 // TestXDCRFilterExp checks that the filter expressions when applied to XDCR cluster
 // is behaving as expected.
 func TestXDCRFilterExp(t *testing.T) {

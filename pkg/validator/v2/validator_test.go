@@ -1375,3 +1375,95 @@ func TestCheckConstraintBucketReplicaCountsForReconcile(t *testing.T) {
 		t.Errorf("held bucket = %q, want \"short\"", held[0].BucketName)
 	}
 }
+
+// TestCheckConstraintXDCRRemoteAuthenticationMissingSecret checks that a cluster
+// referencing an XDCR authentication secret that doesn't exist yet is admitted with
+// a warning, so it can be applied before or along with the secret.
+// Note spec.xdcr.managed is false here. The check returns early when XDCR is
+// managed, so that's the only case where it actually runs.
+func TestCheckConstraintXDCRRemoteAuthenticationMissingSecret(t *testing.T) {
+	const (
+		namespace  = "default"
+		secretName = "remote-credentials"
+	)
+
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster",
+			Namespace: namespace,
+		},
+		Spec: couchbasev2.ClusterSpec{
+			XDCR: couchbasev2.XDCR{
+				Managed: false,
+				RemoteClusters: []couchbasev2.RemoteCluster{
+					{
+						Name:                 "remote",
+						Hostname:             "remote.example.com",
+						AuthenticationSecret: func() *string { s := secretName; return &s }(),
+					},
+				},
+			},
+		},
+	}
+
+	secret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			"username": []byte("Administrator"),
+			"password": []byte("password"),
+		},
+	}
+
+	testcases := []struct {
+		name            string
+		secret          runtime.Object
+		validateSecrets bool
+		expectedWarning string
+	}{
+		{
+			name:            "missing secret is admitted with a warning",
+			secret:          nil,
+			validateSecrets: true,
+			expectedWarning: "secret remote-credentials referenced by spec.xdcr.remoteClusters[0].authenticationSecret does not exist",
+		},
+		{
+			name:            "existing secret is admitted without a warning",
+			secret:          secret,
+			validateSecrets: true,
+		},
+		{
+			name:            "secret validation disabled skips the check entirely",
+			secret:          nil,
+			validateSecrets: false,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			var objects []runtime.Object
+			if testcase.secret != nil {
+				objects = append(objects, testcase.secret)
+			}
+
+			v := types.New(k8sfake.NewSimpleClientset(objects...), couchbasefake.NewSimpleClientset(),
+				&types.ValidatorOptions{ValidateSecrets: testcase.validateSecrets})
+
+			warnings, err := checkConstraintXDCRRemoteAuthentication(v, cluster.DeepCopy())
+			if err != nil {
+				t.Errorf("expected no error but got: %s", err.Error())
+			}
+
+			joinedWarnings := strings.Join(warnings, "; ")
+
+			switch {
+			case testcase.expectedWarning == "" && len(warnings) != 0:
+				t.Errorf("expected no warnings but got: %s", joinedWarnings)
+			case testcase.expectedWarning != "" && !strings.Contains(joinedWarnings, testcase.expectedWarning):
+				t.Errorf("expected warning containing %q but got %q", testcase.expectedWarning, joinedWarnings)
+			}
+		})
+	}
+}

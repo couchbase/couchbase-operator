@@ -66,6 +66,11 @@ const (
 // marked under the other.
 const KindBucketName = "couchbase.com/bucketName"
 
+// KindXDCRRemoteCluster is a pseudo kind for the remote clusters in
+// spec.xdcr.remoteClusters. They are part of the cluster spec, not resources of
+// their own, so there is no condition to report, we only need the skip.
+const KindXDCRRemoteCluster = "couchbase.com/xdcrRemoteCluster"
+
 const (
 	// validatedDetail is the message detail on the False condition, which
 	// metav1.Condition requires to be non-empty.

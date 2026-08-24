@@ -696,6 +696,7 @@ func registerTests() {
 		framework.NewTestDef(TestXDCRRemoveRemoteClusterFromSpec).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRDeleteSourceBucketReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRReplicationBeforeSourceBucket).WithTags(TagSuiteP1, TagFeatureXDCR),
+		framework.NewTestDef(TestXDCRRemoteClusterBeforeAuthSecret).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRFilterExp).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRMismatchedConflictResolutionReconciles).WithTags(TagSuiteP1, TagFeatureXDCR),
 		framework.NewTestDef(TestXDCRRotateClientMutualTLS).WithTags(TagSuiteP1, TagFeatureTLS, TagFeatureXDCR),

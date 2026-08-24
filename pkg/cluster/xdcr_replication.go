@@ -23,6 +23,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/cluster/persistence"
 	"github.com/couchbase/couchbase-operator/pkg/errors"
+	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util/annotations"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -383,7 +384,19 @@ func (c *Cluster) generateXDCR() ([]couchbaseutil.RemoteCluster, error) {
 		if remoteCluster.AuthenticationSecret != nil {
 			secret, found := c.k8s.Secrets.Get(*remoteCluster.AuthenticationSecret)
 			if !found {
-				return nil, fmt.Errorf("%w: unable to get remote cluster authentication secret %s", errors.NewStackTracedError(errors.ErrResourceRequired), *remoteCluster.AuthenticationSecret)
+				// The secret may not exist yet, so admission only warns about it.
+				// Skip this remote cluster instead of failing the whole reconcile,
+				// we pick it up on a later cycle once the secret is created.
+				c.log.Info("Deferring XDCR remote cluster with missing authentication secret",
+					"cluster", c.namespacedName(), "remote", remoteCluster.Name, "secret", *remoteCluster.AuthenticationSecret)
+
+				c.unreconcilable.Mark(unreconcilable.Ref{
+					Kind: unreconcilable.KindXDCRRemoteCluster,
+					Name: remoteCluster.Name,
+				}, unreconcilable.ReasonDependencyMissing,
+					fmt.Sprintf("authentication secret %s does not exist", *remoteCluster.AuthenticationSecret))
+
+				continue
 			}
 
 			requested.Username = string(secret.Data["username"])
@@ -623,6 +636,12 @@ func (c *Cluster) deleteUnwantedReplications(currentReplications couchbaseutil.R
 	_, _, toDelete := c.diffReplicationStates(desiredStates, currentStates)
 
 	for _, current := range toDelete {
+		// These replications are only missing from the desired state because their
+		// remote cluster is waiting on its secret. Leave them running.
+		if c.unreconcilable.IsSkipped(unreconcilable.KindXDCRRemoteCluster, current.Create.ToCluster) {
+			continue
+		}
+
 		c.log.Info("Deleting XDCR replication", "cluster", c.namespacedName(), "replication", current.Key)
 
 		cluster, err := c.getRemoteClusterByName(current.Create.ToCluster)
@@ -778,6 +797,15 @@ func (c *Cluster) BuildDesiredReplicationStates() (map[string]DesiredReplication
 
 		// Compute the operator-managed remote cluster name deterministically.
 		generatedName := remoteCluster.Name + RemoteClusterOperatorManagedSuffix
+
+		// Skip replications for a remote cluster we held back. Its remote may not
+		// exist on the server yet, so creating them would fail. Leaving them out
+		// here is safe because deleteUnwantedReplications won't delete them.
+		if c.unreconcilable.IsSkipped(unreconcilable.KindXDCRRemoteCluster, generatedName) {
+			c.log.V(1).Info("Skipping replications for deferred XDCR remote cluster", "cluster", c.namespacedName(), "remote", generatedName)
+
+			continue
+		}
 
 		// Process migration replications first (if supported)
 		if xdcrScopesAndCollectionsSupported {
@@ -1433,6 +1461,13 @@ func (c *Cluster) reconcileXDCR() error {
 	deletes := remoteClusterDeletions(currentClusters, requestedClusters)
 	for i := range deletes {
 		cluster := &deletes[i]
+
+		// This remote cluster is only missing from the desired state because its
+		// secret isn't there yet. Deleting it would break a working connection and
+		// stop every replication using it.
+		if c.unreconcilable.IsSkipped(unreconcilable.KindXDCRRemoteCluster, cluster.Name) {
+			continue
+		}
 
 		c.log.Info("Deleting XDCR remote cluster", "cluster", c.namespacedName(), "remote", cluster.Name)
 

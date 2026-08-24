@@ -80,7 +80,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintLoggingPermissible,
 		checkConstraintLoggingSidecarTLS,
 		checkConstraintAuditLoggingPermissible,
-		checkConstraintXDCRRemoteAuthentication,
 		checkConstraintXDCRReplicationConflictLogging,
 		checkConstraintXDCRReplicationScopesAndCollectionsSupported,
 		checkConstraintXDCRReplicationRules,
@@ -143,6 +142,7 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintBucketsMeetMinReplicasCount,
 		checkConstraintBucketsThrottleReservedWithinNodeCapacity,
 		checkConstraintFileBasedRebalanceSupported,
+		checkConstraintXDCRRemoteAuthentication,
 	}
 
 	var errs []error
@@ -1030,12 +1030,15 @@ func checkConstraintAuditLoggingPermissible(_ *types.Validator, cluster *couchba
 	return nil
 }
 
-func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.XDCR.Managed {
-		return nil
+		return nil, nil
 	}
 
-	var errs []error
+	var (
+		errs     []error
+		warnings []string
+	)
 
 	for i, remoteCluster := range cluster.Spec.XDCR.RemoteClusters {
 		if v.Options.ValidateSecrets && remoteCluster.AuthenticationSecret != nil {
@@ -1043,20 +1046,27 @@ func checkConstraintXDCRRemoteAuthentication(v *types.Validator, cluster *couchb
 
 			_, found, err := v.Abstraction.GetSecret(cluster.Namespace, secretName)
 			if err != nil {
+				// We couldn't read the secret, so we don't know if it exists.
+				// Don't warn about it being missing as well.
 				errs = append(errs, err)
+
+				continue
 			}
 
+			// The secret may not be created yet, which is fine when resources are
+			// applied together. Let the cluster through with a warning, the operator
+			// waits for the secret before connecting to the remote cluster.
 			if !found {
-				errs = append(errs, fmt.Errorf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret must exist", secretName, i))
+				warnings = append(warnings, fmt.Sprintf("secret %s referenced by spec.xdcr.remoteClusters[%d].authenticationSecret does not exist, the remote cluster connection will not be established until it is created", secretName, i))
 			}
 		}
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 func areKeyspacesValid(allowRule couchbasev2.CouchbaseAllowReplicationMapping) error {

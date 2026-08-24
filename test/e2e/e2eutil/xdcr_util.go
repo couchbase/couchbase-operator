@@ -409,6 +409,43 @@ func MustSetupXDCRReplicationGeneric(t *testing.T, srcK8s, dstK8s *types.Cluster
 	return info, clusterName
 }
 
+// MustSetupXDCRRemoteClusterMissingSecret adds a remote cluster whose authentication
+// secret doesn't exist, and creates the replication. It waits for nothing, the caller
+// checks the remote cluster is held back and then creates the secret with
+// MustCreateXDCRRemoteClusterSecret. Returns the remote cluster and secret names.
+func MustSetupXDCRRemoteClusterMissingSecret(t *testing.T, srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (string, string) {
+	replication.Namespace = srcK8s.Namespace
+
+	if _, err := srcK8s.CRClient.CouchbaseV2().CouchbaseReplications(source.Namespace).Create(context.Background(), replication, metav1.CreateOptions{}); err != nil {
+		Die(t, err)
+	}
+
+	// We don't create this, the operator has to cope with the missing secret.
+	secretName := fmt.Sprintf("%s-auth-deferred", target.Name)
+
+	clusterName, err := createRemoteClusterGeneric(srcK8s, dstK8s, source, target, secretName)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return clusterName, secretName
+}
+
+// MustCreateXDCRRemoteClusterSecret creates the named XDCR authentication secret in
+// the source namespace, using the target cluster's credentials. Caller must delete it.
+func MustCreateXDCRRemoteClusterSecret(t *testing.T, srcK8s, dstK8s *types.Cluster, source *couchbasev2.CouchbaseCluster, name string) {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: dstK8s.DefaultSecret.Data,
+	}
+
+	if _, err := srcK8s.KubeClient.CoreV1().Secrets(source.Namespace).Create(context.Background(), secret, metav1.CreateOptions{}); err != nil {
+		Die(t, err)
+	}
+}
+
 // establishXDCRReplicationGenericWithoutUUID creates a remote cluster without UUID and a replication from the source bucket to the destination
 // bucket. This tests the optional UUID functionality where the operator should auto-resolve the UUID.
 func establishXDCRReplicationGenericWithoutUUID(srcK8s, dstK8s *types.Cluster, source, target *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplication) (*XDCRInfo, error) {
