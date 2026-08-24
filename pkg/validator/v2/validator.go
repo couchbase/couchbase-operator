@@ -2738,14 +2738,14 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 	return warnings, nil
 }
 
-func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseReplication) error {
+func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseReplication) ([]string, error) {
 	if checkAnnotationSkipValidation(r.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	err := annotations.Populate(&r.Spec, r.Annotations)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	mobileValue := ""
@@ -2756,19 +2756,31 @@ func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseRep
 	switch mobileValue {
 	case "", "Active", "Off":
 	default:
-		return fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
+		return nil, fmt.Errorf("spec.mobile must be either 'Active' or 'Off'")
 	}
 
 	clusters, err := getReplicationRelatedClusters(v, r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var errs []error
+	var (
+		errs     []error
+		warnings []string
+	)
 
 	for _, cluster := range clusters {
 		if err := validateReplicationBucketValid(v, cluster, &r.Spec); err != nil {
-			errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket must be valid: %w", r.Spec.Bucket, err))
+			// The bucket resource may simply not have been created yet, which is a
+			// legitimate ordering when applying a set of resources at once. Admit the
+			// replication and warn, the operator holds off starting the replication
+			// until the bucket exists. Anything else means the bucket does exist but
+			// cannot be replicated, which is a hard failure.
+			if isBucketNotFoundError(err) {
+				warnings = append(warnings, fmt.Sprintf("bucket %s referenced by spec.bucket does not exist in couchbaseclusters.couchbase.com/%s, the replication will not start until it is created", r.Spec.Bucket, cluster.Name))
+			} else {
+				errs = append(errs, fmt.Errorf("bucket %s referenced by spec.bucket must be valid: %w", r.Spec.Bucket, err))
+			}
 		}
 
 		if err := validateReplicationConflictLogging(v, cluster, &r.Spec); err != nil {
@@ -2777,10 +2789,10 @@ func CheckConstraintsReplication(v *types.Validator, r *couchbasev2.CouchbaseRep
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 func CheckConstraintsCouchbaseUser(v *types.Validator, user *couchbasev2.CouchbaseUser) ([]string, error) {
@@ -4103,6 +4115,28 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 	return nil
 }
 
+// bucketNotFoundError is returned when the bucket referenced by an XDCR replication
+// has no corresponding bucket resource. It is distinguished from the other
+// replication validation failures because a missing bucket may simply mean the bucket
+// resource has not been created yet, which is legitimate, DAC demotes it to a
+// warning so the replication can be persisted, while reconciliation uses it to hold
+// off starting the replication until the bucket exists.
+type bucketNotFoundError struct {
+	bucket string
+}
+
+func (e *bucketNotFoundError) Error() string {
+	return fmt.Sprintf("bucket %s not found", e.bucket)
+}
+
+// isBucketNotFoundError reports whether err was caused by a bucket resource that does
+// not exist, as opposed to one that exists but cannot be replicated.
+func isBucketNotFoundError(err error) bool {
+	var notFound *bucketNotFoundError
+
+	return goerrors.As(err, &notFound)
+}
+
 // validateReplicationBucketValid ensures the specified Couchbase bucket exists.
 func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, rs *couchbasev2.CouchbaseReplicationSpec) error {
 	if !cluster.Spec.Buckets.Managed {
@@ -4149,7 +4183,7 @@ func validateReplicationBucketValid(v *types.Validator, cluster *couchbasev2.Cou
 		return nil
 	}
 
-	return fmt.Errorf("bucket %s not found", bucketName)
+	return &bucketNotFoundError{bucket: bucketName}
 }
 
 func validateReplicationConflictLogging(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, replication *couchbasev2.CouchbaseReplicationSpec) error {

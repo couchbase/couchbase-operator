@@ -865,6 +865,58 @@ func TestXDCRDeleteSourceBucketReconciles(t *testing.T) {
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
 }
 
+// TestXDCRReplicationBeforeSourceBucket tests that a replication may be created
+// before the bucket it references. Applying a set of resources at once gives no
+// ordering guarantees, so the replication must be admitted rather than rejected,
+// and the operator must hold off starting it until the source bucket exists.
+func TestXDCRReplicationBeforeSourceBucket(t *testing.T) {
+	// Platform configuration.
+	kubernetes1, kubernetes2, cleanup := framework.Global.SetupTestRemote(t)
+	defer cleanup()
+
+	framework.Requires(t, kubernetes1).CouchbaseBucket().NotVersion("6.5.1").IstioDisabled()
+
+	// Static configuration.
+	clusterSize := 1
+
+	// The buckets are deliberately named differently so that the source bucket can be
+	// missing while the target bucket exists, even when replicating to self.
+	sourceBucket := e2espec.DefaultBucket()
+	sourceBucket.Name = "source-late"
+	sourceBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+
+	targetBucket := e2espec.DefaultBucket()
+	targetBucket.Name = "target"
+	targetBucket.Spec.MemoryQuota = e2espec.NewResourceQuantityMi(128)
+	e2eutil.MustNewBucket(t, kubernetes2, targetBucket)
+
+	// Create the clusters. Only the target bucket exists at this point.
+	sourceCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes1)
+	targetCluster := clusterOptions().WithEphemeralTopology(clusterSize).WithGenericNetworking().MustCreate(t, kubernetes2)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes2, targetCluster, targetBucket, time.Minute)
+
+	// Create the replication before its source bucket. This fails if admission
+	// rejects the missing bucket instead of warning about it.
+	replication := e2espec.GetReplication(sourceBucket.GetName(), targetBucket.GetName())
+	_, remoteClusterName := e2eutil.MustSetupXDCRReplicationGeneric(t, kubernetes1, kubernetes2, sourceCluster, targetCluster, replication)
+
+	addedEvent := e2eutil.ReplicationAddedEvent(sourceCluster, remoteClusterName, sourceBucket.GetName(), targetBucket.GetName())
+
+	// The replication must be held until the source bucket exists, and the cluster must
+	// keep reconciling in the meantime.
+	e2eutil.MustNotObserveClusterEventFor(t, kubernetes1, sourceCluster, addedEvent, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+
+	// Create the source bucket, at which point the replication must start on its own.
+	// Wait on the event alone, it is only emitted once the bucket exists on the server,
+	// and the bucket is published to the cluster status by the same reconcile pass that
+	// starts the replication, so waiting for the bucket first can miss the event.
+	e2eutil.MustNewBucket(t, kubernetes1, sourceBucket)
+	e2eutil.MustWaitForClusterEvent(t, kubernetes1, sourceCluster, addedEvent, 5*time.Minute)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes1, sourceCluster, sourceBucket, time.Minute)
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes1, sourceCluster, 2*time.Minute)
+}
+
 // TestXDCRFilterExp checks that the filter expressions when applied to XDCR cluster
 // is behaving as expected.
 func TestXDCRFilterExp(t *testing.T) {

@@ -14,8 +14,12 @@ import (
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"testing"
 )
@@ -1060,6 +1064,117 @@ func TestCheckBucketThrottleSettings(t *testing.T) {
 				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
 			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
 				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+// TestCheckConstraintsReplicationMissingBucket covers the admission behaviour of a
+// CouchbaseReplication whose source bucket resource does not exist yet. Such a
+// replication must be admitted with a warning so that it can be applied before, or
+// alongside, the bucket it references, a bucket that does exist but cannot be
+// replicated remains a hard failure.
+func TestCheckConstraintsReplicationMissingBucket(t *testing.T) {
+	const (
+		namespace  = "default"
+		bucketName = "source"
+	)
+
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster",
+			Namespace: namespace,
+		},
+		Spec: couchbasev2.ClusterSpec{
+			Buckets: couchbasev2.Buckets{
+				Managed: true,
+			},
+			XDCR: couchbasev2.XDCR{
+				Managed: true,
+				RemoteClusters: []couchbasev2.RemoteCluster{
+					{
+						Name:     "remote",
+						Hostname: "remote.example.com",
+					},
+				},
+			},
+		},
+	}
+
+	replication := &couchbasev2.CouchbaseReplication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "replication",
+			Namespace: namespace,
+		},
+		Spec: couchbasev2.CouchbaseReplicationSpec{
+			Bucket:       bucketName,
+			RemoteBucket: bucketName,
+		},
+	}
+
+	couchbaseBucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bucketName,
+			Namespace: namespace,
+		},
+	}
+
+	memcachedBucket := &couchbasev2.CouchbaseMemcachedBucket{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      bucketName,
+			Namespace: namespace,
+		},
+	}
+
+	testcases := []struct {
+		name            string
+		bucket          runtime.Object
+		expectedErr     string
+		expectedWarning string
+	}{
+		{
+			name:            "missing bucket resource is admitted with a warning",
+			bucket:          nil,
+			expectedWarning: "bucket source referenced by spec.bucket does not exist",
+		},
+		{
+			name:   "existing bucket resource is admitted without a warning",
+			bucket: couchbaseBucket,
+		},
+		{
+			name:        "memcached bucket remains a hard failure",
+			bucket:      memcachedBucket,
+			expectedErr: "memcached bucket source cannot be replicated",
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			objects := []runtime.Object{cluster, replication}
+			if testcase.bucket != nil {
+				objects = append(objects, testcase.bucket)
+			}
+
+			v := types.New(k8sfake.NewSimpleClientset(), couchbasefake.NewSimpleClientset(objects...), nil)
+
+			warnings, err := CheckConstraintsReplication(v, replication.DeepCopy())
+
+			switch {
+			case testcase.expectedErr == "" && err != nil:
+				t.Errorf("expected no error but got: %s", err.Error())
+			case testcase.expectedErr != "" && err == nil:
+				t.Errorf("expected error containing %q but got none", testcase.expectedErr)
+			case testcase.expectedErr != "" && !strings.Contains(err.Error(), testcase.expectedErr):
+				t.Errorf("expected error containing %q but got %q", testcase.expectedErr, err.Error())
+			}
+
+			joinedWarnings := strings.Join(warnings, "; ")
+
+			switch {
+			case testcase.expectedWarning == "" && len(warnings) != 0:
+				t.Errorf("expected no warnings but got: %s", joinedWarnings)
+			case testcase.expectedWarning != "" && !strings.Contains(joinedWarnings, testcase.expectedWarning):
+				t.Errorf("expected warning containing %q but got %q", testcase.expectedWarning, joinedWarnings)
 			}
 		})
 	}

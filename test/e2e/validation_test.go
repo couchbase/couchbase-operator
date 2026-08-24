@@ -3262,10 +3262,14 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 		// These tests need a cluster to already exist when the replication is
 		// admitted, so they target replication2 which is created after the cluster.
 		{
-			name:           "TestValidateXDCRReplicationBucketExists",
-			mutations:      patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "huggy-bear")},
-			shouldFail:     true,
-			expectedErrors: []string{`bucket huggy-bear referenced by spec.bucket must be valid: bucket huggy-bear not found`},
+			// A bucket that does not exist yet is only a warning, resources may be
+			// applied in any order, and the operator holds the replication until the
+			// bucket appears. A bucket that exists but cannot be replicated, as
+			// covered by the next test, remains an error.
+			name:             "TestValidateXDCRReplicationBucketMissingWarns",
+			mutations:        patchMap{"replication2": jsonpatch.NewPatchSet().Replace("/spec/bucket", "travel-sample")},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket travel-sample referenced by spec.bucket does not exist`},
 		},
 		{
 			name:           "TestValidateXDCRReplicationBucketTypeInvalid",
@@ -3282,11 +3286,13 @@ func TestNegValidationCreateCouchbaseReplication(t *testing.T) {
 		{
 			// When a CouchbaseBucket has spec.name set, replications must reference
 			// that explicit name, not the CRD's resource name (which doesn't exist
-			// on the server). This test confirms the operator rejects that mistake.
-			name:           "TestValidateXDCRSourceNamePrecedence",
-			mutations:      patchMap{"replication3": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
-			shouldFail:     true,
-			expectedErrors: []string{`spec.bucket`},
+			// on the server). The mistake is indistinguishable from a bucket that has
+			// not been created yet, so it is reported as a warning and the replication
+			// waits for a bucket that will never appear.
+			name:             "TestValidateXDCRSourceNamePrecedence",
+			mutations:        patchMap{"replication3": jsonpatch.NewPatchSet().Replace("/spec/bucket", "bucket1")},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket bucket1 referenced by spec.bucket does not exist`},
 		},
 		// Scopes and collections tests - this is only validation checks so does not actually need server 7 to run.
 		// For replication we can source and target either a scope or a scope.collection which is
