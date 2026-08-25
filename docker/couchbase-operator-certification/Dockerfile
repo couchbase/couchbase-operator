@@ -14,8 +14,7 @@ FROM dhi.io/debian-base:trixie-dev AS extractor
 
 # Update apt, install bzip2, and stage the files.
 # The wildcard /usr/lib/*/ gracefully catches both x86_64 and aarch64 paths.
-RUN apt-get update && apt-get install -y --no-install-recommends --allow-downgrades \
-    bzip2 libbz2-1.0=1.0.8-6 && \
+RUN apt-get update && apt-get install -y --no-install-recommends bzip2 && \
     mkdir -p /extra-bins && \
     cp /usr/bin/bzip2 /extra-bins/bzip2 && \
     cp /usr/lib/*/libbz2.so.1* /extra-bins/

@@ -140,10 +140,12 @@ func getFailedTests(testSuiteResults map[string]*JUnitTestSuites, numReruns int)
 	} else {
 		latestRerunSuiteName := fmt.Sprintf("rerun_%d", numReruns-1)
 
-		for _, testSuite := range testSuiteResults[latestRerunSuiteName].TestSuites {
-			for _, testCase := range testSuite.TestCases {
-				if testCase.Failure != nil {
-					failedTestsMap[testCase.Name] = struct{}{}
+		if latestRerun, ok := testSuiteResults[latestRerunSuiteName]; ok {
+			for _, testSuite := range latestRerun.TestSuites {
+				for _, testCase := range testSuite.TestCases {
+					if testCase.Failure != nil {
+						failedTestsMap[testCase.Name] = struct{}{}
+					}
 				}
 			}
 		}

@@ -219,13 +219,13 @@ pipeline {
 
                 // Extract the results.
                 try {
-                  sh "tar xf ${suite}.tar.bz2"
+                  retry(3) { sh "tar xf ${suite}.tar.bz2" }
                 } catch (Exception e) {
                   echo "Caught Exception: extract ${suite}.tar.bz2: ${e.message}"
                   currentBuild.result = 'UNSTABLE'
                 }
                 try {
-                  sh 'tar xf results.tar.bz'
+                  retry(3) { sh 'tar xf results.tar.bz' }
                 } catch (Exception e) {
                   echo "Caught Exception: extract ${suite}.tar.bz2/results.tar.bz: ${e.message}"
                   currentBuild.result = 'UNSTABLE'
@@ -344,13 +344,13 @@ pipeline {
 
           // Extract the results.
           try {
-            sh 'tar xf custom.tar.bz2'
+            retry(3) { sh 'tar xf custom.tar.bz2' }
           } catch (Exception e) {
             echo "Caught Exception: extract custom.tar.bz2: ${e.message}"
             currentBuild.result = 'UNSTABLE'
           }
           try {
-            sh 'tar xf results.tar.bz'
+            retry(3) { sh 'tar xf results.tar.bz' }
           } catch (Exception e) {
             echo "Caught Exception: extract custom.tar.bz2/results.tar.bz: ${e.message}"
             currentBuild.result = 'UNSTABLE'
@@ -489,13 +489,13 @@ pipeline {
 
             // Extract the results.
             try {
-              sh 'tar xf first_rerun.tar.bz2'
+              retry(3) { sh 'tar xf first_rerun.tar.bz2' }
             } catch (Exception e) {
               echo "Caught Exception: extract first_rerun.tar.bz2: ${e.message}"
               currentBuild.result = 'UNSTABLE'
             }
             try {
-              sh 'tar xf results.tar.bz'
+              retry(3) { sh 'tar xf results.tar.bz' }
             } catch (Exception e) {
               echo "Caught Exception: extract first_rerun.tar.bz2/results.tar.bz: ${e.message}"
               currentBuild.result = 'UNSTABLE'
@@ -573,7 +573,8 @@ pipeline {
           def failedTestsStr = ''
 
           // Running the Go Script which gets all the failed tests by parsing all the XMLs.
-          sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=1"
+          // numReruns=2 tells the script to only look at rerun_1's results (see getFailedTests), not the original suite runs.
+          sh "go run ./jenkins/qa/resultsXML.go -jobBuildNumber=${env.BUILD_NUMBER} -numReruns=2"
 
           // Reading all the failed tests.
           try {
@@ -631,14 +632,14 @@ pipeline {
 
             // Extract the results.
             try {
-              sh 'tar xf second_rerun.tar.bz2'
+              retry(3) { sh 'tar xf second_rerun.tar.bz2' }
             } catch (Exception e) {
               echo "Caught Exception: extract second_rerun.tar.bz2: ${e.message}"
               currentBuild.result = 'UNSTABLE'
               return
             }
             try {
-              sh 'tar xf results.tar.bz'
+              retry(3) { sh 'tar xf results.tar.bz' }
             } catch (Exception e) {
               echo "Caught Exception: extract second_rerun.tar.bz2/results.tar.bz: ${e.message}"
               currentBuild.result = 'UNSTABLE'
