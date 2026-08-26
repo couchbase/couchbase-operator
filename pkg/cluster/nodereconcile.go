@@ -2115,26 +2115,34 @@ func (c *Cluster) rollbackMethod() couchbasev2.RollbackMethod {
 	}
 }
 
-// minActualBucketReplicas returns the smallest replica count across all buckets, and
-// whether there were any. Read from Couchbase, not the bucket CRDs: the guards exist to
-// avoid issuing a call the server would reject, so they must agree with the server.
-func (c *Cluster) minActualBucketReplicas() (int, bool, error) {
+// actualBucketReplicaBounds returns the smallest and largest replica count across all
+// buckets, and whether there were any. Both ends are needed because the two rollback
+// methods bind on opposite buckets: failover loses vBuckets on the least-replicated one,
+// while rebalance-out has to keep a full replica chain placeable for the most-replicated
+// one. Read from Couchbase, not the bucket CRDs: the guards exist to avoid issuing a call
+// the server would reject, so they must agree with the server.
+func (c *Cluster) actualBucketReplicaBounds() (int, int, bool, error) {
 	buckets := couchbaseutil.BucketList{}
 	if err := couchbaseutil.ListBuckets(&buckets).On(c.api, c.readyMembers()); err != nil {
-		return 0, false, err
+		return 0, 0, false, err
 	}
 
-	minReplicas := 0
+	minReplicas, maxReplicas := 0, 0
 	found := false
 
 	for _, bucket := range buckets {
-		if !found || bucket.BucketReplicas < minReplicas {
-			minReplicas = bucket.BucketReplicas
+		if !found {
+			minReplicas, maxReplicas = bucket.BucketReplicas, bucket.BucketReplicas
 			found = true
+
+			continue
 		}
+
+		minReplicas = min(minReplicas, bucket.BucketReplicas)
+		maxReplicas = max(maxReplicas, bucket.BucketReplicas)
 	}
 
-	return minReplicas, found, nil
+	return minReplicas, maxReplicas, found, nil
 }
 
 // clusteredDataMembers counts clustered members running the data service. The caller's
@@ -2159,20 +2167,21 @@ func (r *ReconcileMachine) clusteredDataMembers(c *Cluster) int {
 
 // clampRollbackBatch returns how many nodes may be removed in one rollback batch, or
 // zero when no batch is safe on this topology and the caller must revert to swap.
-func clampRollbackBatch(method couchbasev2.RollbackMethod, candidates, replicas int, haveBuckets bool, dataNodes, callableMembers int) int {
+func clampRollbackBatch(method couchbasev2.RollbackMethod, candidates, minReplicas, maxReplicas int, haveBuckets bool, dataNodes, callableMembers int) int {
 	// Already clamped to maxUpgradable by selectUpgradeCandidatesIgnoringOrchestrator.
 	batch := candidates
 
 	switch method {
 	case couchbasev2.RollbackMethodConstrainedFailover:
 		if haveBuckets {
-			// Couchbase refuses a graceful failover that would lose vBuckets.
-			if replicas < 1 {
+			// Couchbase refuses a graceful failover that would lose vBuckets, so the
+			// least-replicated bucket binds.
+			if minReplicas < 1 {
 				return 0
 			}
 
 			// Leave a replica serving, as multipleInPlaceUpgradesSupported does.
-			batch = min(batch, replicas-1)
+			batch = min(batch, minReplicas-1)
 		}
 
 		// Failing over half the cluster loses the orchestrator quorum.
@@ -2185,10 +2194,13 @@ func clampRollbackBatch(method couchbasev2.RollbackMethod, candidates, replicas 
 		// Not negotiable: Couchbase refuses to fail over the last KV node.
 		batch = min(batch, dataNodes-1)
 	case couchbasev2.RollbackMethodConstrainedRebalanceOut:
-		// Survivors must still place a full chain: replicas+1 distinct data nodes.
-		// Subsumes keeping one data node, including at zero replicas.
+		// Survivors must still place a full chain for every bucket: maxReplicas+1
+		// distinct data nodes, so the most-replicated bucket binds. Taking the least
+		// replicated one instead let a replica-1 bucket authorise a batch that left a
+		// replica-2 bucket under-placed (K8S-4884). Subsumes keeping one data node,
+		// including at zero replicas.
 		if haveBuckets {
-			batch = min(batch, dataNodes-replicas-1)
+			batch = min(batch, dataNodes-maxReplicas-1)
 		} else {
 			batch = min(batch, dataNodes-1)
 		}
@@ -2202,18 +2214,19 @@ func clampRollbackBatch(method couchbasev2.RollbackMethod, candidates, replicas 
 // rollbackBatchSize gathers the cluster state clampRollbackBatch needs and reports
 // what it decided.
 func (r *ReconcileMachine) rollbackBatchSize(c *Cluster, method couchbasev2.RollbackMethod, candidates int) (int, error) {
-	replicas, haveBuckets, err := c.minActualBucketReplicas()
+	minReplicas, maxReplicas, haveBuckets, err := c.actualBucketReplicaBounds()
 	if err != nil {
 		return 0, err
 	}
 
 	dataNodes := r.clusteredDataMembers(c)
 
-	batch := clampRollbackBatch(method, candidates, replicas, haveBuckets, dataNodes, len(c.callableMembers))
+	batch := clampRollbackBatch(method, candidates, minReplicas, maxReplicas, haveBuckets, dataNodes, len(c.callableMembers))
 	if batch == 0 {
 		log.Info("[WARN] No safe rollback batch for this topology, reverting to SwapRebalance",
 			"cluster", c.namespacedName(), "rollbackMethod", method, "candidates", candidates,
-			"replicas", replicas, "dataNodes", dataNodes, "callableMembers", len(c.callableMembers))
+			"minReplicas", minReplicas, "maxReplicas", maxReplicas, "dataNodes", dataNodes,
+			"callableMembers", len(c.callableMembers))
 
 		return 0, nil
 	}
@@ -2221,7 +2234,8 @@ func (r *ReconcileMachine) rollbackBatchSize(c *Cluster, method couchbasev2.Roll
 	if batch < candidates {
 		log.Info("Reducing rollback batch to stay within safety limits",
 			"cluster", c.namespacedName(), "rollbackMethod", method, "candidates", candidates,
-			"batch", batch, "replicas", replicas, "dataNodes", dataNodes, "callableMembers", len(c.callableMembers))
+			"batch", batch, "minReplicas", minReplicas, "maxReplicas", maxReplicas,
+			"dataNodes", dataNodes, "callableMembers", len(c.callableMembers))
 	}
 
 	return batch, nil
