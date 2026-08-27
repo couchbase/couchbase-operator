@@ -2224,7 +2224,7 @@ func TestServerGroupUpgradeOrderWithArbiterNodes(t *testing.T) {
 	classSize := 2
 
 	// Create a cluster with server groups enabled
-	cluster := clusterOptionsUpgrade().WithMixedTopology(classSize).Generate(kubernetes)
+	cluster := clusterOptionsUpgrade().WithMixedTopologyNoEventing(classSize).Generate(kubernetes)
 
 	// Add an arbiter serverclass to the cluster at the start of the cluster servers list.
 	cluster.Spec.Servers = append([]couchbasev2.ServerConfig{{
