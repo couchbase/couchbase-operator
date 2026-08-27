@@ -757,7 +757,7 @@ pipeline {
             def xmlFile = "${env.BUILD_NUMBER}_${suite}_modified.xml"
 
             if (fileExists(xmlFile)) {
-              junit xmlFile
+              junit testResults: xmlFile, skipPublishingChecks: true
             } else {
               echo "File ${xmlFile} does not exist."
             }
