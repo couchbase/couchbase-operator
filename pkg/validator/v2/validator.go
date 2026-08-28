@@ -105,7 +105,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintPublicNetworking,
 		checkConstraintBucketNames,
 		checkConstraintBucketSynchronization,
-		checkConstraintMemoryAllocations,
 		checkConstraintMTLSPaths,
 		checkConstraintAutoCompactionCluster,
 		checkConstraintLDAPAuthentication,
@@ -124,7 +123,6 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkClusterBackupConstraints,
 		checkConstraintsDataSettings,
 		checkConstraintsIndexerSettings,
-		checkConstraintEncryptionKeys,
 		checkConstraintsPasswordPolicy,
 		checkConstraintsUpgrade,
 		checkConstraintsRebalanceSettings,
@@ -140,6 +138,8 @@ func CheckConstraints(v *types.Validator, cluster *couchbasev2.CouchbaseCluster)
 		checkConstraintsDeprecatedNetworkingOptions,
 		checkConstraintDeprecatedAnnotations,
 		checkConstraintDeprecatedRBACRoles,
+		checkConstraintMemoryAllocations,
+		checkConstraintEncryptionKeys,
 		checkConstraintBucketsMeetMinReplicasCount,
 		checkConstraintBucketsThrottleReservedWithinNodeCapacity,
 		checkConstraintFileBasedRebalanceSupported,
@@ -1350,6 +1350,21 @@ type UnreconcilableReplication struct {
 	Message string
 }
 
+// UnreconcilableBucket identifies one bucket the Operator has to leave alone for
+// now, and why.
+//
+// It is keyed by the Couchbase-side bucket name rather than by kind and
+// metadata.name, because that is the name the bucket reconciler asks about and
+// the unreconcilable tracker resolves it back to the owning CR itself.
+type UnreconcilableBucket struct {
+	// BucketName is the Couchbase-side bucket name, which is spec.name where that
+	// is set and metadata.name otherwise.
+	BucketName string
+
+	// Message is why the bucket cannot be reconciled yet, and what will release it.
+	Message string
+}
+
 func CheckConstraintXDCRReplicationBucketsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]UnreconcilableReplication, error) {
 	if !cluster.Spec.XDCR.Managed {
 		return nil, nil
@@ -1995,8 +2010,14 @@ func checkConstraintBucketSynchronization(_ *types.Validator, cluster *couchbase
 
 // checkConstraintMemoryAllocations checks that all buckets referenced by this cluster
 // have total memory requirements less than or equal to the data service memory quota.
-func checkConstraintMemoryAllocations(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
-	return validateMemoryConstraints(v, cluster, nil)
+//
+// Over-allocation is a warning rather than a rejection. The Operator re-runs this
+// check against the live CouchbaseCluster on every reconcile, so rejecting here
+// would not merely block one edit: it would brand the whole cluster unreconcilable
+// for as long as any one of its buckets asked for too much. The buckets are held
+// individually instead — see validationrunner.ValidateBucketsInAbeyance.
+func checkConstraintMemoryAllocations(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+	return warnOnBucketMemoryQuota(validateMemoryConstraints(v, cluster, nil))
 }
 
 // checkConstraintMTLSPaths checks that when mTLS is enabled, then paths are specified
@@ -2347,16 +2368,20 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
+	if w, err := warnOnBucketMemoryQuota(validateMemoryConstraints(v, bucket, cluster)); err != nil {
 		errs = append(errs, err)
+	} else {
+		warnings = append(warnings, w...)
 	}
 
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.BucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := checkBucketReplicasCount(v, bucket, cluster); err != nil {
+	if w, err := checkBucketReplicasCount(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
+	} else {
+		warnings = append(warnings, w...)
 	}
 
 	if err := checkConstraintAutoCompactionBucket(bucket.Spec.AutoCompaction); err != nil {
@@ -2384,7 +2409,16 @@ func CheckConstraintsBucket(v *types.Validator, bucket *couchbasev2.CouchbaseBuc
 	}
 
 	if err := checkBucketEncryptionAtRestSettings(v, bucket); err != nil {
-		errs = append(errs, err)
+		// The key resource may simply not have been created yet, which is a
+		// legitimate ordering when applying a set of resources at once. Admit the
+		// bucket and warn; the Operator holds off creating or updating it until
+		// the key exists. Anything else means the key does exist but cannot
+		// encrypt buckets, which is a hard failure.
+		if isEncryptionKeyNotFoundError(err) {
+			warnings = append(warnings, encryptionKeyNotFoundWarning(err))
+		} else {
+			errs = append(errs, err)
+		}
 	}
 
 	if err := checkBucketUnsupportedFields(v, bucket, cluster); err != nil {
@@ -2494,7 +2528,7 @@ func checkBucketEncryptionAtRestSettings(v *types.Validator, bucket *couchbasev2
 
 		key, ok := keyMap[keyName]
 		if !ok {
-			return fmt.Errorf("spec.encryptionAtRest.keyName %s does not exist for cluster %s", keyName, cluster.Name)
+			return &encryptionKeyNotFoundError{keyName: keyName, cluster: cluster.Name}
 		}
 
 		if !key.Spec.Usage.AllBuckets {
@@ -2502,6 +2536,93 @@ func checkBucketEncryptionAtRestSettings(v *types.Validator, bucket *couchbasev2
 		}
 	}
 	return nil
+}
+
+// encryptionKeyNotFoundError is returned when a bucket's
+// spec.encryptionAtRest.keyName names a CouchbaseEncryptionKey that the cluster
+// does not select.
+//
+// Much like a replication's source bucket, a missing key may simply mean the key
+// resource has not been created yet, which is a legitimate ordering when applying
+// a set of resources at once. It is therefore kept apart from the key existing but
+// being unusable: admission demotes this one to a warning so the bucket can be
+// persisted, and reconciliation uses it to hold the bucket until the key appears.
+type encryptionKeyNotFoundError struct {
+	keyName string
+	cluster string
+}
+
+func (e *encryptionKeyNotFoundError) Error() string {
+	return fmt.Sprintf("spec.encryptionAtRest.keyName %s does not exist for cluster %s", e.keyName, e.cluster)
+}
+
+// isEncryptionKeyNotFoundError reports whether err was caused by an encryption key
+// resource that does not exist, as opposed to one that exists but cannot encrypt
+// buckets.
+func isEncryptionKeyNotFoundError(err error) bool {
+	var notFound *encryptionKeyNotFoundError
+
+	return goerrors.As(err, &notFound)
+}
+
+// encryptionKeyNotFoundWarning explains what the Operator will do about a key that
+// is not there yet.
+func encryptionKeyNotFoundWarning(err error) string {
+	return fmt.Sprintf("%s. The Operator will not create or update this bucket on the cluster until the CouchbaseEncryptionKey exists.", err.Error())
+}
+
+// CheckConstraintBucketEncryptionKeysForReconcile returns every bucket the cluster
+// selects whose encryption key does not exist yet, so that reconciliation can hold
+// those buckets rather than reject them.
+//
+// Only the missing-key case is held. A key that exists but is not usable for bucket
+// encryption is a spec that is wrong, and stays a validation failure.
+func CheckConstraintBucketEncryptionKeysForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]UnreconcilableBucket, error) {
+	if !cluster.Spec.Buckets.Managed || !cluster.IsEncryptionAtRestManaged() {
+		return nil, nil
+	}
+
+	buckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptionKeys, err := v.Abstraction.GetCouchbaseEncryptionKeys(cluster.Namespace, cluster.Spec.Security.EncryptionAtRest.Selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get encryption keys: %w", err)
+	}
+
+	keyNames := make(map[string]struct{}, len(encryptionKeys.Items))
+
+	for i := range encryptionKeys.Items {
+		keyNames[encryptionKeys.Items[i].Name] = struct{}{}
+	}
+
+	var held []UnreconcilableBucket
+
+	for i := range buckets.Items {
+		bucket := &buckets.Items[i]
+
+		// spec.encryptionAtRest has no annotation overrides, so there is nothing to
+		// populate here — and these come straight from a shared cache, so leaving
+		// them alone is the point.
+		config := bucket.Spec.EncryptionAtRest
+		if config == nil || config.KeyName == "" {
+			continue
+		}
+
+		if _, found := keyNames[config.KeyName]; found {
+			continue
+		}
+
+		held = append(held, UnreconcilableBucket{
+			BucketName: bucket.GetCouchbaseName(),
+			Message: encryptionKeyNotFoundWarning(
+				&encryptionKeyNotFoundError{keyName: config.KeyName, cluster: cluster.Name}),
+		})
+	}
+
+	return held, nil
 }
 
 func checkMagmaBucketRequiredSettings(bucket *couchbasev2.CouchbaseBucket) error {
@@ -2618,63 +2739,138 @@ func checkEphemeralBucketCrossClusterVersioning(v *types.Validator, bucket *couc
 	return checkCrossClusterVersioning(v, bucket.GetName(), bucket.Namespace, bucket.Labels, bucket.Spec.EnableCrossClusterVersioning)
 }
 
-func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) error {
+// minReplicasNotMetWarning is the message reported when a bucket asks for fewer
+// replicas than its cluster's spec.cluster.data.minReplicasCount permits.
+//
+// Raising the cluster minimum and raising each bucket's replica count are two
+// edits to two resources, and in practice they are applied one after the other,
+// in whichever order the user reaches for. Rejecting the bucket would make one of
+// those orders impossible, so the shortfall is reported as a warning and the
+// Operator holds the bucket until the pair converge — see
+// validationrunner.ValidateBucketsInAbeyance.
+func minReplicasNotMetWarning(replicas, minReplicas int, clusterName string) string {
+	return fmt.Sprintf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount). "+
+		"The Operator will not create or update this bucket on the cluster until its replica count meets the cluster minimum.",
+		replicas, minReplicas, clusterName)
+}
+
+// checkBucketReplicasCount warns for every cluster selecting this bucket whose
+// minimum replica count the bucket does not meet.
+func checkBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
 	} else {
 		bClusters, err := getBucketsRelatedClusters(v, bucket)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		clusters = append(clusters, bClusters...)
 	}
 
+	var warnings []string
+
 	for _, cluster := range clusters {
 		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
-			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
-				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
+			warnings = append(warnings, minReplicasNotMetWarning(bucket.Spec.Replicas,
+				cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name))
 		}
 	}
 
-	return nil
+	return warnings, nil
 }
 
-func checkEphemeralBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+// checkEphemeralBucketReplicasCount is checkBucketReplicasCount for ephemeral
+// buckets.
+func checkEphemeralBucketReplicasCount(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	clusters := []*couchbasev2.CouchbaseCluster{}
 	if cluster != nil {
 		clusters = []*couchbasev2.CouchbaseCluster{cluster}
 	} else {
 		bClusters, err := getEphemeralBucketsRelatedClusters(v, bucket)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		clusters = append(clusters, bClusters...)
 	}
 
+	var warnings []string
+
 	for _, cluster := range clusters {
 		if cluster.Spec.ClusterSettings.Data != nil && cluster.Spec.ClusterSettings.Data.MinReplicasCount > bucket.Spec.Replicas {
-			return fmt.Errorf("spec.replicas (%v) should be atleast %v (by %s, spec.cluster.data.minReplicasCount)",
-				bucket.Spec.Replicas, cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name)
+			warnings = append(warnings, minReplicasNotMetWarning(bucket.Spec.Replicas,
+				cluster.Spec.ClusterSettings.Data.MinReplicasCount, cluster.Name))
 		}
 	}
 
-	return nil
+	return warnings, nil
 }
 
-func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
+// CheckConstraintBucketReplicaCountsForReconcile returns every bucket the cluster
+// selects whose replica count falls short of spec.cluster.data.minReplicasCount,
+// so that reconciliation can hold those buckets rather than reject them.
+//
+// Called on every reconcile, so a bucket is released the moment either half of the
+// pair of edits catches up with the other.
+func CheckConstraintBucketReplicaCountsForReconcile(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]UnreconcilableBucket, error) {
+	if !cluster.Spec.Buckets.Managed {
+		return nil, nil
+	}
+
+	if cluster.Spec.ClusterSettings.Data == nil || cluster.Spec.ClusterSettings.Data.MinReplicasCount == 0 {
+		return nil, nil
+	}
+
+	minReplicas := cluster.Spec.ClusterSettings.Data.MinReplicasCount
+
+	buckets, ephemeralBuckets, err := getClusterBucketsByType(v, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	var held []UnreconcilableBucket
+
+	for name, bucket := range buckets {
+		if bucket.Spec.Replicas < minReplicas {
+			held = append(held, UnreconcilableBucket{
+				BucketName: name,
+				Message:    minReplicasNotMetWarning(bucket.Spec.Replicas, minReplicas, cluster.Name),
+			})
+		}
+	}
+
+	for name, bucket := range ephemeralBuckets {
+		if bucket.Spec.Replicas < minReplicas {
+			held = append(held, UnreconcilableBucket{
+				BucketName: name,
+				Message:    minReplicasNotMetWarning(bucket.Spec.Replicas, minReplicas, cluster.Name),
+			})
+		}
+	}
+
+	return held, nil
+}
+
+// CheckConstraintsEphemeralBucket validates a CouchbaseEphemeralBucket, returning
+// any warnings alongside the verdict. Some constraints the bucket shares with the
+// cluster cannot be satisfied by the bucket alone, and those are reported as
+// warnings so the resource is still admitted — see splitMemoryQuotaWarning and
+// checkEphemeralBucketReplicasCount.
+func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	var errs []error
+
+	var warnings []string
 
 	err := annotations.Populate(&bucket.Spec, bucket.Annotations)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if checkAnnotationSkipValidation(bucket.Annotations) {
-		return nil
+		return nil, nil
 	}
 
 	if bucket.Spec.MemoryQuota != nil {
@@ -2693,16 +2889,20 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
+	if w, err := warnOnBucketMemoryQuota(validateMemoryConstraints(v, bucket, cluster)); err != nil {
 		errs = append(errs, err)
+	} else {
+		warnings = append(warnings, w...)
 	}
 
 	if err := checkBucketScopesUnique(v, bucket.Namespace, couchbasev2.EphemeralBucketCRDResourceKind, bucket.Name, bucket.Spec.Scopes); err != nil {
 		errs = append(errs, err)
 	}
 
-	if err := checkEphemeralBucketReplicasCount(v, bucket, cluster); err != nil {
+	if w, err := checkEphemeralBucketReplicasCount(v, bucket, cluster); err != nil {
 		errs = append(errs, err)
+	} else {
+		warnings = append(warnings, w...)
 	}
 
 	if bucket.Spec.SampleBucket {
@@ -2724,10 +2924,10 @@ func CheckConstraintsEphemeralBucket(v *types.Validator, bucket *couchbasev2.Cou
 	}
 
 	if errs != nil {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
@@ -2747,13 +2947,15 @@ func CheckConstraintsMemcachedBucket(v *types.Validator, bucket *couchbasev2.Cou
 		errs = append(errs, err)
 	}
 
-	if err := validateMemoryConstraints(v, bucket, cluster); err != nil {
-		errs = append(errs, err)
-	}
-
 	warnings, err := validateMemcachedBucketSupported(v, bucket, cluster)
 	if err != nil {
 		errs = append(errs, err)
+	}
+
+	if w, err := warnOnBucketMemoryQuota(validateMemoryConstraints(v, bucket, cluster)); err != nil {
+		errs = append(errs, err)
+	} else {
+		warnings = append(warnings, w...)
 	}
 
 	if errs != nil {
@@ -4114,14 +4316,9 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 
 	buckets = util.MergeAbstractBucketLists(newBuckets, buckets)
 
-	sb := false
-
 	for _, bucket := range buckets {
-		// If the bucket is a sample bucket, we want to validate with a pre-determined resource quantity of 200Mi
 		if bucket.IsSampleBucket() {
-			allocated.Add(*k8sutil.NewResourceQuantityMi(int64(200)))
-
-			sb = true
+			allocated.Add(*k8sutil.NewResourceQuantityMi(int64(cbcluster.SampleBucketQuotaMB)))
 		} else {
 			allocated.Add(*bucket.GetMemoryQuota())
 		}
@@ -4129,15 +4326,50 @@ func validateClusterMemoryConstraints(v *types.Validator, cluster *couchbasev2.C
 
 	if cluster.Spec.ClusterSettings.DataServiceMemQuota != nil {
 		if allocated.Cmp(*cluster.Spec.ClusterSettings.DataServiceMemQuota) > 0 {
-			if sb {
-				return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s sample buckets have a memory quota of 200Mi", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
+			return &memoryQuotaExceededError{
+				cluster:   cluster.Name,
+				allocated: allocated.String(),
+				quota:     cluster.Spec.ClusterSettings.DataServiceMemQuota.String(),
 			}
-
-			return fmt.Errorf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", allocated, cluster.Spec.ClusterSettings.DataServiceMemQuota, cluster.Name)
 		}
 	}
 
 	return nil
+}
+
+// memoryQuotaExceededError is returned when the buckets a cluster selects ask for
+// more memory in total than spec.cluster.dataServiceMemoryQuota allows.
+type memoryQuotaExceededError struct {
+	cluster   string
+	allocated string
+	quota     string
+}
+
+func (e *memoryQuotaExceededError) Error() string {
+	return fmt.Sprintf("bucket memory allocation (%v) exceeds data service quota (%v) on cluster %s", e.allocated, e.quota, e.cluster)
+}
+
+// isBucketMemoryQuotaExceededError reports whether err was caused by the cluster's
+// buckets over-subscribing the data service memory quota, as opposed to the
+// memory validation being unable to reach a verdict at all.
+func isBucketMemoryQuotaExceededError(err error) bool {
+	var exceeded *memoryQuotaExceededError
+
+	return goerrors.As(err, &exceeded)
+}
+
+// warnOnBucketMemoryQuota demotes an over-allocation verdict to a warning and
+// passes everything else back as an error.
+func warnOnBucketMemoryQuota(err error) ([]string, error) {
+	if err == nil {
+		return nil, nil
+	}
+
+	if !isBucketMemoryQuotaExceededError(err) {
+		return nil, err
+	}
+
+	return []string{fmt.Sprintf("%s. The Operator will not create or resize the affected bucket(s) on the cluster until the total fits within spec.cluster.dataServiceMemoryQuota.", err.Error())}, nil
 }
 
 // bucketNotFoundError is returned when the bucket referenced by an XDCR replication
@@ -6615,15 +6847,15 @@ func checkConstraintDeprecatedAnnotations(v *types.Validator, cluster *couchbase
 	return nil, nil
 }
 
-func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) error {
+func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
 	if cluster.Spec.Security.EncryptionAtRest == nil || !cluster.Spec.Security.EncryptionAtRest.Managed {
-		return nil
+		return nil, nil
 	}
 
 	if encryptionAtRestSupported, err := cluster.IsAtLeastVersion("8.0.0"); err != nil {
-		return err
+		return nil, err
 	} else if !encryptionAtRestSupported {
-		return fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
+		return nil, fmt.Errorf("encryption at rest requires Couchbase Server version 8.0.0 or later")
 	}
 
 	encryptionAtRest := cluster.Spec.Security.EncryptionAtRest
@@ -6631,7 +6863,7 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 	// Get all encryption keys using the selector
 	encryptionKeys, err := v.Abstraction.GetCouchbaseEncryptionKeys(cluster.Namespace, encryptionAtRest.Selector)
 	if err != nil {
-		return fmt.Errorf("failed to get encryption keys: %w", err)
+		return nil, fmt.Errorf("failed to get encryption keys: %w", err)
 	}
 
 	// Create a map of key names to their specs for easy lookup
@@ -6676,15 +6908,16 @@ func checkConstraintEncryptionKeys(v *types.Validator, cluster *couchbasev2.Couc
 	}
 
 	// Check the encryption keyys used on buckets all exist and have the appropriate usage settings
-	if err := validateEncryptionKeysUsedOnBuckets(v, cluster, keyMap); err != nil {
+	warnings, err := validateEncryptionKeysUsedOnBuckets(v, cluster, keyMap)
+	if err != nil {
 		errs = append(errs, fmt.Errorf("encryption key used on bucket validation failed: %w", err))
 	}
 
 	if len(errs) > 0 {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 // validateEncryptionKey validates that an encryption key exists in the map and has the appropriate usage setting.
@@ -6862,12 +7095,22 @@ func formatCycle(cycle []string) string {
 	return strings.Join(cycle, " -> ")
 }
 
-func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, keyMap map[string]*couchbasev2.CouchbaseEncryptionKey) error {
+// validateEncryptionKeysUsedOnBuckets checks that every encryption key a selected
+// bucket names exists and may be used to encrypt buckets.
+//
+// A key that is not there yet comes back as a warning rather than an error: the key
+// resource may simply not have been applied yet, and rejecting the cluster over it
+// would take the whole cluster out of reconciliation over one bucket. The Operator
+// holds those buckets instead — see
+// CheckConstraintBucketEncryptionKeysForReconcile.
+func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev2.CouchbaseCluster, keyMap map[string]*couchbasev2.CouchbaseEncryptionKey) ([]string, error) {
 	var errs []error
+
+	var warnings []string
 
 	couchbaseBuckets, err := v.Abstraction.GetCouchbaseBuckets(cluster.Namespace, cluster.Spec.Buckets.Selector)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// First check that the bucket is using an encryption key that exists
@@ -6879,7 +7122,7 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 		if bucket.Spec.EncryptionAtRest.RotationInterval != nil {
 			rotationInterval := bucket.Spec.EncryptionAtRest.RotationInterval.Duration
 			if rotationInterval.Hours() < 7*24 {
-				return fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
+				return warnings, fmt.Errorf("rotation interval must be at least 7 days, got %v", rotationInterval)
 			}
 		}
 
@@ -6887,13 +7130,16 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 		if bucket.Spec.EncryptionAtRest.KeyLifetime != nil {
 			keyLifetime := bucket.Spec.EncryptionAtRest.KeyLifetime.Duration
 			if keyLifetime.Hours() < 30*24 {
-				return fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
+				return warnings, fmt.Errorf("key lifetime must be at least 30 days, got %v", keyLifetime)
 			}
 		}
 
 		key, found := keyMap[bucket.Spec.EncryptionAtRest.KeyName]
 		if !found {
-			errs = append(errs, fmt.Errorf("encryption key %s does not exist or is not selected by the encryption at rest selector", bucket.Spec.EncryptionAtRest.KeyName))
+			warnings = append(warnings, fmt.Sprintf("encryption key %s used by couchbasebuckets.couchbase.com/%s does not exist or is not selected by the encryption at rest selector. "+
+				"The Operator will not create or update that bucket on the cluster until the key exists.",
+				bucket.Spec.EncryptionAtRest.KeyName, bucket.Name))
+
 			continue
 		}
 
@@ -6904,10 +7150,10 @@ func validateEncryptionKeysUsedOnBuckets(v *types.Validator, cluster *couchbasev
 	}
 
 	if len(errs) > 0 {
-		return errors.CompositeValidationError(errs...)
+		return warnings, errors.CompositeValidationError(errs...)
 	}
 
-	return nil
+	return warnings, nil
 }
 
 // nolint:gocognit

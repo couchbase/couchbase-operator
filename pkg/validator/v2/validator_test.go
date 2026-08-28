@@ -15,6 +15,7 @@ import (
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	couchbasefake "github.com/couchbase/couchbase-operator/pkg/generated/clientset/versioned/fake"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1177,5 +1178,200 @@ func TestCheckConstraintsReplicationMissingBucket(t *testing.T) {
 				t.Errorf("expected warning containing %q but got %q", testcase.expectedWarning, joinedWarnings)
 			}
 		})
+	}
+}
+
+// TestCheckConstraintsBucketMemoryQuotaWarning covers the three bucket kinds that
+// share the data service memory quota. Over-subscribing it used to be a rejection;
+// it is now a warning, because the Operator holds the offending buckets instead.
+func TestCheckConstraintsBucketMemoryQuotaWarning(t *testing.T) {
+	const namespace = "default"
+
+	newCluster := func() *couchbasev2.CouchbaseCluster {
+		return &couchbasev2.CouchbaseCluster{
+			ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: namespace},
+			Spec: couchbasev2.ClusterSpec{
+				Image:   "couchbase/server:7.6.2",
+				Buckets: couchbasev2.Buckets{Managed: true},
+				ClusterSettings: couchbasev2.ClusterConfig{
+					DataServiceMemQuota: k8sutil.NewResourceQuantityMi(1024),
+				},
+			},
+		}
+	}
+
+	// A bucket asking for more than the whole quota on its own, so the verdict
+	// does not depend on what else happens to be in the namespace.
+	couchbaseBucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "big", Namespace: namespace},
+		Spec: couchbasev2.CouchbaseBucketSpec{
+			MemoryQuota: k8sutil.NewResourceQuantityMi(2048),
+		},
+	}
+
+	ephemeralBucket := &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "big-ephemeral", Namespace: namespace},
+		Spec: couchbasev2.CouchbaseEphemeralBucketSpec{
+			MemoryQuota: k8sutil.NewResourceQuantityMi(2048),
+		},
+	}
+
+	memcachedBucket := &couchbasev2.CouchbaseMemcachedBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "big-memcached", Namespace: namespace},
+		Spec: couchbasev2.CouchbaseMemcachedBucketSpec{
+			MemoryQuota: k8sutil.NewResourceQuantityMi(2048),
+		},
+	}
+
+	const expectedWarning = "exceeds data service quota"
+
+	testcases := []struct {
+		name  string
+		check func(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error)
+	}{
+		{
+			name: "CouchbaseBucket",
+			check: func(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+				return CheckConstraintsBucket(v, couchbaseBucket.DeepCopy(), cluster)
+			},
+		},
+		{
+			name: "CouchbaseEphemeralBucket",
+			check: func(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+				return CheckConstraintsEphemeralBucket(v, ephemeralBucket.DeepCopy(), cluster)
+			},
+		},
+		{
+			name: "CouchbaseMemcachedBucket",
+			check: func(v *types.Validator, cluster *couchbasev2.CouchbaseCluster) ([]string, error) {
+				return CheckConstraintsMemcachedBucket(v, memcachedBucket.DeepCopy(), cluster)
+			},
+		},
+		{
+			name:  "CouchbaseCluster",
+			check: checkConstraintMemoryAllocations,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			cluster := newCluster()
+
+			v := types.New(k8sfake.NewSimpleClientset(), couchbasefake.NewSimpleClientset(
+				cluster, couchbaseBucket, ephemeralBucket, memcachedBucket), nil)
+
+			warnings, err := testcase.check(v, cluster)
+
+			// Unrelated complaints are none of this test's business; the quota
+			// complaint specifically must no longer come back as an error.
+			if err != nil && strings.Contains(err.Error(), expectedWarning) {
+				t.Errorf("over-allocation should no longer be an error, got: %s", err.Error())
+			}
+
+			if joined := strings.Join(warnings, "; "); !strings.Contains(joined, expectedWarning) {
+				t.Errorf("expected a warning containing %q but got %q", expectedWarning, joined)
+			}
+		})
+	}
+}
+
+// TestCheckBucketReplicasCountWarning checks that a bucket below the cluster
+// minimum is admitted with a warning, since raising the cluster minimum and
+// raising the bucket's replicas are two edits applied one after the other.
+func TestCheckBucketReplicasCountWarning(t *testing.T) {
+	const namespace = "default"
+
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: namespace},
+		Spec: couchbasev2.ClusterSpec{
+			Image:   "couchbase/server:7.6.2",
+			Buckets: couchbasev2.Buckets{Managed: true},
+			ClusterSettings: couchbasev2.ClusterConfig{
+				Data: &couchbasev2.CouchbaseClusterDataSettings{MinReplicasCount: 2},
+			},
+		},
+	}
+
+	bucket := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "bucket", Namespace: namespace},
+		Spec:       couchbasev2.CouchbaseBucketSpec{Replicas: 1},
+	}
+
+	ephemeral := &couchbasev2.CouchbaseEphemeralBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "ephemeral", Namespace: namespace},
+		Spec:       couchbasev2.CouchbaseEphemeralBucketSpec{Replicas: 1},
+	}
+
+	const expectedWarning = "should be atleast 2"
+
+	v := types.New(k8sfake.NewSimpleClientset(), couchbasefake.NewSimpleClientset(cluster, bucket, ephemeral), nil)
+
+	warnings, err := checkBucketReplicasCount(v, bucket.DeepCopy(), cluster)
+	if err != nil {
+		t.Fatalf("a replica shortfall should no longer be an error, got: %s", err.Error())
+	}
+
+	if joined := strings.Join(warnings, "; "); !strings.Contains(joined, expectedWarning) {
+		t.Errorf("expected a warning containing %q but got %q", expectedWarning, joined)
+	}
+
+	warnings, err = checkEphemeralBucketReplicasCount(v, ephemeral.DeepCopy(), cluster)
+	if err != nil {
+		t.Fatalf("a replica shortfall should no longer be an error, got: %s", err.Error())
+	}
+
+	if joined := strings.Join(warnings, "; "); !strings.Contains(joined, expectedWarning) {
+		t.Errorf("expected a warning containing %q but got %q", expectedWarning, joined)
+	}
+
+	// A bucket that meets the minimum has nothing to say.
+	meets := bucket.DeepCopy()
+	meets.Spec.Replicas = 2
+
+	if warnings, err := checkBucketReplicasCount(v, meets, cluster); err != nil || len(warnings) != 0 {
+		t.Errorf("a bucket meeting the minimum should be silent, got warnings %v and error %v", warnings, err)
+	}
+}
+
+// TestCheckConstraintBucketReplicaCountsForReconcile checks the reconcile-side
+// half: the buckets the Operator has to hold are named, and a bucket that has
+// caught up with the cluster minimum is released.
+func TestCheckConstraintBucketReplicaCountsForReconcile(t *testing.T) {
+	const namespace = "default"
+
+	cluster := &couchbasev2.CouchbaseCluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster", Namespace: namespace},
+		Spec: couchbasev2.ClusterSpec{
+			Image:   "couchbase/server:7.6.2",
+			Buckets: couchbasev2.Buckets{Managed: true},
+			ClusterSettings: couchbasev2.ClusterConfig{
+				Data: &couchbasev2.CouchbaseClusterDataSettings{MinReplicasCount: 2},
+			},
+		},
+	}
+
+	short := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "short", Namespace: namespace},
+		Spec:       couchbasev2.CouchbaseBucketSpec{Replicas: 1},
+	}
+
+	ok := &couchbasev2.CouchbaseBucket{
+		ObjectMeta: metav1.ObjectMeta{Name: "ok", Namespace: namespace},
+		Spec:       couchbasev2.CouchbaseBucketSpec{Replicas: 2},
+	}
+
+	v := types.New(k8sfake.NewSimpleClientset(), couchbasefake.NewSimpleClientset(cluster, short, ok), nil)
+
+	held, err := CheckConstraintBucketReplicaCountsForReconcile(v, cluster)
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err.Error())
+	}
+
+	if len(held) != 1 {
+		t.Fatalf("expected exactly the one short bucket to be held, got %d: %v", len(held), held)
+	}
+
+	if held[0].BucketName != "short" {
+		t.Errorf("held bucket = %q, want \"short\"", held[0].BucketName)
 	}
 }

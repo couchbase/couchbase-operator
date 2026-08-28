@@ -16,6 +16,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
@@ -25,6 +26,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/unreconcilable"
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/validator"
 	"github.com/couchbase/couchbase-operator/pkg/validator/types"
 	"github.com/couchbase/couchbase-operator/pkg/validator/util"
@@ -647,7 +649,8 @@ func (rv *reconcileValidator) validateEphemeralBuckets(buckets []*couchbasev2.Co
 }
 
 func (rv *reconcileValidator) checkEphemeralBucketConstraints(bucket *couchbasev2.CouchbaseEphemeralBucket, cluster *couchbasev2.CouchbaseCluster) error {
-	return validationv2.CheckConstraintsEphemeralBucket(rv.v, bucket, cluster)
+	_, err := validationv2.CheckConstraintsEphemeralBucket(rv.v, bucket, cluster)
+	return err
 }
 
 func (rv *reconcileValidator) checkMemcachedBucketsConstraints(bucket *couchbasev2.CouchbaseMemcachedBucket, cluster *couchbasev2.CouchbaseCluster) error {
@@ -805,4 +808,144 @@ func ValidateXDCRReplicationBuckets(currentCluster *cluster.Cluster) []error {
 	}
 
 	return errs
+}
+
+// ValidateBucketsInAbeyance holds the buckets that are valid in themselves but
+// cannot be applied to the live cluster yet.
+func ValidateBucketsInAbeyance(currentCluster *cluster.Cluster) []error {
+	cbCluster := currentCluster.GetCouchbaseCluster()
+
+	if cbCluster.Spec.Paused || !cbCluster.Spec.Buckets.Managed {
+		return nil
+	}
+
+	rv := &reconcileValidator{v: currentCluster.GetValidator(), k8s: currentCluster.GetK8sClient(), tracker: currentCluster.Unreconcilable()}
+
+	var errs []error
+
+	errs = append(errs, rv.holdBucketsOverMemoryQuota(currentCluster)...)
+	errs = append(errs, rv.holdBucketsBelowMinReplicas(cbCluster)...)
+	errs = append(errs, rv.holdBucketsMissingEncryptionKeys(cbCluster)...)
+
+	return errs
+}
+
+// holdBucketsOverMemoryQuota holds any bucket whose creation or resize would push
+// the cluster's total bucket memory past spec.cluster.dataServiceMemoryQuota.
+func (rv *reconcileValidator) holdBucketsOverMemoryQuota(currentCluster *cluster.Cluster) []error {
+	quota := currentCluster.GetCouchbaseCluster().Spec.ClusterSettings.DataServiceMemQuota
+	if quota == nil {
+		return nil
+	}
+
+	allocations, err := currentCluster.GetBucketMemoryAllocations()
+	if err != nil {
+		if isIndeterminateError(err) {
+			return nil
+		}
+
+		return []error{err}
+	}
+
+	return rv.markHeldBuckets(bucketsOverMemoryQuota(allocations, k8sutil.Megabytes(quota)),
+		unreconcilable.ReasonQuotaExceeded)
+}
+
+// holdBucketsBelowMinReplicas holds any bucket asking for fewer replicas than
+// spec.cluster.data.minReplicasCount allows.
+func (rv *reconcileValidator) holdBucketsBelowMinReplicas(cbCluster *couchbasev2.CouchbaseCluster) []error {
+	held, err := validationv2.CheckConstraintBucketReplicaCountsForReconcile(rv.v, cbCluster)
+	if isIndeterminateError(err) {
+		return nil
+	}
+
+	errs := rv.markHeldBuckets(held, unreconcilable.ReasonValidationFailed)
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	return errs
+}
+
+// holdBucketsMissingEncryptionKeys holds any bucket naming a CouchbaseEncryptionKey
+// that does not exist yet.
+func (rv *reconcileValidator) holdBucketsMissingEncryptionKeys(cbCluster *couchbasev2.CouchbaseCluster) []error {
+	held, err := validationv2.CheckConstraintBucketEncryptionKeysForReconcile(rv.v, cbCluster)
+	if isIndeterminateError(err) {
+		return nil
+	}
+
+	errs := rv.markHeldBuckets(held, unreconcilable.ReasonDependencyMissing)
+
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	return errs
+}
+
+// markHeldBuckets suppresses each held bucket for the rest of this cycle under the
+// given reason, and hands its message back for the log.
+func (rv *reconcileValidator) markHeldBuckets(held []validationv2.UnreconcilableBucket, reason unreconcilable.Reason) []error {
+	var errs []error
+
+	for _, bucket := range held {
+		rv.tracker.MarkBucket(bucket.BucketName, reason, bucket.Message)
+
+		errs = append(errs, goerrors.New(bucket.Message))
+	}
+
+	return errs
+}
+
+// bucketsOverMemoryQuota decides which pending bucket creates and resizes have to
+// wait for room within quotaMB.
+func bucketsOverMemoryQuota(allocations []cluster.BucketMemoryAllocation, quotaMB int64) []validationv2.UnreconcilableBucket {
+	var committed int64
+
+	pending := make([]cluster.BucketMemoryAllocation, 0, len(allocations))
+
+	for _, allocation := range allocations {
+		if allocation.Exists {
+			committed += allocation.AllocatedMB
+
+			// Unchanged, or shrinking. Either way there is nothing to hold, and it
+			// asks for no more than the server has already given it.
+			if allocation.RequestedMB <= allocation.AllocatedMB {
+				continue
+			}
+		}
+
+		pending = append(pending, allocation)
+	}
+
+	if len(pending) == 0 {
+		return nil
+	}
+
+	sort.Slice(pending, func(i, j int) bool { return pending[i].BucketName < pending[j].BucketName })
+
+	headroom := quotaMB - committed
+
+	var held []validationv2.UnreconcilableBucket
+
+	for _, allocation := range pending {
+		increase := allocation.RequestedMB - allocation.AllocatedMB
+
+		if increase <= headroom {
+			headroom -= increase
+
+			continue
+		}
+
+		held = append(held, validationv2.UnreconcilableBucket{
+			BucketName: allocation.BucketName,
+			Message: fmt.Sprintf("bucket %s needs a further %dMi of the cluster's %dMi data service memory quota, of which only %dMi is unallocated; "+
+				"the Operator is holding this bucket until the total fits — raise spec.cluster.dataServiceMemoryQuota, or reduce another bucket's spec.memoryQuota",
+				allocation.BucketName, increase, quotaMB, max(headroom, 0)),
+		})
+	}
+
+	return held
 }

@@ -307,6 +307,11 @@ func validateManagedResources(c *cluster.Cluster, clusterName string) []string {
 		log.Error(err, "XDCR validation failed; skipping affected replication, cluster reconciliation continues.", "cluster", clusterName)
 	}
 
+	for _, err := range validationrunner.ValidateBucketsInAbeyance(c) {
+		log.Info("Bucket cannot be applied yet; holding affected bucket, cluster reconciliation continues.",
+			"cluster", clusterName, "reason", err.Error())
+	}
+
 	// This runs before RunReconcile, so a resource marked during this cycle is
 	// also skipped during this cycle.
 	c.FlushUnreconcilable(context.Background())

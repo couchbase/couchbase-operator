@@ -536,6 +536,70 @@ func (c *Cluster) gatherBuckets() ([]couchbaseutil.Bucket, error) {
 	return allBuckets, nil
 }
 
+// SampleBucketQuotaMB is the fixed memory quota a sample bucket occupies, whatever
+// its CRD asks for. It matches what the memory constraint validators account for.
+const SampleBucketQuotaMB = 200
+
+// BucketMemoryAllocation pairs the memory quota one bucket's CR asks for with
+// whatever the live cluster has already allocated for it.
+type BucketMemoryAllocation struct {
+	// BucketName is the Couchbase-side bucket name, the name the unreconcilable
+	// tracker's bucket key space uses.
+	BucketName string
+
+	// RequestedMB is the quota the CRD asks for, in mebibytes.
+	RequestedMB int64
+
+	// AllocatedMB is the quota the live cluster currently holds for this bucket,
+	// in mebibytes. Zero when the bucket is not on the cluster yet.
+	AllocatedMB int64
+
+	// Exists reports whether the bucket is already on the live cluster.
+	Exists bool
+}
+
+// GetBucketMemoryAllocations pairs every bucket this cluster selects with the
+// memory the live cluster has already allocated for it.
+func (c *Cluster) GetBucketMemoryAllocations() ([]BucketMemoryAllocation, error) {
+	requested, err := c.gatherBuckets()
+	if err != nil {
+		return nil, err
+	}
+
+	actual := couchbaseutil.BucketList{}
+	if err := couchbaseutil.ListBuckets(&actual).On(c.api, c.readyMembers()); err != nil {
+		return nil, err
+	}
+
+	allocations := make([]BucketMemoryAllocation, 0, len(requested))
+
+	for _, r := range requested {
+		allocation := BucketMemoryAllocation{
+			BucketName:  r.BucketName,
+			RequestedMB: r.BucketMemoryQuota,
+		}
+
+		if r.SampleBucket {
+			allocation.RequestedMB = SampleBucketQuotaMB
+		}
+
+		for _, a := range actual {
+			if a.BucketName != r.BucketName {
+				continue
+			}
+
+			allocation.Exists = true
+			allocation.AllocatedMB = a.BucketMemoryQuota
+
+			break
+		}
+
+		allocations = append(allocations, allocation)
+	}
+
+	return allocations, nil
+}
+
 func (c *Cluster) GetBucketsToUpdate() (map[couchbaseutil.Bucket]couchbaseutil.Bucket, error) {
 	updateBuckets := make(map[couchbaseutil.Bucket]couchbaseutil.Bucket)
 

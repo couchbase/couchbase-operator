@@ -49,6 +49,10 @@ const (
 	// exists.
 	ReasonDependencyMissing Reason = "DependencyMissing"
 
+	// ReasonQuotaExceeded means the resource is valid in itself, but applying it
+	// would take a quota it shares with its siblings past its limit.
+	ReasonQuotaExceeded Reason = "QuotaExceeded"
+
 	// ReasonValidated is the reason on the False condition.
 	ReasonValidated Reason = "Validated"
 )

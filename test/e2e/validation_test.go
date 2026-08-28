@@ -78,7 +78,9 @@ type testDef struct {
 	validations    patchMap
 	shouldFail     bool
 	expectedErrors []string
-	// expectedWarnings is a list of expected warnings for the test. Warnings are only collected for the resources that are being patched.
+	// expectedWarnings is a list of regular expressions, each of which must match a
+	// warning raised against some resource in the set. It asserts presence only, and
+	// says nothing about which resource carried the warning or what else was raised.
 	expectedWarnings []string
 	deleteTargets    []string
 }
@@ -245,6 +247,21 @@ func createResources(k8s *types.Cluster, resources resourceList, wc *types.KubeW
 		}
 
 		resources[i] = raw
+	}
+
+	return nil
+}
+
+// trackResources tells the warning collector about every resource in the set, so
+// that a warning is collected whichever resource it ends up reported against.
+func trackResources(resources resourceList, wc *types.KubeWarningCollector) error {
+	for _, resource := range resources {
+		object := &unstructured.Unstructured{}
+		if err := json.Unmarshal(resource, object); err != nil {
+			return err
+		}
+
+		wc.TrackResource(object.GetName())
 	}
 
 	return nil
@@ -617,12 +634,15 @@ func runValidationTest(t *testing.T, testDefs []testDef, validation validationCo
 				if err := patchResources(objects, test.mutations); err != nil {
 					e2eutil.Die(t, err)
 				}
+			}
 
-				// If we have a warning collector, track the resources that are being patched so we collect warnings for them.
-				if wc != nil {
-					for resource := range test.mutations {
-						wc.TrackResource(resource)
-					}
+			// Track every resource, not only the patched ones. A constraint shared
+			// between a cluster and its buckets is reported against whichever of the
+			// two is admitted last, and on create that is decided by the order of the
+			// resources in the YAML rather than by which one the test patched.
+			if wc != nil {
+				if err := trackResources(objects, wc); err != nil {
+					e2eutil.Die(t, err)
 				}
 			}
 
@@ -2816,10 +2836,12 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 			expectedErrors: []string{"spec.evictionPolicy"},
 		},
 		{
-			name:           "TestValidateBucketQuotaOverflow",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
-			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
+			// Over-subscribing the data service memory quota is admitted with a
+			// warning rather than rejected.
+			name:             "TestValidateBucketQuotaOverflow",
+			mutations:        patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket memory allocation \(1001Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name:           "TestValidateBucketCompressionModeInvalidForCouchbase",
@@ -2976,8 +2998,12 @@ func TestNegValidationCreateCouchbaseBucket(t *testing.T) {
 						"cao.couchbase.com/sampleBucket": "true",
 					}),
 				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/dataServiceMemoryQuota", "256Mi")},
-			shouldFail:     true,
-			expectedErrors: []string{`sample buckets have a memory quota of 200Mi`},
+			// Sample buckets are counted at their fixed quota rather than the one in
+			// the CRD, so two of them plus the remaining buckets overshoot 256Mi. Like
+			// every other overshoot this is now a warning and a hold rather than a
+			// rejection.
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket memory allocation \([0-9]*Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
 		},
 		{
 			name: "TestValidateCreateMagmaBucketInvalidClusterSupport",
@@ -3997,10 +4023,10 @@ func TestNegValidationDefaultCreate(t *testing.T) {
 		{
 			// dataServiceMemoryQuota will get mutated to the default of 256, but we have
 			// 500 worth of buckets defined.
-			name:           "TestValidateDataServiceMemoryQuotaDefault",
-			mutations:      patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/dataServiceMemoryQuota")},
-			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \([0-9]*Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
+			name:             "TestValidateDataServiceMemoryQuotaDefault",
+			mutations:        patchMap{"cluster": jsonpatch.NewPatchSet().Remove("/spec/cluster/dataServiceMemoryQuota")},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket memory allocation \([0-9]*Mi\) exceeds data service quota \(256Mi\) on cluster cluster`},
 		},
 	}
 	runValidationTest(t, testDefs, validationContext{operation: operationCreate})
@@ -4132,10 +4158,10 @@ func TestNegValidationApply(t *testing.T) {
 			expectedErrors: []string{`specify just one value, either Str or Int`},
 		},
 		{
-			name:           "TestValidateUpdateBucketMemoryQuotaOverflow",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
-			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(1101Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
+			name:             "TestValidateUpdateBucketMemoryQuotaOverflow",
+			mutations:        patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/memoryQuota", "601Mi")},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket memory allocation \(1101Mi\) exceeds data service quota \(600Mi\) on cluster cluster`},
 		},
 		{
 			name: "TestValidateAddSampleBucketAnnotation",
@@ -4902,36 +4928,29 @@ func TestBucketMinReplicasCountApply(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name:           "TestBucketNotEnoughReplicas",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.replicas"},
+			name:             "TestBucketNotEnoughReplicas",
+			mutations:        patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.replicas"},
 		},
 		{
-			// We patch both resources because the valaidation updates everything in yaml order.
-			// The cluster update goes first and triggers our warning, since bucket0 still has
-			// replicas=2 in the API at that moment. The bucket update follows and would fail
-			// the existing bucket side check, so we bump it to 3 to keep it valid.
+			// Raising the cluster minimum above an existing bucket no longer needs a
+			// compensating bucket patch.
 			name: "TestClusterMinReplicasCountRaisedAboveExistingBucket",
 			mutations: patchMap{
 				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
-				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 3),
 			},
 			shouldFail:       false,
 			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
 		},
 		{
-			// The cluster update lands first and warns about bucket0 (still at replicas=2 in
-			// the API). The bucket update then tries to drop replicas to 1, which the existing
-			// bucket side check rejects. Both the warning and the error are expected.
 			name: "TestClusterMinReplicasCountRaisedAndBucketDroppedBelow",
 			mutations: patchMap{
 				"cluster": jsonpatch.NewPatchSet().Replace("/spec/cluster/data/minReplicasCount", 3),
 				"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1),
 			},
-			shouldFail:       true,
-			expectedErrors:   []string{"spec.replicas"},
-			expectedWarnings: []string{"spec.cluster.data.minReplicasCount"},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.replicas", "spec.cluster.data.minReplicasCount"},
 		},
 	}
 
@@ -4941,10 +4960,10 @@ func TestBucketMinReplicasCountApply(t *testing.T) {
 func TestBucketMinReplicasCountCreate(t *testing.T) {
 	testDefs := []testDef{
 		{
-			name:           "TestBucketNotEnoughReplicas",
-			mutations:      patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.replicas"},
+			name:             "TestBucketNotEnoughReplicas",
+			mutations:        patchMap{"bucket0": jsonpatch.NewPatchSet().Replace("/spec/replicas", 1)},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.replicas"},
 		},
 	}
 
@@ -5378,8 +5397,8 @@ func TestValidationEncryptionKey(t *testing.T) {
 				"bucket3": jsonpatch.NewPatchSet().Add("/spec/encryptionAtRest", &couchbasev2.BucketEncryptionAtRestConfiguration{
 					KeyName: "non-existent-key",
 				})},
-			shouldFail:     true,
-			expectedErrors: []string{"spec.encryptionAtRest.keyName non-existent-key does not exist"},
+			shouldFail:       false,
+			expectedWarnings: []string{"spec.encryptionAtRest.keyName non-existent-key does not exist"},
 		},
 		{
 			name: "TestInvalidKeyNoBucketUsage",
@@ -6285,8 +6304,8 @@ func TestBucketStorageBackendValidationCreate(t *testing.T) {
 				"cluster1": jsonpatch.NewPatchSet().Replace("/spec/buckets/selector/matchLabels/cluster", "cluster1-memory-quota").
 					Replace("/spec/cluster/dataServiceMemoryQuota", "1Gi"),
 			},
-			shouldFail:     true,
-			expectedErrors: []string{`bucket memory allocation \(2Gi\) exceeds data service quota \(1Gi\) on cluster cluster1`},
+			shouldFail:       false,
+			expectedWarnings: []string{`bucket memory allocation \(2Gi\) exceeds data service quota \(1Gi\) on cluster cluster1`},
 		},
 		{
 			name: "TestValidateBucketMemoryQuotaMultipleClusters",
