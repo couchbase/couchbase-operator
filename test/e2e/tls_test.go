@@ -1285,9 +1285,7 @@ func testCreateClusterWithTLSAndNodeToNode(t *testing.T, encryptionType couchbas
 
 	// Check the cluster is healthy and all pods are ready
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	for i := 0; i < clusterSize; i++ {
-		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
-	}
+	e2eutil.MustValidateAllPodReadiness(t, kubernetes, cluster, clusterSize, v1.ConditionTrue, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1420,9 +1418,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenScale(t *testing.T, encryptionType
 
 	// Check the cluster is healthy and all pods are ready
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	for i := 0; i < clusterSize+scaleUp; i++ {
-		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
-	}
+	e2eutil.MustValidateAllPodReadiness(t, kubernetes, cluster, clusterSize+scaleUp, v1.ConditionTrue, time.Minute)
 
 	// Check the events match what we expect:
 	// * Cluster created
@@ -1754,9 +1750,7 @@ func testCreateClusterWithTLSAndNodeToNodeThenChangeNodeToNodeMode(t *testing.T,
 	time.Sleep(30 * time.Second)
 	// Check the cluster is healthy and all pods are ready.
 	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 2*time.Minute)
-	for i := 0; i < clusterSize; i++ {
-		e2eutil.MustValidatePodReadiness(t, kubernetes, cluster, i, v1.ConditionTrue, time.Minute)
-	}
+	e2eutil.MustValidateAllPodReadiness(t, kubernetes, cluster, clusterSize, v1.ConditionTrue, time.Minute)
 
 	// Check the state is still as we expect.
 	e2eutil.MustExposePortsTLS(t, kubernetes, cluster, aFamily, ctx, time.Minute)

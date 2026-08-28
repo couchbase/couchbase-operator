@@ -208,6 +208,23 @@ func MustRollingUpgrade(t *testing.T, k8s *types.Cluster, timeout time.Duration)
 	}
 }
 
+// validatePodReadiness checks a single pod carries the expected readiness condition.
+func validatePodReadiness(pod *v1.Pod, status v1.ConditionStatus) error {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type != v1.PodReady {
+			continue
+		}
+
+		if condition.Status != status {
+			return fmt.Errorf("%s ready status %v not as expected %v", pod.Name, condition.Status, status)
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("%s ready status not set", pod.Name)
+}
+
 // MustValidatePodReadiness checks a pod has the the correct readiness condition.
 func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, index int, status v1.ConditionStatus, timeout time.Duration) {
 	name := couchbaseutil.CreateMemberName(cluster.Name, index)
@@ -218,19 +235,39 @@ func MustValidatePodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchba
 			return err
 		}
 
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type != v1.PodReady {
-				continue
-			}
+		return validatePodReadiness(pod, status)
+	}
 
-			if condition.Status != status {
-				return fmt.Errorf("ready status %v not as expected %v", condition.Status, status)
-			}
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+}
 
-			return nil
+// MustValidateAllPodReadiness checks the cluster has the expected number of pods, and
+// that all of them are ready.
+// We use this instead of calling MustValidatePodReadiness for each index from 0 to size-1.
+// Member indexes are not always contiguous. If a member fails to come up, the Operator
+// replaces it with one using the next index, so a three node cluster can end up with
+// members 0000, 0002 and 0003. Looping over indexes then waits for pod 0001, which does
+// not exist, until the timeout expires and the test fails for an unrelated reason.
+func MustValidateAllPodReadiness(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, expected int, status v1.ConditionStatus, timeout time.Duration) {
+	callback := func() error {
+		pods, err := k8s.KubeClient.CoreV1().Pods(k8s.Namespace).List(context.Background(), ClusterListOpt(cluster))
+		if err != nil {
+			return err
 		}
 
-		return fmt.Errorf("ready status not set")
+		if len(pods.Items) != expected {
+			return fmt.Errorf("expected %d pods, got %d", expected, len(pods.Items))
+		}
+
+		for i := range pods.Items {
+			if err := validatePodReadiness(&pods.Items[i], status); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	if err := retryutil.RetryFor(timeout, callback); err != nil {
