@@ -1,0 +1,51 @@
+name: Close GitHub issue when Jira ticket is resolved
+
+on:
+  repository_dispatch:
+    types: [jira-resolved]
+
+permissions:
+  issues: write
+
+jobs:
+  close-issue:
+    runs-on: ubuntu-latest
+    steps:
+      # Triggered by a Jira Automation rule when a ticket transitions to
+      # Resolved. Looks up the linked GitHub issue via its `jira-ticket:<KEY>`
+      # label, then comments the resolution Jira used (verbatim, whatever it
+      # is) and closes the issue. Closed as `completed` if the payload
+      # includes a release version (implying a fix shipped), otherwise
+      # `not planned` — this avoids having to enumerate Jira's many possible
+      # resolutions (Won't Fix, Duplicate, Cannot Reproduce, ...) here.
+      - name: Comment and close linked GitHub issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JIRA_KEY: ${{ github.event.client_payload.issue_key }}
+          RESOLUTION: ${{ github.event.client_payload.resolution }}
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          set -euo pipefail
+
+          issue_number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+            --label "jira-ticket:$JIRA_KEY" --json number --jq '.[0].number // empty')
+
+          if [ -z "$issue_number" ]; then
+            echo "No GitHub issue linked to $JIRA_KEY, skipping" >&2
+            exit 0
+          fi
+
+          if [ -z "$VERSION" ]; then
+            comment="Resolved in Jira [$JIRA_KEY] as $RESOLUTION."
+            reason="not planned"
+          else
+            comment="Resolved in Jira [$JIRA_KEY] as $RESOLUTION. This fix will be included in release $VERSION."
+            reason="completed"
+          fi
+
+          # Posted separately from the close below: `gh issue close --comment`
+          # silently skips the comment if the issue is already closed (e.g.
+          # someone closed it manually before this ran), and that comment is
+          # the whole point of this workflow.
+          gh issue comment "$issue_number" --repo "$GITHUB_REPOSITORY" --body "$comment"
+          gh issue close "$issue_number" --repo "$GITHUB_REPOSITORY" --reason "$reason"

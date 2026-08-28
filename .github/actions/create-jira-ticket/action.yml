@@ -1,0 +1,108 @@
+name: 'Create Jira ticket from GitHub issue'
+description: 'Files a Jira ticket for a GitHub issue, comments back with the link, and labels the issue as linked.'
+
+inputs:
+  issue-number:
+    required: true
+  jira-base-url:
+    required: true
+  jira-email:
+    required: true
+  jira-api-token:
+    required: true
+  jira-project-key:
+    required: true
+  jira-issue-type:
+    required: true
+  github-token:
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    # Fetches the GitHub issue's title/body/url, builds a Jira description in
+    # Atlassian Document Format (Jira Cloud requires ADF for rich-text fields,
+    # so this always goes through the v3 endpoint), and creates the ticket.
+    # Outputs the new ticket's key for the next step.
+    - name: Create Jira ticket
+      id: create
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        JIRA_BASE_URL: ${{ inputs.jira-base-url }}
+        JIRA_EMAIL: ${{ inputs.jira-email }}
+        JIRA_API_TOKEN: ${{ inputs.jira-api-token }}
+        JIRA_PROJECT_KEY: ${{ inputs.jira-project-key }}
+        JIRA_ISSUE_TYPE: ${{ inputs.jira-issue-type }}
+      run: |
+        set -euo pipefail
+
+        issue_json=$(gh issue view "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,url)
+        title=$(echo "$issue_json" | jq -r '.title')
+        body=$(echo "$issue_json" | jq -r '.body // ""')
+        url=$(echo "$issue_json" | jq -r '.url')
+
+        if [ -z "$body" ]; then
+          body="(no description provided)"
+        fi
+
+        description_adf=$(jq -n --arg body "$body" --arg footer "Reported via GitHub: $url" '
+          {
+            type: "doc",
+            version: 1,
+            content: [
+              { type: "paragraph", content: [ { type: "text", text: $body } ] },
+              { type: "paragraph", content: [ { type: "text", text: $footer } ] }
+            ]
+          }')
+
+        # The github-issue label lets the Jira Automation rule that closes
+        # resolved tickets filter to only tickets this action created,
+        # instead of running for every ticket in the project.
+        payload=$(jq -n \
+          --arg project "$JIRA_PROJECT_KEY" \
+          --arg issuetype "$JIRA_ISSUE_TYPE" \
+          --arg summary "$title" \
+          --argjson description "$description_adf" \
+          '{fields: {project: {key: $project}, issuetype: {name: $issuetype}, summary: $summary, description: $description, labels: ["github-issue"]}}')
+
+        response=$(curl -sS -w '\n%{http_code}' -X POST \
+          -u "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+          -H 'Content-Type: application/json' \
+          --data "$payload" \
+          "$JIRA_BASE_URL/rest/api/3/issue")
+
+        http_code=$(echo "$response" | tail -n1)
+        response_body=$(echo "$response" | sed '$d')
+
+        if [ "$http_code" -ge 300 ]; then
+          echo "Jira API returned $http_code: $response_body" >&2
+          exit 1
+        fi
+
+        key=$(echo "$response_body" | jq -r '.key')
+        echo "key=$key" >> "$GITHUB_OUTPUT"
+
+    # Comments the ticket link back on the GitHub issue, and applies
+    # `has-jira-ticket` (marks the issue as linked so it isn't re-filed) plus
+    # `jira-ticket:<KEY>` (the reverse-lookup index the resolution and PR-link
+    # workflows use to find this issue from the Jira key alone).
+    - name: Comment and label GitHub issue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        JIRA_BASE_URL: ${{ inputs.jira-base-url }}
+        JIRA_KEY: ${{ steps.create.outputs.key }}
+      run: |
+        set -euo pipefail
+
+        gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+          --body "Filed as [$JIRA_KEY]($JIRA_BASE_URL/browse/$JIRA_KEY)"
+
+        gh label create "has-jira-ticket" --repo "$GITHUB_REPOSITORY" --color "0E8A16" --force >/dev/null
+        gh label create "jira-ticket:$JIRA_KEY" --repo "$GITHUB_REPOSITORY" --color "5319E7" --force >/dev/null
+
+        gh issue edit "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" \
+          --add-label "has-jira-ticket" --add-label "jira-ticket:$JIRA_KEY"

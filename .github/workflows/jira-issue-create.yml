@@ -1,0 +1,145 @@
+name: Create Jira ticket from GitHub issue
+
+on:
+  issues:
+    types: [labeled]
+  schedule:
+    # TEMP: every 10 minutes for easier testing. Change back to a daily
+    # schedule (e.g. '0 9 * * *') once verified.
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  JIRA_TRIGGER_LABEL: create-jira-ticket
+  JIRA_LINKED_LABEL: has-jira-ticket
+  JIRA_PROJECT_KEY: K8S
+  JIRA_ISSUE_TYPE: Bug
+  STALE_DAYS: 14
+  # Caps how many tickets one sweep can file, so a burst of spam issues on
+  # this public repo can't flood Jira in a single run. Oldest issues are
+  # processed first; anything past the cap is picked up on a later run.
+  MAX_STALE_TICKETS_PER_RUN: 10
+
+jobs:
+  label-triggered:
+    # job-level `if` can't read the workflow `env` context, so this must be kept
+    # in sync with JIRA_TRIGGER_LABEL above by hand.
+    if: github.event_name == 'issues' && github.event.label.name == 'create-jira-ticket'
+    runs-on: ubuntu-latest
+    steps:
+      # Needed so `uses: ./.github/actions/create-jira-ticket` below can
+      # resolve the local composite action.
+      - uses: actions/checkout@v4
+
+      # Guards against re-filing a ticket if this event fires again for an
+      # issue that's already linked (e.g. label removed and re-added).
+      - name: Skip if already linked
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh issue view "${{ github.event.issue.number }}" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' \
+              | grep -qx "${{ env.JIRA_LINKED_LABEL }}"; then
+            echo "linked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "linked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Delegates to the shared composite action so the label-triggered and
+      # scheduled paths use identical ticket-creation logic.
+      - name: Create Jira ticket
+        if: steps.check.outputs.linked == 'false'
+        uses: ./.github/actions/create-jira-ticket
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          jira-base-url: ${{ secrets.JIRA_BASE_URL }}
+          jira-email: ${{ secrets.JIRA_EMAIL }}
+          jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
+          jira-project-key: ${{ env.JIRA_PROJECT_KEY }}
+          jira-issue-type: ${{ env.JIRA_ISSUE_TYPE }}
+          github-token: ${{ github.token }}
+
+  find-stale:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      issues: ${{ steps.find.outputs.issues }}
+    steps:
+      # Lists open issues, keeps the ones older than STALE_DAYS that aren't
+      # already linked to a ticket, sorts oldest-first, then drops any that a
+      # maintainer or collaborator has already commented on (checked via each
+      # comment's author_association). Stops once MAX_STALE_TICKETS_PER_RUN
+      # issues have qualified, so a burst of freshly-opened spam issues can't
+      # flood Jira in one run. Outputs a JSON array of issue numbers for the
+      # matrix job below.
+      - name: Find issues open 14+ days with no maintainer response
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          cutoff=$(date -u -d "${STALE_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
+
+          open_issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
+            --json number,createdAt,labels)
+
+          candidates=$(echo "$open_issues" | jq -c --arg cutoff "$cutoff" --arg label "$JIRA_LINKED_LABEL" \
+            '[.[] | select(.createdAt <= $cutoff) | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
+
+          result="[]"
+          count=0
+          for number in $(echo "$candidates" | jq -c '.[]'); do
+            if [ "$count" -ge "$MAX_STALE_TICKETS_PER_RUN" ]; then
+              break
+            fi
+            has_maintainer_comment=$(gh api "repos/$GITHUB_REPOSITORY/issues/$number/comments" --paginate \
+              --jq '[.[] | select(.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR")] | length > 0')
+            if [ "$has_maintainer_comment" = "false" ]; then
+              result=$(echo "$result" | jq -c --argjson n "$number" '. + [$n]')
+              count=$((count + 1))
+            fi
+          done
+
+          echo "issues=$result" >> "$GITHUB_OUTPUT"
+
+  create-for-stale:
+    needs: find-stale
+    # Skips this job entirely if find-stale found nothing to process.
+    if: needs.find-stale.outputs.issues != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # One job run per stale issue number found above.
+      matrix:
+        issue: ${{ fromJson(needs.find-stale.outputs.issues) }}
+    steps:
+      # Needed so `uses: ./.github/actions/create-jira-ticket` below can
+      # resolve the local composite action.
+      - uses: actions/checkout@v4
+
+      # Applied directly here rather than relying on the `issues: labeled`
+      # trigger above, since a label change made with GITHUB_TOKEN does not
+      # trigger other workflow runs.
+      - name: Label issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue edit "${{ matrix.issue }}" --repo "$GITHUB_REPOSITORY" --add-label "${{ env.JIRA_TRIGGER_LABEL }}"
+
+      # Same composite action as the label-triggered job above, so both paths
+      # behave identically.
+      - name: Create Jira ticket
+        uses: ./.github/actions/create-jira-ticket
+        with:
+          issue-number: ${{ matrix.issue }}
+          jira-base-url: ${{ secrets.JIRA_BASE_URL }}
+          jira-email: ${{ secrets.JIRA_EMAIL }}
+          jira-api-token: ${{ secrets.JIRA_API_TOKEN }}
+          jira-project-key: ${{ env.JIRA_PROJECT_KEY }}
+          jira-issue-type: ${{ env.JIRA_ISSUE_TYPE }}
+          github-token: ${{ github.token }}
