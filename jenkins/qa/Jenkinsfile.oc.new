@@ -24,7 +24,9 @@ pipeline {
     string(name: 'admission_image', defaultValue: 'ghcr.io/cb-rhcc/admission-controller:latest')
     string(name: 'certification_image', defaultValue: 'ghcr.io/cb-rhcc/operator-certification:latest')
     string(name: 'server_image', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.6.3-5')
+    string(name: 'server_image_version', defaultValue: '', description: 'Override the Couchbase version when server_image is a digest')
     string(name: 'server_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/server:7.2.6-3')
+    string(name: 'server_image_upgrade_version', defaultValue: '', description: 'Override the Couchbase version when server_image_upgrade is a digest')
     string(name: 'backup_image', defaultValue: 'ghcr.io/cb-rhcc/operator-backup:latest')
     string(name: 'exporter_image', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.10-1')
     string(name: 'exporter_image_upgrade', defaultValue: 'registry.connect.redhat.com/couchbase/exporter:1.0.5-1')
@@ -212,7 +214,9 @@ PYEOF
                   -admission-image ${params.admission_image} \
                   -mobile-image ${params.mobile_image} \
                   -server-image ${params.server_image} \
+                  ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
                   -server-image-upgrade ${params.server_image_upgrade} \
+                  ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
                   -exporter-image ${params.exporter_image} \
                   -exporter-image-upgrade ${params.exporter_image_upgrade} \
                   -backup-image ${params.backup_image} \
@@ -332,7 +336,9 @@ PYEOF
             -admission-image ${params.admission_image} \
             -mobile-image ${params.mobile_image} \
             -server-image ${params.server_image} \
+            ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
             -server-image-upgrade ${params.server_image_upgrade} \
+            ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
             -exporter-image ${params.exporter_image} \
             -exporter-image-upgrade ${params.exporter_image_upgrade} \
             -backup-image ${params.backup_image} \
@@ -475,7 +481,9 @@ PYEOF
               -admission-image ${params.admission_image} \
               -mobile-image ${params.mobile_image} \
               -server-image ${params.server_image} \
+              ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
               -server-image-upgrade ${params.server_image_upgrade} \
+              ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
               -exporter-image ${params.exporter_image} \
               -exporter-image-upgrade ${params.exporter_image_upgrade} \
               -backup-image ${params.backup_image} \
@@ -613,7 +621,9 @@ PYEOF
               -admission-image ${params.admission_image} \
               -mobile-image ${params.mobile_image} \
               -server-image ${params.server_image} \
+              ${params.server_image_version ? "-server-image-version ${params.server_image_version}" : ''} \
               -server-image-upgrade ${params.server_image_upgrade} \
+              ${params.server_image_upgrade_version ? "-server-image-upgrade-version ${params.server_image_upgrade_version}" : ''} \
               -exporter-image ${params.exporter_image} \
               -exporter-image-upgrade ${params.exporter_image_upgrade} \
               -backup-image ${params.backup_image} \
