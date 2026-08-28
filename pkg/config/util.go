@@ -34,7 +34,7 @@ import (
 
 const (
 	// matrixLink help users self heal...
-	matrixLink = "https://docs.couchbase.com/operator/current/prerequisite-and-setup.html"
+	matrixLink = "https://docs.couchbase.com/operator/current/prerequisite-and-setup.html#kubernetes-platform-compatibility"
 	trimSet    = "+"
 )
 
@@ -348,7 +348,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 
 	if ok {
 		// https://en.wikipedia.org/wiki/ANSI_escape_code
-		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is unsupported (too old), check", matrixLink, "for current support and versioning information")
+		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is older than the minimum supported version for this Operator release.  Check", matrixLink, "for support and versioning information")
 	}
 
 	ok, err = VersionGreaterThan(supportedUpperBound, v)
@@ -359,7 +359,7 @@ func checkAPIVersions(flags *genericclioptions.ConfigFlags) error {
 
 	if ok {
 		// https://en.wikipedia.org/wiki/ANSI_escape_code
-		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "is unsupported (too new), check", matrixLink, "current support and versioning information")
+		fmt.Println("\033[1;33mWarning\033[0m: platform version", v, "was unsupported when this Operator version was released.  Check", matrixLink, "for updated support and versioning information")
 	}
 
 	return nil
