@@ -676,3 +676,50 @@ func assertCommonProbeSettings(t *testing.T, probe *v1.Probe) {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+// TestIsPodPendingAnyEjection checks how the reconciler tells whether a pod has
+// been rebalanced out yet. Scale down and swap rebalance upgrades use separate
+// conditions, because the upgrade one also gates upgrade completion, but either
+// one must stop the pod being deleted.
+func TestIsPodPendingAnyEjection(t *testing.T) {
+	pod := func(conditions ...v1.PodConditionType) *v1.Pod {
+		p := &v1.Pod{}
+		for _, c := range conditions {
+			p.Status.Conditions = append(p.Status.Conditions, v1.PodCondition{Type: c, Status: v1.ConditionTrue})
+		}
+
+		return p
+	}
+
+	cases := []struct {
+		name                   string
+		pod                    *v1.Pod
+		wantScaleDown, wantAny bool
+	}{
+		{"unmarked pod is not pending ejection", pod(), false, false},
+		{"scale down mark", pod(PodPendingEjectionCondition), true, true},
+		{"upgrade mark is not the scale down mark, but still blocks deletion", pod(PodPendingUpgradeBeforeEjectionCondition), false, true},
+		{"both marks", pod(PodPendingEjectionCondition, PodPendingUpgradeBeforeEjectionCondition), true, true},
+		{"an unrelated condition does not count", pod(PodPendingInitializationCondition), false, false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsPodPendingEjection(tc.pod); got != tc.wantScaleDown {
+				t.Errorf("IsPodPendingEjection = %v, want %v", got, tc.wantScaleDown)
+			}
+
+			if got := IsPodPendingAnyEjection(tc.pod); got != tc.wantAny {
+				t.Errorf("IsPodPendingAnyEjection = %v, want %v", got, tc.wantAny)
+			}
+		})
+	}
+
+	// A false status condition must not read as marked.
+	notMarked := &v1.Pod{Status: v1.PodStatus{Conditions: []v1.PodCondition{
+		{Type: PodPendingEjectionCondition, Status: v1.ConditionFalse},
+	}}}
+	if IsPodPendingAnyEjection(notMarked) {
+		t.Errorf("condition with status False: IsPodPendingAnyEjection = true, want false")
+	}
+}

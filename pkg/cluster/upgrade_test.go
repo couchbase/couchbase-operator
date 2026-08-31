@@ -16,6 +16,7 @@ import (
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 
 	"github.com/couchbase/couchbase-operator/pkg/util/constants"
+	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,5 +183,100 @@ func TestMigrationCycleStrategy(t *testing.T) {
 			t.Errorf("%s: migrationCycleStrategy = (inPlace %v, fullRecovery %v), want (%v, %v)",
 				tc.name, inPlace, fullRecovery, tc.wantInPlace, tc.wantFullRecovery)
 		}
+	}
+}
+
+// TestPendingPodsBlockingRebalance covers the check that gates both
+// handleRebalance and handleEjectedMembers. A pending initialization pod
+// blocks the rebalance so every joining pod lands in one rebalance, so an
+// eject member's pod is not destroyed before the rebalance that ejects it
+// has run. A pod waiting on external DNS is exempt (it may wait a long time
+// and would block rebalances existing members need), unless it is a swap rebalance
+// replacement, which must join before its old node is ejected.
+func TestPendingPodsBlockingRebalance(t *testing.T) {
+	pod := func(name string, pendingDNS, upgradeReplacement bool) *v1.Pod {
+		p := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"}}
+
+		if pendingDNS {
+			p.Status.Conditions = []v1.PodCondition{{
+				Type:   k8sutil.PodPendingExternalDNSCondition,
+				Status: v1.ConditionTrue,
+			}}
+		}
+
+		if upgradeReplacement {
+			p.Annotations = map[string]string{constants.UpgradeTrackingAnnotation: "cb-example-0000"}
+		}
+
+		return p
+	}
+
+	pendingInit := func(names ...string) couchbaseutil.MemberSet {
+		ms := couchbaseutil.MemberSet{}
+		for _, name := range names {
+			ms.Add(couchbaseutil.NewMember("default", "cb-example", name, "", "", false, ""))
+		}
+
+		return ms
+	}
+
+	testcases := []struct {
+		name           string
+		pendingInit    couchbaseutil.MemberSet
+		pendingDNSPods []*v1.Pod
+		expected       []string
+	}{
+		{
+			name:        "no pods initializing, so the rebalance is free to run",
+			pendingInit: pendingInit(),
+			expected:    nil,
+		},
+		{
+			name:        "a pending initialization pod blocks the rebalance",
+			pendingInit: pendingInit("cb-example-0005"),
+			expected:    []string{"cb-example-0005"},
+		},
+		{
+			// The scale down regression, a scale up pod still initializing must keep
+			// handleEjectedMembers from destroying the scale down pod early.
+			name:        "only the pods still initializing block",
+			pendingInit: pendingInit("cb-example-0005", "cb-example-0006"),
+			expected:    []string{"cb-example-0005", "cb-example-0006"},
+		},
+		{
+			name:           "a pod only waiting on external DNS does not block",
+			pendingInit:    pendingInit("cb-example-0005"),
+			pendingDNSPods: []*v1.Pod{pod("cb-example-0005", true, false)},
+			expected:       nil,
+		},
+		{
+			name:           "a swap rebalance replacement waiting on DNS still blocks",
+			pendingInit:    pendingInit("cb-example-0005"),
+			pendingDNSPods: []*v1.Pod{pod("cb-example-0005", true, true)},
+			expected:       []string{"cb-example-0005"},
+		},
+		{
+			name:           "DNS exemption applies per pod",
+			pendingInit:    pendingInit("cb-example-0005", "cb-example-0006"),
+			pendingDNSPods: []*v1.Pod{pod("cb-example-0005", true, false)},
+			expected:       []string{"cb-example-0006"},
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			blocking := pendingPodsBlockingRebalance(testcase.pendingInit, testcase.pendingDNSPods)
+
+			if blocking.Size() != len(testcase.expected) {
+				t.Fatalf("expected %d blocking pods %v, got %d %v",
+					len(testcase.expected), testcase.expected, blocking.Size(), blocking.Names())
+			}
+
+			for _, name := range testcase.expected {
+				if !blocking.Contains(name) {
+					t.Errorf("expected %s to block the rebalance, got %v", name, blocking.Names())
+				}
+			}
+		})
 	}
 }

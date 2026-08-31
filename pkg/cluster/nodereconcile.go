@@ -27,6 +27,7 @@ import (
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
 	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -373,6 +374,7 @@ func (c *Cluster) newReconcileMachine() (*ReconcileMachine, error) {
 	}
 
 	c.deriveStabilizingFSMMembers(fsm, state)
+
 	c.deriveEjectFSMMembers(fsm, state)
 
 	return fsm, nil
@@ -393,10 +395,14 @@ func (c *Cluster) deriveStabilizingFSMMembers(fsm *ReconcileMachine, state *Memb
 	}
 }
 
-// deriveEjectFSMMembers populates fsm.ejectMembers from active nodes marked with
-// PodPendingUpgradeBeforeEjectionCondition. Swap-rebalance marks old members for ejection durably so
-// that the intent survives across reconcile cycles. The condition is NOT cleared here —
-// it is cleared by handleRebalance after successful ejection.
+// deriveEjectFSMMembers populates fsm.ejectMembers from active nodes marked
+// for ejection, by either the swap rebalance upgrade path or a scale down.
+// Both mark their old members durably so that the intent survives across
+// reconcile cycles. The condition is NOT cleared here, it is cleared by
+// handleRebalance after successful ejection.
+//
+// A scale down mark is the exception. It outlives the spec change that set it, so
+// if the user puts the size back we drop the mark and keep the node.
 //
 // NOTE: The ejected member is also removed from clusteredMembers. In the migration path
 // swapRebalanceMembers called removeMemberUser which did this in the same cycle. In the
@@ -406,18 +412,61 @@ func (c *Cluster) deriveStabilizingFSMMembers(fsm *ReconcileMachine, state *Memb
 // and scale-downs the wrong pod, and verifyRebalance fails because it expects the ejected
 // node to remain Active after rebalance.
 func (c *Cluster) deriveEjectFSMMembers(fsm *ReconcileMachine, state *MemberState) {
+	eject := couchbaseutil.NewMemberSet()
+	scaleDown := map[string]couchbaseutil.MemberList{}
+
 	for name := range state.ActiveNodes {
 		pod, ok := c.k8s.Pods.Get(name)
 		if !ok {
 			continue
 		}
-		if k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
-			if member, ok := c.members[name]; ok {
-				fsm.ejectMembers.Add(member)
-				fsm.clusteredMembers.Remove(name)
-				fsm.needsRebalance = true
+
+		member, ok := c.members[name]
+		if !ok {
+			continue
+		}
+
+		switch {
+		case k8sutil.IsPodPendingUpgradeBeforeEjection(pod):
+			eject.Add(member)
+		case k8sutil.IsPodPendingEjection(pod):
+			scaleDown[member.Config()] = append(scaleDown[member.Config()], member)
+		}
+	}
+
+	want := map[string]int{}
+	for _, serverSpec := range c.cluster.Spec.Servers {
+		want[serverSpec.Name] = serverSpec.Size
+	}
+
+	for class, members := range scaleDown {
+		// Marked members are still in clusteredMembers, so the total includes them.
+		// A class the spec no longer has wants 0, so every one of its members is kept for ejection.
+		total := fsm.clusteredMembers.GroupByServerConfig(class).Size() +
+			fsm.pendingInitPods.GroupByServerConfig(class).Size()
+
+		// Lowest name goes first, same as the removal queue.
+		sort.Slice(members, func(i, j int) bool { return members[i].Name() < members[j].Name() })
+
+		keep := min(max(total-want[class], 0), len(members))
+
+		for _, member := range members[:keep] {
+			eject.Add(member)
+		}
+
+		for _, member := range members[keep:] {
+			c.log.Info("Scale down no longer requested, keeping node", "cluster", c.namespacedName(), "name", member.Name())
+
+			if err := k8sutil.ClearPodPendingEjection(c.k8s, member.Name()); err != nil {
+				c.log.Error(err, "Failed to clear ejection mark", "cluster", c.namespacedName(), "pod", member.Name())
 			}
 		}
+	}
+
+	for name, member := range eject {
+		fsm.ejectMembers.Add(member)
+		fsm.clusteredMembers.Remove(name)
+		fsm.needsRebalance = true
 	}
 }
 
@@ -1306,9 +1355,16 @@ func populateRemovalQueuePerServerClass(serverClass string, clusteredMembers cou
 		memNames = append(memNames, name)
 	}
 
-	// sort the slice of member names based on the size.
+	// Sort the slice of member names based on the size, breaking ties by name.
+	// memNames comes from a map walk and sort.Slice is not stable, so without
+	// the tie break, equally sized members come out in a different order every
+	// reconcile and a different one gets removed each time.
 	sort.Slice(memNames, func(i, j int) bool {
-		return memberToSize[memNames[i]] < memberToSize[memNames[j]]
+		if memberToSize[memNames[i]] != memberToSize[memNames[j]] {
+			return memberToSize[memNames[i]] < memberToSize[memNames[j]]
+		}
+
+		return memNames[i] < memNames[j]
 	})
 
 	queueMembers = append(queueMembers, memNames...)
@@ -1383,6 +1439,13 @@ func (r *ReconcileMachine) handleRemoveNode(c *Cluster) error {
 		server, err := c.scheduler.Delete(serverSpec.Name)
 		if err != nil {
 			return fmt.Errorf("failed to schedule removal of member '%s': %w", serverSpec.Name, err)
+		}
+
+		// Record the intent on the pod. r.ejectMembers only lives for this cycle, and
+		// handleAddNode aborts it while a scale up pod initializes, so deriveEjectFSMMembers
+		// replays the mark until the rebalance that both adds and removes has run.
+		if err := k8sutil.SetPodPendingEjection(c.k8s, server); err != nil {
+			return fmt.Errorf("failed to mark member '%s' for ejection: %w", server, err)
 		}
 
 		r.removeMemberUser(c.members[server])
@@ -2645,28 +2708,33 @@ func (r *ReconcileMachine) handleAutoscaleServerConfigs(c *Cluster) error {
 	return nil
 }
 
+// podsBlockingRebalance returns the pending initialization pods that must
+// join the cluster before a rebalance may run, so they are all added in a
+// single rebalance. Pods only waiting on external DNS are skipped, they
+// may wait a long time. A swap rebalance replacement is the exception,
+// it must join before its old node is ejected.
+func (r *ReconcileMachine) podsBlockingRebalance(c *Cluster) couchbaseutil.MemberSet {
+	return pendingPodsBlockingRebalance(r.pendingInitPods, c.getPendingDNSPods())
+}
+
+// pendingPodsBlockingRebalance does the work for podsBlockingRebalance, split
+// out so it can be tested without a pod cache.
+func pendingPodsBlockingRebalance(pendingInitPods couchbaseutil.MemberSet, pendingDNSPods []*v1.Pod) couchbaseutil.MemberSet {
+	skippable := podsToMemberSet(pendingDNSPods)
+
+	for _, pod := range pendingDNSPods {
+		if k8sutil.GetPodUpgradeTracking(pod) != "" {
+			skippable.Remove(pod.Name)
+		}
+	}
+
+	return pendingInitPods.Diff(skippable)
+}
+
 //nolint:gocognit
 func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 	if shouldRebalance(c, r) {
-		// Wait for pods that are about to join the cluster before rebalancing, so
-		// all of them are added in a single rebalance instead of one per pod.
-		// Pods only waiting on external DNS are skipped, they may wait a long
-		// time, and waiting for them would block rebalances the existing members
-		// need (such as recovering a failed node). The exception is a swap
-		// rebalance replacement (it carries the upgrade tracking annotation), we
-		// must still wait for it to join before its old node is ejected, else the
-		// swap would remove the old node while the replacement is still outside
-		// the cluster and briefly drop below the requested size.
-		pendingDNSPods := c.getPendingDNSPods()
-		skippable := podsToMemberSet(pendingDNSPods)
-
-		for _, pod := range pendingDNSPods {
-			if k8sutil.GetPodUpgradeTracking(pod) != "" {
-				skippable.Remove(pod.Name)
-			}
-		}
-
-		mustWaitFor := r.pendingInitPods.Diff(skippable)
+		mustWaitFor := r.podsBlockingRebalance(c)
 		if mustWaitFor.Size() > 0 {
 			c.log.V(1).Info("Waiting for pods to join the cluster before rebalancing",
 				"cluster", c.namespacedName(), "pending", mustWaitFor.Names())
@@ -2769,6 +2837,10 @@ func (r *ReconcileMachine) handleRebalance(c *Cluster) error {
 			if err := k8sutil.ClearPodPendingUpgradeBeforeEjection(c.k8s, member.Name()); err != nil {
 				c.log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
 			}
+
+			if err := k8sutil.ClearPodPendingEjection(c.k8s, member.Name()); err != nil {
+				c.log.Error(err, "Failed to clear pending ejection condition", "cluster", c.namespacedName(), "pod", member.Name())
+			}
 		}
 	}
 
@@ -2817,11 +2889,19 @@ func (r *ReconcileMachine) handleEjectedMembers(c *Cluster) error {
 		return nil
 	}
 
+	// handleRebalance defers while a pod is still initializing, so the
+	// eject members have not been rebalanced out yet. Deleting their pods
+	// now would take a live node down and force an auto failover, so
+	// leave them for the cycle that rebalances.
+	if r.podsBlockingRebalance(c).Size() > 0 {
+		return nil
+	}
+
 	for name := range r.ejectMembers {
-		// Do not delete a pod that still carries PodPendingUpgradeBeforeEjection — the CBS
-		// eject-rebalance (handleRebalance) has not yet run for it.
+		// Do not delete a pod that is still marked for ejection, handleRebalance has not
+		// yet rebalanced it out of the cluster.
 		pod, ok := c.k8s.Pods.Get(name)
-		if ok && k8sutil.IsPodPendingUpgradeBeforeEjection(pod) {
+		if ok && k8sutil.IsPodPendingAnyEjection(pod) {
 			continue
 		}
 

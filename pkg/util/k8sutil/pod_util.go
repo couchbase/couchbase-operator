@@ -63,6 +63,7 @@ const (
 	PodPendingExternalDNSCondition            = v1.PodConditionType("pod.couchbase.com/pending-external-dns")
 	PodPendingInitializationCondition         = v1.PodConditionType("pod.couchbase.com/pending-initialization")
 	PodPendingUpgradeBeforeEjectionCondition  = v1.PodConditionType("pod.couchbase.com/pending-upgrade-before-ejection")
+	PodPendingEjectionCondition               = v1.PodConditionType("pod.couchbase.com/pending-ejection")
 	CouchbaseLogSidecarContainerName          = "logging"
 	CouchbaseAuditCleanupSidecarContainerName = "audit-cleanup"
 	loggingSidecarMetadataMountDir            = "/etc/podinfo"
@@ -2705,6 +2706,44 @@ func ClearPodPendingUpgradeBeforeEjection(client *client.Client, name string) er
 func IsPodPendingUpgradeBeforeEjection(pod *v1.Pod) bool {
 	condition := GetPodCondition(pod, PodPendingUpgradeBeforeEjectionCondition)
 	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// SetPodPendingEjection marks a scale down pod for ejection during
+// the next rebalance. It is the scale down counterpart of
+// SetPodPendingUpgradeBeforeEjection and is deliberately a separate
+// condition, the upgrade one also gates upgrade completion. The condition
+// survives reconcile cycles, so the ejection still happens in the rebalance
+// that admits an async scale up pod.
+func SetPodPendingEjection(client *client.Client, name string) error {
+	pod, ok := client.Pods.Get(name)
+	if !ok {
+		return fmt.Errorf("%w: unable to set pending ejection condition on pod %s", errors.NewStackTracedError(errors.ErrResourceRequired), name)
+	}
+	condition := NewPodCondition(PodPendingEjectionCondition, v1.ConditionTrue, "Pod marked for ejection during scale down")
+	return UpsertPodCondition(client, pod, condition)
+}
+
+// ClearPodPendingEjection removes the PodPendingEjectionCondition from the pod.
+func ClearPodPendingEjection(client *client.Client, name string) error {
+	pod, ok := client.Pods.Get(name)
+	if !ok {
+		// Pod not in local cache, either already deleted or condition already gone.
+		return nil
+	}
+	return RemovePodCondition(client, pod, PodPendingEjectionCondition)
+}
+
+// IsPodPendingEjection returns true if the pod has the pending ejection condition set.
+func IsPodPendingEjection(pod *v1.Pod) bool {
+	condition := GetPodCondition(pod, PodPendingEjectionCondition)
+	return condition != nil && condition.Status == v1.ConditionTrue
+}
+
+// IsPodPendingAnyEjection returns true if the pod is marked for ejection
+// by either the scale down or the swap rebalance upgrade path. The node has
+// not been rebalanced out yet, so the pod must not be deleted.
+func IsPodPendingAnyEjection(pod *v1.Pod) bool {
+	return IsPodPendingUpgradeBeforeEjection(pod) || IsPodPendingEjection(pod)
 }
 
 // setPodAnnotation is a helper that sets a single annotation on a pod with retry.
