@@ -1053,9 +1053,10 @@ func testXDCRRotateClient(t *testing.T, kubernetes1, kubernetes2 *types.Cluster,
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
 	}
+	// The target cluster uses mutual TLS, so use the mutual TLS event list.
+	// It already covers the settings edit that turning mutual TLS on makes.
 	expectedEvents2 := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		eventschema.Event{Reason: k8sutil.EventReasonClientTLSUpdated},
 	}
@@ -1126,9 +1127,9 @@ func testXDCRRotateCA(t *testing.T, kubernetes1, kubernetes2 *types.Cluster, dns
 			Validator: eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterUpdated},
 		},
 	}
+	// Same as above, the target cluster uses mutual TLS.
 	expectedEvents2 := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited},
+		e2eutil.ClusterCreateSequenceWithMutualTLS(clusterSize),
 		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		// Race condition updating secrets.
 		eventschema.Optional{
@@ -1429,7 +1430,9 @@ func TestXDCRRemoveExplicitMapping(t *testing.T) {
 	e2eutil.MustVerifyDocCountInCollection(t, kubernetes, targetCluster, bucket.GetName(), scopeName, deniedCollectionName, 0, time.Minute)
 
 	// Remove the explicitMapping from the CR.
-	e2eutil.MustPatchReplication(t, kubernetes, replication, jsonpatch.NewPatchSet().Remove("/spec/explicitMapping"), time.Minute)
+	// explicitMapping is a top level field, it sits next to spec rather than
+	// inside it, so the path has no "/spec" in front of it.
+	e2eutil.MustPatchReplication(t, kubernetes, replication, jsonpatch.NewPatchSet().Remove("/explicitMapping"), time.Minute)
 
 	// With the mapping cleared the replication reverts to replicating everything,
 	// so the previously denied collection now replicates across.

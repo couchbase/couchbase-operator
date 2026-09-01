@@ -159,8 +159,10 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 		Test("/GoGC", &goGC).
 		Test("/GoMaxProcs", &goMaxProcs)
 
-	// Add version-specific validations
-	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.2.0"); err != nil {
+	// Server 7.2.0 does not send these three settings back, it leaves them empty,
+	// so only check them on newer servers. VersionAfter means "this version or
+	// newer", so we pass 7.2.1 here to leave 7.2.0 out.
+	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.2.1"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
 		validationPatch = validationPatch.Test("/CollectionsOSOMode", &collectionsOSOMode)
@@ -199,14 +201,17 @@ func TestXDCRGlobalSettingsBeforeReplication(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes2, targetCluster, bucket.GetName(), numOfDocs, 10*time.Minute)
 
 	// Assert event ordering on the source cluster: global settings edited occurs before replication added.
+	// Do not list the bucket event here, the create sequence above already takes it.
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonServiceCreated},
 		e2eutil.ClusterCreateSequenceWithExposedFeatures(clusterSize, couchbasev2.FeatureXDCR),
-		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
 		// Allow one or more global settings edits before replication is established.
 		eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
 		eventschema.Event{Reason: k8sutil.EventReasonRemoteClusterAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonReplicationAdded},
+		// The operator keeps writing the global settings after this, so allow any
+		// number of later edits. Every event has to be matched or the check fails.
+		eventschema.Optional{Validator: eventschema.RepeatAtLeast{Times: 1, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}}},
 	}
 
 	ValidateEvents(t, kubernetes1, sourceCluster, expectedEvents)
