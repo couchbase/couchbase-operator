@@ -470,3 +470,62 @@ func TestIndexStorageMode(t *testing.T) {
 		})
 	}
 }
+
+func TestCouchbaseEncryptionKeyCanEncryptBucket(t *testing.T) {
+	tests := []struct {
+		name     string
+		usage    *CouchbaseEncryptionKeyUsage
+		bucket   string
+		expected bool
+	}{
+		{
+			name:     "nil usage defaults to all buckets",
+			usage:    nil,
+			bucket:   "travel",
+			expected: true,
+		},
+		{
+			name:     "allBuckets covers any bucket",
+			usage:    &CouchbaseEncryptionKeyUsage{AllBuckets: true},
+			bucket:   "travel",
+			expected: true,
+		},
+		{
+			name:     "named bucket is permitted",
+			usage:    &CouchbaseEncryptionKeyUsage{Buckets: []string{"beer", "travel"}},
+			bucket:   "travel",
+			expected: true,
+		},
+		{
+			name:     "unnamed bucket is not permitted",
+			usage:    &CouchbaseEncryptionKeyUsage{Buckets: []string{"beer"}},
+			bucket:   "travel",
+			expected: false,
+		},
+		{
+			name:     "no bucket usage at all",
+			usage:    &CouchbaseEncryptionKeyUsage{Configuration: true},
+			bucket:   "travel",
+			expected: false,
+		},
+		{
+			name:     "prefix is not a match",
+			usage:    &CouchbaseEncryptionKeyUsage{Buckets: []string{"travel-sample"}},
+			bucket:   "travel",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := &CouchbaseEncryptionKey{
+				Spec: CouchbaseEncryptionKeySpec{Usage: tt.usage},
+			}
+
+			if got := key.CanEncryptBucket(tt.bucket); got != tt.expected {
+				t.Errorf("CanEncryptBucket(%q) = %v, want %v", tt.bucket, got, tt.expected)
+			}
+		})
+	}
+}
+

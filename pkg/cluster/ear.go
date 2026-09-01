@@ -583,8 +583,23 @@ func (c *Cluster) reconcileSingleEncryptionKey(requestedKey *couchbasev2.Couchba
 		actualKey.EncryptionKey.KMIP.KeyPassphrase = apiRequestedKey.KMIP.KeyPassphrase
 	}
 
+	// The server rejects the whole update with "usage in use" if a dropped usage
+	// still has DEKs. Hold those back until the DEKs leave usedBy.
+	retained := actualKey.UsagesToRetain(apiRequestedKey.Usage)
+	apiRequestedKey.Usage = append(apiRequestedKey.Usage, retained...)
+
+	// Usage order carries no meaning, so a reorder is not a change worth writing.
+	slices.Sort(apiRequestedKey.Usage)
+	slices.Sort(actualKey.EncryptionKey.Usage)
+
+	// Compared before the log below, so a settled key does not log every cycle.
 	if reflect.DeepEqual(*apiRequestedKey, actualKey.EncryptionKey) {
 		return nil
+	}
+
+	if len(retained) > 0 {
+		c.log.Info("Retaining encryption key usages that are still in use on the server",
+			"cluster", c.namespacedName(), "name", apiRequestedKey.Name, "usages", retained)
 	}
 
 	if err := couchbaseutil.UpdateEncryptionKey(apiRequestedKey, actualKey.ID).On(c.api, c.readyMembers()); err != nil {
@@ -918,8 +933,24 @@ func (c *Cluster) getUsageList(key *couchbasev2.CouchbaseEncryptionKey) []string
 
 	usageList := make([]string, 0)
 
-	if usage.AllBuckets {
+	switch {
+	// The wildcard subsumes any bucket specific usage, so never send both.
+	case usage.AllBuckets:
 		usageList = append(usageList, couchbaseutil.EncryptionKeyUsageBucketEncryptionAll)
+
+	case len(usage.Buckets) == 0:
+		// No bucket usage at all, which is what a KEK looks like.
+
+	// Validation rejects this below the version, but the DAC can be skipped. No
+	// wildcard fallback: over-granting is worse than granting nothing.
+	case !c.SupportsVersionFeatures(constants.MinimumVersionForEncryptionKeyUsedBy):
+		c.log.Info("Ignoring spec.usage.buckets, which needs Couchbase Server "+constants.MinimumVersionForEncryptionKeyUsedBy+" or later",
+			"cluster", c.namespacedName(), "name", key.Name, "buckets", usage.Buckets)
+
+	default:
+		for _, bucket := range usage.Buckets {
+			usageList = append(usageList, couchbaseutil.BucketEncryptionUsage(bucket))
+		}
 	}
 
 	if usage.Configuration {

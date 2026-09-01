@@ -13,10 +13,13 @@ package e2eutil
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
+	"time"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
+	"github.com/couchbase/couchbase-operator/pkg/util/retryutil"
 	"github.com/couchbase/couchbase-operator/test/e2e/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +47,62 @@ func MustAssertEncryptionKeyExists(t *testing.T, kubernetes *types.Cluster, clus
 	}
 
 	Die(t, fmt.Errorf("encryption key %s not found", keyName))
+}
+
+// getEncryptionKey returns the named key as the server reports it, with usedBy.
+func getEncryptionKey(kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyName string) (*couchbaseutil.EncryptionKeyInfo, error) {
+	client, err := CreateAdminConsoleClient(kubernetes, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	keys := couchbaseutil.EncryptionKeyList{}
+	if err := couchbaseutil.ListEncryptionKeys(&keys).On(client.client, client.host); err != nil {
+		return nil, err
+	}
+
+	key := keys.GetKeyByName(keyName)
+	if key == nil {
+		return nil, fmt.Errorf("encryption key %s not found", keyName)
+	}
+
+	return key, nil
+}
+
+// MustGetEncryptionKey returns the named key as the server reports it, with usedBy.
+func MustGetEncryptionKey(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyName string) *couchbaseutil.EncryptionKeyInfo {
+	key, err := getEncryptionKey(kubernetes, cluster, keyName)
+	if err != nil {
+		Die(t, err)
+	}
+
+	return key
+}
+
+// MustWaitForEncryptionKeyUsage waits until the key's usage matches want, as a set.
+func MustWaitForEncryptionKeyUsage(t *testing.T, kubernetes *types.Cluster, cluster *couchbasev2.CouchbaseCluster, keyName string, want []string, timeout time.Duration) {
+	expected := slices.Clone(want)
+	slices.Sort(expected)
+
+	var last []string
+
+	err := retryutil.RetryFor(timeout, func() error {
+		key, err := getEncryptionKey(kubernetes, cluster, keyName)
+		if err != nil {
+			return err
+		}
+
+		last = slices.Sorted(slices.Values(key.Usage))
+
+		if !slices.Equal(last, expected) {
+			return fmt.Errorf("encryption key %s usage is %v, want %v", keyName, last, expected)
+		}
+
+		return nil
+	})
+	if err != nil {
+		Die(t, fmt.Errorf("timed out waiting for encryption key %s usage %v, last saw %v: %w", keyName, expected, last, err))
+	}
 }
 
 // MustAssertEncryptionKeyFinalizerExists asserts that the encryption key has the cluster finalizer.

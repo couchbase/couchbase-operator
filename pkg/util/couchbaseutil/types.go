@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2638,20 +2639,57 @@ func (l EncryptionKeyList) GetKeyByName(name string) *EncryptionKeyInfo {
 	return nil
 }
 
+// BucketEncryptionUsage returns the usage string permitting a key to encrypt one named bucket.
+func BucketEncryptionUsage(bucketName string) string {
+	return strings.Join([]string{constants.EncryptionKeyUsageBucketEncryptionPrefix, bucketName}, "-")
+}
+
+// EncryptionKeyUsedBy is one entry of a key's usedBy list, added by MB-68887.
+type EncryptionKeyUsedBy struct {
+	Usage       string `json:"usage"`
+	Description string `json:"description"`
+}
+
 // EncryptionKeyInfo is what we get back from the API when getting/listing the encryption keys.
 type EncryptionKeyInfo struct {
 	ID int `json:"id"`
 	EncryptionKey
+
+	// UsedBy is read-only. It lists DEKs still encrypted by this key even once
+	// their entity no longer selects it, which is what blocks a usage removal.
+	UsedBy []EncryptionKeyUsedBy `json:"usedBy,omitempty"`
 }
 
 func (k *EncryptionKeyInfo) CanEncryptBucket(bucketName string) bool {
-	for _, usage := range k.Usage {
-		if usage == EncryptionKeyUsageBucketEncryptionAll || usage == strings.Join([]string{constants.EncryptionKeyUsageBucketEncryptionPrefix, bucketName}, "-") {
-			return true
+	return usagePermits(k.Usage, BucketEncryptionUsage(bucketName))
+}
+
+// UsagesToRetain returns the usages requested would drop while the server still
+// reports them in use. The server rejects dropping a usage that still has DEKs.
+func (k *EncryptionKeyInfo) UsagesToRetain(requested []string) []string {
+	var retain []string
+
+	for _, inUse := range k.UsedBy {
+		// usedBy repeats a usage once per dependent key, hence the dedup.
+		if usagePermits(requested, inUse.Usage) || slices.Contains(retain, inUse.Usage) {
+			continue
 		}
+
+		retain = append(retain, inUse.Usage)
 	}
 
-	return false
+	return retain
+}
+
+// usagePermits mirrors the server's is_allowed: an exact match, or the bucket
+// encryption wildcard covering a bucket usage. Never the other way round.
+func usagePermits(granted []string, needed string) bool {
+	if slices.Contains(granted, needed) {
+		return true
+	}
+
+	return strings.HasPrefix(needed, constants.EncryptionKeyUsageBucketEncryptionPrefix) &&
+		slices.Contains(granted, EncryptionKeyUsageBucketEncryptionAll)
 }
 
 // MarshalJSON is used to marshal the EncryptionKey into a JSON object.

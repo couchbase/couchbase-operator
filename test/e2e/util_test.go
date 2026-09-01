@@ -939,6 +939,7 @@ func registerTests() {
 		framework.NewTestDef(TestRotateEncryptionKey).WithTags(TagSuiteP1, TagFeatureEAR),
 		framework.NewTestDef(TestDropDEKBucket).WithTags(TagSuiteP1, TagFeatureEAR),
 		framework.NewTestDef(TestDropDEKSystem).WithTags(TagSuiteP1, TagFeatureEAR),
+		framework.NewTestDef(TestBucketSpecificEncryptionKeyUsage).WithTags(TagSuiteP1, TagFeatureEAR),
 
 		// Server group tests
 		framework.NewTestDef(TestServerGroupAddRedistributesPods).WithTags(TagSuiteP1, TagFeatureServerGroups),

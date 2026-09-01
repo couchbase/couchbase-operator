@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
+	"github.com/couchbase/couchbase-operator/pkg/util/constants"
 	"github.com/couchbase/couchbase-operator/pkg/util/couchbaseutil"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -456,4 +457,92 @@ func TestIsEncryptionKeyDeferred(t *testing.T) {
 		assert.True(t, c.isEncryptionKeyDeferred("key-A"))
 		assert.True(t, c.isEncryptionKeyDeferred("key-B"))
 	})
+}
+
+func TestGetUsageList(t *testing.T) {
+	const (
+		oldServerImage    = "couchbase/server:8.0.0"
+		usedByServerImage = "couchbase/server:" + constants.MinimumVersionForEncryptionKeyUsedBy
+	)
+
+	cases := []struct {
+		name  string
+		usage *couchbasev2.CouchbaseEncryptionKeyUsage
+		image string
+		want  []string
+	}{
+		{
+			name:  "bucket specific usages dropped on an older server",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{Buckets: []string{"beer"}},
+			image: oldServerImage,
+			want:  []string{},
+		},
+		{
+			name:  "older server never falls back to the wildcard",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{Buckets: []string{"beer"}, Configuration: true},
+			image: oldServerImage,
+			want:  []string{couchbaseutil.EncryptionKeyUsageConfigEncryption},
+		},
+		{
+			name:  "wildcard is unaffected by the version gate",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{AllBuckets: true},
+			image: oldServerImage,
+			want:  []string{couchbaseutil.EncryptionKeyUsageBucketEncryptionAll},
+		},
+		{
+			name:  "nil usage defaults to everything",
+			usage: nil,
+			image: usedByServerImage,
+			want: []string{
+				couchbaseutil.EncryptionKeyUsageBucketEncryptionAll,
+				couchbaseutil.EncryptionKeyUsageConfigEncryption,
+				couchbaseutil.EncryptionKeyUsageKEKEncryption,
+				couchbaseutil.EncryptionKeyUsageLogsEncryption,
+				couchbaseutil.EncryptionKeyUsageAuditEncryption,
+			},
+		},
+		{
+			name:  "bucket specific usages only",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{Buckets: []string{"beer", "travel"}},
+			image: usedByServerImage,
+			want:  []string{"bucket-encryption-beer", "bucket-encryption-travel"},
+		},
+		{
+			name:  "bucket specific alongside config",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{Buckets: []string{"beer"}, Configuration: true},
+			image: usedByServerImage,
+			want:  []string{"bucket-encryption-beer", couchbaseutil.EncryptionKeyUsageConfigEncryption},
+		},
+		{
+			name:  "wildcard suppresses bucket specific usages",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{AllBuckets: true, Buckets: []string{"beer"}},
+			image: usedByServerImage,
+			want:  []string{couchbaseutil.EncryptionKeyUsageBucketEncryptionAll},
+		},
+		{
+			name:  "no bucket usage at all",
+			usage: &couchbasev2.CouchbaseEncryptionKeyUsage{Audit: true},
+			image: usedByServerImage,
+			want:  []string{couchbaseutil.EncryptionKeyUsageAuditEncryption},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// No api client, so the version gate falls back to the spec image.
+			// The gate also logs, which reaches namespacedName().
+			c := &Cluster{
+				cluster: &couchbasev2.CouchbaseCluster{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-cluster", Namespace: "default"},
+					Spec:       couchbasev2.ClusterSpec{Image: tc.image},
+				},
+			}
+
+			key := &couchbasev2.CouchbaseEncryptionKey{
+				Spec: couchbasev2.CouchbaseEncryptionKeySpec{Usage: tc.usage},
+			}
+
+			assert.Equal(t, tc.want, c.getUsageList(key))
+		})
+	}
 }

@@ -42,6 +42,8 @@ The following is an example resource, depicting the overall structure and any de
   <<couchbaseencryptionkeys-spec-usage,usage>>:
     <<couchbaseencryptionkeys-spec-usage-allbuckets,allBuckets>>: True
     <<couchbaseencryptionkeys-spec-usage-audit,audit>>: True
+    <<couchbaseencryptionkeys-spec-usage-buckets,buckets>>:
+    - ""
     <<couchbaseencryptionkeys-spec-usage-configuration,configuration>>: True
     <<couchbaseencryptionkeys-spec-usage-key,key>>: True
     <<couchbaseencryptionkeys-spec-usage-log,log>>: True
@@ -399,6 +401,19 @@ AllBuckets defines whether the key should be used for all buckets.
 ==== Description
 
 Audit defines whether the key should be used for audit.
+
+=== couchbaseencryptionkeys.spec.usage.buckets
+
+==== Constraints
+
+*Type*: `[]string`
+
+==== Description
+
+Buckets names the individual buckets the key may encrypt.
+Only valid when
+allBuckets is false.
+Each bucket must exist on a cluster that selects this key.
 
 === couchbaseencryptionkeys.spec.usage.configuration
 

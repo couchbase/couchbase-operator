@@ -2018,6 +2018,13 @@ func (k *CouchbaseEncryptionKey) GetUsage() CouchbaseEncryptionKeyUsage {
 	return *k.Spec.Usage
 }
 
+// CanEncryptBucket reports whether spec.usage permits encrypting the named bucket.
+func (k *CouchbaseEncryptionKey) CanEncryptBucket(bucketName string) bool {
+	usage := k.GetUsage()
+
+	return usage.AllBuckets || slices.Contains(usage.Buckets, bucketName)
+}
+
 func (k *CouchbaseEncryptionKey) HasClusterFinalizer(c *CouchbaseCluster) bool {
 	if len(k.Finalizers) == 0 {
 		return false

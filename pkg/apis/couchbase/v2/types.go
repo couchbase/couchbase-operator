@@ -6391,6 +6391,12 @@ type CouchbaseEncryptionKeyUsage struct {
 	// AllBuckets defines whether the key should be used for all buckets.
 	// +kubebuilder:default=true
 	AllBuckets bool `json:"allBuckets"`
+
+	// Buckets names the individual buckets the key may encrypt. Only valid when
+	// allBuckets is false. Each bucket must exist on a cluster that selects this key.
+	// +optional
+	// +listType=set
+	Buckets []string `json:"buckets,omitempty"`
 }
 
 // CouchbaseEncryptionKeyRotation defines rotation settings for auto-generated keys.

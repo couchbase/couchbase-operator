@@ -6022,7 +6022,7 @@ func TestValidationEncryptionKey(t *testing.T) {
 				AllBuckets:    false,
 			})},
 			shouldFail:     true,
-			expectedErrors: []string{"at least one usage field must be set to true in spec.usage"},
+			expectedErrors: []string{"at least one usage field must be set in spec.usage"},
 		},
 		{
 			name:           "TestEncryptionKeyTypeChange",
@@ -6206,7 +6206,7 @@ func TestValidationEncryptionKeyCreate(t *testing.T) {
 				AllBuckets:    false,
 			})},
 			shouldFail:     true,
-			expectedErrors: []string{"at least one usage field must be set to true in spec.usage"},
+			expectedErrors: []string{"at least one usage field must be set in spec.usage"},
 		},
 		{
 			name: "TestEncryptionKeyEmptyUsageNoStartTime",

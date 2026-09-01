@@ -238,7 +238,7 @@ func gatherCouchbaseBuckets(supportedFeatures SupportedFeatureMap, selector *cou
 			if bucket.Spec.EncryptionAtRest != nil && bucket.Spec.EncryptionAtRest.KeyName != "" {
 				if key := encryptionKeys.GetKeyByName(bucket.Spec.EncryptionAtRest.KeyName); key == nil {
 					log.Info("Encryption key not found for bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
-				} else if !key.CanEncryptBucket(bucket.Name) {
+				} else if !key.CanEncryptBucket(name) {
 					log.Info("Encryption key cannot encrypt bucket", "cluster", cluster.NamespacedName(), "bucket", bucket.Name, "key-name", bucket.Spec.EncryptionAtRest.KeyName)
 				} else {
 					b.EncryptionAtRestKeyID = util.IntPtr(key.ID)
