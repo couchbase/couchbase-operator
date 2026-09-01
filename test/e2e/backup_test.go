@@ -3901,3 +3901,107 @@ func TestBackupLogsCollectionWithName(t *testing.T) {
 
 	mustVerifyArchiveContents(t, archive, files)
 }
+
+// TestBackupAndRestoreCleansUpOrphanedJobs checks the Operator will cleanup restore jobs for which a restore CR no longer exists,
+// and still raise the restore deleted event, even if the job never completed.
+func TestBackupAndRestoreCleansUpOrphanedJobs(t *testing.T) {
+	f := framework.Global
+
+	kubernetes, cleanup := f.SetupTest(t)
+	defer cleanup()
+
+	provider := MustNewProvider(t, kubernetes, cloud.NoCloudProvider)
+
+	objStoreSecret, bucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+
+	defer storeCleanup()
+
+	framework.Requires(t, kubernetes).StaticCluster()
+
+	// Create a normal cluster.
+	clusterSize := constants.Size3
+
+	numOfDocs := f.DocsCount
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
+	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
+
+	// Insert docs to backup
+	e2eutil.NewDocumentSet(bucket.GetName(), numOfDocs).MustCreate(t, kubernetes, cluster)
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// Create a Backup object.
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+
+	// Wait for backup
+	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
+
+	// Wait for backup to complete
+	e2eutil.MustWaitForBackupEvent(t, kubernetes, backup, e2eutil.BackupCompletedEvent(cluster, backup.Name), 15*time.Minute)
+
+	// Create a restore, then delete its CouchbaseBackupRestore CR as soon as it starts.
+	restore := e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+
+	firstRestoreName := restore.Name
+
+	// The restore may have already completed (and been cleaned up by the operator) by the time
+	// we get here, so tolerate the CR already being gone.
+	if err := e2eutil.DeleteBackupRestore(kubernetes, restore); err != nil && !errors.IsNotFound(err) {
+		e2eutil.Die(t, fmt.Errorf("failed to delete restore: %w", err))
+	}
+
+	// Regardless of whether the operator's normal post-completion cleanup or its orphaned job
+	// cleanup won the race, we should always see a delete event, and the restore job should be
+	// gone even though it's no longer owned by the (now deleted) restore CR.
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.BackupRestoreDeletedEvent(cluster, restore.Name), time.Minute, 2*time.Minute)
+	e2eutil.MustWaitUntilJobNotExists(t, kubernetes, restore.Name, restore.Namespace, 2*time.Minute)
+
+	// Empty the bucket so the doc count check below actually proves the second restore
+	// repopulated it, rather than just observing data that was never removed.
+	e2eutil.MustDeleteBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketNotExists(t, kubernetes, cluster, bucket.GetName(), 2*time.Minute)
+
+	e2eutil.MustWaitClusterStatusHealthy(t, kubernetes, cluster, 10*time.Minute)
+
+	bucket = e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
+	e2eutil.MustNewBucket(t, kubernetes, bucket)
+	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
+
+	// Confirm the recreated bucket is actually empty before restoring into it.
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), 0, time.Minute)
+
+	// Recreate the restore and verify it completes successfully.
+	restore = e2eutil.NewRestore(backup).FromObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).UseBlankBackupName(false).MustCreate(t, kubernetes)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
+
+	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
+
+	// The second restore keeps PreserveRestoreRecord at its default (false), so the operator
+	// will always delete it once it completes successfully.  Wait for that explicitly, rather
+	// than leaving it to chance whether it's already happened by the time we validate events.
+	e2eutil.MustObserveClusterEventFrom(t, kubernetes, cluster, e2eutil.BackupRestoreDeletedEvent(cluster, restore.Name), time.Minute, 2*time.Minute)
+
+	// Check the events match what we expect:
+	// * Cluster created
+	// * Bucket created
+	// * Backup created
+	// * First restore created, then deleted (orphan cleanup after we removed the CR)
+	// * Bucket deleted, then recreated (so the second restore has to repopulate it)
+	// * Second restore created, then deleted (normal auto cleanup after success)
+	expectedEvents := []eventschema.Validatable{
+		e2eutil.ClusterCreateSequence(clusterSize),
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupCreated, FuzzyMessage: backup.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated, FuzzyMessage: firstRestoreName},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted, FuzzyMessage: firstRestoreName},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketDeleted},
+		eventschema.Event{Reason: k8sutil.EventReasonBucketCreated},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreCreated, FuzzyMessage: restore.Name},
+		eventschema.Event{Reason: k8sutil.EventReasonBackupRestoreDeleted, FuzzyMessage: restore.Name},
+	}
+
+	ValidateEvents(t, kubernetes, cluster, expectedEvents)
+}

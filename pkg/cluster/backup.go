@@ -28,6 +28,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1830,6 +1831,33 @@ func (c *Cluster) reconcileBackupRestore() error {
 		}
 	}
 
+	return c.cleanupOrphanedRestoreJobs()
+}
+
+// cleanupOrphanedRestoreJobs deletes any restore jobs that do not have an associated restore CR.
+func (c *Cluster) cleanupOrphanedRestoreJobs() error {
+	for _, job := range c.k8s.Jobs.List() {
+		if _, ok := job.Labels[constants.LabelBackupRestore]; !ok {
+			continue
+		}
+
+		if c.unreconcilable.IsSkipped(couchbasev2.BackupRestoreCRDResourceKind, job.Name) {
+			continue
+		}
+
+		if _, ok := c.k8s.CouchbaseBackupRestores.Get(job.Name); ok {
+			continue
+		}
+
+		if err := c.deleteRestoreJob(job.Name); err != nil {
+			return err
+		}
+
+		c.log.Info("Orphaned restore job deleted", "cluster", c.cluster.NamespacedName(), "cbrestore", job.Name)
+
+		c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(job.Name, c.cluster))
+	}
+
 	return nil
 }
 
@@ -1876,20 +1904,29 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 func (c *Cluster) deleteCouchbaseRestore(restoreName string) error {
 	c.log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", restoreName)
 
-	if _, ok := c.k8s.Jobs.Get(restoreName); ok {
-		propagationPolicy := metav1.DeletePropagationBackground
-		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), restoreName, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
-			return err
-		}
+	if err := c.deleteRestoreJob(restoreName); err != nil {
+		return err
 	}
 
-	if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), restoreName, *metav1.NewDeleteOptions(0)); err != nil {
+	if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), restoreName, *metav1.NewDeleteOptions(0)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
 	c.raiseEvent(k8sutil.BackupRestoreDeleteEvent(restoreName, c.cluster))
 
 	return nil
+}
+
+// deleteRestoreJob deletes the restore Job for restoreName, if it still exists.  The restore Job
+// is owned by the cluster, not the CouchbaseBackupRestore CR, so it must be deleted explicitly.
+func (c *Cluster) deleteRestoreJob(restoreName string) error {
+	if _, ok := c.k8s.Jobs.Get(restoreName); !ok {
+		return nil
+	}
+
+	propagationPolicy := metav1.DeletePropagationBackground
+
+	return c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), restoreName, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 }
 
 // Creates the base template for backup/restore jobs.

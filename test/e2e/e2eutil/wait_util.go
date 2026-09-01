@@ -795,6 +795,28 @@ func MustObserveRestoreEventFrom(t *testing.T, k8s *types.Cluster, restore *couc
 	}
 }
 
+// WaitUntilRestoreJobNotExists polls until the restore Job for restore no longer exists.
+func WaitUntilJobNotExists(k8s *types.Cluster, name, namespace string, timeout time.Duration) error {
+	return retryutil.RetryFor(timeout, func() error {
+		_, err := k8s.KubeClient.BatchV1().Jobs(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err == nil {
+			return fmt.Errorf("job %s still exists", name)
+		}
+
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func MustWaitUntilJobNotExists(t *testing.T, k8s *types.Cluster, name, namespace string, timeout time.Duration) {
+	if err := WaitUntilJobNotExists(k8s, name, namespace, timeout); err != nil {
+		Die(t, err)
+	}
+}
+
 // MustObserveBackupEventFrom checks events that occur in the future until the timeout, but also checks for events that occurred from a given time before the method call time.
 // This is useful for backup tests where a (typically incremental) backup is started and finished within 1 second of eachother and therefore might be missed by the default waitForResourceEventFromNow.
 func MustObserveBackupEventFrom(t *testing.T, k8s *types.Cluster, backup *couchbasev2.CouchbaseBackup, event *v1.Event, from, timeout time.Duration) {
