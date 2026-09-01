@@ -1246,12 +1246,7 @@ func (c *Cluster) generateRestoreJob(restore *couchbasev2.CouchbaseBackupRestore
 			Name:   restore.Name,
 			Labels: labels,
 			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: couchbasev2.Group,
-					Kind:       couchbasev2.BackupRestoreCRDResourceKind,
-					Name:       restore.Name,
-					UID:        restore.UID,
-				},
+				c.cluster.AsOwner(),
 			},
 		},
 		Spec: *c.createBaseJobSpec(&restore.Spec.BackoffLimit, restore.Spec.TTLSecondsAfterFinished, c.generateRestoreContainer(restore, start, end), volume),
@@ -1880,6 +1875,13 @@ func (c *Cluster) reconcileActiveBackupRestore(currentRestore *couchbasev2.Couch
 
 func (c *Cluster) deleteCouchbaseRestore(restoreName string) error {
 	c.log.Info("Deleting successful restore", "cluster", c.namespacedName(), "restore", restoreName)
+
+	if _, ok := c.k8s.Jobs.Get(restoreName); ok {
+		propagationPolicy := metav1.DeletePropagationBackground
+		if err := c.k8s.KubeClient.BatchV1().Jobs(c.cluster.Namespace).Delete(context.Background(), restoreName, metav1.DeleteOptions{PropagationPolicy: &propagationPolicy}); err != nil {
+			return err
+		}
+	}
 
 	if err := c.k8s.CouchbaseClient.CouchbaseV2().CouchbaseBackupRestores(c.cluster.Namespace).Delete(context.Background(), restoreName, *metav1.NewDeleteOptions(0)); err != nil {
 		return err
