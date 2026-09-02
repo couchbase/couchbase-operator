@@ -4,9 +4,10 @@ on:
   issues:
     types: [labeled]
   schedule:
-    # TEMP: every 10 minutes for easier testing. Change back to a daily
-    # schedule (e.g. '0 9 * * *') once verified.
+    # TEMP: every 10 minutes for easier testing. Change back to the daily
+    # schedule below once verified.
     - cron: '*/10 * * * *'
+    # - cron: '0 9 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -18,7 +19,7 @@ env:
   JIRA_LINKED_LABEL: has-jira-ticket
   JIRA_PROJECT_KEY: K8S
   JIRA_ISSUE_TYPE: Bug
-  STALE_DAYS: 14
+  STALE_DAYS: 7
   # Caps how many tickets one sweep can file, so a burst of spam issues on
   # this public repo can't flood Jira in a single run. Oldest issues are
   # processed first; anything past the cap is picked up on a later run.
@@ -77,20 +78,26 @@ jobs:
       # issues have qualified, so a burst of freshly-opened spam issues can't
       # flood Jira in one run. Outputs a JSON array of issue numbers for the
       # matrix job below.
-      - name: Find issues open 14+ days with no maintainer response
+      - name: Find issues open 7+ days with no maintainer response
         id: find
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
+          # TEMP: cutoff computed but not applied below while testing against
+          # all open issues. Restore the commented-out filter beneath once
+          # verified.
           cutoff=$(date -u -d "${STALE_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
 
           open_issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
             --json number,createdAt,labels)
 
-          candidates=$(echo "$open_issues" | jq -c --arg cutoff "$cutoff" --arg label "$JIRA_LINKED_LABEL" \
-            '[.[] | select(.createdAt <= $cutoff) | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
+          # TEMP: process all open issues regardless of age while testing.
+          candidates=$(echo "$open_issues" | jq -c --arg label "$JIRA_LINKED_LABEL" \
+            '[.[] | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
+          # candidates=$(echo "$open_issues" | jq -c --arg cutoff "$cutoff" --arg label "$JIRA_LINKED_LABEL" \
+          #   '[.[] | select(.createdAt <= $cutoff) | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
 
           result="[]"
           count=0

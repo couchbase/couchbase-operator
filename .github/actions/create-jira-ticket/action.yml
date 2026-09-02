@@ -47,13 +47,16 @@ runs:
           body="(no description provided)"
         fi
 
-        description_adf=$(jq -n --arg body "$body" --arg footer "Reported via GitHub: $url" '
+        description_adf=$(jq -n --arg body "$body" --arg url "$url" '
           {
             type: "doc",
             version: 1,
             content: [
               { type: "paragraph", content: [ { type: "text", text: $body } ] },
-              { type: "paragraph", content: [ { type: "text", text: $footer } ] }
+              { type: "paragraph", content: [
+                  { type: "text", text: "Reported via GitHub: " },
+                  { type: "text", text: $url, marks: [ { type: "link", attrs: { href: $url } } ] }
+                ] }
             ]
           }')
 
