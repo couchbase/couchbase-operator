@@ -4,10 +4,8 @@ on:
   issues:
     types: [labeled]
   schedule:
-    # TEMP: every 10 minutes for easier testing. Change back to the daily
-    # schedule below once verified.
-    - cron: '*/10 * * * *'
-    # - cron: '0 9 * * *'
+    # Daily sweep, 09:00 UTC.
+    - cron: '0 9 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -85,19 +83,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          # TEMP: cutoff computed but not applied below while testing against
-          # all open issues. Restore the commented-out filter beneath once
-          # verified.
           cutoff=$(date -u -d "${STALE_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
 
           open_issues=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 500 \
             --json number,createdAt,labels)
 
-          # TEMP: process all open issues regardless of age while testing.
-          candidates=$(echo "$open_issues" | jq -c --arg label "$JIRA_LINKED_LABEL" \
-            '[.[] | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
-          # candidates=$(echo "$open_issues" | jq -c --arg cutoff "$cutoff" --arg label "$JIRA_LINKED_LABEL" \
-          #   '[.[] | select(.createdAt <= $cutoff) | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
+          candidates=$(echo "$open_issues" | jq -c --arg cutoff "$cutoff" --arg label "$JIRA_LINKED_LABEL" \
+            '[.[] | select(.createdAt <= $cutoff) | select([.labels[].name] | index($label) | not)] | sort_by(.createdAt) | [.[].number]')
 
           result="[]"
           count=0
