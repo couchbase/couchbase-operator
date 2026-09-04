@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	couchbasev2 "github.com/couchbase/couchbase-operator/pkg/apis/couchbase/v2"
 	"github.com/couchbase/couchbase-operator/pkg/util/eventschema"
 	"github.com/couchbase/couchbase-operator/pkg/util/jsonpatch"
 	"github.com/couchbase/couchbase-operator/pkg/util/k8sutil"
@@ -51,8 +52,12 @@ func TestAutoCompactionUpdate(t *testing.T) {
 	couchbase := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 
 	// Twiddle the knobs, and ensure the server settings are changed.
-	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Replace("/spec/cluster/autoCompaction/timeWindow/start", "01:01").
-		Replace("/spec/cluster/autoCompaction/timeWindow/end", "07:37"), time.Minute)
+	start, end := "01:01", "07:37"
+	couchbase = e2eutil.MustPatchCluster(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Add("/spec/cluster/autoCompaction/timeWindow",
+		couchbasev2.TimeWindow{
+			Start: &start,
+			End:   &end,
+		}), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromHour", 1), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/FromMinute", 1), time.Minute)
 	e2eutil.MustPatchAutoCompactionSettings(t, kubernetes, couchbase, jsonpatch.NewPatchSet().Test("/AutoCompactionSettings/AllowedTimePeriod/ToHour", 7), time.Minute)

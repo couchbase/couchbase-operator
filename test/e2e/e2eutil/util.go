@@ -1005,6 +1005,37 @@ func MustPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.Cou
 	return cluster
 }
 
+// MustRemoveClusterStatus clears the cluster's status via the /status subresource. CouchbaseCluster
+// declares the status subresource, so a plain Update() against the main resource (as patchResource
+// uses) has any change to /status silently ignored by the API server.
+func MustRemoveClusterStatus(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, timeout time.Duration) *couchbasev2.CouchbaseCluster {
+	client := k8s.CRClient.CouchbaseV2().CouchbaseClusters(cluster.Namespace)
+
+	callback := func() error {
+		current, err := client.Get(context.Background(), cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		current.Status = couchbasev2.ClusterStatus{}
+
+		updated, err := client.UpdateStatus(context.Background(), current, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+
+		cluster = updated
+
+		return nil
+	}
+
+	if err := retryutil.RetryFor(timeout, callback); err != nil {
+		Die(t, err)
+	}
+
+	return cluster
+}
+
 // MustNotPatchCluster patches the cluster with a list of JSON patch objects, dying if the test succeeded.
 func MustNotPatchCluster(t *testing.T, k8s *types.Cluster, cluster *couchbasev2.CouchbaseCluster, patches jsonpatch.PatchSet) {
 	if _, err := patchCluster(k8s, cluster, patches, 30*time.Second); err == nil {

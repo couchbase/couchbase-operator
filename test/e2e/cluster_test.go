@@ -216,7 +216,7 @@ func TestIndexerSettings(t *testing.T) {
 	cbVersion := e2eutil.MustGetCouchbaseVersion(t, f.CouchbaseServerImage, f.CouchbaseServerImageVersion)
 
 	// We'll enable the page bloom filter before we add the index service, as cb server seems to change it to true when an index service is started when the storage mode is plasma.
-	// This avoids some test flakiness where the operator changes it to false and then true again, adding	 patch cycles.
+	// This avoids some test flakiness where the operator changes it to false and then true again, adding patch cycles.
 	if ok, err := couchbaseutil.VersionAfter(cbVersion, "7.1.0"); err != nil {
 		e2eutil.Die(t, err)
 	} else if ok {
@@ -283,11 +283,19 @@ func TestIndexerSettings(t *testing.T) {
 	}
 
 	// Check that the user can see the cluster being edited.
+	//
+	// Cluster creation may or may not raise its own incidental ClusterSettingsEdited when it changes defaults,
+	// alongside our preIndexServicePatchCycles edits, depending on CB version. To cover this scenario,
+	// we assert the clusterSettingsEdited count is either preIndexServicePatchCycles+1 or just preIndexServicePatchCycles.
+	clusterSettingsEdited := eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}
 	expectedEvents := []eventschema.Validatable{
-		e2eutil.ClusterCreateSequence(clusterSize),
-		eventschema.Repeat{Times: preIndexServicePatchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
+		eventschema.AnyOf{Validators: []eventschema.Validatable{
+			eventschema.Repeat{Times: preIndexServicePatchCycles + 1, Validator: clusterSettingsEdited},
+			eventschema.Repeat{Times: preIndexServicePatchCycles, Validator: clusterSettingsEdited},
+		}},
 		e2eutil.ClusterScaleUpSequence(constants.Size2),
-		eventschema.Repeat{Times: postIndexServicePatchCycles, Validator: eventschema.Event{Reason: k8sutil.EventReasonClusterSettingsEdited}},
+		eventschema.Repeat{Times: postIndexServicePatchCycles, Validator: clusterSettingsEdited},
 	}
 
 	ValidateEvents(t, kubernetes, cluster, expectedEvents)

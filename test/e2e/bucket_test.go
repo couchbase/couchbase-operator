@@ -1028,8 +1028,7 @@ func TestUpdateSampleBucket(t *testing.T) {
 	kubernetes, cleanup := f.SetupTest(t)
 	defer cleanup()
 
-	// TODO: Remove this and fix the test once we implement magma vbucket config support.
-	framework.Requires(t, kubernetes).AtLeastVersion("7.1.0").BeforeVersion("8.0.0")
+	framework.Requires(t, kubernetes).AtLeastVersion("7.6.0")
 
 	cluster := clusterOptions().WithEphemeralTopology(clusterSize).Generate(kubernetes)
 	cluster.Spec.Buckets.EnableBucketMigrationRoutines = true

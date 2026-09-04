@@ -169,8 +169,9 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 	// * Cluster created
 	// * New nodes added
 	// * Rebalance starts and fails
-	// * Victim has active vBuckets by 25% progress, so CBS reports it as Down
-	//   (not FailedAdd). Auto-failover kicks in after ~30s.
+	// * Depending on timing, the victim is killed either before it has active
+	//   vBuckets (CBS reports FailedAdd) or after (CBS reports it as Down,
+	//   with auto-failover kicking in ~30s later).
 	// * New node added and rebalanced in
 	expectedEvents := []eventschema.Validatable{
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
@@ -179,7 +180,13 @@ func TestNodeRecoveryAfterMemberAdd(t *testing.T) {
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonRebalanceIncomplete}},
 		eventschema.Optional{Validator: eventschema.Event{Reason: k8sutil.EventReasonReconcileFailed}},
-		eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+		eventschema.AnyOf{Validators: []eventschema.Validatable{
+			eventschema.Event{Reason: k8sutil.EventReasonFailedAddNode, FuzzyMessage: victimName},
+			eventschema.Sequence{Validators: []eventschema.Validatable{
+				eventschema.Event{Reason: k8sutil.EventReasonMemberDown, FuzzyMessage: victimName},
+				eventschema.Event{Reason: k8sutil.EventReasonMemberFailedOver, FuzzyMessage: victimName},
+			}},
+		}},
 		eventschema.Event{Reason: k8sutil.EventReasonNewMemberAdded},
 		eventschema.Event{Reason: k8sutil.EventReasonRebalanceStarted},
 		eventschema.Event{Reason: k8sutil.EventReasonMemberRemoved},

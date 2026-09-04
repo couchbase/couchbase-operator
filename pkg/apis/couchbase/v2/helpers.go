@@ -1472,7 +1472,17 @@ func (b *CouchbaseBucket) GetStorageBackend(cluster *CouchbaseCluster) (Couchbas
 		return fallback()
 	}
 
-	if !magmaSupported || b.IsSampleBucket() {
+	if !magmaSupported {
+		return CouchbaseStorageBackendCouchstore, false
+	}
+
+	if b.IsSampleBucket() {
+		if magmaSample, err := cluster.RunningVersion("8.0.0"); err != nil {
+			log.Error(err, "failed to get cluster version, using default storage backend", "cluster", cluster.Name, "default-storage-backend", constants.DefaultBucketStorageBackend)
+			return fallback()
+		} else if magmaSample {
+			return CouchbaseStorageBackendMagma, false
+		}
 		return CouchbaseStorageBackendCouchstore, false
 	}
 
