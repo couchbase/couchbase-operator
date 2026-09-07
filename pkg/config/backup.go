@@ -184,6 +184,19 @@ func (o *generateBackupOptions) GetBackupRole() *rbacv1.Role {
 					"update",
 				},
 			},
+			{
+				APIGroups: []string{
+					"couchbase.com",
+				},
+				Resources: []string{
+					"couchbasebackups/status",
+					"couchbasebackuprestores/status",
+				},
+				Verbs: []string{
+					"get",
+					"update",
+				},
+			},
 		},
 	}
 }
