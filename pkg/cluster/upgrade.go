@@ -561,46 +561,14 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 		return nil, nil, nil, err
 	}
 
-	// Handle immediate upgrade strategy - upgrade everything
-	if c.cluster.GetUpgradeStrategy() == couchbasev2.ImmediateUpgrade {
-		specImage := c.cluster.Spec.CouchbaseImage()
-		targetVersion, err := k8sutil.CouchbaseVersion(specImage)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		allCandidates := couchbaseutil.MemberSet{}
-		allCandidates.Merge(changes.SpecOnly)
-
-		// Version-change candidates need the new image/version so the
-		// replacement pods are created with the correct image.
-		versionCandidates := couchbaseutil.MemberSet{}
-		versionCandidates.Merge(changes.VersionOnly)
-		versionCandidates.Merge(changes.Both)
-		for _, candidate := range versionCandidates {
-			cloned := candidate.Clone()
-			cloned.SetImage(specImage)
-			cloned.SetVersion(targetVersion)
-			allCandidates.Add(cloned)
-		}
-
-		return allCandidates.ToList(), changes.ChangedZones, changes.ChangedPVCs, nil
+	targetVersion, err := k8sutil.CouchbaseVersion(c.cluster.Spec.CouchbaseImage())
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	// Get baseline version for determining old vs new
-	baselineVersion := ""
-	targetImage := c.cluster.Spec.CouchbaseImage()
-	targetVersion := ""
-
-	if c.cluster.Spec.Upgrade != nil {
-		baselineVersion, err = c.state.Get(persistence.Version)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		targetVersion, err = k8sutil.CouchbaseVersion(targetImage)
-		if err != nil {
-			return nil, nil, nil, err
-		}
+	baselineVersion, err := c.state.Get(persistence.Version)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	isRollback := targetVersion == baselineVersion
