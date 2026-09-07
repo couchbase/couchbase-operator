@@ -59,6 +59,19 @@ func DefaultSchedule() string {
 	return ScheduleIn(2 * time.Minute)
 }
 
+// DefaultIncrementalSchedule schedules the incremental half of a full_incremental backup.
+// The operator does not create the incremental cronjob until a full backup has completed
+// and reported its repository into the backup's status, see generateBackupResources in
+// pkg/cluster/backup.go.  A single slot is therefore racy: the cronjob only starts
+// existing part way through the test, and ScheduleIn produces an hourly schedule, so if
+// the cronjob is created a moment after its one slot has passed the next firing is an
+// hour away and the test cannot pass.  Give it a run of consecutive minutes instead so it
+// fires as soon as it exists.  The first slot is after DefaultSchedule's full backup, and
+// the gate guarantees the ordering regardless.
+func DefaultIncrementalSchedule() string {
+	return ScheduleXWithYIntervalInZ(6, 1, 3*time.Minute)
+}
+
 // Backup is an abstract type used to build backups.
 type Backup struct {
 	// kind is the type of backup to perform.

@@ -1796,6 +1796,10 @@ func MustPopulateWithDataSize(t *testing.T, k8s *types.Cluster, couchbase *couch
 		},
 	}
 
+	for _, secret := range k8s.PullSecrets {
+		job.Spec.Template.Spec.ImagePullSecrets = append(job.Spec.Template.Spec.ImagePullSecrets, v1.LocalObjectReference{Name: secret})
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

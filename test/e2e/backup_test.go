@@ -70,7 +70,7 @@ func testFullIncremental(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Expect the full backup to complete, followed by the the incremental.
@@ -400,7 +400,7 @@ func testReplaceFullOnlyBackup(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustWaitForBackupDeletion(t, kubernetes, backup1, 2*time.Minute)
 
 	// create new backup
-	backup2 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup2 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup2, 2*time.Minute)
 
 	// wait for backups to complete
@@ -479,7 +479,7 @@ func testReplaceFullIncrementalBackup(t *testing.T, providerType cloud.ProviderT
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// create initial backup
-	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup1, 2*time.Minute)
@@ -731,7 +731,7 @@ func testMultipleBackups(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create Backup object 1.
-	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup1 := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// Create Backup object 2.
 	backup2 := e2eutil.NewFullBackup(e2eutil.ScheduleIn(7*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
@@ -812,7 +812,7 @@ func testFullIncrementalOverTLS(t *testing.T, providerType cloud.ProviderType) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).ToObjStore(provider.PrefixBucket(bucketName)).WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -2688,7 +2688,7 @@ func TestBackupThenDelete(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.ScheduleIn(5*time.Minute)).MustCreate(t, kubernetes)
+	backup := e2eutil.NewIncrementalBackup(e2eutil.DefaultSchedule(), e2eutil.DefaultIncrementalSchedule()).MustCreate(t, kubernetes)
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, time.Minute)
 
 	// Delete the backup object.
@@ -3039,11 +3039,11 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	defer cleanup()
 
 	provider := MustNewProvider(t, kubernetes, cloud.CloudProviderAWS)
-	s3secret, s3BucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
+	objStoreSecret, s3BucketName, storeCleanup := provider.SetupEnvironment(t, kubernetes)
 
 	defer storeCleanup()
 
-	s3BucketName += "/subpath"
+	objStoreURI := provider.PrefixBucket(s3BucketName + "/subpath")
 
 	framework.Requires(t, kubernetes).StaticCluster()
 
@@ -3051,7 +3051,7 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	clusterSize := constants.Size3
 
 	numOfDocs := f.DocsCount
-	cluster := clusterOptions().WithEphemeralTopology(clusterSize).WithS3(s3secret).MustCreate(t, kubernetes)
+	cluster := clusterOptions().WithEphemeralTopology(clusterSize).MustCreate(t, kubernetes)
 	bucket := e2eutil.MustGetBucket(f.BucketType, f.CompressionMode)
 	e2eutil.MustNewBucket(t, kubernetes, bucket)
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 2*time.Minute)
@@ -3061,7 +3061,8 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	e2eutil.MustVerifyDocCountInBucket(t, kubernetes, cluster, bucket.GetName(), numOfDocs, time.Minute)
 
 	// Create a Backup object.
-	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToS3(s3BucketName).MustCreate(t, kubernetes)
+	backup := e2eutil.NewFullBackup(e2eutil.DefaultSchedule()).ToObjStore(objStoreURI).
+		WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 
 	// wait for backup
 	e2eutil.MustWaitForBackup(t, kubernetes, backup, 2*time.Minute)
@@ -3082,7 +3083,8 @@ func TestBackupAndRestoreToSubPathS3(t *testing.T) {
 	e2eutil.MustWaitUntilBucketExists(t, kubernetes, cluster, bucket, 5*time.Minute)
 
 	// create new restore
-	restore := e2eutil.NewRestore(backup).FromS3(s3BucketName).MustCreate(t, kubernetes)
+	restore := e2eutil.NewRestore(backup).FromObjStore(objStoreURI).
+		WithObjStoreSecret(objStoreSecret).MustCreate(t, kubernetes)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreStartedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 	e2eutil.MustObserveRestoreEventFrom(t, kubernetes, restore, e2eutil.BackupRestoreCompletedEvent(cluster, restore.Name), time.Minute, 5*time.Minute)
 
