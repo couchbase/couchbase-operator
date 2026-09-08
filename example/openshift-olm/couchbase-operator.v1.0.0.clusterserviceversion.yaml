@@ -196,7 +196,7 @@ spec:
 
     * **Rack/zone awareness** - Tell the Couchbase Operator about availability zones in your datacenter and let the operator take care of ensuring that nodes in your cluster are deployed equally across each zone.
 
-    * **Supportability** - When things go wrong use the cbopinfo tool provided with the Couchbase Operator to collect relevant data about your Couchbase deployment so that you can quickly address issues.
+    * **Supportability** - When things go wrong use the cao tool provided with the Couchbase Operator to collect relevant data about your Couchbase deployment so that you can quickly address issues.
 
     * **Centralized configuration management** - Manage your configuration centrally with OpenShift. Updates to the configuration are watched by the Couchbase Operator and actions are taken to make the target cluster match the desired configuration.
 

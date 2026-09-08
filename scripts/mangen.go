@@ -21,9 +21,7 @@ import (
 	"strings"
 
 	cao "github.com/couchbase/couchbase-operator/pkg/certification"
-	cbopcfg "github.com/couchbase/couchbase-operator/pkg/config"
 	"github.com/couchbase/couchbase-operator/pkg/info/collector"
-	cbopinfo "github.com/couchbase/couchbase-operator/pkg/info/command"
 	"github.com/couchbase/couchbase-operator/pkg/info/resource"
 
 	"github.com/spf13/cobra"
@@ -203,14 +201,6 @@ func main() {
 		{
 			name:  "cao",
 			cobra: cao.GenerateCommand(),
-		},
-		{
-			name:  "cbopcfg",
-			cobra: cbopcfg.GenerateCommand(),
-		},
-		{
-			name:  "cbopinfo",
-			cobra: cbopinfo.GenerateCommand(),
 		},
 	}
 

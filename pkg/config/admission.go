@@ -143,7 +143,7 @@ func (o *generateAdmissionOptions) registerAdmissionGenerateFlags(cmd *cobra.Com
 }
 
 // getGenerateAdmissionCommand creates YAML capable of creating the dynamic admission controller.
-func getGenerateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getGenerateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
@@ -163,22 +163,22 @@ func getGenerateAdmissionCommand(command string, flags *genericclioptions.Config
 			certificates are correctly configured, and any resources referenced
 			actually exist.
 		`),
-		Example: normalize(fmt.Sprintf(`
+		Example: normalize(`
 			# Create admission controller (recommended).
-			%[1]s generate admission
+			cao generate admission
 
 			# Create admission controller scoped to a namespace.
-			%[1]s generate admission --scope namespace --namespace-selector key=value
+			cao generate admission --scope namespace --namespace-selector key=value
 
 			# Create admission controller with custom image and secure image registry.
-			%[1]s generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+			cao generate admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
 
                         # Create admission controller without secret access.
-                        %[1]s generate admission --validate-secrets=false
+                        cao generate admission --validate-secrets=false
 
                         # Create admission controller with debug logging.
-                        %[1]s generate admission --log-level debug
-		`, command)),
+                        cao generate admission --log-level debug
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.validate(GenerateCmd); err != nil {
 				return err
@@ -199,7 +199,7 @@ func getGenerateAdmissionCommand(command string, flags *genericclioptions.Config
 }
 
 // getCreateAdmissionCommand creates the admission controller.
-func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getCreateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
@@ -219,27 +219,23 @@ func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
                         certificates are correctly configured, and any resources referenced
                         actually exist.
 		`),
-		Example: normalize(fmt.Sprintf(`
+		Example: normalize(`
                         # Create admission controller (recommended).
-                        %[1]s create admission
+                        cao create admission
 
                         # Create admission controller scoped to a namespace.
-                        %[1]s create admission --scope namespace --namespace-selector key=value
+                        cao create admission --scope namespace --namespace-selector key=value
 
                         # Create admission controller with custom image and secure image registry.
-                        %[1]s create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
+                        cao create admission --image acme.corp/admission:1.0.0 --image-pull-secret secret-name
 
 			# Create admission controller without secret access.
-			%[1]s create admission --validate-secrets=false
+			cao create admission --validate-secrets=false
 
                         # Create admission controller with debug logging.
-                        %[1]s create admission --log-level debug
-                `, command)),
+                        cao create admission --log-level debug
+                `),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if command != caoBinaryName {
-				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-admission-flags")
-			}
-
 			if err := o.validate(CreateCmd); err != nil {
 				return err
 			}
@@ -259,25 +255,21 @@ func getCreateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 }
 
 // getDeleteAdmissionCommand deletes the admission controller.
-func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getDeleteAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
 		Use:   "admission",
 		Short: "Deletes the dynamic admission controller.",
 		Long:  "Deletes the dynamic admission controller.",
-		Example: normalize(fmt.Sprintf(`
+		Example: normalize(`
 			# Delete admission controller (recommended).
-			%[1]s delete admission
+			cao delete admission
 
 			# Delete admission controller scoped to a namespace.
-			%[1]s delete admission --scope namespace
-		`, command)),
+			cao delete admission --scope namespace
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if command != caoBinaryName {
-				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
-			}
-
 			if err := o.validate(DeleteCmd); err != nil {
 				return err
 			}
@@ -296,7 +288,7 @@ func getDeleteAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 	return cmd
 }
 
-func getUpdateAdmissionCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getUpdateAdmissionCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newGenerateAdmissionOptions()
 
 	cmd := &cobra.Command{
@@ -304,10 +296,6 @@ func getUpdateAdmissionCommand(command string, flags *genericclioptions.ConfigFl
 		Short: "refreshes the self signed certificate used by the validating webhook.",
 		Long:  "refreshes the self signed certificate used by the validating webhook.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if command != caoBinaryName {
-				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-admission-flags")
-			}
-
 			if err := o.validate(UpdateCmd); err != nil {
 				return err
 			}

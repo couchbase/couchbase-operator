@@ -27,8 +27,8 @@ import (
 type Framework struct {
 	certification.SharedTestFlags
 
-	// CbopinfoPath is the absolute path to the cbopinfo binary
-	CbopinfoPath                     string
+	// CaoPath is the absolute path to the cao binary
+	CaoPath                          string
 	OpImage                          string
 	AdmissionControllerImage         string
 	SyncGatewayImage                 string

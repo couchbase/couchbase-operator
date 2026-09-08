@@ -20,5 +20,4 @@ import (
 var (
 	admissionImageDefault = "couchbase/admission-controller:" + version.WithRevision()
 	operatorImageDefault  = "couchbase/operator:" + version.WithRevision()
-	caoBinaryName         = "cao"
 )

@@ -1862,7 +1862,7 @@ func MustTerminateAllPods(t *testing.T, kubernetes *types.Cluster, cluster *couc
 	}
 }
 
-// ArgumentList represents parameters to cbopinfo.  They are modelled as a
+// ArgumentList represents parameters to cao collect-logs.  They are modelled as a
 // map to support keys and values (an empty value is ignored) and to allow
 // simple overriding (uniqueness).
 type ArgumentList map[string][]string
@@ -1922,22 +1922,22 @@ func (a ArgumentList) Clone() ArgumentList {
 	return n
 }
 
-// Generic function to run cbopinfo command.
-func Cbopinfo(path string, cmdArgs []string) ([]byte, error) {
+// Generic function to run cao collect-logs command.
+func CaoCollectLogs(path string, cmdArgs []string) ([]byte, error) {
 	args := []string{"collect-logs"}
 	args = append(args, cmdArgs...)
 
 	return exec.Command(path, args...).CombinedOutput()
 }
 
-func CbopinfoVerify(path string, cmdArgs []string) ([]byte, error) {
+func CaoVerify(path string, cmdArgs []string) ([]byte, error) {
 	args := []string{"verify"}
 	args = append(args, cmdArgs...)
 
 	return exec.Command(path, args...).CombinedOutput()
 }
 
-func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPath, operatorImage string, collectServerLogs bool, logLevel int) {
+func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, caoPath, operatorImage string, collectServerLogs bool, logLevel int) {
 	// Create and move to the log directory.
 	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		t.Logf("Failed to create dir %s: %v", logDir, err)
@@ -1959,12 +1959,12 @@ func CollectLogs(t *testing.T, cluster *types.Cluster, logDir string, cbopinfoPa
 		args.Add("--collectinfo-collect", "all")
 	}
 
-	execOut, err := Cbopinfo(cbopinfoPath, args.Slice())
+	execOut, err := CaoCollectLogs(caoPath, args.Slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 
 	if err != nil {
-		t.Logf("cbopinfo returned: %s", execOutStr)
-		t.Logf("cbopinfo command failed: %v", err)
+		t.Logf("cao collect-logs returned: %s", execOutStr)
+		t.Logf("cao collect-logs command failed: %v", err)
 	}
 }
 

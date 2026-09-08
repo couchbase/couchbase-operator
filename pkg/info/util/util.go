@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	Application = "cbopinfo"
+	ArchivePrefix = "cbopinfo"
 )
 
 var (
@@ -64,7 +64,7 @@ func Salt() string {
 
 // ArchiveName returns an archive name for an archive type.  The suffix is back end dependant.
 func ArchiveName() string {
-	return Application + "-" + Timestamp()
+	return ArchivePrefix + "-" + Timestamp()
 }
 
 // ArchivePath returns the required path for an archive type.

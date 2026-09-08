@@ -314,7 +314,7 @@ func WaitForPod(ctx context.Context, kubeCli kubernetes.Interface, namespace, po
 	// pod is successfully scheduled and all dependencies e.g. persistent volumes.  Don't ever
 	// short cut this, honour context the timeout!
 	callback := func() error {
-		// TODO: cache me, used my cbopinfo :/
+		// TODO: cache me, used by 'cao collect-logs' :/
 		pod, err := kubeCli.CoreV1().Pods(namespace).Get(context.Background(), podName, metav1.GetOptions{})
 		if err != nil {
 			return errors.NewStackTracedError(err)

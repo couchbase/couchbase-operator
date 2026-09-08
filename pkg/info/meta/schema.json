@@ -19,7 +19,7 @@
       "type": "string"
     },
     "toolVersion": {
-      "description": "Version of tooling (cbopinfo) used to collect the logs.",
+      "description": "Version of tooling (cao) used to collect the logs.",
       "type": "string"
     },
     "commandLine": {

@@ -168,8 +168,6 @@ TARGET_BINDIR := $(BUILDDIR)/bin/$(TARGET)
 # and flags etc.
 STATIC_BINARIES := \
 	cao \
-	cbopcfg \
-	cbopinfo \
 	couchbase-operator \
 	couchbase-admission-controller
 
@@ -335,9 +333,7 @@ TOOLS_PACKAGE_FILES := \
 	crd.yaml \
 	couchbase-cluster.yaml \
 	sync-gateway.yaml \
-	bin/cao$(EXE_SUFFIX) \
-	bin/cbopcfg$(EXE_SUFFIX) \
-	bin/cbopinfo$(EXE_SUFFIX)
+	bin/cao$(EXE_SUFFIX)
 
 ifeq ($(TARGET_PLATFORM),kubernetes)
 TOOLS_PACKAGE_FILES += network-policies.yaml
@@ -597,8 +593,6 @@ dist-lite:
 	mkdir -p ./build/bin/kubernetes-linux-amd64
 	docker build -f ./docker/couchbase-operator-lite-build/Dockerfile . -t couchbase/build-a-bear:v1
 	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cao > build/bin/kubernetes-linux-amd64/cao
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cbopinfo > build/bin/kubernetes-linux-amd64/cbopinfo
-	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/cbopcfg > build/bin/kubernetes-linux-amd64/cbopcfg
 	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/couchbase-operator > build/bin/kubernetes-linux-amd64/couchbase-operator
 	docker run --rm --entrypoint /bin/cat couchbase/build-a-bear:v1 /tmp/src/github.com/couchbase/couchbase-operator/build/bin/couchbase-admission-controller > build/bin/kubernetes-linux-amd64/couchbase-admission-controller
 

@@ -3819,8 +3819,8 @@ func TestBackupLogsCollection(t *testing.T) {
 	commonArgs.Add("--backup-logs", "")
 	commonArgs.Add("--backup-logs-keep-job", "")
 
-	archive, cleanCbopinfo := cbopinfo(t, commonArgs)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, commonArgs)
+	defer cleanCollect()
 
 	// Verify backup logs are included in the archive
 	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, f.OpImage, false, true, true, 0, true, "", cluster.Name)
@@ -3857,8 +3857,8 @@ func TestBackupLogsCollectionWithName(t *testing.T) {
 	commonArgs.Add("--backup-logs-name", backup1.Name)
 	commonArgs.Add("--backup-logs-keep-job", "")
 
-	archive, cleanCbopinfo := cbopinfo(t, commonArgs)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, commonArgs)
+	defer cleanCollect()
 
 	// Verify only backup1's logs are included in the archive, but both backup YAMLs are present
 	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, f.OpImage, false, true, true, 0, true, backup1.Name, cluster.Name)

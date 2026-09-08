@@ -300,7 +300,6 @@ observability
 gRPC
 gRPCurl
 deployers
-cbopinfo
 RPC
 LoadBalancers
 CNG

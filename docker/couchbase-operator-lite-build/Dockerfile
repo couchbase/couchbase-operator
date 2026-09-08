@@ -22,8 +22,6 @@ RUN make pkg/generated/informers
 RUN make example/crd.yaml
 
 RUN make binary -e BINARY=cao
-RUN make binary -e BINARY=cbopcfg
-RUN make binary -e BINARY=cbopinfo
 RUN make binary -e BINARY=couchbase-operator
 RUN make binary -e BINARY=couchbase-admission-controller
 

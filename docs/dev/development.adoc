@@ -234,10 +234,10 @@ $ test-couchbase -suite p0 --collect-logs
 ----
 
 Test runs will place the results of the test run in the base directory, in an archive called `couchbase-operator-certification-<TIMESTAMP>.tar.bz2`.
-Inside there is an artifacts folder, containing the test `results.xml` and `logs` folder with logs for every test, plus a xref:tools/cbopinfo.adoc[`cbopinfo`] archive for any failed test.
+Inside there is an artifacts folder, containing the test `results.xml` and `logs` folder with logs for every test, plus a xref:tools/cao.adoc[`cao collect-logs`] archive for any failed test.
 You can unzip this with `tar -xf <FILE>`, and view an individual instances logs via `./namespace/pod/<PODNAME>/`
 
-https://github.com/spjmurray/logify/[Logify^] can be used to pull apart the logs collected via `cbopinfo`.
+https://github.com/spjmurray/logify/[Logify^] can be used to pull apart the logs collected via `cao collect-logs`.
 
 === Targeting other branches
 

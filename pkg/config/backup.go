@@ -58,7 +58,7 @@ func getGenerateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Comma
 }
 
 // getCreateBackupCommand creates backup job prerequisites.
-func getCreateBackupCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getCreateBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateBackupOptions{}
 
 	cmd := &cobra.Command{
@@ -66,10 +66,6 @@ func getCreateBackupCommand(command string, flags *genericclioptions.ConfigFlags
 		Short: "Creates backup roles.",
 		Long:  "Creates backup roles.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if command != caoBinaryName {
-				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-create-backup-flags")
-			}
-
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err
@@ -85,7 +81,7 @@ func getCreateBackupCommand(command string, flags *genericclioptions.ConfigFlags
 }
 
 // getDeleteBackupCommand deletes backup job prerequisites.
-func getDeleteBackupCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getDeleteBackupCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := &generateBackupOptions{}
 
 	cmd := &cobra.Command{
@@ -93,10 +89,6 @@ func getDeleteBackupCommand(command string, flags *genericclioptions.ConfigFlags
 		Short: "Deletes backup roles.",
 		Long:  "Deletes backup roles.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if command != caoBinaryName {
-				genDeprecatedWarning("https://docs.couchbase.com/operator/current/tools/cao.html#cao-delete-backup")
-			}
-
 			resources, err := o.generate(flags)
 			if err != nil {
 				return err

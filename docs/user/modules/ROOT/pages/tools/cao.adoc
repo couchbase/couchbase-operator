@@ -78,7 +78,7 @@ Force a cleanup of existing resources on start up.  These may have been left ove
 +
 *Default*: 0
 +
-Log level to be collected by cbopinfo
+Log level to be collected by 'cao collect-logs'
 
 --fsgroup::
 *Type*: int
@@ -3211,13 +3211,13 @@ The name of the kubeconfig user to use
 
 == cao verify [flags]
 
-Verifies the integrity of the collected cbopinfo archive collected using cbopinfo or cao collect-logs
+Verifies the integrity of an archive collected using cao collect-logs
 
 === Examples
 
 [source,console]
 ----
-# Using cao
+# Verify a collected archive
 cao verify --file cbopinfo-20260630T150424+0530.tar.gz
 ----
 

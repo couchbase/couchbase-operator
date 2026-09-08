@@ -365,7 +365,7 @@ func mustVerifyServerLogs(t *testing.T, k8s *types.Cluster, archive string, reda
 		e2eutil.Die(t, err)
 	}
 
-	// Grab the timestamp from the archive, all files share this across a cbopinfo run.
+	// Grab the timestamp from the archive, all files share this across a cao collect-logs run.
 	timestamp := extractTimestamp(archive)
 
 	// For each pod, ensure the associated server log exists.
@@ -426,7 +426,7 @@ func verifyLogCollectListJSON(k8s *types.Cluster, cbClusterName, collectInfoList
 	return nil
 }
 
-// mustGetFileList lists all resources that should be collected by cbopinfo.
+// mustGetFileList lists all resources that should be collected by cao collect-logs.
 func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, operatorImage string, all, pprof, metrics bool, logLevel int, backupLogs bool, backupLogsName string, clusters ...string) []string {
 	// The base file path will have a top level directory named the same as the archive.
 	base := strings.TrimSuffix(filepath.Base(archive), ".tar.gz")
@@ -748,10 +748,10 @@ func mustGetFileList(t *testing.T, k8s *types.Cluster, namespace, archive, opera
 	return files
 }
 
-// cbopinfo runs the command with the specified arguments returning the archive name
+// caoCollectLogs runs the command with the specified arguments returning the archive name
 // created.
-func cbopinfo(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
-	// Collect into per-cbopinfo directories in the interests of
+func caoCollectLogs(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
+	// Collect into per-collection directories in the interests of
 	// parallelization.  Also make them relative to the workspace so
 	// they get cleaned up by Jenkins.
 	pwd := "/artifacts"
@@ -767,9 +767,9 @@ func cbopinfo(t *testing.T, args e2eutil.ArgumentList) (string, func()) {
 
 	args.Add("--directory", temp)
 
-	stdout, err := e2eutil.Cbopinfo(framework.Global.CbopinfoPath, args.Slice())
+	stdout, err := e2eutil.CaoCollectLogs(framework.Global.CaoPath, args.Slice())
 	if err != nil {
-		e2eutil.Die(t, fmt.Errorf("cbopinfo command failed: %w: %s", err, string(stdout)))
+		e2eutil.Die(t, fmt.Errorf("cao collect-logs command failed: %w: %s", err, string(stdout)))
 	}
 
 	re := regexp.MustCompile(`Wrote cluster information to (\S+)`)
@@ -797,8 +797,8 @@ func getLogFileNameFromExecOutput(outputStr string) string {
 	return outputStrArr[len(outputStrArr)-1]
 }
 
-// Struct to define cbopinfo command args.
-type cbopinfoArg struct {
+// Struct to define 'cao collect-logs' command args.
+type collectLogsArg struct {
 	Name        string
 	Arg         string
 	ArgValue    string
@@ -806,7 +806,7 @@ type cbopinfoArg struct {
 	ExpectedErr string
 }
 
-// Run cbopinfo command with all valid arguments
+// Run cao collect-logs command with all valid arguments
 // and validate the exit status of the commands.
 func TestLogCollectValidateArguments(t *testing.T) {
 	f := framework.Global
@@ -822,51 +822,51 @@ func TestLogCollectValidateArguments(t *testing.T) {
 	t.Logf("Context: %v", context)
 
 	// Validate args which won't produce output file
-	if _, err := e2eutil.Cbopinfo(f.CbopinfoPath, []string{"--help"}); err != nil {
+	if _, err := e2eutil.CaoCollectLogs(f.CaoPath, []string{"--help"}); err != nil {
 		e2eutil.Die(t, fmt.Errorf("Failed while providing arg %s: %w", "--help", err))
 	}
 
 	// Validate all other arguments
-	validArgumentList := []cbopinfoArg{
+	validArgumentList := []collectLogsArg{
 		{
-			Name:     "TestValidateCbopinfoAll",
+			Name:     "TestValidateCollectLogsAll",
 			Arg:      "--all",
 			ArgValue: "",
 		},
 		/*
 			{
-				Name:        "TestValidateCbopinfoKubeconfig",
+				Name:        "TestValidateCollectLogsKubeconfig",
 				Arg:         "--kubeconfig",
 				ArgValue:    kubeConfPath,
 				ExpectedErr: "flag needs an argument: --kubeconfig",
 			},
 		*/
 		{
-			Name:        "TestValidateCbopinkubernetes.Namespace",
+			Name:        "TestValidateCollectLogsNamespace",
 			Arg:         "--namespace",
 			ArgValue:    kubernetes.Namespace,
 			ExpectedErr: "flag needs an argument: --namespace",
 		},
 		{
-			Name:     "TestValidateCbopinfoSystem",
+			Name:     "TestValidateCollectLogsSystem",
 			Arg:      "--system",
 			ArgValue: "",
 		},
 		{
-			Name:        "TestValidateCbopinfoOperatorImage",
+			Name:        "TestValidateCollectLogsOperatorImage",
 			Arg:         "--operator-image",
 			ArgValue:    f.OpImage,
 			ExpectedErr: "flag needs an argument: --operator-image",
 		},
 		{
-			Name:        "TestValidateCbopinfoOperatorRestPort",
+			Name:        "TestValidateCollectLogsOperatorRestPort",
 			Arg:         "--operator-rest-port",
 			ArgValue:    operatorRestPort,
 			ExpectedErr: "flag needs an argument: --operator-rest-port",
 		},
 	}
 
-	// Deploy cb server for cbopinfo validation
+	// Deploy cb server for cao collect-logs validation
 	clusterOptions().WithEphemeralTopology(1).MustCreate(t, kubernetes)
 
 	for i := range validArgumentList {
@@ -880,7 +880,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			args.AddClusterDefaults(kubernetes)
 			args.Add(arg.Arg, arg.ArgValue)
 
-			execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
+			execOut, err := e2eutil.CaoCollectLogs(f.CaoPath, args.Slice())
 			execOutStr := strings.TrimSpace(string(execOut))
 
 			if err != nil {
@@ -895,7 +895,7 @@ func TestLogCollectValidateArguments(t *testing.T) {
 			if arg.ArgValue != "" {
 				args := e2eutil.ArgumentList{}
 				args.Add(arg.Arg, "")
-				execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
+				execOut, err := e2eutil.CaoCollectLogs(f.CaoPath, args.Slice())
 				execOutStr := strings.TrimSpace(string(execOut))
 
 				if err == nil {
@@ -977,7 +977,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 
 	errMsgList := failureList{}
 
-	validArgumentList := []cbopinfoArg{
+	validArgumentList := []collectLogsArg{
 		{
 			Name:        "Unreachable '-kubeconfig' file",
 			Arg:         "--kubeconfig",
@@ -999,7 +999,7 @@ func TestNegLogCollectValidateArgs(t *testing.T) {
 		cmdArgs := []string{arg.Arg}
 		cmdArgs = append(cmdArgs, arg.ArgValue)
 
-		execOut, err := e2eutil.Cbopinfo(framework.Global.CbopinfoPath, cmdArgs)
+		execOut, err := e2eutil.CaoCollectLogs(framework.Global.CaoPath, cmdArgs)
 		execOutStr := strings.TrimSpace(string(execOut))
 
 		t.Logf("Returned: %s\n", execOutStr)
@@ -1056,8 +1056,8 @@ func TestLogCollect(t *testing.T) {
 		args := commonArgs.Clone()
 		args.Add("--couchbase-cluster", cluster1.Name)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
@@ -1071,8 +1071,8 @@ func TestLogCollect(t *testing.T) {
 		args.Add("--couchbase-cluster", cluster1.Name)
 		args.Add("--log-level", "1")
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 1, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
@@ -1086,8 +1086,8 @@ func TestLogCollect(t *testing.T) {
 		args.Add("--couchbase-cluster", cluster1.Name)
 		args.Add("--couchbase-cluster", cluster3.Name)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name, cluster3.Name)
 		mustVerifyArchiveContents(t, archive, files)
@@ -1097,8 +1097,8 @@ func TestLogCollect(t *testing.T) {
 		cleanup := f.SetupSubTest(t)
 		defer cleanup()
 
-		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, commonArgs)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
@@ -1112,8 +1112,8 @@ func TestLogCollect(t *testing.T) {
 		args.Add("--system", "")
 		args.Add("--couchbase-cluster", cluster2.Name)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster2.Name)
 		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
@@ -1129,8 +1129,8 @@ func TestLogCollect(t *testing.T) {
 		args.Add("--couchbase-cluster", cluster1.Name)
 		args.Add("--couchbase-cluster", cluster3.Name)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name, cluster3.Name)
 		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
@@ -1144,8 +1144,8 @@ func TestLogCollect(t *testing.T) {
 		args := commonArgs.Clone()
 		args.Add("--system", "")
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "")
 		files = append(files, mustGetFileList(t, kubernetes, "kube-system", archive, framework.Global.OpImage, true, true, true, 0, false, "")...)
@@ -1161,8 +1161,8 @@ func TestLogCollect(t *testing.T) {
 		args.Add("--collectinfo-collect", "all")
 		args.Add("--couchbase-cluster", cluster1.Name)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, true, true, 0, false, "", cluster1.Name)
 		mustVerifyArchiveContents(t, archive, files)
@@ -1176,8 +1176,8 @@ func TestLogCollect(t *testing.T) {
 		args := commonArgs.Clone()
 		args.Add("--all", "")
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
@@ -1187,15 +1187,15 @@ func TestLogCollect(t *testing.T) {
 		cleanup := f.SetupSubTest(t)
 		defer cleanup()
 
-		archive, cleanCbopinfo := cbopinfo(t, commonArgs)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, commonArgs)
+		defer cleanCollect()
 
 		dir := filepath.Dir(archive)
 		baseName := filepath.Base(archive)
 		targetArchive := filepath.Join(dir, baseName)
 
 		verifyArgs := []string{"--file", targetArchive}
-		stdout, err := e2eutil.CbopinfoVerify(framework.Global.CbopinfoPath, verifyArgs)
+		stdout, err := e2eutil.CaoVerify(framework.Global.CaoPath, verifyArgs)
 
 		if err != nil {
 			e2eutil.Die(t, fmt.Errorf("verify subcommand failed on a valid archive: %w: %s", err, string(stdout)))
@@ -1296,7 +1296,7 @@ func TestLogCollectRbacPermission(t *testing.T) {
 	// Collect logs
 	args := e2eutil.ArgumentList{}
 	args.Add("--kubeconfig", kubeconfig.Name())
-	execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
+	execOut, err := e2eutil.CaoCollectLogs(f.CaoPath, args.Slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 
 	t.Log(execOutStr)
@@ -1345,7 +1345,7 @@ func ReDeployOperator(t *testing.T, k8s *types.Cluster, imageName string, port i
 ***********************************/
 
 // Generic function to re-deploy the operator with given image name and rest-port.
-// Collect logs with appropriate cbopinfo arguments and verify the collected info.
+// Collect logs with appropriate cao collect-logs arguments and verify the collected info.
 func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorImage string, operatorPort int, args e2eutil.ArgumentList) {
 	kubernetes := k8s
 	clusterSize := 3
@@ -1360,15 +1360,15 @@ func CollectExtendedDebugLogGeneric(t *testing.T, k8s *types.Cluster, operatorIm
 	// Collect logs
 	args.Add("--couchbase-cluster", cbCluster.Name)
 
-	archive, cleanCbopinfo := cbopinfo(t, args)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, args)
+	defer cleanCollect()
 
 	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, operatorImage, true, true, true, 0, false, "")
 	mustVerifyArchiveContents(t, archive, files)
 	mustVerifyServerLogs(t, kubernetes, archive, false)
 }
 
-// Collect cbopinfo using '--operator-image' and '--operator-rest-port'
+// Collect logs using '--operator-image' and '--operator-rest-port'
 // with default values and validate the logs collected
 //
 // SM: Given the default is the build we are working on, you need to
@@ -1390,7 +1390,7 @@ func TestExtendedDebugWithDefaultValues(t *testing.T) {
 	CollectExtendedDebugLogGeneric(t, kubernetes, f.OpImage, constants.OperatorRestPort, args)
 }
 
-// Collect cbopinfo using '--operator-image' and '--operator-rest-port'
+// Collect logs using '--operator-image' and '--operator-rest-port'
 // with custom values and validate the logs collected.
 func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	f := framework.Global
@@ -1409,7 +1409,7 @@ func TestExtendedDebugWithNonDefaultValues(t *testing.T) {
 	CollectExtendedDebugLogGeneric(t, kubernetes, f.OpImage, testPort, args)
 }
 
-// Collect cbopinfo with '--operator-image' & '-operator-rest-port'
+// Collect logs with '--operator-image' & '-operator-rest-port'
 // with invalid values and validate the log collection.
 func TestLogCollectInvalid(t *testing.T) {
 	f := framework.Global
@@ -1434,8 +1434,8 @@ func TestLogCollectInvalid(t *testing.T) {
 		args.Add("--operator-image", invalidImgName)
 		args.Add("--operator-rest-port", strconv.Itoa(constants.OperatorRestPort))
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, invalidImgName, false, true, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
@@ -1451,15 +1451,15 @@ func TestLogCollectInvalid(t *testing.T) {
 		args.AddEnvironmentDefaults(f.OpImage)
 		args.Add("--operator-rest-port", invalidPortVal)
 
-		archive, cleanCbopinfo := cbopinfo(t, args)
-		defer cleanCbopinfo()
+		archive, cleanCollect := caoCollectLogs(t, args)
+		defer cleanCollect()
 
 		files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, false, false, true, 0, false, "")
 		mustVerifyArchiveContents(t, archive, files)
 	})
 }
 
-// Collect cbopinfo with '-operator-image' & '-operator-rest-port'
+// Collect logs with '-operator-image' & '-operator-rest-port'
 // and kill the operator pod during log collection in parallel.
 func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	f := framework.Global
@@ -1483,8 +1483,8 @@ func TestExtendedDebugKillOperatorDuringLogCollection(t *testing.T) {
 	e2eutil.MustDeleteCouchbaseOperator(t, kubernetes)
 
 	// Collect logs when operator pod goes down in parallel
-	archive, cleanCbopinfo := cbopinfo(t, args)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, args)
+	defer cleanCollect()
 
 	// Verify file list
 	files := mustGetFileList(t, kubernetes, kubernetes.Namespace, archive, framework.Global.OpImage, true, true, true, 0, false, "")
@@ -1904,8 +1904,8 @@ func TestLogRedactionVerify(t *testing.T) {
 	args.Add("--collectinfo-redact", "")
 	args.Add("--all", "")
 
-	archive, cleanCbopinfo := cbopinfo(t, args)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, args)
+	defer cleanCollect()
 
 	mustVerifyServerLogs(t, kubernetes, archive, true)
 }
@@ -1954,8 +1954,8 @@ func TestLogRedactionWithPvVerify(t *testing.T) {
 	args.Add("--collectinfo-redact", "")
 	args.Add("--all", "")
 
-	archive, cleanCbopinfo := cbopinfo(t, args)
-	defer cleanCbopinfo()
+	archive, cleanCollect := caoCollectLogs(t, args)
+	defer cleanCollect()
 
 	mustVerifyServerLogs(t, kubernetes, archive, true)
 }
@@ -2017,7 +2017,7 @@ func TestLogCollectListJson(t *testing.T) {
 	args.AddEnvironmentDefaults(f.OpImage)
 	args.Add("--collectinfo", "")
 	args.Add("--collectinfo-list", "")
-	execOut, err := e2eutil.Cbopinfo(f.CbopinfoPath, args.Slice())
+	execOut, err := e2eutil.CaoCollectLogs(f.CaoPath, args.Slice())
 	execOutStr := strings.TrimSpace(string(execOut))
 
 	t.Logf("Returned: %s\n", execOutStr)
@@ -2056,7 +2056,7 @@ func TestLogsMetadata(t *testing.T) {
 		cleanup := f.SetupSubTest(t)
 		defer cleanup()
 
-		archive, clean := cbopinfo(t, args)
+		archive, clean := caoCollectLogs(t, args)
 		defer clean()
 
 		mustVerifyArchiveMetadata(t, archive, true)
@@ -2070,7 +2070,7 @@ func TestLogsMetadata(t *testing.T) {
 		cleanup := f.SetupSubTest(t)
 		defer cleanup()
 
-		archive, clean := cbopinfo(t, args)
+		archive, clean := caoCollectLogs(t, args)
 		defer clean()
 
 		mustVerifyArchiveMetadata(t, archive, true, cluster1, cluster2)
@@ -2083,7 +2083,7 @@ func TestLogsMetadata(t *testing.T) {
 		cleanup := f.SetupSubTest(t)
 		defer cleanup()
 
-		archive, clean := cbopinfo(t, args)
+		archive, clean := caoCollectLogs(t, args)
 		defer clean()
 
 		mustVerifyArchiveMetadata(t, archive, false, cluster1, cluster2)

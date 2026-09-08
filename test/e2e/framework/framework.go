@@ -575,7 +575,7 @@ func setup() error {
 		cluster,
 	}
 
-	Global.CbopinfoPath = "/cao"
+	Global.CaoPath = "/cao"
 
 	if len(Global.RegistryConfigs) > 0 {
 		logrus.Info(util.PrettyHeading("Docker Registries"))
@@ -1219,9 +1219,9 @@ func (f *Framework) setupCluster(t *testing.T, index int, o []TestOption) (*type
 			t.Logf("Error: %v", err)
 		}
 
-		// Collect any kubernetes/server logs using cbopinfo call.
+		// Collect any kubernetes/server logs using cao collect-logs call.
 		if t.Failed() && f.CollectLogs {
-			e2eutil.CollectLogs(t, cluster, logDir, f.CbopinfoPath, f.OpImage, f.CollectServerLogsOnFailure, f.SharedTestFlags.CollectedLogLevel)
+			e2eutil.CollectLogs(t, cluster, logDir, f.CaoPath, f.OpImage, f.CollectServerLogsOnFailure, f.SharedTestFlags.CollectedLogLevel)
 		}
 
 		// Cleanup, which is now trivial.

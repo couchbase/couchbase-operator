@@ -12,10 +12,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/couchbase/couchbase-operator/pkg/specgen"
-	"github.com/couchbase/couchbase-operator/pkg/version"
 	"github.com/ghodss/yaml"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -34,19 +32,19 @@ const (
 // ApplySubCommands attaches the configuration (create/delete/generate) sub commands to
 // an arbitrary root command.
 func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags) {
-	// 'cbopcfg generate' creates YAML for various Operator deployments.
+	// 'cao generate' creates YAML for various Operator deployments.
 	generate := &cobra.Command{
 		Use:   GenerateCmd,
 		Short: "Generates YAML manifests",
 		Long:  "Generates YAML manifests for various Operator components",
 	}
 
-	generate.AddCommand(getGenerateOperatorCommand(root.UseLine(), flags))
-	generate.AddCommand(getGenerateAdmissionCommand(root.UseLine(), flags))
+	generate.AddCommand(getGenerateOperatorCommand(flags))
+	generate.AddCommand(getGenerateAdmissionCommand(flags))
 	generate.AddCommand(getGenerateBackupCommand(flags))
-	generate.AddCommand(getGeneratePodCommand(root.UseLine(), flags))
+	generate.AddCommand(getGeneratePodCommand(flags))
 
-	// 'cbopcfg create' actually creates resources.
+	// 'cao create' actually creates resources.
 	create := &cobra.Command{
 		Use:   CreateCmd,
 		Short: "Creates Couchbase Autonomous Operator components",
@@ -56,12 +54,12 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 		},
 	}
 
-	create.AddCommand(getCreateOperatorCommand(root.UseLine(), flags))
-	create.AddCommand(getCreateAdmissionCommand(root.UseLine(), flags))
-	create.AddCommand(getCreateBackupCommand(root.UseLine(), flags))
-	create.AddCommand(getCreatePodCommand(root.UseLine(), flags))
+	create.AddCommand(getCreateOperatorCommand(flags))
+	create.AddCommand(getCreateAdmissionCommand(flags))
+	create.AddCommand(getCreateBackupCommand(flags))
+	create.AddCommand(getCreatePodCommand(flags))
 
-	// 'cbopcfg create' actually deletes resources.
+	// 'cao delete' actually deletes resources.
 	deleteCmd := &cobra.Command{
 		Use:   DeleteCmd,
 		Short: "Deletes Couchbase Autonomous Operator components",
@@ -71,9 +69,9 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 		},
 	}
 
-	deleteCmd.AddCommand(getDeleteOperatorCommand(root.UseLine(), flags))
-	deleteCmd.AddCommand(getDeleteAdmissionCommand(root.UseLine(), flags))
-	deleteCmd.AddCommand(getDeleteBackupCommand(root.UseLine(), flags))
+	deleteCmd.AddCommand(getDeleteOperatorCommand(flags))
+	deleteCmd.AddCommand(getDeleteAdmissionCommand(flags))
+	deleteCmd.AddCommand(getDeleteBackupCommand(flags))
 
 	updateCmd := &cobra.Command{
 		Use:   UpdateCmd,
@@ -84,7 +82,7 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 		},
 	}
 
-	updateCmd.AddCommand(getUpdateAdmissionCommand(root.UseLine(), flags))
+	updateCmd.AddCommand(getUpdateAdmissionCommand(flags))
 
 	oGenSpec := specgen.SpecGeneratorOptions{}
 
@@ -121,55 +119,4 @@ func ApplySubCommands(root *cobra.Command, flags *genericclioptions.ConfigFlags)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(genSpecCmd)
-}
-
-func GenerateCommand() *cobra.Command {
-	flags := genericclioptions.NewConfigFlags(true)
-
-	// 'cbopcfg version' prints out the Operator version this binary belongs to.
-	version := &cobra.Command{
-		Use:   "version",
-		Short: "Prints the command version",
-		Long:  "Prints the command version",
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("cbopcfg", version.WithBuildNumberAndRevision())
-		},
-	}
-
-	// 'cbopcfg' is the top level command.
-	root := &cobra.Command{
-		Use:   "cbopcfg",
-		Short: "Couchbase Autonomous Operator configuration utility",
-		Long: normalize(`
-			Couchbase Autonomous Operator configuration utility.
-
-			The cbopcfg tool is used to automate the life-cycle of the Autonomous
-			Operator.  It is responsible for creation and deletion of Autonomous
-			Operator components.  A typical installation involves installing the
-			Couchbase custom resource definitions, then the Dynamic Admission
-			Controller, and finally the Operator itself.
-
-			Additional details for each component are documented under each
-			sub-command.
-
-			Alternative methods of life-cycle management are available in the form
-			of Helm charts and the Couchbase Open Service Broker. 
-		`),
-	}
-
-	flags.AddFlags(root.PersistentFlags())
-
-	root.AddCommand(version)
-
-	ApplySubCommands(root, flags)
-
-	return root
-}
-
-func Execute() {
-	root := GenerateCommand()
-
-	if err := root.Execute(); err != nil {
-		os.Exit(1)
-	}
 }

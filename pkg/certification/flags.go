@@ -109,7 +109,7 @@ type SharedTestFlags struct {
 	LocalPV bool
 
 	// CollectedLogLevel is passed to the certification container for controlling the
-	// sensitivity of collected information by cbopinfo
+	// sensitivity of collected information by 'cao collect-logs'
 	CollectedLogLevel int
 }
 
@@ -122,7 +122,7 @@ func (s *SharedTestFlags) BindSharedFlags(flagSet *pflag.FlagSet) {
 	flag.StringVar(&s.StorageClassName, storageClassFlag,
 		"",
 		"Storage class to use for result artifacts and test volumes. The default storage class of the platform is used if not specified.")
-	flag.IntVar(&s.CollectedLogLevel, collectLogLevelFlag, 0, "Log level to be collected by cbopinfo")
+	flag.IntVar(&s.CollectedLogLevel, collectLogLevelFlag, 0, "Log level to be collected by 'cao collect-logs'")
 	flag.BoolVar(&s.LocalPV, localPVFlag, false, "Use LPV when testing")
 
 	// add flag to cli flagset if provided

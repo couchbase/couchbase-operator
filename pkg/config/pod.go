@@ -55,7 +55,7 @@ func (o *podOptions) registerPodGenerateFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired("server-class")
 }
 
-func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getGeneratePodCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newPodOptions()
 
 	cmd := &cobra.Command{
@@ -66,13 +66,13 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 		Long: normalize(`This command is for debug and recovery purposes only.  It is intended
 							to generate a pod definition for a since removed pod, or a new pod when
 							support needs to do so.`),
-		Example: normalize(fmt.Sprintf(`
+		Example: normalize(`
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --index 3
+			cao generate pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
-		`, command)),
+			cao generate pod --couchbase-cluster cb-example --server-class all_services --auto-index
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
 			if err != nil {
@@ -86,7 +86,7 @@ func getGeneratePodCommand(command string, flags *genericclioptions.ConfigFlags)
 	return cmd
 }
 
-func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *cobra.Command {
+func getCreatePodCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	o := newPodOptions()
 
 	cmd := &cobra.Command{
@@ -99,13 +99,13 @@ func getCreatePodCommand(command string, flags *genericclioptions.ConfigFlags) *
 							support needs to do so.
 
 Note: The Couchbase Operator watches CouchbaseCluster resources and may immediately delete pods it considers unclustered.  Pause or stop the Operator before using this command.`),
-		Example: normalize(fmt.Sprintf(`
+		Example: normalize(`
 			# Create pod scoped to the cluster with a specific index.
-			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --index 3
+			cao create pod --couchbase-cluster cb-example --server-class all_services --index 3
 
 			# Create pod scoped to a cluster with the next available index.
-			%[1]s create pod --couchbase-cluster cb-example --server-class all_services --auto-index
-		`, command)),
+			cao create pod --couchbase-cluster cb-example --server-class all_services --auto-index
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resources, err := o.generate(flags)
 			if err != nil {
