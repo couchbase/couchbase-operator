@@ -536,6 +536,8 @@ func Collect(context *context.Context) error {
 	// collect and download.
 	indices := configure(context, logList)
 
+	fmt.Println("Starting log collection...")
+
 	// Collect the logs in parallel.
 	resultChan := make(chan *util.CollectInfoResult, len(indices))
 
