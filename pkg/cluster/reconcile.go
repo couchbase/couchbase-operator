@@ -1402,13 +1402,7 @@ func (c *Cluster) reconcilePersistentStatus() error {
 		return err
 	}
 
-	version, err := c.state.Get(persistence.Version)
-	if err != nil {
-		return err
-	}
-
 	c.cluster.Status.ClusterID = uuid
-	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		log.Info("failed to update cluster status", "cluster", c.namespacedName())

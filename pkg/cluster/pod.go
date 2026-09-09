@@ -524,14 +524,9 @@ func (c *Cluster) reconcileVersionBaseline() error {
 	return c.updateVersionBaseline("")
 }
 
-// updateVersionBaseline owns the baseline. Running members decide it, so a
-// previousVersionPodCount hold keeps it on the old version; learned covers creation, before
-// there are members. Frozen while upgrading, so isRollback keeps something to compare.
+// updateVersionBaseline sets the baseline to the lowest member version, or learned before
+// there are members.
 func (c *Cluster) updateVersionBaseline(learned string) error {
-	if upgrading, _ := c.isUpgrading(); upgrading {
-		return nil
-	}
-
 	version := c.GetLowestMemberVersion()
 	if version == "" {
 		version = learned
@@ -540,8 +535,7 @@ func (c *Cluster) updateVersionBaseline(learned string) error {
 	return c.setClusterVersion(version)
 }
 
-// setClusterVersion writes the durable baseline. Upsert because Update rejects a missing key
-// and apply() eats that.
+// setClusterVersion writes the baseline, then its status copy, so status can lag but never lead.
 func (c *Cluster) setClusterVersion(version string) error {
 	// Stores only a version we can name, as updateMemberVersion and UpdateImageDigestMap do.
 	if !couchbaseutil.VersionKnown(version) {
@@ -551,8 +545,26 @@ func (c *Cluster) setClusterVersion(version string) error {
 	// Called every cycle and a Secret write is an API call, so compare first. An errored
 	// read falls through to the write, which is how an absent key repairs itself.
 	if current, err := c.state.Get(persistence.Version); err != nil || current != version {
-		return c.state.Upsert(persistence.Version, version)
+		if err := c.state.Upsert(persistence.Version, version); err != nil {
+			return err
+		}
 	}
 
+	c.cluster.Status.SetVersion(version)
+
 	return nil
+}
+
+// clusterVersion returns the baseline, falling back to status if the key is missing.
+func (c *Cluster) clusterVersion() (string, error) {
+	version, err := c.state.Get(persistence.Version)
+	if err == nil {
+		return version, nil
+	}
+
+	if c.cluster.Status.CurrentVersion != "" {
+		return c.cluster.Status.CurrentVersion, nil
+	}
+
+	return "", err
 }

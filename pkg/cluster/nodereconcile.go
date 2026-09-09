@@ -1214,7 +1214,12 @@ func (r *ReconcileMachine) handleAddNode(c *Cluster) error {
 
 	var scheduledScaling couchbasev2.ScalingMessageList
 
-	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		return err
+	}
+
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return err
 	}
@@ -1917,7 +1922,7 @@ func (r *ReconcileMachine) handleMoveNodes(c *Cluster) error {
 }
 
 func (r *ReconcileMachine) checkIfValidUpgradePath() error {
-	currentVersion, err := r.c.state.Get(persistence.Version)
+	currentVersion, err := r.c.clusterVersion()
 	if err != nil {
 		return err
 	}
@@ -1951,7 +1956,14 @@ func (r *ReconcileMachine) handleUpgradeNode(c *Cluster) error {
 
 	c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionWaitingBetweenUpgrades)
 
-	arbiterNodesSupported, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		// Skip with a log rather than fail.
+		log.Error(err, "Failed to read the cluster version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	arbiterNodesSupported, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}
@@ -2606,7 +2618,12 @@ func (r *ReconcileMachine) shouldRemoveVolumes(server string) bool {
 // eviction policy migrations, and whether any of those nodes actually need
 // cycling to converge to spec.
 func (c *Cluster) getBucketMigrationCandidates() (candidates couchbaseutil.MemberSet, cyclesNeeded bool, hasStorageBackendOverrides bool, err error) {
-	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		return nil, false, false, err
+	}
+
+	atleast76, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -2694,7 +2711,14 @@ func (r *ReconcileMachine) handleBucketStorageBackendMigration(c *Cluster) error
 		return err
 	}
 
-	atleast76, err := couchbaseutil.VersionAfter(c.cluster.Status.CurrentVersion, "7.6.0")
+	currentVersion, err := c.clusterVersion()
+	if err != nil {
+		// Skip with a log rather than fail.
+		log.Error(err, "Failed to read the cluster version", "cluster", c.namespacedName())
+		return nil
+	}
+
+	atleast76, err := couchbaseutil.VersionAfter(currentVersion, "7.6.0")
 	if err != nil {
 		return nil
 	}

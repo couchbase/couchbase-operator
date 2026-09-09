@@ -567,7 +567,7 @@ func rollbackDetected(targetVersion, baselineVersion, highestMemberVersion strin
 // isRollback reports whether spec.image takes the cluster back to the version it was
 // running before the in-flight upgrade started.
 func (c *Cluster) isRollback() (bool, error) {
-	baselineVersion, err := c.state.Get(persistence.Version)
+	baselineVersion, err := c.clusterVersion()
 	if err != nil {
 		return false, err
 	}
@@ -620,7 +620,7 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 	targetVersion := ""
 
 	if c.cluster.Spec.Upgrade != nil {
-		baselineVersion, err = c.state.Get(persistence.Version)
+		baselineVersion, err = c.clusterVersion()
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -906,7 +906,7 @@ func (c *Cluster) isUpgrading() (bool, error) {
 // Currently the only prerequisite is that clusters going from < 8.0.0 to 8.0.0,
 // need to not have any memcached buckets.
 func (c *Cluster) getUpgradeBlockers() ([]string, error) {
-	startVersion, err := c.state.Get(persistence.Version)
+	startVersion, err := c.clusterVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -958,8 +958,7 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 		return err
 	}
 
-	// Get the baseline (old) version from persistence
-	baselineVersion, err := c.state.Get(persistence.Version)
+	baselineVersion, err := c.clusterVersion()
 	if err != nil {
 		return err
 	}

@@ -126,18 +126,6 @@ func (c *Cluster) reconcileMigrationCluster() error {
 			return err
 		}
 
-		lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
-		if err != nil {
-			return err
-		}
-
-		version, err := k8sutil.CouchbaseVersion(lowestImage)
-		if err != nil {
-			return err
-		}
-
-		c.cluster.Status.CurrentVersion = version
-
 		target := c.getMigratingReadyTarget()
 
 		if err := c.checkUnmanagedClusterReadiness(target); err != nil {

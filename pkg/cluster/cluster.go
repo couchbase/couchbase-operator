@@ -375,8 +375,14 @@ func (c *Cluster) initializeClusterState() error {
 		return err
 	}
 
+	// Seeded even when unresolved, so a later Get doesn't wait out the cache timeout.
+	// Status only takes a known version.
 	if err := c.state.Insert(persistence.Version, version); err != nil {
 		return err
+	}
+
+	if couchbaseutil.VersionKnown(version) {
+		c.cluster.Status.SetVersion(version)
 	}
 
 	if err := c.state.Insert(persistence.Password, c.password); err != nil {
@@ -500,18 +506,7 @@ func (c *Cluster) create() error {
 		return err
 	}
 
-	lowestImage, err := c.cluster.Spec.LowestInUseCouchbaseVersionImage()
-	if err != nil {
-		return err
-	}
-
-	version, err := k8sutil.CouchbaseVersion(lowestImage)
-	if err != nil {
-		return err
-	}
-
 	c.cluster.Status.SetCreatingCondition()
-	c.cluster.Status.CurrentVersion = version
 
 	if err := c.updateCRStatus(); err != nil {
 		return err
