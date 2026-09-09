@@ -419,7 +419,8 @@ func (c *Cluster) regeneratePod(member couchbaseutil.Member, actual *v1.Pod, ser
 // This involves not only updating the member, but the Pod
 // and PVC as well.
 func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version string) error {
-	if version == "" { // won't upgrade to empty version
+	// Never persist the sentinel.
+	if !couchbaseutil.VersionKnown(version) {
 		return nil
 	}
 
@@ -463,54 +464,44 @@ func (c *Cluster) updateMemberVersion(member couchbaseutil.Member, version strin
 	return nil
 }
 
-// Updates the internal digest map, based on running pods.
-// This is mostly used for when operator is recovering from a restart
-// and has lost it's internal map.
-// We update the image digest map early in reconciliation because it's
-// used in c.IsAtLeastVersion().
+// reconcilePodServerVersions rebuilds the digest cache from running pods and fills in
+// missing member versions.
 func (c *Cluster) reconcilePodServerVersions() error {
-	couchbaseImageToVersion := map[string]string{}
-	couchbaseImageToVersion[c.cluster.Spec.CouchbaseImage()] = ""
-
-	log.V(2).Info("requesting server version for image", "image", c.cluster.Spec.CouchbaseImage(), "cluster", c.namespacedName())
-
 	for _, member := range c.callableMembers {
-		info := &couchbaseutil.PoolsInfo{}
-
-		if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, member); err != nil {
-			return err
-		}
-
 		pod, found := c.k8s.Pods.Get(member.Name())
-		if !found {
+		if !found || pod.DeletionTimestamp != nil {
 			continue
 		}
 
-		config := c.cluster.Spec.GetServerConfigByName(member.Config())
-		image := c.cluster.Spec.ServerClassCouchbaseImage(config)
+		// Use the pod's image; mid-upgrade it differs from the spec.
+		image := extractCouchbaseImage(pod)
 
-		for _, container := range pod.Spec.Containers {
-			if container.Image == image {
-				if version, exists := couchbaseImageToVersion[image]; !exists || version == "" {
-					couchbaseImageToVersion[image] = info.Version
-				}
+		resolved, err := k8sutil.CouchbaseVersion(image)
+		if err != nil {
+			log.Error(err, "Failed to read image version", "cluster", c.namespacedName(), "member", member.Name())
+			continue
+		}
+
+		// Only query for digests the cache can't resolve.
+		if !couchbaseutil.VersionKnown(resolved) {
+			info := &couchbaseutil.PoolsInfo{}
+			if err := couchbaseutil.GetPools(info).RetryFor(time.Minute).On(c.api, member); err != nil {
+				// Unnamed members are held by setClusterVersion, so don't fail here.
+				log.Error(err, "Failed to read server version", "cluster", c.namespacedName(), "member", member.Name())
+				continue
 			}
+
+			learnedVersion, learned := couchbaseutil.UpdateImageDigestMap(image, info.Version)
+			if learned {
+				log.V(2).Info("found server version", "version", info.Version, "image", image, "cluster", c.namespacedName())
+			}
+
+			resolved = learnedVersion
 		}
-	}
 
-	for image, cbversion := range couchbaseImageToVersion {
-		version := couchbaseutil.GetVersionTag(image)
-		// check if we know about this image.
-		if _, ok := constants.ImageDigests[version]; ok {
-			continue
-		}
-
-		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion); newVersion != "" && updated {
-			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.namespacedName())
-
-			err := c.updateVersionBaseline(newVersion)
-
-			if err != nil {
+		// PVC-recovered pods skip initMember, so fill in a missing version here.
+		if !couchbaseutil.VersionKnown(member.Version()) {
+			if err := c.updateMemberVersion(member, resolved); err != nil {
 				return err
 			}
 		}
@@ -519,7 +510,7 @@ func (c *Cluster) reconcilePodServerVersions() error {
 	return nil
 }
 
-// reconcileVersionBaseline runs first in preTopology, before anything reads the baseline.
+// reconcileVersionBaseline runs after reconcilePodServerVersions, before any baseline reader.
 func (c *Cluster) reconcileVersionBaseline() error {
 	return c.updateVersionBaseline("")
 }
@@ -542,14 +533,21 @@ func (c *Cluster) setClusterVersion(version string) error {
 		return nil
 	}
 
-	// Called every cycle and a Secret write is an API call, so compare first. An errored
-	// read falls through to the write, which is how an absent key repairs itself.
+	// Moving the baseline, or recreating a missing key: hold while any member is unnamed, it may be the oldest.
 	if current, err := c.state.Get(persistence.Version); err != nil || current != version {
+		if !c.membersAllNamed() {
+			log.Info("Holding the cluster version: a member's version cannot be resolved",
+				"cluster", c.namespacedName(), "holding", current, "wanted", version)
+
+			return nil
+		}
+
 		if err := c.state.Upsert(persistence.Version, version); err != nil {
 			return err
 		}
 	}
 
+	// The Secret now holds version, so the copy is always safe.
 	c.cluster.Status.SetVersion(version)
 
 	return nil

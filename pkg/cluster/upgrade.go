@@ -615,25 +615,25 @@ func (c *Cluster) getUpgradeCandidates(logCandidates bool) (couchbaseutil.Member
 	}
 
 	// Get baseline version for determining old vs new
-	baselineVersion := ""
 	targetImage := c.cluster.Spec.CouchbaseImage()
 	targetVersion := ""
+	isRollback := false
 
 	if c.cluster.Spec.Upgrade != nil {
-		baselineVersion, err = c.clusterVersion()
+		targetVersion, err = k8sutil.CouchbaseVersion(targetImage)
 		if err != nil {
 			return nil, nil, nil, err
 		}
-		targetVersion, err = k8sutil.CouchbaseVersion(targetImage)
+
+		// Use isRollback, not target == baseline: a wrong baseline would zero the budget.
+		isRollback, err = c.isRollback()
 		if err != nil {
 			return nil, nil, nil, err
 		}
 	}
 
-	isRollback := targetVersion == baselineVersion
-
 	pvpc := 0
-	if c.cluster.Spec.Upgrade != nil && !isRollback {
+	if !isRollback && c.cluster.Spec.Upgrade != nil {
 		pvpc = c.cluster.Spec.Upgrade.PreviousVersionPodCount
 	}
 

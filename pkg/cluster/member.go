@@ -352,16 +352,13 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 		return err
 	}
 
-	// check if we already know about this SHA256
-	// update the digest map
+	// Name a digest image from the version the server reports, caching it if new.
 	serverImage := c.cluster.Spec.ServerClassCouchbaseImage(&serverSpec)
 	newVersion, updated := couchbaseutil.UpdateImageDigestMap(serverImage, info.Version)
-	// check the member version, if it's different then update EVERYTHING.
-	if newVersion != "" {
-		if err := c.updateMemberVersion(newMember, newVersion); err != nil {
-			log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
-			return err
-		}
+	// "" for a tag image; updateMemberVersion skips a version it cannot name.
+	if err := c.updateMemberVersion(newMember, newVersion); err != nil {
+		log.V(2).Info("failed to update member version label", "name", newMember.Name(), "version", info.Version, "cluster", c.namespacedName())
+		return err
 	}
 
 	// Offer it to the baseline, which only takes it when there are no members yet.

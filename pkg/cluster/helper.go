@@ -239,6 +239,17 @@ func (c *Cluster) GetRunningImageForVersion(version string) string {
 	return ""
 }
 
+// membersAllNamed reports whether every member's version is known; empty is skipped.
+func (c *Cluster) membersAllNamed() bool {
+	for _, member := range c.members {
+		if version := member.Version(); version != "" && !couchbaseutil.VersionKnown(version) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (c *Cluster) GetLowestMemberVersion() string {
 	versions := c.GetRunningVersions()
 

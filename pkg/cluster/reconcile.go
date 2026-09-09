@@ -176,11 +176,11 @@ func (c *Cluster) reconcile() error {
 	// These should not use c.members, preferring c.callableMembers to avoid
 	// log spam until the cluster is repaired.
 	preTopologyReconcilers := reconcileFuncList{
+		(*Cluster).reconcilePodServerVersions,
 		(*Cluster).reconcileVersionBaseline,
 		(*Cluster).reconcilePersistentStatus,
 		(*Cluster).reconcileAdminPassword,
 		(*Cluster).reconcileTLSPreTopologyChange,
-		(*Cluster).reconcilePodServerVersions,
 	}
 
 	if err := preTopologyReconcilers.run(c); err != nil {
