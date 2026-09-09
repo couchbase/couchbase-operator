@@ -125,7 +125,8 @@ func (c *Cluster) GetRunningVersions() []*couchbaseutil.Version {
 	versions := []*couchbaseutil.Version{}
 
 	for _, member := range c.members {
-		if member.Version() == "" || member.Version() == "unknown" {
+		// Better left out than guessed at.
+		if !couchbaseutil.VersionKnown(member.Version()) {
 			continue
 		}
 

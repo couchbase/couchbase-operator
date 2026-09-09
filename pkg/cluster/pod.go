@@ -508,7 +508,7 @@ func (c *Cluster) reconcilePodServerVersions() error {
 		if newVersion, updated := couchbaseutil.UpdateImageDigestMap(image, cbversion); newVersion != "" && updated {
 			log.V(2).Info("found server version", "version", cbversion, "image", image, "cluster", c.namespacedName())
 
-			err := c.updatePersistenceVersion(newVersion)
+			err := c.updateVersionBaseline(newVersion)
 
 			if err != nil {
 				return err
@@ -519,14 +519,40 @@ func (c *Cluster) reconcilePodServerVersions() error {
 	return nil
 }
 
-// Only update persistence version if
-// we aren't upgrading, since the status is used
-// for rollback recovery.
-func (c *Cluster) updatePersistenceVersion(version string) error {
-	upgrading, _ := c.isUpgrading()
-	if upgrading {
+// reconcileVersionBaseline runs first in preTopology, before anything reads the baseline.
+func (c *Cluster) reconcileVersionBaseline() error {
+	return c.updateVersionBaseline("")
+}
+
+// updateVersionBaseline owns the baseline. Running members decide it, so a
+// previousVersionPodCount hold keeps it on the old version; learned covers creation, before
+// there are members. Frozen while upgrading, so isRollback keeps something to compare.
+func (c *Cluster) updateVersionBaseline(learned string) error {
+	if upgrading, _ := c.isUpgrading(); upgrading {
 		return nil
 	}
 
-	return c.state.Update(persistence.Version, version)
+	version := c.GetLowestMemberVersion()
+	if version == "" {
+		version = learned
+	}
+
+	return c.setClusterVersion(version)
+}
+
+// setClusterVersion writes the durable baseline. Upsert because Update rejects a missing key
+// and apply() eats that.
+func (c *Cluster) setClusterVersion(version string) error {
+	// Stores only a version we can name, as updateMemberVersion and UpdateImageDigestMap do.
+	if !couchbaseutil.VersionKnown(version) {
+		return nil
+	}
+
+	// Called every cycle and a Secret write is an API call, so compare first. An errored
+	// read falls through to the write, which is how an absent key repairs itself.
+	if current, err := c.state.Get(persistence.Version); err != nil || current != version {
+		return c.state.Upsert(persistence.Version, version)
+	}
+
+	return nil
 }

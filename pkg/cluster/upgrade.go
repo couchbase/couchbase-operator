@@ -813,14 +813,9 @@ func (c *Cluster) reportUpgradeComplete() error {
 		return err
 	}
 
-	// If we're not upgrading, let's ensure the version is set to the lowest member version.
+	// Steady state, and the baseline is not ours to write.
 	if !upgrading {
-		lowestImageVer := c.GetLowestMemberVersion()
-		if lowestImageVer == "" {
-			return nil
-		}
-
-		return c.state.Update(persistence.Version, lowestImageVer)
+		return nil
 	}
 
 	// Check to see if there are any more upgrade candidates.
@@ -837,9 +832,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	// Upgrade has completed, raise and event, remove the cluster condition
 	// update the current cluster version and clear the upgrading flag in
 	// persistent storage.
-	lowestImageVer := c.GetLowestMemberVersion()
-
-	if err := c.state.Update(persistence.Version, lowestImageVer); err != nil {
+	if err := c.setClusterVersion(c.GetLowestMemberVersion()); err != nil {
 		return err
 	}
 

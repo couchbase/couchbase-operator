@@ -51,7 +51,7 @@ func UpdateImageDigestMap(image string, poolsVersion string) (string, bool) {
 	// If we don't have a version from the pools, try to find it in the env config map, otherwise trust the user provided version but don't add it to the digest map.
 	if poolsVersion == "" {
 		poolsVersion = GetVersionFromEnvConfigMap(version)
-		if poolsVersion == "" || poolsVersion == "9.9.9" {
+		if !VersionKnown(poolsVersion) {
 			log.Info("Unable to find version for image", "image", image)
 			return poolsVersion, false
 		}

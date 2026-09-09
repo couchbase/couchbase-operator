@@ -364,13 +364,11 @@ func (c *Cluster) initMember(ctx context.Context, newMember couchbaseutil.Member
 		}
 	}
 
-	// update state with the actual version IF we aren't upgrading.
-	// i.e this is a new cluster. We don't want to change versions until we're finished
-	// upgrading.
+	// Offer it to the baseline, which only takes it when there are no members yet.
 	if updated {
 		log.V(2).Info("discovered new SHA256 ", "image", serverImage, "version", info.Version, "cluster", c.namespacedName())
 
-		if err := c.updatePersistenceVersion(newVersion); err != nil {
+		if err := c.updateVersionBaseline(newVersion); err != nil {
 			log.V(2).Info("failed to update version in state", "version", info.Version, "cluster", c.namespacedName())
 
 			return err

@@ -5045,7 +5045,7 @@ func checkImmutableImage(current, updated *couchbasev2.CouchbaseCluster) error {
 	isMigrating := current.HasCondition(couchbasev2.ClusterConditionMigrating)
 
 	if !isUpgrading && !isMigrating && fullyUpgraded {
-		if updatedVersion == "9.9.9" {
+		if !couchbaseutil.VersionKnown(updatedVersion) {
 			// we have no idea what this is so we trust the user
 			return nil
 		}
@@ -5067,7 +5067,7 @@ func isFullyUpgraded(c *couchbasev2.CouchbaseCluster) (bool, error) {
 		return false, err
 	}
 
-	if imageVersion == "9.9.9" {
+	if !couchbaseutil.VersionKnown(imageVersion) {
 		// we have no idea what this is so we trust the user
 		return true, nil
 	}
@@ -5396,7 +5396,7 @@ func checkClusterVersionUpgradePath(prev, curr *couchbasev2.CouchbaseCluster) er
 		return err
 	}
 
-	if oldVersion == "9.9.9" && prev.Status.CurrentVersion != "" {
+	if !couchbaseutil.VersionKnown(oldVersion) && prev.Status.CurrentVersion != "" {
 		// since we aren't upgrading the status should be what is actually running.
 		oldVersion = prev.Status.CurrentVersion
 	}

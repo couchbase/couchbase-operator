@@ -91,6 +91,16 @@ func IsSHA256Version(version string) bool {
 	return len(matches) != 0
 }
 
+// UnknownVersion is what we return for a digest we cannot put a name to. Deliberately higher
+// than any real release: an image we failed to identify should not turn features off.
+const UnknownVersion = "9.9.9"
+
+// VersionKnown reports whether v is a real version rather than one of our ways of saying
+// we do not know.
+func VersionKnown(v string) bool {
+	return v != "" && v != "unknown" && v != UnknownVersion
+}
+
 // Get readable version from sha256.
 func GetSHA256Version(version string) string {
 	if v, ok := constants.ImageDigests[version]; ok {
@@ -104,7 +114,7 @@ func GetSHA256Version(version string) string {
 
 	// Trusting user provided a valid version since we don't
 	// know what version the digest maps to
-	return "9.9.9"
+	return UnknownVersion
 }
 
 func GetVersionFromEnvConfigMap(version string) string {
@@ -118,7 +128,7 @@ func GetVersionFromEnvConfigMap(version string) string {
 		}
 	}
 
-	return "9.9.9"
+	return UnknownVersion
 }
 
 // Return the full version string.
