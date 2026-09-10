@@ -6587,6 +6587,9 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 			expectedErrors: []string{"encryption key auto-generated-key-1 does not have bucket usage enabled"},
 		},
 		{
+			// A bucket referencing a key that doesn't exist yet is a legitimate
+			// ordering when applying resources together, so it is a warning and a
+			// hold rather than a rejection (see validateEncryptionKeysUsedOnBuckets).
 			name: "TestEncryptionAtRestKeyWithNonexistentKey",
 			mutations: patchMap{
 				"cluster1": jsonpatch.NewPatchSet().Add("/spec/security/encryptionAtRest", &couchbasev2.EncryptionAtRestSpec{
@@ -6596,8 +6599,8 @@ func TestValidationEncryptionAtRest(t *testing.T) {
 					KeyName: "non-existent-key",
 				}),
 			},
-			shouldFail:     true,
-			expectedErrors: []string{"encryption key non-existent-key does not exist"},
+			shouldFail:       false,
+			expectedWarnings: []string{"encryption key non-existent-key used by couchbasebuckets.couchbase.com/bucket1 does not exist"},
 		},
 		{
 			name: "TestBucketEncryptionAtRestRotationIntervalTooShort",
