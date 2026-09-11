@@ -518,7 +518,7 @@ func (c *Cluster) reconcileVersionBaseline() error {
 // updateVersionBaseline sets the baseline to the lowest member version, or learned before
 // there are members.
 func (c *Cluster) updateVersionBaseline(learned string) error {
-	version := c.GetLowestMemberVersion()
+	version := c.GetLowestKnownMemberVersion()
 	if version == "" {
 		version = learned
 	}
@@ -535,7 +535,7 @@ func (c *Cluster) setClusterVersion(version string) error {
 
 	// Moving the baseline, or recreating a missing key: hold while any member is unnamed, it may be the oldest.
 	if current, err := c.state.Get(persistence.Version); err != nil || current != version {
-		if !c.membersAllNamed() {
+		if !c.allMemberVersionsKnown() {
 			log.Info("Holding the cluster version: a member's version cannot be resolved",
 				"cluster", c.namespacedName(), "holding", current, "wanted", version)
 

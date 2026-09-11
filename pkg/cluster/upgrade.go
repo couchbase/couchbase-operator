@@ -577,7 +577,7 @@ func (c *Cluster) isRollback() (bool, error) {
 		return false, err
 	}
 
-	return rollbackDetected(targetVersion, baselineVersion, c.GetHighestMemberVersion()), nil
+	return rollbackDetected(targetVersion, baselineVersion, c.GetHighestKnownMemberVersion()), nil
 }
 
 // nolint:gocognit,gocyclo
@@ -822,7 +822,7 @@ func (c *Cluster) reportUpgrade(status *couchbasev2.UpgradeStatus) error {
 }
 
 func (c *Cluster) reportMixedMode() error {
-	if c.GetLowestMemberVersion() != c.GetHighestMemberVersion() {
+	if c.GetLowestKnownMemberVersion() != c.GetHighestKnownMemberVersion() {
 		c.cluster.Status.SetMixedModeCondition()
 	} else {
 		c.cluster.Status.ClearCondition(couchbasev2.ClusterConditionMixedMode)
@@ -859,7 +859,7 @@ func (c *Cluster) reportUpgradeComplete() error {
 	// Upgrade has completed, raise and event, remove the cluster condition
 	// update the current cluster version and clear the upgrading flag in
 	// persistent storage.
-	if err := c.setClusterVersion(c.GetLowestMemberVersion()); err != nil {
+	if err := c.setClusterVersion(c.GetLowestKnownMemberVersion()); err != nil {
 		return err
 	}
 
@@ -972,7 +972,7 @@ func (c *Cluster) applyPreviousVersionToNewPods(additions []couchbasev2.ServerCo
 	// If that fails, we'll fallback to a check on lowest vs highest active member versions.
 	if clusterCompatLe, err := c.CheckClusterCompatVersion(baselineVersion, false); err == nil && !clusterCompatLe {
 		return errors.ErrClusterNoLongerCompatible
-	} else if err != nil && c.GetLowestMemberVersion() == c.GetHighestMemberVersion() {
+	} else if err != nil && c.GetLowestKnownMemberVersion() == c.GetHighestKnownMemberVersion() {
 		return nil
 	}
 
