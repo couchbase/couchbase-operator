@@ -1760,9 +1760,11 @@ func (r *ReconcileMachine) handleInPlaceUpgrade(c *Cluster, candidates couchbase
 				return err
 			} else if pvcState != nil {
 				for _, volume := range pvcState.List() {
-					// Use candidate's version/image (set by getUpgradeCandidates)
+					// Use the candidate's image; its version may still be the sentinel.
 					volume.Annotations[constants.PVCImageAnnotation] = candidate.GetImage()
-					volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
+					if couchbaseutil.VersionKnown(candidate.Version()) {
+						volume.Annotations[constants.CouchbaseVersionAnnotationKey] = candidate.Version()
+					}
 					_, err := c.k8s.KubeClient.CoreV1().PersistentVolumeClaims(c.cluster.Namespace).Update(c.ctx, volume, metav1.UpdateOptions{})
 
 					if err != nil {

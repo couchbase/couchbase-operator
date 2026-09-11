@@ -597,10 +597,14 @@ func generatePVC(cluster *couchbasev2.CouchbaseCluster, member couchbaseutil.Mem
 	}
 
 	annotations := map[string]string{
-		constants.AnnotationVolumeMountPath:     mount.mountPath,
-		constants.AnnotationVolumeNodeConf:      config.Name,
-		constants.CouchbaseVersionAnnotationKey: version,
-		constants.PVCImageAnnotation:            cbImage,
+		constants.AnnotationVolumeMountPath: mount.mountPath,
+		constants.AnnotationVolumeNodeConf:  config.Name,
+		constants.PVCImageAnnotation:        cbImage,
+	}
+
+	// Omit an unknown version; the image annotation still records what wrote the volume.
+	if couchbaseutil.VersionKnown(version) {
+		annotations[constants.CouchbaseVersionAnnotationKey] = version
 	}
 
 	// Merge our labels/annotations on top of any user defined ones.  We take
@@ -1000,7 +1004,11 @@ func MaintainMutablePodConfiguration(actual, requested *v1.Pod) {
 	// subsequent pod changes can be detected by the topology reconciler.  Not
 	// doing this means that upgrades won't happen as they should.
 	newAnnotations[constants.PodSpecAnnotation] = actual.Annotations[constants.PodSpecAnnotation]
-	newAnnotations[constants.CouchbaseVersionAnnotationKey] = actual.Annotations[constants.CouchbaseVersionAnnotationKey]
+
+	// Copy only if set, so a missing value isn't copied as empty.
+	if version, ok := actual.Annotations[constants.CouchbaseVersionAnnotationKey]; ok {
+		newAnnotations[constants.CouchbaseVersionAnnotationKey] = version
+	}
 
 	// Now use the copy as the version to set
 	requested.Annotations = newAnnotations
@@ -2427,11 +2435,8 @@ func PVCToMemberset(client *client.Client, cluster, namespace string, secure boo
 			continue
 		}
 
-		version, ok := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
-		if !ok {
-			// BUG: tell me why you are ignoring it in the logs!
-			continue
-		}
+		// A missing version annotation is normal; keep the member.
+		version := pvc.Annotations[constants.CouchbaseVersionAnnotationKey]
 
 		// Extract the image from PVC annotation
 		image := ""
@@ -2487,7 +2492,8 @@ func CheckIfPodIsRecoverable(client *client.Client, config couchbasev2.ServerCon
 		if err != nil {
 			return err
 		}
-		if targetVersion != nil && pvc.Annotations[constants.CouchbaseVersionAnnotationKey] != "" {
+		// VersionKnown, not != "": older operators wrote 9.9.9, which looks newer than any release.
+		if targetVersion != nil && couchbaseutil.VersionKnown(pvc.Annotations[constants.CouchbaseVersionAnnotationKey]) {
 			pvcServerVersion, err := couchbaseutil.NewVersion(pvc.Annotations[constants.CouchbaseVersionAnnotationKey])
 			if err != nil {
 				return err

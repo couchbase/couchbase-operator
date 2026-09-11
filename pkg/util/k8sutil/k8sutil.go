@@ -64,6 +64,11 @@ func SetCouchbaseVersionAndImage(pod *v1.Pod, image string) error {
 		return err
 	}
 
+	// Leave the annotation absent when the version is unknown.
+	if !couchbaseutil.VersionKnown(version) {
+		return nil
+	}
+
 	pod.Annotations[constants.CouchbaseVersionAnnotationKey] = version
 
 	return nil

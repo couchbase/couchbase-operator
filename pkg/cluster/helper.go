@@ -239,10 +239,14 @@ func (c *Cluster) GetRunningImageForVersion(version string) string {
 	return ""
 }
 
-// allMemberVersionsKnown reports whether every member's version is known; empty is skipped.
+// allMemberVersionsKnown reports whether every non-external member's version is known.
 func (c *Cluster) allMemberVersionsKnown() bool {
 	for _, member := range c.members {
-		if version := member.Version(); version != "" && !couchbaseutil.VersionKnown(version) {
+		if member.IsExternal() {
+			continue
+		}
+
+		if !couchbaseutil.VersionKnown(member.Version()) {
 			return false
 		}
 	}
