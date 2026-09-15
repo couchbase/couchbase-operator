@@ -284,10 +284,6 @@ func (m *memberImpl) Config() string {
 }
 
 func (m *memberImpl) Version() string {
-	if m.version == "" {
-		return "unknown"
-	}
-
 	return m.version
 }
 
@@ -660,7 +656,7 @@ func (m *externamMemberImpl) GetImage() string {
 }
 
 func (m *externamMemberImpl) Version() string {
-	return "unknown"
+	return ""
 }
 
 func (m *externamMemberImpl) Clone() Member {

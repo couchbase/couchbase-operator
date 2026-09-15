@@ -95,10 +95,9 @@ func IsSHA256Version(version string) bool {
 // than any real release: an image we failed to identify should not turn features off.
 const UnknownVersion = "9.9.9"
 
-// VersionKnown reports whether v is a real version rather than one of our ways of saying
-// we do not know.
+// VersionKnown reports whether v is a real version, not empty or UnknownVersion.
 func VersionKnown(v string) bool {
-	return v != "" && v != "unknown" && v != UnknownVersion
+	return v != "" && v != UnknownVersion
 }
 
 // Get readable version from sha256.
